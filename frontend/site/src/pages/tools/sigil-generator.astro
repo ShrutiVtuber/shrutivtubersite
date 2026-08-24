@@ -1,0 +1,261 @@
+---
+/* Sigil generator — `templates/sigil-generator/`.
+ *
+ * RUNS ENTIRELY IN THE BROWSER, for a reason a practitioner will recognise
+ * rather than a technical one: many hold a statement of intent is spent once
+ * drawn. It never reaches a server, it is never put in the URL, and it is
+ * never written into the exported file's metadata.
+ *
+ * EVERY STEP OF THE REDUCTION IS SHOWN. A sigil you cannot reconstruct is one
+ * you have to take somebody's word for.
+ *
+ * The geometry is deterministic: the same letters give the same figure on any
+ * machine, at any time.
+ */
+import ToolLayout from "../../layouts/ToolLayout.astro";
+
+const q = Astro.url.searchParams;
+/* The LETTER SET may travel in a link; the statement never does. */
+const letters = (q.get("letters") ?? "").toUpperCase().replace(/[^A-Z]/g, "");
+const weight = q.get("weight") ?? "hairline";
+const enclosure = q.get("enclosure") ?? "none";
+const keepVowels = q.get("vowels") === "keep";
+---
+
+<ToolLayout
+  title="Sigil generator"
+  description="Intent, reduced and drawn. Every step of the reduction is shown, and the figure is the same every time for the same letters."
+  glyph="●"
+  rule="letter collapse, after Spare"
+  ruleLabel="method"
+  disclosure="◐"
+  where="device"
+  reckoned="A statement of intent is put into capitals, stripped to letters, then reduced — vowels struck unless you keep them, then repeats struck — leaving a set of letters. Each letter has a fixed position on a circle, and the figure is the path through them in order, marked at its start and crossed at its end. Because the positions are fixed, the same letters always give the same figure."
+>
+  <div slot="parameters" class="params">
+    <form class="sigil-form" method="GET" data-sigil-form>
+      <fieldset class="options">
+        <legend class="t-eyebrow">Method</legend>
+        <label class="opt">
+          <input type="checkbox" name="vowels" value="keep" checked={keepVowels} data-opt="vowels" />
+          <span>Keep vowels</span>
+        </label>
+        <label class="sel">
+          <span class="lbl">Line</span>
+          <select name="weight" data-opt="weight">
+            <option value="hairline" selected={weight === "hairline"}>Hairline</option>
+            <option value="broad-pen" selected={weight === "broad-pen"}>Broad pen</option>
+            <option value="engraved" selected={weight === "engraved"}>Engraved</option>
+          </select>
+        </label>
+        <label class="sel">
+          <span class="lbl">Enclosure</span>
+          <select name="enclosure" data-opt="enclosure">
+            <option value="none" selected={enclosure === "none"}>None</option>
+            <option value="circle" selected={enclosure === "circle"}>Circle</option>
+            <option value="vesica" selected={enclosure === "vesica"}>Vesica</option>
+          </select>
+        </label>
+      </fieldset>
+    </form>
+  </div>
+
+  <section class="entry">
+    <label class="entry-label" for="sigil-input">Statement of intent</label>
+    <textarea
+      id="sigil-input"
+      rows="2"
+      placeholder="My will is to finish the work"
+      data-sigil-input
+      value={letters ? "" : ""}
+    ></textarea>
+    <p class="never-leaves">
+      <span class="t-glyph" aria-hidden="true">○</span> nothing typed here leaves your device — the
+      statement is not sent, not put in the link, and not written into the file you export
+    </p>
+    {
+      letters && (
+        <p class="from-link">
+          This link carried the letter set <strong class="t-tabular">{letters}</strong>, not the
+          statement it came from.
+        </p>
+      )
+    }
+  </section>
+
+  <section class="steps" data-sigil-steps hidden></section>
+  <section class="figure" data-sigil-figure hidden></section>
+
+  <noscript>
+    <p class="noscript">
+      This instrument draws in the browser so that the statement is never transmitted. With
+      scripting off there is nothing to send it to, so it cannot draw — which is the same privacy
+      property from the other side. The method is written out under “How it is reckoned”, and it
+      works perfectly well with a pen.
+    </p>
+  </noscript>
+
+  <p slot="aside" class="convenience">
+    The tool is a convenience, never a requirement. Every step is shown so the same figure can be
+    drawn by hand, and a sigil drawn by hand is not a lesser one.
+  </p>
+</ToolLayout>
+
+<style>
+  .params { display: grid; gap: var(--space-3); }
+  .options { border: 0; margin: 0; padding: 0; display: flex; gap: var(--space-4); flex-wrap: wrap; align-items: end; }
+  .options legend { padding: 0; margin-bottom: 10px; }
+  .opt { display: flex; gap: 8px; align-items: center; font: 400 var(--text-sm) var(--font-body); color: var(--ink); min-height: 40px; }
+  .opt input { accent-color: var(--accent); }
+  .sel { display: grid; gap: 4px; }
+  .lbl { font: 600 var(--text-micro) var(--font-body); letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; color: var(--ink-faint); }
+  .sel select {
+    font: 400 var(--text-sm) var(--font-body); color: var(--ink); background: var(--surface-page);
+    border: var(--border-w) solid var(--line); border-radius: var(--radius-sm); padding: 8px 10px; min-height: 40px;
+  }
+
+  .entry { display: grid; gap: 8px; }
+  .entry-label { font: 600 var(--text-micro) var(--font-body); letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; color: var(--ink-faint); }
+  .entry textarea {
+    font: 400 var(--text-h4) var(--font-display); color: var(--ink); background: var(--surface-card);
+    border: var(--border-w) solid var(--line); border-radius: var(--radius-sm); padding: 12px 14px;
+    width: 100%; box-sizing: border-box; resize: vertical;
+  }
+  .entry textarea:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; border-color: var(--accent); }
+  .never-leaves { font: 400 var(--text-xs) var(--font-mono); color: var(--ink-faint); margin: 0; }
+  .never-leaves .t-glyph { color: var(--accent); }
+  .from-link { font: 400 var(--text-xs) var(--font-mono); color: var(--ink-soft); margin: 0; }
+  .noscript { font: 400 var(--text-sm) / 1.7 var(--font-body); color: var(--ink-soft); max-width: 62ch; }
+  .convenience { font: 400 var(--text-sm) / 1.7 var(--font-body); color: var(--ink-soft); margin: 0; }
+</style>
+
+<style is:global>
+  .sig-step { display: grid; grid-template-columns: 130px 1fr; gap: 10px 16px; padding: 10px 0; border-bottom: var(--border-w) solid var(--line); align-items: baseline; }
+  .sig-step dt { font: 600 var(--text-micro) var(--font-body); letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; color: var(--ink-faint); }
+  .sig-step dd { margin: 0; font: 400 var(--text-body) var(--font-mono); color: var(--ink); word-break: break-all; }
+  .sig-struck { color: var(--ink-faint); text-decoration: line-through; }
+  .sig-figure-frame { max-width: 420px; color: var(--ink); margin: 0 0 var(--space-3); }
+  .sig-figure-frame svg { width: 100%; height: auto; }
+  .sig-actions { display: flex; gap: var(--space-3); flex-wrap: wrap; }
+  .sig-actions button, .sig-actions a {
+    appearance: none; min-height: 40px; padding: 0 14px; display: inline-flex; align-items: center;
+    font: 600 var(--text-sm) var(--font-body); color: var(--ink); background: transparent;
+    border: var(--border-w) solid var(--line-strong); border-radius: var(--radius-sm);
+    cursor: pointer; text-decoration: none;
+  }
+  .sig-actions button:hover, .sig-actions a:hover { border-color: var(--accent); color: var(--accent); }
+  .sig-cc {
+    background: var(--surface-card); border: var(--border-w) solid var(--line);
+    border-radius: var(--radius-md); box-shadow: var(--shadow-1); padding: var(--space-4); display: grid; gap: 10px;
+  }
+  .sig-cc .mark { font: 600 var(--text-micro) var(--font-body); letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; color: var(--rose); margin: 0; }
+  .sig-cc h3 { font: 600 var(--text-h3) var(--font-display); color: var(--ink); margin: 0; }
+  .sig-cc p { font: 400 1.0625rem / 1.7 var(--font-display); color: var(--ink); margin: 0; max-width: 54ch; }
+  .sig-cc ol { margin: 6px 0 0; padding-left: 1.3em; font: 400 var(--text-sm) / 1.7 var(--font-body); color: var(--ink-soft); }
+</style>
+
+<script>
+  import { reduce, draw } from "../../lib/sigil.js";
+
+  const input = document.querySelector("[data-sigil-input]");
+  const stepsOut = document.querySelector("[data-sigil-steps]");
+  const figureOut = document.querySelector("[data-sigil-figure]");
+  const form = document.querySelector("[data-sigil-form]");
+
+  if (input && stepsOut && figureOut) {
+    const opts = () => ({
+      keepVowels: form?.querySelector('[data-opt="vowels"]')?.checked ?? false,
+      weight: form?.querySelector('[data-opt="weight"]')?.value ?? "hairline",
+      enclosure: form?.querySelector('[data-opt="enclosure"]')?.value ?? "none",
+    });
+
+    const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]);
+
+    const render = () => {
+      const text = input.value;
+      if (!text.trim()) { stepsOut.hidden = true; figureOut.hidden = true; return; }
+      const o = opts();
+      const r = reduce(text, o);
+
+      const struck = r.lettersOnly.filter((c) => !r.afterVowels.includes(c));
+      const repeats = r.afterVowels.length - r.unique.length;
+
+      stepsOut.innerHTML =
+        `<h2>The reduction</h2><dl>` +
+        `<div class="sig-step"><dt>Statement</dt><dd>${esc(r.statement)}</dd></div>` +
+        `<div class="sig-step"><dt>Upper case</dt><dd>${esc(r.upper)}</dd></div>` +
+        `<div class="sig-step"><dt>Letters only</dt><dd>${esc(r.lettersOnly.join(""))}</dd></div>` +
+        `<div class="sig-step"><dt>${o.keepVowels ? "Vowels kept" : "Vowels struck"}</dt>` +
+        `<dd>${esc(r.afterVowels.join(""))}` +
+        (struck.length ? ` <span class="sig-struck">${esc(struck.join(""))}</span>` : "") + `</dd></div>` +
+        `<div class="sig-step"><dt>Repeats struck</dt><dd>${esc(r.unique.join(""))}` +
+        (repeats > 0 ? ` <span class="sig-struck">${repeats} removed</span>` : "") + `</dd></div>` +
+        `<div class="sig-step"><dt>The letter set</dt><dd><strong>${esc(r.unique.join(" "))}</strong></dd></div>` +
+        `</dl>`;
+      stepsOut.hidden = false;
+
+      if (r.exhausted || r.tooShort) {
+        /* The reduction consumed the sentence. A real outcome with a designed
+           state — never an error, and never a figure invented to fill it. */
+        figureOut.innerHTML =
+          `<div class="sig-cc"><p class="mark">◐ Nothing left to draw</p>` +
+          `<h3>The reduction consumed the sentence</h3>` +
+          `<p>${r.exhausted
+            ? "Every letter was a vowel or a repeat, so no letters remain and there is no figure to draw. That is a fact about the sentence, not a failure of the tool."
+            : "Only one letter remains, and a single point is not a figure."}</p>` +
+          `<ol><li>Keep the vowels, using the option above — the set will be longer.</li>` +
+          `<li>Write a longer statement, or one with more distinct consonants.</li>` +
+          `<li>Draw it by hand. The tool is a convenience, never a requirement.</li></ol></div>`;
+        figureOut.hidden = false;
+        return;
+      }
+
+      const svg = draw(r.unique, { weight: o.weight, enclosure: o.enclosure, size: 512 });
+      figureOut.innerHTML =
+        `<h2>The figure</h2><div class="sig-figure-frame" data-svg>${svg}</div>` +
+        `<div class="sig-actions">` +
+        `<button type="button" data-download="svg">Download SVG</button>` +
+        `<button type="button" data-download="png">Download PNG · 2048px</button>` +
+        `<a href="?letters=${encodeURIComponent(r.unique.join(""))}&weight=${o.weight}&enclosure=${o.enclosure}${o.keepVowels ? "&vowels=keep" : ""}">Link to this figure</a>` +
+        `</div>` +
+        `<p class="never-leaves">The link carries the letter set, never the statement.</p>`;
+      figureOut.hidden = false;
+
+      figureOut.querySelectorAll("[data-download]").forEach((button) => {
+        button.addEventListener("click", () => {
+          const kind = button.getAttribute("data-download");
+          const source = draw(r.unique, { weight: o.weight, enclosure: o.enclosure, size: kind === "png" ? 2048 : 512 });
+          /* Named for the letter set, never for the statement. */
+          const name = `sigil-${r.unique.join("").toLowerCase()}`;
+          if (kind === "svg") {
+            const blob = new Blob([source], { type: "image/svg+xml" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url; a.download = `${name}.svg`; a.click();
+            URL.revokeObjectURL(url);
+            return;
+          }
+          const img = new Image();
+          const svg64 = btoa(unescape(encodeURIComponent(source.replace(/currentColor/g, "#26304A"))));
+          img.onload = () => {
+            const canvas = document.createElement("canvas");
+            canvas.width = 2048; canvas.height = 2048;
+            const ctx = canvas.getContext("2d");
+            ctx.drawImage(img, 0, 0, 2048, 2048);
+            canvas.toBlob((blob) => {
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement("a");
+              a.href = url; a.download = `${name}.png`; a.click();
+              URL.revokeObjectURL(url);
+            }, "image/png");
+          };
+          img.src = `data:image/svg+xml;base64,${svg64}`;
+        });
+      });
+    };
+
+    input.addEventListener("input", render);
+    form?.addEventListener("change", render);
+    render();
+  }
+</script>

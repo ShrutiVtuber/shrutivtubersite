@@ -1,0 +1,231 @@
+---
+/* Isopsephy — `templates/isopsephy/`.
+ *
+ * RUNS ENTIRELY IN THE BROWSER, and that is the point rather than an
+ * optimisation: letter-reckoning needs no ephemeris, so "nothing typed here
+ * leaves your device" can be literally true. What people type into a gematria
+ * box is often the thing they least want transmitted.
+ *
+ * Six systems, six tables, NO CONVERSION BETWEEN THEM. A Greek 598 and a
+ * Hebrew 598 are not a correspondence and the page says so.
+ *
+ * Devanagari is deliberately not additive. Kaṭapayādi is a place-value
+ * encoding read right to left, and no total is offered because the system does
+ * not make one. That is not a gap to be filled.
+ */
+import ToolLayout from "../../layouts/ToolLayout.astro";
+import { CIPHERS } from "../../lib/ciphers.js";
+
+const q = Astro.url.searchParams;
+const slug = Object.hasOwn(CIPHERS, q.get("cipher") ?? "") ? q.get("cipher")! : "greek-iso";
+/* The text is NOT read from the URL. A share link carries the system, never
+   what was typed. */
+const grouped: Record<string, { slug: string; name: string }[]> = {};
+for (const [s, c] of Object.entries(CIPHERS)) {
+  (grouped[c.language] ??= []).push({ slug: s, name: c.name });
+}
+const LANGUAGE_ORDER = ["greek", "hebrew", "arabic", "coptic", "sanskrit", "english"];
+const LANGUAGE_LABEL: Record<string, string> = {
+  greek: "Greek", hebrew: "Hebrew", arabic: "Arabic",
+  coptic: "Coptic", sanskrit: "Devanagari", english: "English",
+};
+const current = CIPHERS[slug];
+---
+
+<ToolLayout
+  title="Isopsephy"
+  native="Ἰσοψηφία"
+  description="Letter-reckoning in six scripts, each by its own table. Matches are only ever found inside one system."
+  glyph="Σ"
+  rule={`${LANGUAGE_LABEL[current.language]} — ${current.name}`}
+  ruleLabel="system"
+  disclosure="○"
+  where="device"
+  reckoned="Each script is summed under its own table and nothing is converted between them. Greek keeps the numeral-only letters — digamma 6, koppa 90, sampi 900 — because omitting them silently produces wrong sums for many words. Hebrew finals take ordinary values. Arabic uses abjad order, which is not alphabet order. Coptic follows the Greek scheme plus soou, fai and shai; the demotic-derived letters carry no value, which is a fact about the system rather than an omission."
+>
+  <div slot="parameters" class="params">
+    <form class="cipher-form" method="GET">
+      <fieldset>
+        <legend class="t-eyebrow">Which reckoning</legend>
+        <div class="systems">
+          {
+            LANGUAGE_ORDER.filter((l) => grouped[l]).map((lang) => (
+              <div class="sys-group">
+                <span class="sys-lang">{LANGUAGE_LABEL[lang]}</span>
+                <div class="sys-options">
+                  {
+                    grouped[lang].map((c) => (
+                      <label class="sys" data-chosen={c.slug === slug || undefined}>
+                        <input type="radio" name="cipher" value={c.slug} checked={c.slug === slug} />
+                        <span>{c.name}</span>
+                      </label>
+                    ))
+                  }
+                </div>
+              </div>
+            ))
+          }
+        </div>
+        <button type="submit" class="apply">Use this system</button>
+      </fieldset>
+    </form>
+    <p class="cite">{current.citation}</p>
+  </div>
+
+  <section class="entry">
+    <label class="entry-label" for="iso-input">Text</label>
+    <textarea
+      id="iso-input"
+      rows="3"
+      dir={current.language === "hebrew" || current.language === "arabic" ? "rtl" : "ltr"}
+      placeholder={current.language === "sanskrit" ? "भारत" : current.language === "hebrew" ? "אמת" : "Ἰησοῦς"}
+      data-iso-input
+      data-cipher={slug}
+      data-language={current.language}
+    ></textarea>
+    <p class="never-leaves">
+      <span class="t-glyph" aria-hidden="true">○</span> nothing typed here leaves your device — the
+      tables are in the page and the reckoning runs on your own machine
+    </p>
+  </section>
+
+  <section class="result" data-iso-result hidden></section>
+
+  <noscript>
+    <p class="noscript">
+      This instrument reckons in the browser so that nothing typed into it is transmitted. With
+      scripting off there is nothing to send it to, so it cannot compute — which is the same
+      privacy property, seen from the other side.
+    </p>
+  </noscript>
+
+  <p slot="aside" class="no-cross">
+    <strong>No conversion between systems.</strong> A Greek 598 and a Hebrew 598 are not a
+    correspondence; they are two different questions that happen to have the same answer. Matches
+    are only ever sought inside one system.
+  </p>
+</ToolLayout>
+
+<style>
+  .params { display: grid; gap: var(--space-3); }
+  .cipher-form fieldset { border: 0; margin: 0; padding: 0; }
+  .cipher-form legend { padding: 0; margin-bottom: 10px; }
+  .systems { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: var(--space-3); }
+  .sys-group { display: grid; gap: 6px; align-content: start; }
+  .sys-lang { font: 600 var(--text-micro) var(--font-body); letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; color: var(--ink-faint); }
+  .sys-options { display: grid; gap: 4px; }
+  .sys {
+    display: flex; gap: 8px; align-items: center; padding: 7px 10px;
+    border: var(--border-w) solid var(--line); border-radius: var(--radius-sm);
+    background: var(--surface-page); cursor: pointer;
+    font: 400 var(--text-sm) var(--font-body); color: var(--ink);
+  }
+  .sys:hover { border-color: var(--line-strong); }
+  .sys[data-chosen] { border-color: color-mix(in srgb, var(--accent) 50%, transparent); background: var(--accent-wash); }
+  .sys input { accent-color: var(--accent); }
+  .apply {
+    margin-top: 12px; appearance: none; min-height: 36px; padding: 0 14px;
+    font: 600 var(--text-xs) var(--font-body); letter-spacing: 0.04em; text-transform: uppercase;
+    color: var(--ink); background: transparent; border: var(--border-w) solid var(--line-strong);
+    border-radius: var(--radius-sm); cursor: pointer;
+  }
+  .apply:hover { border-color: var(--accent); color: var(--accent); }
+  .cite { font: 400 var(--text-xs) / 1.6 var(--font-mono); color: var(--ink-faint); margin: 0; max-width: 70ch; }
+
+  .entry { display: grid; gap: 8px; }
+  .entry-label { font: 600 var(--text-micro) var(--font-body); letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; color: var(--ink-faint); }
+  .entry textarea {
+    font: 400 var(--text-h4) var(--font-display); color: var(--ink); background: var(--surface-card);
+    border: var(--border-w) solid var(--line); border-radius: var(--radius-sm); padding: 12px 14px;
+    width: 100%; box-sizing: border-box; resize: vertical;
+  }
+  .entry textarea:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; border-color: var(--accent); }
+  .never-leaves { font: 400 var(--text-xs) var(--font-mono); color: var(--ink-faint); margin: 0; }
+  .never-leaves .t-glyph { color: var(--accent); }
+  .noscript { font: 400 var(--text-sm) / 1.7 var(--font-body); color: var(--ink-soft); max-width: 62ch; }
+  .no-cross { font: 400 var(--text-sm) / 1.7 var(--font-body); color: var(--ink-soft); margin: 0; }
+</style>
+
+<style is:global>
+  .iso-tiles { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 var(--space-4); padding: 0; list-style: none; }
+  .iso-tile {
+    display: grid; justify-items: center; gap: 2px; min-width: 40px; padding: 8px 10px;
+    border: var(--border-w) solid var(--line); border-radius: var(--radius-sm); background: var(--surface-card);
+  }
+  .iso-tile .ch { font: 400 var(--text-h4) var(--font-display); color: var(--ink); line-height: 1; }
+  .iso-tile .v { font: 400 var(--text-xs) var(--font-mono); color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+  .iso-tile[data-kind="unreckonable"] { border-style: dashed; border-color: var(--rose); }
+  .iso-tile[data-kind="unreckonable"] .v { color: var(--rose); }
+  .iso-tile[data-kind="cluster"] { opacity: 0.5; }
+  .iso-tile[data-kind="space"] { border: 0; background: none; min-width: 12px; }
+  .iso-total { display: flex; gap: 14px; align-items: baseline; flex-wrap: wrap; margin: 0 0 8px; }
+  .iso-total .n { font: 500 clamp(2rem, 6vw, 3rem) var(--font-mono); color: var(--ink); line-height: 1; font-variant-numeric: tabular-nums; }
+  .iso-total .lbl { font: 600 var(--text-micro) var(--font-body); letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; color: var(--ink-faint); }
+  .iso-note { font: 400 var(--text-sm) / 1.7 var(--font-body); color: var(--ink-soft); margin: 0 0 8px; max-width: 62ch; }
+  .iso-partial { color: var(--rose); }
+  .iso-rule { font: 400 var(--text-sm) var(--font-display); color: var(--ink-soft); margin: 8px 0 0; }
+</style>
+
+<script>
+  import { reckonAny, isKatapayadi, RTL } from "../../lib/isopsephy.js";
+
+  const input = document.querySelector("[data-iso-input]");
+  const out = document.querySelector("[data-iso-result]");
+  if (input && out) {
+    const slug = input.getAttribute("data-cipher");
+    const language = input.getAttribute("data-language");
+
+    const esc = (s) =>
+      String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+
+    const tile = (t) => {
+      if (t.kind === "space") return `<li class="iso-tile" data-kind="space"></li>`;
+      const value =
+        t.kind === "unreckonable" ? "—"
+        : t.kind === "cluster" ? "·"
+        : t.kind === "matra" || t.kind === "virama" ? ""
+        : String(t.value);
+      return `<li class="iso-tile" data-kind="${t.kind}"><span class="ch">${esc(t.ch)}</span><span class="v">${value}</span></li>`;
+    };
+
+    const render = () => {
+      const text = input.value;
+      if (!text.trim()) { out.hidden = true; out.innerHTML = ""; return; }
+      const r = reckonAny(text, slug);
+      if (!r) { out.hidden = true; return; }
+
+      const tiles = `<ul class="iso-tiles" dir="${RTL.has(language) ? "rtl" : "ltr"}">${r.tiles.map(tile).join("")}</ul>`;
+
+      let head;
+      if (r.kind === "place-value") {
+        /* No total, and the reason is stated rather than left as an absence. */
+        head =
+          `<p class="iso-total"><span class="n">${esc(r.assembled || "—")}</span>` +
+          `<span class="lbl">assembled number</span></p>` +
+          `<p class="iso-note">Kaṭapayādi is a <strong>place-value encoding, not a sum</strong>. ` +
+          `Only the last consonant of a cluster counts, standalone vowels are zero, and the digits ` +
+          `are read right to left — <em lang="sa">aṅkānāṁ vāmato gatiḥ</em>. ` +
+          `No total is offered because the system does not make one.</p>` +
+          `<p class="iso-rule" lang="sa">अङ्कानां वामतो गतिः</p>`;
+      } else {
+        head =
+          `<p class="iso-total"><span class="n">${r.total}</span><span class="lbl">total</span>` +
+          `<span class="lbl">reduces to ${r.reduction.final}</span></p>`;
+      }
+
+      const partial = r.partial
+        ? `<p class="iso-note iso-partial"><span aria-hidden="true">◐</span> Partly reckonable — ` +
+          `${r.unreckonable.map((c) => `<strong>${esc(c)}</strong>`).join(", ")} ` +
+          `${r.unreckonable.length === 1 ? "is" : "are"} outside this system, so ` +
+          `${r.unreckonable.length === 1 ? "it is" : "they are"} marked with a dash and excluded. ` +
+          `Not zero — outside. Which letter was meant is a decision for you, not for the tool.</p>`
+        : "";
+
+      out.innerHTML = head + partial + tiles;
+      out.hidden = false;
+    };
+
+    input.addEventListener("input", render);
+    render();
+  }
+</script>
