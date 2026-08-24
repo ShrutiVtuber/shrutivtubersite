@@ -67,6 +67,34 @@ class Settings(BaseSettings):
 
     max_upload_mb: int = 25
 
+    # ── Stripe ──────────────────────────────────────────────────────────
+    #
+    # Subscriptions and one-off gifts. As with R2, a half-configured Stripe
+    # degrades to the page's honest absent state rather than to a button that
+    # fails at the moment someone tries to give money — which is the single
+    # worst moment for anything on this site to break.
+    #
+    # Card details never reach this server: payment happens on Stripe's hosted
+    # Checkout, and managing or cancelling a subscription happens on Stripe's
+    # hosted Customer Portal. That is not laziness — it keeps the site outside
+    # PCI scope entirely, and the Portal IS the one-click cancellation.
+    stripe_secret_key: str = ""
+    stripe_publishable_key: str = ""
+    # Signs the webhook. Without it every webhook is refused, because an
+    # unverified webhook is an open endpoint for inventing subscriptions.
+    stripe_webhook_secret: str = ""
+    # Price IDs from the Stripe dashboard. Kept in configuration rather than
+    # in code so a price can change without a deploy — and the page reads the
+    # amount back FROM Stripe, so what is displayed is always what will be
+    # charged.
+    stripe_price_lamplighter: str = ""
+    stripe_price_almanac: str = ""
+
+    @property
+    def stripe_enabled(self) -> bool:
+        """Checkout needs a key. Subscriptions additionally need a price."""
+        return bool(self.stripe_secret_key)
+
     @property
     def is_production(self) -> bool:
         return self.env.lower() in {"production", "prod"}

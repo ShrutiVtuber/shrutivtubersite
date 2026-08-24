@@ -1,0 +1,65 @@
+---
+/* After Stripe.
+ *
+ * Stripe has already told them the payment worked; saying it again is not the
+ * job. The job is the two things Stripe cannot say: that the money goes to a
+ * specific bench, and where the cancel button lives — because the moment
+ * somebody has just started a subscription is the moment they most want to
+ * know they can stop it without a fight.
+ *
+ * The session id in the URL is deliberately NOT trusted or looked up. Stripe's
+ * webhook is the record; a page that read its state from a query parameter
+ * would be a page anyone could make say "thank you".
+ */
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import SectionHeader from "../../components/brand/SectionHeader.astro";
+import Button from "../../components/forms/Button.astro";
+import { account } from "../../lib/account";
+
+const me = await account(Astro);
+---
+
+<BaseLayout title="Thank you — Shruti" description="Your support keeps the bench lit." noindex>
+  <div class="page thanks">
+    <SectionHeader
+      as="h1" glyph="♄" eyebrow="Support" title="Thank you"
+      body="That goes to the ephemeris server, art commissions, and the hours the software takes. It is not a small thing and I know it."
+    />
+
+    <div class="card">
+      <h2>If it was monthly</h2>
+      <p>
+        {
+          me
+            ? "It is on your account. You can change or cancel it there in one click — it stops at the end of the month you have already paid for, not the moment you press it, and no message to me is needed."
+            : "You can manage or cancel it any time from Stripe's own receipt email, which links to the same portal. Make an account with the address you paid with and it will appear there too."
+        }
+      </p>
+      <div class="row">
+        {me
+          ? <Button href="/account">Your account</Button>
+          : <Button href="/signup">Make an account</Button>}
+        <Button variant="ghost" href="/">Back to the site</Button>
+      </div>
+    </div>
+
+    <p class="quiet">
+      A receipt is on its way from Stripe. If your name is to be read on stream, it is the one you
+      gave them — tell me on <a href="/contact">the contact page</a> if it should be something else.
+    </p>
+  </div>
+</BaseLayout>
+
+<style>
+  .thanks { max-width: 680px; display: grid; gap: var(--space-5); }
+  .card {
+    background: var(--surface-card); border: var(--border-w) solid var(--line);
+    border-radius: var(--radius-md); box-shadow: var(--shadow-1);
+    padding: var(--space-5); display: grid; gap: var(--space-3);
+  }
+  .card h2 { font: 600 var(--text-h3) var(--font-display); color: var(--ink); margin: 0; }
+  .card p { font: 400 var(--text-body) / var(--leading-body) var(--font-body); color: var(--ink-soft); margin: 0; }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  .quiet { font: 400 var(--text-sm) / 1.7 var(--font-body); color: var(--ink-faint); margin: 0; max-width: 62ch; }
+  .quiet a { color: var(--accent); }
+</style>

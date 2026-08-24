@@ -263,3 +263,38 @@ class Passkey(TimestampMixin, table=True):
     # So a person can tell one key from another when removing it.
     label: str = ""
     last_used_at: Optional[datetime] = Field(default=None, sa_type=UTC_TS)
+
+
+class Supporter(TimestampMixin, table=True):
+    """
+    Someone who has given money — once, or every month.
+
+    **Not a copy of Stripe's data.** Stripe is the ledger; this table is the
+    minimum needed to answer two questions without a round trip on every page
+    load: does this person have an active subscription, and which customer are
+    they in Stripe. Anything else — invoices, cards, amounts — is looked up
+    live or not at all, because a stale copy of a billing record is worse than
+    no copy.
+
+    `user_id` is nullable on purpose. A one-off gift needs no account, and
+    requiring one to give someone money would lose most of the gifts.
+    """
+
+    __tablename__ = "supporter"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: Optional[int] = Field(default=None, foreign_key="site_user.id", index=True)
+    email: str = Field(default="", index=True)
+
+    stripe_customer_id: str = Field(default="", index=True)
+    stripe_subscription_id: str = Field(default="", index=True)
+
+    # Stripe's own vocabulary, kept verbatim: active, trialing, past_due,
+    # canceled, incomplete. Translating it here would mean maintaining a
+    # mapping that drifts every time Stripe adds a state.
+    status: str = ""
+    tier: str = ""                       # "lamplighter" | "almanac"
+    # Set when someone cancels: the subscription stays active until this date
+    # rather than stopping mid-month, and the account page has to say so.
+    cancel_at_period_end: bool = False
+    current_period_end: Optional[datetime] = Field(default=None, sa_type=UTC_TS)

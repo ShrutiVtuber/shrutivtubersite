@@ -10,31 +10,100 @@ import SectionHeader from "../components/brand/SectionHeader.astro";
 import Button from "../components/forms/Button.astro";
 import Badge from "../components/navigation/Badge.astro";
 import EmptyState from "../components/feedback/EmptyState.astro";
+import CsrfField from "../components/forms/CsrfField.astro";
 import { pageSections } from "../lib/content";
-import { site, PATHS, type LinkGroups } from "../lib/api";
+import { site, SITE_API } from "../lib/api";
+import { verifyCsrf } from "../lib/csrf";
 
-const [sections, links] = await Promise.all([pageSections("support"), site<LinkGroups>(PATHS.links)]);
+/* Checkout is started by a PLAIN FORM POST handled here, then a redirect to
+   Stripe — not by JavaScript. The rest of the site works with scripting off
+   and the page where someone gives money is the last one that should be the
+   exception. */
+let failed = "";
+if (Astro.request.method === "POST") {
+  const form = await Astro.request.formData();
+  if (!verifyCsrf(Astro.cookies, form)) {
+    failed = "That did not start. Reload the page and try again.";
+  } else {
+    const tier = String(form.get("tier") ?? "one-off");
+    /* Euros in the box, cents on the wire. The server clamps the range —
+       what arrives from a form is a suggestion, not an amount. */
+    const euros = Number(form.get("amount") ?? 0);
+    const amount = tier === "one-off" && euros > 0 ? Math.round(euros * 100) : null;
+    try {
+      const response = await fetch(`${SITE_API}/api/billing/checkout`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          // The reader's session, so a signed-in supporter is matched to
+          // their account rather than to a second Stripe customer.
+          cookie: Astro.request.headers.get("cookie") ?? "",
+        },
+        body: JSON.stringify({ tier, amount }),
+      });
+      const body = await response.json().catch(() => null);
+      if (response.ok && body?.url) return Astro.redirect(body.url, 303);
+      failed = body?.detail ?? "That could not be started. Try again in a moment.";
+    } catch {
+      failed = "That could not be started. Try again in a moment.";
+    }
+  }
+}
+
+interface StripeTier { tier: string; amount: number | null; currency: string; interval: string }
+interface Billing {
+  configured: boolean;
+  tiers: StripeTier[];
+  oneOff: { min: number; max: number; default: number; currency: string } | null;
+}
+
+const [sections, billing] = await Promise.all([
+  pageSections("support"),
+  site<Billing>("/api/billing/tiers"),
+]);
 const intro = sections.find((s) => s.key === "intro");
 const extra = sections.filter((s) => s.key !== "intro");
 
-/* Ko-fi only if it is actually one of her links. No invented destination. */
-const kofi = Object.values(links?.groups ?? {}).flat()
-  .find((l) => l.platform === "kofi")?.url;
+/* The AMOUNT comes from Stripe, never from this file. A price written here and
+   a price configured in the dashboard drift the moment either changes, and the
+   direction that drift breaks in — charging more than the page promised — is
+   the one that must never happen. What is here is only the copy. */
+const priced = new Map((billing?.tiers ?? []).map((t) => [t.tier, t]));
+const open = Boolean(billing?.configured);
+const oneOff = billing?.oneOff ?? null;
+
+const money = (cents: number | null | undefined, currency = "EUR") =>
+  cents == null
+    ? ""
+    : new Intl.NumberFormat("en-IE", {
+        style: "currency", currency,
+        minimumFractionDigits: cents % 100 === 0 ? 0 : 2,
+      }).format(cents / 100);
 
 const TIERS = [
   {
-    name: "One-off", price: "€3", note: "once, or any amount", primary: false, badge: "",
+    key: "one-off", name: "One-off",
+    price: money(oneOff?.default ?? 300), note: "once, or any amount",
+    primary: false, badge: "", cta: "Give once",
     items: ["A coffee for the bench", "Name read on stream if you leave one", "No account needed"],
   },
   {
-    name: "Lamplighter", price: "€4", note: "/ month", primary: true, badge: "Most common",
+    key: "lamplighter", name: "Lamplighter",
+    price: money(priced.get("lamplighter")?.amount ?? null), note: "/ month",
+    primary: true, badge: "Most common", cta: "Become a Lamplighter",
     items: ["Members channel on Discord", "Schedule a day early", "Name in the monthly credits roll"],
   },
   {
-    name: "Almanac", price: "€9", note: "/ month", primary: false, badge: "",
+    key: "almanac", name: "Almanac",
+    price: money(priced.get("almanac")?.amount ?? null), note: "/ month",
+    primary: false, badge: "", cta: "Become an Almanac",
     items: ["Everything in Lamplighter", "Monthly practice notes, signed Soror Eu. A.", "A vote on the next instrument"],
   },
 ];
+
+/* A tier is offerable when Stripe knows its price. The one-off always is —
+   its amount is chosen here, not configured. */
+const offerable = (key: string) => open && (key === "one-off" || priced.has(key));
 
 /* Every block the admin has added to /support. */
 ---
@@ -46,6 +115,8 @@ const TIERS = [
       body="Streams are free and the tools are open source. Support pays for the ephemeris server, art commissions, and the hours the software takes."
     />
 
+    {failed && <p class="pay-failed" role="alert">{failed}</p>}
+
     <div class="tiers">
       {
         TIERS.map((t) => (
@@ -54,17 +125,44 @@ const TIERS = [
               <h2>{t.name}</h2>
               {t.badge && <Badge tone="rose">{t.badge}</Badge>}
             </div>
-            <div class="tier-price">{t.price}<span class="tier-note"> {t.note}</span></div>
+            <div class="tier-price">
+              {t.price || <span class="tier-tbd">—</span>}
+              <span class="tier-note"> {t.note}</span>
+            </div>
             <ul>{t.items.map((i) => <li>{i}</li>)}</ul>
             <div>
               {
-                kofi ? (
-                  <Button variant={t.primary ? "primary" : "secondary"} href={kofi}>
-                    {t.primary ? "Join on Ko-fi" : "Open Ko-fi"}
-                  </Button>
+                offerable(t.key) ? (
+                  <form method="POST" class="tier-form">
+                    <CsrfField />
+                    <input type="hidden" name="tier" value={t.key} />
+                    {
+                      t.key === "one-off" && oneOff && (
+                        <label class="amount">
+                          <span class="amount-lbl">Amount</span>
+                          <span class="amount-box">
+                            <span class="amount-cur" aria-hidden="true">€</span>
+                            <input
+                              type="number" name="amount" inputmode="decimal"
+                              value={(oneOff.default / 100).toFixed(0)}
+                              min={(oneOff.min / 100).toFixed(2)}
+                              max={(oneOff.max / 100).toFixed(0)}
+                              step="1" aria-label="Amount in euro"
+                            />
+                          </span>
+                        </label>
+                      )
+                    }
+                    <Button type="submit" variant={t.primary ? "primary" : "secondary"}>
+                      {t.cta}
+                    </Button>
+                  </form>
                 ) : (
-                  /* No Ko-fi link recorded, so no button that goes nowhere. */
-                  <span class="tier-absent">Ko-fi link not set yet</span>
+                  /* No button that goes nowhere. Which half is missing matters
+                     to whoever has to fix it, so the two states differ. */
+                  <span class="tier-absent">
+                    {open ? "This tier is not open yet" : "Not open yet"}
+                  </span>
                 )
               }
             </div>
@@ -74,8 +172,22 @@ const TIERS = [
     </div>
 
     <p class="tiers-note">
-      Memberships are Ko-fi-hosted; cancel any time. Tiers ship only if memberships open — this is
-      the design for that day.
+      {
+        open ? (
+          <>
+            Payment happens on Stripe — card details never reach this site. Monthly support can be
+            cancelled from <a href="/account">your account</a> in one click, it stops at the end of
+            the month you have already paid for rather than the moment you press it, and no email to
+            me is required or wanted.
+          </>
+        ) : (
+          <>
+            Support is not open yet. When it is, payment will happen on Stripe, card details will
+            never reach this site, and cancelling monthly support will be one button on your own
+            account page.
+          </>
+        )
+      }
     </p>
 
     <SectionHeader as="h2" title="Merch" />
@@ -107,6 +219,25 @@ const TIERS = [
 </BaseLayout>
 
 <style>
+  .pay-failed { font: 400 var(--text-sm) var(--font-body); color: var(--live); margin: 0; }
+  .tier-form { display: grid; gap: var(--space-3); justify-items: start; }
+  .tier-tbd { color: var(--ink-faint); }
+  .amount { display: grid; gap: 4px; }
+  .amount-lbl { font: 500 var(--text-xs) var(--font-body); color: var(--ink-soft); }
+  .amount-box {
+    display: inline-flex; align-items: center; gap: 2px;
+    border: var(--border-w) solid var(--line-strong); border-radius: var(--radius-sm);
+    background: var(--surface-card); padding: 0 10px;
+  }
+  .amount-cur { font: 400 var(--text-sm) var(--font-mono); color: var(--ink-faint); }
+  .amount-box input {
+    font: 500 var(--text-body) var(--font-mono); color: var(--ink);
+    background: none; border: 0; padding: 9px 4px; width: 5.5ch;
+  }
+  .amount-box input:focus { outline: none; }
+  .amount-box:focus-within { border-color: var(--accent); }
+  .tiers-note a { color: var(--accent); }
+
   .tiers {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));

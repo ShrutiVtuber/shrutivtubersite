@@ -281,5 +281,5 @@ __all__ = [
 # sees them and Alembic autogenerate does not miss the tables.
 from shruti.models.accounts import (  # noqa: E402,F401
     ConsentRecord, Horoscope, Issue, JournalSky, Nativity, Passkey, Subscriber,
-    User,
+    Supporter, User,
 )

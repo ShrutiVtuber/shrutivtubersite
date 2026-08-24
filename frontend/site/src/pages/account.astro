@@ -63,6 +63,15 @@ if (Astro.request.method === "POST") {
       }
     }
 
+    if (action === "portal") {
+      /* A redirect into Stripe's own portal. Building a cancel screen here
+         would mean maintaining a worse copy of one Stripe keeps correct — and
+         card details would have to pass through this server to do it. */
+      const r = await asReader(Astro, "/api/billing/portal", { method: "POST" });
+      if (r.ok && r.body?.url) return Astro.redirect(r.body.url, 303);
+      failed = r.body?.detail ?? "That could not be opened. Try again in a moment.";
+    }
+
     if (action === "delete") {
       const r = await asReader(Astro, "/api/account/", { method: "DELETE" });
       if (r.ok) {
@@ -84,6 +93,19 @@ const state = Object.fromEntries(me.consents.map((c) => [c.kind, c]));
    should not. */
 const keys = await asReader(Astro, "/api/passkeys");
 const passkeys: PasskeyRow[] = keys.ok ? (keys.body?.passkeys ?? []) : [];
+
+/* Support, if there is any. A 404 here means "not a supporter", which is the
+   ordinary case and not a failure — so the card simply does not render. */
+const supportRead = await asReader(Astro, "/api/billing/me");
+const support = supportRead.ok ? supportRead.body : null;
+
+const renews = (iso: string | null | undefined) =>
+  iso ? new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" }) : "";
+
+const TIER_NAMES: Record<string, string> = {
+  lamplighter: "Lamplighter",
+  almanac: "Almanac",
+};
 const TRADITIONS = [
   { value: "", label: "No preference — show both" },
   { value: "hellenistic", label: "Hellenistic" },
@@ -196,6 +218,39 @@ const TRADITIONS = [
       }
     </section>
 
+    {
+      support?.supporting && (
+        <section class="card">
+          <h2>Your support</h2>
+          <p class="support-tier">
+            <strong>{TIER_NAMES[support.tier] || "Monthly support"}</strong>
+            {support.status === "past_due" && <span class="undef"> · payment failed</span>}
+          </p>
+          <p class="quiet">
+            {
+              support.cancelAtPeriodEnd
+                ? `Cancelled. It stays active until ${renews(support.currentPeriodEnd)}, and then stops — you keep what you have already paid for.`
+                : support.currentPeriodEnd
+                  ? `Renews ${renews(support.currentPeriodEnd)}.`
+                  : "Active."
+            }
+          </p>
+          <p class="quiet">
+            Cancelling is one button on Stripe's own page, it takes effect at the end of the month
+            you have already paid for rather than the moment you press it, and no message to me is
+            needed or wanted. Thank you either way — genuinely.
+          </p>
+          <div>
+            <form method="POST">
+              <CsrfField />
+              <input type="hidden" name="action" value="portal" />
+              <Button type="submit" variant="secondary">Manage or cancel</Button>
+            </form>
+          </div>
+        </section>
+      )
+    }
+
     <section class="card">
       <h2>Passkeys</h2>
       <p class="quiet">
@@ -280,6 +335,7 @@ const TRADITIONS = [
   .undef { color: var(--ink-faint); font-style: italic; }
   .notice { font: 400 var(--text-sm) var(--font-body); color: var(--accent); margin: 0; }
   .failed { font: 400 var(--text-sm) var(--font-body); color: var(--live); margin: 0; }
+  .support-tier { font: 500 var(--text-h4) var(--font-body); color: var(--ink); margin: 0; }
   .nat-line { font: 500 var(--text-h4) var(--font-mono); color: var(--ink); margin: 0; }
   .nat-place { font: 400 var(--text-sm) var(--font-body); color: var(--ink-soft); margin: 0; }
   .consent-row { display: grid; gap: 6px; }
