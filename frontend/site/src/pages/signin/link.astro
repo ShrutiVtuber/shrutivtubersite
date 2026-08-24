@@ -1,0 +1,39 @@
+---
+/* The magic link's landing. Consumes the token and signs the reader in. */
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import EmptyState from "../../components/feedback/EmptyState.astro";
+import Button from "../../components/forms/Button.astro";
+import { SITE_API } from "../../lib/api";
+
+const token = Astro.url.searchParams.get("token") ?? "";
+let failed = "";
+
+if (token) {
+  try {
+    const response = await fetch(`${SITE_API}/api/account/link?token=${encodeURIComponent(token)}`);
+    if (response.ok) {
+      const cookie = response.headers.get("set-cookie");
+      if (cookie) Astro.response.headers.append("set-cookie", cookie);
+      return Astro.redirect("/account");
+    }
+    const body = await response.json().catch(() => null);
+    failed = body?.detail ?? "That link did not work.";
+  } catch {
+    failed = "That link did not work.";
+  }
+} else {
+  failed = "That link is missing its token.";
+}
+---
+
+<BaseLayout title="Sign in — Shruti" description="Signing you in.">
+  <div class="page">
+    <EmptyState
+      glyph="◐"
+      title="That link has expired"
+      body={`${failed} Links work once and last twenty minutes, which is short on purpose — a forwarded email should not be a standing key.`}
+    >
+      <Button slot="action" variant="secondary" href="/signin">Send a new one</Button>
+    </EmptyState>
+  </div>
+</BaseLayout>

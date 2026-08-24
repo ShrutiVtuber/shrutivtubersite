@@ -1,0 +1,108 @@
+---
+/* The newsletter page — `ui_kits/site/Newsletter.jsx`.
+ *
+ * Subscribe, and the archive so a prospective subscriber can see exactly what
+ * they are getting before handing over an address.
+ */
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import SectionHeader from "../../components/brand/SectionHeader.astro";
+import SubscribeBlock from "../../components/brand/SubscribeBlock.astro";
+import EmptyState from "../../components/feedback/EmptyState.astro";
+import { site, SITE_API } from "../../lib/api";
+import { verifyCsrf } from "../../lib/csrf";
+
+let state: "idle" | "sent" = "idle";
+let error = "";
+let email = "";
+
+if (Astro.request.method === "POST") {
+  const form = await Astro.request.formData();
+  if (!verifyCsrf(Astro.cookies, form)) {
+    error = "That did not send. Reload the page and try again.";
+  } else {
+    email = String(form.get("email") ?? "").trim();
+    const consent = form.get("consent") === "1";
+    if (!/^\S+@\S+\.\S+$/.test(email)) {
+      error = "That address doesn’t look complete.";
+    } else if (!consent) {
+      error = "The letter needs your agreement before it can be sent.";
+    } else {
+      const r = await fetch(`${SITE_API}/api/newsletter/subscribe`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, consent: true }),
+      });
+      if (r.ok) state = "sent";
+      else error = (await r.json().catch(() => null))?.detail ?? "That did not go through.";
+    }
+  }
+}
+
+interface Issue { slug: string; subject: string; sentAt: string | null }
+const issues = (await site<Issue[]>("/api/newsletter/archive")) ?? [];
+---
+
+<BaseLayout title="The monthly letter — Shruti" description="One letter a month, and the archive of every one so far.">
+  <div class="page letter">
+    <SectionHeader
+      as="h1" glyph="⁂" eyebrow="The monthly letter" title="Once a month"
+      body="Your horoscope if you have a saved nativity, what went up since last time, and a letter written by hand."
+    />
+
+    <SubscribeBlock state={state} email={email} error={error} />
+
+    <section class="archive">
+      <h2>Every issue so far</h2>
+      <p class="quiet">
+        Public, on purpose — you should be able to read exactly what you are signing up for before
+        you hand over an address.
+      </p>
+      {
+        issues.length > 0 ? (
+          <ul>
+            {
+              issues.map((i) => (
+                <li>
+                  <a href={`/newsletter/archive/${i.slug}`}>
+                    <span class="t-tabular date">{i.sentAt?.slice(0, 10) ?? ""}</span>
+                    <span class="subject">{i.subject}</span>
+                  </a>
+                </li>
+              ))
+            }
+          </ul>
+        ) : (
+          <EmptyState
+            glyph="○"
+            title="No issues yet"
+            body="The first one has not gone out. When it does it appears here, in full, without a subscription."
+          />
+        )
+      }
+    </section>
+
+    <section class="held">
+      {/* Held deliberately, per the brief: do not build a shop yet. */}
+      <p class="quiet">
+        Nothing is for sale yet. When courses or services open, they will be offered in the letter —
+        which is why the consent above says so, rather than that arriving as a surprise later.
+      </p>
+    </section>
+  </div>
+</BaseLayout>
+
+<style>
+  .letter { max-width: 760px; display: grid; gap: var(--space-6); }
+  .archive h2 { font: 600 var(--text-h3) var(--font-display); color: var(--ink); margin: 0 0 6px; }
+  .quiet { font: 400 var(--text-sm) / 1.7 var(--font-body); color: var(--ink-soft); margin: 0 0 var(--space-4); max-width: 64ch; }
+  .archive ul { list-style: none; margin: 0; padding: 0; }
+  .archive li a {
+    display: grid; grid-template-columns: 110px 1fr; gap: var(--space-4);
+    padding: 14px 0; border-bottom: var(--border-w) solid var(--line);
+    text-decoration: none; align-items: baseline;
+  }
+  .date { font: 400 var(--text-xs) var(--font-mono); color: var(--ink-faint); }
+  .subject { font: 600 var(--text-h4) var(--font-display); color: var(--ink); }
+  .archive li a:hover .subject { color: var(--accent-hover); }
+  @media (max-width: 560px) { .archive li a { grid-template-columns: 1fr; gap: 4px; } }
+</style>

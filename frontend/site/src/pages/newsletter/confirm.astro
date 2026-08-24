@@ -1,0 +1,64 @@
+---
+/* The opt-in link's landing. Confirms, and says what happens next. */
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import SectionHeader from "../../components/brand/SectionHeader.astro";
+import EmptyState from "../../components/feedback/EmptyState.astro";
+import Button from "../../components/forms/Button.astro";
+import { SITE_API } from "../../lib/api";
+
+const token = Astro.url.searchParams.get("token") ?? "";
+let ok = false;
+let email = "";
+let unsubToken = "";
+let failed = "";
+
+if (token) {
+  const r = await fetch(`${SITE_API}/api/newsletter/confirm?token=${encodeURIComponent(token)}`);
+  const body = await r.json().catch(() => null);
+  if (r.ok) { ok = true; email = body.email; unsubToken = body.unsubscribeToken; }
+  else failed = body?.detail ?? "That link did not work.";
+} else {
+  failed = "That link is missing its token.";
+}
+---
+
+<BaseLayout title="Confirmed — Shruti" description="Your subscription to the monthly letter.">
+  <div class="page confirm">
+    {
+      ok ? (
+        <>
+          <SectionHeader as="h1" glyph="☾" eyebrow="Confirmed" title="You're on the list" />
+          <p class="body">
+            <strong>{email}</strong> will get the letter once a month. The first one goes out at the
+            new moon after it is written.
+          </p>
+          <p class="body quiet">
+            One click unsubscribes from any issue, with no login. You can also just pause it —
+            pausing deletes nothing and your consent stays exactly as it is.
+          </p>
+          <div class="actions">
+            <Button href={`/newsletter/preferences?token=${encodeURIComponent(unsubToken)}`}>
+              Choose what you get
+            </Button>
+            <Button variant="secondary" href="/newsletter">Read past issues</Button>
+          </div>
+        </>
+      ) : (
+        <EmptyState
+          glyph="◐"
+          title="That link has already been used"
+          body={`${failed} Confirmation links work once — if you have already confirmed, you are on the list and nothing more is needed.`}
+        >
+          <Button slot="action" variant="secondary" href="/newsletter">Back to the letter</Button>
+        </EmptyState>
+      )
+    }
+  </div>
+</BaseLayout>
+
+<style>
+  .confirm { max-width: 620px; display: grid; gap: var(--space-3); }
+  .body { font: 400 var(--text-body) / var(--leading-body) var(--font-body); color: var(--ink-soft); margin: 0; max-width: 62ch; }
+  .quiet { color: var(--ink-faint); font-size: var(--text-sm); }
+  .actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: var(--space-4); }
+</style>

@@ -1,0 +1,163 @@
+---
+/* The preference centre — sections, cadence, and PAUSE.
+ *
+ * A pause keeps more people than an unsubscribe loses, and the copy says
+ * plainly that nothing is deleted by it and consent stays intact.
+ */
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import SectionHeader from "../../components/brand/SectionHeader.astro";
+import CsrfField from "../../components/forms/CsrfField.astro";
+import Button from "../../components/forms/Button.astro";
+import EmptyState from "../../components/feedback/EmptyState.astro";
+import { SITE_API } from "../../lib/api";
+import { verifyCsrf } from "../../lib/csrf";
+
+const token = Astro.url.searchParams.get("token") ?? "";
+let notice = "";
+let failed = "";
+
+if (Astro.request.method === "POST") {
+  const form = await Astro.request.formData();
+  if (!verifyCsrf(Astro.cookies, form)) {
+    failed = "That did not save. Reload the page and try again.";
+  } else {
+    const r = await fetch(`${SITE_API}/api/newsletter/preferences`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        token: String(form.get("token") ?? ""),
+        wants_horoscope: form.get("horoscope") === "1",
+        wants_videos: form.get("videos") === "1",
+        wants_streams: form.get("streams") === "1",
+        wants_articles: form.get("articles") === "1",
+        cadence: String(form.get("cadence") ?? "monthly"),
+        paused_until: String(form.get("paused_until") ?? "") || null,
+      }),
+    });
+    notice = r.ok ? "Saved." : "";
+    failed = r.ok ? "" : ((await r.json().catch(() => null))?.detail ?? "That did not save.");
+  }
+}
+
+interface Prefs {
+  email: string; confirmed: boolean; unsubscribed: boolean;
+  cadence: string; pausedUntil: string | null;
+  sections: { horoscope: boolean; videos: boolean; streams: boolean; articles: boolean };
+}
+let prefs: Prefs | null = null;
+if (token) {
+  const r = await fetch(`${SITE_API}/api/newsletter/preferences?token=${encodeURIComponent(token)}`);
+  if (r.ok) prefs = await r.json();
+}
+
+const SECTIONS: [keyof Prefs["sections"], string, string][] = [
+  ["horoscope", "Your horoscope", "Only if you have a saved nativity — otherwise it is skipped."],
+  ["videos", "Videos", "What went up since the last letter."],
+  ["streams", "Streams", "What was streamed since the last letter."],
+  ["articles", "Writing", "Summaries of what was written."],
+];
+---
+
+<BaseLayout title="Letter preferences — Shruti" description="Choose what the monthly letter carries, or pause it.">
+  <div class="page prefs">
+    {
+      !prefs ? (
+        <EmptyState
+          glyph="◐"
+          title="That link is not valid"
+          body="Preference links come from the footer of any issue. If yours has stopped working, the one in the most recent letter will."
+        >
+          <Button slot="action" variant="secondary" href="/newsletter">Back to the letter</Button>
+        </EmptyState>
+      ) : (
+        <>
+          <SectionHeader
+            as="h1" glyph="⁂" eyebrow="Preferences" title="What you get"
+            body={`Settings for ${prefs.email}.`}
+          />
+          {notice && <p class="notice" role="status">{notice}</p>}
+          {failed && <p class="failed" role="alert">{failed}</p>}
+
+          <form method="POST" class="card">
+            <CsrfField />
+            <input type="hidden" name="token" value={token} />
+
+            <fieldset>
+              <legend>Sections</legend>
+              {
+                SECTIONS.map(([key, label, note]) => (
+                  <label class="row">
+                    <input type="checkbox" name={key} value="1" checked={prefs!.sections[key]} />
+                    <span>
+                      <strong>{label}</strong>
+                      <span class="note">{note}</span>
+                    </span>
+                  </label>
+                ))
+              }
+            </fieldset>
+
+            <fieldset>
+              <legend>Cadence</legend>
+              <label class="row">
+                <input type="radio" name="cadence" value="monthly" checked={prefs.cadence !== "paused"} />
+                <span><strong>Monthly</strong><span class="note">One letter a month.</span></span>
+              </label>
+              <label class="row">
+                <input type="radio" name="cadence" value="paused" checked={prefs.cadence === "paused"} />
+                <span>
+                  <strong>Paused</strong>
+                  <span class="note">
+                    Nothing arrives until you turn it back on. <strong>Nothing is deleted</strong> —
+                    your address, your settings and your consent all stay exactly as they are.
+                  </span>
+                </span>
+              </label>
+              <label class="until">
+                <span class="lbl">Pause until</span>
+                <input type="date" name="paused_until" value={prefs.pausedUntil ?? ""} />
+              </label>
+            </fieldset>
+
+            <div><Button type="submit">Save</Button></div>
+          </form>
+
+          <p class="out">
+            Or <a href={`/newsletter/unsubscribed?token=${encodeURIComponent(token)}`}>unsubscribe
+            entirely</a> — one click, and that page does not argue with you.
+          </p>
+        </>
+      )
+    }
+  </div>
+</BaseLayout>
+
+<style>
+  .prefs { max-width: 700px; display: grid; gap: var(--space-4); }
+  .card {
+    background: var(--surface-card); border: var(--border-w) solid var(--line);
+    border-radius: var(--radius-md); box-shadow: var(--shadow-1);
+    padding: var(--space-5); display: grid; gap: var(--space-5);
+  }
+  fieldset { border: 0; margin: 0; padding: 0; display: grid; gap: 12px; }
+  legend {
+    padding: 0; font: 600 var(--text-micro) var(--font-body);
+    letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; color: var(--ink-faint);
+  }
+  .row { display: flex; gap: 10px; align-items: start; cursor: pointer; }
+  .row input { margin-top: 3px; accent-color: var(--accent); width: 18px; height: 18px; flex: none; }
+  .row > span { display: grid; gap: 2px; }
+  .row strong { font: 500 var(--text-body) var(--font-body); color: var(--ink); }
+  .note { font: 400 var(--text-sm) / 1.6 var(--font-body); color: var(--ink-soft); max-width: 60ch; }
+  .until { display: grid; gap: 4px; }
+  .lbl { font: 600 var(--text-micro) var(--font-body); letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; color: var(--ink-faint); }
+  .until input {
+    font: 400 var(--text-sm) var(--font-body); color: var(--ink); background: var(--surface-page);
+    border: var(--border-w) solid var(--line); border-radius: var(--radius-sm);
+    padding: 8px 10px; min-height: 40px; width: 180px;
+  }
+  .notice { font: 400 var(--text-sm) var(--font-body); color: var(--accent); margin: 0; }
+  .failed { font: 400 var(--text-sm) var(--font-body); color: var(--live); margin: 0; }
+  .out { font: 400 var(--text-sm) var(--font-body); color: var(--ink-soft); margin: 0; }
+  .out a { color: var(--accent); }
+</style>

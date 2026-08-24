@@ -1,0 +1,98 @@
+---
+/* Horoscope index — `ui_kits/site/Horoscopes.jsx`.
+ *
+ * The sign picker is the primary control. A SIGNED-IN READER WITH A SAVED
+ * NATIVITY SEES THEIR OWN SIGN FIRST, without picking — that is the whole
+ * reward for having an account, so it is an accent-wash band naming their sign
+ * rather than a subtle highlight.
+ */
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import SectionHeader from "../../components/brand/SectionHeader.astro";
+import SignPicker from "../../components/navigation/SignPicker.astro";
+import PeriodSwitcher from "../../components/navigation/PeriodSwitcher.astro";
+import Prose from "../../components/content/Prose.astro";
+import Button from "../../components/forms/Button.astro";
+import EmptyState from "../../components/feedback/EmptyState.astro";
+import { site } from "../../lib/api";
+import { account } from "../../lib/account";
+import { renderMarkdown } from "../../lib/markdown";
+import { sunSign } from "../../lib/signs";
+
+const period = Astro.url.searchParams.get("period") ?? "monthly";
+
+interface Index {
+  period: string; covers: string; availablePeriods: string[];
+  readings: { sign: string; published: boolean; bodyMd: string }[];
+}
+const data = await site<Index>(`/api/horoscopes?period=${encodeURIComponent(period)}`);
+const me = await account(Astro);
+const yours = me?.nativity ? sunSign(me.nativity.birthDate) : null;
+
+const readings = data?.readings ?? [];
+const yourReading = yours ? readings.find((r) => r.sign === yours) : null;
+const yourHtml = yourReading?.published ? await renderMarkdown(yourReading.bodyMd) : "";
+const anyPublished = readings.some((r) => r.published);
+const NAME = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+---
+
+<BaseLayout title="Horoscopes — Shruti" description="Twelve readings a month, one per sign, written by hand.">
+  <div class="page horoscopes">
+    <SectionHeader
+      as="h1" glyph="☾" eyebrow="Horoscopes" title="This month"
+      body="Twelve a month, one per sign, written by hand."
+    />
+
+    <PeriodSwitcher
+      available={data?.availablePeriods ?? ["monthly"]}
+      current={period}
+      hrefFor={(p) => `/horoscopes?period=${p}`}
+    />
+
+    {
+      yours && yourReading?.published && (
+        <section class="yours-band">
+          <p class="t-eyebrow">Your sign</p>
+          <h2>{NAME(yours)}</h2>
+          <Prose html={yourHtml} byline="Soror Eu. A." />
+          <div><Button variant="secondary" href={`/horoscopes/${yours}/${period}`}>Open the reading</Button></div>
+        </section>
+      )
+    }
+    {
+      !me && (
+        <p class="invite">
+          With a saved nativity your own sign appears here first, without picking it.
+          <a href="/signup"> Make an account</a> — everything else on this page works without one.
+        </p>
+      )
+    }
+
+    {
+      anyPublished ? (
+        <SignPicker
+          signs={readings.map((r) => ({ sign: r.sign, published: r.published }))}
+          yours={yours ?? undefined}
+          hrefFor={(s) => `/horoscopes/${s}/${period}`}
+        />
+      ) : (
+        <EmptyState
+          glyph="○"
+          title="Nothing written for this month yet"
+          body="Twelve readings go up together — an empty reading is worse than a late one, so none appear until all twelve exist."
+        />
+      )
+    }
+  </div>
+</BaseLayout>
+
+<style>
+  .horoscopes { display: grid; gap: var(--space-5); }
+  .yours-band {
+    background: var(--accent-wash);
+    border: var(--border-w) solid color-mix(in srgb, var(--accent) 40%, transparent);
+    border-radius: var(--radius-md); padding: var(--space-5); display: grid; gap: 10px;
+  }
+  .yours-band h2 { font: 500 var(--text-h2) var(--font-display); color: var(--ink); margin: 0; }
+  .invite { font: 400 var(--text-sm) / 1.7 var(--font-body); color: var(--ink-soft); margin: 0; max-width: 64ch; }
+  .invite a { color: var(--accent); }
+</style>

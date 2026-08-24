@@ -1,0 +1,139 @@
+---
+/* Sign up — ported from `ui_kits/site/Auth.jsx`.
+ *
+ * Longer than a normal form, deliberately. Three decisions, three
+ * checkboxes, none pre-ticked, and yes to one with no to another is possible.
+ * Only the account agreement can block the submit.
+ */
+import BaseLayout from "../layouts/BaseLayout.astro";
+import SectionHeader from "../components/brand/SectionHeader.astro";
+import TextField from "../components/forms/TextField.astro";
+import ConsentCheckbox from "../components/forms/ConsentCheckbox.astro";
+import CsrfField from "../components/forms/CsrfField.astro";
+import Button from "../components/forms/Button.astro";
+import EmptyState from "../components/feedback/EmptyState.astro";
+import { CONSENTS } from "../lib/consents";
+import { SITE_API } from "../lib/api";
+import { verifyCsrf } from "../lib/csrf";
+
+let done = false;
+let failed = "";
+const errors: Record<string, string> = {};
+const values = { email: "", name: "", password: "" };
+const given: Record<string, boolean> = {};
+
+if (Astro.request.method === "POST") {
+  const form = await Astro.request.formData();
+  if (!verifyCsrf(Astro.cookies, form)) {
+    failed = "That did not send. Reload the page and try again.";
+  } else {
+    values.email = String(form.get("email") ?? "").trim();
+    values.name = String(form.get("name") ?? "").trim();
+    values.password = String(form.get("password") ?? "");
+    for (const c of CONSENTS) given[c.kind] = form.get(`consent_${c.kind}`) === "1";
+
+    if (!/^\S+@\S+\.\S+$/.test(values.email)) errors.email = "That address doesn’t look complete.";
+    if (values.password && values.password.length < 10) {
+      errors.password = "Ten characters or more, or leave it blank and use a sign-in link.";
+    }
+    /* The ONLY consent that can produce an error. */
+    if (!given.account) {
+      errors.account = "The account itself needs this one — there is nothing to sign in to without it.";
+    }
+
+    if (Object.keys(errors).length === 0) {
+      try {
+        const response = await fetch(`${SITE_API}/api/account/signup`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: values.email,
+            password: values.password || null,
+            display_name: values.name,
+            consents: CONSENTS.map((c) => ({ kind: c.kind, granted: !!given[c.kind] })),
+          }),
+        });
+        if (response.ok) {
+          const cookie = response.headers.get("set-cookie");
+          if (cookie) Astro.response.headers.append("set-cookie", cookie);
+          done = true;
+        } else {
+          const body = await response.json().catch(() => null);
+          failed = body?.detail ?? "That did not go through.";
+        }
+      } catch {
+        failed = "That did not go through.";
+      }
+    }
+  }
+}
+---
+
+<BaseLayout title="Sign up — Shruti" description="An account for your own chart and your own reading. Nothing public.">
+  <div class="page auth">
+    <SectionHeader
+      as="h1" glyph="☾" eyebrow="Sign up" title="An account"
+      body="For keeping your own chart and reading your own horoscope. Nothing here is public — no profile, no avatar, no follower count."
+    />
+
+    {
+      done ? (
+        <EmptyState glyph="☾" title="You're in" body="The account is made. Where would you like to start?">
+          <div slot="action" class="auth-actions">
+            <Button href="/nativity">Add a nativity</Button>
+            <Button variant="secondary" href="/today">See today</Button>
+          </div>
+        </EmptyState>
+      ) : (
+        <form method="POST" novalidate class="auth-form">
+          <CsrfField />
+          {failed && <p class="auth-failed" role="alert">{failed}</p>}
+
+          <TextField label="Email" name="email" type="email" required value={values.email} error={errors.email} autocomplete="email" />
+          <TextField label="Name" name="name" optionalLabel value={values.name} hint="Only ever shown back to you." autocomplete="name" />
+          <TextField
+            label="Password" name="password" type="password" optionalLabel
+            value="" error={errors.password} autocomplete="new-password"
+            hint="Leave it blank to sign in by emailed link instead."
+          />
+
+          <div class="consents">
+            <h2>Three decisions</h2>
+            <p class="consents-intro">
+              These are separate on purpose. You can say yes to one and no to another, and change
+              any of them later from your account.
+            </p>
+            {
+              CONSENTS.map((c) => (
+                <ConsentCheckbox
+                  name={`consent_${c.kind}`}
+                  label={c.label}
+                  basis={c.basis}
+                  required={c.required}
+                  explanation={c.explanation}
+                  wording={c.wording}
+                  error={errors[c.kind]}
+                />
+              ))
+            }
+          </div>
+
+          <div><Button type="submit" size="lg">Create the account</Button></div>
+          <p class="auth-alt">Already have one? <a href="/signin">Sign in</a>.</p>
+        </form>
+      )
+    }
+  </div>
+</BaseLayout>
+
+<style>
+  .auth { max-width: 680px; }
+  .auth-form { display: grid; gap: var(--space-5); margin-top: var(--space-6); }
+  .consents { display: grid; gap: var(--space-3); }
+  .consents h2 { font: 600 var(--text-h3) var(--font-display); color: var(--ink); margin: 0; }
+  .consents-intro { font: 400 var(--text-sm) / 1.6 var(--font-body); color: var(--ink-soft); margin: 0 0 4px; max-width: 62ch; }
+  .auth-failed { font: 400 var(--text-sm) var(--font-body); color: var(--live); margin: 0; }
+  .auth-alt { font: 400 var(--text-sm) var(--font-body); color: var(--ink-soft); margin: 0; }
+  .auth-alt a { color: var(--accent); }
+  .auth-actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+</style>

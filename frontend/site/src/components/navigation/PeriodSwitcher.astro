@@ -1,0 +1,41 @@
+---
+/* Ported from `components/navigation/PeriodSwitcher.jsx`; contract in
+ * `PeriodSwitcher.d.ts`.
+ *
+ * UNAVAILABLE PERIODS ARE ABSENT, not errors and not disabled-with-a-tooltip.
+ * The control is placed now, with only monthly existing, so turning daily,
+ * seasonal or yearly on is a switch rather than a rebuild.
+ */
+interface Props {
+  available: string[];
+  current: string;
+  hrefFor: (period: string) => string;
+}
+const { available, current, hrefFor } = Astro.props;
+const LABEL: Record<string, string> = {
+  daily: "Daily", monthly: "Monthly", seasonal: "Seasonal", yearly: "Yearly",
+};
+---
+
+{
+  available.length > 1 && (
+    <nav class="periods" aria-label="Reading period">
+      {
+        available.map((p) => (
+          <a href={hrefFor(p)} aria-current={p === current ? "page" : undefined}>{LABEL[p] ?? p}</a>
+        ))
+      }
+    </nav>
+  )
+}
+
+<style>
+  .periods { display: flex; gap: 4px; flex-wrap: wrap; }
+  .periods a {
+    font: 500 var(--text-sm) var(--font-body); color: var(--ink-soft); text-decoration: none;
+    padding: 8px 14px; border-radius: var(--radius-full); min-height: 40px;
+    display: inline-flex; align-items: center;
+  }
+  .periods a:hover { color: var(--ink); background: var(--surface-veil); }
+  .periods a[aria-current="page"] { color: var(--accent); background: var(--accent-wash); }
+</style>

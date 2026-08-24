@@ -1,0 +1,68 @@
+---
+/* Ported from `components/navigation/SignPicker.jsx`; contract in
+ * `SignPicker.d.ts`.
+ *
+ * The PRIMARY control on the horoscope index, and it marks the reader's own
+ * sign — that mark is the whole reward for having an account.
+ */
+export interface SignItem { sign: string; published: boolean }
+interface Props {
+  signs: SignItem[];
+  current?: string;
+  /** The reader's own sign, from a saved nativity. */
+  yours?: string;
+  hrefFor: (sign: string) => string;
+}
+const { signs, current, yours, hrefFor } = Astro.props;
+
+const GLYPH: Record<string, string> = {
+  aries: "♈", taurus: "♉", gemini: "♊", cancer: "♋",
+  leo: "♌", virgo: "♍", libra: "♎", scorpio: "♏",
+  sagittarius: "♐", capricorn: "♑", aquarius: "♒", pisces: "♓",
+};
+const NAME = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+---
+
+<ul class="signs">
+  {
+    signs.map((s) => (
+      <li>
+        <a
+          href={hrefFor(s.sign)}
+          data-current={s.sign === current || undefined}
+          data-yours={s.sign === yours || undefined}
+          data-unwritten={!s.published || undefined}
+        >
+          <span class="t-glyph glyph" aria-hidden="true">{GLYPH[s.sign]}</span>
+          <span class="name">{NAME(s.sign)}</span>
+          {s.sign === yours && <span class="yours">yours</span>}
+          {!s.published && <span class="unwritten">not yet</span>}
+        </a>
+      </li>
+    ))
+  }
+</ul>
+
+<style>
+  .signs {
+    list-style: none; margin: 0; padding: 0;
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px;
+  }
+  .signs a {
+    display: grid; gap: 2px; justify-items: center; padding: 12px 10px;
+    border: var(--border-w) solid var(--line); border-radius: var(--radius-md);
+    background: var(--surface-card); text-decoration: none; min-height: 44px;
+    transition: border-color var(--dur-1) var(--ease-out), background var(--dur-1) var(--ease-out);
+  }
+  .signs a:hover { border-color: var(--line-strong); }
+  .signs a[data-current] { border-color: color-mix(in srgb, var(--accent) 50%, transparent); background: var(--accent-wash); }
+  .signs a[data-yours] { border-color: color-mix(in srgb, var(--rose) 55%, transparent); }
+  .glyph { font: 400 1.5rem var(--font-display); color: var(--rose); line-height: 1; }
+  .name { font: 500 var(--text-sm) var(--font-body); color: var(--ink); }
+  .yours {
+    font: 600 0.625rem var(--font-mono); letter-spacing: var(--tracking-caps);
+    text-transform: uppercase; color: var(--rose);
+  }
+  .unwritten { font: 400 var(--text-xs) var(--font-body); color: var(--ink-faint); font-style: italic; }
+  .signs a[data-unwritten] { opacity: 0.7; }
+</style>

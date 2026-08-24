@@ -1,0 +1,298 @@
+---
+/* Profile, consents and data — `ui_kits/site/Account.jsx`.
+ *
+ * Small, and honestly so. The design says out loud on this screen that nothing
+ * is public, because that sentence is what stops the feature creeping.
+ *
+ * Export, delete and change-consent are REAL CONTROLS that work here, not a
+ * support address.
+ */
+import BaseLayout from "../layouts/BaseLayout.astro";
+import SectionHeader from "../components/brand/SectionHeader.astro";
+import TextField from "../components/forms/TextField.astro";
+import SelectField from "../components/forms/SelectField.astro";
+import ConsentCheckbox from "../components/forms/ConsentCheckbox.astro";
+import CsrfField from "../components/forms/CsrfField.astro";
+import Button from "../components/forms/Button.astro";
+import { CONSENTS } from "../lib/consents";
+import { account, asReader } from "../lib/account";
+import { verifyCsrf } from "../lib/csrf";
+
+let notice = "";
+let failed = "";
+
+if (Astro.request.method === "POST") {
+  const form = await Astro.request.formData();
+  if (!verifyCsrf(Astro.cookies, form)) {
+    failed = "That did not save. Reload the page and try again.";
+  } else {
+    const action = String(form.get("action") ?? "");
+
+    if (action === "profile") {
+      const r = await asReader(Astro, "/api/account/profile", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          display_name: String(form.get("display_name") ?? ""),
+          timezone: String(form.get("timezone") ?? ""),
+          reading_language: String(form.get("reading_language") ?? "en"),
+          preferred_tradition: String(form.get("preferred_tradition") ?? ""),
+          house_system: String(form.get("house_system") ?? ""),
+          ayanamsa: String(form.get("ayanamsa") ?? ""),
+        }),
+      });
+      notice = r.ok ? "Saved." : "";
+      failed = r.ok ? "" : (r.body?.detail ?? "That did not save.");
+    }
+
+    if (action === "consent") {
+      const kind = String(form.get("kind") ?? "");
+      const granted = form.get("granted") === "1";
+      const r = await asReader(Astro, "/api/account/consents", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ kind, granted }),
+      });
+      if (r.ok) {
+        notice = r.body?.nativityDeleted
+          ? "Consent withdrawn, and the saved nativity was deleted with it."
+          : "Consent updated.";
+      } else {
+        failed = r.body?.detail ?? "That did not change.";
+      }
+    }
+
+    if (action === "delete") {
+      const r = await asReader(Astro, "/api/account/", { method: "DELETE" });
+      if (r.ok) {
+        Astro.cookies.delete("shruti_reader", { path: "/" });
+        return Astro.redirect("/account/deleted");
+      }
+      failed = r.body?.detail ?? "That did not delete.";
+    }
+  }
+}
+
+const me = await account(Astro);
+if (!me) return Astro.redirect("/signin");
+
+const state = Object.fromEntries(me.consents.map((c) => [c.kind, c]));
+const TRADITIONS = [
+  { value: "", label: "No preference — show both" },
+  { value: "hellenistic", label: "Hellenistic" },
+  { value: "vedic", label: "Vedic" },
+];
+---
+
+<BaseLayout title="Your account — Shruti" description="Profile, consents and your data.">
+  <div class="page account">
+    <SectionHeader
+      as="h1" glyph="☾" eyebrow="Account" title={me.displayName || me.email}
+      body="Nothing here is public. There is no profile page, no avatar and no follower count — this site is not that, and saying so is what keeps it that way."
+    />
+
+    {notice && <p class="notice" role="status">{notice}</p>}
+    {failed && <p class="failed" role="alert">{failed}</p>}
+
+    <section class="card">
+      <h2>Profile</h2>
+      <form method="POST" class="stack">
+        <CsrfField />
+        <input type="hidden" name="action" value="profile" />
+        <TextField label="Display name" name="display_name" value={me.displayName} optionalLabel hint="Only ever shown back to you." />
+        <TextField label="Timezone" name="timezone" value={me.timezone} optionalLabel hint="IANA name, e.g. Europe/Athens." />
+        <SelectField label="Preferred tradition" name="preferred_tradition" value={me.preferredTradition} options={TRADITIONS} />
+        <TextField label="House system" name="house_system" value={me.houseSystem} optionalLabel />
+        <TextField label="Ayanāṁśa" name="ayanamsa" value={me.ayanamsa} optionalLabel />
+        <div><Button type="submit">Save</Button></div>
+      </form>
+    </section>
+
+    <section class="card">
+      <h2>Nativity</h2>
+      {
+        me.nativity ? (
+          <div class="nativity">
+            <p class="nat-line">
+              <span class="t-tabular">{me.nativity.birthDate}</span>
+              {me.nativity.timeUnknown
+                ? <span class="undef"> · birth time unknown</span>
+                : <span class="t-tabular"> · {me.nativity.birthTime}</span>}
+            </p>
+            <p class="nat-place">
+              {me.nativity.placeName || "—"}
+              <span class="t-tabular faint"> · {me.nativity.lat.toFixed(4)}, {me.nativity.lon.toFixed(4)}</span>
+              {me.nativity.timezone && <span class="t-tabular faint"> · {me.nativity.timezone}</span>}
+            </p>
+            <div><Button variant="secondary" href="/nativity">Edit</Button></div>
+          </div>
+        ) : state.nativity?.granted ? (
+          <div class="stack">
+            <p class="quiet">No nativity saved yet.</p>
+            <div><Button href="/nativity">Add one</Button></div>
+          </div>
+        ) : (
+          <p class="quiet">
+            Storing birth data needs its own consent, below. Nothing is kept until it is given.
+          </p>
+        )
+      }
+    </section>
+
+    <section class="card">
+      <h2>Consents</h2>
+      <p class="quiet">
+        Three decisions, revisitable. Withdrawing is exactly as easy as giving — one control, here,
+        with no email and no waiting.
+      </p>
+      {
+        CONSENTS.map((c) => {
+          const now = state[c.kind];
+          const granted = !!now?.granted;
+          return (
+            <div class="consent-row">
+              <ConsentCheckbox
+                name={`consent_${c.kind}`}
+                label={c.label}
+                basis={c.basis}
+                required={c.required}
+                explanation={c.explanation}
+                wording={c.wording}
+                checked={granted}
+              />
+              <div class="consent-state">
+                {
+                  now?.givenAt && (
+                    <span class="t-tabular faint">
+                      {granted ? "Given" : "Withdrawn"} {new Date(now.givenAt).toISOString().slice(0, 10)}
+                      {granted ? " · withdraw any time" : ""}
+                    </span>
+                  )
+                }
+                {
+                  !c.required && (
+                    <form method="POST" class="inline">
+                      <CsrfField />
+                      <input type="hidden" name="action" value="consent" />
+                      <input type="hidden" name="kind" value={c.kind} />
+                      <input type="hidden" name="granted" value={granted ? "0" : "1"} />
+                      <Button type="submit" variant="ghost" size="sm">
+                        {granted ? "Withdraw" : "Give"}
+                      </Button>
+                    </form>
+                  )
+                }
+              </div>
+            </div>
+          );
+        })
+      }
+    </section>
+
+    <section class="card">
+      <h2>Your data</h2>
+      <div class="rights">
+        <div class="right">
+          <h3>Export</h3>
+          <p class="quiet">
+            Everything held about you, as a file, now — profile, nativity, the full consent history
+            with dates, and your newsletter state. No email round-trip and no thirty days.
+          </p>
+          <div><Button variant="secondary" href="/account/export">Download JSON</Button></div>
+        </div>
+        <div class="right">
+          <h3>Delete</h3>
+          <p class="quiet">
+            Immediate, irreversible, and it reaches the newsletter list too — not just the account.
+          </p>
+          <div><Button variant="secondary" data-open-delete>Delete my account</Button></div>
+        </div>
+      </div>
+    </section>
+
+    <dialog class="modal" data-delete-modal>
+      <h2>Delete your account</h2>
+      <div class="lists">
+        <div>
+          <h3>What goes</h3>
+          <ul>
+            <li>Your email address</li>
+            <li>Your name and preferences</li>
+            <li>Your saved nativity</li>
+            <li>Your newsletter subscription</li>
+          </ul>
+        </div>
+        <div>
+          <h3>What is kept, and why</h3>
+          <ul>
+            <li>
+              A record that consent was given and withdrawn, with dates and <strong>no birth
+              data</strong> — that record is the proof the law asks for, and it no longer names you.
+            </li>
+            <li>Invoices, for as long as tax law requires. There are none yet.</li>
+          </ul>
+        </div>
+      </div>
+      <p class="modal-note">Immediate. Not reversible. No grace period.</p>
+      <div class="modal-actions">
+        <form method="POST">
+          <CsrfField />
+          <input type="hidden" name="action" value="delete" />
+          <Button type="submit">Delete it</Button>
+        </form>
+        <Button variant="ghost" data-close-delete>Keep my account</Button>
+      </div>
+    </dialog>
+  </div>
+</BaseLayout>
+
+<style>
+  .account { max-width: 780px; display: grid; gap: var(--space-5); }
+  .card {
+    background: var(--surface-card); border: var(--border-w) solid var(--line);
+    border-radius: var(--radius-md); box-shadow: var(--shadow-1);
+    padding: var(--space-5); display: grid; gap: var(--space-3);
+  }
+  .card h2 { font: 600 var(--text-h3) var(--font-display); color: var(--ink); margin: 0; }
+  .card h3 { font: 600 var(--text-h4) var(--font-display); color: var(--ink); margin: 0 0 4px; }
+  .stack { display: grid; gap: var(--space-4); }
+  .quiet { font: 400 var(--text-sm) / 1.7 var(--font-body); color: var(--ink-soft); margin: 0; max-width: 64ch; }
+  .faint { color: var(--ink-faint); font-size: var(--text-xs); }
+  .undef { color: var(--ink-faint); font-style: italic; }
+  .notice { font: 400 var(--text-sm) var(--font-body); color: var(--accent); margin: 0; }
+  .failed { font: 400 var(--text-sm) var(--font-body); color: var(--live); margin: 0; }
+  .nat-line { font: 500 var(--text-h4) var(--font-mono); color: var(--ink); margin: 0; }
+  .nat-place { font: 400 var(--text-sm) var(--font-body); color: var(--ink-soft); margin: 0; }
+  .consent-row { display: grid; gap: 6px; }
+  .consent-state { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  .inline { display: inline; }
+  .rights { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-5); }
+  @media (max-width: 640px) { .rights { grid-template-columns: 1fr; } }
+  .right { display: grid; gap: 8px; align-content: start; }
+
+  .modal {
+    border: var(--border-w) solid var(--line-strong); border-radius: var(--radius-lg);
+    background: var(--surface-card); color: var(--ink); box-shadow: var(--shadow-3);
+    padding: var(--space-5); max-width: 640px; width: calc(100% - var(--space-5));
+  }
+  .modal::backdrop { background: color-mix(in srgb, var(--surface-inset) 70%, transparent); }
+  .modal h2 { font: 600 var(--text-h3) var(--font-display); margin: 0 0 var(--space-4); }
+  .lists { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-5); }
+  @media (max-width: 560px) { .lists { grid-template-columns: 1fr; } }
+  .lists ul { margin: 0; padding-left: 1.2em; font: 400 var(--text-sm) / 1.7 var(--font-body); color: var(--ink-soft); }
+  .modal-note { font: 500 var(--text-sm) var(--font-body); color: var(--live); margin: var(--space-4) 0 0; }
+  .modal-actions { display: flex; gap: 10px; align-items: center; margin-top: var(--space-4); }
+</style>
+
+<script is:inline>
+  (function () {
+    var modal = document.querySelector("[data-delete-modal]");
+    if (!modal) return;
+    document.querySelector("[data-open-delete]")?.addEventListener("click", function (e) {
+      e.preventDefault(); modal.showModal();
+    });
+    document.querySelector("[data-close-delete]")?.addEventListener("click", function (e) {
+      e.preventDefault(); modal.close();
+    });
+  })();
+</script>

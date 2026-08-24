@@ -1,0 +1,34 @@
+---
+/* After deletion. States what happened without asking anything further. */
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import SectionHeader from "../../components/brand/SectionHeader.astro";
+import Button from "../../components/forms/Button.astro";
+---
+
+<BaseLayout title="Account deleted — Shruti" description="Your account has been deleted.">
+  <div class="page done">
+    <SectionHeader as="h1" glyph="○" eyebrow="Deleted" title="That's done" />
+    <p class="body">
+      The account, your email address, your preferences, your saved nativity and your newsletter
+      subscription are gone. It reached the list as well as the account.
+    </p>
+    <p class="body">
+      What is kept is a record that consent was given and withdrawn, with dates and no birth data.
+      That record is the proof the law asks for, and it no longer names you.
+    </p>
+    <p class="body quiet">
+      Everything on the site that never needed an account still works, and always will.
+    </p>
+    <div class="actions">
+      <Button href="/today">Day at a glance</Button>
+      <Button variant="secondary" href="/tools/solar-stations">Station tracker</Button>
+    </div>
+  </div>
+</BaseLayout>
+
+<style>
+  .done { max-width: 620px; display: grid; gap: var(--space-3); }
+  .body { font: 400 var(--text-body) / var(--leading-body) var(--font-body); color: var(--ink-soft); margin: 0; max-width: 62ch; }
+  .quiet { color: var(--ink-faint); font-size: var(--text-sm); }
+  .actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: var(--space-4); }
+</style>

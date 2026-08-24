@@ -1,0 +1,196 @@
+---
+/* The nativity form — the most delicate on the site.
+ *
+ * THREE THINGS ARE LOAD-BEARING:
+ *
+ *  - "I don't know my birth time" is a FIRST-CLASS CHOICE, not a validation
+ *    error and not a warning triangle. When ticked, the cost is stated plainly.
+ *  - Place is a search that resolves to coordinates AND a historical timezone,
+ *    and the resolution is shown back. Greece's offset in 1996 is not a lookup
+ *    of today's rules.
+ *  - Data minimisation is a design constraint: nothing is asked for that the
+ *    ephemeris does not use. No street address, no phone, no gender field.
+ */
+import BaseLayout from "../layouts/BaseLayout.astro";
+import SectionHeader from "../components/brand/SectionHeader.astro";
+import TextField from "../components/forms/TextField.astro";
+import PlaceField from "../components/forms/PlaceField.astro";
+import CsrfField from "../components/forms/CsrfField.astro";
+import Button from "../components/forms/Button.astro";
+import { account, asReader } from "../lib/account";
+import { verifyCsrf } from "../lib/csrf";
+import { SITE_API } from "../lib/api";
+
+let notice = "";
+let failed = "";
+let offsetNote = "";
+
+if (Astro.request.method === "POST") {
+  const form = await Astro.request.formData();
+  if (!verifyCsrf(Astro.cookies, form)) {
+    failed = "That did not save. Reload the page and try again.";
+  } else {
+    const timeUnknown = form.get("time_unknown") === "1";
+    const birthDate = String(form.get("birth_date") ?? "");
+    const birthTime = String(form.get("birth_time") ?? "");
+    const tz = String(form.get("tz") ?? "");
+
+    /* Resolve the offset that applied ON THAT DATE, not today's. */
+    let offsetMinutes: number | null = null;
+    if (tz && birthDate) {
+      try {
+        const when = `${birthDate}T${timeUnknown ? "12:00" : birthTime || "12:00"}`;
+        const r = await fetch(
+          `${SITE_API}/api/places/offset?tz=${encodeURIComponent(tz)}&when=${encodeURIComponent(when)}`,
+        );
+        if (r.ok) {
+          const body = await r.json();
+          offsetMinutes = body.offsetMinutes;
+          if (body.note) offsetNote = body.note;
+        }
+      } catch { /* the offset is a refinement, not a blocker */ }
+    }
+
+    const r = await asReader(Astro, "/api/account/nativity", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        label: String(form.get("label") ?? ""),
+        birth_date: birthDate,
+        birth_time: timeUnknown ? null : (birthTime || null),
+        time_unknown: timeUnknown,
+        place_name: String(form.get("place") ?? ""),
+        lat: Number(form.get("lat") ?? 0),
+        lon: Number(form.get("lon") ?? 0),
+        elevation: Number(form.get("elevation") ?? 0),
+        timezone: tz,
+        utc_offset_minutes: offsetMinutes,
+      }),
+    });
+    notice = r.ok ? "Saved." : "";
+    failed = r.ok ? "" : (r.body?.detail ?? "That did not save.");
+  }
+}
+
+const me = await account(Astro);
+if (!me) return Astro.redirect("/signin");
+
+const consent = me.consents.find((c) => c.kind === "nativity");
+const allowed = !!consent?.granted;
+const n = me.nativity;
+---
+
+<BaseLayout title="Your nativity — Shruti" description="A saved birth moment, for your own readings.">
+  <div class="page nativity">
+    <SectionHeader
+      as="h1" glyph="✶" eyebrow="Nativity" title="Your birth moment"
+      body="Only what the ephemeris actually uses: when, and where. No street address, no phone number, no gender field."
+    />
+
+    {notice && <p class="notice" role="status">{notice}</p>}
+    {failed && <p class="failed" role="alert">{failed}</p>}
+    {offsetNote && <p class="offset-note" role="status">◐ {offsetNote}</p>}
+
+    {
+      !allowed ? (
+        <div class="card">
+          <h2>This needs its own consent</h2>
+          <p class="quiet">
+            Birth data used to produce an astrological reading arguably reveals philosophical
+            belief, which makes it special-category data. It is never stored without a separate,
+            explicit yes — and withdrawing that later deletes it again.
+          </p>
+          <div><Button href="/account">Give it in your account</Button></div>
+        </div>
+      ) : (
+        <form method="POST" class="card stack">
+          <CsrfField />
+          <TextField label="Label" name="label" value={n?.label ?? ""} optionalLabel hint="For your own reference, if you save more than one later." />
+          <TextField label="Birth date" name="birth_date" type="date" required value={n?.birthDate ?? ""} />
+
+          <div class="time-block">
+            <TextField label="Birth time" name="birth_time" type="time" value={n?.birthTime ?? ""} optionalLabel />
+            <label class="unknown">
+              <input type="checkbox" name="time_unknown" value="1" checked={n?.timeUnknown ?? false} data-unknown-time />
+              <span>I don't know my birth time</span>
+            </label>
+            {/* Not an error, not a warning. The cost, stated. */}
+            <div class="cost">
+              <p>
+                If you don't know it, that is a normal answer and the chart still works. What it
+                costs: the ascendant moves a degree every four minutes, so the
+                <strong> ascendant, midheaven, houses and sect become undefined</strong>.
+              </p>
+              <p class="cost-lists">
+                <strong>You still get:</strong> every planet's sign and degree, their aspects by
+                sign, and the Moon given as the range it covers across the day.
+                <br />
+                <strong>You do not get:</strong> houses, angles, sect, or the lots that depend on
+                the ascendant. They are left undefined rather than guessed — a fabricated ascendant
+                is worse than an absent one.
+              </p>
+            </div>
+          </div>
+
+          <div class="place-block">
+            <PlaceField
+              lat={n?.lat ?? 37.9838}
+              lon={n?.lon ?? 23.7275}
+              place={n?.placeName ?? ""}
+              elevation={n?.elevation ?? 0}
+              timezone={n?.timezone ?? ""}
+              label="Birth place"
+              wantTimezone
+            />
+            <p class="place-why">
+              A chart cast for the wrong city is indistinguishable from a right one — so the
+              resolved place, its coordinates and its timezone stay visible above. The timezone is
+              stored by name, not as an offset, because the offset that applied on your birth date
+              is not a lookup of today's rules.
+            </p>
+          </div>
+
+          <div><Button type="submit" size="lg">Save</Button></div>
+        </form>
+      )
+    }
+  </div>
+</BaseLayout>
+
+<style>
+  .nativity { max-width: 720px; display: grid; gap: var(--space-4); }
+  .card {
+    background: var(--surface-card); border: var(--border-w) solid var(--line);
+    border-radius: var(--radius-md); box-shadow: var(--shadow-1); padding: var(--space-5);
+    display: grid; gap: var(--space-4);
+  }
+  .card h2 { font: 600 var(--text-h3) var(--font-display); color: var(--ink); margin: 0; }
+  .stack { display: grid; gap: var(--space-5); }
+  .quiet { font: 400 var(--text-sm) / 1.7 var(--font-body); color: var(--ink-soft); margin: 0; max-width: 64ch; }
+  .notice { font: 400 var(--text-sm) var(--font-body); color: var(--accent); margin: 0; }
+  .failed { font: 400 var(--text-sm) var(--font-body); color: var(--live); margin: 0; }
+  .offset-note { font: 400 var(--text-sm) var(--font-body); color: var(--rose); margin: 0; max-width: 64ch; }
+  .time-block { display: grid; gap: 10px; }
+  .unknown { display: flex; gap: 8px; align-items: center; font: 400 var(--text-sm) var(--font-body); color: var(--ink); }
+  .unknown input { accent-color: var(--accent); width: 18px; height: 18px; }
+  .cost {
+    display: grid; gap: 8px; padding: var(--space-4);
+    border-left: 2px solid var(--rose); background: color-mix(in srgb, var(--rose-wash) 40%, transparent);
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  }
+  .cost p { margin: 0; font: 400 var(--text-sm) / 1.7 var(--font-body); color: var(--ink-soft); max-width: 64ch; }
+  .cost-lists { color: var(--ink) !important; }
+  .place-block { display: grid; gap: 8px; }
+  .place-why { font: 400 var(--text-xs) / 1.6 var(--font-body); color: var(--ink-faint); margin: 0; max-width: 66ch; }
+</style>
+
+<script is:inline>
+  (function () {
+    var box = document.querySelector("[data-unknown-time]");
+    var time = document.querySelector('input[name="birth_time"]');
+    if (!box || !time) return;
+    var sync = function () { time.disabled = box.checked; if (box.checked) time.value = ""; };
+    box.addEventListener("change", sync);
+    sync();
+  })();
+</script>

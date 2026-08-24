@@ -1,0 +1,126 @@
+---
+/* Sign in — ported from `ui_kits/site/Auth.jsx`.
+ *
+ * Magic link or password, switchable. If a link is sent, the "check your
+ * email" state is MANDATORY and is the third surface in this pack — it is
+ * where people get lost, so it names the address, gives the expiry, says the
+ * link works once, mentions spam, and offers both "different address" and
+ * "send it again".
+ */
+import BaseLayout from "../layouts/BaseLayout.astro";
+import SectionHeader from "../components/brand/SectionHeader.astro";
+import TextField from "../components/forms/TextField.astro";
+import CsrfField from "../components/forms/CsrfField.astro";
+import Button from "../components/forms/Button.astro";
+import { SITE_API } from "../lib/api";
+import { verifyCsrf } from "../lib/csrf";
+
+const method = Astro.url.searchParams.get("method") === "password" ? "password" : "link";
+let sent = false;
+let failed = "";
+const values = { email: "" };
+
+if (Astro.request.method === "POST") {
+  const form = await Astro.request.formData();
+  if (!verifyCsrf(Astro.cookies, form)) {
+    failed = "That did not send. Reload the page and try again.";
+  } else {
+    values.email = String(form.get("email") ?? "").trim();
+    const password = String(form.get("password") ?? "");
+    try {
+      const response = await fetch(`${SITE_API}/api/account/signin`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: values.email, password: password || null }),
+      });
+      const body = await response.json().catch(() => null);
+      if (response.ok) {
+        const cookie = response.headers.get("set-cookie");
+        if (cookie) Astro.response.headers.append("set-cookie", cookie);
+        if (body?.signedIn) return Astro.redirect("/account");
+        sent = true;
+      } else {
+        failed = body?.detail ?? "That did not work.";
+      }
+    } catch {
+      failed = "That did not work.";
+    }
+  }
+}
+---
+
+<BaseLayout title="Sign in — Shruti" description="Sign in by emailed link, or with a password.">
+  <div class="page auth">
+    {
+      sent ? (
+        /* The state where people get lost, designed rather than implied. */
+        <div class="check">
+          <SectionHeader as="h1" glyph="☾" eyebrow="Check your email" title="The link is on its way" />
+          <p class="check-body">
+            Sent to <strong>{values.email}</strong>. It works <strong>once</strong> and expires in
+            <strong> 20 minutes</strong>.
+          </p>
+          <p class="check-body">
+            Nothing yet? It sometimes lands in spam — and if the address has no account here, no
+            mail is sent at all, which is deliberate: whether an address has an account is not
+            something a stranger gets to learn from this form.
+          </p>
+          <div class="check-actions">
+            <Button variant="secondary" href="/signin">Use a different address</Button>
+            <form method="POST" class="inline-form">
+              <CsrfField />
+              <input type="hidden" name="email" value={values.email} />
+              <Button type="submit" variant="ghost">Send it again</Button>
+            </form>
+          </div>
+        </div>
+      ) : (
+        <>
+          <SectionHeader
+            as="h1" glyph="☾" eyebrow="Sign in" title="Welcome back"
+            body="By emailed link, or with a password if you set one."
+          />
+          <nav class="method-switch" aria-label="Sign-in method">
+            <a href="/signin" aria-current={method === "link" ? "page" : undefined}>Emailed link</a>
+            <a href="/signin?method=password" aria-current={method === "password" ? "page" : undefined}>Password</a>
+          </nav>
+          <form method="POST" novalidate class="auth-form">
+            <CsrfField />
+            {failed && <p class="auth-failed" role="alert">{failed}</p>}
+            <TextField label="Email" name="email" type="email" required value={values.email} autocomplete="email" />
+            {
+              method === "password" && (
+                <TextField label="Password" name="password" type="password" required autocomplete="current-password" />
+              )
+            }
+            <div>
+              <Button type="submit" size="lg">
+                {method === "password" ? "Sign in" : "Send me a link"}
+              </Button>
+            </div>
+            <p class="auth-alt">No account? <a href="/signup">Make one</a>.</p>
+          </form>
+        </>
+      )
+    }
+  </div>
+</BaseLayout>
+
+<style>
+  .auth { max-width: 620px; }
+  .auth-form { display: grid; gap: var(--space-5); margin-top: var(--space-5); }
+  .method-switch { display: flex; gap: 4px; margin-top: var(--space-5); }
+  .method-switch a {
+    font: 500 var(--text-sm) var(--font-body); color: var(--ink-soft); text-decoration: none;
+    padding: 8px 14px; border-radius: var(--radius-sm);
+  }
+  .method-switch a:hover { color: var(--ink); background: var(--surface-veil); }
+  .method-switch a[aria-current="page"] { color: var(--accent); background: var(--accent-wash); }
+  .check { display: grid; gap: 12px; }
+  .check-body { font: 400 var(--text-body) / var(--leading-body) var(--font-body); color: var(--ink-soft); margin: 0; max-width: 62ch; }
+  .check-actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: var(--space-3); }
+  .inline-form { display: inline; }
+  .auth-failed { font: 400 var(--text-sm) var(--font-body); color: var(--live); margin: 0; }
+  .auth-alt { font: 400 var(--text-sm) var(--font-body); color: var(--ink-soft); margin: 0; }
+  .auth-alt a { color: var(--accent); }
+</style>

@@ -1,0 +1,92 @@
+---
+/* Ported from `components/brand/SubscribeBlock.jsx`; contract in
+ * `SubscribeBlock.d.ts`.
+ *
+ * THE CONSENT WORDING SITS INSIDE THE FORM, not pinned underneath it, and the
+ * COMMERCIAL INTENT IS STATED AT THE POINT OF SUBSCRIPTION — not in a tooltip
+ * and not deferred to the privacy policy. That is deliberate and not to be
+ * softened.
+ *
+ * `state="sent"` is the in-form half of double opt-in, and it is designed
+ * rather than implied: this flow is where subscribers are lost.
+ */
+import CsrfField from "../forms/CsrfField.astro";
+import Button from "../forms/Button.astro";
+import { CONSENTS } from "../../lib/consents";
+
+interface Props {
+  state?: "idle" | "sent";
+  email?: string;
+  error?: string;
+  compact?: boolean;
+}
+const { state = "idle", email = "", error, compact = false } = Astro.props;
+const spec = CONSENTS.find((c) => c.kind === "newsletter")!;
+---
+
+<section class="subscribe" data-compact={compact || undefined}>
+  {
+    state === "sent" ? (
+      <div class="sent">
+        <p class="t-eyebrow">Check your email</p>
+        <h3>Almost — confirm it</h3>
+        <p class="body">
+          Sent to <strong>{email}</strong>. Click the link in it and you are on the list.
+          <strong> Nothing is sent to an unconfirmed address</strong>, so if you do not confirm,
+          nothing arrives — which is how it should work.
+        </p>
+        <p class="body quiet">Not there? It sometimes lands in spam.</p>
+      </div>
+    ) : (
+      <form method="POST" class="form">
+        <CsrfField />
+        <input type="hidden" name="action" value="subscribe" />
+        <h3>The monthly letter</h3>
+        <p class="body">
+          One a month: your horoscope if you have a saved nativity, the videos and streams since
+          last time, notes on what was written — and a letter, which is the part people actually
+          subscribe for.
+        </p>
+        <label class="field">
+          <span class="lbl">Email</span>
+          <input type="email" name="email" value={email} required placeholder="you@example.com" autocomplete="email" />
+        </label>
+        {error && <p class="error" role="alert">{error}</p>}
+        <label class="consent">
+          <input type="checkbox" name="consent" value="1" />
+          <span>{spec.wording}</span>
+        </label>
+        <div><Button type="submit">Send me the letter</Button></div>
+        <p class="body quiet">
+          One click to unsubscribe from any issue, no login. No tracking pixel — the emails carry
+          no open-tracking image, and there is nothing to consent to because the analytics here use
+          no cookies.
+        </p>
+      </form>
+    )
+  }
+</section>
+
+<style>
+  .subscribe {
+    background: var(--surface-card); border: var(--border-w) solid var(--line);
+    border-radius: var(--radius-md); box-shadow: var(--shadow-1); padding: var(--space-5);
+  }
+  .subscribe[data-compact] { padding: var(--space-4); }
+  .form, .sent { display: grid; gap: 12px; }
+  .subscribe h3 { font: 600 var(--text-h3) var(--font-display); color: var(--ink); margin: 0; }
+  .body { font: 400 var(--text-sm) / 1.7 var(--font-body); color: var(--ink-soft); margin: 0; max-width: 62ch; }
+  .quiet { color: var(--ink-faint); font-size: var(--text-xs); }
+  .field { display: grid; gap: 4px; }
+  .lbl { font: 600 var(--text-micro) var(--font-body); letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; color: var(--ink-faint); }
+  .field input {
+    font: 400 var(--text-body) var(--font-body); color: var(--ink); background: var(--surface-page);
+    border: var(--border-w) solid var(--line); border-radius: var(--radius-sm);
+    padding: 10px 12px; min-height: 44px; width: 100%; box-sizing: border-box; max-width: 380px;
+  }
+  /* Inside the form, not pinned under it. */
+  .consent { display: flex; gap: 10px; align-items: start; cursor: pointer; }
+  .consent input { margin-top: 3px; accent-color: var(--accent); width: 18px; height: 18px; flex: none; }
+  .consent span { font: 400 var(--text-sm) / 1.6 var(--font-body); color: var(--ink); max-width: 62ch; }
+  .error { font: 400 var(--text-sm) var(--font-body); color: var(--live); margin: 0; }
+</style>

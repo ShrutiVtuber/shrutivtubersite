@@ -1,0 +1,88 @@
+---
+/* Ported from `components/forms/ConsentCheckbox.jsx`; contract in
+ * `ConsentCheckbox.d.ts`.
+ *
+ * NEVER PRE-TICKED, NEVER BUNDLED, ALWAYS EXPLAINS ITSELF. Three decisions
+ * means three of these, and yes to one with no to another has to be possible.
+ *
+ * `basis` and `required` make the difference between a contract and a consent
+ * visible before a word is read: required renders "· required", optional
+ * renders "· optional" in rose.
+ *
+ * Only a CONTRACT consent can ever show an error. A special-category consent
+ * is never required, so it can never block a submit — one that could would not
+ * be freely given.
+ */
+interface Props {
+  name: string;
+  label: string;
+  basis: "contract" | "consent" | "explicit-consent";
+  required?: boolean;
+  explanation?: string;
+  wording?: string;
+  checked?: boolean;
+  error?: string;
+}
+const {
+  name, label, basis, required = false, explanation, wording,
+  checked = false, error,
+} = Astro.props;
+const BASIS_WORD: Record<string, string> = {
+  contract: "contract",
+  consent: "consent",
+  "explicit-consent": "explicit consent",
+};
+---
+
+<div class="consent" data-invalid={!!error || undefined}>
+  <label class="consent-head">
+    {/* Never `checked` by default — the prop exists so a settings screen can
+        show the current state, not so a signup form can pre-tick it. */}
+    <input type="checkbox" name={name} value="1" checked={checked} />
+    <span class="consent-label">
+      {label}
+      <span class="consent-flag" data-required={required || undefined}>
+        · {required ? "required" : "optional"}
+      </span>
+    </span>
+  </label>
+  <p class="consent-basis">lawful basis: {BASIS_WORD[basis]}</p>
+  {explanation && <p class="consent-explain">{explanation}</p>}
+  {wording && <p class="consent-wording">“{wording}”</p>}
+  {error && <p class="consent-error" role="alert">{error}</p>}
+</div>
+
+<style>
+  .consent {
+    display: grid;
+    gap: 6px;
+    padding: var(--space-4);
+    border: var(--border-w) solid var(--line);
+    border-radius: var(--radius-md);
+    background: var(--surface-card);
+  }
+  .consent[data-invalid] { border-color: var(--live); background: color-mix(in srgb, var(--live-wash) 45%, var(--surface-card)); }
+  .consent-head { display: flex; gap: 10px; align-items: start; cursor: pointer; }
+  .consent-head input { margin-top: 4px; accent-color: var(--accent); width: 18px; height: 18px; flex: none; }
+  .consent-label { font: 500 var(--text-body) var(--font-body); color: var(--ink); }
+  .consent-flag { font: 400 var(--text-xs) var(--font-body); color: var(--rose); }
+  .consent-flag[data-required] { color: var(--ink-faint); }
+  .consent-basis {
+    margin: 0;
+    font: 400 var(--text-micro) var(--font-mono);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+  }
+  .consent-explain { margin: 0; font: 400 var(--text-sm) / 1.6 var(--font-body); color: var(--ink-soft); max-width: 62ch; }
+  .consent-wording {
+    margin: 4px 0 0;
+    padding-left: 12px;
+    border-left: 2px solid var(--rose);
+    font: 400 var(--text-sm) / 1.6 var(--font-display);
+    font-style: italic;
+    color: var(--ink-soft);
+    max-width: 62ch;
+  }
+  .consent-error { margin: 0; font: 400 var(--text-sm) var(--font-body); color: var(--live); }
+</style>

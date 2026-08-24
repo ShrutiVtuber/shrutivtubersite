@@ -1,0 +1,81 @@
+---
+/* One reading — linkable and shareable, which is the point: this is the page
+ * that gets posted in a Discord.
+ *
+ * Readings are bylined Soror Eu. A., because magickal writing signs with the
+ * motto.
+ */
+import BaseLayout from "../../../layouts/BaseLayout.astro";
+import SectionHeader from "../../../components/brand/SectionHeader.astro";
+import PeriodSwitcher from "../../../components/navigation/PeriodSwitcher.astro";
+import Prose from "../../../components/content/Prose.astro";
+import Badge from "../../../components/navigation/Badge.astro";
+import EmptyState from "../../../components/feedback/EmptyState.astro";
+import Button from "../../../components/forms/Button.astro";
+import { site } from "../../../lib/api";
+import { account } from "../../../lib/account";
+import { renderMarkdown } from "../../../lib/markdown";
+import { sunSign, SIGNS } from "../../../lib/signs";
+
+const sign = String(Astro.params.sign ?? "");
+const period = String(Astro.params.period ?? "monthly");
+if (!SIGNS.includes(sign)) return Astro.rewrite("/404");
+
+interface Reading {
+  sign: string; period: string; covers: string; published: boolean;
+  bodyMd: string; byline: string; availablePeriods: string[];
+}
+const data = await site<Reading>(`/api/horoscopes/${sign}/${period}`);
+if (!data) return Astro.rewrite("/404");
+
+const me = await account(Astro);
+const yours = me?.nativity ? sunSign(me.nativity.birthDate) : null;
+const html = data.published ? await renderMarkdown(data.bodyMd) : "";
+const NAME = sign.charAt(0).toUpperCase() + sign.slice(1);
+const GLYPH: Record<string, string> = {
+  aries: "♈", taurus: "♉", gemini: "♊", cancer: "♋", leo: "♌", virgo: "♍",
+  libra: "♎", scorpio: "♏", sagittarius: "♐", capricorn: "♑", aquarius: "♒", pisces: "♓",
+};
+---
+
+<BaseLayout
+  title={`${NAME} — ${data.covers} — Shruti`}
+  description={`The ${period} reading for ${NAME}, written by hand and signed Soror Eu. A.`}
+>
+  <div class="page reading">
+    <div class="reading-head">
+      <SectionHeader as="h1" glyph={GLYPH[sign]} eyebrow={data.covers} title={NAME} />
+      {sign === yours && <Badge tone="rose">your sign</Badge>}
+    </div>
+
+    <PeriodSwitcher
+      available={data.availablePeriods.length ? data.availablePeriods : ["monthly"]}
+      current={period}
+      hrefFor={(p) => `/horoscopes/${sign}/${p}`}
+    />
+
+    {
+      data.published ? (
+        <Prose html={html} byline={data.byline} />
+      ) : (
+        <EmptyState
+          glyph="○"
+          title="Not written yet"
+          body="This one is not up. Twelve go together — an empty reading is worse than a late one."
+        >
+          <Button slot="action" variant="secondary" href="/horoscopes">All twelve signs</Button>
+        </EmptyState>
+      )
+    }
+
+    <p class="back"><a href="/horoscopes">← All twelve signs</a></p>
+  </div>
+</BaseLayout>
+
+<style>
+  .reading { max-width: 720px; display: grid; gap: var(--space-4); }
+  .reading-head { display: flex; gap: var(--space-4); align-items: baseline; flex-wrap: wrap; }
+  .back { margin: var(--space-5) 0 0; font: 400 var(--text-sm) var(--font-body); }
+  .back a { color: var(--accent); text-decoration: none; }
+  .back a:hover { text-decoration: underline; }
+</style>

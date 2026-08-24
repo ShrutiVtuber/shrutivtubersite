@@ -1,0 +1,17 @@
+---
+/* The export, as a download. Not a promise — a file. */
+import { asReader } from "../../lib/account";
+
+const r = await asReader(Astro, "/api/account/export");
+if (!r.ok) return Astro.redirect("/signin");
+
+const stamp = new Date().toISOString().slice(0, 10);
+return new Response(JSON.stringify(r.body, null, 2), {
+  headers: {
+    "content-type": "application/json; charset=utf-8",
+    "content-disposition": `attachment; filename="shrutivtuber-data-${stamp}.json"`,
+    // Personal data should not sit in a shared cache on the way out.
+    "cache-control": "no-store",
+  },
+});
+---

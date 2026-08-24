@@ -1,0 +1,51 @@
+---
+/* One click, no login, and THIS PAGE DOES NOT ARGUE.
+ *
+ * No survey, no "are you sure", no win-back offer. It mentions pause once,
+ * because a pause keeps more people than an unsubscribe loses — and then it
+ * stops.
+ */
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import SectionHeader from "../../components/brand/SectionHeader.astro";
+import Button from "../../components/forms/Button.astro";
+import { SITE_API } from "../../lib/api";
+
+const token = Astro.url.searchParams.get("token") ?? "";
+let ok = false;
+let email = "";
+
+if (token) {
+  const r = await fetch(`${SITE_API}/api/newsletter/unsubscribe?token=${encodeURIComponent(token)}`);
+  const body = await r.json().catch(() => null);
+  if (r.ok) { ok = true; email = body.email; }
+}
+---
+
+<BaseLayout title="Unsubscribed — Shruti" description="You have been removed from the monthly letter.">
+  <div class="page out">
+    <SectionHeader as="h1" glyph="○" eyebrow="Unsubscribed" title="Done" />
+    <p class="body">
+      {ok ? <><strong>{email}</strong> will not get the letter again.</> : "That address will not get the letter again."}
+      {" "}No further email, and nothing else needed from you.
+    </p>
+    {/* Mentioned once. Then it stops. */}
+    {
+      ok && token && (
+        <p class="body quiet">
+          If you only wanted a break rather than an ending, there is a pause —
+          <a href={`/newsletter/preferences?token=${encodeURIComponent(token)}`}> here</a>. It deletes
+          nothing.
+        </p>
+      )
+    }
+    <div class="actions"><Button variant="secondary" href="/">Back to the site</Button></div>
+  </div>
+</BaseLayout>
+
+<style>
+  .out { max-width: 600px; display: grid; gap: var(--space-3); }
+  .body { font: 400 var(--text-body) / var(--leading-body) var(--font-body); color: var(--ink-soft); margin: 0; max-width: 62ch; }
+  .quiet { color: var(--ink-faint); font-size: var(--text-sm); }
+  .quiet a { color: var(--accent); }
+  .actions { display: flex; gap: 10px; margin-top: var(--space-4); }
+</style>
