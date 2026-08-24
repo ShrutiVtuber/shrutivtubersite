@@ -9,7 +9,7 @@ import "../styles/global.css";
 import "../styles/site.css";
 import SiteHeader from "../components/chrome/SiteHeader.astro";
 import SiteFooter from "../components/chrome/SiteFooter.astro";
-import { site, type LiveStatus, type LinkGroups } from "../lib/api";
+import { site, type LiveStatus, type LinkGroups, PATHS } from "../lib/api";
 import { badgeFrom } from "../lib/live";
 import type { SocialLink } from "../components/brand/SocialLinkRow.astro";
 
@@ -23,8 +23,8 @@ const { title, description = "", bare = false } = Astro.props;
 const siteUrl = import.meta.env.SHRUTI_SITE_URL ?? "https://shrutivtuber.com";
 
 const [live, links] = await Promise.all([
-  site<LiveStatus>("/live"),
-  site<LinkGroups>("/links"),
+  site<LiveStatus>(PATHS.live),
+  site<LinkGroups>(PATHS.links),
 ]);
 const badge = badgeFrom(live);
 

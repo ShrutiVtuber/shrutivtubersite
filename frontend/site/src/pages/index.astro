@@ -14,7 +14,7 @@ import SocialLinkRow from "../components/brand/SocialLinkRow.astro";
 import Button from "../components/forms/Button.astro";
 import ProjectCard from "../components/cards/ProjectCard.astro";
 import ScheduleItem from "../components/tables/ScheduleItem.astro";
-import { site, type LiveStatus, type LinkGroups, type Project } from "../lib/api";
+import { site, type LiveStatus, type LinkGroups, type Project, PATHS } from "../lib/api";
 import { badgeFrom } from "../lib/live";
 import type { SocialLink } from "../components/brand/SocialLinkRow.astro";
 
@@ -28,10 +28,10 @@ interface ScheduleRow {
 }
 
 const [live, links, projects, schedule] = await Promise.all([
-  site<LiveStatus>("/live"),
-  site<LinkGroups>("/links"),
-  site<Project[]>("/projects"),
-  site<ScheduleRow[]>("/schedule"),
+  site<LiveStatus>(PATHS.live),
+  site<LinkGroups>(PATHS.links),
+  site<Project[]>(PATHS.projects),
+  site<ScheduleRow[]>(PATHS.schedule),
 ]);
 
 const badge = badgeFrom(live);

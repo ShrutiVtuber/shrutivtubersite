@@ -31,6 +31,23 @@ async function get<T>(base: string, path: string, timeoutMs = 6000): Promise<T |
 export const site = <T,>(path: string) => get<T>(SITE_API, path);
 export const astro = <T,>(path: string) => get<T>(ASTRO_API, path);
 
+/* The backend mounts its routers under /api, and the content router under
+ * /api/content. Naming the paths here once stops every caller from having to
+ * remember which of the two a given resource lives on — and stops the class of
+ * bug this file shipped with, where every path was missing its prefix, every
+ * fetch 404'd, and nothing looked broken because the designed absent states
+ * look deliberate. That is precisely the failure the design brief warns about
+ * with the press kit rendering nine zeroes.
+ */
+export const PATHS = {
+  live: "/api/live",
+  schedule: "/api/schedule",
+  links: "/api/content/links",
+  projects: "/api/content/projects",
+  profile: "/api/content/profile",
+  page: (name: string) => `/api/content/page/${name}`,
+} as const;
+
 export interface LinkGroups {
   groups: Record<string, { platform: string; url: string; label: string }[]>;
 }
