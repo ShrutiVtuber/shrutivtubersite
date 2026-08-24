@@ -80,9 +80,14 @@ def _allowed_origins() -> list[str]:
     credential made at localhost is scoped to localhost and is useless
     anywhere else, which is exactly the property that makes including it safe.
     """
-    site = os.environ.get("SHRUTI_SITE_URL", "http://localhost:8200").rstrip("/")
+    settings = get_settings()
+    site = (settings.site_url or "http://localhost:8200").rstrip("/")
     allowed = [site]
-    if os.environ.get("SHRUTI_ENV", "dev") != "prod":
+    # `is_production` rather than a string compare on SHRUTI_ENV. The setting
+    # accepts both "prod" and "production", and a second definition of
+    # production living here would have quietly allowed localhost passkeys on
+    # a server whose env happened to say the longer word.
+    if not settings.is_production:
         allowed += [
             "http://localhost:8200", "http://127.0.0.1:8200",
             "http://localhost:4321", "http://127.0.0.1:4321",

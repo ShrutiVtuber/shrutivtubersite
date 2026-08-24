@@ -31,6 +31,7 @@ from cryptography.hazmat.primitives.asymmetric import ec
 from webauthn import verify_authentication_response, verify_registration_response
 
 from shruti.api.routes import passkeys as pk
+from shruti.core.config import get_settings
 
 ORIGIN = "http://localhost:8200"
 RP_ID = "localhost"
@@ -218,25 +219,38 @@ def test_no_cookie_means_no_challenge() -> None:
 
 # ── the relying party ───────────────────────────────────────────────────────
 
-def test_an_unknown_origin_cannot_introduce_itself(monkeypatch) -> None:
+@pytest.fixture
+def configured(monkeypatch):
+    """Settings are cached, so an env change alone would not be seen."""
+    def apply(env: str, site: str = "https://shrutivtuber.com"):
+        monkeypatch.setenv("SHRUTI_SITE_URL", site)
+        monkeypatch.setenv("SHRUTI_ENV", env)
+        get_settings.cache_clear()
+        return get_settings()
+    yield apply
+    get_settings.cache_clear()
+
+
+def test_an_unknown_origin_cannot_introduce_itself(configured) -> None:
     """A forged Origin must not be able to scope a credential elsewhere. The
     header only ever PICKS from the allowlist."""
-    monkeypatch.setenv("SHRUTI_SITE_URL", "https://shrutivtuber.com")
-    monkeypatch.setenv("SHRUTI_ENV", "prod")
+    configured("prod")
     rp_id, origin = pk._relying_party(_Request(headers={"origin": "https://evil.example"}))
     assert rp_id == "shrutivtuber.com"
     assert origin == "https://shrutivtuber.com"
 
 
-def test_localhost_is_allowed_off_production(monkeypatch) -> None:
-    monkeypatch.setenv("SHRUTI_SITE_URL", "https://shrutivtuber.com")
-    monkeypatch.setenv("SHRUTI_ENV", "dev")
+def test_localhost_is_allowed_off_production(configured) -> None:
+    configured("development")
     rp_id, origin = pk._relying_party(_Request(headers={"origin": ORIGIN}))
     assert (rp_id, origin) == ("localhost", ORIGIN)
 
 
-def test_localhost_is_not_allowed_in_production(monkeypatch) -> None:
-    monkeypatch.setenv("SHRUTI_SITE_URL", "https://shrutivtuber.com")
-    monkeypatch.setenv("SHRUTI_ENV", "prod")
+@pytest.mark.parametrize("env", ["prod", "production"])
+def test_localhost_is_not_allowed_in_production(configured, env: str) -> None:
+    """BOTH spellings. `is_production` accepts "prod" and "production", and a
+    second definition of production living in this module would have quietly
+    allowed localhost passkeys on a server whose env said the longer word."""
+    configured(env)
     rp_id, _ = pk._relying_party(_Request(headers={"origin": ORIGIN}))
     assert rp_id == "shrutivtuber.com"
