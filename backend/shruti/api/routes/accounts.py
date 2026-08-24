@@ -198,6 +198,77 @@ async def sign_out(response: Response) -> dict:
     return {"ok": True}
 
 
+# ── forgotten passwords ─────────────────────────────────────────────────────
+
+
+class ResetRequestIn(BaseModel):
+    email: EmailStr
+
+
+@router.post("/reset/request", status_code=202)
+async def request_reset(
+    body: ResetRequestIn, session: AsyncSession = Depends(get_session)
+) -> dict:
+    """
+    Send a reset link, and say the same thing either way.
+
+    Whether an address has an account here is not something a stranger gets to
+    learn from a form, so the reply is identical whether one was sent or not.
+    """
+    email = body.email.lower().strip()
+    user = (
+        await session.execute(select(User).where(User.email == email))
+    ).scalar_one_or_none()
+    if user is not None:
+        url = f"{_site_url()}/reset?token={issue_link(email, purpose='reset')}"
+        await send_mail(
+            subject="Reset your password",
+            body=(
+                "A password reset was requested for your shrutivtuber.com account.\n\n"
+                f"{url}\n\n"
+                "It works once and expires in 20 minutes. If this was not you, "
+                "nothing has happened and you can ignore it."
+            ),
+            to=email,
+        )
+    return {"ok": True, "checkEmail": True}
+
+
+class ResetIn(BaseModel):
+    token: str
+    password: str = Field(min_length=10, max_length=200)
+
+
+@router.post("/reset")
+async def do_reset(
+    body: ResetIn, request: Request, response: Response,
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """
+    Set a new password from a reset link, and sign in.
+
+    A reset link cannot be used as a sign-in link and vice versa: the purpose
+    is claimed in the token and checked, so one cannot stand in for the other.
+    """
+    email = read_link(body.token, purpose="reset")
+    if not email:
+        raise HTTPException(400, "that link has expired or has already been used")
+    user = (
+        await session.execute(select(User).where(User.email == email))
+    ).scalar_one_or_none()
+    if user is None:
+        raise HTTPException(400, "that link has expired or has already been used")
+
+    user.password_hash = hash_password(body.password)
+    user.email_verified_at = user.email_verified_at or datetime.now(timezone.utc)
+    await session.commit()
+
+    secure = request.url.scheme == "https" or \
+        request.headers.get("x-forwarded-proto") == "https"
+    _set_session(response, user, secure)
+    return {"ok": True, "signedIn": True}
+
+
 # ── the account ─────────────────────────────────────────────────────────────
 
 @router.get("/me")

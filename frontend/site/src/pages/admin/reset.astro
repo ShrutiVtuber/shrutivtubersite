@@ -1,0 +1,54 @@
+---
+/* Landing for the admin reset link. */
+import AdminLayout from "../../layouts/AdminLayout.astro";
+import CsrfField from "../../components/forms/CsrfField.astro";
+import Button from "../../components/forms/Button.astro";
+import { SITE_API } from "../../lib/api";
+import { verifyCsrf } from "../../lib/csrf";
+import { redirectWithCookies } from "../../lib/redirect";
+
+const token = Astro.url.searchParams.get("token") ?? "";
+let failed = "";
+
+if (Astro.request.method === "POST") {
+  const form = await Astro.request.formData();
+  if (!verifyCsrf(Astro.cookies, form)) {
+    failed = "That did not send. Reload the page and try again.";
+  } else {
+    const r = await fetch(`${SITE_API}/api/admin/reset`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        token: String(form.get("token") ?? ""),
+        password: String(form.get("password") ?? ""),
+      }),
+    });
+    if (r.ok) return redirectWithCookies("/admin", r);
+    failed = (await r.json().catch(() => null))?.detail ?? "That link did not work.";
+  }
+}
+---
+
+<AdminLayout title="Reset password" open>
+  <div class="wrap">
+    <h1 class="adm-h">Choose a new password</h1>
+    <form method="POST" class="adm-card form">
+      <CsrfField />
+      <input type="hidden" name="token" value={token} />
+      {failed && <p class="adm-bad" role="alert">{failed}</p>}
+      <label class="field">
+        <span class="adm-lbl">New password</span>
+        <input class="adm-input" type="password" name="password" required minlength="12" autocomplete="new-password" autofocus />
+        <span class="hint">Twelve characters or more.</span>
+      </label>
+      <div><Button type="submit">Set it and sign in</Button></div>
+    </form>
+  </div>
+</AdminLayout>
+
+<style>
+  .wrap { max-width: 420px; display: grid; gap: var(--space-4); }
+  .form { gap: var(--space-4); }
+  .field { display: grid; gap: 4px; }
+  .hint { font: 400 var(--text-xs) / 1.5 var(--font-body); color: var(--ink-faint); }
+</style>

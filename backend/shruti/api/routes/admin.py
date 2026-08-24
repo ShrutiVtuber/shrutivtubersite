@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import SQLModel, select
 
@@ -58,8 +58,13 @@ class LoginIn(BaseModel):
 
 
 @router.post("/login")
-async def login(payload: LoginIn, response: Response) -> dict:
-    if not authenticate(payload.email, payload.password):
+async def login(
+    payload: LoginIn, response: Response,
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    from shruti.core.operator import verify as verify_operator
+
+    if not await verify_operator(session, payload.email, payload.password):
         # One message for both failures. Distinguishing "no such user" from
         # "wrong password" tells an attacker which half to work on.
         raise HTTPException(401, "email or password is wrong")
@@ -191,6 +196,129 @@ def _model(kind: str) -> type[SQLModel]:
 def _order(model: type[SQLModel]):
     return model.position if hasattr(model, "position") else model.id
 
+
+
+# NOTE ON ORDER: everything below this line must stay ABOVE the generic
+# /{kind} routes. FastAPI matches in definition order, so a /{kind} route
+# declared first will happily match /claim and /reset as table names and
+# answer 401 for a route that should be public. That has now bitten twice
+# in this file — the first time it was /media.
+
+# ── claiming the site, and resetting the password ───────────────────────────
+
+
+class ClaimIn(BaseModel):
+    email: EmailStr
+    password: str = Field(min_length=12, max_length=200)
+    token: str
+
+
+@router.get("/claim")
+async def claim_status(session: AsyncSession = Depends(get_session)) -> dict:
+    """
+    Whether the site has an operator yet.
+
+    Public, and safe to be: an unclaimed site is a fact anyone can establish by
+    trying to log in, and saying so plainly is what lets the admin show a setup
+    screen instead of a login that cannot succeed. Minting the token on this
+    call means it reaches the log the first time someone actually looks.
+    """
+    from shruti.core.operator import is_claimed, setup_token
+
+    claimed = await is_claimed(session)
+    if not claimed:
+        await setup_token(session)     # logged, not returned
+    return {"claimed": claimed}
+
+
+@router.post("/claim", status_code=201)
+async def claim_site(
+    body: ClaimIn, response: Response,
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """
+    Claim the site once, with the setup token from the server log.
+
+    Reading the log means having the box, which is the fact being proven. An
+    unclaimed admin on a public site is otherwise a takeover waiting for
+    whoever loads the page first.
+    """
+    from shruti.core.operator import claim
+
+    if not await claim(session, body.email, body.password, body.token):
+        # One message for every failure: already claimed, wrong token, or a
+        # race. Distinguishing them tells an attacker which half to work on.
+        raise HTTPException(400, "that setup token is not valid, or the site is already claimed")
+
+    token = issue_token(body.email)
+    response.set_cookie(
+        "shruti_session", token, httponly=True, samesite="lax",
+        secure=get_settings().is_production, max_age=12 * 3600, path="/",
+    )
+    return {"ok": True}
+
+
+class ResetRequestIn(BaseModel):
+    email: EmailStr
+
+
+@router.post("/reset/request", status_code=202)
+async def request_reset(
+    body: ResetRequestIn, session: AsyncSession = Depends(get_session)
+) -> dict:
+    """
+    Send a password-reset link to the operator's address.
+
+    The reply is identical whether or not the address is the operator's —
+    otherwise this form tells a stranger who runs the site.
+    """
+    from shruti.core.mail import send
+    from shruti.core.operator import operator_email
+    from shruti.core.sessions import issue_link
+
+    address = await operator_email(session)
+    if address and address == body.email.strip().lower():
+        import os
+
+        site_url = os.environ.get("SHRUTI_SITE_URL", "http://localhost:8200").rstrip("/")
+        link = issue_link(address, purpose="admin-reset")
+        await send(
+            subject="Reset your admin password",
+            body=(
+                "A password reset was requested for the shrutivtuber.com admin.\n\n"
+                f"{site_url}/admin/reset?token={link}\n\n"
+                "It works once and expires in 20 minutes. If this was not you, "
+                "nothing has happened and you can ignore it."
+            ),
+            to=address,
+        )
+    return {"ok": True, "checkEmail": True}
+
+
+class ResetIn(BaseModel):
+    token: str
+    password: str = Field(min_length=12, max_length=200)
+
+
+@router.post("/reset")
+async def do_reset(
+    body: ResetIn, response: Response,
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    from shruti.core.operator import operator_email, set_password
+    from shruti.core.sessions import read_link
+
+    email = read_link(body.token, purpose="admin-reset")
+    if not email or email != await operator_email(session):
+        raise HTTPException(400, "that link has expired or has already been used")
+
+    await set_password(session, body.password)
+    token = issue_token(email)
+    response.set_cookie(
+        "shruti_session", token, httponly=True, samesite="lax",
+        secure=get_settings().is_production, max_age=12 * 3600, path="/",
+    )
+    return {"ok": True}
 
 @router.get("/{kind}")
 async def list_items(

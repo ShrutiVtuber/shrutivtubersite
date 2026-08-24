@@ -1,5 +1,13 @@
 ---
-/* Admin sign-in. The one admin page that cannot require a session. */
+/* Admin sign-in — and, on a site nobody has claimed yet, the setup screen.
+ *
+ * THE CLAIM IS THE DELICATE PART. An unclaimed admin on a public site is a
+ * takeover waiting for whoever loads the page first, so claiming needs proof
+ * that the claimant has the server. The proof is a setup token written to the
+ * backend log on first ask: reading the log means having the box, which is
+ * exactly the fact being proven. The token is spent on success and the route
+ * closes for good.
+ */
 import AdminLayout from "../../layouts/AdminLayout.astro";
 import CsrfField from "../../components/forms/CsrfField.astro";
 import Button from "../../components/forms/Button.astro";
@@ -10,11 +18,36 @@ import { signedIn } from "../../lib/admin";
 
 const next = Astro.url.searchParams.get("next") || "/admin";
 let failed = "";
+let notice = "";
+let sentReset = false;
+
+const mode = Astro.url.searchParams.get("mode") === "forgot" ? "forgot" : "signin";
 
 if (Astro.request.method === "POST") {
   const form = await Astro.request.formData();
+  const action = String(form.get("action") ?? "signin");
   if (!verifyCsrf(Astro.cookies, form)) {
     failed = "That did not send. Reload the page and try again.";
+  } else if (action === "claim") {
+    const r = await fetch(`${SITE_API}/api/admin/claim`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: String(form.get("email") ?? ""),
+        password: String(form.get("password") ?? ""),
+        token: String(form.get("token") ?? "").trim(),
+      }),
+    });
+    if (r.ok) return redirectWithCookies("/admin", r);
+    failed = (await r.json().catch(() => null))?.detail ?? "That did not work.";
+  } else if (action === "forgot") {
+    await fetch(`${SITE_API}/api/admin/reset/request`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: String(form.get("email") ?? "") }),
+    });
+    // Always the same reply — otherwise this form says who runs the site.
+    sentReset = true;
   } else {
     const r = await fetch(`${SITE_API}/api/admin/login`, {
       method: "POST",
@@ -24,38 +57,117 @@ if (Astro.request.method === "POST") {
         password: String(form.get("password") ?? ""),
       }),
     });
-    // redirectWithCookies, not Astro.redirect: the latter builds a new
-    // Response and drops the Set-Cookie that just signed you in.
     if (r.ok) return redirectWithCookies(String(form.get("next") ?? "/admin"), r);
     failed = "Email or password is wrong.";
   }
 } else if (await signedIn(Astro)) {
   return Astro.redirect(next);
 }
+
+/* Asking also mints the setup token and writes it to the log, so it is there
+   the first time someone actually looks. */
+let claimed = true;
+try {
+  const r = await fetch(`${SITE_API}/api/admin/claim`);
+  if (r.ok) claimed = (await r.json()).claimed;
+} catch { /* treat as claimed: showing a setup form on a claimed site is worse */ }
 ---
 
-<AdminLayout title="Sign in" open>
-  <div class="signin-wrap">
-    <h1 class="adm-h">Sign in</h1>
-    <form method="POST" class="adm-card signin-form">
-      <CsrfField />
-      <input type="hidden" name="next" value={next} />
-      {failed && <p class="adm-bad" role="alert">{failed}</p>}
-      <label class="field">
-        <span class="adm-lbl">Email</span>
-        <input class="adm-input" type="email" name="email" required autocomplete="username" autofocus />
-      </label>
-      <label class="field">
-        <span class="adm-lbl">Password</span>
-        <input class="adm-input" type="password" name="password" required autocomplete="current-password" />
-      </label>
-      <div><Button type="submit">Sign in</Button></div>
-    </form>
+<AdminLayout title={claimed ? "Sign in" : "Set up"} open>
+  <div class="wrap">
+    {
+      !claimed ? (
+        <>
+          <h1 class="adm-h">Claim this site</h1>
+          <p class="adm-note">
+            Nobody has set an operator password yet. To prove you are the person running this
+            server rather than the first person to find this page, paste the setup token from the
+            backend log:
+          </p>
+          <pre class="hint-cmd">docker compose logs backend | grep "setup token"</pre>
+          <form method="POST" class="adm-card form">
+            <CsrfField />
+            <input type="hidden" name="action" value="claim" />
+            {failed && <p class="adm-bad" role="alert">{failed}</p>}
+            <label class="field">
+              <span class="adm-lbl">Setup token</span>
+              <input class="adm-input" name="token" required autocomplete="off" autofocus />
+            </label>
+            <label class="field">
+              <span class="adm-lbl">Your email</span>
+              <input class="adm-input" type="email" name="email" required autocomplete="username" />
+            </label>
+            <label class="field">
+              <span class="adm-lbl">Choose a password</span>
+              <input class="adm-input" type="password" name="password" required minlength="12" autocomplete="new-password" />
+              <span class="hint">Twelve characters or more. You can reset it by email later.</span>
+            </label>
+            <div><Button type="submit">Claim it</Button></div>
+          </form>
+        </>
+      ) : sentReset ? (
+        <>
+          <h1 class="adm-h">Check your email</h1>
+          <p class="adm-note">
+            If that address is the operator's, a reset link is on its way. It works once and
+            expires in twenty minutes.
+          </p>
+          <p class="adm-note">
+            The reply is the same either way, deliberately — otherwise this form would tell a
+            stranger who runs the site.
+          </p>
+          <div><Button variant="secondary" href="/admin/signin">Back to sign in</Button></div>
+        </>
+      ) : mode === "forgot" ? (
+        <>
+          <h1 class="adm-h">Reset your password</h1>
+          <form method="POST" class="adm-card form">
+            <CsrfField />
+            <input type="hidden" name="action" value="forgot" />
+            <label class="field">
+              <span class="adm-lbl">Email</span>
+              <input class="adm-input" type="email" name="email" required autocomplete="username" autofocus />
+            </label>
+            <div><Button type="submit">Send me a link</Button></div>
+          </form>
+          <p class="alt"><a href="/admin/signin">Back to sign in</a></p>
+        </>
+      ) : (
+        <>
+          <h1 class="adm-h">Sign in</h1>
+          <form method="POST" class="adm-card form">
+            <CsrfField />
+            <input type="hidden" name="action" value="signin" />
+            <input type="hidden" name="next" value={next} />
+            {failed && <p class="adm-bad" role="alert">{failed}</p>}
+            {notice && <p class="adm-ok">{notice}</p>}
+            <label class="field">
+              <span class="adm-lbl">Email</span>
+              <input class="adm-input" type="email" name="email" required autocomplete="username" autofocus />
+            </label>
+            <label class="field">
+              <span class="adm-lbl">Password</span>
+              <input class="adm-input" type="password" name="password" required autocomplete="current-password" />
+            </label>
+            <div><Button type="submit">Sign in</Button></div>
+          </form>
+          <p class="alt"><a href="/admin/signin?mode=forgot">Forgotten your password?</a></p>
+        </>
+      )
+    }
   </div>
 </AdminLayout>
 
 <style>
-  .signin-wrap { max-width: 380px; display: grid; gap: var(--space-4); }
-  .signin-form { gap: var(--space-4); }
+  .wrap { max-width: 440px; display: grid; gap: var(--space-4); }
+  .form { gap: var(--space-4); }
   .field { display: grid; gap: 4px; }
+  .hint { font: 400 var(--text-xs) / 1.5 var(--font-body); color: var(--ink-faint); }
+  .hint-cmd {
+    font: 400 var(--text-xs) var(--font-mono); color: var(--ink-soft);
+    background: var(--surface-inset); border: var(--border-w) solid var(--line);
+    border-radius: var(--radius-sm); padding: 10px 12px; margin: 0; overflow-x: auto;
+  }
+  .alt { font: 400 var(--text-sm) var(--font-body); margin: 0; }
+  .alt a { color: var(--accent); }
 </style>

@@ -20,7 +20,7 @@ import { SITE_API } from "./lib/api";
 
 const ADMIN_COOKIE = "shruti_session";
 /** The only admin paths reachable without a session. */
-const OPEN_ADMIN = new Set(["/admin/signin", "/admin/signout"]);
+const OPEN_ADMIN = new Set(["/admin/signin", "/admin/signout", "/admin/reset"]);
 
 export const onRequest = defineMiddleware(async (context, next) => {
   const secure =
