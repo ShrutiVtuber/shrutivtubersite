@@ -59,6 +59,11 @@
 		header {
 			Cache-Control "no-store"
 			X-Robots-Tag "noindex, nofollow"
+			# Nothing here may be framed. The admin has one-click destructive
+			# controls, and a transparent iframe over a "Delete" button is the
+			# whole clickjacking attack — cheap to close, and there is no
+			# legitimate reason to embed a CMS in another page.
+			Content-Security-Policy "frame-ancestors 'none'"
 		}
 	}
 
@@ -90,6 +95,23 @@ Try /api/health
 	header {
 		X-Content-Type-Options "nosniff"
 		Referrer-Policy "strict-origin-when-cross-origin"
+		# The site is not framed either. Someone else's page wrapping the
+		# natal-chart form would be collecting birth data under this site's
+		# privacy promises while not being this site.
+		X-Frame-Options "SAMEORIGIN"
+		# Browser features this site never uses. Denying them means a third
+		# party that somehow got script in cannot quietly ask for them either.
+		#
+		# `payment` is deliberately NOT on this list. Stripe is coming to
+		# /support, and Apple Pay and Google Pay go through the Payment Request
+		# API — denying it here would make those buttons silently fail to
+		# appear, which is close to undiagnosable. Add `payment=(self
+		# "https://js.stripe.com")` when Stripe lands rather than a blanket
+		# deny that has to be reversed.
+		Permissions-Policy "camera=(), microphone=(), geolocation=(self), usb=(), interest-cohort=()"
+		# HSTS is set by the HOST Caddy, which is the one that terminates TLS.
+		# Setting it here as well would send it over the plain-HTTP hop, where
+		# it means nothing and only invites confusion about who owns it.
 		-Server
 	}
 

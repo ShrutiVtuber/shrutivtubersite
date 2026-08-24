@@ -19,8 +19,10 @@ interface Props {
   description?: string;
   /** Set on pages that carry their own <main> wrapper or a full-bleed hero. */
   bare?: boolean;
+  /** Kept out of search results — the admin, and anything behind sign-in. */
+  noindex?: boolean;
 }
-const { title, description = "", bare = false } = Astro.props;
+const { title, description = "", bare = false, noindex = false } = Astro.props;
 const siteUrl = import.meta.env.SHRUTI_SITE_URL ?? "https://shrutivtuber.com";
 
 const [live, links] = await Promise.all([
@@ -45,6 +47,32 @@ const socials: SocialLink[] = Object.values(links?.groups ?? {})
     <title>{title}</title>
     {description && <meta name="description" content={description} />}
     <link rel="canonical" href={new URL(Astro.url.pathname, siteUrl).href} />
+    {noindex && <meta name="robots" content="noindex, nofollow" />}
+
+    {/* A crescent rather than the wordmark: at sixteen pixels a wordmark is a
+        smudge, and the brief forbids inventing a seal. Transparent, so it
+        reads on a light tab bar and a dark one. */}
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <meta name="theme-color" content="#121829" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#F8F6F3" media="(prefers-color-scheme: light)" />
+
+    {/* Without these a shared link is a bare URL with no image — which for a
+        site whose audience finds it through Discord and Bluesky is most of
+        the first impression. The card is built from the real wordmark and the
+        design's own cloud plate; nothing about it is invented. */}
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Shruti" />
+    <meta property="og:title" content={title} />
+    {description && <meta property="og:description" content={description} />}
+    <meta property="og:url" content={new URL(Astro.url.pathname, siteUrl).href} />
+    <meta property="og:image" content={new URL("/social-card.png", siteUrl).href} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Shruti — instruments for magick, astrology and divination" />
+    <meta name="twitter:card" content="summary_large_image" />
 
     {/* Runs before any stylesheet so a stored dark preference never flashes
         white. Inlined on purpose — it cannot wait for a module to load. */}
