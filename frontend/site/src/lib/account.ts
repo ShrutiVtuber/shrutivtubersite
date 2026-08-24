@@ -30,9 +30,28 @@ export interface Account {
   newsletter: { subscribed: boolean; pending: boolean; cadence: string | null };
 }
 
-function headers(astro: { cookies: { get(name: string): { value: string } | undefined } }) {
-  const token = astro.cookies.get(READER_COOKIE)?.value;
-  return token ? { cookie: `${READER_COOKIE}=${token}` } : {};
+function headers(astro: any) {
+  const out: Record<string, string> = {};
+  const token = astro.cookies?.get(READER_COOKIE)?.value;
+  if (token) out.cookie = `${READER_COOKIE}=${token}`;
+
+  /* Forward the BROWSER'S origin, not this server's.
+   *
+   * These calls run in Node, so without this the backend sees a request with
+   * no Origin at all and falls back to the configured site. Everything that
+   * only reads was fine with that; the moment one of these calls decided
+   * where to send somebody AFTER a payment, it stopped being fine — a
+   * checkout started on a laptop handed Stripe a cancel URL pointing at
+   * shrutivtuber.com, which before cutover is the old WordPress site.
+   *
+   * The backend still only ever matches this against its own allowlist, so
+   * forwarding it hands over nothing a header could abuse. */
+  const origin = astro.request?.headers?.get("origin");
+  if (origin) out.origin = origin;
+  const referer = astro.request?.headers?.get("referer");
+  if (referer) out.referer = referer;
+
+  return out;
 }
 
 export async function account(astro: any): Promise<Account | null> {

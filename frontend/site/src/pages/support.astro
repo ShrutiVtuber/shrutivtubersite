@@ -38,6 +38,17 @@ if (Astro.request.method === "POST") {
           // The reader's session, so a signed-in supporter is matched to
           // their account rather than to a second Stripe customer.
           cookie: Astro.request.headers.get("cookie") ?? "",
+          // And the BROWSER'S origin. This runs in Node, so without it the
+          // backend sees no origin, falls back to the configured site, and
+          // hands Stripe a cancel URL pointing at shrutivtuber.com — which
+          // before cutover is the old WordPress site. The backend matches it
+          // against its own allowlist regardless.
+          ...(Astro.request.headers.get("origin")
+            ? { origin: Astro.request.headers.get("origin")! }
+            : {}),
+          ...(Astro.request.headers.get("referer")
+            ? { referer: Astro.request.headers.get("referer")! }
+            : {}),
         },
         body: JSON.stringify({ tier, amount }),
       });

@@ -173,6 +173,18 @@ def _line_items(tier: str, amount: int | None) -> dict[str, Any]:
                 "price_data": {
                     "currency": "eur",
                     "unit_amount": cents,
+                    # VAT is INSIDE this number, not added to it.
+                    #
+                    # EU consumer law wants a price shown to a consumer to be
+                    # the price they pay, and Managed Payments will otherwise
+                    # add tax on top — a €4 tier quoted on the page and
+                    # charged at €4.84 on Stripe's, which is both unlawful for
+                    # B2C and the exact moment somebody abandons a checkout.
+                    #
+                    # The subscription prices carry the same behaviour, set on
+                    # the price itself in Stripe. It cannot be changed on an
+                    # existing price, so switching means creating a new one.
+                    "tax_behavior": "inclusive",
                     "product_data": {
                     "name": "A one-off gift",
                     # Required by Managed Payments, same as the subscription
