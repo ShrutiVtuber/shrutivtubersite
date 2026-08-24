@@ -89,6 +89,21 @@ class Settings(BaseSettings):
     # charged.
     stripe_price_lamplighter: str = ""
     stripe_price_almanac: str = ""
+    # The product tax code, required because Managed Payments is on: Stripe
+    # acts as merchant of record and settles VAT, which for a Greek creator
+    # selling digital subscriptions across the EU is the difference between
+    # this being simple and it being a MOSS registration.
+    #
+    # `txcd_10000000` is Stripe's general "Electronically Supplied Services",
+    # which is how a creator membership is treated for EU VAT. **Confirm it
+    # with an accountant** — it decides what VAT gets charged, which is not a
+    # decision that belongs in a default. Configurable so changing it is not a
+    # deploy.
+    stripe_tax_code: str = "txcd_10000000"
+
+    # Extra origins this site answers as, comma separated. Normally blank; see
+    # shruti/core/origins.py for why a request header can never add one.
+    passkey_origins: str = ""
 
     @property
     def stripe_enabled(self) -> bool:

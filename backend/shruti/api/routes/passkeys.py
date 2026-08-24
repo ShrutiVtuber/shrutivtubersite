@@ -48,6 +48,7 @@ from shruti.core.auth import SESSION_HOURS as ADMIN_SESSION_HOURS, issue_token
 from shruti.core.config import get_settings
 from shruti.core.db import get_session
 from shruti.core.operator import operator_email
+from shruti.core.origins import relying_party
 from shruti.core.sessions import SESSION_COOKIE, SESSION_DAYS, issue_session
 from shruti.api.deps import require_admin
 from shruti.models.accounts import Passkey, User
@@ -66,50 +67,16 @@ CHALLENGE_SECONDS = 300
 _challenges: dict[str, tuple[bytes, float, str]] = {}
 
 
-def _allowed_origins() -> list[str]:
-    """
-    The origins a passkey may be created for or used from.
-
-    The relying party is the site's own domain, and it CANNOT come from the
-    Host or Origin header alone — a forged one would otherwise mint a
-    credential scoped to somewhere else. So the header is only ever matched
-    against this list, never trusted on its own.
-
-    Local development is on the list because WebAuthn treats localhost as a
-    secure context and there is no other way to try this on a laptop. A
-    credential made at localhost is scoped to localhost and is useless
-    anywhere else, which is exactly the property that makes including it safe.
-    """
-    settings = get_settings()
-    site = (settings.site_url or "http://localhost:8200").rstrip("/")
-    allowed = [site]
-    # `is_production` rather than a string compare on SHRUTI_ENV. The setting
-    # accepts both "prod" and "production", and a second definition of
-    # production living here would have quietly allowed localhost passkeys on
-    # a server whose env happened to say the longer word.
-    if not settings.is_production:
-        allowed += [
-            "http://localhost:8200", "http://127.0.0.1:8200",
-            "http://localhost:4321", "http://127.0.0.1:4321",
-        ]
-    extra = os.environ.get("SHRUTI_PASSKEY_ORIGINS", "")
-    allowed += [o.strip().rstrip("/") for o in extra.split(",") if o.strip()]
-    # Dedupe, order preserved: the configured site URL stays the default.
-    return list(dict.fromkeys(allowed))
-
-
 def _relying_party(request: Request) -> tuple[str, str]:
     """
     Return `(rp_id, origin)` for this request.
 
-    The Origin header picks WHICH of the allowed origins is in play; it cannot
-    introduce one. An unrecognised origin falls back to the configured site,
-    where the WebAuthn check will then fail — refusing is the right outcome.
+    The allowlist itself lives in `shruti.core.origins`, shared with billing's
+    Checkout return URLs: both are places where trusting a request header
+    outright lets an attacker pick the destination, and two copies of that rule
+    would eventually disagree.
     """
-    sent = (request.headers.get("origin") or "").rstrip("/")
-    allowed = _allowed_origins()
-    origin = sent if sent in allowed else allowed[0]
-    return (urlparse(origin).hostname or "localhost"), origin
+    return relying_party(request.headers.get("origin"))
 
 
 def _b64(raw: bytes) -> str:

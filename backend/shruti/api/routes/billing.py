@@ -23,6 +23,7 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timezone
 from typing import Any
+from urllib.parse import urlparse
 
 import stripe
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
@@ -34,6 +35,7 @@ from shruti.core import emails
 from shruti.core.config import get_settings
 from shruti.core.db import get_session
 from shruti.core.mail import send
+from shruti.core.origins import resolve as resolve_origin
 from shruti.core.settings_store import imprint as imprint_settings
 from shruti.models.accounts import Supporter, User
 
@@ -74,8 +76,32 @@ def _price_id(tier: str) -> str:
     return price
 
 
-def _site_url() -> str:
-    return (get_settings().site_url or "http://localhost:8200").rstrip("/")
+def _site_url(request: Request | None = None) -> str:
+    """
+    Where to send somebody back to after Stripe.
+
+    Follows the origin they actually came from, so a checkout walked on a
+    laptop returns to the laptop instead of dumping the payer on whatever is
+    currently served at the live domain. Only ever an origin from the
+    allowlist — a return URL a header could choose would be a "payment
+    complete" page under somebody else's control.
+
+    Without a request — the webhook, the portal's default return — it is the
+    configured site, which is the only correct answer there anyway.
+    """
+    if request is None:
+        return (get_settings().site_url or "http://localhost:8200").rstrip("/")
+
+    sent = request.headers.get("origin")
+    if not sent and (referer := request.headers.get("referer")):
+        # A Referer is a full URL, and the allowlist holds origins. Firefox
+        # sends no Origin on a same-site form POST, which is exactly the
+        # request this needs to answer, so the scheme and host are taken off
+        # the front rather than the header being ignored.
+        parsed = urlparse(referer)
+        if parsed.scheme and parsed.netloc:
+            sent = f"{parsed.scheme}://{parsed.netloc}"
+    return resolve_origin(sent)
 
 
 # ── what the page shows ─────────────────────────────────────────────────────
@@ -147,7 +173,14 @@ def _line_items(tier: str, amount: int | None) -> dict[str, Any]:
                 "price_data": {
                     "currency": "eur",
                     "unit_amount": cents,
-                    "product_data": {"name": "A one-off gift"},
+                    "product_data": {
+                    "name": "A one-off gift",
+                    # Required by Managed Payments, same as the subscription
+                    # products. A gift that promises a name read on stream is
+                    # not a no-consideration donation, so it is declared
+                    # taxable rather than assumed out of scope.
+                    "tax_code": get_settings().stripe_tax_code,
+                },
                 },
             }],
         }
@@ -179,9 +212,10 @@ async def checkout(
     user = await current_user(request, session)
     email = (user.email if user else None) or (str(body.email) if body.email else None)
 
+    here = _site_url(request)
     common: dict[str, Any] = {
-        "success_url": f"{_site_url()}/support/thanks?session={{CHECKOUT_SESSION_ID}}",
-        "cancel_url": f"{_site_url()}/support",
+        "success_url": f"{here}/support/thanks?session={{CHECKOUT_SESSION_ID}}",
+        "cancel_url": f"{here}/support",
         # Stripe collects the address it needs for tax; asking for more than
         # that on a gift is how a gift stops being given.
         "billing_address_collection": "auto",
@@ -286,7 +320,7 @@ async def portal(
         portal_session = client.billing_portal.Session.create(
             customer=row.stripe_customer_id,
             configuration=_portal_configuration(client),
-            return_url=f"{_site_url()}/account",
+            return_url=f"{_site_url(request)}/account",
         )
     except Exception as exc:                       # noqa: BLE001
         log.warning("stripe portal could not be created: %s", type(exc).__name__)

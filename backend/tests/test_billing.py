@@ -33,6 +33,7 @@ def configured(monkeypatch):
     def apply(**values: str):
         for key, value in values.items():
             monkeypatch.setenv(f"SHRUTI_{key.upper()}", value)
+        _ = values
         get_settings.cache_clear()
         return get_settings()
     yield apply
@@ -188,3 +189,41 @@ def test_a_stripe_timestamp_becomes_an_aware_datetime() -> None:
 def test_a_missing_timestamp_stays_missing() -> None:
     assert billing._moment(None) is None
     assert billing._moment(0) is None
+
+
+# ── where somebody lands after paying ───────────────────────────────────────
+
+def test_the_return_origin_cannot_be_chosen_by_a_header(configured) -> None:
+    """A Checkout return URL sends a browser somewhere after money has moved.
+    A header that could pick that destination is a 'payment complete' page
+    under somebody else's control."""
+    from shruti.core.origins import resolve
+
+    configured(site_url="https://shrutivtuber.com", env="prod")
+    assert resolve("https://evil.example") == "https://shrutivtuber.com"
+    assert resolve(None) == "https://shrutivtuber.com"
+    assert resolve("") == "https://shrutivtuber.com"
+
+
+def test_a_local_checkout_returns_to_the_laptop(configured) -> None:
+    """Otherwise a test checkout walked on localhost dumps the payer on
+    whatever is currently served at the live domain — which before cutover is
+    the old WordPress site."""
+    from shruti.core.origins import resolve
+
+    configured(site_url="https://shrutivtuber.com", env="development")
+    assert resolve("http://localhost:8200") == "http://localhost:8200"
+
+
+def test_localhost_is_not_a_return_origin_in_production(configured) -> None:
+    from shruti.core.origins import resolve
+
+    configured(site_url="https://shrutivtuber.com", env="production")
+    assert resolve("http://localhost:8200") == "https://shrutivtuber.com"
+
+
+def test_a_trailing_slash_does_not_defeat_the_allowlist(configured) -> None:
+    from shruti.core.origins import resolve
+
+    configured(site_url="https://shrutivtuber.com/", env="prod")
+    assert resolve("https://shrutivtuber.com/") == "https://shrutivtuber.com"
