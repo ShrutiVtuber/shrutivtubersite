@@ -106,108 +106,77 @@ templates, Dawn/Dusk themes. **Not implemented yet.**
 - `docs/DEPLOY.md` — the runbook.
 - `docs/adr/0001-astrology-licensing.md` — the licence boundary and its amendment.
 
-## FIRST TASK — close the three festival gaps
+## The festival calendars are DONE — audited, verified, packed
 
-Output is in `~/Documents/development/shruti-research/` (outside the repo:
-working material, partly unverified). Read its `README.md` first.
+All three gaps closed, the audit applied, both corpora shipped as MBF:
 
-**71 Hindu entries and 45 Attic entries**, all cited, confidence graded
-`attested` / `disputed` / `reconstructed`. Sourcing quality is good — real loci
-(Plutarch *Theseus* 24, Harpokration s.v. εἰρεσιώνη, Demosthenes 24.26) and the
-agents recorded disagreement rather than resolving it.
+- `shruti-hindu-festivals-v0.1.0.mbf` — **72 entries**, 242 dated occurrences
+  in 2026, 2 undated and both correct (a container, and one entry whose lunar
+  month falls outside the civil year).
+- `shruti-attic-festivals-v0.2.0.mbf` — **45 entries**.
 
-Three gaps, all diagnosed, in the order to fix them.
+Both CC-BY-SA-4.0, both verify, both rebuild byte-identically from
+`scripts/pack_festivals.py`, which refuses to pack a corpus not marked
+verified. Interop with theourgia is verified in both directions;
+`practiseapp/NOTE_FROM_SHRUTI_2026-08-24_*.md` has the reader's notes.
 
-### Gap 1 — CLOSED and verified
+### What the audit actually turned up
 
-Day rules applied to **18 entries**, each carrying a cited reason in its own
-note. Everything else keeps the sunrise default. **Twelve festivals now resolve
-to their published 2026 almanac dates exactly**, including the four the sunrise
-rule got wrong: Mahā Śivarātri and Janmāṣṭamī (niśītha), Gaṇeśa Caturthī and
-Rāma Navamī (madhyāhna), Vijayadaśamī (aparāhṇa), Lakṣmī Pūjā (pradoṣa).
+Three of its source corrections **had never been applied** — they were written
+into the corpus as instruction text and splatted character by character, so 269
+of 525 "sources" were single letters and three entries had no sources at all
+while appearing to have hundreds. Executed properly now.
 
-One moment the engine cannot model is recorded rather than forced: **Karva
-Chauth is kept until moonrise**, and there is no moonrise day-rule. It resolves
-to the sunrise answer, which is usually but not always the same day.
+The audit itself read 42 entries with **19,005 characters of nirṇaya reasoning
+missing**, because the export handed to it was truncated at 900 characters.
+That was our bug, not the corpus's. Treat its findings as indicative, not
+final — at least one (a `pan-indian` contradiction on `dhanteras`) does not
+survive contact with the full note.
 
-The original diagnosis, kept for context:
+### Bugs the gaps hid
 
-**Cause: the schema handed to the agents predated the discovery.** Day-ownership
-is not one rule — most observances go to the tithi at sunrise, but Dīpāvalī is
-kept at *pradoṣa*, Mahā Śivarātri and Janmāṣṭamī at *niśītha*, Vijayadaśamī at
-*aparāhṇa*, Gaṇeśa Caturthī at *madhyāhna*.
+RESUME used to record "4 legitimately kṣaya" failures. **They were not
+legitimate.** A kṣaya opening tithi was deleting festivals outright: 37
+occurrences across 19 entries between 2026 and 2040, with Śāradīya Navarātri
+simply absent from 2027. A kṣaya tithi does not cancel a rite; it is kept on
+the day the tithi was current. All 37 recovered.
 
-Measured against published 2026 almanacs:
+Also fixed, each of them user-visible:
 
-| festival | resolved | almanac | |
-|---|---|---|---|
-| Vasant Pañcamī | 23 Jan | 23 Jan | ✓ |
-| Holikā Dahan | 3 Mar | 3 Mar | ✓ |
-| Holi | 4 Mar | 4 Mar | ✓ |
-| **Mahā Śivarātri** | **16 Feb** | **15 Feb** | ✗ needs `nishitha` |
+- **Multi-day festivals rendered as one day.** `lasts` counts TITHIS. Navarātri
+  runs 8, 9 or 10 civil days by year; Pitṛ Pakṣa 15–17.
+- **`kind:"solar"` was never implemented**, so Makara Saṅkrānti — Pongal,
+  Lohri, Magh Bihu — was absent. And `recurrence` was being stripped as
+  "provenance", turning twelve saṅkrāntis into one.
+- **No `kind:"nakshatra"`**, so Onam and Kārttikai Dīpam could not be entered
+  at all. Malayalam and Tamil months are solar; no lunar anchor can state them.
+- **Six festivals were missing entirely** — Onam, Kārttikai Dīpam, Chhaṭh Pūjā,
+  Skanda Ṣaṣṭhī, Vaṭa Sāvitrī, Hanumān Jayantī. Skanda Ṣaṣṭhī's key had been
+  squatted by the monthly ṣaṣṭhī, so it printed twelve times a year and never
+  on the festival.
 
-The sunrise default is right for most and wrong for a known handful. **Do not
-add `dayRule` to everything** — add it only where the tradition actually uses a
-different moment, and cite why in the entry's note. `DAY_RULES` in
-`shruti_astro/core/festivals.py` has the five.
+### Rules that now hold, and are tested
 
-Verify by resolving a year and diffing against a published pañcāṅga, not by
-inspection.
+- **Location is not decoration.** Five of seven major Hindu festivals fall on a
+  different day in Sydney than Ujjain. Both `/festivals` and `/attic-calendar`
+  take `lat`/`lon` and say when they defaulted.
+- **Where traditions disagree, both are returned labelled.** smārta/vaiṣṇava on
+  ekādaśī, north/deccan on Vaṭa Sāvitrī, north/tamil on Hanumān Jayantī
+  (**seven months apart**), conjunction/visibility on the Attic month.
+- **Cross-check:** Vaṭa Sāvitrī (north) and Phalahārinī Kālikā Pūjā resolve to
+  the same day from independent anchors. That is a test.
+- **`restriction` on every entry** — `none`, `detail-withheld`, `initiatory`.
+  No closed material in either pack.
 
-### Gap 2 — the Hindu entries never went through the audit pass
+### Deliberately unmodelled — flagged, not faked
 
-The assembly agent's report contains **only the Attic corpus**. The 71 Hindu
-entries were recovered from `journal.jsonl`, where each agent's structured
-result is recorded — so they exist and are complete, but they skipped the
-adversarial verification the Attic set received.
-
-Run them through the same audit: anchor correctness, the amānta/pūrṇimānta trap,
-citations that do not actually support the date, anything graded `attested` that
-is really `disputed`, and initiatory material reproduced in detail rather than
-merely named. The six raw corpora are in `shruti-research/corpora/`.
-
-### Gap 3 — CLOSED
-
-All 68 lunar anchors resolve: **50 annual, 14 recurring, 4 legitimately kṣaya,
-0 failing** — 206 dated occurrences across 2026.
-
-Three things were built. `month: "*"` returns **every** occurrence in the year,
-with a return type that genuinely differs from an annual anchor's. `month:
-"adhika"` resolves only inside intercalary months, so an empty list in an
-ordinary year is the right answer. And a doubled tithi is **marked, not
-deduped** — on a vṛddhi Ekādaśī the Smārta and Vaiṣṇava traditions fast on
-different days, and dropping one would make that ruling for the practitioner.
-
-The original diagnosis:
-
-### Gap 3 — four causes, two already fixed
-
-The 17 break down as: **13×** `month: "*"`, **2×** `Caitra` (a spelling variant
-of `Chaitra` — **fixed**, original recorded), **1×** `Mārgaśīrṣa or Pauṣa`
-(Vaikuṇṭha Ekādaśī genuinely differs by region — record as regional variants,
-do not resolve), **1×** `adhika (intercalary)` (Padminī and Paramā Ekādaśī occur
-only in an intercalary month and need an anchor kind that says so).
-
-`Śāradīya Navarātri` also appears twice under different keys, from two corpora.
-
-The remaining thirteen are the real work:
-
-**All 13 use `"month": "*"`.** They are the *recurring* observances —
-Ekādaśī twice a lunation, Pradoṣa, Sankaṣṭī Caturthī, Amāvāsyā, Pūrṇimā. The
-agents encoded "every month" sensibly; `resolve_lunar` simply rejects a wildcard.
-
-These matter more than the annual festivals for daily practice, so this is worth
-doing properly:
-
-- Accept `month: "*"` and return **every** occurrence in the year, not one date
-- The return type changes — a recurring anchor yields a list, an annual one a
-  single date. Decide that shape before writing it
-- They also need `dayRule`: Pradoṣa is kept at *pradoṣa* by definition, and
-  Ekādaśī has its own conventions
-- 49 of 68 resolve today; 2 are legitimately kṣaya (a tithi owning no civil day)
-
-Then pack both corpora as MBF via `shruti_astro/packs/mbf.py` and resolve a full
-year of each against the engine before shipping.
+**candrodaya** (Karva Chauth, Saṅkaṣṭī Caturthī) carries
+`dayRuleUnmodelled`; it is longitude-dependent enough to split one festival
+across two civil days for two cities, which needs a surface that can show two
+answers with the place attached. **Saṅkrānti puṇyakāla** day-attribution
+differs between Tamil, Bengali and northern practice and is not applied.
+**14 citations** name a real work with no page locus — `locus` is null on
+exactly those, so a consumer can tell them apart programmatically.
 
 ### One limit that belongs in the UI, not just a file
 
@@ -234,4 +203,11 @@ projects, grouped links — in plain markup awaiting the design implementation.
 `SHRUTI_WEB_ENABLED=1` switches Caddy from the placeholder to the site.
 
 **The largest remaining piece is implementing the design system** across the
-surfaces in the three handoffs.
+surfaces in the three handoffs. All three came back and are extracted to
+`design/` — 35 components with `.d.ts` prop contracts and `.prompt.md` notes,
+20 pages, 7 tool-page templates, 2 emails, a print stylesheet. The reference
+build is `design/ui_kits/site/index.html`; its demo bar drives the signed-in,
+polar/no-sunrise and missing-birth-time states.
+
+The design already expects the failures the daemon models — there is an
+athens/polar toggle for the no-sunrise case, which is `SunNeverRose`.
