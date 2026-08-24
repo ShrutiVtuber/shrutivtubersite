@@ -1,0 +1,144 @@
+---
+/* Ported from `components/tables/NextStation.jsx`; contract in
+ * `NextStation.d.ts`.
+ *
+ * The countdown IS the answer — someone opening this at four in the afternoon
+ * wants "sunset in 2h 14m" before they want thirty rows — so it is the largest
+ * number on the page.
+ *
+ * Where there is no station to count to (polar latitude), the design shows a
+ * NAMED state, never a zeroed countdown.
+ */
+interface Props {
+  name?: string;
+  glyph?: string;
+  /** ISO instant of the station. Rendered in the visitor's zone by script. */
+  atISO?: string;
+  secondsAway?: number;
+  currentName?: string;
+  currentSinceISO?: string;
+  attribution?: string;
+  progress?: number;
+  size?: "hero" | "compact";
+  undefinedReason?: string;
+}
+const {
+  name, glyph, atISO, secondsAway = 0, currentName, currentSinceISO,
+  attribution, progress = 0, size = "hero", undefinedReason,
+} = Astro.props;
+const hero = size === "hero";
+
+/** "2h 14m", "14m", "3d 4h" — the same shape the design shows. */
+function away(seconds: number): string {
+  const s = Math.max(0, Math.round(seconds));
+  const d = Math.floor(s / 86400);
+  const h = Math.floor((s % 86400) / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  if (d > 0) return `${d}d ${h}h`;
+  if (h > 0) return `${h}h ${m}m`;
+  return `${m}m`;
+}
+const pct = Math.max(0, Math.min(1, progress)) * 100;
+---
+
+{
+  undefinedReason ? (
+    <div class="ns ns-undefined" data-hero={hero}>
+      <span class="t-eyebrow ns-mark">○ No station to count to</span>
+      <p class="ns-why">{undefinedReason}</p>
+    </div>
+  ) : (
+    <div class="ns" data-hero={hero}>
+      {currentName && (
+        <div class="ns-now">
+          <span class="t-eyebrow">Now</span>
+          <span class="ns-now-name">{currentName}</span>
+          {currentSinceISO && (
+            <span class="t-tabular ns-since" data-time={currentSinceISO} data-prefix="since " />
+          )}
+        </div>
+      )}
+      <div class="ns-main">
+        {glyph && <span aria-hidden="true" class="t-glyph ns-glyph">{glyph}</span>}
+        <div class="ns-id">
+          <span class="ns-name">{name}</span>
+          {attribution && <span class="ns-attr">{attribution}</span>}
+        </div>
+        <div class="ns-count">
+          <span class="t-tabular ns-in" data-countdown={secondsAway}>in {away(secondsAway)}</span>
+          {atISO && <span class="t-tabular ns-at" data-time={atISO} data-suffix=" your time" data-prefix="at " />}
+        </div>
+      </div>
+      <div aria-hidden="true" class="ns-rule"><div class="ns-rule-fill" style={`width:${pct}%`} /></div>
+    </div>
+  )
+}
+
+<style>
+  .ns {
+    border: var(--border-w) solid var(--line);
+    border-radius: var(--radius-md);
+    background: var(--surface-card);
+    box-shadow: var(--shadow-1);
+    padding: var(--space-4);
+    display: grid;
+    gap: 10px;
+  }
+  .ns[data-hero="true"] { padding: var(--space-5); gap: 14px; }
+  .ns-undefined { box-shadow: none; }
+  .ns-mark { margin: 0; color: var(--rose); }
+  .ns-why { margin: 0; font: 400 var(--text-sm) / 1.6 var(--font-body); color: var(--ink-soft); max-width: 48ch; }
+  .ns-now { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+  .ns-now-name { font: 500 var(--text-sm) var(--font-body); color: var(--ink); }
+  .ns-since { font: 400 var(--text-xs) var(--font-mono); color: var(--ink-faint); }
+  .ns-main { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  .ns[data-hero="true"] .ns-main { gap: 14px; }
+  .ns-glyph { font: 400 1.5rem var(--font-display); line-height: 1; color: var(--rose); }
+  .ns[data-hero="true"] .ns-glyph { font-size: 2.25rem; }
+  .ns-id { display: grid; gap: 2px; min-width: 0; }
+  .ns-name { font: 600 var(--text-body) var(--font-display); color: var(--ink); }
+  .ns[data-hero="true"] .ns-name { font-size: var(--text-h3); }
+  .ns-attr { font: 400 var(--text-xs) var(--font-body); color: var(--rose); }
+  .ns-count { margin-left: auto; text-align: right; display: grid; gap: 2px; }
+  /* The countdown is the answer, so it is the largest number here. */
+  .ns-in { font: 500 1.375rem var(--font-mono); line-height: 1; color: var(--ink); }
+  .ns[data-hero="true"] .ns-in { font-size: clamp(1.75rem, 5vw, 2.5rem); }
+  .ns-at { font: 400 var(--text-xs) var(--font-mono); color: var(--ink-soft); }
+  .ns-rule { height: 2px; background: var(--line); border-radius: 2px; overflow: hidden; }
+  .ns-rule-fill { height: 100%; background: var(--rose); transition: width var(--dur-2) var(--ease-out); }
+</style>
+
+<script is:inline>
+  (function () {
+    function fmt(iso) {
+      var d = new Date(iso);
+      if (isNaN(d)) return null;
+      return new Intl.DateTimeFormat("en-GB", {
+        hour: "2-digit", minute: "2-digit", hour12: false,
+      }).format(d);
+    }
+    document.querySelectorAll("[data-time]").forEach(function (el) {
+      var t = fmt(el.getAttribute("data-time"));
+      if (!t) return;
+      el.textContent = (el.getAttribute("data-prefix") || "") + t + (el.getAttribute("data-suffix") || "");
+    });
+
+    /* Keep the countdown honest while the page sits open — a station that has
+       passed must not still read "in 3m". */
+    function away(s) {
+      s = Math.max(0, Math.round(s));
+      var d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600), m = Math.floor((s % 3600) / 60);
+      if (d > 0) return d + "d " + h + "h";
+      if (h > 0) return h + "h " + m + "m";
+      return m + "m";
+    }
+    document.querySelectorAll("[data-countdown]").forEach(function (el) {
+      var left = Number(el.getAttribute("data-countdown"));
+      var started = Date.now();
+      setInterval(function () {
+        var now = left - (Date.now() - started) / 1000;
+        el.textContent = now <= 0 ? "now" : "in " + away(now);
+      }, 30000);
+    });
+  })();
+</script>

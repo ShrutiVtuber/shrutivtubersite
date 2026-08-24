@@ -1,0 +1,191 @@
+---
+/* Ported from `components/tables/StationTable.jsx`; contract in
+ * `StationTable.d.ts`.
+ *
+ * Two rules from the handoff, both load-bearing:
+ *
+ *   - NEVER A BLANK CELL. A station that does not occur renders its
+ *     `absentLabel` — "no moonrise today" — in italic at --ink-faint. The Moon
+ *     rises about fifty minutes later each day and skips a civil day
+ *     regularly; at high latitude whole weeks can lack one. That is a fact
+ *     about the sky, not missing data, and a blank cell reads as a bug.
+ *
+ *   - This table is READ ON A PHONE, OUTDOORS, AT DAWN, IN POOR LIGHT. Times
+ *     are mono, tabular and larger than the surrounding body text, and in Dusk
+ *     they use --ink, never --ink-soft.
+ *
+ * Print geometry belongs to tokens/print.css, not here.
+ */
+export interface StationRow {
+  date: string;
+  weekday?: string;
+  today?: boolean;
+  currentIndex?: number;
+  /** ISO instants, one per station column. null means it did not occur. */
+  times: (string | null)[];
+  phase?: string;
+}
+interface Props {
+  stations: string[];
+  glyphs?: string[];
+  attributions?: string[];
+  rows: StationRow[];
+  absentLabel?: string;
+  undefinedReason?: string;
+  caption?: string;
+}
+const {
+  stations, glyphs = [], attributions = [], rows,
+  absentLabel = "none today", undefinedReason, caption,
+} = Astro.props;
+const hasPhase = rows.some((r) => r.phase);
+
+/* The daemon returns UTC instants and the design says times are shown in the
+ * visitor's local zone — which the server cannot know. So each cell renders
+ * the UTC time, clearly labelled in the caption, and a script rewrites both
+ * the cells and the caption in the browser's own zone.
+ *
+ * Both states are correct and neither is a guess: without scripting you read
+ * true UTC times that say they are UTC, with it you read your own.
+ */
+const utc = (iso: string) =>
+  new Intl.DateTimeFormat("en-GB", {
+    hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "UTC",
+  }).format(new Date(iso));
+---
+
+{
+  undefinedReason ? (
+    <div class="st-undefined">
+      <p class="t-eyebrow st-mark">○ Cannot be reckoned</p>
+      <div class="st-why">{undefinedReason}</div>
+    </div>
+  ) : (
+    <div class="station-table">
+      <table>
+        {caption && <caption data-caption>{caption} · times in UTC</caption>}
+        <thead>
+          <tr>
+            <th scope="col" class="st-day-head">Day</th>
+            {stations.map((s, i) => (
+              <th scope="col">
+                <span class="st-head-stack">
+                  {glyphs[i] && <span aria-hidden="true" class="t-glyph st-glyph">{glyphs[i]}</span>}
+                  <span>{s}</span>
+                  {attributions[i] && <span class="st-attr">{attributions[i]}</span>}
+                </span>
+              </th>
+            ))}
+            {hasPhase && <th scope="col">Moon</th>}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr class="station-row" data-today={r.today || undefined}>
+              <th scope="row" class="st-day" data-today={r.today || undefined}>
+                <span class="t-tabular">{r.date}</span>
+                {r.weekday && <span class="st-weekday"> {r.weekday}</span>}
+                {r.today && <span class="st-today-mark"> today</span>}
+              </th>
+              {r.times.map((t, i) => (
+                <td class="t-tabular st-time" data-now={(r.today && r.currentIndex === i) || undefined} data-absent={t === null || undefined}>
+                  {
+                    t === null
+                      ? <span class="st-absent">{absentLabel}</span>
+                      : <span data-time={t}>{utc(t)}</span>
+                  }
+                  {r.today && r.currentIndex === i && <span aria-hidden="true" class="st-dot"> ·</span>}
+                </td>
+              ))}
+              {hasPhase && <td class="t-tabular st-phase">{r.phase || ""}</td>}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+<style>
+  .station-table { overflow-x: auto; }
+  .station-table table { width: 100%; border-collapse: collapse; min-width: 460px; }
+  .station-table caption {
+    caption-side: top;
+    text-align: left;
+    padding-bottom: 12px;
+    font: 400 var(--text-xs) / 1.6 var(--font-mono);
+    color: var(--ink-faint);
+  }
+  .station-table th {
+    padding: 0 8px 8px;
+    border-bottom: var(--border-w) solid var(--line-strong);
+    text-align: right;
+    font: 600 var(--text-micro) var(--font-body);
+    letter-spacing: var(--tracking-eyebrow);
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    vertical-align: bottom;
+  }
+  .st-day-head { text-align: left !important; }
+  .st-head-stack { display: grid; gap: 3px; justify-items: end; }
+  .st-glyph { font: 400 1.0625rem var(--font-display); line-height: 1; color: var(--rose); letter-spacing: 0; }
+  .st-attr { font: 400 var(--text-micro) var(--font-body); letter-spacing: 0; text-transform: none; color: var(--rose); }
+
+  .station-table td,
+  .station-table tbody th {
+    padding: 10px 8px;
+    border-bottom: var(--border-w) solid var(--line);
+    text-align: right;
+  }
+  .station-table tbody tr[data-today] { background: var(--accent-wash); }
+  .st-day {
+    text-align: left !important;
+    font: 400 var(--text-sm) var(--font-body) !important;
+    color: var(--ink) !important;
+    white-space: nowrap;
+    text-transform: none !important;
+    letter-spacing: normal !important;
+    border-bottom: var(--border-w) solid var(--line) !important;
+  }
+  .st-day[data-today] { font-weight: 600 !important; }
+  .st-weekday { font: 400 var(--text-xs) var(--font-mono); color: var(--ink-faint); }
+  .st-today-mark {
+    font: 600 0.625rem var(--font-mono);
+    letter-spacing: var(--tracking-caps);
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+  /* Times are the reason the table exists. */
+  .st-time { font: 400 1.0625rem var(--font-mono); color: var(--ink); white-space: nowrap; }
+  .st-time[data-now] { font-weight: 600; }
+  .st-time[data-absent] { color: var(--ink-faint); }
+  .st-absent { font: 400 var(--text-xs) var(--font-body); font-style: italic; }
+  .st-dot { color: var(--accent); }
+  .st-phase { font: 400 var(--text-sm) var(--font-mono); color: var(--ink-soft); white-space: nowrap; }
+
+  .st-undefined {
+    background: var(--surface-card);
+    border: var(--border-w) solid var(--line);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-1);
+    padding: clamp(28px, 5vw, 44px) clamp(20px, 4vw, 32px);
+  }
+  .st-mark { margin: 0 0 10px; color: var(--rose); }
+  .st-why { font: 400 1.0625rem / 1.7 var(--font-display); color: var(--ink); max-width: 52ch; }
+</style>
+
+<script is:inline>
+  (function () {
+    var zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    var fmt = new Intl.DateTimeFormat("en-GB", {
+      hour: "2-digit", minute: "2-digit", hour12: false, timeZone: zone,
+    });
+    document.querySelectorAll(".station-table [data-time]").forEach(function (el) {
+      var d = new Date(el.getAttribute("data-time"));
+      if (!isNaN(d)) el.textContent = fmt.format(d);
+    });
+    document.querySelectorAll(".station-table [data-caption]").forEach(function (el) {
+      el.textContent = el.textContent.replace(/times in UTC$/, "times in " + zone);
+    });
+  })();
+</script>

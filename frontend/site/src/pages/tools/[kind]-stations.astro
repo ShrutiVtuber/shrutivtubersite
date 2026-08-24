@@ -1,0 +1,229 @@
+---
+/* Solar and lunar station trackers — ported from `ui_kits/site/Stations.jsx`.
+ *
+ * One page, two bodies, exactly as the design has it. Rules from the handoff
+ * that are load-bearing here:
+ *
+ *   - the current or next station is called out ABOVE the table, because
+ *     someone opening this at four in the afternoon wants "sunset in 2h 14m"
+ *     before they want thirty rows;
+ *   - the range cap is STATED and REFUSED, never quietly trimmed;
+ *   - the resolved coordinates are shown back, because a station table for the
+ *     wrong city is indistinguishable from a right one until someone misses a
+ *     dawn;
+ *   - never a blank cell — a station that does not occur says so;
+ *   - the preset only LABELS the stations. The tool computes times, and
+ *     "none — times only" is a first-class choice, not a fallback.
+ */
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import SectionHeader from "../../components/brand/SectionHeader.astro";
+import NextStation from "../../components/tables/NextStation.astro";
+import StationTable from "../../components/tables/StationTable.astro";
+import ExportBlock from "../../components/tables/ExportBlock.astro";
+import Button from "../../components/forms/Button.astro";
+import { stations, nextStation, SOLAR, LUNAR, GLYPHS, PRESETS } from "../../lib/stations";
+
+/* SSR, so no getStaticPaths — params come off the URL. Anything that is not
+   one of the two known kinds is a 404 rather than a silent fallback to solar,
+   which would answer a question nobody asked. */
+const kind = Astro.params.kind;
+if (kind !== "solar" && kind !== "lunar") return Astro.rewrite("/404");
+const body: "sun" | "moon" = kind === "lunar" ? "moon" : "sun";
+const names = kind === "lunar" ? [...LUNAR] : [...SOLAR];
+
+const q = Astro.url.searchParams;
+const ATHENS = { lat: 37.9838, lon: 23.7275, label: "Athens, Greece" };
+const lat = Number(q.get("lat") ?? ATHENS.lat);
+const lon = Number(q.get("lon") ?? ATHENS.lon);
+const place = q.get("place") ?? (q.has("lat") ? "" : ATHENS.label);
+const preset = PRESETS.some((p) => p.value === q.get("preset")) ? q.get("preset")! : "hellenic";
+const start = q.get("start") ?? "";
+
+/* THE CAP IS REFUSED, NOT TRIMMED. Asking for 60 days gets a stated refusal
+   and the maximum, not 31 days pretending to be what was asked for. */
+const MAX_DAYS = 31;
+const asked = Number(q.get("days") ?? 7);
+const overCap = Number.isFinite(asked) && asked > MAX_DAYS;
+const days = Math.min(MAX_DAYS, Math.max(1, Number.isFinite(asked) ? asked : 7));
+
+const query = new URLSearchParams({
+  lat: String(lat), lon: String(lon), body, preset, days: String(days),
+});
+if (start) query.set("start", start);
+
+const [table, next] = await Promise.all([
+  stations(query),
+  nextStation(new URLSearchParams({ lat: String(lat), lon: String(lon), body })),
+]);
+
+const today = new Date().toISOString().slice(0, 10);
+const rows = (table?.table ?? []).map((d) => {
+  const byName = Object.fromEntries(d.stations.map((s) => [s.name, s]));
+  return {
+    date: d.date,
+    weekday: new Date(`${d.date}T12:00:00Z`).toLocaleDateString("en-GB", { weekday: "short" }),
+    today: d.date === today,
+    /* null is the designed absent cell and StationTable renders absentLabel
+       for it. It is never an empty string. */
+    times: names.map((n) => (byName[n]?.occurred ? byName[n].at : null)),
+    phase: d.phase ? `${d.phase}${d.moonAgeDays != null ? ` · ${d.moonAgeDays}d` : ""}` : undefined,
+  };
+});
+
+const dedications = names.map(
+  (n) => table?.table?.[0]?.stations.find((s) => s.name === n)?.dedication ?? "",
+);
+const feed = `/api/astro/stations/ical?lat=${lat}&lon=${lon}&body=${body}&preset=${preset}&days=${days}`;
+const title = kind === "lunar" ? "Lunar stations" : "Solar stations";
+
+/* Polar. The test is NOT "every cell is empty" — at Longyearbyen in December
+ * noon and midnight still occur, because a culmination happens whether or not
+ * the body is above the horizon. What breaks is the rise and the set, and with
+ * them the shape the stations assume: the day has no beginning and no end.
+ * The handoff puts it exactly this way for the planetary hours too — with no
+ * sunrise there is nothing to divide.
+ *
+ * For the Moon this must not fire on an ordinary skipped day: a missing
+ * moonrise is routine, so the state only applies when EVERY day in the range
+ * lacks both the rise and the set.
+ */
+const riseIndex = 0;
+const setIndex = names.indexOf(kind === "lunar" ? "moonset" : "sunset");
+const noRiseOrSet =
+  rows.length > 0 &&
+  rows.every((r) => r.times[riseIndex] === null && r.times[setIndex] === null);
+const polarReason = noRiseOrSet
+  ? kind === "solar"
+    ? "The Sun does not cross the horizon here on these dates, so there are no solar stations to keep. This is the sky, not a failure to compute — at this latitude the day does not begin or end in the way the stations assume."
+    : "The Moon does not cross the horizon here on these dates. At this latitude whole weeks can pass without a moonrise or a moonset."
+  : undefined;
+---
+
+<BaseLayout
+  title={`${title} — Shruti`}
+  description={`Four daily ${kind} stations for any place, up to a month ahead, exportable to your calendar.`}
+>
+  <div class="page stations">
+    <SectionHeader
+      as="h1"
+      glyph={kind === "lunar" ? "☾" : "☉"}
+      eyebrow="Theourgia · instrument"
+      title={title}
+      body={
+        kind === "lunar"
+          ? "Moonrise, culmination, moonset and nadir — with the Moon's phase beside them. The Moon rises about fifty minutes later each day and skips a civil day regularly; where a station does not occur, the table says so."
+          : "Sunrise, noon, sunset and midnight — the structural skeleton of a daily rite. The tool computes the times; which deity belongs to which station is yours to choose or ignore."
+      }
+    />
+
+    <div class="meta-bar t-tabular">
+      <span>{place || `${lat.toFixed(4)}, ${lon.toFixed(4)}`}</span>
+      <span>·</span><span>{lat.toFixed(4)}, {lon.toFixed(4)}</span>
+      <span>·</span><span>{days} {days === 1 ? "day" : "days"}</span>
+      <span>·</span><span>shown in your local time</span>
+    </div>
+    <p class="place-why">
+      A station table for the wrong city is indistinguishable from a right one until someone misses
+      a dawn — so the coordinates in use are shown above.
+    </p>
+
+    <form class="controls" method="GET">
+      <label><span>Place</span><input type="text" name="place" value={place} placeholder="Athens, Greece" /></label>
+      <label><span>Latitude</span><input type="number" name="lat" value={lat} step="0.0001" min="-90" max="90" required /></label>
+      <label><span>Longitude</span><input type="number" name="lon" value={lon} step="0.0001" min="-180" max="180" required /></label>
+      <label><span>Days</span><input type="number" name="days" value={days} min="1" max={MAX_DAYS} /></label>
+      <label>
+        <span>Naming</span>
+        <select name="preset">
+          {PRESETS.map((p) => <option value={p.value} selected={p.value === preset}>{p.label}</option>)}
+        </select>
+      </label>
+      <Button type="submit" size="sm">Show</Button>
+    </form>
+
+    {
+      overCap && (
+        <p class="cap-refusal" role="alert">
+          One month is the cap — you asked for {asked} days, and it is refused rather than quietly
+          trimmed. Showing {MAX_DAYS}.
+        </p>
+      )
+    }
+    <p class="cap-note">One month is the cap — ask for more and it is refused, not quietly trimmed.</p>
+
+    {
+      next && !polarReason ? (
+        <NextStation
+          name={next.name}
+          glyph={GLYPHS[next.name]}
+          atISO={next.at}
+          secondsAway={next.secondsAway}
+          attribution={next.dedication || undefined}
+        />
+      ) : (
+        <NextStation undefinedReason={polarReason ?? "No upcoming station could be computed for this place."} />
+      )
+    }
+
+    <StationTable
+      stations={names}
+      glyphs={names.map((n) => GLYPHS[n])}
+      attributions={dedications}
+      rows={rows}
+      absentLabel={kind === "lunar" ? "no moonrise today" : "does not occur"}
+      undefinedReason={polarReason}
+      caption={`${title} · ${place || `${lat.toFixed(4)}, ${lon.toFixed(4)}`} · times in your local zone`}
+    />
+
+    {
+      kind === "lunar" && !polarReason && (
+        <p class="table-why">
+          The Moon does not rise every day. It rises roughly fifty minutes later each day and
+          occasionally skips a civil day entirely; at high latitude whole weeks can lack a moonrise
+          or a moonset. An empty cell here is the sky, not missing data.
+        </p>
+      )
+    }
+
+    {
+      !polarReason && (
+        <ExportBlock
+          feedHref={feed}
+          fileHref={feed}
+          fileName={`${kind}-stations.ics`}
+          fileScope={`${days} ${days === 1 ? "day" : "days"} from ${table?.start ?? "today"}`}
+          meta={`${place || "coordinates"} · ${lat.toFixed(4)}, ${lon.toFixed(4)} · naming: ${preset}`}
+        />
+      )
+    }
+  </div>
+</BaseLayout>
+
+<style>
+  .stations { display: grid; gap: var(--space-5); }
+  .meta-bar {
+    display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
+    font: 400 var(--text-xs) var(--font-mono); color: var(--ink-soft);
+    border: var(--border-w) solid var(--line); border-radius: var(--radius-sm); padding: 8px 12px;
+  }
+  .place-why { font: 400 var(--text-xs) / 1.6 var(--font-body); color: var(--ink-faint); margin: 0; max-width: 62ch; }
+  .controls {
+    display: flex; gap: var(--space-3); flex-wrap: wrap; align-items: end;
+    background: var(--surface-card); border: var(--border-w) solid var(--line);
+    border-radius: var(--radius-md); padding: var(--space-4);
+  }
+  .controls label { display: grid; gap: 4px; }
+  .controls span {
+    font: 600 var(--text-micro) var(--font-body); letter-spacing: var(--tracking-eyebrow);
+    text-transform: uppercase; color: var(--ink-faint);
+  }
+  .controls input, .controls select {
+    font: 400 var(--text-sm) var(--font-body); color: var(--ink); background: var(--surface-page);
+    border: var(--border-w) solid var(--line); border-radius: var(--radius-sm);
+    padding: 8px 10px; min-height: 40px;
+  }
+  .controls input:focus-visible, .controls select:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
+  .cap-refusal { font: 500 var(--text-sm) / 1.6 var(--font-body); color: var(--live); margin: 0; max-width: 62ch; }
+  .cap-note { font: 400 var(--text-xs) var(--font-mono); color: var(--ink-faint); margin: 0; }
+  .table-why { font: 400 var(--text-sm) / 1.6 var(--font-body); color: var(--ink-soft); margin: 0; max-width: 62ch; }
+</style>

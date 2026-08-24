@@ -196,3 +196,48 @@ sourced rule per school. **Do not pick one and call it the default.**
   missing**, because our own export truncated at 900 chars. Its findings are
   indicative, not final. Re-running it against the full notes would likely
   retire some and surface others.
+
+## Payments — Stripe on /support, and one-click cancellation
+
+Requested 2026-08-24. Not started; the Support page currently ships the
+designed tiers with a Ko-fi route and no payment integration.
+
+**Two halves, and the second is a legal requirement, not a nicety.**
+
+### Stripe
+
+Ko-fi is what the design assumes today (`Join on Ko-fi`, `Open Ko-fi`), and the
+page already says "Memberships are Ko-fi-hosted; cancel any time". Moving to
+Stripe changes that copy, so it is a design change as well as an integration —
+the tier cards, the button labels and that line all have to move together. Raise
+it with the design owner rather than swapping the buttons and leaving the
+sentence.
+
+Needs: Stripe account and keys, products/prices for the two membership tiers
+(€4 Lamplighter, €9 Almanac) plus a one-off, webhook endpoint for
+`checkout.session.completed` / `customer.subscription.deleted`, and a customer
+record joined to the site account.
+
+### One-click cancellation — this is the law, not a preference
+
+The EU's Consumer Rights Directive as amended (and Germany's
+*Kündigungsbutton*, and California's click-to-cancel rule) require that a
+subscription entered into online can be cancelled **as easily as it was
+started** — a plainly labelled control, reachable without logging a support
+ticket, without a retention flow, and without a phone call.
+
+The design already takes this position for the newsletter: unsubscribe is one
+click, no login, and the landing page "does not argue — no survey, no 'are you
+sure', no win-back offer". The same rule has to hold for a paid membership.
+Concretely:
+
+- a **Cancel membership** control in the account, at the same level as the
+  thing that started it;
+- **no** retention interstitial, no discount offer, no multi-step confirm;
+- it must reach **Stripe**, not just the local record — a cancelled account
+  that keeps billing is the worst possible failure here;
+- confirmation by email, and the period already paid for runs out rather than
+  being clawed back.
+
+This lands alongside the account deletion flow, which has the same shape and the
+same rule: deletion must reach the newsletter list too, not only the account.

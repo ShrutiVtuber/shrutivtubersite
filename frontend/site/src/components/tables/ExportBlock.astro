@@ -1,0 +1,171 @@
+---
+/* Ported from `components/tables/ExportBlock.jsx`; contract in
+ * `ExportBlock.d.ts`.
+ *
+ * THREE ROUTES, ONE HIERARCHY, AND THEY ARE NOT EQUIVALENT:
+ *
+ *   1. the subscribable feed  — stays correct as the year turns, and is the
+ *      ONLY one that produces notifications. It gets its own card, the strong
+ *      border, the rose tag and the accent button.
+ *   2. the .ics download      — a snapshot. The copy says it will go stale, at
+ *      the point of choice, on purpose: someone who exports in September and
+ *      finds wrong times in March blames the tool, not the snapshot.
+ *   3. Google links           — one event, one station. Pills.
+ *
+ * The handoff says: do not reorder these by visual balance. The hierarchy is
+ * the information.
+ */
+interface Props {
+  feedHref: string;
+  fileHref: string;
+  fileName?: string;
+  fileScope?: string;
+  googleLinks?: { label: string; href: string; glyph?: string }[];
+  meta?: string;
+}
+const {
+  feedHref, fileHref, fileName = "stations.ics", fileScope,
+  googleLinks = [], meta,
+} = Astro.props;
+---
+
+<section class="export-block">
+  <p class="t-eyebrow">Take it with you</p>
+
+  <div class="eb-feed">
+    <div class="eb-feed-head">
+      <h3>Subscribe to the feed</h3>
+      <span class="eb-tag">stays correct · notifies</span>
+    </div>
+    <p class="eb-body">
+      Your calendar re-reads this as the year turns, so the times keep matching the sky and your
+      reminders keep arriving. This is the one that becomes a habit.
+    </p>
+    <div class="eb-actions">
+      <a class="eb-primary" href={feedHref}>Subscribe in my calendar</a>
+      <button type="button" class="eb-secondary" data-copy={feedHref}>Copy feed URL</button>
+    </div>
+    <code class="eb-url">{feedHref}</code>
+    {meta && <span class="eb-meta">{meta}</span>}
+  </div>
+
+  <div class="eb-rest">
+    <div class="eb-col">
+      <h3 class="eb-sub">Download a snapshot</h3>
+      <p class="eb-body">
+        A fixed <code class="eb-inline">.ics</code> file of the range shown. It does not update —
+        <strong>it will go stale</strong>, so take it only if you want exactly these dates and
+        nothing more.
+      </p>
+      <div><a class="eb-secondary" href={fileHref} download={fileName}>Download .ics</a></div>
+      {fileScope && <span class="t-tabular eb-meta">{fileScope}</span>}
+    </div>
+
+    {
+      googleLinks.length > 0 && (
+        <div class="eb-col">
+          <h3 class="eb-sub">Add one station to Google</h3>
+          <p class="eb-body">A single event for a single station, if you only keep one of the four.</p>
+          <div class="eb-pills">
+            {googleLinks.map((g) => (
+              <a class="eb-pill" href={g.href}>
+                {g.glyph && <span aria-hidden="true" class="t-glyph eb-pill-glyph">{g.glyph}</span>}
+                {g.label}
+              </a>
+            ))}
+          </div>
+        </div>
+      )
+    }
+  </div>
+</section>
+
+<style>
+  .export-block { display: grid; gap: var(--space-4); }
+  .export-block .t-eyebrow { margin: 0; }
+  .eb-feed {
+    background: var(--surface-card);
+    border: var(--border-w) solid var(--line-strong);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-1);
+    padding: var(--space-4);
+    display: grid;
+    gap: 10px;
+  }
+  .eb-feed-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  .eb-feed-head h3 { margin: 0; font: 600 var(--text-h4) var(--font-display); color: var(--ink); }
+  .eb-tag {
+    font: 600 0.625rem var(--font-mono);
+    letter-spacing: var(--tracking-caps);
+    text-transform: uppercase;
+    color: var(--rose);
+  }
+  .eb-body { margin: 0; font: 400 var(--text-sm) / 1.6 var(--font-body); color: var(--ink-soft); max-width: 58ch; }
+  .eb-body strong { font-weight: 600; color: var(--ink); }
+  .eb-inline { font: 400 var(--text-xs) var(--font-mono); }
+  .eb-actions { display: flex; gap: var(--space-2); flex-wrap: wrap; align-items: center; }
+  .eb-primary {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    padding: 0 18px;
+    font: 600 var(--text-sm) var(--font-body);
+    color: var(--on-accent);
+    text-decoration: none;
+    background: var(--accent);
+    border: var(--border-w) solid var(--accent);
+    border-radius: var(--radius-sm);
+  }
+  .eb-primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+  .eb-secondary {
+    display: inline-flex;
+    align-items: center;
+    min-height: 40px;
+    padding: 0 14px;
+    font: 600 var(--text-sm) var(--font-body);
+    color: var(--ink);
+    text-decoration: none;
+    background: transparent;
+    border: var(--border-w) solid var(--line-strong);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+  }
+  .eb-secondary:hover { border-color: var(--accent); color: var(--accent); }
+  .eb-url { font: 400 var(--text-xs) var(--font-mono); color: var(--ink-faint); word-break: break-all; }
+  .eb-meta { font: 400 var(--text-xs) var(--font-mono); color: var(--ink-faint); }
+  .eb-rest { display: grid; gap: var(--space-3); grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+  .eb-col { display: grid; gap: 8px; align-content: start; }
+  .eb-sub { margin: 0; font: 600 var(--text-body) var(--font-body); color: var(--ink); }
+  .eb-pills { display: flex; gap: var(--space-2); flex-wrap: wrap; }
+  .eb-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 36px;
+    padding: 0 12px;
+    font: 500 var(--text-sm) var(--font-body);
+    color: var(--accent);
+    text-decoration: none;
+    border: var(--border-w) solid var(--line);
+    border-radius: var(--radius-full);
+  }
+  .eb-pill:hover { border-color: var(--line-strong); }
+  .eb-pill-glyph { color: var(--rose); }
+</style>
+
+<script is:inline>
+  (function () {
+    document.querySelectorAll("[data-copy]").forEach(function (button) {
+      button.addEventListener("click", function () {
+        var url = button.getAttribute("data-copy");
+        var done = function () {
+          var was = button.textContent;
+          button.textContent = "Copied";
+          setTimeout(function () { button.textContent = was; }, 1600);
+        };
+        if (navigator.clipboard) navigator.clipboard.writeText(url).then(done, function () {});
+        else done();
+      });
+    });
+  })();
+</script>
