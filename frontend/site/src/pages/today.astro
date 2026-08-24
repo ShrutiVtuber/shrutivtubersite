@@ -1,0 +1,364 @@
+---
+/* Day at a Glance — ported from `ui_kits/site/Today.jsx`.
+ *
+ * "The page most likely to be someone's daily open." One screen answering:
+ * what is the sky doing right now, here.
+ *
+ * THE SIGNED-OUT STATE MATTERS MORE THAN THE SIGNED-IN ONE. Everything except
+ * transits works without an account and always will. The transits block is a
+ * quiet invitation, never a locked panel — no blur, no lock icon, no fake
+ * preview, no count of what you are missing, no modal. If the page is a teaser
+ * for signing up, nobody signs up.
+ */
+import BaseLayout from "../layouts/BaseLayout.astro";
+import SectionHeader from "../components/brand/SectionHeader.astro";
+import NextStation from "../components/tables/NextStation.astro";
+import Button from "../components/forms/Button.astro";
+import Badge from "../components/navigation/Badge.astro";
+import { astro } from "../lib/api";
+import { GLYPHS } from "../lib/stations";
+
+const q = Astro.url.searchParams;
+const ATHENS = { lat: 37.9838, lon: 23.7275, label: "Athens, Greece" };
+const lat = Number(q.get("lat") ?? ATHENS.lat);
+const lon = Number(q.get("lon") ?? ATHENS.lon);
+const place = q.get("place") ?? (q.has("lat") ? "" : ATHENS.label);
+
+interface Today {
+  at: string;
+  location: { lat: number; lon: number };
+  sun: any; moon: any;
+  stations: Record<string, { today: any[]; next: any | null; current?: any | null }>;
+  planetaryHours: { current: any | null; next: any | null };
+  reckonings: any;
+  sky: { ascendant: number; midheaven: number; bodies: any[] };
+  transits: any | null;
+  undefined: string[];
+}
+
+const today = await astro<Today>(`/today?lat=${lat}&lon=${lon}`);
+const undef: string[] = today?.undefined ?? [];
+
+/* Polar: the hours divide sunrise to sunset, so with no sunrise there is
+   nothing to divide. The page still shows Sun, Moon, sky and reckonings. */
+const sunToday = today?.stations?.sun?.today ?? [];
+const noSunrise = sunToday.length > 0 && !sunToday.find((s) => s.name === "sunrise")?.occurred;
+
+const signedIn = false;   // accounts are not built yet; the signed-out state is the honest one
+
+const fmtDeg = (d: number) => `${d.toFixed(1)}°`;
+const moonProgress = today ? (today.moon.tropical.degree % 30) / 30 : 0;
+---
+
+<BaseLayout
+  title="Today — Shruti"
+  description="What the sky is doing right now, where you are: luminaries, stations, planetary hours and every reckoning kept."
+>
+  <div class="page today">
+    <SectionHeader
+      as="h1" glyph="☾" eyebrow="Day at a glance" title="Today"
+      body="What the sky is doing right now, here. Everything on this page works without an account."
+    />
+
+    <form class="place-bar" method="GET">
+      <label><span>Place</span><input type="text" name="place" value={place} placeholder="Athens, Greece" /></label>
+      <label><span>Lat</span><input type="number" name="lat" value={lat} step="0.0001" min="-90" max="90" /></label>
+      <label><span>Lon</span><input type="number" name="lon" value={lon} step="0.0001" min="-180" max="180" /></label>
+      <Button type="submit" size="sm">Show</Button>
+      <span class="place-echo t-tabular">{lat.toFixed(4)}, {lon.toFixed(4)}</span>
+    </form>
+
+    {
+      !today ? (
+        <div class="block">
+          <p class="t-eyebrow rose">○ Cannot be reckoned</p>
+          <p class="why">The ephemeris could not be reached, so nothing on this page can be computed right now. This is a failure on my side, not a fact about the sky.</p>
+        </div>
+      ) : (
+        <div class="today-grid">
+          <section class="block span2">
+            <h2>Sun and Moon</h2>
+            <div class="lum-row">
+              <div class="lum">
+                <span class="lum-glyph t-glyph" aria-hidden="true">☉</span>
+                <div>
+                  <span class="lum-name">Sun</span>
+                  <span class="lum-pos t-tabular">{fmtDeg(today.sun.tropical.degree)} {today.sun.tropical.sign}</span>
+                  <span class="lum-alt t-tabular">{fmtDeg(today.sun.sidereal.degree)} {today.sun.sidereal.rashi} · {today.sun.sidereal.nakshatra}</span>
+                </div>
+              </div>
+              <div class="lum">
+                <span class="lum-glyph t-glyph" aria-hidden="true">☾</span>
+                <div>
+                  <span class="lum-name">Moon</span>
+                  <span class="lum-pos t-tabular">{fmtDeg(today.moon.tropical.degree)} {today.moon.tropical.sign}</span>
+                  <span class="lum-alt t-tabular">{fmtDeg(today.moon.sidereal.degree)} {today.moon.sidereal.rashi} · {today.moon.sidereal.nakshatra}</span>
+                  {/* The Moon moves visibly over a day and the Sun does not, so
+                      only the Moon carries its motion and a progress rule. */}
+                  <span class="lum-alt t-tabular">{today.moon.speedPerDay.toFixed(2)}° per day</span>
+                  <span class="progress" aria-hidden="true"><span style={`width:${moonProgress * 100}%`} /></span>
+                </div>
+              </div>
+            </div>
+            <p class="both-zodiacs">Both zodiacs, unranked — tropical above, sidereal below. Neither is a correction of the other.</p>
+          </section>
+
+          <section class="block">
+            <h2>Stations</h2>
+            {
+              noSunrise ? (
+                <NextStation size="compact" undefinedReason="The Sun does not cross the horizon here today, so there are no solar stations to keep." />
+              ) : today.stations.sun?.next ? (
+                <NextStation
+                  size="compact"
+                  name={today.stations.sun.next.name}
+                  glyph={GLYPHS[today.stations.sun.next.name]}
+                  atISO={today.stations.sun.next.at}
+                  secondsAway={today.stations.sun.next.secondsAway}
+                  attribution={today.stations.sun.next.dedication || undefined}
+                />
+              ) : null
+            }
+            {
+              today.stations.moon?.next && (
+                <NextStation
+                  size="compact"
+                  name={today.stations.moon.next.name}
+                  glyph={GLYPHS[today.stations.moon.next.name]}
+                  atISO={today.stations.moon.next.at}
+                  secondsAway={today.stations.moon.next.secondsAway}
+                />
+              )
+            }
+            <div class="links">
+              <a href={`/tools/solar-stations?lat=${lat}&lon=${lon}&place=${encodeURIComponent(place)}`}>Solar tracker →</a>
+              <a href={`/tools/lunar-stations?lat=${lat}&lon=${lon}&place=${encodeURIComponent(place)}`}>Lunar tracker →</a>
+            </div>
+          </section>
+
+          <section class="block">
+            <h2>Planetary hour</h2>
+            {
+              noSunrise || !today.planetaryHours.current ? (
+                <p class="why">
+                  ○ The hours divide sunrise to sunset, and with no sunrise there is nothing to
+                  divide. Undefined here, which is itself the answer.
+                </p>
+              ) : (
+                <div class="hours">
+                  <div class="hour">
+                    <span class="t-eyebrow">Now</span>
+                    <span class="hour-ruler">{today.planetaryHours.current.ruler}</span>
+                    <span class="t-tabular hour-span" data-span-start={today.planetaryHours.current.startsAt} data-span-end={today.planetaryHours.current.endsAt}></span>
+                  </div>
+                  <div class="hour hour-next">
+                    <div class="hour-next-head">
+                      <span class="t-eyebrow">Next</span>
+                      <Badge tone="rose">plan against this</Badge>
+                    </div>
+                    <span class="hour-ruler">{today.planetaryHours.next?.ruler}</span>
+                    <span class="t-tabular hour-span" data-span-start={today.planetaryHours.next?.startsAt} data-span-end={today.planetaryHours.next?.endsAt}></span>
+                  </div>
+                </div>
+              )
+            }
+          </section>
+
+          <section class="block span2">
+            <h2>The sky over {place || "your coordinates"}</h2>
+            {/* Art-absent plate in the design; the real SVG figure is the
+                natal-chart instrument's job and links from there. */}
+            <div class="sky-plate">
+              <span class="sky-caption t-tabular">
+                asc {today.sky.ascendant.toFixed(2)}° · mc {today.sky.midheaven.toFixed(2)}°
+              </span>
+              <span class="sky-horizon" aria-hidden="true" />
+            </div>
+            <ul class="bodies">
+              {today.sky.bodies.map((b: any) => (
+                <li>
+                  <span class="body-name">{b.name}</span>
+                  <span class="t-tabular body-pos">{b.sign}</span>
+                  {b.retrograde && <span class="retro" title="retrograde">℞</span>}
+                </li>
+              ))}
+            </ul>
+          </section>
+
+          <section class="block span2">
+            <h2>Transits</h2>
+            {
+              signedIn && today.transits ? (
+                <p class="why">—</p>
+              ) : (
+                /* Invitation, not a wall. No blur, no lock, no fake preview,
+                   no count of what is missing. */
+                <div class="invite">
+                  <p>
+                    Everything else on this page works without an account, and always will. This one
+                    block needs to know where you were born — nothing else does.
+                  </p>
+                  <p class="invite-quiet">
+                    No account? The page above is the whole page. This is an invitation, not a wall.
+                  </p>
+                  <div><Button variant="secondary" href="/signup">Save a nativity</Button></div>
+                </div>
+              )
+            }
+          </section>
+
+          <section class="block span2">
+            <h2>Today in every reckoning kept</h2>
+            <ul class="reckonings">
+              <li>
+                <span class="r-name">Gregorian</span>
+                <span class="t-tabular r-val">{today.reckonings.gregorian}</span>
+                <span class="r-rule">civil, by the clock</span>
+              </li>
+              {today.reckonings.hindu && (
+                <li>
+                  <span class="r-name">Hindu</span>
+                  <span class="r-val">{today.reckonings.hindu.month} {today.reckonings.hindu.tithi}</span>
+                  <span class="r-rule">amānta · Vikrama {today.reckonings.hindu.vikrama} · <a href="/tools/hindu-calendar">the calendar →</a></span>
+                </li>
+              )}
+              {today.reckonings.attic && (
+                <li>
+                  <span class="r-name">Attic</span>
+                  <span class="r-val" lang="el">{today.reckonings.attic.greek} {today.reckonings.attic.day}</span>
+                  <span class="r-rule">month opened by conjunction · <a href="/tools/attic-calendar">the calendar →</a></span>
+                </li>
+              )}
+              {today.reckonings.thelemic && (
+                <li>
+                  <span class="r-name">Thelemic</span>
+                  <span class="r-val">{today.reckonings.thelemic.formatted}</span>
+                  <span class="r-rule">year turns at the March equinox</span>
+                </li>
+              )}
+            </ul>
+          </section>
+        </div>
+      )
+    }
+
+    {
+      undef.length > 0 && (
+        <div class="block">
+          <p class="t-eyebrow rose">◐ Partly reckonable</p>
+          <ul class="undef">{undef.map((u) => <li>{u}</li>)}</ul>
+        </div>
+      )
+    }
+  </div>
+</BaseLayout>
+
+<style>
+  .today { display: grid; gap: var(--space-5); }
+  .today-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); }
+  .span2 { grid-column: 1 / -1; }
+  @media (max-width: 760px) { .today-grid { grid-template-columns: 1fr; } }
+
+  .block {
+    background: var(--surface-card);
+    border: var(--border-w) solid var(--line);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-1);
+    padding: var(--space-4);
+    display: grid;
+    gap: 12px;
+    align-content: start;
+  }
+  .block h2 { font: 600 var(--text-h4) var(--font-display); color: var(--ink); margin: 0; }
+  .why { font: 400 var(--text-sm) / 1.6 var(--font-body); color: var(--ink-soft); margin: 0; max-width: 54ch; }
+  .rose { color: var(--rose); margin: 0; }
+
+  .place-bar {
+    display: flex; gap: var(--space-3); flex-wrap: wrap; align-items: end;
+    border: var(--border-w) solid var(--line); border-radius: var(--radius-md); padding: var(--space-3) var(--space-4);
+  }
+  .place-bar label { display: grid; gap: 4px; }
+  .place-bar span {
+    font: 600 var(--text-micro) var(--font-body); letter-spacing: var(--tracking-eyebrow);
+    text-transform: uppercase; color: var(--ink-faint);
+  }
+  .place-bar input {
+    font: 400 var(--text-sm) var(--font-body); color: var(--ink); background: var(--surface-page);
+    border: var(--border-w) solid var(--line); border-radius: var(--radius-sm); padding: 8px 10px; min-height: 40px;
+  }
+  .place-echo { font: 400 var(--text-xs) var(--font-mono) !important; color: var(--ink-faint); text-transform: none !important; letter-spacing: normal !important; margin-left: auto; }
+
+  .lum-row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); }
+  @media (max-width: 560px) { .lum-row { grid-template-columns: 1fr; } }
+  .lum { display: flex; gap: 12px; align-items: start; }
+  .lum > div { display: grid; gap: 2px; }
+  .lum-glyph { font: 400 1.75rem var(--font-display); color: var(--rose); line-height: 1; }
+  .lum-name { font: 600 var(--text-micro) var(--font-body); letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; color: var(--ink-faint); }
+  .lum-pos { font: 500 var(--text-h4) var(--font-mono); color: var(--ink); }
+  .lum-alt { font: 400 var(--text-xs) var(--font-mono); color: var(--ink-soft); }
+  .progress { display: block; height: 2px; background: var(--line); border-radius: 2px; overflow: hidden; margin-top: 6px; }
+  .progress span { display: block; height: 100%; background: var(--rose); }
+  .both-zodiacs { font: 400 var(--text-xs) / 1.6 var(--font-body); color: var(--ink-faint); margin: 0; }
+
+  .links { display: flex; gap: var(--space-4); flex-wrap: wrap; }
+  .links a { font: 500 var(--text-sm) var(--font-body); color: var(--accent); text-decoration: none; }
+  .links a:hover { color: var(--accent-hover); text-decoration: underline; }
+
+  .hours { display: grid; gap: 12px; }
+  .hour { display: grid; gap: 3px; }
+  .hour-next-head { display: flex; gap: 8px; align-items: center; }
+  .hour-ruler { font: 600 var(--text-h4) var(--font-display); color: var(--ink); }
+  .hour-span { font: 400 var(--text-xs) var(--font-mono); color: var(--ink-soft); }
+
+  .sky-plate {
+    position: relative;
+    border-radius: var(--radius-lg);
+    background: linear-gradient(180deg, var(--sky-zenith), var(--sky-mid) 58%, var(--sky-horizon));
+    min-height: 140px;
+    display: grid;
+    place-items: center;
+    overflow: hidden;
+  }
+  .sky-caption {
+    font: 400 var(--text-xs) var(--font-mono);
+    color: var(--ink-soft);
+    background: color-mix(in srgb, var(--surface-page) 62%, transparent);
+    backdrop-filter: blur(8px);
+    border: var(--border-w) solid color-mix(in srgb, var(--line) 60%, transparent);
+    border-radius: var(--radius-sm);
+    padding: 6px 12px;
+  }
+  .sky-horizon { position: absolute; left: 0; right: 0; bottom: 0; height: 1px; background: var(--horizon-line); }
+  .bodies { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px 16px; }
+  .bodies li { display: flex; gap: 8px; align-items: baseline; font-size: var(--text-sm); }
+  .body-name { color: var(--ink); font-weight: 500; }
+  .body-pos { color: var(--ink-soft); font-family: var(--font-mono); font-size: var(--text-xs); }
+  .retro { color: var(--rose); font-family: var(--font-display); }
+
+  .invite { display: grid; gap: 10px; }
+  .invite p { font: 400 var(--text-body) / var(--leading-body) var(--font-body); color: var(--ink-soft); margin: 0; max-width: 62ch; }
+  .invite-quiet { font-size: var(--text-sm) !important; color: var(--ink-faint) !important; }
+
+  .reckonings { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; }
+  .reckonings li {
+    display: grid; grid-template-columns: 110px 1fr; gap: 4px 16px;
+    padding: 10px 0; border-bottom: var(--border-w) solid var(--line);
+  }
+  .r-name { font: 600 var(--text-micro) var(--font-body); letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; color: var(--ink-faint); }
+  .r-val { font: 500 var(--text-body) var(--font-display); color: var(--ink); }
+  .r-rule { grid-column: 2; font: 400 var(--text-xs) var(--font-body); color: var(--ink-faint); }
+  .r-rule a { color: var(--accent); text-decoration: none; }
+  .undef { margin: 0; padding-left: 1.2em; font: 400 var(--text-sm) / 1.6 var(--font-body); color: var(--ink-soft); }
+</style>
+
+<script is:inline>
+  (function () {
+    var fmt = new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false });
+    document.querySelectorAll("[data-span-start]").forEach(function (el) {
+      var a = new Date(el.getAttribute("data-span-start"));
+      var b = new Date(el.getAttribute("data-span-end"));
+      if (isNaN(a) || isNaN(b)) return;
+      el.textContent = fmt.format(a) + " – " + fmt.format(b);
+    });
+  })();
+</script>
