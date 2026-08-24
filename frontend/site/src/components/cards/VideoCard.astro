@@ -1,0 +1,124 @@
+---
+/* Ported from `components/cards/VideoCard.jsx`; contract in `VideoCard.d.ts`.
+ *
+ * The thumbnail is nullable and its absent state is designed: the sky stands
+ * in and the play disc STAYS VISIBLE rather than waiting for hover, so the
+ * card still reads as a video. Platform marks come from the vendored icons
+ * for the same reason as SocialLinkRow — no CDN hotlink on a live page.
+ */
+interface Props {
+  title: string;
+  thumb?: string | null;
+  platform?: "twitch" | "youtube";
+  duration?: string;
+  date?: string;
+  href?: string;
+  loading?: boolean;
+}
+const { title, thumb, platform = "twitch", duration, date, href = "#", loading = false } = Astro.props;
+
+const icons = import.meta.glob<string>("../../icons/*.svg", { query: "?raw", import: "default", eager: true });
+const PLAT = { twitch: "Twitch", youtube: "YouTube" } as const;
+const name = PLAT[platform] ?? PLAT.twitch;
+const svg = icons[`../../icons/${platform}.svg`] ?? null;
+---
+
+{
+  loading ? (
+    <div class="sh-vid-skel" aria-hidden="true">
+      <span class="sk sk-thumb" />
+      <span class="sk sk-t1" />
+      <span class="sk sk-t2" />
+    </div>
+  ) : (
+    <a class="sh-vid" href={href} data-noart={!thumb}>
+      <span class="sh-vid-thumb">
+        {thumb ? <img src={thumb} alt="" loading="lazy" /> : <span class="sh-vid-horizon" aria-hidden="true" />}
+        <span class="sh-vid-play" aria-hidden="true">▶</span>
+        {duration && <span class="sh-vid-dur">{duration}</span>}
+      </span>
+      <h3 class="sh-vid-title">{title}</h3>
+      <span class="sh-vid-meta">
+        <span class="sh-vid-plat">
+          {svg && <i aria-hidden="true" set:html={svg} />}
+          {name}
+        </span>
+        {date && <Fragment>·<span>{date}</span></Fragment>}
+      </span>
+    </a>
+  )
+}
+
+<style>
+  .sh-vid { display: grid; gap: 10px; text-decoration: none; color: inherit; font-family: var(--font-body); border-radius: var(--radius-md); outline-offset: 4px; }
+  .sh-vid-thumb {
+    position: relative;
+    aspect-ratio: 16 / 9;
+    border-radius: var(--radius-md);
+    border: var(--border-w) solid var(--line);
+    overflow: hidden;
+    background: linear-gradient(180deg, var(--sky-zenith), var(--sky-mid) 58%, var(--sky-horizon));
+    transition: border-color var(--dur-1) var(--ease-out), box-shadow var(--dur-1) var(--ease-out);
+  }
+  .sh-vid-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .sh-vid-play {
+    position: absolute;
+    inset: 0;
+    margin: auto;
+    width: 44px;
+    height: 44px;
+    border-radius: 99px;
+    background: color-mix(in srgb, var(--surface-page) 72%, transparent);
+    backdrop-filter: blur(6px);
+    border: var(--border-w) solid color-mix(in srgb, var(--line) 70%, transparent);
+    display: grid;
+    place-items: center;
+    color: var(--ink);
+    font-size: 15px;
+    opacity: 0;
+    transition: opacity var(--dur-1) var(--ease-out);
+  }
+  .sh-vid:hover .sh-vid-play,
+  .sh-vid:focus-visible .sh-vid-play { opacity: 1; }
+  /* With no thumbnail the disc is what says "video", so it does not hide. */
+  .sh-vid[data-noart="true"] .sh-vid-play { opacity: 1; }
+  .sh-vid-dur {
+    position: absolute;
+    right: 8px;
+    bottom: 8px;
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    font-size: 10.5px;
+    color: var(--ink);
+    background: color-mix(in srgb, var(--surface-page) 80%, transparent);
+    border: var(--border-w) solid color-mix(in srgb, var(--line) 60%, transparent);
+    border-radius: 4px;
+    padding: 2px 6px;
+  }
+  .sh-vid:hover .sh-vid-thumb { border-color: var(--line-strong); box-shadow: var(--shadow-2); }
+  .sh-vid-title {
+    font-size: var(--text-sm);
+    font-weight: 600;
+    color: var(--ink);
+    line-height: var(--leading-tight);
+    margin: 0;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    transition: color var(--dur-1) var(--ease-out);
+  }
+  .sh-vid:hover .sh-vid-title { color: var(--accent-hover); }
+  .sh-vid-meta { display: flex; align-items: center; gap: 8px; font-size: var(--text-xs); color: var(--ink-faint); }
+  .sh-vid-plat { display: inline-flex; align-items: center; gap: 5px; font-weight: 500; }
+  .sh-vid-plat i { width: 12px; height: 12px; display: inline-block; }
+  .sh-vid-plat i :global(svg) { width: 100%; height: 100%; display: block; }
+  .sh-vid-horizon { position: absolute; left: 0; right: 0; bottom: 0; height: 1px; background: var(--horizon-line); }
+
+  .sh-vid-skel { display: grid; gap: 10px; }
+  .sh-vid-skel .sk { background: var(--surface-veil); border-radius: var(--radius-md); animation: sh-skel 1.6s var(--ease-in-out) infinite; }
+  .sh-vid-skel .sk-thumb { aspect-ratio: 16 / 9; }
+  .sh-vid-skel .sk-t1 { height: 13px; width: 82%; border-radius: 4px; }
+  .sh-vid-skel .sk-t2 { height: 11px; width: 40%; border-radius: 4px; }
+  @keyframes sh-skel { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }
+</style>

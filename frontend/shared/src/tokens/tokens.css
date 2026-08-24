@@ -13,3 +13,13 @@
 @import "./fonts.css";
 @import "./spacing.css";
 @import "./effects.css";
+/* Print is a designed medium here, not an afterthought: it owns page geometry,
+   forces Dawn on paper and repeats table headers. Pages must not write print
+   CSS of their own. */
+@import "./print.css";
+/* The two atmosphere pieces, copied verbatim from the design bundle's
+   `assets/`. The seal is typographic because no drawn seal exists and the
+   brief forbids inventing one; the sky is the single panel each page is
+   allowed. */
+@import "./seal.css";
+@import "./sky.css";

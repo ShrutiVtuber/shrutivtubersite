@@ -1,0 +1,113 @@
+---
+/* Site header. Ported from the design bundle's `ui_kits/site/Chrome.jsx`.
+ *
+ * The prototype's hash routes (#home) become real paths. Everything else —
+ * order, labels, the compact live badge, the scrolled state past 8px, the
+ * Menu collapse below 960px — is as delivered.
+ */
+import LiveBadge from "../brand/LiveBadge.astro";
+import type { BadgeState } from "../../lib/live";
+
+interface Props {
+  live: BadgeState;
+  signedIn?: boolean;
+  withArt?: boolean;
+}
+const { live, signedIn = false, withArt = false } = Astro.props;
+const here = Astro.url.pathname;
+
+const NAV: [string, string][] = [
+  ["/", "Home"],
+  ["/today", "Today"],
+  ["/about", "About"],
+  ["/work", "Work"],
+  ["/schedule", "Schedule"],
+  ["/videos", "Videos"],
+  ["/horoscopes", "Horoscopes"],
+  ["/journal", "Journal"],
+];
+const current = (href: string) => (href === "/" ? here === "/" : here.startsWith(href));
+---
+
+<header class="site-header" data-scrolled="false">
+  <div class="page">
+    <div class="bar">
+      <a class="brand" href="/" aria-label="Shruti — home">
+        {
+          withArt ? (
+            <img src="/brand/wordmark-small.png" alt="Shruti" />
+          ) : (
+            <span class="brand-word">Shruti</span>
+          )
+        }
+      </a>
+      <nav class="site-nav" aria-label="Primary">
+        {
+          NAV.map(([href, label]) => (
+            <a href={href} aria-current={current(href) ? "page" : undefined}>
+              {label}
+            </a>
+          ))
+        }
+      </nav>
+      <div class="header-side">
+        <LiveBadge compact status={live.status} href="/videos" />
+        <a class="acct-link" href={signedIn ? "/account" : "/signin"}>
+          {signedIn ? "Account" : "Sign in"}
+        </a>
+        <button
+          type="button"
+          class="nav-toggle"
+          aria-expanded="false"
+          aria-controls="site-menu"
+          data-nav-toggle
+        >
+          <span aria-hidden="true" data-nav-glyph>≡</span> Menu
+        </button>
+      </div>
+    </div>
+    <nav id="site-menu" class="site-menu" aria-label="Primary, mobile" hidden>
+      {
+        NAV.map(([href, label]) => (
+          <a href={href} aria-current={current(href) ? "page" : undefined}>
+            {label}
+          </a>
+        ))
+      }
+      <span class="site-menu-rule"></span>
+      <a href="/tools/solar-stations">Solar stations</a>
+      <a href="/tools/lunar-stations">Lunar stations</a>
+      <a href="/newsletter">The monthly letter</a>
+      <a href={signedIn ? "/account" : "/signin"}>{signedIn ? "Account" : "Sign in"}</a>
+      <a href="/support">Support</a>
+      <a href="/contact">Contact</a>
+    </nav>
+  </div>
+</header>
+
+{/* The only script the chrome needs: a scrolled flag and the mobile menu.
+    Inline and tiny on purpose — the site is zero-JS by default and this does
+    not justify an island. */}
+<script is:inline>
+  (function () {
+    var header = document.querySelector(".site-header");
+    var toggle = document.querySelector("[data-nav-toggle]");
+    var glyph = document.querySelector("[data-nav-glyph]");
+    var menu = document.getElementById("site-menu");
+    if (!header) return;
+
+    var onScroll = function () {
+      header.setAttribute("data-scrolled", window.scrollY > 8 ? "true" : "false");
+    };
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+
+    if (!toggle || !menu) return;
+    toggle.addEventListener("click", function () {
+      var open = toggle.getAttribute("aria-expanded") === "true";
+      toggle.setAttribute("aria-expanded", open ? "false" : "true");
+      menu.hidden = open;
+      if (glyph) glyph.textContent = open ? "≡" : "×";
+    });
+  })();
+</script>

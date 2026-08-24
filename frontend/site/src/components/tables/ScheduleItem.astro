@@ -1,0 +1,115 @@
+---
+/* Ported from `components/tables/ScheduleItem.jsx`; contract in
+ * `ScheduleItem.d.ts`.
+ *
+ * The reference reads the visitor's timezone from
+ * `Intl.DateTimeFormat().resolvedOptions()`, which is a browser API and does
+ * not exist during SSR. So this renders the AUTHORED Athens time server-side —
+ * the value that is always correct and never a guess — and a small inline
+ * script fills the visitor's local conversion in beside it. With scripting
+ * off, the reader still gets a complete, correctly-labelled Athens time rather
+ * than a wrong one labelled "your time". That is the design's `tz="athens"`
+ * configuration, not a new one.
+ */
+interface Props {
+  title: string;
+  startISO: string;
+  durationMin?: number;
+  topic?: string;
+  status?: "upcoming" | "live" | "past";
+  href?: string;
+}
+const { title, startISO, durationMin, topic, status = "upcoming", href } = Astro.props;
+
+const d = new Date(startISO);
+const ath = (opts: Intl.DateTimeFormatOptions) =>
+  new Intl.DateTimeFormat("en-GB", { ...opts, timeZone: "Europe/Athens" }).format(d);
+const hours = durationMin ? Math.round((durationMin / 60) * 10) / 10 : null;
+const Tag = href ? "a" : "article";
+---
+
+<Tag class="sh-sched" data-status={status} href={href}>
+  <span class="sh-sc-date">
+    <span class="sh-sc-dow">{ath({ weekday: "short" })}</span>
+    <span class="sh-sc-day">{ath({ day: "2-digit" })}</span>
+    <span class="sh-sc-dow sh-sc-mon">{ath({ month: "short" })}</span>
+  </span>
+  <span class="sh-sc-main">
+    {status === "live" && <span class="sh-sc-live">● Live now</span>}
+    <h3 class="sh-sc-title">{title}</h3>
+    {topic && <span class="sh-sc-topic">{topic}{hours ? ` · ~${hours}h` : ""}</span>}
+  </span>
+  <span class="sh-sc-time">
+    <span class="sh-sc-t1">{ath({ hour: "2-digit", minute: "2-digit", hour12: false })} Athens</span>
+    <span class="sh-sc-t2" data-local-time={startISO} hidden></span>
+  </span>
+</Tag>
+
+<style>
+  .sh-sched {
+    display: grid;
+    grid-template-columns: 64px 1fr auto;
+    gap: 18px;
+    align-items: center;
+    padding: 16px 18px;
+    background: var(--surface-card);
+    border: var(--border-w) solid var(--line);
+    border-radius: var(--radius-md);
+    font-family: var(--font-body);
+    text-decoration: none;
+    color: inherit;
+    transition: border-color var(--dur-1) var(--ease-out), box-shadow var(--dur-1) var(--ease-out);
+  }
+  a.sh-sched:hover { border-color: var(--line-strong); box-shadow: var(--shadow-2); }
+  .sh-sched[data-status="live"] {
+    border-color: color-mix(in srgb, var(--live) 40%, transparent);
+    background: color-mix(in srgb, var(--live-wash) 40%, var(--surface-card));
+  }
+  .sh-sched[data-status="past"] { opacity: 0.6; }
+  .sh-sc-date { display: grid; justify-items: center; gap: 2px; border-right: var(--border-w) solid var(--line); padding-right: 16px; }
+  .sh-sc-dow {
+    font-size: var(--text-micro);
+    font-weight: 600;
+    letter-spacing: var(--tracking-eyebrow);
+    text-transform: uppercase;
+    color: var(--ink-faint);
+  }
+  .sh-sc-mon { letter-spacing: 0.06em; }
+  .sh-sc-day {
+    font-family: var(--font-display);
+    font-size: 28px;
+    font-weight: 600;
+    color: var(--ink);
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+  .sh-sc-main { display: grid; gap: 4px; min-width: 0; }
+  .sh-sc-title { font-family: var(--font-display); font-size: var(--text-h4); font-weight: 600; color: var(--ink); margin: 0; }
+  .sh-sc-topic { font-size: var(--text-xs); color: var(--ink-faint); }
+  .sh-sc-time { display: grid; gap: 3px; justify-items: end; text-align: right; }
+  .sh-sc-t1 { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: var(--text-sm); color: var(--ink); }
+  .sh-sc-t2 { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 10.5px; color: var(--ink-faint); }
+  .sh-sc-live { font-size: var(--text-micro); font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--live); }
+  @media (max-width: 560px) {
+    .sh-sched { grid-template-columns: 56px 1fr; }
+    .sh-sc-time { grid-column: 2; justify-items: start; text-align: left; }
+  }
+</style>
+
+<script is:inline>
+  (function () {
+    var slots = document.querySelectorAll("[data-local-time]:not([data-done])");
+    if (!slots.length) return;
+    var zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    slots.forEach(function (slot) {
+      var when = new Date(slot.getAttribute("data-local-time"));
+      if (isNaN(when)) return;
+      var time = new Intl.DateTimeFormat("en-GB", {
+        hour: "2-digit", minute: "2-digit", hour12: false, timeZone: zone,
+      }).format(when);
+      slot.textContent = time + " your time";
+      slot.hidden = false;
+      slot.setAttribute("data-done", "");
+    });
+  })();
+</script>

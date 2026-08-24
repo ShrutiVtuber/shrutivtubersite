@@ -1,40 +1,53 @@
-/* Tailwind preset mapping utilities onto the design tokens.
+/* Tailwind v3 preset — COPIED VERBATIM from the design bundle's
+ * `tailwind.preset.js`, with only the dual browser/module export shim replaced
+ * by a plain CommonJS export.
  *
- * Every colour resolves to a CSS custom property rather than a literal, so a
- * utility class follows the theme automatically and there is no parallel
- * palette to keep in sync. `bg-page` is correct in Dawn and Dusk without a
- * `dark:` variant anywhere.
+ * The previous version here was a paraphrase carrying 24 of the designer's 72
+ * entries: the whole type scale, spacing steps, radii, shadows, durations and
+ * max-widths were simply missing, so half the design had no utility to express
+ * it. Do not rewrite this file — a token edited in the implementation is a
+ * decision quietly overturned. If it needs to change, it changes in the design
+ * bundle first.
  */
-const v = (name) => `var(--${name})`;
-
-module.exports = {
-  darkMode: ["class", '[data-theme="dark"]'],
+/** Shruti — Tailwind v3 preset. Wire into tailwind.config.js: `presets: [require('./tailwind.preset')]`.
+ * Colours reference the CSS custom properties from tokens/colors.css, so the
+ * three theme states (light / dark / system) keep working without `dark:` variants. */
+const shrutiPreset = {
+  darkMode: ['class', '[data-theme="dark"]'],
   theme: {
     extend: {
       colors: {
-        page: v("surface-page"),
-        card: v("surface-card"),
-        veil: v("surface-veil"),
-        inset: v("surface-inset"),
-        ink: { DEFAULT: v("ink"), soft: v("ink-soft"), faint: v("ink-faint") },
-        line: { DEFAULT: v("line"), strong: v("line-strong") },
-        accent: {
-          DEFAULT: v("accent"),
-          hover: v("accent-hover"),
-          wash: v("accent-wash"),
-          on: v("on-accent"),
-        },
-        rose: { DEFAULT: v("rose"), hover: v("rose-hover"), wash: v("rose-wash") },
-        live: { DEFAULT: v("live"), wash: v("live-wash") },
-        sky: {
-          zenith: v("sky-zenith"),
-          mid: v("sky-mid"),
-          horizon: v("sky-horizon"),
-          line: v("horizon-line"),
-        },
+        page: 'var(--surface-page)', card: 'var(--surface-card)', veil: 'var(--surface-veil)', inset: 'var(--surface-inset)',
+        ink: { DEFAULT: 'var(--ink)', soft: 'var(--ink-soft)', faint: 'var(--ink-faint)' },
+        line: { DEFAULT: 'var(--line)', strong: 'var(--line-strong)' },
+        accent: { DEFAULT: 'var(--accent)', hover: 'var(--accent-hover)', wash: 'var(--accent-wash)', on: 'var(--on-accent)' },
+        rose: { DEFAULT: 'var(--rose)', hover: 'var(--rose-hover)', wash: 'var(--rose-wash)' },
+        live: { DEFAULT: 'var(--live)', wash: 'var(--live-wash)' },
+        sky: { zenith: 'var(--sky-zenith)', mid: 'var(--sky-mid)', horizon: 'var(--sky-horizon)', line: 'var(--horizon-line)' },
       },
-      backgroundImage: { sky: v("sky") },
-      ringColor: { DEFAULT: v("focus-ring") },
+      fontFamily: {
+        display: ['"EB Garamond"', '"Noto Serif Devanagari"', 'Georgia', 'serif'],
+        body: ['Commissioner', 'Mukta', 'system-ui', 'sans-serif'],
+        mono: ['"JetBrains Mono"', '"Noto Sans Devanagari"', 'ui-monospace', 'monospace'],
+      },
+      fontSize: {
+        hero: ['var(--text-hero)', { lineHeight: '1.08', letterSpacing: '-0.01em' }],
+        h1: ['2.25rem', { lineHeight: '1.2' }], h2: ['1.75rem', { lineHeight: '1.2' }], h3: ['1.375rem', { lineHeight: '1.2' }],
+        prose: ['1.1875rem', { lineHeight: '1.72' }], micro: ['.75rem', { lineHeight: '1', letterSpacing: '.14em' }],
+      },
+      spacing: { 1: '4px', 2: '8px', 3: '12px', 4: '16px', 5: '24px', 6: '32px', 7: '48px', 8: '64px', 9: '96px' },
+      borderRadius: { sm: '4px', md: '10px', lg: '16px', full: '999px' },
+      boxShadow: { 1: 'var(--shadow-1)', 2: 'var(--shadow-2)', 3: 'var(--shadow-3)' },
+      transitionTimingFunction: { out: 'cubic-bezier(.2,.7,.3,1)', 'in-out': 'cubic-bezier(.45,0,.25,1)' },
+      transitionDuration: { 1: '120ms', 2: '240ms', 3: '600ms' },
+      maxWidth: { page: '1120px', prose: '66ch' },
+      backgroundImage: { sky: 'linear-gradient(180deg,var(--sky-zenith) 0%,var(--sky-mid) 58%,var(--sky-horizon) 100%)' },
     },
   },
 };
+
+// Ours, and additive only: the design's focus ring is a token, and Tailwind's
+// `ring-*` utilities need it named to reach it.
+shrutiPreset.theme.extend.ringColor = { DEFAULT: 'var(--focus-ring)' };
+
+module.exports = shrutiPreset;

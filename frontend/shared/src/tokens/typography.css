@@ -26,3 +26,7 @@
 .t-sm{font-family:var(--font-body);font-size:var(--text-sm);line-height:var(--leading-body);color:var(--ink-soft)}
 .t-mono{font-family:var(--font-mono);font-size:var(--text-sm);font-variant-numeric:tabular-nums;color:var(--ink)}
 .t-tabular{font-variant-numeric:tabular-nums lining-nums}
+/* Astronomical and zodiac glyphs are TYPE, never emoji. U+2648–2653 and U+FE0F-adjacent
+   characters default to a colour-emoji font in most browsers, which ignores `color` and breaks
+   the brand rule. Always set this on a glyph span, and pair it with U+FE0E in the data. */
+.t-glyph{font-family:var(--font-display);font-variant-emoji:text;font-feature-settings:normal}

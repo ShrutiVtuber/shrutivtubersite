@@ -1,0 +1,62 @@
+---
+/* Ported from `components/brand/SectionHeader.jsx`; contract in
+ * `SectionHeader.d.ts`. Almanac-style opener: eyebrow, display title, one
+ * supporting sentence. The glyph is an astronomical ornament set as TYPE in
+ * rose — never an icon, never an emoji.
+ */
+interface Props {
+  eyebrow?: string;
+  title: string;
+  body?: string;
+  align?: "left" | "center";
+  glyph?: string;
+  as?: "h1" | "h2" | "h3";
+}
+const { eyebrow, title, body, align = "left", glyph, as: Tag = "h2" } = Astro.props;
+---
+
+<header class="sh-sechead" data-align={align}>
+  {
+    eyebrow && (
+      <span class="sh-eyebrow">
+        {glyph && <span class="sh-glyph t-glyph" aria-hidden="true">{glyph}</span>}
+        {eyebrow}
+      </span>
+    )
+  }
+  <Tag class="sh-title">{title}</Tag>
+  {body && <p class="sh-body">{body}</p>}
+  <slot name="action" />
+</header>
+
+<style>
+  .sh-sechead { display: grid; gap: 10px; max-width: var(--measure-ui); }
+  .sh-sechead[data-align="center"] { justify-items: center; text-align: center; margin-inline: auto; }
+  .sh-eyebrow {
+    font-family: var(--font-body);
+    font-size: var(--text-micro);
+    font-weight: 600;
+    letter-spacing: var(--tracking-eyebrow);
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .sh-glyph { font-family: var(--font-display); font-size: 1.1em; color: var(--rose); text-transform: none; letter-spacing: 0; }
+  .sh-title {
+    font-family: var(--font-display);
+    font-size: var(--text-h2);
+    line-height: var(--leading-heading);
+    font-weight: 600;
+    color: var(--ink);
+    margin: 0;
+  }
+  .sh-body {
+    font-family: var(--font-body);
+    font-size: var(--text-body);
+    line-height: var(--leading-body);
+    color: var(--ink-soft);
+    margin: 0;
+  }
+</style>

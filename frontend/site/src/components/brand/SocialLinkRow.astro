@@ -1,0 +1,98 @@
+---
+/* Row of platform links. Ported from the design bundle's
+ * `components/brand/SocialLinkRow.jsx`; contract in `SocialLinkRow.d.ts`.
+ *
+ * One deliberate departure from the reference, and it is not a restyle: the
+ * prototype hotlinks cdn.simpleicons.org and unpkg for its glyphs. Doing that
+ * on a production page hands every visitor's IP to two third parties on every
+ * request, which contradicts this site's own posture — the scaffold already
+ * fetches server-side so nothing leaks to the browser. The same marks are
+ * vendored under `src/icons/` instead (Simple Icons CC0, Lucide ISC), with
+ * brand hexes rewritten to currentColor so they tint to ink like the design
+ * says. Glyph shapes are untouched.
+ */
+export interface SocialLink {
+  platform: string;
+  href: string;
+  label?: string;
+}
+interface Props {
+  links?: SocialLink[];
+  variant?: "row" | "pills";
+  size?: number;
+}
+const { links = [], variant = "row", size = 18 } = Astro.props;
+
+const icons = import.meta.glob<string>("../../icons/*.svg", {
+  query: "?raw",
+  import: "default",
+  eager: true,
+});
+
+const NAMES: Record<string, string> = {
+  twitch: "Twitch", youtube: "YouTube", discord: "Discord", x: "X",
+  twitter: "X", github: "GitHub", linkedin: "LinkedIn", kofi: "Ko-fi",
+  instagram: "Instagram", bluesky: "Bluesky", mastodon: "Mastodon",
+};
+
+const resolved = links.map((link) => {
+  const key = link.platform === "twitter" ? "x" : link.platform;
+  return {
+    ...link,
+    name: link.label ?? NAMES[link.platform] ?? link.platform,
+    svg: icons[`../../icons/${key}.svg`] ?? null,
+  };
+});
+---
+
+<ul class="sh-socials" data-variant={variant}>
+  {
+    resolved.map((link) => (
+      <li>
+        <a href={link.href} aria-label={link.name} title={link.name}>
+          {/* A platform with no vendored mark falls back to its name rather
+              than to a hand-drawn approximation, which the brief forbids. */}
+          {link.svg ? (
+            <span
+              class="sh-ico"
+              aria-hidden="true"
+              style={`width:${size}px;height:${size}px`}
+              set:html={link.svg}
+            />
+          ) : (
+            <span class="sh-lbl">{link.name}</span>
+          )}
+          {variant === "pills" && link.svg && <span class="sh-lbl">{link.name}</span>}
+        </a>
+      </li>
+    ))
+  }
+</ul>
+
+<style>
+  .sh-socials {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 0;
+    margin: 0;
+    list-style: none;
+  }
+  .sh-socials a {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--ink-soft);
+    text-decoration: none;
+    padding: 8px;
+    border-radius: var(--radius-sm);
+    transition: color var(--dur-1) var(--ease-out), background var(--dur-1) var(--ease-out);
+  }
+  .sh-socials a:hover { color: var(--accent-hover); background: var(--surface-veil); }
+  .sh-socials a:active { transform: translateY(1px); }
+  .sh-socials[data-variant="pills"] a { border: var(--border-w) solid var(--line); padding: 8px 14px; }
+  .sh-socials[data-variant="pills"] a:hover { border-color: var(--line-strong); }
+  .sh-socials .sh-lbl { font-family: var(--font-body); font-size: var(--text-sm); }
+  .sh-ico { display: inline-block; flex: none; }
+  .sh-ico :global(svg) { width: 100%; height: 100%; display: block; }
+</style>

@@ -154,3 +154,45 @@ and therefore need §6 settled first. **Build 1 and 2 first**: they are the
 return-visit hook, they carry no personal data beyond a location the visitor
 types, and they make the site worth coming back to before there is anything to
 sign up for.
+
+## Festival rules deliberately not modelled — revisit
+
+Both are flagged in the corpus rather than faked, and both need a surface
+before they can be answered honestly. Neither is a bug.
+
+### candrodaya — moonrise-anchored observances
+
+Karva Chauth and Saṅkaṣṭī Caturthī are kept **until moonrise**, and moonrise is
+longitude-dependent enough to put one festival on **two different civil days for
+two cities**. A single `dayRule` value cannot express that — the honest answer
+needs two dates with the place attached to each.
+
+The entries carry `dayRuleUnmodelled: "candrodaya"` and currently resolve to the
+sunrise answer, which is usually but not always the same day.
+
+**What it needs:** `swe.rise_trans` for the Moon (the same call the solar
+stations use, with `swe.CALC_RISE`), plus a results surface that can show a
+per-location answer rather than one date. The `/today` page and the station
+trackers are exactly that surface, so this is worth revisiting **once handoff
+02's three pages exist** — not before.
+
+### saṅkrānti puṇyakāla — which civil day owns an ingress
+
+`resolve_solar` takes the civil day containing the ingress instant. Regional
+nirṇaya can defer it to the following day when the Sun crosses after sunset, and
+the rule **differs between Tamil, Bengali and northern practice** — so this is a
+`variants`/`school` problem, not a single missing calculation.
+
+`/festivals` already returns labelled variants where traditions disagree
+(smārta/vaiṣṇava, north/deccan), so the mechanism exists; what is missing is the
+sourced rule per school. **Do not pick one and call it the default.**
+
+### Also open, lower stakes
+
+- **14 citations name a work with no page or section locus.** `locus` is null on
+  exactly those, so they are machine-distinguishable from pinned ones. Real
+  works, not fabrications — but they could be pinned properly.
+- **The Hindu audit read 42 entries with ~19,000 characters of nirṇaya reasoning
+  missing**, because our own export truncated at 900 chars. Its findings are
+  indicative, not final. Re-running it against the full notes would likely
+  retire some and surface others.

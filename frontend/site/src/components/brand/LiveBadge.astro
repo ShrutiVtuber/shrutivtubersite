@@ -1,0 +1,103 @@
+---
+/* The stream-status moment. Ported from `components/brand/LiveBadge.jsx`;
+ * contract in `LiveBadge.d.ts`.
+ *
+ * Three rules from the handoff, all load-bearing:
+ *   - min-height 40px is fixed so there is NO layout shift between states;
+ *   - 'unknown' is the API-failed state and must never claim live OR offline;
+ *   - meaning is carried by the WORD, never by colour alone.
+ * Live red belongs to this component and nowhere else on the site.
+ */
+interface Props {
+  status: "live" | "offline" | "unknown";
+  title?: string;
+  game?: string;
+  viewers?: number;
+  nextStream?: string;
+  href?: string;
+  compact?: boolean;
+}
+const { status = "unknown", title, game, viewers, nextStream, href, compact = false } = Astro.props;
+const Tag = href ? "a" : "span";
+const word = status === "live" ? "Live" : status === "offline" ? "Offline" : "Status unavailable";
+const count = viewers != null ? new Intl.NumberFormat("en").format(viewers) : null;
+---
+
+<Tag class="sh-live" data-status={status} href={href} role="status" aria-live="polite">
+  <span class="sh-dot" aria-hidden="true"></span>
+  <span class="sh-word">{word}</span>
+  {
+    !compact && status === "live" && (title || game) && (
+      <span class="sh-meta">
+        <b>{title}</b>
+        {game ? <Fragment> · {game}</Fragment> : null}
+      </span>
+    )
+  }
+  {!compact && status === "live" && count && <span class="sh-count">{count} watching</span>}
+  {
+    !compact && status === "offline" && (
+      <span class="sh-meta">
+        {nextStream ? <Fragment>next: <b>{nextStream}</b></Fragment> : "streams announced on Discord"}
+      </span>
+    )
+  }
+  {!compact && status === "unknown" && <span class="sh-meta">check Twitch directly</span>}
+</Tag>
+
+<style>
+  .sh-live {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    /* Fixed so the three states never shift the layout under them. */
+    min-height: 40px;
+    padding: 6px 14px 6px 10px;
+    border-radius: var(--radius-full);
+    border: var(--border-w) solid var(--line);
+    background: var(--surface-card);
+    font-family: var(--font-body);
+    font-size: var(--text-sm);
+    color: var(--ink-soft);
+    text-decoration: none;
+    max-width: 100%;
+    transition: border-color var(--dur-1) var(--ease-out);
+  }
+  a.sh-live:hover { border-color: var(--line-strong); color: var(--ink-soft); }
+  .sh-dot { width: 8px; height: 8px; border-radius: 99px; flex: none; }
+  .sh-live[data-status="live"] {
+    border-color: color-mix(in srgb, var(--live) 45%, transparent);
+    background: var(--live-wash);
+  }
+  .sh-live[data-status="live"] .sh-dot {
+    background: var(--live);
+    animation: sh-pulse 2s var(--ease-in-out) infinite;
+  }
+  .sh-live[data-status="offline"] .sh-dot { background: var(--ink-faint); opacity: 0.5; }
+  .sh-live[data-status="unknown"] .sh-dot {
+    background: transparent;
+    border: 1.5px dashed var(--ink-faint);
+    width: 7px;
+    height: 7px;
+  }
+  .sh-word {
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    font-size: var(--text-micro);
+  }
+  .sh-live[data-status="live"] .sh-word { color: var(--live); }
+  .sh-meta { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sh-meta b { font-weight: 600; color: var(--ink); }
+  .sh-count {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    font-size: var(--text-xs);
+    color: var(--ink-faint);
+    flex: none;
+  }
+  @keyframes sh-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.35; }
+  }
+</style>

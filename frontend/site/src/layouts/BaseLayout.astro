@@ -1,12 +1,39 @@
 ---
+/* The shell every page sits in: chrome, tokens, and the head.
+ *
+ * Live status is fetched here rather than per page, because the badge appears
+ * in the header on every surface. It is fetched server-side like everything
+ * else — nothing about the backends reaches the browser.
+ */
 import "../styles/global.css";
+import "../styles/site.css";
+import SiteHeader from "../components/chrome/SiteHeader.astro";
+import SiteFooter from "../components/chrome/SiteFooter.astro";
+import { site, type LiveStatus, type LinkGroups } from "../lib/api";
+import { badgeFrom } from "../lib/live";
+import type { SocialLink } from "../components/brand/SocialLinkRow.astro";
 
 interface Props {
   title: string;
   description?: string;
+  /** Set on pages that carry their own <main> wrapper or a full-bleed hero. */
+  bare?: boolean;
 }
-const { title, description = "" } = Astro.props;
+const { title, description = "", bare = false } = Astro.props;
 const siteUrl = import.meta.env.SHRUTI_SITE_URL ?? "https://shrutivtuber.com";
+
+const [live, links] = await Promise.all([
+  site<LiveStatus>("/live"),
+  site<LinkGroups>("/links"),
+]);
+const badge = badgeFrom(live);
+
+/* Only what the admin has marked visible reaches the footer. LinkedIn is
+   hidden deliberately and that is a content decision, not a layout one — the
+   footer renders whatever comes back and nothing more. */
+const socials: SocialLink[] = Object.values(links?.groups ?? {})
+  .flat()
+  .map((l) => ({ platform: l.platform, href: l.url, label: l.label }));
 ---
 
 <!doctype html>
@@ -22,15 +49,30 @@ const siteUrl = import.meta.env.SHRUTI_SITE_URL ?? "https://shrutivtuber.com";
         white. Inlined on purpose — it cannot wait for a module to load. */}
     <script is:inline src="/first-paint.js"></script>
   </head>
-  <body class="min-h-screen bg-page text-ink antialiased">
-    <a
-      href="#main"
-      class="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded focus:bg-card focus:px-4 focus:py-2"
-    >
-      Skip to content
-    </a>
-    <main id="main">
-      <slot />
-    </main>
+  <body>
+    <a href="#main" class="skip-link">Skip to content</a>
+    <SiteHeader live={badge} />
+    {bare ? <slot /> : <main id="main" class="site-main"><slot /></main>}
+    <SiteFooter socials={socials} />
   </body>
 </html>
+
+<style is:global>
+  body { margin: 0; background: var(--surface-page); color: var(--ink); }
+  .skip-link {
+    position: absolute;
+    left: -9999px;
+    top: 0;
+    z-index: 100;
+  }
+  .skip-link:focus {
+    left: var(--space-4);
+    top: var(--space-4);
+    background: var(--surface-card);
+    color: var(--ink);
+    border: var(--border-w) solid var(--line-strong);
+    border-radius: var(--radius-sm);
+    padding: 10px 16px;
+    font: 500 var(--text-sm) / 1 var(--font-body);
+  }
+</style>

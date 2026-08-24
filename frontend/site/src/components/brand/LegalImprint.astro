@@ -1,0 +1,57 @@
+---
+/* Footer imprint. Ported from `components/brand/LegalImprint.jsx`; contract in
+ * `LegalImprint.d.ts`.
+ *
+ * Ships from day one. Pseudonymity is off, so the imprint IS the exposure —
+ * it is what stops a home address reaching a WHOIS record or a takedown
+ * notice. The bracketed values are not placeholders to be filled in with a
+ * guess: the handoff says ship the brackets until the company is registered.
+ */
+interface Props {
+  entity?: string;
+  street?: string;
+  postcode?: string;
+  city?: string;
+  country?: string;
+  email?: string;
+  registry?: string;
+  vat?: string;
+  layout?: "stacked" | "inline";
+}
+const {
+  entity = "ShrutiVTuber, LLC",
+  street = "[street, no.]",
+  postcode = "[postcode]",
+  city = "Athens",
+  country = "GR",
+  email = "business@shrutivtuber.com",
+  registry = "GEMI [000000000000]",
+  vat = "VAT EL[000000000]",
+  layout = "stacked",
+} = Astro.props;
+const inline = layout === "inline";
+---
+
+<div>
+  <p class="t-eyebrow" style="margin:0 0 8px">Imprint</p>
+  <p class="imprint" data-layout={layout}>
+    {entity}{inline ? " · " : <br />}
+    Registered office (virtual): {street} · {postcode} {city}, {country}{inline ? " · " : <br />}
+    <a href={`mailto:${email}`}>{email}</a>{inline ? " · " : <br />}
+    {registry} · {vat}
+  </p>
+</div>
+
+<style>
+  .imprint {
+    margin: 0;
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    font-weight: 400;
+    color: var(--ink-faint);
+  }
+  .imprint[data-layout="stacked"] { line-height: 1.9; max-width: 40ch; }
+  .imprint[data-layout="inline"] { line-height: 1.7; max-width: 68ch; }
+  .imprint a { color: var(--accent); text-decoration: none; }
+  .imprint a:hover { color: var(--accent-hover); text-decoration: underline; }
+</style>

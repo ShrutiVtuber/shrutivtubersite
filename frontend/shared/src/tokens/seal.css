@@ -1,0 +1,6 @@
+/* The Soror Eu. A. seal — typographic, not a drawn sigil (none exists yet).
+   <span class="seal">Soror Eu&#8202;. A.</span>  or ring form: <span class="seal seal-ring">S∴E.A.</span> */
+.seal{font-family:var(--font-display);font-variant-caps:small-caps;letter-spacing:.12em;color:var(--rose);font-weight:500}
+.seal-ring{display:inline-grid;place-items:center;width:56px;height:56px;border:var(--border-w) solid color-mix(in srgb,var(--rose) 55%,transparent);border-radius:var(--radius-full);font-size:.8125rem;letter-spacing:.06em}
+.seal-line{display:inline-flex;align-items:center;gap:var(--space-3)}
+.seal-line::before,.seal-line::after{content:"";width:28px;height:1px;background:color-mix(in srgb,var(--rose) 45%,transparent)}

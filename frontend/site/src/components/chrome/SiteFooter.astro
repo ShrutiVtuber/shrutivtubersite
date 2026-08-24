@@ -1,0 +1,78 @@
+---
+/* Site footer. Ported from `ui_kits/site/Chrome.jsx`.
+ *
+ * Carries the legal imprint from day one and the Soror Eu. A. seal. The seal
+ * is typographic, not a logo and not an image: no drawn seal exists and the
+ * brief forbids inventing one.
+ */
+import SocialLinkRow from "../brand/SocialLinkRow.astro";
+import LegalImprint from "../brand/LegalImprint.astro";
+import type { SocialLink } from "../brand/SocialLinkRow.astro";
+
+interface Props {
+  socials?: SocialLink[];
+}
+const { socials = [] } = Astro.props;
+
+const SITE: [string, string][] = [
+  ["/work", "Work"],
+  ["/today", "Day at a glance"],
+  ["/tools/solar-stations", "Solar stations"],
+  ["/tools/lunar-stations", "Lunar stations"],
+  ["/schedule", "Schedule"],
+  ["/videos", "Videos"],
+  ["/horoscopes", "Horoscopes"],
+  ["/journal", "Journal"],
+  ["/about", "About"],
+];
+const ELSEWHERE: [string, string][] = [
+  ["/newsletter", "The monthly letter"],
+  ["/press", "Press & media kit"],
+  ["/fan-works", "Fan works"],
+  ["/guidelines", "Derivative work guidelines"],
+  ["/support", "Support"],
+  ["/contact", "Contact"],
+];
+const year = new Date().getUTCFullYear();
+---
+
+<footer class="site-footer">
+  <div class="page">
+    <div class="cols">
+      <div>
+        <span class="brand-word footer-brand">Shruti</span>
+        <p class="footer-thesis">Instruments for magick, built live from Athens.</p>
+        <SocialLinkRow links={socials} size={16} />
+      </div>
+      <div>
+        <h4>Site</h4>
+        <ul>{SITE.map(([href, label]) => <li><a href={href}>{label}</a></li>)}</ul>
+      </div>
+      <div>
+        <h4>Elsewhere</h4>
+        <ul>{ELSEWHERE.map(([href, label]) => <li><a href={href}>{label}</a></li>)}</ul>
+      </div>
+    </div>
+    <div class="imprint-rule"><LegalImprint /></div>
+    <div class="legal">
+      <p>© ShrutiVTuber, LLC · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a></p>
+      <span class="seal seal-ring" title="Soror Eu. A.">S∴E.A.</span>
+    </div>
+  </div>
+</footer>
+
+<style>
+  .footer-brand { font-family: var(--font-display); font-size: 22px; color: var(--ink); }
+  .footer-thesis {
+    font: 400 var(--text-sm) / 1.55 var(--font-body);
+    color: var(--ink-soft);
+    max-width: 34ch;
+    margin: 10px 0 14px;
+  }
+  .imprint-rule {
+    padding-top: var(--space-5);
+    margin-top: var(--space-5);
+    border-top: var(--border-w) solid var(--line);
+  }
+  .site-footer .legal p a { color: inherit; }
+</style>
