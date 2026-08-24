@@ -14,6 +14,7 @@
  * shows that refusal rather than filling the gap.
  */
 import ToolLayout from "../../layouts/ToolLayout.astro";
+import PlaceField from "../../components/forms/PlaceField.astro";
 import DisagreementControl from "../../components/tools/DisagreementControl.astro";
 import CannotCompute from "../../components/tools/CannotCompute.astro";
 import { askAstro } from "../../lib/api";
@@ -98,9 +99,7 @@ const RULE_NAME: Record<string, string> = {
     <form class="param-panel" method="GET">
       <input type="hidden" name="reckoning" value={reckoning} />
       <label><span>Date</span><input type="date" name="when" value={when} /></label>
-      <label><span>Place</span><input type="text" name="place" value={place} /></label>
-      <label><span>Latitude</span><input type="number" name="lat" value={lat} step="0.0001" min="-90" max="90" /></label>
-      <label><span>Longitude</span><input type="number" name="lon" value={lon} step="0.0001" min="-180" max="180" /></label>
+      <PlaceField lat={lat} lon={lon} place={place} />
       <button type="submit">Show</button>
     </form>
   </div>

@@ -18,6 +18,7 @@
  * and everything ascendant-dependent withheld and named.
  */
 import ToolLayout from "../../layouts/ToolLayout.astro";
+import PlaceField from "../../components/forms/PlaceField.astro";
 import DisagreementControl from "../../components/tools/DisagreementControl.astro";
 import CannotCompute from "../../components/tools/CannotCompute.astro";
 import { askAstro } from "../../lib/api";
@@ -144,9 +145,7 @@ const ASPECT_BASIS: Record<string, string> = {
         <input type="checkbox" name="unknownTime" value="1" checked={unknownTime} />
         <span class="check-label">I don't know my birth time</span>
       </label>
-      <label><span>Place</span><input type="text" name="place" value={place} /></label>
-      <label><span>Latitude</span><input type="number" name="lat" value={lat} step="0.0001" min="-90" max="90" /></label>
-      <label><span>Longitude</span><input type="number" name="lon" value={lon} step="0.0001" min="-180" max="180" /></label>
+      <PlaceField lat={lat} lon={lon} place={place} />
       <label>
         <span>Houses</span>
         <select name="house_system">

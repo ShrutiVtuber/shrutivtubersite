@@ -16,6 +16,7 @@
  *     "none — times only" is a first-class choice, not a fallback.
  */
 import BaseLayout from "../../layouts/BaseLayout.astro";
+import PlaceField from "../../components/forms/PlaceField.astro";
 import SectionHeader from "../../components/brand/SectionHeader.astro";
 import NextStation from "../../components/tables/NextStation.astro";
 import StationTable from "../../components/tables/StationTable.astro";
@@ -128,9 +129,7 @@ const polarReason = noRiseOrSet
     </p>
 
     <form class="controls" method="GET">
-      <label><span>Place</span><input type="text" name="place" value={place} placeholder="Athens, Greece" /></label>
-      <label><span>Latitude</span><input type="number" name="lat" value={lat} step="0.0001" min="-90" max="90" required /></label>
-      <label><span>Longitude</span><input type="number" name="lon" value={lon} step="0.0001" min="-180" max="180" required /></label>
+      <PlaceField lat={lat} lon={lon} place={place} />
       <label><span>Days</span><input type="number" name="days" value={days} min="1" max={MAX_DAYS} /></label>
       <label>
         <span>Naming</span>

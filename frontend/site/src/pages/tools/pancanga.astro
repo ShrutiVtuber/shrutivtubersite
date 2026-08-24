@@ -14,6 +14,7 @@
  * the panel says the current shift outright.
  */
 import ToolLayout from "../../layouts/ToolLayout.astro";
+import PlaceField from "../../components/forms/PlaceField.astro";
 import DisagreementControl from "../../components/tools/DisagreementControl.astro";
 import CannotCompute from "../../components/tools/CannotCompute.astro";
 import { askAstro } from "../../lib/api";
@@ -117,9 +118,7 @@ const limbs = d
     <form class="param-panel" method="GET">
       <input type="hidden" name="convention" value={convention} />
       <label><span>Date</span><input type="date" name="when" value={when} /></label>
-      <label><span>Place</span><input type="text" name="place" value={place} /></label>
-      <label><span>Latitude</span><input type="number" name="lat" value={lat} step="0.0001" min="-90" max="90" /></label>
-      <label><span>Longitude</span><input type="number" name="lon" value={lon} step="0.0001" min="-180" max="180" /></label>
+      <PlaceField lat={lat} lon={lon} place={place} />
       <label>
         <span>Ayanāṁśa</span>
         <select name="ayanamsa">

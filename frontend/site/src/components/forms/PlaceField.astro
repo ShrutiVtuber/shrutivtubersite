@@ -1,0 +1,242 @@
+---
+/* One place control, used everywhere a surface needs a location.
+ *
+ * NOBODY SHOULD TYPE COORDINATES. You know your city; the tool should know the
+ * rest. Type a name, pick from the list, and latitude, longitude, elevation
+ * and the timezone name are filled in behind it.
+ *
+ * The resolution is SHOWN BACK, which both handoffs insist on in almost the
+ * same words: "a station table for the wrong city is indistinguishable from a
+ * right one until someone misses a dawn", and "a chart cast for the wrong city
+ * is indistinguishable from a right one". So the chosen place, its coordinates
+ * and its elevation stay visible, with a "Not this place?" escape.
+ *
+ * Search runs through our own backend rather than from the browser, so the
+ * visitor's IP never reaches the gazetteer. Same provider as theourgia —
+ * Open-Meteo over GeoNames — so a place resolved on the phone and here is the
+ * same place.
+ *
+ * Degrades: with scripting off the coordinate fields are ordinary inputs and
+ * still work. They are the fallback, not the interface.
+ */
+interface Props {
+  lat: number;
+  lon: number;
+  place?: string;
+  /** Metres. Altitude shifts a sunrise by about a minute per 500m. */
+  elevation?: number;
+  timezone?: string;
+  label?: string;
+  /** Ask for the timezone too — the nativity needs it, a station table does not. */
+  wantTimezone?: boolean;
+}
+const {
+  lat, lon, place = "", elevation = 0, timezone = "",
+  label = "Place", wantTimezone = false,
+} = Astro.props;
+---
+
+<div class="place" data-place-field data-want-tz={wantTimezone ? "1" : undefined}>
+  <label class="place-search">
+    <span class="lbl">{label}</span>
+    <input
+      type="text"
+      name="place"
+      value={place}
+      placeholder="City, or country"
+      autocomplete="off"
+      data-place-input
+    />
+  </label>
+
+  <ul class="place-results" data-place-results hidden></ul>
+
+  {/* Shown back, always. The escape is part of the design, not a courtesy. */}
+  <p class="place-resolved" data-place-resolved>
+    <span class="t-tabular" data-place-coords>{lat.toFixed(4)}, {lon.toFixed(4)}</span>
+    {elevation ? <span class="t-tabular" data-place-elev>· {elevation} m</span> : <span data-place-elev></span>}
+    {timezone && <span data-place-tz>· {timezone}</span>}
+    {!timezone && <span data-place-tz></span>}
+    <button type="button" class="place-reset" data-place-reset>Not this place?</button>
+  </p>
+
+  {/* The fallback, and what actually gets submitted. */}
+  <div class="place-manual">
+    <label><span class="lbl">Latitude</span><input type="number" name="lat" value={lat} step="0.000001" min="-90" max="90" data-place-lat /></label>
+    <label><span class="lbl">Longitude</span><input type="number" name="lon" value={lon} step="0.000001" min="-180" max="180" data-place-lon /></label>
+    {wantTimezone && <input type="hidden" name="tz" value={timezone} data-place-tzfield />}
+    <input type="hidden" name="elevation" value={elevation} data-place-elevfield />
+  </div>
+</div>
+
+<style>
+  .place { display: grid; gap: 6px; position: relative; }
+  .lbl {
+    font: 600 var(--text-micro) var(--font-body);
+    letter-spacing: var(--tracking-eyebrow);
+    text-transform: uppercase;
+    color: var(--ink-faint);
+  }
+  .place-search { display: grid; gap: 4px; }
+  .place-search input {
+    font: 400 var(--text-sm) var(--font-body);
+    color: var(--ink);
+    background: var(--surface-page);
+    border: var(--border-w) solid var(--line);
+    border-radius: var(--radius-sm);
+    padding: 8px 10px;
+    min-height: 40px;
+    min-width: 220px;
+  }
+  .place-search input:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; border-color: var(--accent); }
+
+  .place-results {
+    list-style: none;
+    margin: 0;
+    padding: 4px;
+    display: grid;
+    gap: 2px;
+    background: var(--surface-card);
+    border: var(--border-w) solid var(--line-strong);
+    border-radius: var(--radius-sm);
+    box-shadow: var(--shadow-3);
+    max-height: 280px;
+    overflow-y: auto;
+    z-index: 20;
+  }
+  .place-results[hidden] { display: none; }
+  .place-results button {
+    appearance: none;
+    width: 100%;
+    text-align: left;
+    background: transparent;
+    border: 0;
+    border-radius: var(--radius-sm);
+    padding: 8px 10px;
+    cursor: pointer;
+    display: grid;
+    gap: 2px;
+    min-height: 44px;
+  }
+  .place-results button:hover,
+  .place-results button:focus-visible { background: var(--accent-wash); }
+  .place-results .r-name { font: 500 var(--text-sm) var(--font-body); color: var(--ink); }
+  .place-results .r-where { font: 400 var(--text-xs) var(--font-mono); color: var(--ink-faint); }
+
+  .place-resolved {
+    display: flex;
+    gap: 8px;
+    align-items: baseline;
+    flex-wrap: wrap;
+    margin: 0;
+    font: 400 var(--text-xs) var(--font-mono);
+    color: var(--ink-faint);
+  }
+  .place-reset {
+    appearance: none;
+    background: transparent;
+    border: 0;
+    padding: 0;
+    font: 400 var(--text-xs) var(--font-body);
+    color: var(--accent);
+    cursor: pointer;
+    text-decoration: underline;
+  }
+  .place-reset:hover { color: var(--accent-hover); }
+
+  .place-manual { display: flex; gap: var(--space-3); flex-wrap: wrap; }
+  .place-manual label { display: grid; gap: 4px; }
+  .place-manual input[type="number"] {
+    font: 400 var(--text-sm) var(--font-mono);
+    color: var(--ink);
+    background: var(--surface-page);
+    border: var(--border-w) solid var(--line);
+    border-radius: var(--radius-sm);
+    padding: 8px 10px;
+    min-height: 40px;
+    width: 130px;
+  }
+  /* With scripting on, the coordinate boxes step back: they are the fallback,
+     not the interface. They stay reachable and stay submitted. */
+  :global(html.js) .place-manual { opacity: 0.62; }
+  :global(html.js) .place-manual:focus-within { opacity: 1; }
+</style>
+
+<script>
+  document.documentElement.classList.add("js");
+
+  document.querySelectorAll("[data-place-field]").forEach((field) => {
+    const input = field.querySelector("[data-place-input]");
+    const list = field.querySelector("[data-place-results]");
+    const latField = field.querySelector("[data-place-lat]");
+    const lonField = field.querySelector("[data-place-lon]");
+    const tzField = field.querySelector("[data-place-tzfield]");
+    const elevField = field.querySelector("[data-place-elevfield]");
+    const coords = field.querySelector("[data-place-coords]");
+    const elevOut = field.querySelector("[data-place-elev]");
+    const tzOut = field.querySelector("[data-place-tz]");
+    const reset = field.querySelector("[data-place-reset]");
+    if (!input || !list) return;
+
+    let timer = null;
+    let controller = null;
+
+    const hide = () => { list.hidden = true; list.innerHTML = ""; };
+
+    const choose = (p) => {
+      input.value = [p.name, p.region, p.country].filter(Boolean).join(", ");
+      if (latField) latField.value = p.lat;
+      if (lonField) lonField.value = p.lon;
+      if (tzField) tzField.value = p.timezone || "";
+      if (elevField) elevField.value = p.elevation || 0;
+      if (coords) coords.textContent = `${Number(p.lat).toFixed(4)}, ${Number(p.lon).toFixed(4)}`;
+      if (elevOut) elevOut.textContent = p.elevation ? `· ${p.elevation} m` : "";
+      if (tzOut) tzOut.textContent = p.timezone ? `· ${p.timezone}` : "";
+      hide();
+    };
+
+    const search = async (q) => {
+      if (controller) controller.abort();
+      controller = new AbortController();
+      try {
+        const r = await fetch(`/api/places?q=${encodeURIComponent(q)}`, { signal: controller.signal });
+        if (!r.ok) { hide(); return; }
+        const { places } = await r.json();
+        if (!places || places.length === 0) {
+          list.innerHTML = `<li class="r-none"><span class="r-where">No place of that name found. The coordinate boxes still work.</span></li>`;
+          list.hidden = false;
+          return;
+        }
+        list.innerHTML = "";
+        places.forEach((p) => {
+          const li = document.createElement("li");
+          const button = document.createElement("button");
+          button.type = "button";
+          const where = [p.region, p.country].filter(Boolean).join(", ");
+          button.innerHTML =
+            `<span class="r-name"></span><span class="r-where"></span>`;
+          button.querySelector(".r-name").textContent = p.name;
+          button.querySelector(".r-where").textContent =
+            `${where} · ${Number(p.lat).toFixed(3)}, ${Number(p.lon).toFixed(3)}` +
+            (p.elevation ? ` · ${p.elevation} m` : "");
+          button.addEventListener("click", () => choose(p));
+          li.appendChild(button);
+          list.appendChild(li);
+        });
+        list.hidden = false;
+      } catch (e) {
+        if (e.name !== "AbortError") hide();
+      }
+    };
+
+    input.addEventListener("input", () => {
+      const q = input.value.trim();
+      clearTimeout(timer);
+      if (q.length < 2) { hide(); return; }
+      timer = setTimeout(() => search(q), 220);
+    });
+    input.addEventListener("blur", () => setTimeout(hide, 180));
+    reset?.addEventListener("click", () => { input.value = ""; input.focus(); });
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape") hide(); });
+  });
+</script>
