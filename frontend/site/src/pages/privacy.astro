@@ -13,7 +13,14 @@ import Prose from "../components/content/Prose.astro";
 import LegalImprint from "../components/brand/LegalImprint.astro";
 import EmptyState from "../components/feedback/EmptyState.astro";
 import { pageSections } from "../lib/content";
+import { site } from "../lib/api";
 
+interface Imprint {
+  visible: boolean;
+  entity?: string; street?: string; postcode?: string; city?: string;
+  country?: string; email?: string; registry?: string; vat?: string;
+}
+const imprint = await site<Imprint>("/api/content/imprint");
 const sections = await pageSections("privacy");
 ---
 
@@ -38,7 +45,18 @@ const sections = await pageSections("privacy");
         />
       )
     }
-    <div class="legal-imprint"><LegalImprint layout="inline" /></div>
+    {
+      imprint?.visible && (
+        <div class="legal-imprint">
+          <LegalImprint
+            layout="inline"
+            entity={imprint.entity} street={imprint.street} postcode={imprint.postcode}
+            city={imprint.city} country={imprint.country} email={imprint.email}
+            registry={imprint.registry} vat={imprint.vat}
+          />
+        </div>
+      )
+    }
   </div>
 </BaseLayout>
 

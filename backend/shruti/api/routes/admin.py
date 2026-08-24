@@ -338,3 +338,39 @@ async def list_media(
         }
         for m in rows
     ]
+
+
+# ── site settings ───────────────────────────────────────────────────────────
+
+class SettingsIn(BaseModel):
+    """Arbitrary key/value, validated by the caller knowing the keys."""
+
+    values: dict[str, str]
+
+
+@router.get("/settings")
+async def read_settings(
+    prefix: str = "",
+    session: AsyncSession = Depends(get_session),
+    _: str = Depends(require_admin),
+) -> dict:
+    from shruti.core.settings_store import get_all
+
+    return {"settings": await get_all(session, prefix)}
+
+
+@router.put("/settings")
+async def write_settings(
+    body: SettingsIn,
+    session: AsyncSession = Depends(get_session),
+    _: str = Depends(require_admin),
+) -> dict:
+    from shruti.core.settings_store import get_all, put_many
+
+    # Keys are namespaced and short; nothing here is a path or a template.
+    clean = {
+        k: v for k, v in body.values.items()
+        if k and len(k) <= 64 and len(v) <= 500
+    }
+    await put_many(session, clean)
+    return {"ok": True, "settings": await get_all(session)}

@@ -177,3 +177,18 @@ async def get_fan_art(session: AsyncSession = Depends(get_session)) -> list[dict
         }
         for f, m in rows
     ]
+
+
+@router.get("/imprint")
+async def get_imprint(session: AsyncSession = Depends(get_session)) -> dict:
+    """
+    The legal imprint, or `{"visible": false}`.
+
+    Hidden until it is filled in and switched on. The design ships bracketed
+    placeholders, which is right for a mock-up and wrong to publish: a registry
+    number that looks real and is not is worse than no imprint. It goes up from
+    the admin the day the company exists.
+    """
+    from shruti.core.settings_store import imprint
+
+    return await imprint(session)

@@ -1,0 +1,117 @@
+---
+/* Site settings — currently the legal imprint.
+ *
+ * The imprint is hidden until it is both filled in and switched on. The design
+ * ships bracketed placeholders, which is right for a mock-up and wrong to
+ * publish: a registry number that looks like a registry number and is not one
+ * reads as a claim rather than as a gap.
+ *
+ * The reason the design wanted it from day one is not lost — pseudonymity is
+ * off, and a virtual office on the page is what stops a home address reaching
+ * a WHOIS record or a takedown notice. This screen is how it goes up the day
+ * the company exists, without a deploy.
+ */
+import AdminLayout from "../../layouts/AdminLayout.astro";
+import CsrfField from "../../components/forms/CsrfField.astro";
+import Button from "../../components/forms/Button.astro";
+import Badge from "../../components/navigation/Badge.astro";
+import { asAdmin } from "../../lib/admin";
+import { verifyCsrf } from "../../lib/csrf";
+
+const FIELDS: [string, string, string][] = [
+  ["imprint.entity", "Entity", "The registered name, e.g. ShrutiVTuber, LLC"],
+  ["imprint.street", "Street", "The VIRTUAL OFFICE — never a home address"],
+  ["imprint.postcode", "Postcode", ""],
+  ["imprint.city", "City", ""],
+  ["imprint.country", "Country", "Two letters, e.g. GR"],
+  ["imprint.email", "Role email", "Reachable, and monitored"],
+  ["imprint.registry", "Registry", "e.g. GEMI 123456789012"],
+  ["imprint.vat", "VAT", "e.g. VAT EL123456789"],
+];
+
+let notice = "";
+let failed = "";
+
+if (Astro.request.method === "POST") {
+  const form = await Astro.request.formData();
+  if (!verifyCsrf(Astro.cookies, form)) {
+    failed = "That did not save. Reload the page and try again.";
+  } else {
+    const values: Record<string, string> = {};
+    for (const [key] of FIELDS) values[key] = String(form.get(key) ?? "").trim();
+    values["imprint.visible"] = form.get("visible") === "1" ? "1" : "0";
+    const r = await asAdmin(Astro, "/api/admin/settings", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ values }),
+    });
+    notice = r.ok ? "Saved." : "";
+    failed = r.ok ? "" : (r.body?.detail ?? "That did not save.");
+  }
+}
+
+const read = await asAdmin(Astro, "/api/admin/settings?prefix=imprint.");
+const values: Record<string, string> = read.body?.settings ?? {};
+const on = values["imprint.visible"] === "1";
+const complete = Boolean(values["imprint.entity"]?.trim() && values["imprint.email"]?.trim());
+const live = on && complete;
+---
+
+<AdminLayout title="Settings">
+  <div class="head">
+    <h1 class="adm-h">Settings</h1>
+    <Badge tone={live ? "accent" : "faint"}>
+      {live ? "imprint is published" : on ? "switched on, but incomplete" : "imprint is hidden"}
+    </Badge>
+  </div>
+
+  {notice && <p class="adm-ok" role="status">{notice}</p>}
+  {failed && <p class="adm-bad" role="alert">{failed}</p>}
+
+  <form method="POST" class="adm-card">
+    <h2 class="h2">Legal imprint</h2>
+    <p class="adm-note">
+      Hidden until it is filled in and switched on. It stays down while the entity or the email is
+      blank, however the switch is set — a half-filled imprint is worse than none, because the
+      missing half reads as an omission rather than as work in progress.
+    </p>
+    <CsrfField />
+
+    <div class="fields">
+      {
+        FIELDS.map(([key, label, hint]) => (
+          <label class="field">
+            <span class="adm-lbl">{label}</span>
+            <input class="adm-input" name={key} value={values[key] ?? ""} autocomplete="off" />
+            {hint && <span class="hint">{hint}</span>}
+          </label>
+        ))
+      }
+    </div>
+
+    <label class="switch">
+      <input type="checkbox" name="visible" value="1" checked={on} />
+      <span>
+        <strong>Show it in the footer and on the legal pages</strong>
+        <span class="hint">
+          Turn this on once the company is registered. Leave it off while the numbers are not real
+          — publishing a registry number that is not one is a claim, not a placeholder.
+        </span>
+      </span>
+    </label>
+
+    <div><Button type="submit">Save</Button></div>
+  </form>
+</AdminLayout>
+
+<style>
+  .head { display: flex; gap: var(--space-4); align-items: baseline; flex-wrap: wrap; }
+  .h2 { font: 600 var(--text-h3) var(--font-display); color: var(--ink); margin: 0; }
+  .fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: var(--space-4); }
+  .field { display: grid; gap: 4px; align-content: start; }
+  .hint { font: 400 var(--text-xs) / 1.5 var(--font-body); color: var(--ink-faint); }
+  .switch { display: flex; gap: 10px; align-items: start; cursor: pointer; padding-top: var(--space-3); border-top: var(--border-w) solid var(--line); }
+  .switch input { margin-top: 3px; accent-color: var(--accent); width: 18px; height: 18px; flex: none; }
+  .switch > span { display: grid; gap: 3px; }
+  .switch strong { font: 500 var(--text-body) var(--font-body); color: var(--ink); }
+</style>

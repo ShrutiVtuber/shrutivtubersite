@@ -177,6 +177,62 @@ const INSTRUMENTS = [
     </div>
   </section>
 
+  {/* An INVITATION, not a teaser. The design's rule for the signed-out state
+      is that the free half must be fully useful on its own — "if the page is a
+      teaser for signing up, nobody signs up" — so this says what an account
+      ADDS rather than what it withholds, and says out loud that everything
+      above works without one. No lock, no blur, no count of what is missing. */}
+  <section class="section page">
+    <div class="account-invite">
+      <div class="ai-words">
+        <span class="t-eyebrow">A free account</span>
+        <h2>Save a nativity, and the instruments start answering about you</h2>
+        <p class="ai-lead">
+          Everything above works without an account and always will. What an account changes is
+          that the tools stop asking where and when, and start knowing.
+        </p>
+        <ul class="ai-list">
+          <li>
+            <span class="t-glyph" aria-hidden="true">✶</span>
+            <span>
+              <strong>Your chart, kept.</strong> Cast once and it is there — no re-typing a birth
+              time and a city every time you want to look at it.
+            </span>
+          </li>
+          <li>
+            <span class="t-glyph" aria-hidden="true">☾</span>
+            <span>
+              <strong>Transits on Day at a glance.</strong> The one block on that page that needs
+              to know where you were born. Nothing else does.
+            </span>
+          </li>
+          <li>
+            <span class="t-glyph" aria-hidden="true">☉</span>
+            <span>
+              <strong>Your place, remembered.</strong> Stations, sunrise and the pañcāṅga answer
+              for where you actually are, without setting it each visit.
+            </span>
+          </li>
+          <li>
+            <span class="t-glyph" aria-hidden="true">◐</span>
+            <span>
+              <strong>Your sign first.</strong> The monthly reading opens on yours instead of
+              twelve to choose from.
+            </span>
+          </li>
+        </ul>
+        <div class="ai-actions">
+          <Button size="lg" href="/signup">Make an account</Button>
+          <Button variant="ghost" href="/signin">Sign in</Button>
+        </div>
+        <p class="ai-quiet">
+          Nothing public — no profile, no avatar, no follower count. Birth data is a separate,
+          optional decision, and withdrawing it deletes it. Free, and staying that way.
+        </p>
+      </div>
+    </div>
+  </section>
+
   <section class="section page">
     <div class="section-head">
       <SectionHeader
@@ -257,6 +313,37 @@ const INSTRUMENTS = [
 
 <style>
   .hero-foot-row { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+
+  .account-invite {
+    background: var(--surface-card);
+    border: var(--border-w) solid var(--line-strong);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-1);
+    padding: clamp(20px, 4vw, var(--space-6));
+  }
+  .ai-words { display: grid; gap: 12px; max-width: 68ch; }
+  .account-invite h2 {
+    font: 600 var(--text-h2) var(--font-display);
+    line-height: var(--leading-heading);
+    color: var(--ink);
+    margin: 0;
+    text-wrap: balance;
+  }
+  .ai-lead { font: 400 var(--text-h4) / var(--leading-body) var(--font-display); color: var(--ink-soft); margin: 0; }
+  .ai-list {
+    list-style: none;
+    margin: var(--space-3) 0 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: var(--space-3) var(--space-5);
+  }
+  .ai-list li { display: flex; gap: 10px; align-items: baseline; }
+  .ai-list .t-glyph { color: var(--rose); font: 400 1.1rem var(--font-display); flex: none; }
+  .ai-list span:last-child { font: 400 var(--text-sm) / 1.6 var(--font-body); color: var(--ink-soft); }
+  .ai-list strong { font-weight: 600; color: var(--ink); }
+  .ai-actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: var(--space-3); }
+  .ai-quiet { font: 400 var(--text-xs) / 1.6 var(--font-body); color: var(--ink-faint); margin: 0; max-width: 66ch; }
 
   .instruments {
     display: grid;

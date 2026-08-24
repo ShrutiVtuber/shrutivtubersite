@@ -2,10 +2,21 @@
 /* Footer imprint. Ported from `components/brand/LegalImprint.jsx`; contract in
  * `LegalImprint.d.ts`.
  *
- * Ships from day one. Pseudonymity is off, so the imprint IS the exposure —
- * it is what stops a home address reaching a WHOIS record or a takedown
- * notice. The bracketed values are not placeholders to be filled in with a
- * guess: the handoff says ship the brackets until the company is registered.
+ * ONE DEPARTURE FROM THE HANDOFF, decided with the owner. The design ships
+ * bracketed placeholders — `GEMI [000000000000]`, `VAT EL[000000000]` — which
+ * is the right convention for a mock-up and the wrong thing to publish. A
+ * registry number that looks like a registry number and is not one is worse
+ * than no imprint at all: it reads as a claim rather than as a gap.
+ *
+ * So the imprint is now stored, editable from the admin, and HIDDEN until it
+ * is both filled in and switched on. The reason the design wanted it from day
+ * one still holds and is not lost — pseudonymity is off, and a virtual office
+ * on the page is what stops a home address reaching a WHOIS record or a
+ * takedown notice. It goes up the day the company exists, from the admin,
+ * without a deploy.
+ *
+ * Values passed as props still render, so the component is unchanged for any
+ * caller that has them.
  */
 interface Props {
   entity?: string;
@@ -19,28 +30,32 @@ interface Props {
   layout?: "stacked" | "inline";
 }
 const {
-  entity = "ShrutiVTuber, LLC",
-  street = "[street, no.]",
-  postcode = "[postcode]",
-  city = "Athens",
-  country = "GR",
-  email = "business@shrutivtuber.com",
-  registry = "GEMI [000000000000]",
-  vat = "VAT EL[000000000]",
-  layout = "stacked",
+  entity = "", street = "", postcode = "", city = "", country = "",
+  email = "", registry = "", vat = "", layout = "stacked",
 } = Astro.props;
 const inline = layout === "inline";
+
+/* Nothing invented and nothing bracketed: without an entity and an address to
+   write to, there is no imprint to show. */
+const show = Boolean(entity && email);
+const officeLine = [street, [postcode, city].filter(Boolean).join(" "), country]
+  .filter(Boolean).join(" · ");
+const registryLine = [registry, vat].filter(Boolean).join(" · ");
 ---
 
-<div>
-  <p class="t-eyebrow" style="margin:0 0 8px">Imprint</p>
-  <p class="imprint" data-layout={layout}>
-    {entity}{inline ? " · " : <br />}
-    Registered office (virtual): {street} · {postcode} {city}, {country}{inline ? " · " : <br />}
-    <a href={`mailto:${email}`}>{email}</a>{inline ? " · " : <br />}
-    {registry} · {vat}
-  </p>
-</div>
+{
+  show && (
+    <div>
+      <p class="t-eyebrow" style="margin:0 0 8px">Imprint</p>
+      <p class="imprint" data-layout={layout}>
+        {entity}{inline ? " · " : <br />}
+        {officeLine && <Fragment>Registered office (virtual): {officeLine}{inline ? " · " : <br />}</Fragment>}
+        <a href={`mailto:${email}`}>{email}</a>
+        {registryLine && <Fragment>{inline ? " · " : <br />}{registryLine}</Fragment>}
+      </p>
+    </div>
+  )
+}
 
 <style>
   .imprint {
