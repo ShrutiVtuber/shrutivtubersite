@@ -30,8 +30,11 @@ from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
+from shruti.core import emails
 from shruti.core.config import get_settings
 from shruti.core.db import get_session
+from shruti.core.mail import send
+from shruti.core.settings_store import imprint as imprint_settings
 from shruti.models.accounts import Supporter, User
 
 log = logging.getLogger(__name__)
@@ -329,6 +332,78 @@ def _moment(value: int | None) -> datetime | None:
     return datetime.fromtimestamp(value, tz=timezone.utc) if value else None
 
 
+async def _tell(
+    session: AsyncSession, to: str, built: tuple[str, str] | None
+) -> None:
+    """
+    Send one billing email, if there is somewhere to send it.
+
+    A failed send must never fail the webhook. Stripe retries a non-2xx for
+    days, and retrying a webhook because an email bounced would re-run the
+    database work over and over to fix something the database was never wrong
+    about.
+    """
+    if not (to and built):
+        return
+    subject, html = built
+    result = await send(subject=subject, body=_plain(html), to=to, html=html)
+    if not result.sent:
+        log.warning("billing mail '%s' not sent: %s", subject, result.error)
+
+
+def _plain(html: str) -> str:
+    """
+    The text part.
+
+    Both parts, always — a client that will not render the HTML gets a real
+    message rather than an empty frame, and a screen reader meets this first.
+    Crude on purpose: a real HTML-to-text dependency for five templates whose
+    structure is known would be the wrong trade.
+
+    Three details that are not cosmetic. Entities are UNESCAPED, or `&#9827;`
+    reaches somebody as those six characters. Inline tags close up rather than
+    becoming spaces, or a bolded amount reads `€15 , once`. And a line holding
+    nothing but the decorative glyph is dropped, because in text it is a
+    stray symbol on a line of its own with no way to tell it was ornament.
+    """
+    import re
+    from html import unescape
+
+    text = re.sub(r"(?is)<(script|style|head)[^>]*>.*?</\1>", " ", html)
+    # A link with no destination is useless in text. `Label (https://…)`,
+    # unless the label already IS the destination.
+    def _link(match: "re.Match[str]") -> str:
+        href, label = match.group(1), re.sub(r"<[^>]+>", "", match.group(2)).strip()
+        if not label:
+            return href
+        return label if href in label else f"{label} ({href})"
+
+    text = re.sub(r'(?is)<a\b[^>]*href="([^"]+)"[^>]*>(.*?)</a>', _link, text)
+    text = re.sub(r"(?i)<br\s*/?>|</p>|</tr>|</h1>|</div>", "\n", text)
+    # Inline tags vanish; everything else becomes a space.
+    text = re.sub(r"(?i)</?(b|strong|i|em|span|a|u)\b[^>]*>", "", text)
+    text = re.sub(r"<[^>]+>", " ", text)
+    text = unescape(text)
+
+    lines = []
+    for line in text.splitlines():
+        line = " ".join(line.split())
+        line = re.sub(r"\s+([,.;:!?])", r"\1", line)
+        # A lone ornament, or nothing at all.
+        if len(line) <= 1:
+            continue
+        lines.append(line)
+    return "\n".join(lines).strip()
+
+
+async def _current_imprint(session: AsyncSession) -> dict:
+    """The registered details, or nothing. Never the bracketed placeholders."""
+    try:
+        return await imprint_settings(session)
+    except Exception:                              # noqa: BLE001
+        return {"visible": False}
+
+
 async def _upsert(
     session: AsyncSession, *, customer_id: str, subscription: dict | None,
     email: str = "", user_id: int | None = None,
@@ -370,6 +445,41 @@ async def _upsert(
             row.tier = tier
 
 
+async def _supporter(session: AsyncSession, customer_id: str) -> Supporter | None:
+    if not customer_id:
+        return None
+    return (
+        await session.execute(
+            select(Supporter).where(Supporter.stripe_customer_id == customer_id)
+        )
+    ).scalars().first()
+
+
+async def _email_for(session: AsyncSession, customer_id: str) -> str:
+    """
+    Where to write.
+
+    The account's address is preferred over the one Stripe holds: somebody who
+    changed their email here and not there should still be reachable, and this
+    is the address they see on their own account page.
+    """
+    row = await _supporter(session, customer_id)
+    if row is None:
+        return ""
+    if row.user_id:
+        user = (
+            await session.execute(select(User).where(User.id == row.user_id))
+        ).scalar_one_or_none()
+        if user and user.email:
+            return user.email
+    return row.email
+
+
+async def _tier_for(session: AsyncSession, customer_id: str) -> str:
+    row = await _supporter(session, customer_id)
+    return row.tier if row else ""
+
+
 @router.post("/webhook", include_in_schema=False)
 async def webhook(
     request: Request,
@@ -404,6 +514,8 @@ async def webhook(
     obj = event["data"]["object"]
     stripe.api_key = s.stripe_secret_key
 
+    imprint = await _current_imprint(session)
+
     if kind == "checkout.session.completed":
         customer_id = obj.get("customer") or ""
         reference = obj.get("client_reference_id")
@@ -432,6 +544,26 @@ async def webhook(
             )
             await session.commit()
 
+        # The contract confirmation is owed even when Stripe made no customer
+        # — which is the ordinary shape of a one-off gift — so this sits
+        # outside the `if customer_id` above rather than inside it.
+        if email and subscription is not None:
+            item = ((subscription.get("items") or {}).get("data") or [{}])[0]
+            price = item.get("price") or {}
+            await _tell(session, email, emails.subscription_started(
+                tier=(subscription.get("metadata") or {}).get("tier", ""),
+                amount=price.get("unit_amount"),
+                currency=price.get("currency", "eur"),
+                renews_on=_moment(subscription.get("current_period_end")),
+                imprint=imprint,
+            ))
+        elif email and obj.get("mode") == "payment":
+            await _tell(session, email, emails.gift_received(
+                amount=obj.get("amount_total"),
+                currency=obj.get("currency", "eur"),
+                imprint=imprint,
+            ))
+
     elif kind in {
         "customer.subscription.created",
         "customer.subscription.updated",
@@ -441,6 +573,53 @@ async def webhook(
         if customer_id:
             await _upsert(session, customer_id=customer_id, subscription=dict(obj))
             await session.commit()
+
+            tier = (obj.get("metadata") or {}).get("tier", "")
+
+            # A cancellation is the TRANSITION, not the state. Stripe sends
+            # `updated` for many reasons and this event arrives again on every
+            # later change; without checking what actually changed, somebody
+            # who cancelled once would be told so repeatedly.
+            changed = (event["data"].get("previous_attributes") or {})
+            just_cancelled = (
+                kind == "customer.subscription.updated"
+                and obj.get("cancel_at_period_end")
+                and changed.get("cancel_at_period_end") is False
+            )
+            if just_cancelled:
+                await _tell(
+                    session, await _email_for(session, customer_id),
+                    emails.subscription_cancelled(
+                        tier=tier,
+                        ends_on=_moment(obj.get("current_period_end")),
+                        imprint=imprint,
+                    ),
+                )
+
+    elif kind == "invoice.upcoming":
+        # Stripe fires this a few days before it charges. The gap it fills:
+        # a charge nobody remembered agreeing to is the commonest route to a
+        # chargeback, and being surprised by money leaving is a bad thing to do
+        # to somebody whether or not the law requires the warning.
+        customer_id = obj.get("customer") or ""
+        to = obj.get("customer_email") or await _email_for(session, customer_id)
+        line = ((obj.get("lines") or {}).get("data") or [{}])[0]
+        await _tell(session, to, emails.renewal_reminder(
+            tier=((line.get("metadata") or {}).get("tier")
+                  or await _tier_for(session, customer_id)),
+            amount=obj.get("amount_due"),
+            currency=obj.get("currency", "eur"),
+            charge_on=_moment(obj.get("next_payment_attempt")
+                              or obj.get("period_end")),
+            imprint=imprint,
+        ))
+
+    elif kind == "invoice.payment_failed":
+        customer_id = obj.get("customer") or ""
+        to = obj.get("customer_email") or await _email_for(session, customer_id)
+        await _tell(session, to, emails.payment_failed(
+            tier=await _tier_for(session, customer_id), imprint=imprint,
+        ))
 
     # Everything else is acknowledged and ignored. Returning 200 for an event
     # we do not handle is correct: a 4xx makes Stripe retry it for days.

@@ -1,0 +1,70 @@
+<!-- Billing mail — subscription confirmations, renewal reminders,
+     cancellations, failed payments, one-off gifts.
+
+     Built to the same rules as the designer's two templates and from the same
+     ramps: table layout, every critical style inlined as well as in <style>,
+     no webfonts, no images, dark mode via prefers-color-scheme. Assume a
+     hostile client: images blocked, <style> stripped, dark mode forced.
+
+     There is NO tracking pixel and there must not be. A test asserts it.
+
+     One template rather than five near-identical files: the slots carry the
+     difference, and five copies of this markup would drift the first time one
+     of them was edited. -->
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light dark"><meta name="supported-color-schemes" content="light dark"><title>{{heading}}</title>
+<style>
+body{margin:0;padding:0;background:#F1ECEF;-webkit-text-size-adjust:100%}
+table{border-collapse:collapse}
+a{color:#33639C}
+.sh{display:none!important;visibility:hidden;opacity:0;height:0;width:0;overflow:hidden;mso-hide:all}
+@media (prefers-color-scheme:dark){
+  body,.bg{background:#0D1220!important}
+  .card{background:#1A2138!important}
+  .ink{color:#E9E6F0!important}
+  .soft{color:#B3B9D2!important}
+  .faint{color:#8B93AF!important}
+  .rule{border-color:#2E3752!important}
+  .inset{background:#121829!important}
+  a,.acc{color:#8FBEE8!important}
+  .btn{background:#8FBEE8!important;border-color:#8FBEE8!important}
+  .btn a{color:#10182B!important}
+}
+@media (max-width:620px){.pad{padding-left:20px!important;padding-right:20px!important}}
+</style></head>
+<body style="margin:0;padding:0;background:#F1ECEF">
+<div class="sh">{{preheader}}</div>
+<table class="bg" role="presentation" width="100%" style="background:#F1ECEF">
+<tr><td align="center" style="padding:28px 12px">
+<table role="presentation" width="600" class="card" style="width:600px;max-width:600px;background:#FFFFFF;border:1px solid #DCD6DC;border-radius:10px">
+
+<tr><td class="pad" style="padding:28px 32px 18px">
+<span class="ink" style="font:500 24px Georgia,'Times New Roman',serif;color:#26304A">Shruti</span>
+</td></tr>
+<tr><td class="pad" style="padding:0 32px"><div class="rule" style="border-top:1px solid #DCD6DC;height:1px;line-height:1px">&nbsp;</div></td></tr>
+
+<tr><td class="pad" style="padding:28px 32px 10px">
+<span class="rose" style="font:400 26px Georgia,'Times New Roman',serif;color:#A85A76">{{glyph}}</span>
+</td></tr>
+<tr><td class="pad" style="padding:0 32px 12px">
+<h1 class="ink" style="margin:0;font:600 26px/1.25 Georgia,'Times New Roman',serif;color:#26304A">{{heading}}</h1>
+</td></tr>
+<tr><td class="pad" style="padding:0 32px 22px">
+<p class="soft" style="margin:0;font:400 16px/1.7 Georgia,'Times New Roman',serif;color:#4A5470">{{lede}}</p>
+</td></tr>
+
+{{facts}}
+
+{{cta}}
+
+<tr><td class="pad" style="padding:0 32px 26px">
+<p class="faint" style="margin:0;font:400 12px/1.8 'JetBrains Mono',Consolas,monospace;color:#6E7890">{{note}}</p>
+</td></tr>
+
+<tr><td class="pad inset" style="padding:20px 32px;background:#ECE7EB;border-radius:0 0 10px 10px">
+{{footer_legal}}
+<p class="faint" style="margin:0;font:400 11px/1.8 'JetBrains Mono',Consolas,monospace;color:#6E7890">This is a message about money you have paid or agreed to pay, so it is sent whether or not you take the monthly letter. <a href="{{contact_url}}" style="color:#33639C" class="acc">Something wrong?</a></p>
+</td></tr>
+
+</table>
+</td></tr></table>
+</body></html>

@@ -1,5 +1,10 @@
-<!-- Copied VERBATIM from the design bundle's email/optin-confirm.html.
-     Only the demo links became slots; the markup, the inlined styles
+<!-- Copied from the design bundle's email/optin-confirm.html.
+     The demo links became slots, and so did the registered-details block:
+     the bundle ships a bracketed registry number and a bracketed street,
+     which is the right convention for a mock-up and the wrong thing to put
+     in mail that actually leaves the building. It now
+     follows the same rule as the site footer — nothing until it is filled in
+     and switched on. Otherwise the markup, the inlined styles
      and the dark-mode overrides are the designer's and are not to be
      touched. Assume a hostile client: images blocked, <style> stripped,
      dark mode forced. There is NO tracking pixel and there must not be. -->
@@ -64,12 +69,7 @@ a{color:#33639C}
 </td></tr>
 
 <tr><td class="pad inset" style="padding:20px 32px;background:#ECE7EB;border-radius:0 0 10px 10px">
-<p class="faint" style="margin:0 0 10px;font:400 11px/1.8 'JetBrains Mono',Consolas,monospace;color:#6E7890">
-ShrutiVTuber, LLC<br>
-Registered office (virtual): [street, no.] · [postcode] Athens, GR<br>
-business@shrutivtuber.com<br>
-GEMI [000000000000] · VAT EL[000000000]
-</p>
+{{footer_legal}}
 <p class="faint" style="margin:0;font:400 11px/1.8 'JetBrains Mono',Consolas,monospace;color:#6E7890">Didn’t enter this address? Ignore this email — nothing happens, and we do not write again. <a href="{{report_url}}" style="color:#33639C" class="acc">Report it</a></p>
 </td></tr>
 

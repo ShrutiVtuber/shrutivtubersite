@@ -61,7 +61,7 @@ async def subscribe(
     await session.commit()
 
     from shruti.api.routes.accounts import _send_optin
-    await _send_optin(email, row.confirm_token)
+    await _send_optin(email, row.confirm_token, session)
 
     # The reply is the same whether or not the address was already known.
     return {"ok": True, "checkEmail": True}

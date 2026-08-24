@@ -128,7 +128,7 @@ async def sign_up(
             email=email, user_id=user.id, confirm_token=token,
             unsubscribe_token=new_token(),
         ))
-        await _send_optin(email, token)
+        await _send_optin(email, token, session)
 
     await session.commit()
 
@@ -464,7 +464,7 @@ async def change_consent(
                     email=user.email, user_id=user.id,
                     confirm_token=token, unsubscribe_token=new_token(),
                 ))
-                await _send_optin(user.email, token)
+                await _send_optin(user.email, token, session)
             else:
                 subscriber.unsubscribed_at = None
         elif subscriber is not None:
@@ -592,7 +592,9 @@ async def _send_magic_link(email: str) -> None:
     )
 
 
-async def _send_optin(email: str, token: str) -> None:
+async def _send_optin(
+    email: str, token: str, session: AsyncSession | None = None
+) -> None:
     """
     The mandatory double opt-in mail, in the designer's own template.
 
@@ -600,6 +602,15 @@ async def _send_optin(email: str, token: str) -> None:
     hostile client, with a plain-text body alongside for the ones that want it.
     """
     from shruti.core.emails import optin_confirm, site_url
+    from shruti.core.settings_store import imprint as imprint_settings
+
+    # Registered details only when they are real. See `legal_footer`.
+    imprint = {"visible": False}
+    if session is not None:
+        try:
+            imprint = await imprint_settings(session)
+        except Exception:                          # noqa: BLE001
+            pass
 
     url = f"{site_url()}/newsletter/confirm?token={token}"
     await send_mail(
@@ -611,7 +622,7 @@ async def _send_optin(email: str, token: str) -> None:
             "If you did not ask for this, do nothing — an unconfirmed address "
             "is never sent to."
         ),
-        html=optin_confirm(token),
+        html=optin_confirm(token, imprint),
         to=email,
     )
 
