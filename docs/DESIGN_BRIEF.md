@@ -24,17 +24,34 @@ She is a practising Greek theurgist under Hekate and an OTO member. Based in
 Athens (GMT+3). Secondary texture, not the thesis: polyglot — the current site
 greets in English, Greek and Hindi, and the old archive is French study notes.
 
-### The two names
+### The two names — settled, please don't reinterpret
 
-**Shruti is the brand.** श्रुति means *"that which is heard"* — revealed scripture,
-received transmission. It is already an initiatory name, which is why she is
-keeping it. Her magickal motto **Soror Eu. A.** is the *signature* on magickal
-work, not the brand.
+**Shruti is the brand, and it is her real name.** Shruti Swara. She is part
+Indian and part Greek, so the Sanskrit name and the Greek theurgy are not two
+themes in tension — they are one person. Treat that as an asset the design can
+lean on, not a contradiction to smooth over.
 
-Design consequence: the site is titled and navigated as **Shruti**. Soror Eu. A.
-appears in exactly two places — the About page (where the two names meet, and
-where the *shruti* etymology is told) and as the byline on magickal writing. It
-should feel like a sigil or a seal, not a second logo.
+Her magickal motto **Soror Eu. A.** is the *signature* on magickal work — never
+a handle, a slug, or a second logo. It should read like a seal or a mark at the
+foot of a page.
+
+| Layer | Name | Where it appears |
+|---|---|---|
+| Person / brand | **Shruti** (Shruti Swara) | Site title, hero, nav, socials, footer |
+| Signature | **Soror Eu. A.** | Byline on magickal writing; the About page |
+| Product / house | **Theourgia** | The software, on `/work` and the tool pages |
+
+**Two voices, two sections.** She has a genuine practitioner biography *and* a
+character layer. Keep them visually and typographically distinct on the About
+page — a real Description block and a separate Lore block. Conflating them is
+exactly what makes occult-adjacent creators read as performance rather than
+practice, and avoiding that is the central craft problem of this brand.
+
+**Pseudonymity is not in play.** The avatar is aesthetic, not protective —
+people already know both names. So the footer must carry a proper legal imprint
+(entity name, a *virtual office* address, role email, company and VAT number).
+Design the footer to hold it from day one; retrofitting an imprint is how home
+addresses leak.
 
 ### Tone
 
