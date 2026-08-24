@@ -1,0 +1,172 @@
+---
+/* The one layout all seven instruments share.
+ *
+ * Top to bottom, per the handoff §7.1: sky hero, meta bar, parameter card,
+ * results column and aside, the other-instruments row, footer. Get this right
+ * once and each tool varies only its results body and its disagreement
+ * control.
+ */
+import BaseLayout from "./BaseLayout.astro";
+import ProvenanceBlock from "../components/tools/ProvenanceBlock.astro";
+
+interface Props {
+  title: string;
+  /** Native-script subtitle where one exists — पञ्चाङ्ग, Ἀττικός. */
+  native?: string;
+  description: string;
+  glyph?: string;
+  /** Meta bar: the rule currently in force. */
+  rule?: string;
+  ruleLabel?: string;
+  place?: string;
+  date?: string;
+  /** ○ public · ◐ named, not detailed · ● under seal. */
+  disclosure?: "○" | "◐" | "●";
+  /** How it is reckoned — prose for the aside. */
+  reckoned?: string;
+  where?: "server" | "device";
+  noJs?: string;
+}
+const {
+  title, native, description, glyph = "✶", rule, ruleLabel,
+  place, date, disclosure = "○", reckoned, where = "server", noJs,
+} = Astro.props;
+
+const INSTRUMENTS: [string, string, string][] = [
+  ["☉", "Planetary hours", "/tools/planetary-hours"],
+  ["◐", "Pañcāṅga", "/tools/pancanga"],
+  ["☾", "Hindu calendar", "/tools/hindu-calendar"],
+  ["☽", "Attic calendar", "/tools/attic-calendar"],
+  ["✶", "Natal chart", "/tools/natal-chart"],
+  ["Σ", "Isopsephy", "/tools/isopsephy"],
+  ["●", "Sigil generator", "/tools/sigil-generator"],
+];
+const here = Astro.url.pathname;
+const DISCLOSURE_WORD = { "○": "public", "◐": "named, not detailed", "●": "under seal" };
+---
+
+<BaseLayout title={`${title} — Shruti`} description={description}>
+  <div class="page tool">
+    <section class="tool-hero">
+      <div class="tool-hero-inner">
+        <span class="t-eyebrow">Theourgia · instrument</span>
+        <h1>
+          {title}
+          {native && <span class="tool-native" lang="sa">{native}</span>}
+        </h1>
+        <p class="tool-desc">{description}</p>
+      </div>
+      <span class="tool-hero-horizon" aria-hidden="true"></span>
+    </section>
+
+    <div class="meta-bar t-tabular">
+      {date && <span>{date}</span>}
+      {date && <span aria-hidden="true">·</span>}
+      {place && <span>{place}</span>}
+      {place && <span aria-hidden="true">·</span>}
+      {rule && <span>{rule}</span>}
+      {rule && <span aria-hidden="true">·</span>}
+      <span>shown in your local time</span>
+      <span class="meta-disclosure" title={DISCLOSURE_WORD[disclosure]}>
+        <span class="t-glyph" aria-hidden="true">{disclosure}</span> {DISCLOSURE_WORD[disclosure]}
+      </span>
+    </div>
+
+    <div class="param-card"><slot name="parameters" /></div>
+
+    <div class="tool-cols">
+      <div class="tool-results"><slot /></div>
+      <aside class="tool-aside">
+        {
+          reckoned && (
+            <section class="reckoned">
+              <h3>How it is reckoned</h3>
+              <p>{reckoned}</p>
+            </section>
+          )
+        }
+        <ProvenanceBlock rule={rule} ruleLabel={ruleLabel} where={where} noJs={noJs} />
+        <slot name="aside" />
+        <a class="theourgia-link" href="https://theourgia.com">
+          Theourgia, where this comes from <span aria-hidden="true">→</span>
+        </a>
+      </aside>
+    </div>
+
+    <nav class="others" aria-label="Other instruments">
+      <span class="t-eyebrow">Other instruments</span>
+      <div class="others-row">
+        {
+          INSTRUMENTS.filter(([, , href]) => href !== here).map(([g, name, href]) => (
+            <a href={href}>
+              <span aria-hidden="true" class="t-glyph">{g}</span> {name}
+            </a>
+          ))
+        }
+      </div>
+    </nav>
+  </div>
+</BaseLayout>
+
+<style>
+  .tool { display: grid; gap: var(--space-5); }
+
+  /* Exactly one sky panel per page — this is it. */
+  .tool-hero {
+    position: relative;
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    background: linear-gradient(180deg, var(--sky-zenith), var(--sky-mid) 58%, var(--sky-horizon));
+    transition: background var(--dur-3) var(--ease-in-out);
+    padding: clamp(22px, 4vw, 44px);
+  }
+  .tool-hero-inner { display: grid; gap: 10px; max-width: 62ch; }
+  .tool-hero h1 {
+    font: 500 var(--text-h1) var(--font-display);
+    line-height: var(--leading-heading);
+    color: var(--ink);
+    margin: 0;
+    display: flex;
+    gap: 12px;
+    align-items: baseline;
+    flex-wrap: wrap;
+  }
+  .tool-native { font-size: var(--text-h3); color: var(--ink-soft); }
+  .tool-desc { font: 400 var(--text-h4) / var(--leading-body) var(--font-display); color: var(--ink-soft); margin: 0; max-width: 56ch; }
+  .tool-hero-horizon { position: absolute; left: 0; right: 0; bottom: 0; height: 1px; background: var(--horizon-line); }
+
+  .meta-bar {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+    font: 400 var(--text-xs) var(--font-mono);
+    color: var(--ink-soft);
+    border: var(--border-w) solid var(--line);
+    border-radius: var(--radius-sm);
+    padding: 8px 12px;
+  }
+  .meta-disclosure { margin-left: auto; color: var(--rose); }
+
+  .param-card {
+    background: var(--surface-card);
+    border: var(--border-w) solid var(--line);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-1);
+    padding: var(--space-4);
+  }
+
+  .tool-cols { display: flex; gap: var(--space-5); flex-wrap: wrap; align-items: start; }
+  .tool-results { flex: 1 1 520px; min-width: 0; display: grid; gap: var(--space-4); }
+  .tool-aside { flex: 1 1 280px; max-width: 440px; display: grid; gap: var(--space-5); }
+  .reckoned h3 { font: 600 var(--text-h4) var(--font-display); color: var(--ink); margin: 0 0 8px; }
+  .reckoned p { font: 400 var(--text-sm) / 1.7 var(--font-body); color: var(--ink-soft); margin: 0; }
+  .theourgia-link { font: 500 var(--text-sm) var(--font-body); color: var(--accent); text-decoration: none; }
+  .theourgia-link:hover { color: var(--accent-hover); text-decoration: underline; }
+
+  .others { border-top: var(--border-w) solid var(--line); padding-top: var(--space-4); display: grid; gap: 10px; }
+  .others-row { display: flex; gap: var(--space-4); flex-wrap: wrap; }
+  .others-row a { font: 500 var(--text-sm) var(--font-body); color: var(--ink-soft); text-decoration: none; }
+  .others-row a:hover { color: var(--accent-hover); }
+  .others-row .t-glyph { color: var(--rose); }
+</style>

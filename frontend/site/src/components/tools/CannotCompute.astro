@@ -1,0 +1,53 @@
+---
+/* The shared cannot-compute state.
+ *
+ * Every instrument has at least one, they WILL be seen, and they must look
+ * deliberate. The shape is fixed by the handoff: the ○ or ◐ mark, a
+ * plain-language heading, an explanation of WHY the answer is undefined rather
+ * than zero, and a numbered list of honest alternatives.
+ *
+ * Never invent a value to fill the space.
+ */
+interface Props {
+  mark?: "○" | "◐";
+  title: string;
+  why: string;
+  alternatives?: string[];
+}
+const { mark = "○", title, why, alternatives = [] } = Astro.props;
+---
+
+<div class="cc">
+  <p class="t-eyebrow cc-mark">{mark} {mark === "◐" ? "Partly reckonable" : "Cannot be reckoned"}</p>
+  <h3>{title}</h3>
+  <p class="cc-why">{why}</p>
+  {
+    alternatives.length > 0 && (
+      <ol class="cc-alts">{alternatives.map((a) => <li>{a}</li>)}</ol>
+    )
+  }
+  <slot />
+</div>
+
+<style>
+  .cc {
+    background: var(--surface-card);
+    border: var(--border-w) solid var(--line);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-1);
+    padding: clamp(24px, 4vw, 36px) clamp(20px, 4vw, 30px);
+    display: grid;
+    gap: 10px;
+  }
+  .cc-mark { margin: 0; color: var(--rose); }
+  .cc h3 { font: 600 var(--text-h3) var(--font-display); color: var(--ink); margin: 0; }
+  .cc-why { font: 400 1.0625rem / 1.7 var(--font-display); color: var(--ink); margin: 0; max-width: 54ch; }
+  .cc-alts {
+    margin: 6px 0 0;
+    padding-left: 1.3em;
+    font: 400 var(--text-sm) / 1.7 var(--font-body);
+    color: var(--ink-soft);
+    max-width: 54ch;
+  }
+  .cc-alts li::marker { color: var(--ink-faint); }
+</style>

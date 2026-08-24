@@ -28,6 +28,42 @@ async function get<T>(base: string, path: string, timeoutMs = 6000): Promise<T |
   }
 }
 
+/* Some daemon 4xx bodies ARE the answer: "the Sun did not rise at this
+ * location on this date" is a fact about the sky, not a failure, and the page
+ * has a designed state for it. Collapsing every non-200 to null threw that
+ * sentence away and left the page unable to tell "no sunrise" from "the
+ * ephemeris is down" — two states the design treats very differently.
+ */
+export interface Answer<T> {
+  ok: boolean;
+  data: T | null;
+  /** The daemon's own explanation, where it gave one. */
+  detail: string;
+  status: number;
+}
+
+async function ask<T>(base: string, path: string, timeoutMs = 8000): Promise<Answer<T>> {
+  const control = new AbortController();
+  const timer = setTimeout(() => control.abort(), timeoutMs);
+  try {
+    const response = await fetch(`${base}${path}`, { signal: control.signal });
+    const body = await response.json().catch(() => null);
+    if (response.ok) return { ok: true, data: body as T, detail: "", status: response.status };
+    return {
+      ok: false,
+      data: null,
+      detail: typeof body?.detail === "string" ? body.detail : "",
+      status: response.status,
+    };
+  } catch {
+    return { ok: false, data: null, detail: "", status: 0 };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+export const askAstro = <T,>(path: string) => ask<T>(ASTRO_API, path);
+
 export const site = <T,>(path: string) => get<T>(SITE_API, path);
 export const astro = <T,>(path: string) => get<T>(ASTRO_API, path);
 

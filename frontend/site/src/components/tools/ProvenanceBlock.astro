@@ -1,0 +1,93 @@
+---
+/* The provenance card in every tool page's aside.
+ *
+ * "A credibility mark, not fine print" — the developer audience reads visible
+ * engineering as the reason to trust the astrology. It also discharges an
+ * obligation: these tools are AGPL, and §13 requires an offer of source for
+ * the *running* build, so the link goes to the exact commit rather than the
+ * repository root.
+ *
+ * ONE LINE DEPARTS FROM THE DESIGN, deliberately and with the owner's
+ * agreement. The bundle reads "computed on your device · nothing stored". For
+ * the five ephemeris instruments that would be false — Swiss Ephemeris runs in
+ * the AGPL daemon on the server, which is the architecture the licence
+ * boundary depends on. Saying so is the honest version of the same claim.
+ * Sigil and isopsephy need no ephemeris and DO run in the browser, so they
+ * pass `where="device"` and keep the original line, true.
+ */
+interface Props {
+  /** The rule currently in force — the disagreement control's chosen option. */
+  rule?: string;
+  ruleLabel?: string;
+  where?: "server" | "device";
+  noJs?: string;
+}
+const { rule, ruleLabel = "rule", where = "server", noJs } = Astro.props;
+
+interface Version {
+  service: string; version: string; licence: string; sha: string; sourceUrl: string;
+}
+import { astro } from "../../lib/api";
+const v = await astro<Version>("/version");
+---
+
+<section class="prov">
+  <h3>Provenance</h3>
+  <p class="prov-intro">
+    The astrology is only as good as the engineering behind it, so the engineering is on the table.
+  </p>
+  <div class="prov-rows">
+    <div><span>engine</span><span>Swiss Ephemeris 2.10.03</span></div>
+    {rule && <div><span>{ruleLabel}</span><span>{rule}</span></div>}
+    <div>
+      <span>computed</span>
+      <span>
+        {
+          where === "device"
+            ? "on your device · nothing stored"
+            : "on the server · nothing stored, nothing logged"
+        }
+      </span>
+    </div>
+    {noJs && <div><span>no-JS</span><span>{noJs}</span></div>}
+    <div><span>licence</span><span>{v?.licence ?? "AGPL-3.0-only"}</span></div>
+    <div>
+      <span>version</span>
+      <span class="t-tabular">{v?.version ?? "—"} · {v?.sha ?? "—"}</span>
+    </div>
+  </div>
+  {
+    v?.sourceUrl && (
+      <a class="prov-source" href={v.sourceUrl}>
+        Source for this running version <span aria-hidden="true">→</span>
+      </a>
+    )
+  }
+</section>
+
+<style>
+  .prov h3 { font: 600 var(--text-h4) var(--font-display); color: var(--ink); margin: 0 0 8px; }
+  .prov-intro { margin: 0 0 12px; font-size: var(--text-sm); line-height: 1.6; color: var(--ink-soft); }
+  .prov-rows {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    line-height: 1.9;
+    color: var(--ink-soft);
+    border-top: var(--border-w) solid var(--line);
+    border-bottom: var(--border-w) solid var(--line);
+    padding: 10px 0;
+    margin-bottom: 12px;
+  }
+  .prov-rows > div { display: flex; gap: 10px; }
+  .prov-rows > div > span:first-child { color: var(--ink-faint); width: 82px; flex-shrink: 0; }
+  .prov-source {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 7px;
+    font-size: var(--text-sm);
+    font-weight: 600;
+    color: var(--accent);
+    text-decoration: none;
+  }
+  .prov-source:hover { color: var(--accent-hover); text-decoration: underline; }
+</style>

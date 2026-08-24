@@ -1,0 +1,111 @@
+---
+/* The disagreement control — the most important pattern in the tool pages.
+ *
+ * Every instrument opens with a first-class control over a REAL scholarly
+ * disagreement. The handoff's requirements, all mandatory:
+ *
+ *   - it sits at the TOP of the page, inside the parameter card. Never a
+ *     settings-page preference and never a hidden default;
+ *   - each option shows its one-line rule in plain language AND the concrete
+ *     consequence — a time, a degree, a month name;
+ *   - NEITHER OPTION IS PRESENTED AS THE CORRECT ONE. No "recommended", no
+ *     asterisk, no styling that implies primacy. The selected one is marked
+ *     "✓ in use" and that is all;
+ *   - selecting genuinely recomputes, rather than swapping a label;
+ *   - the choice travels in the URL and appears in the provenance block.
+ *
+ * It is a GET form of radios so it works without scripting: choosing an option
+ * and submitting re-renders the page from the server with the other rule
+ * actually applied.
+ */
+export interface Option {
+  value: string;
+  name: string;
+  /** The rule, in plain language. */
+  rule: string;
+  /** What it concretely produces here — a time, a degree, a month name. */
+  consequence?: string;
+}
+interface Props {
+  legend: string;
+  name: string;
+  options: Option[];
+  value: string;
+  /** Other query params that must survive the submit. */
+  keep?: Record<string, string>;
+}
+const { legend, name, options, value, keep = {} } = Astro.props;
+---
+
+<form class="dc" method="GET">
+  {Object.entries(keep).map(([k, v]) => <input type="hidden" name={k} value={v} />)}
+  <fieldset>
+    <legend class="t-eyebrow">{legend}</legend>
+    <div class="dc-options">
+      {
+        options.map((o) => (
+          <label class="dc-option" data-chosen={o.value === value || undefined}>
+            <input type="radio" name={name} value={o.value} checked={o.value === value} />
+            <span class="dc-body">
+              <span class="dc-head">
+                <span class="dc-name">{o.name}</span>
+                {o.value === value && <span class="dc-inuse">✓ in use</span>}
+              </span>
+              <span class="dc-rule">{o.rule}</span>
+              {o.consequence && <span class="t-tabular dc-consequence">{o.consequence}</span>}
+            </span>
+          </label>
+        ))
+      }
+    </div>
+    <button type="submit" class="dc-apply">Recompute</button>
+  </fieldset>
+</form>
+
+<style>
+  .dc fieldset { border: 0; margin: 0; padding: 0; }
+  .dc legend { padding: 0; margin-bottom: 10px; }
+  .dc-options { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); }
+  .dc-option {
+    display: flex;
+    gap: 10px;
+    align-items: start;
+    padding: 12px;
+    border: var(--border-w) solid var(--line);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    /* Both options are styled identically until one is chosen. Nothing here
+       implies that either is the right answer. */
+    background: var(--surface-page);
+    transition: border-color var(--dur-1) var(--ease-out);
+  }
+  .dc-option:hover { border-color: var(--line-strong); }
+  .dc-option[data-chosen] { border-color: color-mix(in srgb, var(--accent) 50%, transparent); background: var(--accent-wash); }
+  .dc-option input { margin-top: 3px; accent-color: var(--accent); }
+  .dc-body { display: grid; gap: 3px; }
+  .dc-head { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+  .dc-name { font: 600 var(--text-body) var(--font-body); color: var(--ink); }
+  .dc-inuse {
+    font: 600 var(--text-micro) var(--font-mono);
+    letter-spacing: var(--tracking-caps);
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+  .dc-rule { font: 400 var(--text-sm) / 1.5 var(--font-body); color: var(--ink-soft); }
+  .dc-consequence { font: 400 var(--text-xs) var(--font-mono); color: var(--rose); }
+  .dc-apply {
+    margin-top: 10px;
+    appearance: none;
+    min-height: 36px;
+    padding: 0 14px;
+    font: 600 var(--text-xs) var(--font-body);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--ink);
+    background: transparent;
+    border: var(--border-w) solid var(--line-strong);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+  }
+  .dc-apply:hover { border-color: var(--accent); color: var(--accent); }
+</style>

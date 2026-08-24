@@ -1,0 +1,240 @@
+---
+/* Planetary hours — the reference tool page. `templates/tool-page/`.
+ *
+ * The day from sunrise to sunset is divided into twelve equal hours and the
+ * night into twelve more, so an "hour" is only sixty minutes twice a year.
+ * Hour 1 belongs to the day's planetary ruler and the rest follow the Chaldean
+ * order ♄ ♃ ♂ ☉ ♀ ☿ ☾.
+ *
+ * The disagreement: WHERE SUNRISE IS. Hellenistic practice takes the upper
+ * limb of the visible disc with refraction; Vedic practice takes the centre of
+ * the disc without it. About 4.6 minutes apart at Athens — enough to move an
+ * hour boundary, and therefore enough to change which planet rules the moment
+ * you are standing in.
+ */
+import ToolLayout from "../../layouts/ToolLayout.astro";
+import DisagreementControl from "../../components/tools/DisagreementControl.astro";
+import CannotCompute from "../../components/tools/CannotCompute.astro";
+import { askAstro } from "../../lib/api";
+
+const q = Astro.url.searchParams;
+const ATHENS = { lat: 37.9838, lon: 23.7275, label: "Athens · 37.98°N 23.73°E" };
+const lat = Number(q.get("lat") ?? ATHENS.lat);
+const lon = Number(q.get("lon") ?? ATHENS.lon);
+const place = q.get("place") ?? (q.has("lat") ? `${lat.toFixed(2)}, ${lon.toFixed(2)}` : ATHENS.label);
+const convention = q.get("convention") === "hindu" ? "hindu" : "visible_disc";
+
+interface Hour {
+  index: number; ruler: string; isNight: boolean; startsAt: string; endsAt: string;
+}
+interface Payload {
+  convention: string; sunrise: string | null; sunset: string | null; nextSunrise: string | null;
+  dayRuler: string; current: Hour | null; hours: Hour[]; undefined?: string[];
+}
+
+const when = q.get("when") ?? "";
+const suffix = when ? `&when=${encodeURIComponent(when)}` : "";
+const answer = await askAstro<Payload>(
+  `/planetary-hours?lat=${lat}&lon=${lon}&convention=${convention}${suffix}`,
+);
+const data = answer.data;
+
+/* Both conventions are computed so the control can show its consequence — the
+   actual sunrise each one produces — rather than describing it in the abstract. */
+const other = convention === "visible_disc" ? "hindu" : "visible_disc";
+const otherData = (await askAstro<Payload>(
+  `/planetary-hours?lat=${lat}&lon=${lon}&convention=${other}${suffix}`,
+)).data;
+
+const hhmm = (iso: string | null) =>
+  iso ? new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "UTC" }).format(new Date(iso)) : "—";
+
+const RULE_NAME: Record<string, string> = {
+  visible_disc: "Hellenistic — upper limb, with refraction",
+  hindu: "Vedic — centre of the disc, no refraction",
+};
+const riseFor = (c: string) =>
+  c === convention ? data?.sunrise ?? null : otherData?.sunrise ?? null;
+
+/* The daemon says so in words when the Sun does not rise; that sentence is
+   the answer and gets shown, rather than being flattened into a generic
+   failure. A fetch that simply failed is a different state entirely. */
+const noSunrise = (!answer.ok && /did not rise|does not rise/i.test(answer.detail)) ||
+  (!!data && !data.sunrise);
+const unreachable = !answer.ok && !noSunrise;
+const dayHours = (data?.hours ?? []).filter((h) => !h.isNight);
+const nightHours = (data?.hours ?? []).filter((h) => h.isNight);
+const meanLen = (list: Hour[]) =>
+  list.length === 0 ? "—"
+    : `≈ ${Math.round(list.reduce((t, h) => t + (new Date(h.endsAt).getTime() - new Date(h.startsAt).getTime()), 0) / list.length / 60000)} min`;
+
+const GLYPH: Record<string, string> = {
+  Saturn: "♄", Jupiter: "♃", Mars: "♂", Sun: "☉", Venus: "♀", Mercury: "☿", Moon: "☾",
+};
+---
+
+<ToolLayout
+  title="Planetary hours"
+  description="The day divided by its own light: twelve hours from sunrise to sunset and twelve more from sunset to sunrise, so an hour is only sixty minutes twice a year."
+  glyph="☉"
+  rule={RULE_NAME[convention]}
+  ruleLabel="sunrise"
+  place={place}
+  date={new Date().toISOString().slice(0, 10)}
+  disclosure="○"
+  reckoned="Sunrise to sunset is divided into twelve equal parts and sunset to the next sunrise into twelve more, so day-hours and night-hours are the same length only at the equinoxes. The first hour of the day belongs to the ruler of the weekday, and the rest follow the Chaldean order — Saturn, Jupiter, Mars, Sun, Venus, Mercury, Moon — running continuously through the night into the next dawn."
+>
+  <div slot="parameters" class="params">
+    <DisagreementControl
+      legend="Where sunrise is"
+      name="convention"
+      value={convention}
+      keep={{ lat: String(lat), lon: String(lon), place }}
+      options={[
+        {
+          value: "visible_disc",
+          name: "Hellenistic",
+          rule: "The moment the upper limb of the visible disc clears the horizon, with atmospheric refraction.",
+          consequence: `sunrise ${hhmm(riseFor("visible_disc"))} UTC`,
+        },
+        {
+          value: "hindu",
+          name: "Vedic",
+          rule: "The moment the centre of the disc reaches the horizon, refraction ignored.",
+          consequence: `sunrise ${hhmm(riseFor("hindu"))} UTC`,
+        },
+      ]}
+    />
+    <hr class="param-rule" />
+    <form class="param-panel" method="GET">
+      <input type="hidden" name="convention" value={convention} />
+      {when && <input type="hidden" name="when" value={when} />}
+      <label><span>Place</span><input type="text" name="place" value={place} /></label>
+      <label><span>Latitude</span><input type="number" name="lat" value={lat} step="0.0001" min="-90" max="90" /></label>
+      <label><span>Longitude</span><input type="number" name="lon" value={lon} step="0.0001" min="-180" max="180" /></label>
+      <button type="submit">Show</button>
+    </form>
+  </div>
+
+  {
+    unreachable ? (
+      <CannotCompute
+        title="The ephemeris could not be reached"
+        why="Nothing here can be computed right now. That is a failure on my side, not a fact about the sky."
+      />
+    ) : noSunrise ? (
+      <CannotCompute
+        title="The Sun does not rise here today"
+        why="The hours divide sunrise to sunset. With no sunrise there is nothing to divide, so the answer stays undefined — which is itself the answer, and a truer one than twelve equal clock hours pretending to be planetary."
+        alternatives={[
+          "Use equal clock hours instead, understanding that they are a substitution and not the same thing.",
+          "Ask for the nearest date on which the Sun clears the horizon here.",
+          "Take the undefined answer, which is what the sky is actually saying.",
+        ]}
+      />
+    ) : (
+      <>
+        <div class="ruler-line">
+          <span class="t-eyebrow">Ruler of the day</span>
+          <span class="ruler"><span class="t-glyph" aria-hidden="true">{GLYPH[data.dayRuler]}</span> {data.dayRuler}</span>
+        </div>
+
+        <div class="hour-cols">
+          <section>
+            <h2>Day <span class="t-tabular col-len">{meanLen(dayHours)}</span></h2>
+            <ol class="hours">
+              {dayHours.map((h) => (
+                <li data-now={data.current?.index === h.index || undefined}>
+                  <span class="h-n t-tabular">{h.index}</span>
+                  <span class="t-glyph h-g" aria-hidden="true">{GLYPH[h.ruler]}</span>
+                  <span class="h-r">{h.ruler}</span>
+                  <span class="t-tabular h-t" data-span-start={h.startsAt} data-span-end={h.endsAt}>
+                    {hhmm(h.startsAt)}–{hhmm(h.endsAt)}
+                  </span>
+                </li>
+              ))}
+            </ol>
+          </section>
+          <section>
+            <h2>Night <span class="t-tabular col-len">{meanLen(nightHours)}</span></h2>
+            <ol class="hours">
+              {nightHours.map((h) => (
+                <li data-now={data.current?.index === h.index || undefined}>
+                  <span class="h-n t-tabular">{h.index}</span>
+                  <span class="t-glyph h-g" aria-hidden="true">{GLYPH[h.ruler]}</span>
+                  <span class="h-r">{h.ruler}</span>
+                  <span class="t-tabular h-t" data-span-start={h.startsAt} data-span-end={h.endsAt}>
+                    {hhmm(h.startsAt)}–{hhmm(h.endsAt)}
+                  </span>
+                </li>
+              ))}
+            </ol>
+          </section>
+        </div>
+
+        <p class="share">
+          <span class="t-eyebrow">This reckoning</span>
+          <code class="t-tabular">{Astro.url.pathname}?{new URLSearchParams({ lat: String(lat), lon: String(lon), place, convention }).toString()}</code>
+        </p>
+      </>
+    )
+  }
+</ToolLayout>
+
+<style>
+  .params { display: grid; gap: var(--space-4); }
+  .param-rule { border: 0; border-top: var(--border-w) solid var(--line); margin: 0; }
+  .param-panel { display: flex; gap: var(--space-3); flex-wrap: wrap; align-items: end; }
+  .param-panel label { display: grid; gap: 4px; }
+  .param-panel span {
+    font: 600 var(--text-micro) var(--font-body); letter-spacing: var(--tracking-eyebrow);
+    text-transform: uppercase; color: var(--ink-faint);
+  }
+  .param-panel input {
+    font: 400 var(--text-sm) var(--font-body); color: var(--ink); background: var(--surface-page);
+    border: var(--border-w) solid var(--line); border-radius: var(--radius-sm); padding: 8px 10px; min-height: 40px;
+  }
+  .param-panel button {
+    appearance: none; min-height: 40px; padding: 0 16px;
+    font: 600 var(--text-sm) var(--font-body); color: var(--on-accent);
+    background: var(--accent); border: var(--border-w) solid var(--accent);
+    border-radius: var(--radius-sm); cursor: pointer;
+  }
+  .param-panel button:hover { background: var(--accent-hover); }
+
+  .ruler-line { display: flex; gap: 12px; align-items: baseline; }
+  .ruler { font: 500 var(--text-h3) var(--font-display); color: var(--ink); }
+  .ruler .t-glyph { color: var(--rose); }
+
+  .hour-cols { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-5); }
+  @media (max-width: 640px) { .hour-cols { grid-template-columns: 1fr; } }
+  .hour-cols h2 {
+    font: 600 var(--text-h4) var(--font-display); color: var(--ink);
+    margin: 0 0 8px; display: flex; gap: 10px; align-items: baseline;
+  }
+  .col-len { font: 400 var(--text-xs) var(--font-mono); color: var(--ink-faint); }
+  .hours { list-style: none; margin: 0; padding: 0; }
+  .hours li {
+    display: grid; grid-template-columns: 22px 18px 1fr auto; gap: 10px; align-items: baseline;
+    padding: 7px 6px; border-bottom: var(--border-w) solid var(--line);
+  }
+  .hours li[data-now] { background: var(--accent-wash); border-radius: var(--radius-sm); }
+  .h-n { font: 400 var(--text-xs) var(--font-mono); color: var(--ink-faint); text-align: right; }
+  .h-g { color: var(--rose); }
+  .h-r { font: 400 var(--text-sm) var(--font-body); color: var(--ink); }
+  .hours li[data-now] .h-r { font-weight: 600; }
+  .h-t { font: 400 var(--text-sm) var(--font-mono); color: var(--ink-soft); white-space: nowrap; }
+
+  .share { display: grid; gap: 6px; margin: 0; }
+  .share code { font: 400 var(--text-xs) var(--font-mono); color: var(--ink-faint); word-break: break-all; }
+</style>
+
+<script is:inline>
+  (function () {
+    var fmt = new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false });
+    document.querySelectorAll("[data-span-start]").forEach(function (el) {
+      var a = new Date(el.getAttribute("data-span-start")), b = new Date(el.getAttribute("data-span-end"));
+      if (!isNaN(a) && !isNaN(b)) el.textContent = fmt.format(a) + "–" + fmt.format(b);
+    });
+  })();
+</script>
