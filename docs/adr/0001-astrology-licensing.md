@@ -42,10 +42,9 @@ work regardless of which git remote they came from.
    of the *running* version, so the service exposes its build SHA and the page
    links to that tree — not to `main`.
 
-4. **No shared code with Theourgia.** Not a shared package, not a vendored
-   module, not a copied file. Theourgia's engine runs under a commercial licence;
-   copying between the two contaminates one side or the other. If logic must
-   exist twice, it exists twice, deliberately.
+4. **No shared *Swiss Ephemeris* linkage with Theourgia.** The boundary is the
+   ephemeris, not the codebase. See the amendment below — the original wording
+   of this clause was wrong and over-broad.
 
 5. **Ephemeris data files ship with the AGPL service**, under the same AGPL arm.
 
@@ -106,3 +105,45 @@ reading and is widely relied upon, but it is a legal judgment, not a settled
 certainty. Astrodienst are the licensor, they sell the commercial licence, and
 they answer email. **One message to them converts this from a reasoned position
 into a documented one** — worth sending before the tools go public.
+
+
+---
+
+## Amendment, 2026-08-24 — clause 4 was over-broad and wrong
+
+The original clause 4 said no code of any kind may cross from Theourgia. That
+was wrong, and correcting it matters because it would have caused a large amount
+of duplicated work for no benefit.
+
+**Why it was wrong.** Three facts undo it:
+
+1. **Theourgia is `AGPL-3.0-only`** — Sophia licensed it that way herself.
+   Copying AGPL code into an AGPL project is exactly what the licence permits.
+2. **She owns the copyright.** A copyright holder may license her own work under
+   whatever terms she chooses, in as many projects as she likes. There is no
+   entity to be "contaminated" by her moving her own code between her own repos.
+3. **The Swiss Ephemeris constraint is about linking `swisseph`, not about her
+   code.** The dual licence governs *the ephemeris library*. What matters is
+   that this daemon links it under the AGPL arm — which it does.
+
+**The corrected boundary.** Only one thing genuinely cannot cross: this daemon
+must never link Swiss Ephemeris under the *commercial* licence's terms, i.e. it
+stays AGPL and stays public. That is a statement about how this program is
+licensed, not a quarantine on Sophia's own source.
+
+**What that unlocks, verified module by module:**
+
+| From Theourgia | Touches swisseph? | Reusable here |
+|---|---|---|
+| `core/linguistic/bundled_ciphers.py` (415 lines) | no | **yes, directly** |
+| `models/ciphers.py` | no | yes |
+| `core/calendars/` — coptic, hebrew, islamic, julian, gregorian, mayan, thelemic, french_republican, `rd.py`, `base.py` | no | **yes, directly** |
+| `core/calendars/attic.py` | **yes** | logic yes; the ephemeris calls get rewritten against this daemon's AGPL binding |
+
+The cipher catalogue already covers **Greek, Hebrew, English, Coptic, Arabic and
+Sanskrit** across fourteen ciphers, each citing a public-domain source. That is
+the entire isopsephy tool, already written and already correctly licensed.
+
+**The one genuine gap:** there is no Hindu calendar in `core/calendars/`. That is
+new work — though `base.py` and `rd.py` provide the substrate, and this daemon
+already computes tithi, nakṣatra, yoga and karaṇa.
