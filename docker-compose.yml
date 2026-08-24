@@ -30,7 +30,7 @@ services:
       - media:/srv/media:ro
       - caddy_data:/data
       - caddy_config:/config
-    networks: [shruti]
+    networks: [shruti, shruti-interop]
 
   # Parked behind the "web" profile until the Astro site exists. A plain
   # `docker compose up` brings up postgres, backend and caddy only, so the API
@@ -102,3 +102,7 @@ volumes:
 networks:
   shruti:
     name: shruti
+  # Shared with the shruti-astro stack so Caddy can reach the daemon by name.
+  # Created out of band: docker network create shruti-interop
+  shruti-interop:
+    external: true

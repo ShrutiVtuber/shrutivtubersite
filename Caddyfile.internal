@@ -6,6 +6,26 @@
 :8080 {
 	encode gzip zstd
 
+	# ── the astrology daemon ─────────────────────────────────────────────────
+	#
+	# Routed straight through by Caddy rather than proxied in Python: no extra
+	# hop, and it keeps the two programs at arm's length over plain HTTP, which
+	# is precisely what holds the AGPL boundary (see ADR 0001). The daemon is a
+	# separate program in a separate stack, reached over plain HTTP on a shared
+	# docker network. Sharing a network is not sharing a process.
+	#
+	# Its X-Source-* headers are preserved deliberately — the §13 source offer
+	# has to survive the hop, or the site is serving AGPL output while hiding
+	# where the source is.
+	handle /api/astro/* {
+		uri strip_prefix /api/astro
+		reverse_proxy shruti-astro:8000 {
+			header_up X-Real-IP {http.request.header.X-Real-IP}
+			header_up X-Forwarded-For {http.request.header.X-Forwarded-For}
+			header_up X-Forwarded-Proto {http.request.header.X-Forwarded-Proto}
+		}
+	}
+
 	# ── API ──────────────────────────────────────────────────────────────────
 	handle /api/* {
 		reverse_proxy backend:8000 {
