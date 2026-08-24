@@ -8,7 +8,9 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from shruti.api.routes import admin, content, live, places, public
+from shruti.api.routes import (
+    accounts, admin, content, horoscopes, live, newsletter, places, public,
+)
 from shruti.core.config import get_settings
 
 logging.basicConfig(level=logging.INFO)
@@ -51,4 +53,7 @@ app.include_router(live.router)
 app.include_router(content.router)
 app.include_router(public.router)
 app.include_router(places.router)
+app.include_router(accounts.router)
+app.include_router(newsletter.router)
+app.include_router(horoscopes.router)
 app.include_router(admin.router)
