@@ -1,0 +1,283 @@
+---
+/* Pañcāṅga — `templates/pancanga/`.
+ *
+ * The five limbs of the day, each with its ending time: tithi, vāra,
+ * nakṣatra, yoga, karaṇa. Plus the almanac strip and the windows of the day —
+ * REPORTED, NOT PRESCRIBED. Rāhu kāla is a fact about where the Sun is in the
+ * day's eighths, not advice.
+ *
+ * The disagreement: WHERE SUNRISE IS, the same pair as the planetary hours.
+ * It matters more here, because the vāra begins at sunrise and so the sunrise
+ * rule moves the whole day.
+ *
+ * Six ayanāṁśas are offered because the choice moves a nakṣatra boundary, and
+ * the panel says the current shift outright.
+ */
+import ToolLayout from "../../layouts/ToolLayout.astro";
+import DisagreementControl from "../../components/tools/DisagreementControl.astro";
+import CannotCompute from "../../components/tools/CannotCompute.astro";
+import { askAstro } from "../../lib/api";
+
+const q = Astro.url.searchParams;
+const ATHENS = { lat: 37.9838, lon: 23.7275, label: "Athens · 37.98°N 23.73°E" };
+const lat = Number(q.get("lat") ?? ATHENS.lat);
+const lon = Number(q.get("lon") ?? ATHENS.lon);
+const place = q.get("place") ?? (q.has("lat") ? `${lat.toFixed(2)}, ${lon.toFixed(2)}` : ATHENS.label);
+const convention = q.get("convention") === "hindu" ? "hindu" : "visible_disc";
+const AYANAMSAS = ["lahiri", "raman", "krishnamurti", "fagan_bradley", "yukteshwar", "true_citra"];
+const ayanamsa = AYANAMSAS.includes(q.get("ayanamsa") ?? "") ? q.get("ayanamsa")! : "lahiri";
+const when = q.get("when") ?? "";
+const whenSuffix = when ? `&when=${encodeURIComponent(when)}` : "";
+
+interface Limb { index: number; name: string; fraction: number; endsAt: string | null }
+interface Payload {
+  at: string; sunrise: string | null;
+  ayanamsa: { name: string; degrees: number; note: string };
+  /* null where the Sun does not rise: the vāra runs sunrise to sunrise, so
+     with no sunrise there is nothing to name. */
+  vara: { name: string; ruler: string; startsAt: string | null } | null;
+  tithi: Limb; nakshatra: Limb; yoga: Limb; karana: Limb;
+  almanac: Record<string, string | null>;
+  windows: { name: string; start: string; end: string; note: string }[];
+  undefined?: string[];
+}
+
+const base = `lat=${lat}&lon=${lon}&convention=${convention}&ayanamsa=${ayanamsa}${whenSuffix}`;
+const [answer, otherAnswer] = await Promise.all([
+  askAstro<Payload>(`/panchanga?${base}`),
+  askAstro<Payload>(`/panchanga?lat=${lat}&lon=${lon}&convention=${convention === "hindu" ? "visible_disc" : "hindu"}&ayanamsa=${ayanamsa}${whenSuffix}`),
+]);
+const d = answer.data;
+const other = otherAnswer.data;
+
+/* Two ways the same fact arrives: the daemon refuses outright, or it answers
+   with a null sunrise and a null vāra. Both mean the day has no beginning. */
+const noSunrise =
+  (!answer.ok && /did not rise|does not rise/i.test(answer.detail)) ||
+  (!!d && (!d.sunrise || !d.vara));
+const unreachable = !answer.ok && !noSunrise;
+
+const hhmm = (iso: string | null) =>
+  iso ? new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "UTC" }).format(new Date(iso)) : "—";
+const RULE_NAME: Record<string, string> = {
+  visible_disc: "Hellenistic — upper limb, with refraction",
+  hindu: "Vedic — centre of the disc, no refraction",
+};
+const varaFor = (c: string) => (c === convention ? d : other);
+
+/* Kept out of the markup on purpose: a regex literal inside JSX makes the
+   parser read the leading slash as a closing tag. */
+const isInstant = (v: unknown) => typeof v === "string" && /^\d{4}-\d{2}-\d{2}T/.test(v);
+
+const limbs = d
+  ? ([
+      ["Tithi", d.tithi, "the Moon gaining 12° on the Sun"],
+      ["Vāra", { index: 0, name: d.vara?.name ?? "undefined", fraction: 0, endsAt: null }, "sunrise to sunrise"],
+      ["Nakṣatra", d.nakshatra, "one of 27 equal sidereal quarters"],
+      ["Yoga", d.yoga, "the summed longitudes"],
+      ["Karaṇa", d.karana, "half a tithi — two often fall in one day"],
+    ] as [string, Limb, string][])
+  : [];
+---
+
+<ToolLayout
+  title="Pañcāṅga"
+  native="पञ्चाङ्ग"
+  description="The five limbs of the day — tithi, vāra, nakṣatra, yoga and karaṇa — each with the moment it ends."
+  glyph="◐"
+  rule={RULE_NAME[convention]}
+  ruleLabel="sunrise"
+  place={place}
+  date={d?.at?.slice(0, 10)}
+  disclosure="○"
+  reckoned="The five limbs are measured from the Sun and Moon, not from a table. A tithi is the Moon gaining twelve degrees on the Sun; a nakṣatra is one of twenty-seven equal divisions of the sidereal circle; a yoga is their summed longitudes; a karaṇa is half a tithi, so two of them usually fall in one day. Only the vāra is tied to the horizon, and it begins at sunrise — which is why the sunrise rule above moves the whole day rather than one number."
+>
+  <div slot="parameters" class="params">
+    <DisagreementControl
+      legend="Where sunrise is"
+      name="convention"
+      value={convention}
+      keep={{ lat: String(lat), lon: String(lon), place, ayanamsa, ...(when ? { when } : {}) }}
+      options={[
+        {
+          value: "visible_disc",
+          name: "Hellenistic",
+          rule: "Upper limb of the visible disc, with atmospheric refraction. The vāra begins here.",
+          consequence: `sunrise ${hhmm(varaFor("visible_disc")?.sunrise ?? null)} UTC`,
+        },
+        {
+          value: "hindu",
+          name: "Vedic",
+          rule: "Centre of the disc, refraction ignored. The vāra begins here instead.",
+          consequence: `sunrise ${hhmm(varaFor("hindu")?.sunrise ?? null)} UTC`,
+        },
+      ]}
+    />
+    <hr class="param-rule" />
+    <form class="param-panel" method="GET">
+      <input type="hidden" name="convention" value={convention} />
+      <label><span>Date</span><input type="date" name="when" value={when} /></label>
+      <label><span>Place</span><input type="text" name="place" value={place} /></label>
+      <label><span>Latitude</span><input type="number" name="lat" value={lat} step="0.0001" min="-90" max="90" /></label>
+      <label><span>Longitude</span><input type="number" name="lon" value={lon} step="0.0001" min="-180" max="180" /></label>
+      <label>
+        <span>Ayanāṁśa</span>
+        <select name="ayanamsa">
+          {AYANAMSAS.map((a) => <option value={a} selected={a === ayanamsa}>{a.replace(/_/g, " ")}</option>)}
+        </select>
+      </label>
+      <button type="submit">Show</button>
+    </form>
+  </div>
+
+  {
+    unreachable ? (
+      <CannotCompute title="The ephemeris could not be reached" why="Nothing here can be computed right now. That is a failure on my side, not a fact about the sky." />
+    ) : d ? (
+      <>
+        {
+          noSunrise && (
+            <CannotCompute
+              mark="◐"
+              title="The Sun does not rise here today, so the day has no beginning"
+              why="The vāra runs sunrise to sunrise. With no sunrise there is nothing to start it, so the vāra is undefined — but the other four limbs are measured from the Sun and Moon alone and are given below, unaffected."
+              alternatives={[
+                "Read the four Moon-and-Sun limbs, which are as true here as anywhere.",
+                "Take the vāra from a lower latitude if a weekday is needed for a rite.",
+                "Leave the vāra undefined, which is what the sky is saying.",
+              ]}
+            />
+          )
+        }
+
+        <section class="limbs">
+          {
+            limbs.map(([label, limb, how]) => (
+              <div class="limb" data-undefined={label === "Vāra" && noSunrise ? "" : undefined}>
+                <span class="t-eyebrow">{label}</span>
+                <span class="limb-name">
+                  {label === "Vāra" && noSunrise ? "undefined" : limb.name}
+                </span>
+                <span class="limb-how">{how}</span>
+                {
+                  limb.endsAt && (
+                    <span class="t-tabular limb-ends" data-time={limb.endsAt}>
+                      ends {hhmm(limb.endsAt)} UTC
+                    </span>
+                  )
+                }
+                {label === "Vāra" && d.vara?.ruler && !noSunrise && (
+                  <span class="limb-ends">ruled by {d.vara?.ruler}</span>
+                )}
+              </div>
+            ))
+          }
+        </section>
+
+        <section class="almanac">
+          <h2>The day</h2>
+          <dl>
+            {
+              Object.entries(d.almanac).map(([k, v]) => (
+                <div>
+                  <dt>{k.replace(/([A-Z])/g, " $1")}</dt>
+                  <dd class="t-tabular">
+                    {isInstant(v) ? <span data-time={v}>{hhmm(v as string)} UTC</span> : (v ?? "—")}
+                  </dd>
+                </div>
+              ))
+            }
+          </dl>
+        </section>
+
+        <section class="windows">
+          <h2>Windows of the day</h2>
+          {/* Reported, not prescribed. These are positions in the day's
+              eighths, not instructions about what to do in them. */}
+          <p class="windows-note">
+            These are reported, not prescribed — they say where the Sun stands in the day's
+            divisions, and nothing about what you should do.
+          </p>
+          <ul>
+            {
+              d.windows.map((w) => (
+                <li>
+                  <span class="w-name">{w.name}</span>
+                  <span class="t-tabular w-span" data-span-start={w.start} data-span-end={w.end}>
+                    {hhmm(w.start)}–{hhmm(w.end)} UTC
+                  </span>
+                  <span class="w-note">{w.note}</span>
+                </li>
+              ))
+            }
+          </ul>
+        </section>
+
+        <section class="ayanamsa-note">
+          <span class="t-eyebrow">Ayanāṁśa</span>
+          <p>
+            <strong>{d.ayanamsa.name.replace(/_/g, " ")}</strong>, currently
+            {" "}<span class="t-tabular">{d.ayanamsa.degrees.toFixed(4)}°</span>. {d.ayanamsa.note}
+          </p>
+        </section>
+      </>
+    ) : null
+  }
+</ToolLayout>
+
+<style>
+  .params { display: grid; gap: var(--space-4); }
+  .param-rule { border: 0; border-top: var(--border-w) solid var(--line); margin: 0; }
+  .param-panel { display: flex; gap: var(--space-3); flex-wrap: wrap; align-items: end; }
+  .param-panel label { display: grid; gap: 4px; }
+  .param-panel > label > span { font: 600 var(--text-micro) var(--font-body); letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; color: var(--ink-faint); }
+  .param-panel input, .param-panel select {
+    font: 400 var(--text-sm) var(--font-body); color: var(--ink); background: var(--surface-page);
+    border: var(--border-w) solid var(--line); border-radius: var(--radius-sm); padding: 8px 10px; min-height: 40px;
+  }
+  .param-panel button {
+    appearance: none; min-height: 40px; padding: 0 16px; font: 600 var(--text-sm) var(--font-body);
+    color: var(--on-accent); background: var(--accent); border: var(--border-w) solid var(--accent);
+    border-radius: var(--radius-sm); cursor: pointer;
+  }
+
+  .limbs { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--space-3); }
+  .limb {
+    background: var(--surface-card); border: var(--border-w) solid var(--line);
+    border-radius: var(--radius-md); box-shadow: var(--shadow-1); padding: var(--space-4);
+    display: grid; gap: 4px; align-content: start;
+  }
+  .limb-name { font: 500 var(--text-h4) var(--font-display); color: var(--ink); }
+  .limb[data-undefined] .limb-name { color: var(--ink-faint); font-style: italic; }
+  .limb-how { font: 400 var(--text-xs) / 1.5 var(--font-body); color: var(--ink-faint); }
+  .limb-ends { font: 400 var(--text-xs) var(--font-mono); color: var(--ink-soft); }
+
+  .almanac h2, .windows h2 { font: 600 var(--text-h4) var(--font-display); color: var(--ink); margin: 0 0 8px; }
+  .almanac dl { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 0 var(--space-4); margin: 0; }
+  .almanac dl > div { display: flex; gap: 10px; align-items: baseline; padding: 8px 0; border-bottom: var(--border-w) solid var(--line); }
+  .almanac dt { font: 600 var(--text-micro) var(--font-body); letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; color: var(--ink-faint); }
+  .almanac dd { margin: 0 0 0 auto; font: 400 var(--text-sm) var(--font-mono); color: var(--ink); }
+
+  .windows-note { font: 400 var(--text-sm) / 1.6 var(--font-body); color: var(--ink-soft); margin: 0 0 10px; max-width: 60ch; }
+  .windows ul { list-style: none; margin: 0; padding: 0; }
+  .windows li { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; padding: 10px 0; border-bottom: var(--border-w) solid var(--line); }
+  .w-name { font: 500 var(--text-body) var(--font-display); color: var(--ink); }
+  .w-span { font: 400 var(--text-sm) var(--font-mono); color: var(--ink); white-space: nowrap; }
+  .w-note { grid-column: 1 / -1; font: 400 var(--text-xs) var(--font-body); color: var(--ink-faint); }
+
+  .ayanamsa-note p { font: 400 var(--text-sm) / 1.7 var(--font-body); color: var(--ink-soft); margin: 6px 0 0; max-width: 62ch; }
+</style>
+
+<script is:inline>
+  (function () {
+    var fmt = new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false });
+    document.querySelectorAll("[data-time]").forEach(function (el) {
+      var d = new Date(el.getAttribute("data-time"));
+      if (!isNaN(d)) el.textContent = el.textContent.replace(/\d\d:\d\d UTC/, fmt.format(d));
+    });
+    document.querySelectorAll("[data-span-start]").forEach(function (el) {
+      var a = new Date(el.getAttribute("data-span-start")), b = new Date(el.getAttribute("data-span-end"));
+      if (!isNaN(a) && !isNaN(b)) el.textContent = fmt.format(a) + "–" + fmt.format(b);
+    });
+  })();
+</script>

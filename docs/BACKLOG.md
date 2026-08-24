@@ -241,3 +241,69 @@ Concretely:
 
 This lands alongside the account deletion flow, which has the same shape and the
 same rule: deletion must reach the newsletter list too, not only the account.
+
+## The API cannot express a date before 1 CE
+
+Found while wiring the Attic calendar tool page, 2026-08-24.
+
+Every endpoint takes its instant as a Python `datetime`, and `datetime` has no
+year below 1 — `replace(year=-490)` raises. So a BCE date cannot be asked for
+anywhere, and `/attic-calendar?when=-0490-09-12` returns a stated refusal.
+
+**Why it matters more here than elsewhere.** The Attic calendar's whole subject
+is classical Athens. Someone wanting the Attic date of Marathon, or of the
+first Panathenaia, cannot ask. That is the obvious question for this
+instrument and it is the one question it will not take.
+
+**It also makes a designed cannot-compute state unreachable.** The handoff
+lists "before 432 BCE the Metonic cycle was not in use" as a state that must be
+reachable. `_attic_year` raises `BeforeTheCycle` correctly and that is tested
+directly — but 432 BCE sits on the far side of a floor at 1 CE, so no request
+can trigger it. The check is right; the path to it does not exist.
+
+**What fixing it takes.** `swe.julday` accepts negative years without
+complaint, so the ephemeris is not the constraint — the datetime-shaped seam
+through the core is. The change is to carry a Julian Day (or a
+year/month/day/hour tuple) through `ephemeris`, `attic`, `hindu_calendar` and
+the API layer instead of a `datetime`, keeping `datetime` only at the edges
+where a real timezone matters. That is a real refactor across most of the core,
+not a patch, which is why it is written down here rather than half-done.
+
+Until then the limit is stated in `_moment`'s docstring, in the API's error
+message, and on the Attic tool page itself.
+
+## Location search by city and country, everywhere
+
+Requested 2026-08-24. Every surface that takes a place currently takes raw
+latitude and longitude — `/today`, both station trackers, and all five
+ephemeris tool pages. Typing coordinates is not how anyone knows where they
+are.
+
+**Match theourgia's mobile behaviour**: type a city, get a resolved place with
+its coordinates and the timezone that applied *on that date*, shown back before
+anything is computed.
+
+Two design rules already written down that this has to honour:
+
+- The stations handoff: *"the resolved coordinates and timezone are shown back
+  — a station table for the wrong city is indistinguishable from a right one
+  until someone misses a dawn."* Both tracker pages already print the
+  coordinates back; a search has to keep doing that, plus the resolved name.
+- The accounts handoff, on the nativity form: place *"is a search that resolves
+  to coordinates and a historical timezone, and the resolution is shown back"*,
+  with *"A chart cast for the wrong city is indistinguishable from a right one"*
+  and a **"Not this place?"** escape.
+
+**Historical timezone matters and is the hard half.** Greece's offset in 1996 is
+not a lookup of today's rules, and a nativity is exactly the case where that
+bites. A geocoder that returns only lat/lon is not enough on its own.
+
+Where it goes, once built as one component: `/today`, `/tools/solar-stations`,
+`/tools/lunar-stations`, `/tools/planetary-hours`, `/tools/pancanga`,
+`/tools/hindu-calendar`, `/tools/attic-calendar`, `/tools/natal-chart`, and the
+nativity form when accounts land. The tool pages share one parameter panel, so
+this is one component and one retrofit pass rather than nine.
+
+Open question for the owner: which gazetteer. Theourgia already solved this on
+mobile — reuse its source and its data shape rather than picking a second one,
+so a place resolved in one product means the same thing in the other.

@@ -1,0 +1,209 @@
+---
+/* Attic calendar — `templates/attic-calendar/`.
+ *
+ * The month opens at the noumenia and runs full (30) or hollow (29); days
+ * after the twentieth are counted BACKWARDS as days remaining, and the last is
+ * ἕνη καὶ νέα, belonging to both months at once. Twelve lunar months fall about
+ * eleven days short of the solar year, so a thirteenth is inserted seven times
+ * in nineteen.
+ *
+ * The disagreement: WHEN THE MONTH BEGINS. Observed first crescent, as Athens
+ * kept it, or the true conjunction, which is reproducible but unhistorical.
+ *
+ * NEVER FABRICATE AN ARCHON YEAR. The daemon refuses and says why; this page
+ * shows that refusal rather than filling the gap.
+ */
+import ToolLayout from "../../layouts/ToolLayout.astro";
+import DisagreementControl from "../../components/tools/DisagreementControl.astro";
+import CannotCompute from "../../components/tools/CannotCompute.astro";
+import { askAstro } from "../../lib/api";
+
+const q = Astro.url.searchParams;
+const ATHENS = { lat: 37.9838, lon: 23.7275, label: "Athens · 37.98°N 23.73°E" };
+const lat = Number(q.get("lat") ?? ATHENS.lat);
+const lon = Number(q.get("lon") ?? ATHENS.lon);
+const place = q.get("place") ?? (q.has("lat") ? `${lat.toFixed(2)}, ${lon.toFixed(2)}` : ATHENS.label);
+const reckoning = q.get("reckoning") === "visibility" ? "visibility" : "conjunction";
+const when = q.get("when") ?? "";
+
+interface Payload {
+  gregorian: string;
+  month: { name: string; greek: string; index: number; intercalary: boolean; length: number; full: boolean };
+  day: { number: number; greek: string; transliteration: string; decad: string; remaining: number };
+  moonAgeDays: number;
+  nextNoumenia: string;
+  observer: { lat: number; lon: number; defaulted: boolean; note: string | null };
+  reckoning: { used: string; note: string | null };
+  year: { months: number; intercalary: boolean };
+  archonYear: string | null;
+  archonNote: string;
+}
+
+const params = (r: string) => {
+  const p = new URLSearchParams({ lat: String(lat), lon: String(lon), reckoning: r });
+  if (when) p.set("when", when);
+  return p;
+};
+const [answer, otherAnswer] = await Promise.all([
+  askAstro<Payload>(`/attic-calendar?${params(reckoning)}`),
+  askAstro<Payload>(`/attic-calendar?${params(reckoning === "conjunction" ? "visibility" : "conjunction")}`),
+]);
+const d = answer.data;
+const other = otherAnswer.data;
+
+const beforeCycle = !answer.ok && /Metonic|432/i.test(answer.detail);
+const unreachable = !answer.ok && !beforeCycle;
+
+const dayLabel = (p: Payload | null) => (p ? `${p.month.name} ${p.day.number}` : "—");
+const RULE_NAME: Record<string, string> = {
+  conjunction: "month opened the day after the conjunction",
+  visibility: "month opened at the first visible crescent",
+};
+---
+
+<ToolLayout
+  title="Attic calendar"
+  native="Ἀττικός"
+  description="The lunisolar month of Athens, kept current: opened at the noumenia, running full or hollow, and counted backwards through its last third."
+  glyph="☽"
+  rule={RULE_NAME[reckoning]}
+  ruleLabel="month opens"
+  place={place}
+  date={d?.gregorian}
+  disclosure="○"
+  reckoned="A month opens at the noumenia and runs thirty days (full) or twenty-nine (hollow), which emerges from where the next conjunction falls rather than from a table. The first two thirds count forward; the last counts backwards by how many days remain, and the final day — ἕνη καὶ νέα, 'old and new' — belongs to both months at once. Twelve such months fall about eleven days short of the solar year, so a thirteenth is inserted seven times in nineteen, after Poseideon."
+>
+  <div slot="parameters" class="params">
+    <DisagreementControl
+      legend="When the month begins"
+      name="reckoning"
+      value={reckoning}
+      keep={{ lat: String(lat), lon: String(lon), place, ...(when ? { when } : {}) }}
+      options={[
+        {
+          value: "visibility",
+          name: "Observed first crescent",
+          rule: "The evening the new crescent can actually be seen from where you stand — as Athens kept it.",
+          consequence: reckoning === "visibility" ? dayLabel(d) : dayLabel(other),
+        },
+        {
+          value: "conjunction",
+          name: "True conjunction",
+          rule: "The day after the astronomical new moon. Reproducible anywhere, and unhistorical.",
+          consequence: reckoning === "conjunction" ? dayLabel(d) : dayLabel(other),
+        },
+      ]}
+    />
+    <hr class="param-rule" />
+    <form class="param-panel" method="GET">
+      <input type="hidden" name="reckoning" value={reckoning} />
+      <label><span>Date</span><input type="date" name="when" value={when} /></label>
+      <label><span>Place</span><input type="text" name="place" value={place} /></label>
+      <label><span>Latitude</span><input type="number" name="lat" value={lat} step="0.0001" min="-90" max="90" /></label>
+      <label><span>Longitude</span><input type="number" name="lon" value={lon} step="0.0001" min="-180" max="180" /></label>
+      <button type="submit">Show</button>
+    </form>
+  </div>
+
+  {
+    unreachable ? (
+      <CannotCompute title="The ephemeris could not be reached" why="Nothing here can be computed right now. That is a failure on my side, not a fact about the calendar." />
+    ) : beforeCycle ? (
+      <CannotCompute
+        title="Before the Metonic cycle, this cannot be reckoned"
+        why={answer.detail || "Before 432 BCE the Metonic cycle was not in use at Athens, and the actual intercalations were magistrates' decisions — argued about at the time and not recoverable now."}
+        alternatives={[
+          "Take the astronomical lunation alone, without an Attic month name on it.",
+          "Move inside the attested range, from 432 BCE onward.",
+          "Accept that the civil calendar of that year is not recoverable — which is the honest answer, and no archon year will be invented to cover it.",
+        ]}
+      />
+    ) : d ? (
+      <>
+        <section class="today-card">
+          <span class="t-eyebrow">Today</span>
+          <h2 lang="el">{d.month.greek} <span class="tr">{d.month.name}</span></h2>
+          <p class="day-greek" lang="el">{d.day.greek}</p>
+          <p class="day-tr">{d.day.transliteration} · day {d.day.number} of {d.month.length}</p>
+          <dl class="facts">
+            <div><dt>Decad</dt><dd lang="el">{d.day.decad}</dd></div>
+            <div><dt>Month</dt><dd>{d.month.full ? "full — 30 days" : "hollow — 29 days"}</dd></div>
+            <div><dt>Days remaining</dt><dd class="t-tabular">{d.day.remaining}</dd></div>
+            <div><dt>Moon age</dt><dd class="t-tabular">{d.moonAgeDays} days</dd></div>
+            <div><dt>Next noumenia</dt><dd class="t-tabular">{d.nextNoumenia}</dd></div>
+            <div><dt>Year</dt><dd>{d.year.months} months{d.year.intercalary ? " — intercalary" : ""}</dd></div>
+          </dl>
+        </section>
+
+        {
+          d.day.number > 20 && (
+            <p class="note">
+              Past the twentieth the days are counted <strong>backwards</strong>: this is
+              {" "}{d.day.remaining} from the end, not {d.day.number} from the beginning. The last day of the
+              month is ἕνη καὶ νέα, “old and new”, and belongs to both months at once.
+            </p>
+          )
+        }
+
+        {
+          d.reckoning.note && (
+            <CannotCompute
+              mark="◐"
+              title="The crescent could not be caught here"
+              why={d.reckoning.note}
+            />
+          )
+        }
+
+        <section class="archon">
+          <span class="t-eyebrow">Archon year</span>
+          {/* Never fabricated. The daemon refuses and explains; that refusal is
+              the content here, not a gap to fill. */}
+          <p class="archon-body">{d.archonYear ?? "—"}</p>
+          <p class="archon-note">{d.archonNote}</p>
+        </section>
+
+        {
+          d.observer.defaulted && d.observer.note && (
+            <p class="note observer-note">{d.observer.note}</p>
+          )
+        }
+      </>
+    ) : null
+  }
+</ToolLayout>
+
+<style>
+  .params { display: grid; gap: var(--space-4); }
+  .param-rule { border: 0; border-top: var(--border-w) solid var(--line); margin: 0; }
+  .param-panel { display: flex; gap: var(--space-3); flex-wrap: wrap; align-items: end; }
+  .param-panel label { display: grid; gap: 4px; }
+  .param-panel span { font: 600 var(--text-micro) var(--font-body); letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; color: var(--ink-faint); }
+  .param-panel input {
+    font: 400 var(--text-sm) var(--font-body); color: var(--ink); background: var(--surface-page);
+    border: var(--border-w) solid var(--line); border-radius: var(--radius-sm); padding: 8px 10px; min-height: 40px;
+  }
+  .param-panel button {
+    appearance: none; min-height: 40px; padding: 0 16px; font: 600 var(--text-sm) var(--font-body);
+    color: var(--on-accent); background: var(--accent); border: var(--border-w) solid var(--accent);
+    border-radius: var(--radius-sm); cursor: pointer;
+  }
+  .param-panel button:hover { background: var(--accent-hover); }
+
+  .today-card, .archon {
+    background: var(--surface-card); border: var(--border-w) solid var(--line);
+    border-radius: var(--radius-md); box-shadow: var(--shadow-1); padding: var(--space-4); display: grid; gap: 6px;
+  }
+  .today-card h2 { font: 500 var(--text-h2) var(--font-display); color: var(--ink); margin: 0; }
+  .today-card .tr { font-size: var(--text-h4); color: var(--ink-soft); }
+  .day-greek { font: 400 var(--text-h3) var(--font-display); color: var(--rose); margin: 4px 0 0; }
+  .day-tr { font: 400 var(--text-sm) var(--font-mono); color: var(--ink-soft); margin: 0; }
+  .facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0 var(--space-4); margin: 10px 0 0; }
+  .facts > div { display: flex; gap: 10px; align-items: baseline; padding: 8px 0; border-bottom: var(--border-w) solid var(--line); }
+  .facts dt { font: 600 var(--text-micro) var(--font-body); letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; color: var(--ink-faint); flex: none; }
+  .facts dd { margin: 0 0 0 auto; font: 400 var(--text-sm) var(--font-body); color: var(--ink); }
+  .note { font: 400 var(--text-sm) / 1.7 var(--font-body); color: var(--ink-soft); margin: 0; max-width: 62ch; }
+  .observer-note { color: var(--ink-faint); font-size: var(--text-xs); }
+  .archon-body { font: 500 var(--text-h4) var(--font-display); color: var(--ink); margin: 0; }
+  .archon-note { font: 400 var(--text-sm) / 1.6 var(--font-body); color: var(--ink-soft); margin: 0; max-width: 62ch; }
+</style>
