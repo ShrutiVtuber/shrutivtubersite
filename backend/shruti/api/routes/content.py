@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
 from shruti.core.db import get_session
-from shruti.models import Credit, Media, ProfileField, Project, Section, SocialLink
+from shruti.models import Credit, FanArt, Media, ProfileField, Project, Section, SocialLink
 
 router = APIRouter(prefix="/api/content", tags=["content"])
 
@@ -142,4 +142,34 @@ async def get_projects(session: AsyncSession = Depends(get_session)) -> list[dic
             "media": _media_payload(m),
         }
         for p, m in rows
+    ]
+
+
+@router.get("/fan-art")
+async def get_fan_art(session: AsyncSession = Depends(get_session)) -> list[dict]:
+    """
+    The fan-works gallery.
+
+    Artist credit travels with every piece and is never optional — the design
+    makes it the loudest text on the card, and a gallery that loses the credit
+    is worse than no gallery. `media` is nullable: a piece can be recorded
+    before its file is uploaded and the card has a designed absent state.
+    """
+    rows = (
+        await session.execute(
+            select(FanArt, Media)
+            .join(Media, FanArt.media_id == Media.id, isouter=True)
+            .where(FanArt.visible.is_(True))
+            .order_by(FanArt.position, FanArt.id)
+        )
+    ).all()
+    return [
+        {
+            "artist": f.artist,
+            "artistUrl": f.artist_url,
+            "platform": f.platform,
+            "title": f.title,
+            "media": _media_payload(m),
+        }
+        for f, m in rows
     ]

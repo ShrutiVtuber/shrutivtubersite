@@ -1,0 +1,33 @@
+---
+/* 500 — copy verbatim from `ui_kits/site/App.jsx`. */
+import BaseLayout from "../layouts/BaseLayout.astro";
+import Button from "../components/forms/Button.astro";
+---
+
+<BaseLayout title="Something failed — Shruti" description="The instrument slipped.">
+  <div class="page err">
+    <span class="err-glyph t-glyph" aria-hidden="true">☿</span>
+    <h1>The instrument slipped.</h1>
+    <p>Something failed on my side, not yours. It's being looked at — try again in a moment.</p>
+    <div class="err-actions">
+      <Button href="/">Back home</Button>
+      <Button variant="secondary" href="/">Try again</Button>
+    </div>
+    <p class="err-code">error 500 · if it persists, hello@shrutivtuber.com</p>
+  </div>
+</BaseLayout>
+
+<style>
+  .err {
+    display: grid;
+    justify-items: center;
+    text-align: center;
+    gap: 14px;
+    padding: var(--space-9) var(--space-4);
+  }
+  .err-glyph { font-family: var(--font-display); font-size: 44px; color: var(--rose); line-height: 1; }
+  .err h1 { font: 600 var(--text-h2) var(--font-display); color: var(--ink); margin: 0; }
+  .err p { font: 400 var(--text-body) var(--font-body); color: var(--ink-soft); margin: 0; max-width: 40ch; }
+  .err-actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+  .err-code { font: 400 var(--text-sm) var(--font-mono); color: var(--ink-soft); margin: 0; }
+</style>

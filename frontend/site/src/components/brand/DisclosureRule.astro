@@ -1,0 +1,35 @@
+---
+/* One rule in the derivative-work guidelines, marked with its moon-phase
+ * disclosure glyph.
+ *
+ * ○ permitted · ◐ ask first · ● not permitted. The brief is explicit that
+ * these are set as TYPE, never a badge component and never a coloured pill —
+ * practitioners read the marks as a credential. The word carries the meaning
+ * as well as the colour, so the rule survives being read without colour.
+ */
+interface Props { mark: "○" | "◐" | "●"; }
+const { mark } = Astro.props;
+const WORD = { "○": "Permitted", "◐": "Ask first", "●": "Not permitted" } as const;
+const TONE = { "○": "accent", "◐": "rose", "●": "live" } as const;
+---
+
+<li class="rule" data-tone={TONE[mark]}>
+  <span aria-hidden="true" class="rule-mark t-glyph">{mark}</span>
+  <span class="rule-body"><strong>{WORD[mark]} — </strong><slot /></span>
+</li>
+
+<style>
+  .rule {
+    display: flex;
+    gap: 12px;
+    align-items: baseline;
+    padding: 10px 0;
+    border-bottom: var(--border-w) solid var(--line);
+  }
+  .rule-mark { font-family: var(--font-display); font-size: 15px; flex-shrink: 0; }
+  .rule[data-tone="accent"] .rule-mark { color: var(--accent); }
+  .rule[data-tone="rose"] .rule-mark { color: var(--rose); }
+  .rule[data-tone="live"] .rule-mark { color: var(--live); }
+  .rule-body { font: 400 var(--text-body) / 1.6 var(--font-body); color: var(--ink); }
+  .rule-body strong { font-weight: 600; }
+</style>

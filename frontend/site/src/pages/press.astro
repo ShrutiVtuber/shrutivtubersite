@@ -1,0 +1,83 @@
+---
+/* Press / media kit — ported from `ui_kits/site/Press.jsx`.
+ *
+ * THE WARNING IN THE BRIEF GOVERNS THIS PAGE. Audience figures are static
+ * sample values with "live numbers on request" stated in the page, and nothing
+ * is wired to an API. The client's reference case was an indie press kit that
+ * rendered NINE ZEROES because its automation broke and nobody noticed — a
+ * sponsor reading nine zeroes concludes the audience is zero.
+ *
+ * So: no figures are rendered here at all until real ones exist. If these are
+ * ever wired to live APIs, the failure mode must HIDE THE BLOCK, never render
+ * a zero.
+ */
+import BaseLayout from "../layouts/BaseLayout.astro";
+import SectionHeader from "../components/brand/SectionHeader.astro";
+import Button from "../components/forms/Button.astro";
+import EmptyState from "../components/feedback/EmptyState.astro";
+import { pageSections } from "../lib/content";
+
+const sections = await pageSections("press");
+const intro = sections.find((s) => s.key === "intro");
+---
+
+<BaseLayout title="Press & media kit — Shruti" description="Brand-safety statement, asset pack and the business route.">
+  <div class="page">
+    <SectionHeader
+      as="h1" glyph="☿" eyebrow="Press" title={intro?.title || "Media kit"}
+      body="Everything a collaborator or journalist needs, in one place."
+    />
+
+    <section class="press-block">
+      <h2>Audience</h2>
+      {/* Deliberately no numbers. See the file header. */}
+      <p class="press-note">
+        Live numbers on request — <a href="mailto:business@shrutivtuber.com">business@shrutivtuber.com</a>.
+        Figures are not published here because a stale or broken figure is worse than none.
+      </p>
+    </section>
+
+    <section class="press-block">
+      <h2>Brand safety</h2>
+      <p>
+        Content is programming, astrology and magickal practice. No gambling, no crypto promotion,
+        no political campaigning. Streams are bilingual English and Greek. Occult subject matter is
+        treated as scholarship and practice, never as spectacle, and restricted material is named
+        rather than detailed.
+      </p>
+    </section>
+
+    <section class="press-block">
+      <h2>The name</h2>
+      <p>
+        <strong>Shruti</strong> — Shruti Swara — is the brand and the real name; use it for titles,
+        credits and copy. <span class="seal">Soror Eu. A.</span> signs magickal writing only and is
+        not a handle or a second logo. <strong>Theourgia</strong> is the software.
+      </p>
+    </section>
+
+    <section class="press-block">
+      <h2>Assets</h2>
+      <EmptyState
+        glyph="◐"
+        title="Asset pack not published yet"
+        body="The wordmark, clear-space rules and hex codes are packaged on request until the download is ready."
+      >
+        <Button slot="action" variant="secondary" href="/contact">Request the pack</Button>
+      </EmptyState>
+    </section>
+  </div>
+</BaseLayout>
+
+<style>
+  .press-block { margin-top: var(--space-6); display: grid; gap: 10px; }
+  .press-block h2 { font: 600 var(--text-h3) var(--font-display); color: var(--ink); margin: 0; }
+  .press-block p {
+    font: 400 var(--text-body) / var(--leading-body) var(--font-body);
+    color: var(--ink-soft);
+    margin: 0;
+    max-width: 66ch;
+  }
+  .press-note { font-family: var(--font-body); }
+  .press-block a { color: var(--accent); }
+</style>

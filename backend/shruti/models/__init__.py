@@ -233,6 +233,30 @@ class Question(TimestampMixin, table=True):
 
 
 # ── settings ────────────────────────────────────────────────────────────────
+class FanArt(TimestampMixin, table=True):
+    """
+    One piece in the fan-works gallery.
+
+    The design's rule for this card is that the ARTIST CREDIT IS THE LOUDEST
+    TEXT, so the artist is required and their link is a first-class field
+    rather than something buried in a caption. Fan art is never recoloured and
+    never presented as official.
+    """
+
+    __tablename__ = "fan_art"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    artist: str
+    artist_url: str = ""
+    platform: str = ""          # where they posted it: twitter, bluesky, ...
+    title: str = ""
+    # Nullable like every other art reference here: a piece can be recorded
+    # before its file is uploaded, and the card has a designed absent state.
+    media_id: Optional[int] = Field(default=None, foreign_key="media.id")
+    position: int = Field(default=0)
+    visible: bool = Field(default=False)   # nothing appears until reviewed
+
+
 class SiteSetting(TimestampMixin, table=True):
     """Global key/value: tagline, brand colours, feature flags."""
 

@@ -1,0 +1,75 @@
+---
+/* Videos — ported from `ui_kits/site/Videos.jsx`.
+ *
+ * The design says "auto-pulled from Twitch and YouTube". Neither API key is
+ * configured, so there is nothing real to pull. Rather than ship the
+ * reference's six sample VODs — which would be inventing a back catalogue —
+ * the page renders its designed empty state and says plainly why.
+ *
+ * This is the same rule as the live badge: never claim, never fake. The
+ * moment the keys exist this page fills itself.
+ */
+import BaseLayout from "../layouts/BaseLayout.astro";
+import SectionHeader from "../components/brand/SectionHeader.astro";
+import VideoCard from "../components/cards/VideoCard.astro";
+import EmptyState from "../components/feedback/EmptyState.astro";
+import Button from "../components/forms/Button.astro";
+import { site, PATHS, type LiveStatus } from "../lib/api";
+import { badgeFrom } from "../lib/live";
+
+interface Video {
+  title: string; platform: "twitch" | "youtube"; duration?: string;
+  date?: string; href: string; thumb?: string | null;
+}
+
+/* No videos endpoint exists yet: it needs the platform API keys, which are
+   what the live badge is also waiting on. Until then this is honestly empty. */
+const videos: Video[] = [];
+const live = badgeFrom(await site<LiveStatus>(PATHS.live));
+---
+
+<BaseLayout title="Videos — Shruti" description="Streams and VODs from Twitch and YouTube.">
+  <div class="page">
+    <div class="section-head">
+      <SectionHeader
+        as="h1" glyph="▶" eyebrow="Videos" title="Streams & VODs"
+        body="Auto-pulled from Twitch and YouTube."
+      />
+    </div>
+
+    {
+      videos.length > 0 ? (
+        <div class="grid-3 video-grid">
+          {videos.map((v) => (
+            <VideoCard
+              title={v.title} platform={v.platform} duration={v.duration}
+              date={v.date} href={v.href} thumb={v.thumb ?? null}
+            />
+          ))}
+        </div>
+      ) : (
+        <EmptyState
+          glyph="◐"
+          title="Nothing pulled through yet"
+          body={
+            live.status === "live"
+              ? "The stream is live now — past VODs will appear here once the platform connections are in place."
+              : "Past VODs appear here automatically once the Twitch and YouTube connections are in place. Nothing is hidden; there is simply nothing fetched yet."
+          }
+        >
+          <div slot="action" class="video-actions">
+            {live.status === "live" && live.href && (
+              <Button variant="live" href={live.href}>Watch live</Button>
+            )}
+            <Button variant="secondary" href="/schedule">See the schedule</Button>
+          </div>
+        </EmptyState>
+      )
+    }
+  </div>
+</BaseLayout>
+
+<style>
+  .video-grid { margin-top: var(--space-6); }
+  .video-actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+</style>

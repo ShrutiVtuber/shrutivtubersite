@@ -1,0 +1,88 @@
+---
+/* Derivative work guidelines — ported from `ui_kits/site/Guidelines.jsx`.
+ * Copy reproduced verbatim: this page is a permission statement, and its
+ * wording is the thing people rely on.
+ */
+import BaseLayout from "../layouts/BaseLayout.astro";
+import SectionHeader from "../components/brand/SectionHeader.astro";
+import DisclosureRule from "../components/brand/DisclosureRule.astro";
+import Button from "../components/forms/Button.astro";
+---
+
+<BaseLayout
+  title="Derivative work guidelines — Shruti"
+  description="What you may make: fan art, commercial use, AI, clips, voice and likeness."
+>
+  <div class="page guidelines">
+    <SectionHeader
+      as="h1" glyph="◐" eyebrow="Derivative work guidelines" title="What you may make"
+      body="Fan works are welcome — this page exists so nobody has to guess. The short version: make things, credit yourself, don't sell the character, and keep machines from learning her."
+    />
+
+    <p class="legend">
+      <span class="k-permitted t-glyph">○</span> permitted ·
+      <span class="k-ask t-glyph">◐</span> ask first ·
+      <span class="k-no t-glyph">●</span> not permitted
+    </p>
+
+    <section>
+      <h2>Fan art</h2>
+      <ul>
+        <DisclosureRule mark="○">Drawing, writing, music, cosplay and edits of Shruti, posted anywhere, with your own credit. Tag #ShrutiArts so it can be found and featured.</DisclosureRule>
+        <DisclosureRule mark="◐">NSFW work — allowed for adults, clearly marked, and kept out of the main tag. Never present it as official.</DisclosureRule>
+        <DisclosureRule mark="●">Passing fan work off as official art, or removing another artist's credit.</DisclosureRule>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Commercial use</h2>
+      <ul>
+        <DisclosureRule mark="○">Monetised platforms carrying your fan work — ad revenue on your own speedpaint or cover is yours.</DisclosureRule>
+        <DisclosureRule mark="◐">Small-batch prints or con merch of your own fan art — write first; the answer is usually yes.</DisclosureRule>
+        <DisclosureRule mark="●">Mass-produced merchandise of the character, or commercial use of the wordmark and official art, without a written agreement.</DisclosureRule>
+      </ul>
+    </section>
+
+    <section>
+      <h2>AI</h2>
+      <ul>
+        <DisclosureRule mark="●">Training generative models on her art, voice, streams or writing — including LoRAs and voice clones.</DisclosureRule>
+        <DisclosureRule mark="●">AI-generated images in the fan tags. The gallery is for made things.</DisclosureRule>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Clips &amp; streams</h2>
+      <ul>
+        <DisclosureRule mark="○">Clips, edits, translations and reaction content, with a link back to the stream or VOD.</DisclosureRule>
+        <DisclosureRule mark="●">Re-uploading full VODs or streams without permission.</DisclosureRule>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Voice &amp; likeness</h2>
+      <ul>
+        <DisclosureRule mark="◐">Soundboards and voice compilations — ask, with the clips you intend to use.</DisclosureRule>
+        <DisclosureRule mark="●">Impersonation: accounts, bots or content presenting themselves as Shruti.</DisclosureRule>
+      </ul>
+    </section>
+
+    <p class="signed">Questions live in the contact form. Last updated 2026-08 · signed, Shruti</p>
+    <div class="actions">
+      <Button variant="secondary" href="/contact">Ask about an edge case</Button>
+      <Button variant="ghost" href="/fan-works">See fan works</Button>
+    </div>
+  </div>
+</BaseLayout>
+
+<style>
+  .guidelines section { margin-top: var(--space-5); }
+  .guidelines h2 { font: 600 var(--text-h3) var(--font-display); color: var(--ink); margin: 18px 0 2px; }
+  .guidelines ul { list-style: none; margin: 0; padding: 0; }
+  .legend { font: 500 var(--text-sm) var(--font-mono); color: var(--ink-soft); margin: var(--space-5) 0 0; }
+  .k-permitted { color: var(--accent); }
+  .k-ask { color: var(--rose); }
+  .k-no { color: var(--live); }
+  .signed { font: 400 var(--text-sm) var(--font-mono); color: var(--ink-soft); margin: 14px 0 0; }
+  .actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: var(--space-5); }
+</style>

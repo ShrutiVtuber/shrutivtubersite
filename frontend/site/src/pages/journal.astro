@@ -1,0 +1,31 @@
+---
+/* Journal.
+ *
+ * The handoff is explicit that the journal files in the bundle are A SPEC THAT
+ * CMS OUTPUT MUST MATCH, not a page to build here — content lives in BeeRanked
+ * and mounts at /journal. That mount is not in place yet.
+ *
+ * So this renders an honest state rather than a fake index. `Prose` in this
+ * codebase is the rendering spec BeeRanked has to match, and it exists.
+ */
+import BaseLayout from "../layouts/BaseLayout.astro";
+import SectionHeader from "../components/brand/SectionHeader.astro";
+import EmptyState from "../components/feedback/EmptyState.astro";
+import Button from "../components/forms/Button.astro";
+---
+
+<BaseLayout title="Journal — Shruti" description="Writing on practice and on the software written as practice.">
+  <div class="page">
+    <SectionHeader
+      as="h1" glyph="⁂" eyebrow="Journal" title="Writing"
+      body="Notes on practice, and on the software written as practice. Magickal writing signs Soror Eu. A.; everything else signs Shruti."
+    />
+    <EmptyState
+      glyph="○"
+      title="Not mounted yet"
+      body="The journal is served from BeeRanked and mounts here once that connection is made. Nothing is hidden behind this — there is simply nothing served at this path yet."
+    >
+      <Button slot="action" variant="secondary" href="/work">See the work instead</Button>
+    </EmptyState>
+  </div>
+</BaseLayout>

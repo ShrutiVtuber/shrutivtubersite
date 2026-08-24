@@ -1,0 +1,59 @@
+---
+/* Privacy — long-form legal, rendered from the database so the wording can be
+ * corrected without a deploy. Anchored subheadings and a readable measure, per
+ * the design.
+ *
+ * Empty is an honest state here and a loud one: a site with accounts and a
+ * newsletter needs this page to say something true before it takes anyone's
+ * data.
+ */
+import BaseLayout from "../layouts/BaseLayout.astro";
+import SectionHeader from "../components/brand/SectionHeader.astro";
+import Prose from "../components/content/Prose.astro";
+import LegalImprint from "../components/brand/LegalImprint.astro";
+import EmptyState from "../components/feedback/EmptyState.astro";
+import { pageSections } from "../lib/content";
+
+const sections = await pageSections("privacy");
+---
+
+<BaseLayout title="Privacy — Shruti" description="What is collected, why, and how to get it back or delete it.">
+  <div class="page legal-page">
+    <SectionHeader as="h1" glyph="◐" eyebrow="Legal" title="Privacy" />
+    {
+      sections.length > 0 ? (
+        <div class="legal-body">
+          {sections.map((s) => (
+            <section id={s.key}>
+              {s.title && <h2>{s.title}</h2>}
+              <Prose html={s.html} />
+            </section>
+          ))}
+        </div>
+      ) : (
+        <EmptyState
+          glyph="○"
+          title="Not written yet"
+          body="This page is edited in the admin. It must say something true before the site collects anything from anyone."
+        />
+      )
+    }
+    <div class="legal-imprint"><LegalImprint layout="inline" /></div>
+  </div>
+</BaseLayout>
+
+<style>
+  .legal-page { max-width: 860px; }
+  .legal-body { display: grid; gap: var(--space-6); margin-top: var(--space-6); }
+  .legal-body h2 {
+    font: 600 var(--text-h3) var(--font-display);
+    color: var(--ink);
+    margin: 0 0 var(--space-3);
+    scroll-margin-top: 84px;
+  }
+  .legal-imprint {
+    margin-top: var(--space-7);
+    padding-top: var(--space-5);
+    border-top: var(--border-w) solid var(--line);
+  }
+</style>

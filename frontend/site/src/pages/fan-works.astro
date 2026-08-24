@@ -1,0 +1,73 @@
+---
+/* Fan works — ported from `ui_kits/site/FanWorks.jsx`.
+ *
+ * Artist credit is the loudest text on every tile; that is the design's rule
+ * and the reason this page has a table behind it rather than a folder of
+ * images. Nothing appears until it is reviewed — FanArt defaults to hidden.
+ */
+import BaseLayout from "../layouts/BaseLayout.astro";
+import SectionHeader from "../components/brand/SectionHeader.astro";
+import FanArtCard from "../components/cards/FanArtCard.astro";
+import EmptyState from "../components/feedback/EmptyState.astro";
+import Button from "../components/forms/Button.astro";
+import Pagination from "../components/navigation/Pagination.astro";
+import { site } from "../lib/api";
+
+interface Work {
+  artist: string; artistUrl: string; platform: string; title: string;
+  media: { url: string; alt: string } | null;
+}
+
+const PER_PAGE = 12;
+const page = Math.max(1, Number(Astro.url.searchParams.get("page") ?? "1") || 1);
+const all = (await site<Work[]>("/api/content/fan-art")) ?? [];
+const pageCount = Math.max(1, Math.ceil(all.length / PER_PAGE));
+const works = all.slice((page - 1) * PER_PAGE, page * PER_PAGE);
+---
+
+<BaseLayout title="Fan works — Shruti" description="Curated fan art and derivative work, credited loudly and linked back.">
+  <div class="page">
+    <SectionHeader
+      as="h1" glyph="✶" eyebrow="Fan works" title="Made by you"
+      body="Curated fan art and derivative work, credited loudly and linked back. Everything here appears with the artist's permission — the tiles fill in as pieces arrive."
+    />
+
+    {
+      works.length > 0 && (
+        <div class="fan-grid">
+          {works.map((w) => (
+            <FanArtCard
+              image={w.media?.url ?? null}
+              title={w.title}
+              artist={w.artist}
+              artistHref={w.artistUrl || undefined}
+              platform={w.platform || undefined}
+            />
+          ))}
+        </div>
+      )
+    }
+    {pageCount > 1 && <Pagination page={page} pageCount={pageCount} hrefFor={(p) => `/fan-works?page=${p}`} />}
+
+    <EmptyState
+      glyph="◐"
+      title="Made something?"
+      body="Tag it #ShrutiArts so it can be found, or send it through the contact form with the credit you want shown. Read the derivative work guidelines first — they're short."
+    >
+      <div slot="action" class="fan-actions">
+        <Button href="/contact">Submit a piece</Button>
+        <Button variant="secondary" href="/guidelines">Read the guidelines</Button>
+      </div>
+    </EmptyState>
+  </div>
+</BaseLayout>
+
+<style>
+  .fan-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 20px;
+    margin: var(--space-6) 0 var(--space-5);
+  }
+  .fan-actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+</style>

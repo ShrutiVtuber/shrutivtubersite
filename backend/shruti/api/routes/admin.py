@@ -24,7 +24,7 @@ from shruti.api.deps import require_admin
 from shruti.core.auth import authenticate, issue_token
 from shruti.core.config import get_settings
 from shruti.core.db import get_session
-from shruti.models import (
+from shruti.models import (FanArt, 
     ContactMessage, Credit, Media, ProfileField, Project, Question,
     ScheduleEntry, Section, SocialLink, Tool,
 )
@@ -41,6 +41,7 @@ EDITABLE: dict[str, type[SQLModel]] = {
     "profile-fields": ProfileField,
     "credits": Credit,
     "schedule": ScheduleEntry,
+    "fan-art": FanArt,
 }
 
 ALLOWED_IMAGE = {
