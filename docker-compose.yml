@@ -20,7 +20,7 @@ services:
   caddy:
     image: caddy:2-alpine
     restart: unless-stopped
-    depends_on: [site, backend]
+    depends_on: [backend]
     ports:
       # Loopback only. TLS is the host Caddy's job.
       - "127.0.0.1:${SHRUTI_HOST_PORT:-8200}:8080"
@@ -32,7 +32,11 @@ services:
       - caddy_config:/config
     networks: [shruti]
 
+  # Parked behind the "web" profile until the Astro site exists. A plain
+  # `docker compose up` brings up postgres, backend and caddy only, so the API
+  # can deploy before there is anything to look at.
   site:
+    profiles: ["web"]
     build:
       context: ./frontend
       dockerfile: site/Dockerfile
@@ -47,6 +51,7 @@ services:
     networks: [shruti]
 
   admin:
+    profiles: ["web"]
     # Builds the admin SPA into a named volume that caddy serves at /admin.
     # Not a long-running service — it exits once the bundle is written.
     build:

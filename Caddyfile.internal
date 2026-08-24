@@ -34,11 +34,26 @@
 	}
 
 	# ── Everything else: the Astro site (SSR) ────────────────────────────────
+	#
+	# The site service is parked behind the "web" compose profile until the
+	# Astro build exists. Until then this returns an honest placeholder rather
+	# than a proxy error to a container that is deliberately absent — a 502
+	# reads as "broken", and this is not broken, it is unbuilt.
 	handle {
-		reverse_proxy site:4321 {
-			header_up X-Real-IP {http.request.header.X-Real-IP}
-			header_up X-Forwarded-For {http.request.header.X-Forwarded-For}
-			header_up X-Forwarded-Proto {http.request.header.X-Forwarded-Proto}
+		@site_up `{env.SHRUTI_WEB_ENABLED} == "1"`
+		handle @site_up {
+			reverse_proxy site:4321 {
+				header_up X-Real-IP {http.request.header.X-Real-IP}
+				header_up X-Forwarded-For {http.request.header.X-Forwarded-For}
+				header_up X-Forwarded-Proto {http.request.header.X-Forwarded-Proto}
+			}
+		}
+		handle {
+			respond `shrutivtuber.com
+
+The API is running. The site is not built yet.
+Try /api/health
+` 200
 		}
 	}
 
