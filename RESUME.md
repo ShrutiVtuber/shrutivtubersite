@@ -118,7 +118,19 @@ agents recorded disagreement rather than resolving it.
 
 Three gaps, all diagnosed, in the order to fix them.
 
-### Gap 1 — no entry carries `dayRule`
+### Gap 1 — CLOSED and verified
+
+Day rules applied to **18 entries**, each carrying a cited reason in its own
+note. Everything else keeps the sunrise default. **Twelve festivals now resolve
+to their published 2026 almanac dates exactly**, including the four the sunrise
+rule got wrong: Mahā Śivarātri and Janmāṣṭamī (niśītha), Gaṇeśa Caturthī and
+Rāma Navamī (madhyāhna), Vijayadaśamī (aparāhṇa), Lakṣmī Pūjā (pradoṣa).
+
+One moment the engine cannot model is recorded rather than forced: **Karva
+Chauth is kept until moonrise**, and there is no moonrise day-rule. It resolves
+to the sunrise answer, which is usually but not always the same day.
+
+The original diagnosis, kept for context:
 
 **Cause: the schema handed to the agents predated the discovery.** Day-ownership
 is not one rule — most observances go to the tithi at sunrise, but Dīpāvalī is
@@ -154,9 +166,19 @@ citations that do not actually support the date, anything graded `attested` that
 is really `disputed`, and initiatory material reproduced in detail rather than
 merely named. The six raw corpora are in `shruti-research/corpora/`.
 
-### Gap 3 — a resolver feature, not a data defect
+### Gap 3 — four causes, two already fixed
 
-**All 17 failures use `"month": "*"`.** They are the *recurring* observances —
+The 17 break down as: **13×** `month: "*"`, **2×** `Caitra` (a spelling variant
+of `Chaitra` — **fixed**, original recorded), **1×** `Mārgaśīrṣa or Pauṣa`
+(Vaikuṇṭha Ekādaśī genuinely differs by region — record as regional variants,
+do not resolve), **1×** `adhika (intercalary)` (Padminī and Paramā Ekādaśī occur
+only in an intercalary month and need an anchor kind that says so).
+
+`Śāradīya Navarātri` also appears twice under different keys, from two corpora.
+
+The remaining thirteen are the real work:
+
+**All 13 use `"month": "*"`.** They are the *recurring* observances —
 Ekādaśī twice a lunation, Pradoṣa, Sankaṣṭī Caturthī, Amāvāsyā, Pūrṇimā. The
 agents encoded "every month" sensibly; `resolve_lunar` simply rejects a wildcard.
 
