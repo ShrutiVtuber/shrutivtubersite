@@ -1,0 +1,11 @@
+**/node_modules
+**/dist
+**/.astro
+**/__pycache__
+.git
+.env
+.env.*
+!.env.example
+assets/*.zip
+*.zip
+media/

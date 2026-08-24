@@ -106,21 +106,44 @@ templates, Dawn/Dusk themes. **Not implemented yet.**
 - `docs/DEPLOY.md` — the runbook.
 - `docs/adr/0001-astrology-licensing.md` — the licence boundary and its amendment.
 
-## Two things pending
+## The festival research finished — with gaps
 
-1. **The festival research workflow** (`wf_c1b48a88-6af`) was still running at
-   session end. Its output — Hindu and Attic festival entries with citations —
-   goes into MBF packs via `shruti_astro/packs/mbf.py`. The resolver is built and
-   validated; only the data is missing.
-2. **The BeeRanked MCP** was installed but needs a fresh session to be usable.
-   shrutivtuber.com is already connected to BeeRanked; the journal at `/journal`
-   is the intended mount.
+Output is in `~/Documents/development/shruti-research/` (outside the repo:
+working material, partly unverified). **Read its `README.md` first.**
 
-## The honest gap
+**71 Hindu entries and 45 Attic entries**, all cited, confidence graded. Three
+things need doing before any of it is packed:
 
-Almost all of this is backend. **There is no website to look at.** The engine is
-well ahead of anything that exposes it, and the design system has been sitting
-unimplemented since it arrived. Sophia knows and chose this order deliberately —
-"functionality working soundly is more important than splitting our focus" — but
-a fresh session should know that standing up the Astro site is the largest single
-piece of undone work.
+1. **No entry carries `dayRule`** — the schema given to the agents predated that
+   discovery. Verified for 2026: Vasant Pañcamī, Holikā Dahan and Holi resolve
+   exactly right on the sunrise default; **Mahā Śivarātri comes back a day late
+   because it needs `nishitha`**. A pass adding the rule to the handful that
+   need it is required.
+2. **The assembly agent dropped the Hindu half** — its report is Attic only. The
+   Hindu entries were recovered from `journal.jsonl` and are therefore
+   *unverified by the audit pass* that the Attic set received.
+3. **17 of 68 Hindu anchors error on resolve.** 49 resolve, 2 are legitimately
+   kṣaya. The rest need triage.
+
+The resolver, the MBF writer and the anchor validation all work — this is a data
+problem, not an engine problem.
+
+## Still pending
+
+**The BeeRanked MCP** was installed but needs a fresh session to be usable.
+shrutivtuber.com is already connected to BeeRanked; `/journal` is the intended
+mount.
+
+## The site now renders
+
+An Astro 6 SSR scaffold is up and serving through the origin: pnpm workspace,
+the **designer's own tokens copied in verbatim**, Dawn/Dusk with all three theme
+states, a no-flash first-paint script, and server-side fetches to both backends
+so nothing leaks to the browser and there is no CORS surface.
+
+It is a scaffold, not the design. The homepage renders real data — live status,
+projects, grouped links — in plain markup awaiting the design implementation.
+`SHRUTI_WEB_ENABLED=1` switches Caddy from the placeholder to the site.
+
+**The largest remaining piece is implementing the design system** across the
+surfaces in the three handoffs.

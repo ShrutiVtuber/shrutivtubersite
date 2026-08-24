@@ -1,0 +1,13 @@
+{
+  "name": "@shruti/shared",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Design tokens and primitives shared by the site and the admin",
+  "sideEffects": ["*.css"],
+  "exports": {
+    "./tokens.css": "./src/tokens/tokens.css",
+    "./theme.js": "./src/tokens/theme.js",
+    "./tailwind-preset": "./src/tokens/tailwind.preset.cjs"
+  }
+}

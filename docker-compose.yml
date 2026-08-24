@@ -21,6 +21,11 @@ services:
     image: caddy:2-alpine
     restart: unless-stopped
     depends_on: [backend]
+    environment:
+      # Read by the internal Caddyfile: "1" proxies to the Astro site, anything
+      # else serves the unbuilt placeholder. Caddy resolves {env.*} at start,
+      # so changing this needs a restart, not a reload.
+      SHRUTI_WEB_ENABLED: ${SHRUTI_WEB_ENABLED:-0}
     ports:
       # Loopback only. TLS is the host Caddy's job.
       - "127.0.0.1:${SHRUTI_HOST_PORT:-8200}:8080"
@@ -38,25 +43,30 @@ services:
   site:
     profiles: ["web"]
     build:
-      context: ./frontend
-      dockerfile: site/Dockerfile
+      # The workspace root, so the shared token package and the lockfile
+      # resolve. A ./frontend context cannot see either.
+      context: .
+      dockerfile: frontend/site/Dockerfile
+      target: prod
     restart: unless-stopped
     depends_on: [backend]
     environment:
-      # Server-side fetches talk to the backend over the internal network.
+      # Server-side fetches talk to the backends over the internal networks —
+      # never from the browser, so no secret and no CORS surface.
       SHRUTI_API_INTERNAL: http://backend:8000
+      SHRUTI_ASTRO_INTERNAL: http://shruti-astro:8000
       SHRUTI_SITE_URL: ${SHRUTI_SITE_URL:-http://localhost:8200}
       HOST: 0.0.0.0
       PORT: 4321
-    networks: [shruti]
+    networks: [shruti, shruti-interop]
 
   admin:
     profiles: ["web"]
     # Builds the admin SPA into a named volume that caddy serves at /admin.
     # Not a long-running service — it exits once the bundle is written.
     build:
-      context: ./frontend
-      dockerfile: admin/Dockerfile
+      context: .
+      dockerfile: frontend/admin/Dockerfile
     volumes:
       - admin_dist:/out
     networks: [shruti]

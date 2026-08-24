@@ -1,0 +1,8 @@
+/* Shruti — element defaults. */
+:root{background:var(--surface-page)}
+body{margin:0;background:var(--surface-page);color:var(--ink);font-family:var(--font-body);font-size:var(--text-body);line-height:var(--leading-body);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+a{color:var(--accent);text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:.18em;text-decoration-color:color-mix(in srgb,var(--accent) 45%,transparent);transition:color var(--dur-1) var(--ease-out),text-decoration-color var(--dur-1) var(--ease-out)}
+a:hover{color:var(--accent-hover);text-decoration-color:var(--accent-hover)}
+hr{border:0;border-top:var(--border-w) solid var(--line);margin:var(--space-5) 0}
+::selection{background:color-mix(in srgb,var(--accent) 24%,transparent)}
+img{max-width:100%;height:auto}

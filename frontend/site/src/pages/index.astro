@@ -1,0 +1,89 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import { site, type LinkGroups, type LiveStatus, type Project } from "../lib/api";
+
+// Fetched in parallel: each block renders its own absent state if its call
+// fails, so a slow or down endpoint costs one block rather than the page.
+const [links, projects, live] = await Promise.all([
+  site<LinkGroups>("/api/content/links"),
+  site<Project[]>("/api/content/projects"),
+  site<LiveStatus>("/api/live"),
+]);
+---
+
+<BaseLayout
+  title="Shruti"
+  description="Software for magickal and astrological practice."
+>
+  <div class="mx-auto max-w-3xl px-6 py-16">
+    <p class="font-mono text-xs uppercase tracking-widest text-ink-faint">
+      Scaffold — awaiting the design implementation
+    </p>
+    <h1 class="mt-4 text-4xl font-semibold tracking-tight">Shruti</h1>
+    <p class="mt-3 max-w-prose text-ink-soft">
+      Software for magickal and astrological practice.
+    </p>
+
+    <section class="mt-12">
+      <h2 class="text-sm font-semibold uppercase tracking-wide text-ink-faint">
+        Live
+      </h2>
+      {
+        live === null ? (
+          <p class="mt-2 text-ink-faint">Status unavailable.</p>
+        ) : live.anyLive && live.primary ? (
+          <p class="mt-2">
+            Live now on {live.primary.platform} —
+            <a class="text-accent underline" href={live.primary.watchUrl}>watch</a>
+          </p>
+        ) : (
+          <p class="mt-2 text-ink-soft">Not live right now.</p>
+        )
+      }
+    </section>
+
+    <section class="mt-10">
+      <h2 class="text-sm font-semibold uppercase tracking-wide text-ink-faint">
+        Work
+      </h2>
+      {
+        projects?.length ? (
+          <ul class="mt-3 space-y-3">
+            {projects.map((p) => (
+              <li class="rounded-lg border border-line bg-card p-4">
+                <a class="font-medium text-accent" href={p.siteUrl}>{p.name}</a>
+                <p class="mt-1 text-sm text-ink-soft">{p.tagline}</p>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p class="mt-2 text-ink-faint">Nothing published yet.</p>
+        )
+      }
+    </section>
+
+    <section class="mt-10">
+      <h2 class="text-sm font-semibold uppercase tracking-wide text-ink-faint">
+        Elsewhere
+      </h2>
+      {
+        links?.groups ? (
+          <div class="mt-3 space-y-3">
+            {Object.entries(links.groups).map(([group, items]) => (
+              <div>
+                <p class="font-mono text-xs uppercase tracking-widest text-ink-faint">{group}</p>
+                <ul class="mt-1 flex flex-wrap gap-3">
+                  {items.map((l) => (
+                    <li><a class="text-accent underline" href={l.url}>{l.label}</a></li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p class="mt-2 text-ink-faint">Links unavailable.</p>
+        )
+      }
+    </section>
+  </div>
+</BaseLayout>

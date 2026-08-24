@@ -1,0 +1,15 @@
+/* Shruti design tokens.
+ *
+ * Delivered by the designer and copied in VERBATIM. Do not restyle here — the
+ * handoff is explicit that every value was decided deliberately, and a token
+ * edited in the implementation is a decision quietly overturned.
+ *
+ * Order matters: base ramps and semantic aliases first, then everything that
+ * consumes them.
+ */
+@import "./base.css";
+@import "./colors.css";
+@import "./typography.css";
+@import "./fonts.css";
+@import "./spacing.css";
+@import "./effects.css";

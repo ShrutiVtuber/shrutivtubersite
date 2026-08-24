@@ -1,0 +1,33 @@
+@import "@shruti/shared/tokens.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  /* The page must paint its own ground. A transparent body borrows whatever
+     is behind it, which in a dark client means dark-on-dark. */
+  html {
+    background: var(--surface-page);
+    color-scheme: light dark;
+  }
+  body {
+    background: var(--surface-page);
+    color: var(--ink);
+  }
+  /* Keyboard focus must always be visible. */
+  :focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 2px;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}

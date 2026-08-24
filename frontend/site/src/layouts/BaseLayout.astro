@@ -1,0 +1,36 @@
+---
+import "../styles/global.css";
+
+interface Props {
+  title: string;
+  description?: string;
+}
+const { title, description = "" } = Astro.props;
+const siteUrl = import.meta.env.SHRUTI_SITE_URL ?? "https://shrutivtuber.com";
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    {description && <meta name="description" content={description} />}
+    <link rel="canonical" href={new URL(Astro.url.pathname, siteUrl).href} />
+
+    {/* Runs before any stylesheet so a stored dark preference never flashes
+        white. Inlined on purpose — it cannot wait for a module to load. */}
+    <script is:inline src="/first-paint.js"></script>
+  </head>
+  <body class="min-h-screen bg-page text-ink antialiased">
+    <a
+      href="#main"
+      class="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded focus:bg-card focus:px-4 focus:py-2"
+    >
+      Skip to content
+    </a>
+    <main id="main">
+      <slot />
+    </main>
+  </body>
+</html>

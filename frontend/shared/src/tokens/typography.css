@@ -1,0 +1,28 @@
+/* Shruti — type system. Display/prose: EB Garamond. UI: Commissioner. Data/code: JetBrains Mono.
+   Devanagari fallbacks: Noto Serif Devanagari (serif), Mukta (sans). */
+:root{
+  --font-display:"EB Garamond","Noto Serif Devanagari",Georgia,"Times New Roman",serif;
+  --font-body:"Commissioner","Mukta",-apple-system,"Segoe UI",system-ui,sans-serif;
+  --font-mono:"JetBrains Mono","Noto Sans Devanagari",ui-monospace,"SF Mono",Menlo,monospace;
+  /* Scale */
+  --text-hero:clamp(2.5rem,6vw,3.75rem); /* @kind spacing */
+  --text-h1:2.25rem; --text-h2:1.75rem; --text-h3:1.375rem; --text-h4:1.125rem;
+  --text-prose:1.1875rem; --text-body:1rem; --text-sm:.875rem; --text-xs:.8125rem; --text-micro:.75rem;
+  /* Leading */
+  --leading-display:1.08; --leading-heading:1.2; --leading-prose:1.72; --leading-body:1.55; --leading-tight:1.3;
+  /* Weights */
+  --weight-display:500; --weight-heading:600; --weight-body:400; --weight-medium:500; --weight-strong:600;
+  /* Tracking */
+  --tracking-display:-0.01em; --tracking-eyebrow:.14em; --tracking-caps:.08em;
+}
+/* Role helpers */
+.t-hero{font-family:var(--font-display);font-size:var(--text-hero);line-height:var(--leading-display);font-weight:var(--weight-display);letter-spacing:var(--tracking-display);color:var(--ink)}
+.t-h1{font-family:var(--font-display);font-size:var(--text-h1);line-height:var(--leading-heading);font-weight:var(--weight-heading);letter-spacing:var(--tracking-display);color:var(--ink)}
+.t-h2{font-family:var(--font-display);font-size:var(--text-h2);line-height:var(--leading-heading);font-weight:var(--weight-heading);color:var(--ink)}
+.t-h3{font-family:var(--font-display);font-size:var(--text-h3);line-height:var(--leading-heading);font-weight:var(--weight-heading);color:var(--ink)}
+.t-eyebrow{font-family:var(--font-body);font-size:var(--text-micro);line-height:1;font-weight:var(--weight-strong);letter-spacing:var(--tracking-eyebrow);text-transform:uppercase;color:var(--ink-faint)}
+.t-prose{font-family:var(--font-display);font-size:var(--text-prose);line-height:var(--leading-prose);font-weight:var(--weight-body);color:var(--ink)}
+.t-body{font-family:var(--font-body);font-size:var(--text-body);line-height:var(--leading-body);color:var(--ink)}
+.t-sm{font-family:var(--font-body);font-size:var(--text-sm);line-height:var(--leading-body);color:var(--ink-soft)}
+.t-mono{font-family:var(--font-mono);font-size:var(--text-sm);font-variant-numeric:tabular-nums;color:var(--ink)}
+.t-tabular{font-variant-numeric:tabular-nums lining-nums}
