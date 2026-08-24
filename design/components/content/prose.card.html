@@ -1,0 +1,19 @@
+<!-- @dsCard group="Components" viewport="700x520" name="Prose" subtitle="The journal spec — EB Garamond 19/1.72, asterism rules, seal byline" -->
+<!DOCTYPE html><html data-theme="light"><head><meta charset="utf-8"><link rel="stylesheet" href="../../styles.css">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../_ds_bundle.js"></script>
+<style>body{margin:0;padding:20px 24px;background:var(--surface-page)}</style></head><body>
+<div id="root"></div>
+<script type="text/babel">
+const {Prose}=window.ShrutiDesignSystem_cb687f;
+ReactDOM.createRoot(document.getElementById('root')).render(
+<Prose byline="Soror Eu. A.">
+  <h3 style={{marginTop:0}}>On planetary hours</h3>
+  <p>An hour here is not sixty minutes. Divide the arc of daylight by twelve and each <em>hour</em> stretches or contracts with the season — the almanac's kind of precision, where <code>sunrise(φ, date)</code> is the first input of the day.</p>
+  <blockquote>The instrument does not believe anything. It computes the sky as it is, and leaves the meaning to the practitioner.</blockquote>
+  <hr/>
+  <p>Theourgia ships this as a first-class primitive: <a href="#">the hours API</a> takes a location and returns the ruler of the moment.</p>
+</Prose>);
+</script></body></html>

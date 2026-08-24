@@ -1,0 +1,58 @@
+<!-- @dsCard group="Components" viewport="1000x900" name="Stations & export" subtitle="NextStation · StationTable with no-moonrise + polar states · ExportBlock" -->
+<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Stations — specimens</title>
+<link rel="stylesheet" href="../../styles.css">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../_ds_bundle.js"></script>
+<style>body{margin:0;background:var(--surface-page);font-family:var(--font-body)}
+.wrap{max-width:1000px;margin:0 auto;padding:28px 24px 48px;display:grid;gap:30px}
+h2{font:600 var(--text-micro) var(--font-body);letter-spacing:.14em;text-transform:uppercase;color:var(--ink-faint);margin:0 0 12px}
+.dusk{border-radius:var(--radius-md);padding:20px;border:1px solid var(--line);background:var(--surface-page)}
+</style></head><body><div id="root"></div>
+<script type="text/babel">
+const {NextStation,StationTable,ExportBlock}=window.ShrutiDesignSystem_cb687f;
+const ROWS=[
+  {date:'7 Sep',weekday:'Mon',times:['17:41','22:14','03:22','10:48'],today:true,currentIndex:0,phase:'◐ 11.4 d'},
+  {date:'8 Sep',weekday:'Tue',times:['18:29','23:02','04:11','11:36'],phase:'◐ 12.4 d'},
+  {date:'9 Sep',weekday:'Wed',times:['19:57',null,'05:55','13:15'],phase:'○ 13.4 d'},
+  {date:'10 Sep',weekday:'Thu',times:[null,'03:21','09:39','16:45'],phase:'○ 14.4 d'}
+];
+function Card(){
+  return <div className="wrap">
+    <section><h2>NextStation — hero, block, and nothing-to-count-to</h2>
+      <div style={{display:'grid',gap:14}}>
+        <NextStation glyph="☉︎" name="Sunset" at="20:05" inLabel="2h 14m" currentName="Noon" currentSince="13:29" attribution="Hekate Enodia" progress={0.62}/>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(280px,1fr))',gap:14}}>
+          <NextStation size="block" glyph="☾︎" name="Moonrise" at="17:41" inLabel="41m" currentName="Nadir" currentSince="10:48" progress={0.88}/>
+          <NextStation name="Sunrise" at="—" inLabel="—" undefinedReason="The Sun does not rise here today, so there is no solar station to count toward. The lunar stations still hold."/>
+        </div>
+      </div>
+    </section>
+    <section><h2>StationTable — lunar, with two absent cells that are the sky and not a gap</h2>
+      <StationTable stations={['Moonrise','Culmination','Moonset','Nadir']} glyphs={['☾︎','☽︎','☾︎','●']}
+        rows={ROWS} absentLabel="no moonrise today"
+        caption="Athens · 37.98°N 23.73°E · your local time · Swiss Ephemeris 2.10.03"/>
+    </section>
+    <section><h2>StationTable — dusk, where this is mostly read</h2>
+      <div className="dusk" data-theme="dark">
+        <StationTable stations={['Sunrise','Noon','Sunset','Midnight']} glyphs={['☉︎','☉︎','☉︎','☾︎']}
+          attributions={['Hekate Phosphoros','Apollo','Hekate Enodia','Persephone']}
+          rows={[{date:'7 Sep',weekday:'Mon',times:['06:52','13:29','20:05','00:29'],today:true,currentIndex:1},
+                 {date:'8 Sep',weekday:'Tue',times:['06:53','13:29','20:03','00:28']}]}/>
+      </div>
+    </section>
+    <section><h2>StationTable — polar, whole table undefined</h2>
+      <StationTable stations={['Sunrise','Noon','Sunset','Midnight']} rows={[]}
+        undefinedReason="At 78.22°N the Sun neither rises nor sets on these dates, so the four solar stations have no times to give. They are undefined here, not zero — and the planetary hours that divide them are undefined with them."/>
+    </section>
+    <section><h2>ExportBlock — three routes, one of them the habit</h2>
+      <ExportBlock feedHref="webcal://theourgia.com/stations/ical?place=athens&preset=hellenic"
+        fileHref="#" fileName="solar-stations-athens-2026-09.ics" fileScope="7 Sep – 6 Oct 2026 · 120 events"
+        googleLinks={[{label:'Sunrise',glyph:'☉︎',href:'#'},{label:'Noon',glyph:'☉︎',href:'#'},{label:'Sunset',glyph:'☉︎',href:'#'},{label:'Midnight',glyph:'☾︎',href:'#'}]}
+        meta="Athens · Hellenic preset · your local time"/>
+    </section>
+  </div>;
+}
+ReactDOM.createRoot(document.getElementById('root')).render(<Card/>);
+</script></body></html>

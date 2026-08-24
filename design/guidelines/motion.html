@@ -1,0 +1,9 @@
+<!-- @dsCard group="Spacing" viewport="700x200" name="Motion" subtitle="Fades and 1px moves — the sky alone gets 600ms" -->
+<!DOCTYPE html><html><head><meta charset="utf-8"><link rel="stylesheet" href="../styles.css"><style>body{padding:24px 28px;display:grid;gap:16px}.r{display:grid;grid-template-columns:150px 90px 1fr;gap:14px;align-items:center;font-family:var(--font-body);font-size:13px;color:var(--ink)}.m{font-family:var(--font-mono);font-size:10.5px;color:var(--ink-faint)}.demo{height:10px;border-radius:99px;background:var(--surface-veil);position:relative;overflow:hidden}.demo i{position:absolute;top:2px;bottom:2px;width:56px;border-radius:99px;background:var(--accent);animation:2.4s var(--ease-out) infinite slide}
+.d2 i{animation-timing-function:var(--ease-in-out);background:var(--rose)}
+@keyframes slide{0%,15%{left:2px}50%,65%{left:calc(100% - 58px)}100%{left:2px}}</style></head><body>
+<div class="r"><span>Micro — hover, press</span><span class="m">120ms · ease-out</span><div class="demo"><i></i></div></div>
+<div class="r"><span>UI — reveal, toast</span><span class="m">240ms · ease-out</span><div class="demo"><i style="animation-duration:3s"></i></div></div>
+<div class="r"><span>Sky — theme change</span><span class="m">600ms · ease-in-out</span><div class="demo d2"><i style="animation-duration:4s"></i></div></div>
+<div class="m">prefers-reduced-motion collapses every duration to 1ms · no bounces, no parallax, no scale-shrink</div>
+</body></html>

@@ -1,0 +1,57 @@
+<!-- @dsCard group="Components" viewport="900x760" name="Accounts, consent & horoscopes" subtitle="ConsentCheckbox · SignPicker · PeriodSwitcher · SubscribeBlock · LegalImprint" -->
+<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Accounts &amp; horoscopes — specimens</title>
+<link rel="stylesheet" href="../../styles.css">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../_ds_bundle.js"></script>
+<style>body{margin:0;background:var(--surface-page);font-family:var(--font-body)}
+.wrap{max-width:900px;margin:0 auto;padding:28px 24px 48px;display:grid;gap:30px}
+h2{font:600 var(--text-micro) var(--font-body);letter-spacing:.14em;text-transform:uppercase;color:var(--ink-faint);margin:0 0 12px}
+.dusk{background:var(--surface-page);border-radius:var(--radius-md);padding:20px;border:1px solid var(--line)}
+</style></head><body><div id="root"></div>
+<script type="text/babel">
+const {ConsentCheckbox,SignPicker,PeriodSwitcher,SubscribeBlock,LegalImprint}=window.ShrutiDesignSystem_cb687f;
+function Card(){
+  const [c,setC]=React.useState({a:false,b:false});
+  const [sign,setSign]=React.useState('virgo');
+  const [p,setP]=React.useState('monthly');
+  return <div className="wrap">
+    <section><h2>ConsentCheckbox — three distinct decisions, none pre-ticked</h2>
+      <div style={{display:'grid',gap:12}}>
+        <ConsentCheckbox basis="contract" required checked={c.a} onChange={e=>setC(s=>({...s,a:e.target.checked}))}
+          label="Create my account" explanation="Email and display name, stored so you can sign in."/>
+        <ConsentCheckbox basis="explicit consent · GDPR Art. 9" checked={c.b} onChange={e=>setC(s=>({...s,b:e.target.checked}))}
+          label="Store my birth data so my chart and horoscope can be calculated"
+          explanation="Birth date, time and place. Because a reading arguably reveals philosophical belief, this may be special category data — so it is asked separately and never assumed."
+          meta="Given 12 Aug 2026 · withdraw any time"/>
+        <ConsentCheckbox basis="contract" required error="This one is needed to make an account at all."
+          label="Create my account" explanation="The error state — only ever reachable for the contract consent."/>
+      </div>
+    </section>
+    <section><h2>SignPicker — grid, with the reader’s own sign marked</h2>
+      <SignPicker layout="grid" current={sign} onChange={setSign} ownSign="virgo"/>
+    </section>
+    <section><h2>SignPicker — row, and PeriodSwitcher with one period available</h2>
+      <div style={{display:'grid',gap:16}}>
+        <SignPicker layout="row" current={sign} onChange={setSign} ownSign="virgo"/>
+        <PeriodSwitcher current={p} available={['monthly']} onChange={setP} label="September 2026"/>
+        <PeriodSwitcher current="daily" available={['daily','monthly','seasonal','yearly']} label="7 September 2026"/>
+      </div>
+    </section>
+    <section><h2>SubscribeBlock — idle and the mandatory “check your email” state</h2>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(300px,1fr))',gap:16,alignItems:'start'}}>
+        <SubscribeBlock/>
+        <SubscribeBlock state="sent" email="reader@example.com"/>
+      </div>
+    </section>
+    <section><h2>LegalImprint — footer column, and dusk</h2>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(280px,1fr))',gap:16,alignItems:'start'}}>
+        <LegalImprint/>
+        <div className="dusk" data-theme="dark"><LegalImprint/></div>
+      </div>
+    </section>
+  </div>;
+}
+ReactDOM.createRoot(document.getElementById('root')).render(<Card/>);
+</script></body></html>

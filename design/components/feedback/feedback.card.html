@@ -1,0 +1,23 @@
+<!-- @dsCard group="Components" viewport="700x560" name="Feedback" subtitle="Toast tones · Modal · EmptyState · Skeleton" -->
+<!DOCTYPE html><html data-theme="light"><head><meta charset="utf-8"><link rel="stylesheet" href="../../styles.css">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../_ds_bundle.js"></script>
+<style>body{margin:0;padding:16px;background:var(--surface-page)}#root{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start}.stack{display:grid;gap:10px}.modal-demo{position:relative;height:300px;border-radius:var(--radius-md);overflow:hidden;border:1px solid var(--line)}.modal-demo .sh-modal-ov{position:absolute}</style></head><body>
+<div id="root"></div>
+<script type="text/babel">
+const {Toast,Modal,EmptyState,Skeleton,Button,TextField}=window.ShrutiDesignSystem_cb687f;
+ReactDOM.createRoot(document.getElementById('root')).render(<>
+  <div className="stack">
+    <Toast tone="success" title="Message sent." body="Business enquiries get a reply within 3 days." onDismiss={()=>{}}/>
+    <Toast tone="info" title="Schedule updated" body="Thursday's stream moved one hour later." onDismiss={()=>{}}/>
+    <Toast tone="error" title="Could not load VODs." action={<Button size="sm" variant="ghost">Retry</Button>} onDismiss={()=>{}}/>
+    <div style={{display:'grid',gap:8,marginTop:6}}><Skeleton variant="text" lines={3}/><div style={{display:'flex',gap:10,alignItems:'center'}}><Skeleton variant="circle" width={40}/><Skeleton variant="line" width="60%"/></div></div>
+  </div>
+  <div className="stack">
+    <EmptyState glyph="○" title="The sky is quiet" body="Nothing scheduled yet — streams are announced on Discord first." action={<Button variant="secondary" size="sm">Join the Discord</Button>}/>
+    <div className="modal-demo"><Modal open onClose={()=>{}} title="Submit fan art" footer={<><Button variant="ghost" size="sm">Cancel</Button><Button size="sm">Submit</Button></>}><TextField label="Link to your post" required placeholder="https://…"/></Modal></div>
+  </div>
+</>);
+</script></body></html>

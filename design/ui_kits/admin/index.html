@@ -1,0 +1,137 @@
+<!-- @dsCard group="Admin" viewport="1280x820" name="Admin SPA" subtitle="Block visibility · edit form · media uploader — same tokens, functional over beautiful" -->
+<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Shruti — admin</title>
+<link rel="stylesheet" href="../../styles.css">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../_ds_bundle.js"></script>
+<script src="../signs.js"></script>
+<style>
+body{margin:0;background:var(--surface-page)}
+.adm{display:grid;grid-template-columns:220px 1fr;min-height:100vh}
+.adm-side{border-right:1px solid var(--line);padding:20px 14px;display:flex;flex-direction:column;gap:4px;background:var(--surface-card)}
+.adm-side .word{font-family:var(--font-display);font-weight:500;font-size:22px;color:var(--ink);padding:4px 10px 14px}
+.adm-side button{appearance:none;border:0;background:transparent;text-align:left;font:500 13px var(--font-body);color:var(--ink-soft);padding:9px 10px;border-radius:var(--radius-sm);cursor:pointer}
+.adm-side button:hover{background:var(--surface-veil);color:var(--ink)}
+.adm-side button[aria-current=true]{background:var(--accent-wash);color:var(--accent)}
+.adm-side .env{margin-top:auto;font:400 10px var(--font-mono);color:var(--ink-faint);padding:10px}
+.adm-main{padding:28px 32px;display:grid;gap:20px;align-content:start}
+.adm-h{font:600 var(--text-h2) var(--font-display);color:var(--ink);margin:0}
+.blk{display:flex;align-items:center;gap:14px;background:var(--surface-card);border:1px solid var(--line);border-radius:var(--radius-md);padding:14px 18px}
+.blk[data-hidden=true]{opacity:.55;background:var(--surface-page)}
+.blk .t{flex:1;display:grid;gap:2px}
+.blk .t b{font:600 14px var(--font-body);color:var(--ink)}
+.blk .t span{font:400 11px var(--font-mono);color:var(--ink-faint)}
+.sw{appearance:none;position:relative;width:40px;height:22px;border-radius:99px;background:var(--surface-veil);border:1px solid var(--line-strong);cursor:pointer;transition:background var(--dur-1) var(--ease-out);flex:none}
+.sw::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:99px;background:var(--surface-card);border:1px solid var(--line);transition:left var(--dur-1) var(--ease-out)}
+.sw[aria-checked=true]{background:var(--accent)}
+.sw[aria-checked=true]::after{left:20px}
+.drop{border:1.5px dashed var(--line-strong);border-radius:var(--radius-md);padding:34px;display:grid;place-items:center;gap:8px;text-align:center;color:var(--ink-faint);font:400 13px var(--font-body);background:color-mix(in srgb,var(--surface-veil) 40%,transparent)}
+.drop b{font:600 14px var(--font-body);color:var(--ink-soft)}
+.media{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.media .m{aspect-ratio:1;border:1px solid var(--line);border-radius:var(--radius-sm);display:grid;place-items:center;font:400 10px var(--font-mono);color:var(--ink-faint);background:repeating-conic-gradient(var(--surface-veil) 0 25%,var(--surface-card) 0 50%) 0 0/14px 14px}
+.toastwrap{position:fixed;right:18px;bottom:18px;z-index:50}
+</style></head><body>
+<div id="root"></div>
+<script type="text/babel">
+const {Button,TextField,TextArea,SelectField,Toast,Badge,EmptyState,SignPicker,PeriodSwitcher,Prose}=window.ShrutiDesignSystem_cb687f;
+const SIGNS=window.SHRUTI_SIGNS;
+const BLOCKS=[
+  {id:'hero-art',name:'Home · hero character art',state:false,note:'image · empty — art-absent design shows'},
+  {id:'hero',name:'Home · hero',state:true,note:'text + CTA'},
+  {id:'videos',name:'Home · latest videos',state:true,note:'auto · Twitch/YouTube'},
+  {id:'outfits',name:'About · outfit gallery',state:false,note:'3 slots · all empty'},
+  {id:'press',name:'Press kit',state:true,note:'stats updated 2026-08-01'}
+];
+function HoroscopeAuthoring({onToast}){
+  const [period,setPeriod]=React.useState('monthly');
+  const [sign,setSign]=React.useState('aries');
+  const [drafts,setDrafts]=React.useState(()=>{const o={};SIGNS.forEach((s,i)=>{o[s.key]=i<5?'Mercury, your ruler, spends the first fortnight in your own sign\u2026':''});return o});
+  const [preview,setPreview]=React.useState(false);
+  const cur=SIGNS.find(s=>s.key===sign)||SIGNS[0];
+  const done=SIGNS.filter(s=>(drafts[s.key]||'').trim().length>0).length;
+  const set=e=>{const v=e.target.value;setDrafts(d=>({...d,[sign]:v}))};
+  return <>
+    <div style={{display:'flex',alignItems:'baseline',gap:12,flexWrap:'wrap'}}>
+      <h1 className="adm-h">Horoscopes</h1>
+      <Badge tone={done===12?'accent':'faint'}>{done} of 12 written</Badge>
+      <div style={{marginLeft:'auto',display:'flex',gap:8,alignItems:'center'}}>
+        <SelectField label="" options={[{value:'2026-09',label:'September 2026'},{value:'2026-10',label:'October 2026'}]} defaultValue="2026-09"/>
+      </div>
+    </div>
+    <PeriodSwitcher current={period} available={['monthly']} onChange={setPeriod} label="September 2026 · draft"/>
+    <p style={{font:'400 13px/1.6 var(--font-body)',color:'var(--ink-soft)',margin:0,maxWidth:'70ch'}}>Twelve fields, one per sign. Writing twelve of anything monthly is a chore, so the editor keeps the sign list, the progress count and the preview on one screen — no navigating away and back.</p>
+    <div style={{display:'grid',gridTemplateColumns:'minmax(0,1fr) minmax(0,1fr)',gap:20,alignItems:'start'}}>
+      <div style={{display:'grid',gap:14}}>
+        <SignPicker layout="row" current={sign} onChange={setSign}/>
+        <div style={{display:'grid',gap:10}}>
+          <TextField label={cur.name+' — lede'} placeholder="One line. The thing someone remembers." defaultValue={sign==='aries'?'The work comes back to you, and it comes back changed.':''}/>
+          <TextArea label={cur.name+' — reading'} rows={12} maxLength={2400} value={drafts[sign]||''} onChange={set}
+            placeholder={'Two or three paragraphs. Name the timing — a station, an ingress, a lunation — and say plainly what it asks.'}/>
+        </div>
+        <div style={{display:'flex',gap:10,flexWrap:'wrap',alignItems:'center'}}>
+          <Button onClick={()=>onToast(cur.name+' saved as draft.')}>Save draft</Button>
+          <Button variant="secondary" onClick={()=>setPreview(p=>!p)}>{preview?'Hide preview':'Preview'}</Button>
+          <Button variant="ghost" onClick={()=>onToast(done===12?'All twelve published for September.':'Publish blocked — '+(12-done)+' still unwritten.')}>Publish month</Button>
+          <span style={{font:'400 11px var(--font-mono)',color:'var(--ink-faint)'}}>{done===12?'ready':'publishing needs all twelve'}</span>
+        </div>
+      </div>
+      <div style={{border:'1px solid var(--line)',borderRadius:'var(--radius-md)',background:'var(--surface-card)',padding:'20px 22px',display:'grid',gap:10}}>
+        <span style={{font:'600 10px var(--font-body)',letterSpacing:'.14em',textTransform:'uppercase',color:'var(--ink-faint)'}}>Preview · exactly the reading page</span>
+        <div style={{display:'flex',alignItems:'baseline',gap:10}}>
+          <span aria-hidden="true" className="t-glyph" style={{font:'400 2rem var(--font-display)',lineHeight:1,color:'var(--rose)'}}>{cur.glyph}</span>
+          <span style={{font:'500 var(--text-h2) var(--font-display)',color:'var(--ink)'}}>{cur.name}</span>
+        </div>
+        {(drafts[sign]||'').trim()
+          ?<Prose byline="Soror Eu. A."><p>{drafts[sign]}</p></Prose>
+          :<EmptyState glyph="○" title="Nothing written yet" body={'This sign is empty. The month cannot be published until all twelve are written — an empty reading is worse than a late one.'}/>}
+      </div>
+    </div>
+  </>;
+}
+function AdminApp(){
+  const [tab,setTab]=React.useState('blocks');
+  const [blocks,setBlocks]=React.useState(BLOCKS);
+  const [toast,setToast]=React.useState(null);
+  const flip=id=>{setBlocks(bs=>bs.map(b=>b.id===id?{...b,state:!b.state}:b));setToast('Saved — the page updates on next build.')};
+  return <div className="adm" data-screen-label="Admin">
+    <aside className="adm-side">
+      <span className="word">Shruti <Badge tone="faint">admin</Badge></span>
+      {[['blocks','Blocks'],['edit','Edit: About'],['horoscopes','Horoscopes'],['media','Media']].map(([k,l])=>
+        <button key={k} aria-current={tab===k} onClick={()=>setTab(k)}>{l}</button>)}
+      <span className="env">astro build · main · GMT+3</span>
+    </aside>
+    <main className="adm-main">
+      {tab==='blocks'&&<>
+        <h1 className="adm-h">Blocks</h1>
+        {blocks.map(b=><div className="blk" key={b.id} data-hidden={!b.state}>
+          <div className="t"><b>{b.name}</b><span>{b.note}</span></div>
+          <Badge tone={b.state?'accent':'faint'}>{b.state?'Visible':'Hidden'}</Badge>
+          <button className="sw" role="switch" aria-checked={b.state} aria-label={'Toggle '+b.name} onClick={()=>flip(b.id)}></button>
+        </div>)}
+      </>}
+      {tab==='edit'&&<>
+        <h1 className="adm-h">Edit — About</h1>
+        <div style={{display:'grid',gap:16,maxWidth:560}}>
+          <TextField label="Page title" defaultValue="Shruti" required/>
+          <TextField label="Subtitle" defaultValue="VTuber · theurgist · toolmaker. Athens, GMT+3."/>
+          <SelectField label="Default language" options={['English','Ελληνικά','हिन्दी','Français']} defaultValue="English"/>
+          <TextArea label="Bio (markdown)" rows={6} defaultValue="I stream the building of software for magickal and astrological practice…"/>
+          <div style={{display:'flex',gap:10}}><Button onClick={()=>setToast('About saved.')}>Save</Button><Button variant="ghost">Preview</Button></div>
+        </div>
+      </>}
+      {tab==='horoscopes'&&<HoroscopeAuthoring onToast={setToast}/>}
+      {tab==='media'&&<>
+        <h1 className="adm-h">Media</h1>
+        <div className="drop"><b>Drop art here</b><span>PNG or WebP · transparent preferred · originals kept</span><Button variant="secondary" size="sm">Choose file</Button></div>
+        <div className="media">
+          <div className="m">wordmark.png</div><div className="m">clouds.png</div><div className="m">avatar.png</div><div className="m" style={{borderStyle:'dashed'}}>empty</div>
+        </div>
+      </>}
+      {tab==='media'&&false&&<EmptyState title="No media yet"/>}
+    </main>
+    {toast&&<div className="toastwrap"><Toast tone="success" title={toast} onDismiss={()=>setToast(null)}/></div>}
+  </div>;
+}
+ReactDOM.createRoot(document.getElementById('root')).render(<AdminApp/>);
+</script></body></html>

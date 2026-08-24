@@ -1,0 +1,17 @@
+<!-- @dsCard group="Components" viewport="700x360" name="Navigation" subtitle="Tag · Badge · Pagination · Breadcrumb" -->
+<!DOCTYPE html><html data-theme="light"><head><meta charset="utf-8"><link rel="stylesheet" href="../../styles.css">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../_ds_bundle.js"></script>
+<style>body{margin:0;padding:18px;background:var(--surface-page)}#root{display:grid;gap:18px}.strip{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.hd{font-family:var(--font-mono);font-size:10px;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;display:block}</style></head><body>
+<div id="root"></div>
+<script type="text/babel">
+const {Tag,Badge,Pagination,Breadcrumb}=window.ShrutiDesignSystem_cb687f;
+ReactDOM.createRoot(document.getElementById('root')).render(<>
+  <div><span className="hd">Tags</span><div className="strip"><Tag label="astrology" count={12} href="#"/><Tag label="theurgy" active count={8}/><Tag label="engineering" count={21} href="#"/><Tag label="γλῶσσα" href="#"/></div></div>
+  <div><span className="hd">Badges</span><div className="strip"><Badge tone="accent">Active</Badge><Badge tone="neutral">Maintained</Badge><Badge tone="faint">Archived</Badge><Badge tone="live" dot>Live</Badge><Badge tone="rose">Soror Eu. A.</Badge></div></div>
+  <div><span className="hd">Pagination</span><Pagination page={4} pageCount={12} onChange={()=>{}}/></div>
+  <div><span className="hd">Breadcrumb</span><Breadcrumb items={[{label:'Journal',href:'#'},{label:'Theurgy',href:'#'},{label:'On the hours of Hekate'}]}/></div>
+</>);
+</script></body></html>

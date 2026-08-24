@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<!-- @template name="Tool page — pañcāṅga" description="Theourgia instrument: the five limbs of the day, with the six ayanāṁśas, sunrise-definition toggle, auspicious windows and a designed no-sunrise state." -->
+<helmet><script src="./ds-base.js"></script></helmet>
+<div style="min-height:100vh;background:var(--surface-page);color:var(--ink);font-family:var(--font-body)">
+<header style="border-bottom:1px solid var(--line)">
+<div style="max-width:1120px;margin:0 auto;padding:14px clamp(16px,4vw,32px);display:flex;align-items:center;gap:10px 24px;flex-wrap:wrap">
+<a href="#" style="font-family:var(--font-display);font-size:22px;font-weight:500;color:var(--ink);text-decoration:none">Shruti</a>
+<nav aria-label="Primary" style="display:flex;gap:16px;flex-wrap:wrap;font-size:var(--text-sm)">
+<a href="#" style="color:var(--ink-soft);text-decoration:none" style-hover="color:var(--ink)">Home</a>
+<a href="#" style="color:var(--ink-soft);text-decoration:none" style-hover="color:var(--ink)">About</a>
+<a href="#" aria-current="page" style="color:var(--ink);text-decoration:none;box-shadow:0 1px 0 var(--accent)">Work</a>
+<a href="#" style="color:var(--ink-soft);text-decoration:none" style-hover="color:var(--ink)">Schedule</a>
+<a href="#" style="color:var(--ink-soft);text-decoration:none" style-hover="color:var(--ink)">Videos</a>
+<a href="#" style="color:var(--ink-soft);text-decoration:none" style-hover="color:var(--ink)">Journal</a>
+</nav>
+<div style="margin-left:auto;display:flex;gap:10px;font-family:var(--font-mono);font-size:var(--text-xs)">
+<a href="#" style="color:var(--ink);text-decoration:none;font-weight:600">EN</a>
+<a href="#" lang="el" style="color:var(--ink-faint);text-decoration:none" style-hover="color:var(--ink)">ΕΛ</a>
+<a href="#" lang="hi" style="color:var(--ink-faint);text-decoration:none" style-hover="color:var(--ink)">हि</a>
+<a href="#" lang="fr" style="color:var(--ink-faint);text-decoration:none" style-hover="color:var(--ink)">FR</a>
+</div>
+</div>
+</header>
+<main style="max-width:1120px;margin:0 auto;padding:0 clamp(16px,4vw,32px) 64px">
+<section class="sky" style="border-radius:16px;margin-top:24px;padding:clamp(24px,5vw,48px)">
+<div class="sky-stars"></div>
+<div class="sky-veil" style="position:relative;max-width:620px;padding:clamp(20px,4vw,32px)">
+<p class="t-eyebrow" style="margin:0 0 10px">Theourgia · instrument</p>
+<h1 style="font-family:var(--font-display);font-size:clamp(2rem,4.5vw,2.75rem);line-height:1.1;font-weight:500;letter-spacing:-.01em;margin:0 0 6px;color:var(--ink)">Pañcāṅga</h1>
+<p lang="sa" style="margin:0 0 10px;font-family:var(--font-display);font-size:1.25rem;color:var(--rose)">पञ्चाङ्ग</p>
+<p style="margin:0;font-family:var(--font-display);font-size:var(--text-prose);line-height:1.6;color:var(--ink-soft)">The five limbs of the day — tithi, vāra, nakṣatra, yoga, karaṇa — reckoned from the Moon and Sun as they stand over your own longitude.</p>
+</div>
+<div class="sky-horizon"></div>
+</section>
+<div style="display:flex;align-items:baseline;gap:8px 20px;flex-wrap:wrap;padding:14px 2px;border-bottom:1px solid var(--line);font-family:var(--font-mono);font-size:var(--text-xs);color:var(--ink-soft)">
+<span class="t-tabular">Monday 24 August 2026</span>
+<span class="t-tabular">{{ placeLabel }}</span>
+<span>shown in your local time</span>
+<span style="margin-left:auto;color:var(--rose);letter-spacing:.06em">◐ named, not detailed</span>
+</div>
+<section style="margin-top:24px;background:var(--surface-card);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow-1);padding:20px clamp(16px,3vw,22px);display:grid;gap:22px">
+<div style="display:grid;gap:10px">
+<p class="t-eyebrow" style="margin:0">Definition of sunrise</p>
+<p style="margin:0;font-size:var(--text-xs);line-height:1.6;color:var(--ink-soft);max-width:70ch">The vāra begins at sunrise, not at midnight, so this choice moves the whole day. The two lineages define the moment differently and both are served.</p>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px">
+<button type="button" onClick="{{ pickVedic }}" aria-pressed="{{ isVedic }}" style="text-align:left;display:grid;gap:5px;padding:13px 14px;border:1px solid var(--line-strong);border-radius:6px;cursor:pointer;font-family:var(--font-body);background:var(--surface-inset)" style-hover="border-color:var(--accent)">
+<span style="display:flex;align-items:baseline;gap:6px;font-size:var(--text-sm);font-weight:600;color:var(--ink)">Vedic<span style="margin-left:auto;font-family:var(--font-mono);font-size:var(--text-xs);color:var(--accent)">{{ vedMark }}</span></span>
+<span style="font-size:var(--text-xs);line-height:1.5;color:var(--ink-soft)">The centre of the disc, without refraction.</span>
+<span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--ink-faint)">sunrise 06:57</span>
+</button>
+<button type="button" onClick="{{ pickHellenistic }}" aria-pressed="{{ isHellenistic }}" style="text-align:left;display:grid;gap:5px;padding:13px 14px;border:1px solid var(--line-strong);border-radius:6px;cursor:pointer;font-family:var(--font-body);background:var(--surface-inset)" style-hover="border-color:var(--accent)">
+<span style="display:flex;align-items:baseline;gap:6px;font-size:var(--text-sm);font-weight:600;color:var(--ink)">Hellenistic<span style="margin-left:auto;font-family:var(--font-mono);font-size:var(--text-xs);color:var(--accent)">{{ helMark }}</span></span>
+<span style="font-size:var(--text-xs);line-height:1.5;color:var(--ink-soft)">The upper limb of the visible disc, with refraction.</span>
+<span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--ink-faint)">sunrise 06:52</span>
+</button>
+</div>
+</div>
+<div style="border-top:1px solid var(--line);padding-top:18px;display:grid;gap:14px">
+<p class="t-eyebrow" style="margin:0">Parameters</p>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px">
+<label style="display:grid;gap:5px"><span style="font-size:var(--text-xs);font-weight:600;color:var(--ink-soft)">Place</span><input type="text" defaultValue="Athens, GR" style="font-family:var(--font-mono);font-size:var(--text-sm);color:var(--ink);background:var(--surface-page);border:1px solid var(--line-strong);border-radius:4px;padding:8px 10px;width:100%;box-sizing:border-box"></label>
+<label style="display:grid;gap:5px"><span style="font-size:var(--text-xs);font-weight:600;color:var(--ink-soft)">Date</span><input type="date" defaultValue="2026-08-24" style="font-family:var(--font-mono);font-size:var(--text-sm);color:var(--ink);background:var(--surface-page);border:1px solid var(--line-strong);border-radius:4px;padding:8px 10px;width:100%;box-sizing:border-box"></label>
+<label style="display:grid;gap:5px"><span style="font-size:var(--text-xs);font-weight:600;color:var(--ink-soft)">Ayanāṁśa</span><select onChange="{{ setAyan }}" style="font-family:var(--font-mono);font-size:var(--text-sm);color:var(--ink);background:var(--surface-page);border:1px solid var(--line-strong);border-radius:4px;padding:8px 10px;width:100%;box-sizing:border-box"><option value="lahiri">Lahiri · Chitrapakṣa</option><option value="raman">B. V. Raman</option><option value="kp">Krishnamurti</option><option value="fagan">Fagan–Bradley</option><option value="yukteshwar">Yukteshwar</option><option value="truecitra">True Citrā</option></select></label>
+<label style="display:grid;gap:5px"><span style="font-size:var(--text-xs);font-weight:600;color:var(--ink-soft)">Day reckoned</span><select defaultValue="sunrise" style="font-family:var(--font-mono);font-size:var(--text-sm);color:var(--ink);background:var(--surface-page);border:1px solid var(--line-strong);border-radius:4px;padding:8px 10px;width:100%;box-sizing:border-box"><option value="sunrise">Sunrise to sunrise</option><option value="midnight">Midnight to midnight</option></select></label>
+</div>
+<p style="margin:0;font-size:var(--text-xs);line-height:1.6;color:var(--ink-soft);max-width:74ch">Six ayanāṁśas are offered because practitioners disagree about where the sidereal zodiac begins, and the disagreement is legitimate rather than a bug to resolve. The current choice shifts every longitude by <span class="t-tabular" style="font-family:var(--font-mono);color:var(--rose)">{{ ayanValue }}</span> — enough to move a nakṣatra boundary.</p>
+<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+<button type="button" style="font-family:var(--font-body);font-size:var(--text-sm);font-weight:600;color:var(--on-accent);background:var(--accent);border:1px solid var(--accent);border-radius:4px;padding:9px 16px;cursor:pointer" style-hover="background:var(--accent-hover);border-color:var(--accent-hover)">Reckon</button>
+<button type="button" style="font-family:var(--font-body);font-size:var(--text-sm);font-weight:600;color:var(--ink-soft);background:transparent;border:1px solid var(--line-strong);border-radius:4px;padding:9px 16px;cursor:pointer" style-hover="color:var(--ink)">Reset to now, here</button>
+</div>
+</div>
+</section>
+<section style="display:flex;gap:32px;flex-wrap:wrap;margin-top:32px">
+<div style="flex:1 1 520px;min-width:0">
+<sc-if value="{{ isReady }}" hint-placeholder-val="{{ true }}">
+<div style="background:var(--surface-card);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow-1);padding:20px 18px">
+<h2 style="display:flex;align-items:baseline;gap:8px;margin:0 0 4px;font-family:var(--font-body);font-size:var(--text-micro);font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-faint)">The five limbs<span lang="sa" style="margin-left:auto;font-family:var(--font-display);font-weight:400;letter-spacing:0;text-transform:none;font-size:1rem;color:var(--rose)">पञ्चाङ्ग</span></h2>
+<sc-for list="{{ limbs }}" as="l" hint-placeholder-count="5">
+<div style="display:grid;grid-template-columns:88px 1fr;gap:4px 12px;padding:14px 0;border-bottom:1px solid var(--line)">
+<span lang="sa" style="font-family:var(--font-display);font-size:1.0625rem;line-height:1.3;color:var(--rose)">{{ l.dev }}</span>
+<div style="min-width:0">
+<div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap">
+<span style="font-family:var(--font-display);font-size:1.125rem;font-weight:600;color:var(--ink)">{{ l.value }}</span>
+<span style="flex:1;border-bottom:1px dotted var(--line-strong);transform:translateY(-4px);min-width:14px"></span>
+<span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--ink-soft)">{{ l.ends }}</span>
+</div>
+<p style="margin:3px 0 0;font-size:var(--text-xs);line-height:1.55;color:var(--ink-soft)"><span style="font-family:var(--font-mono);color:var(--ink-faint)">{{ l.name }}</span> · {{ l.note }}</p>
+</div>
+</div>
+</sc-for>
+<sc-for list="{{ almanac }}" as="a" hint-placeholder-count="4">
+<div style="display:flex;align-items:baseline;gap:10px;padding:5px 0">
+<span style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--ink-faint)">{{ a.k }}</span>
+<span style="flex:1;border-bottom:1px dotted var(--line);transform:translateY(-3px);min-width:12px"></span>
+<span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--ink)">{{ a.v }}</span>
+</div>
+</sc-for>
+</div>
+<div style="margin-top:20px;background:var(--surface-card);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow-1);padding:20px 18px">
+<h2 style="margin:0 0 12px;font-family:var(--font-body);font-size:var(--text-micro);font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-faint)">Windows of the day</h2>
+<sc-for list="{{ windows }}" as="w" hint-placeholder-count="4">
+<div style="display:flex;align-items:baseline;gap:10px;padding:8px 0;border-bottom:1px solid var(--line)">
+<span style="font-family:var(--font-display);font-size:1rem;color:var(--ink)">{{ w.name }}</span>
+<span style="font-family:var(--font-mono);font-size:.625rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-faint)">{{ w.kind }}</span>
+<span style="flex:1;border-bottom:1px dotted var(--line-strong);transform:translateY(-4px);min-width:12px"></span>
+<span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--ink-soft)">{{ w.time }}</span>
+</div>
+</sc-for>
+<p style="margin:12px 0 0;font-size:var(--text-xs);line-height:1.6;color:var(--ink-faint)">Windows are reported, not prescribed. What is done inside them is the practitioner's business.</p>
+</div>
+<div style="display:flex;align-items:center;gap:10px 14px;flex-wrap:wrap;margin-top:16px;padding:12px 14px;background:var(--surface-inset);border-radius:8px">
+<span class="t-eyebrow" style="margin:0">This reckoning</span>
+<code style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--ink-soft);word-break:break-all;flex:1 1 260px">{{ shareUrl }}</code>
+<button type="button" onClick="{{ copyLink }}" style="font-family:var(--font-body);font-size:var(--text-xs);font-weight:600;color:var(--accent);background:transparent;border:1px solid var(--line-strong);border-radius:4px;padding:7px 12px;cursor:pointer" style-hover="border-color:var(--accent)">{{ copyLabel }}</button>
+<p style="margin:0;flex:1 1 100%;font-size:var(--text-xs);line-height:1.5;color:var(--ink-faint)">The ayanāṁśa and the sunrise definition travel in the link, because without them the numbers are not reproducible.</p>
+</div>
+</sc-if>
+<sc-if value="{{ isNoSun }}" hint-placeholder-val="{{ false }}">
+<div style="background:var(--surface-card);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow-1);padding:clamp(28px,5vw,44px) clamp(20px,4vw,32px)">
+<p class="t-eyebrow" style="margin:0 0 10px;color:var(--rose)">○ Cannot be reckoned</p>
+<h2 style="font-family:var(--font-display);font-size:var(--text-h3);font-weight:600;margin:0 0 10px;color:var(--ink)">The day has no beginning here</h2>
+<p style="margin:0;max-width:52ch;font-family:var(--font-display);font-size:1.0625rem;line-height:1.7;color:var(--ink)">The vāra starts at sunrise, and at <span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-sm)">78.22°N</span> the Sun does not rise today. Tithi, nakṣatra, yoga and karaṇa can still be given — they depend on the Moon and Sun in longitude, not on the horizon — but the day they belong to is undefined.</p>
+<div style="display:grid;gap:8px;margin-top:20px;padding-top:16px;border-top:1px solid var(--line)">
+<div style="display:flex;align-items:baseline;gap:10px"><span style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--ink-faint)">01</span><span style="font-size:var(--text-sm);line-height:1.6;color:var(--ink)">Show the four limbs that do not need a sunrise, and mark the vāra undefined. <a href="#" style="color:var(--accent)" style-hover="color:var(--accent-hover)">Do that</a></span></div>
+<div style="display:flex;align-items:baseline;gap:10px"><span style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--ink-faint)">02</span><span style="font-size:var(--text-sm);line-height:1.6;color:var(--ink)">Reckon the day from midnight instead, labelled as a substitution rather than a tradition. <a href="#" style="color:var(--accent)" style-hover="color:var(--accent-hover)">Switch reckoning</a></span></div>
+<div style="display:flex;align-items:baseline;gap:10px"><span style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--ink-faint)">03</span><span style="font-size:var(--text-sm);line-height:1.6;color:var(--ink)">Keep the latitude. The pañcāṅga was not built for the pole, and saying so is more useful than a number.</span></div>
+</div>
+</div>
+</sc-if>
+</div>
+<aside style="flex:1 1 280px;max-width:440px;display:flex;flex-direction:column;gap:26px">
+<div>
+<h2 class="t-eyebrow" style="margin:0">How it is reckoned</h2>
+<p style="margin:10px 0 0;font-family:var(--font-display);font-size:1.0625rem;line-height:1.7;color:var(--ink)">A tithi is the Moon gaining twelve degrees on the Sun, so it is not a day and does not keep a day's length. A nakṣatra is the Moon crossing one of twenty-seven equal sidereal quarters. Both end when the arithmetic says they end — mid-morning, mid-meal, mid-sentence — which is why the ending time matters more than the name.</p>
+</div>
+<div style="border:1px solid var(--line-strong);border-radius:10px;padding:16px">
+<p class="t-eyebrow" style="margin:0 0 10px">Provenance</p>
+<p style="margin:0 0 12px;font-size:var(--text-sm);line-height:1.6;color:var(--ink-soft)">The astrology is only as good as the engineering behind it, so the engineering is on the table.</p>
+<div style="font-family:var(--font-mono);font-size:var(--text-xs);line-height:1.9;color:var(--ink-soft);border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:10px 0;margin-bottom:12px">
+<div style="display:flex;gap:10px"><span style="color:var(--ink-faint);width:82px;flex-shrink:0">engine</span><span>Swiss Ephemeris 2.10.03</span></div>
+<div style="display:flex;gap:10px"><span style="color:var(--ink-faint);width:82px;flex-shrink:0">ayanāṁśa</span><span>{{ ayanLabel }}</span></div>
+<div style="display:flex;gap:10px"><span style="color:var(--ink-faint);width:82px;flex-shrink:0">sunrise</span><span>{{ tradFlag }}</span></div>
+<div style="display:flex;gap:10px"><span style="color:var(--ink-faint);width:82px;flex-shrink:0">computed</span><span>on your device · nothing stored</span></div>
+<div style="display:flex;gap:10px"><span style="color:var(--ink-faint);width:82px;flex-shrink:0">licence</span><span>AGPL-3.0</span></div>
+<div style="display:flex;gap:10px"><span style="color:var(--ink-faint);width:82px;flex-shrink:0">version</span><span class="t-tabular">v4.2.1 · 8f3c1ab</span></div>
+</div>
+<a href="#" style="display:inline-flex;align-items:baseline;gap:7px;font-size:var(--text-sm);font-weight:600;color:var(--accent);text-decoration:none" style-hover="color:var(--accent-hover)">Source for this running version<span aria-hidden="true">→</span></a>
+<p style="margin:8px 0 0;font-size:var(--text-xs);line-height:1.5;color:var(--ink-faint)">The licence obliges an offer of source for exactly the build you are using. Read the ayanāṁśa table and judge the tool for yourself.</p>
+</div>
+<div style="border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:14px 2px">
+<p style="margin:0;font-size:var(--text-micro);font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--rose)">◐ Named, not detailed</p>
+<p style="margin:8px 0 0;font-size:var(--text-sm);line-height:1.6;color:var(--ink-soft)">Tarpaṇam and mantra japa are performed at the junctures this page reports. That they are performed is said here; how is not. Material under seal — marked ● — is not published at all.</p>
+</div>
+<div style="font-size:var(--text-sm);line-height:1.6;color:var(--ink-soft)">
+<p style="margin:0">Part of <a href="https://theourgia.com" style="color:var(--accent)" style-hover="color:var(--accent-hover)">Theourgia</a>, an open-source practitioner's toolkit.</p>
+<p style="margin:6px 0 0"><a href="#" style="color:var(--accent)" style-hover="color:var(--accent-hover)">All instruments</a></p>
+</div>
+</aside>
+</section>
+<section style="margin-top:56px;border-top:1px solid var(--line);padding-top:18px">
+<h2 class="t-eyebrow" style="margin:0 0 12px">Other instruments</h2>
+<div style="display:flex;gap:8px 22px;flex-wrap:wrap;font-size:var(--text-sm)">
+<a href="#" style="color:var(--accent);text-decoration:none" style-hover="color:var(--accent-hover)">☉ Planetary hours</a>
+<a href="#" style="color:var(--accent);text-decoration:none" style-hover="color:var(--accent-hover)">☽ Attic calendar</a>
+<a href="#" style="color:var(--accent);text-decoration:none" style-hover="color:var(--accent-hover)">Σ Isopsephy</a>
+<a href="#" style="color:var(--accent);text-decoration:none" style-hover="color:var(--accent-hover)">✶ Natal chart</a>
+<a href="#" style="color:var(--accent);text-decoration:none" style-hover="color:var(--accent-hover)">● Sigil generator</a>
+</div>
+</section>
+</main>
+<footer style="border-top:1px solid var(--line);margin-top:24px">
+<div style="max-width:1120px;margin:0 auto;padding:32px clamp(16px,4vw,32px) 24px;display:flex;gap:28px 40px;flex-wrap:wrap;align-items:flex-start">
+<div style="flex:1 1 220px">
+<span style="font-family:var(--font-display);font-size:22px;color:var(--ink)">Shruti</span>
+<p style="margin:8px 0 0;font-size:var(--text-sm);line-height:1.55;color:var(--ink-soft);max-width:34ch">Instruments for magick, built live from Athens.</p>
+</div>
+<div style="flex:1 1 300px">
+<p class="t-eyebrow" style="margin:0 0 8px">Imprint</p>
+<p style="margin:0;font-family:var(--font-mono);font-size:var(--text-xs);line-height:1.9;color:var(--ink-faint)">ShrutiVTuber, LLC<br>Registered office (virtual): [street, no.] · [postcode] Athens, GR<br>business@shrutivtuber.com<br>GEMI [000000000000] · VAT EL[000000000]</p>
+</div>
+</div>
+<div style="max-width:1120px;margin:0 auto;padding:14px clamp(16px,4vw,32px) 28px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;border-top:1px solid var(--line);font-size:var(--text-xs);color:var(--ink-faint)">
+<p style="margin:0">© ShrutiVTuber, LLC · <a href="#" style="color:inherit">Privacy</a> · <a href="#" style="color:inherit">Terms</a> · <a href="#" style="color:inherit">Derivative work guidelines</a></p>
+<span class="seal seal-ring" title="Soror Eu. A." style="margin-left:auto">S∴E.A.</span>
+</div>
+</footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;system&quot;,&quot;dawn&quot;,&quot;dusk&quot;],&quot;default&quot;:&quot;system&quot;,&quot;tsType&quot;:&quot;\&quot;system\&quot;|\&quot;dawn\&quot;|\&quot;dusk\&quot;&quot;,&quot;section&quot;:&quot;Theme&quot;},&quot;tradition&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;vedic&quot;,&quot;hellenistic&quot;],&quot;default&quot;:&quot;vedic&quot;,&quot;tsType&quot;:&quot;\&quot;vedic\&quot;|\&quot;hellenistic\&quot;&quot;,&quot;section&quot;:&quot;Instrument&quot;},&quot;instrumentState&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;ready&quot;,&quot;no-sunrise&quot;],&quot;default&quot;:&quot;ready&quot;,&quot;tsType&quot;:&quot;\&quot;ready\&quot;|\&quot;no-sunrise\&quot;&quot;,&quot;section&quot;:&quot;Instrument&quot;}}">
+class Component extends DCLogic {
+  state = { trad: null, ayan: null, copied: false };
+  applyTheme() {
+    const t = this.props.theme ?? 'system';
+    const el = document.documentElement;
+    if (t === 'dawn') el.setAttribute('data-theme', 'light');
+    else if (t === 'dusk') el.setAttribute('data-theme', 'dark');
+    else el.removeAttribute('data-theme');
+  }
+  componentDidMount() { this.applyTheme() }
+  componentDidUpdate() { this.applyTheme() }
+  renderVals() {
+    const AYAN = {
+      lahiri: ['Lahiri · Chitrapakṣa', '24°14′07″'], raman: ['B. V. Raman', '22°30′41″'],
+      kp: ['Krishnamurti', '24°08′52″'], fagan: ['Fagan–Bradley', '25°05′18″'],
+      yukteshwar: ['Yukteshwar', '22°38′24″'], truecitra: ['True Citrā', '24°13′55″']
+    };
+    const ak = this.state.ayan ?? 'lahiri';
+    const A = AYAN[ak] ?? AYAN.lahiri;
+    const tradKey = this.state.trad ?? (this.props.tradition ?? 'vedic');
+    const vedic = tradKey === 'vedic';
+    // Sunrise definitions stand 4.6 min apart in Athens; the vāra boundary moves with them.
+    const rise = vedic ? '06:57' : '06:52', set = vedic ? '20:00' : '20:05';
+    const state = this.props.instrumentState ?? 'ready';
+    return {
+      placeLabel: state === 'no-sunrise' ? 'Longyearbyen · 78.22°N 15.63°E' : 'Athens · 37.98°N 23.73°E',
+      isReady: state === 'ready', isNoSun: state === 'no-sunrise',
+      isVedic: vedic, isHellenistic: !vedic,
+      vedMark: vedic ? '✓ in use' : '', helMark: vedic ? '' : '✓ in use',
+      ayanLabel: A[0], ayanValue: A[1], tradFlag: vedic ? 'disc centre · refraction off' : 'upper limb · refraction on',
+      limbs: [
+        { dev: 'तिथि', name: 'tithi', value: 'Śukla Dvādaśī', ends: 'ends 09:14', note: 'twelfth of the waxing fortnight · the Moon twelve degrees ahead' },
+        { dev: 'वार', name: 'vāra', value: 'Somavāra', ends: rise + ' → ' + rise, note: 'the Moon\u2019s day, from sunrise to sunrise' },
+        { dev: 'नक्षत्र', name: 'nakṣatra', value: 'Jyeṣṭhā', ends: 'ends 14:02', note: 'eighteenth station · ruled by Mercury, Indra presiding' },
+        { dev: 'योग', name: 'yoga', value: 'Vyāghāta', ends: 'ends 11:38', note: 'the summed longitudes of Sun and Moon' },
+        { dev: 'करण', name: 'karaṇa', value: 'Bālava, then Kaulava', ends: '09:14 · 20:31', note: 'half a tithi each — two fall inside one day' }
+      ],
+      almanac: [
+        { k: 'sunrise · sunset', v: rise + ' · ' + set },
+        { k: 'moonrise · moonset', v: '17:41 · 03:22' },
+        { k: 'lunar month · pakṣa', v: 'Bhādrapada · śukla' },
+        { k: 'ayana · ṛtu', v: 'Dakṣiṇāyana · varṣā' }
+      ],
+      windows: [
+        { name: 'Rāhu kāla', kind: 'avoid', time: '07:30–09:00' },
+        { name: 'Yamaghaṇṭa', kind: 'avoid', time: '10:30–12:00' },
+        { name: 'Gulika kāla', kind: 'avoid', time: '13:30–15:00' },
+        { name: 'Abhijit muhūrta', kind: 'favourable', time: '13:12–14:01' }
+      ],
+      shareUrl: 'theourgia.com/pancanga?place=athens&date=2026-08-24&ayanamsa=' + ak + '&sunrise=' + tradKey,
+      copyLabel: this.state.copied ? 'Copied' : 'Copy link',
+      setAyan: e => this.setState({ ayan: e.target.value, copied: false }),
+      pickVedic: () => this.setState({ trad: 'vedic', copied: false }),
+      pickHellenistic: () => this.setState({ trad: 'hellenistic', copied: false }),
+      copyLink: () => { this.setState({ copied: true }); setTimeout(() => this.setState({ copied: false }), 1600) }
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<!-- @template name="Tool page — isopsephy" description="Theourgia instrument: letter-reckoning across six scripts — Greek, Hebrew, Arabic, Coptic, Devanagari, English. Live input, per-letter values, RTL support, positional kaṭapayādi treated as its own thing, corpus matches and unreckonable-character states." -->
+<helmet><script src="./ds-base.js"></script></helmet>
+<div style="min-height:100vh;background:var(--surface-page);color:var(--ink);font-family:var(--font-body)">
+<header style="border-bottom:1px solid var(--line)">
+<div style="max-width:1120px;margin:0 auto;padding:14px clamp(16px,4vw,32px);display:flex;align-items:center;gap:10px 24px;flex-wrap:wrap">
+<a href="#" style="font-family:var(--font-display);font-size:22px;font-weight:500;color:var(--ink);text-decoration:none">Shruti</a>
+<nav aria-label="Primary" style="display:flex;gap:16px;flex-wrap:wrap;font-size:var(--text-sm)">
+<a href="#" style="color:var(--ink-soft);text-decoration:none" style-hover="color:var(--ink)">Home</a>
+<a href="#" style="color:var(--ink-soft);text-decoration:none" style-hover="color:var(--ink)">About</a>
+<a href="#" aria-current="page" style="color:var(--ink);text-decoration:none;box-shadow:0 1px 0 var(--accent)">Work</a>
+<a href="#" style="color:var(--ink-soft);text-decoration:none" style-hover="color:var(--ink)">Schedule</a>
+<a href="#" style="color:var(--ink-soft);text-decoration:none" style-hover="color:var(--ink)">Videos</a>
+<a href="#" style="color:var(--ink-soft);text-decoration:none" style-hover="color:var(--ink)">Journal</a>
+</nav>
+<div style="margin-left:auto;display:flex;gap:10px;font-family:var(--font-mono);font-size:var(--text-xs)">
+<a href="#" style="color:var(--ink);text-decoration:none;font-weight:600">EN</a>
+<a href="#" lang="el" style="color:var(--ink-faint);text-decoration:none" style-hover="color:var(--ink)">ΕΛ</a>
+<a href="#" lang="hi" style="color:var(--ink-faint);text-decoration:none" style-hover="color:var(--ink)">हि</a>
+<a href="#" lang="fr" style="color:var(--ink-faint);text-decoration:none" style-hover="color:var(--ink)">FR</a>
+</div>
+</div>
+</header>
+<main style="max-width:1120px;margin:0 auto;padding:0 clamp(16px,4vw,32px) 64px">
+<section class="sky" style="border-radius:16px;margin-top:24px;padding:clamp(24px,5vw,48px)">
+<div class="sky-stars"></div>
+<div class="sky-veil" style="position:relative;max-width:620px;padding:clamp(20px,4vw,32px)">
+<p class="t-eyebrow" style="margin:0 0 10px">Theourgia · instrument</p>
+<h1 style="font-family:var(--font-display);font-size:clamp(2rem,4.5vw,2.75rem);line-height:1.1;font-weight:500;letter-spacing:-.01em;margin:0 0 6px;color:var(--ink)">Isopsephy</h1>
+<p style="margin:0 0 10px;font-family:var(--font-display);font-size:1.25rem;color:var(--rose)"><span lang="el">ἰσοψηφία</span> · <span lang="he">גימטריה</span> · <span lang="ar">حساب الجمل</span> · <span lang="sa">कटपयादि</span></p>
+<p style="margin:0;font-family:var(--font-display);font-size:var(--text-prose);line-height:1.6;color:var(--ink-soft)">In six scripts, a letter is also a number — so a word is also a figure. The traditions do not agree on the values, and one of them does not produce a sum at all. All six are here, unmerged.</p>
+</div>
+<div class="sky-horizon"></div>
+</section>
+<div style="display:flex;align-items:baseline;gap:8px 20px;flex-wrap:wrap;padding:14px 2px;border-bottom:1px solid var(--line);font-family:var(--font-mono);font-size:var(--text-xs);color:var(--ink-soft)">
+<span>{{ systemFlag }}</span>
+<span class="t-tabular">{{ letterCount }} characters reckoned</span>
+<span>nothing typed here leaves your device</span>
+<span style="margin-left:auto;color:var(--rose);letter-spacing:.06em">○ public commentary</span>
+</div>
+<section style="margin-top:24px;background:var(--surface-card);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow-1);padding:20px clamp(16px,3vw,22px);display:grid;gap:22px">
+<div style="display:grid;gap:10px">
+<p class="t-eyebrow" style="margin:0">Which reckoning</p>
+<p style="margin:0;font-size:var(--text-xs);line-height:1.6;color:var(--ink-soft);max-width:74ch">Six systems, six letter tables, and no conversion between them. Pick the one the source uses rather than the one that gives the answer you were hoping for.</p>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(196px,1fr));gap:10px">
+<button type="button" onClick="{{ pickGreek }}" aria-pressed="{{ isGreek }}" style="text-align:left;display:grid;gap:4px;padding:12px 13px;border:1px solid var(--line-strong);border-radius:6px;cursor:pointer;font-family:var(--font-body);background:var(--surface-inset)" style-hover="border-color:var(--accent)">
+<span style="display:flex;align-items:baseline;gap:6px;font-size:var(--text-sm);font-weight:600;color:var(--ink)">Greek<span lang="el" style="font-family:var(--font-display);color:var(--rose)">Α</span><span style="margin-left:auto;font-family:var(--font-mono);font-size:var(--text-xs);color:var(--accent)">{{ grMark }}</span></span>
+<span style="font-size:var(--text-xs);line-height:1.5;color:var(--ink-soft)">Milesian numerals, with digamma, koppa and sampi.</span>
+</button>
+<button type="button" onClick="{{ pickHebrew }}" aria-pressed="{{ isHebrew }}" style="text-align:left;display:grid;gap:4px;padding:12px 13px;border:1px solid var(--line-strong);border-radius:6px;cursor:pointer;font-family:var(--font-body);background:var(--surface-inset)" style-hover="border-color:var(--accent)">
+<span style="display:flex;align-items:baseline;gap:6px;font-size:var(--text-sm);font-weight:600;color:var(--ink)">Hebrew<span lang="he" style="font-family:var(--font-display);color:var(--rose)">א</span><span style="margin-left:auto;font-family:var(--font-mono);font-size:var(--text-xs);color:var(--accent)">{{ hebMark }}</span></span>
+<span style="font-size:var(--text-xs);line-height:1.5;color:var(--ink-soft)">Gematria at absolute value; final forms unvalued.</span>
+</button>
+<button type="button" onClick="{{ pickArabic }}" aria-pressed="{{ isArabic }}" style="text-align:left;display:grid;gap:4px;padding:12px 13px;border:1px solid var(--line-strong);border-radius:6px;cursor:pointer;font-family:var(--font-body);background:var(--surface-inset)" style-hover="border-color:var(--accent)">
+<span style="display:flex;align-items:baseline;gap:6px;font-size:var(--text-sm);font-weight:600;color:var(--ink)">Arabic<span lang="ar" style="font-family:var(--font-display);color:var(--rose)">ا</span><span style="margin-left:auto;font-family:var(--font-mono);font-size:var(--text-xs);color:var(--accent)">{{ arMark }}</span></span>
+<span style="font-size:var(--text-xs);line-height:1.5;color:var(--ink-soft)">Abjad ḥisāb, eastern order — ghayn reaches a thousand.</span>
+</button>
+<button type="button" onClick="{{ pickCoptic }}" aria-pressed="{{ isCoptic }}" style="text-align:left;display:grid;gap:4px;padding:12px 13px;border:1px solid var(--line-strong);border-radius:6px;cursor:pointer;font-family:var(--font-body);background:var(--surface-inset)" style-hover="border-color:var(--accent)">
+<span style="display:flex;align-items:baseline;gap:6px;font-size:var(--text-sm);font-weight:600;color:var(--ink)">Coptic<span style="font-family:var(--font-display);color:var(--rose)">ⲁ</span><span style="margin-left:auto;font-family:var(--font-mono);font-size:var(--text-xs);color:var(--accent)">{{ coMark }}</span></span>
+<span style="font-size:var(--text-xs);line-height:1.5;color:var(--ink-soft)">The Greek scheme with soou, fai and shai in the gaps.</span>
+</button>
+<button type="button" onClick="{{ pickDevanagari }}" aria-pressed="{{ isDevanagari }}" style="text-align:left;display:grid;gap:4px;padding:12px 13px;border:1px solid var(--line-strong);border-radius:6px;cursor:pointer;font-family:var(--font-body);background:var(--surface-inset)" style-hover="border-color:var(--accent)">
+<span style="display:flex;align-items:baseline;gap:6px;font-size:var(--text-sm);font-weight:600;color:var(--ink)">Devanagari<span lang="sa" style="font-family:var(--font-display);color:var(--rose)">क</span><span style="margin-left:auto;font-family:var(--font-mono);font-size:var(--text-xs);color:var(--accent)">{{ dvMark }}</span></span>
+<span style="font-size:var(--text-xs);line-height:1.5;color:var(--ink-soft)">Kaṭapayādi — digits in place, not a sum. Read right to left.</span>
+</button>
+<button type="button" onClick="{{ pickEnglish }}" aria-pressed="{{ isEnglish }}" style="text-align:left;display:grid;gap:4px;padding:12px 13px;border:1px solid var(--line-strong);border-radius:6px;cursor:pointer;font-family:var(--font-body);background:var(--surface-inset)" style-hover="border-color:var(--accent)">
+<span style="display:flex;align-items:baseline;gap:6px;font-size:var(--text-sm);font-weight:600;color:var(--ink)">English<span style="font-family:var(--font-display);color:var(--rose)">A</span><span style="margin-left:auto;font-family:var(--font-mono);font-size:var(--text-xs);color:var(--accent)">{{ enMark }}</span></span>
+<span style="font-size:var(--text-xs);line-height:1.5;color:var(--ink-soft)">Ordinal, A=1 through Z=26. The modern convention.</span>
+</button>
+</div>
+<p style="margin:0;font-size:var(--text-xs);line-height:1.6;color:var(--ink-soft)"><span style="color:var(--rose)">Devanagari is the odd one.</span> Kaṭapayādi assigns a digit to each consonant and reads the string as a place-value number, so it has no total to compare — a word encodes a figure rather than summing to one. The instrument shows it as what it is instead of forcing it into the Greek shape.</p>
+</div>
+<div style="border-top:1px solid var(--line);padding-top:18px;display:grid;gap:14px">
+<p class="t-eyebrow" style="margin:0">Parameters</p>
+<label style="display:grid;gap:5px"><span style="font-size:var(--text-xs);font-weight:600;color:var(--ink-soft)">Word or phrase</span><input type="text" value="{{ word }}" onChange="{{ setWord }}" dir="{{ dirAttr }}" spellcheck="false" style="font-family:var(--font-display);font-size:1.5rem;color:var(--ink);background:var(--surface-page);border:1px solid var(--line-strong);border-radius:4px;padding:12px 14px;width:100%;box-sizing:border-box"></label>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px">
+<label style="display:grid;gap:5px"><span style="font-size:var(--text-xs);font-weight:600;color:var(--ink-soft)">{{ diacriticLabel }}</span><select defaultValue="strip" style="font-family:var(--font-mono);font-size:var(--text-sm);color:var(--ink);background:var(--surface-page);border:1px solid var(--line-strong);border-radius:4px;padding:8px 10px;width:100%;box-sizing:border-box"><option value="strip">Stripped before reckoning</option><option value="keep">Kept, unvalued</option></select></label>
+<label style="display:grid;gap:5px"><span style="font-size:var(--text-xs);font-weight:600;color:var(--ink-soft)">Search</span><select defaultValue="corpus" style="font-family:var(--font-mono);font-size:var(--text-sm);color:var(--ink);background:var(--surface-page);border:1px solid var(--line-strong);border-radius:4px;padding:8px 10px;width:100%;box-sizing:border-box"><option value="corpus">Her indexed corpus</option><option value="lxx">Septuagint</option><option value="pgm">Greek magical papyri</option><option value="tanakh">Tanakh</option><option value="none">Do not search</option></select></label>
+</div>
+<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+<span style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--ink-faint)">try</span>
+<button type="button" onClick="{{ tryGreek }}" lang="el" style="font-family:var(--font-display);font-size:var(--text-sm);color:var(--accent);background:transparent;border:1px solid var(--line);border-radius:999px;padding:5px 12px;cursor:pointer" style-hover="border-color:var(--accent)">ΘΕΟΥΡΓΙΑ</button>
+<button type="button" onClick="{{ tryHebrew }}" lang="he" style="font-family:var(--font-display);font-size:var(--text-sm);color:var(--accent);background:transparent;border:1px solid var(--line);border-radius:999px;padding:5px 12px;cursor:pointer" style-hover="border-color:var(--accent)">חכמה</button>
+<button type="button" onClick="{{ tryArabic }}" lang="ar" style="font-family:var(--font-display);font-size:var(--text-sm);color:var(--accent);background:transparent;border:1px solid var(--line);border-radius:999px;padding:5px 12px;cursor:pointer" style-hover="border-color:var(--accent)">نور</button>
+<button type="button" onClick="{{ tryCoptic }}" style="font-family:var(--font-display);font-size:var(--text-sm);color:var(--accent);background:transparent;border:1px solid var(--line);border-radius:999px;padding:5px 12px;cursor:pointer" style-hover="border-color:var(--accent)">ⲛⲟⲩⲧⲉ</button>
+<button type="button" onClick="{{ tryDevanagari }}" lang="sa" style="font-family:var(--font-display);font-size:var(--text-sm);color:var(--accent);background:transparent;border:1px solid var(--line);border-radius:999px;padding:5px 12px;cursor:pointer" style-hover="border-color:var(--accent)">भारत</button>
+<button type="button" onClick="{{ tryEnglish }}" style="font-family:var(--font-display);font-size:var(--text-sm);color:var(--accent);background:transparent;border:1px solid var(--line);border-radius:999px;padding:5px 12px;cursor:pointer" style-hover="border-color:var(--accent)">WISDOM</button>
+<button type="button" onClick="{{ tryBroken }}" style="font-family:var(--font-body);font-size:var(--text-xs);color:var(--ink-soft);background:transparent;border:1px solid var(--line);border-radius:999px;padding:6px 12px;cursor:pointer" style-hover="color:var(--ink);border-color:var(--line-strong)">mixed script</button>
+</div>
+</div>
+</section>
+<section style="display:flex;gap:32px;flex-wrap:wrap;margin-top:32px">
+<div style="flex:1 1 520px;min-width:0">
+<div style="background:var(--surface-card);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow-1);padding:clamp(22px,4vw,30px) clamp(18px,3vw,26px)">
+<p class="t-eyebrow" style="margin:0 0 14px">{{ resultHeading }}</p>
+<div dir="{{ dirAttr }}" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:18px">
+<sc-for list="{{ letters }}" as="l" hint-placeholder-count="8">
+<div style="display:grid;justify-items:center;gap:3px;min-width:36px;padding:8px 6px;border:1px solid var(--line);border-radius:6px;background:var(--surface-inset)">
+<span style="font-family:var(--font-display);font-size:1.5rem;line-height:1.1;color:var(--ink)">{{ l.ch }}</span>
+<span class="t-tabular" style="font-family:var(--font-mono);font-size:.625rem;color:var(--rose)">{{ l.val }}</span>
+</div>
+</sc-for>
+</div>
+<sc-if value="{{ isAdditive }}" hint-placeholder-val="{{ true }}">
+<div style="display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;padding-top:16px;border-top:1px solid var(--line)">
+<span class="t-tabular" style="font-family:var(--font-display);font-size:clamp(2.5rem,7vw,3.5rem);line-height:1;font-weight:500;color:var(--ink)">{{ total }}</span>
+<div style="display:grid;gap:3px;font-family:var(--font-mono);font-size:var(--text-xs);color:var(--ink-soft)">
+<span class="t-tabular" style="word-break:break-word">{{ sumLine }}</span>
+<span class="t-tabular">digital root {{ root }} · {{ parity }}</span>
+</div>
+</div>
+</sc-if>
+<sc-if value="{{ isPositional }}" hint-placeholder-val="{{ false }}">
+<div style="padding-top:16px;border-top:1px solid var(--line)">
+<div style="display:flex;align-items:baseline;gap:14px;flex-wrap:wrap">
+<span class="t-tabular" style="font-family:var(--font-display);font-size:clamp(2.5rem,7vw,3.5rem);line-height:1;font-weight:500;color:var(--ink)">{{ total }}</span>
+<div style="display:grid;gap:3px;font-family:var(--font-mono);font-size:var(--text-xs);color:var(--ink-soft)">
+<span class="t-tabular">digits in order {{ digitLine }}</span>
+<span lang="sa" style="color:var(--rose)">अङ्कानां वामतो गतिः — the digits proceed leftward</span>
+</div>
+</div>
+<p style="margin:14px 0 0;font-size:var(--text-xs);line-height:1.6;color:var(--ink-faint)">No sum is offered because kaṭapayādi does not make one. This is a place-value encoding: the word carries a number, and comparing two words means comparing what they encode, not what they add to.</p>
+</div>
+</sc-if>
+</div>
+<sc-if value="{{ hasMatches }}" hint-placeholder-val="{{ true }}">
+<div style="margin-top:20px;background:var(--surface-card);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow-1);padding:20px 18px">
+<h2 style="display:flex;align-items:baseline;gap:8px;margin:0 0 12px;font-family:var(--font-body);font-size:var(--text-micro);font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-faint)">Equal sums<span style="margin-left:auto;font-family:var(--font-mono);font-weight:400;letter-spacing:0;text-transform:none">in her indexed corpus</span></h2>
+<sc-for list="{{ matches }}" as="m" hint-placeholder-count="2">
+<div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;padding:8px 0;border-bottom:1px solid var(--line)">
+<span style="font-family:var(--font-display);font-size:1.25rem;color:var(--ink)">{{ m.word }}</span>
+<span style="font-size:var(--text-xs);color:var(--ink-soft)">{{ m.gloss }}</span>
+<span style="flex:1;border-bottom:1px dotted var(--line-strong);transform:translateY(-4px);min-width:12px"></span>
+<span style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--ink-faint)">{{ m.source }}</span>
+</div>
+</sc-for>
+<p style="margin:12px 0 0;font-size:var(--text-xs);line-height:1.6;color:var(--ink-faint)">Equal sums are a coincidence until an argument is made for them. The instrument finds them; it does not claim they mean anything. Matches are only ever within one system — a Greek sum and a Hebrew sum of the same value are not a correspondence.</p>
+</div>
+</sc-if>
+<sc-if value="{{ noMatches }}" hint-placeholder-val="{{ false }}">
+<div style="margin-top:20px;background:var(--surface-card);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow-1);padding:32px 24px;text-align:center">
+<div style="font-family:var(--font-display);font-size:1.75rem;line-height:1;color:var(--ink-faint)" aria-hidden="true">○</div>
+<h2 style="font-family:var(--font-display);font-size:var(--text-h3);font-weight:600;margin:12px 0 6px;color:var(--ink)">No equal values yet</h2>
+<p style="margin:0 auto;max-width:44ch;font-size:var(--text-sm);line-height:1.6;color:var(--ink-soft)">Nothing indexed under {{ systemShort }} reckons to <span class="t-tabular" style="font-family:var(--font-mono);color:var(--ink)">{{ total }}</span>. That is a fact about the index, not about the number — the corpus grows as the journal does.</p>
+</div>
+</sc-if>
+<sc-if value="{{ hasUnreckonable }}" hint-placeholder-val="{{ false }}">
+<div style="margin-top:20px;background:var(--surface-card);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow-1);padding:clamp(24px,4vw,32px) clamp(18px,3vw,26px)">
+<p class="t-eyebrow" style="margin:0 0 10px;color:var(--rose)">◐ Partly reckonable</p>
+<h2 style="font-family:var(--font-display);font-size:var(--text-h3);font-weight:600;margin:0 0 10px;color:var(--ink)">{{ skippedCount }} characters have no value in {{ systemShort }}</h2>
+<p style="margin:0;max-width:52ch;font-family:var(--font-display);font-size:1.0625rem;line-height:1.7;color:var(--ink)">A letter from another script is not zero — it is outside the system. Those characters are marked with a dash above and left out, rather than silently transliterated into whatever looked closest. Transliteration is a decision, and it is yours to make.</p>
+<div style="display:grid;gap:8px;margin-top:20px;padding-top:16px;border-top:1px solid var(--line)">
+<div style="display:flex;align-items:baseline;gap:10px"><span style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--ink-faint)">01</span><span style="font-size:var(--text-sm);line-height:1.6;color:var(--ink)">Reckon what belongs to this system, as shown, and say so in the byline. <a href="#" style="color:var(--accent)" style-hover="color:var(--accent-hover)">Keep this</a></span></div>
+<div style="display:flex;align-items:baseline;gap:10px"><span style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--ink-faint)">02</span><span style="font-size:var(--text-sm);line-height:1.6;color:var(--ink)">Switch to the system the rest of the string belongs to. <a href="#" style="color:var(--accent)" style-hover="color:var(--accent-hover)">Switch system</a></span></div>
+<div style="display:flex;align-items:baseline;gap:10px"><span style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--ink-faint)">03</span><span style="font-size:var(--text-sm);line-height:1.6;color:var(--ink)">Transliterate by hand. The tool will not guess which letter you meant.</span></div>
+</div>
+</div>
+</sc-if>
+<div style="display:flex;align-items:center;gap:10px 14px;flex-wrap:wrap;margin-top:16px;padding:12px 14px;background:var(--surface-inset);border-radius:8px">
+<span class="t-eyebrow" style="margin:0">This reckoning</span>
+<code style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--ink-soft);word-break:break-all;flex:1 1 260px">{{ shareUrl }}</code>
+<button type="button" onClick="{{ copyLink }}" style="font-family:var(--font-body);font-size:var(--text-xs);font-weight:600;color:var(--accent);background:transparent;border:1px solid var(--line-strong);border-radius:4px;padding:7px 12px;cursor:pointer" style-hover="border-color:var(--accent)">{{ copyLabel }}</button>
+</div>
+</div>
+<aside style="flex:1 1 280px;max-width:440px;display:flex;flex-direction:column;gap:26px">
+<div>
+<h2 class="t-eyebrow" style="margin:0">How it is reckoned</h2>
+<p style="margin:10px 0 0;font-family:var(--font-display);font-size:1.0625rem;line-height:1.7;color:var(--ink)">{{ methodProse }}</p>
+</div>
+<div style="border:1px solid var(--line-strong);border-radius:10px;padding:16px">
+<p class="t-eyebrow" style="margin:0 0 10px">Provenance</p>
+<p style="margin:0 0 12px;font-size:var(--text-sm);line-height:1.6;color:var(--ink-soft)">The arithmetic is trivial; the letter tables are where tools go wrong. Both are on the table.</p>
+<div style="font-family:var(--font-mono);font-size:var(--text-xs);line-height:1.9;color:var(--ink-soft);border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:10px 0;margin-bottom:12px">
+<div style="display:flex;gap:10px"><span style="color:var(--ink-faint);width:82px;flex-shrink:0">system</span><span>{{ systemFlag }}</span></div>
+<div style="display:flex;gap:10px"><span style="color:var(--ink-faint);width:82px;flex-shrink:0">table</span><span>{{ numeralNote }}</span></div>
+<div style="display:flex;gap:10px"><span style="color:var(--ink-faint);width:82px;flex-shrink:0">variants</span><span>{{ variantNote }}</span></div>
+<div style="display:flex;gap:10px"><span style="color:var(--ink-faint);width:82px;flex-shrink:0">normalise</span><span>NFD · marks stripped · no transliteration</span></div>
+<div style="display:flex;gap:10px"><span style="color:var(--ink-faint);width:82px;flex-shrink:0">computed</span><span>on your device · nothing stored</span></div>
+<div style="display:flex;gap:10px"><span style="color:var(--ink-faint);width:82px;flex-shrink:0">licence</span><span>AGPL-3.0</span></div>
+<div style="display:flex;gap:10px"><span style="color:var(--ink-faint);width:82px;flex-shrink:0">version</span><span class="t-tabular">v4.2.1 · 8f3c1ab</span></div>
+</div>
+<a href="#" style="display:inline-flex;align-items:baseline;gap:7px;font-size:var(--text-sm);font-weight:600;color:var(--accent);text-decoration:none" style-hover="color:var(--accent-hover)">Source for this running version<span aria-hidden="true">→</span></a>
+<p style="margin:8px 0 0;font-size:var(--text-xs);line-height:1.5;color:var(--ink-faint)">Six tables, about two hundred lines in all. Read them in a few minutes and check them against your own sources.</p>
+</div>
+<div style="border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:14px 2px">
+<p style="margin:0;font-size:var(--text-micro);font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--rose)">○ Public commentary</p>
+<p style="margin:8px 0 0;font-size:var(--text-sm);line-height:1.6;color:var(--ink-soft)">Letter-reckoning is open technique in every one of these traditions. Particular names and formulae belonging to an initiated lineage are marked ● and are not reckoned here, publicly or otherwise.</p>
+</div>
+<div style="font-size:var(--text-sm);line-height:1.6;color:var(--ink-soft)">
+<p style="margin:0">Part of <a href="https://theourgia.com" style="color:var(--accent)" style-hover="color:var(--accent-hover)">Theourgia</a>, an open-source practitioner's toolkit.</p>
+<p style="margin:6px 0 0"><a href="#" style="color:var(--accent)" style-hover="color:var(--accent-hover)">All instruments</a></p>
+</div>
+</aside>
+</section>
+<section style="margin-top:56px;border-top:1px solid var(--line);padding-top:18px">
+<h2 class="t-eyebrow" style="margin:0 0 12px">Other instruments</h2>
+<div style="display:flex;gap:8px 22px;flex-wrap:wrap;font-size:var(--text-sm)">
+<a href="#" style="color:var(--accent);text-decoration:none" style-hover="color:var(--accent-hover)">☉ Planetary hours</a>
+<a href="#" style="color:var(--accent);text-decoration:none" style-hover="color:var(--accent-hover)">◐ Pañcāṅga</a>
+<a href="#" style="color:var(--accent);text-decoration:none" style-hover="color:var(--accent-hover)">॥ Hindu calendar</a>
+<a href="#" style="color:var(--accent);text-decoration:none" style-hover="color:var(--accent-hover)">☽ Attic calendar</a>
+<a href="#" style="color:var(--accent);text-decoration:none" style-hover="color:var(--accent-hover)">✶ Natal chart</a>
+<a href="#" style="color:var(--accent);text-decoration:none" style-hover="color:var(--accent-hover)">● Sigil generator</a>
+</div>
+</section>
+</main>
+<footer style="border-top:1px solid var(--line);margin-top:24px">
+<div style="max-width:1120px;margin:0 auto;padding:32px clamp(16px,4vw,32px) 24px;display:flex;gap:28px 40px;flex-wrap:wrap;align-items:flex-start">
+<div style="flex:1 1 220px">
+<span style="font-family:var(--font-display);font-size:22px;color:var(--ink)">Shruti</span>
+<p style="margin:8px 0 0;font-size:var(--text-sm);line-height:1.55;color:var(--ink-soft);max-width:34ch">Instruments for magick, built live from Athens.</p>
+</div>
+<div style="flex:1 1 300px">
+<p class="t-eyebrow" style="margin:0 0 8px">Imprint</p>
+<p style="margin:0;font-family:var(--font-mono);font-size:var(--text-xs);line-height:1.9;color:var(--ink-faint)">ShrutiVTuber, LLC<br>Registered office (virtual): [street, no.] · [postcode] Athens, GR<br>business@shrutivtuber.com<br>GEMI [000000000000] · VAT EL[000000000]</p>
+</div>
+</div>
+<div style="max-width:1120px;margin:0 auto;padding:14px clamp(16px,4vw,32px) 28px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;border-top:1px solid var(--line);font-size:var(--text-xs);color:var(--ink-faint)">
+<p style="margin:0">© ShrutiVTuber, LLC · <a href="#" style="color:inherit">Privacy</a> · <a href="#" style="color:inherit">Terms</a> · <a href="#" style="color:inherit">Derivative work guidelines</a></p>
+<span class="seal seal-ring" title="Soror Eu. A." style="margin-left:auto">S∴E.A.</span>
+</div>
+</footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;system&quot;,&quot;dawn&quot;,&quot;dusk&quot;],&quot;default&quot;:&quot;system&quot;,&quot;tsType&quot;:&quot;\&quot;system\&quot;|\&quot;dawn\&quot;|\&quot;dusk\&quot;&quot;,&quot;section&quot;:&quot;Theme&quot;},&quot;word&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;ΘΕΟΥΡΓΙΑ&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Instrument&quot;},&quot;system&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;greek&quot;,&quot;hebrew&quot;,&quot;arabic&quot;,&quot;coptic&quot;,&quot;devanagari&quot;,&quot;english&quot;],&quot;default&quot;:&quot;greek&quot;,&quot;tsType&quot;:&quot;\&quot;greek\&quot;|\&quot;hebrew\&quot;|\&quot;arabic\&quot;|\&quot;coptic\&quot;|\&quot;devanagari\&quot;|\&quot;english\&quot;&quot;,&quot;section&quot;:&quot;Instrument&quot;}}">
+class Component extends DCLogic {
+  state = { word: null, sys: null, copied: false };
+  applyTheme() {
+    const t = this.props.theme ?? 'system';
+    const el = document.documentElement;
+    if (t === 'dawn') el.setAttribute('data-theme', 'light');
+    else if (t === 'dusk') el.setAttribute('data-theme', 'dark');
+    else el.removeAttribute('data-theme');
+  }
+  componentDidMount() { this.applyTheme() }
+  componentDidUpdate() { this.applyTheme() }
+  renderVals() {
+    const GREEK = { 'Α': 1, 'Β': 2, 'Γ': 3, 'Δ': 4, 'Ε': 5, 'Ϝ': 6, 'Ζ': 7, 'Η': 8, 'Θ': 9, 'Ι': 10, 'Κ': 20, 'Λ': 30, 'Μ': 40, 'Ν': 50, 'Ξ': 60, 'Ο': 70, 'Π': 80, 'Ϙ': 90, 'Ρ': 100, 'Σ': 200, 'Τ': 300, 'Υ': 400, 'Φ': 500, 'Χ': 600, 'Ψ': 700, 'Ω': 800, 'Ϡ': 900 };
+    const HEBREW = { 'א': 1, 'ב': 2, 'ג': 3, 'ד': 4, 'ה': 5, 'ו': 6, 'ז': 7, 'ח': 8, 'ט': 9, 'י': 10, 'כ': 20, 'ך': 20, 'ל': 30, 'מ': 40, 'ם': 40, 'נ': 50, 'ן': 50, 'ס': 60, 'ע': 70, 'פ': 80, 'ף': 80, 'צ': 90, 'ץ': 90, 'ק': 100, 'ר': 200, 'ש': 300, 'ת': 400 };
+    const ARABIC = { 'ا': 1, 'أ': 1, 'إ': 1, 'آ': 1, 'ء': 1, 'ب': 2, 'ج': 3, 'د': 4, 'ه': 5, 'ة': 5, 'و': 6, 'ز': 7, 'ح': 8, 'ط': 9, 'ي': 10, 'ى': 10, 'ك': 20, 'ل': 30, 'م': 40, 'ن': 50, 'س': 60, 'ع': 70, 'ف': 80, 'ص': 90, 'ق': 100, 'ر': 200, 'ش': 300, 'ت': 400, 'ث': 500, 'خ': 600, 'ذ': 700, 'ض': 800, 'ظ': 900, 'غ': 1000 };
+    const COPTIC = { 'ⲁ': 1, 'ⲃ': 2, 'ⲅ': 3, 'ⲇ': 4, 'ⲉ': 5, 'ⲋ': 6, 'ⲍ': 7, 'ⲏ': 8, 'ⲑ': 9, 'ⲓ': 10, 'ⲕ': 20, 'ⲗ': 30, 'ⲙ': 40, 'ⲛ': 50, 'ⲝ': 60, 'ⲟ': 70, 'ⲡ': 80, 'ϥ': 90, 'ⲣ': 100, 'ⲥ': 200, 'ⲧ': 300, 'ⲩ': 400, 'ⲫ': 500, 'ⲭ': 600, 'ⲯ': 700, 'ⲱ': 800, 'ϣ': 900 };
+    // Kaṭapayādi: each consonant carries a digit; vowels standing alone are zero.
+    const KATA = { 'क': 1, 'ख': 2, 'ग': 3, 'घ': 4, 'ङ': 5, 'च': 6, 'छ': 7, 'ज': 8, 'झ': 9, 'ञ': 0, 'ट': 1, 'ठ': 2, 'ड': 3, 'ढ': 4, 'ण': 5, 'त': 6, 'थ': 7, 'द': 8, 'ध': 9, 'न': 0, 'प': 1, 'फ': 2, 'ब': 3, 'भ': 4, 'म': 5, 'य': 1, 'र': 2, 'ल': 3, 'व': 4, 'श': 5, 'ष': 6, 'स': 7, 'ह': 8 };
+    const MARKS = 'ािीुूृॄेैोौंँः्ॉ';
+    const SYS = {
+      greek: { label: 'Greek · Milesian numerals', short: 'Greek', dir: 'ltr', dia: 'Accents and breathings', numerals: 'digamma 6 · koppa 90 · sampi 900', variants: 'ordinal (1–24) also attested', sample: 'ΘΕΟΥΡΓΙΑ',
+        prose: 'Alpha through theta are units, iota through koppa are tens, rho through sampi are hundreds. Three letters survive only as numerals — digamma at six, koppa at ninety, sampi at nine hundred — and any tool that omits them will quietly give the wrong sum for a great many words.' },
+      hebrew: { label: 'Hebrew · absolute gematria', short: 'Hebrew', dir: 'rtl', dia: 'Niqqud', numerals: 'finals unvalued · aleph 1 … tav 400', variants: 'mispar gadol, ordinal and katan also in use', sample: 'חכמה',
+        prose: 'Aleph to tet are units, yod to tsadi tens, qof to tav hundreds — and there the alphabet runs out at four hundred, so thousands are written by other means. Final forms take their ordinary values here; the schools that give them five hundred upward are a separate reckoning, not a correction of this one.' },
+      arabic: { label: 'Arabic · abjad ḥisāb', short: 'Arabic', dir: 'rtl', dia: 'Ḥarakāt and hamza', numerals: 'eastern order · ghayn 1000', variants: 'Maghrebi order swaps sīn, ṣād, shīn and ḍād', sample: 'نور',
+        prose: 'The abjad order is not the alphabet order: it follows the older Semitic sequence, which is why alif, bā, jīm, dāl open the count. The eastern and Maghrebi traditions part company in the hundreds, so a number quoted without its order is only half a number.' },
+      coptic: { label: 'Coptic · alphabetic numerals', short: 'Coptic', dir: 'ltr', dia: 'Supralinear strokes', numerals: 'soou 6 · fai 90 · shai 900', variants: 'Sahidic letterforms assumed', sample: 'ⲛⲟⲩⲧⲉ',
+        prose: 'Coptic took the Greek scheme entire and filled the numeral gaps with its own letters — soou for six, fai for ninety, shai for nine hundred — where Greek had kept archaic signs. The Demotic-derived letters beyond those carry no value, which is a fact about the numeral system rather than an omission in it.' },
+      devanagari: { label: 'Devanagari · kaṭapayādi', short: 'kaṭapayādi', dir: 'ltr', dia: 'Mātrās and virāma', numerals: 'four consonant series · last of a cluster counts', variants: 'Āryabhaṭa and bhūtasaṅkhyā are other systems again', sample: 'भारत',
+        prose: 'Kaṭapayādi runs four consonant series against the digits one to nine and zero, so ka, ṭa, pa and ya all mean one. Vowels standing alone are zero, and in a cluster only the last consonant counts. The digits are then read from the right, by the rule that the digits proceed leftward — which makes this an encoding, not a sum, and the difference matters.' },
+      english: { label: 'English · ordinal', short: 'English', dir: 'ltr', dia: 'Diacritics', numerals: 'A=1 … Z=26', variants: 'Agrippa\u2019s Latin table differs from this one', sample: 'WISDOM',
+        prose: 'A=1 through Z=26 is a modern convention with no manuscript behind it, and it is included because it is what people actually use. Agrippa\u2019s Latin table assigns quite different values; if you are reading an early modern source, that is the one you want, not this.' }
+    };
+    const sysKey = this.state.sys ?? (this.props.system ?? 'greek');
+    const S = SYS[sysKey] ?? SYS.greek;
+    const positional = sysKey === 'devanagari';
+    const raw = this.state.word ?? (this.props.word ?? SYS.greek.sample);
+    const source = sysKey === 'greek' || sysKey === 'english' ? raw.toUpperCase() : raw;
+    const chars = Array.from(source).filter(c => c.trim() !== '');
+    const letters = [];
+    for (let i = 0; i < chars.length; i++) {
+      const c = chars[i];
+      let v = null;
+      if (positional) {
+        if (MARKS.indexOf(c) >= 0) { letters.push({ ch: c, val: '·', n: null, skip: true }); continue }
+        if (KATA[c] !== undefined) {
+          // In a cluster (consonant + virāma) only the final consonant counts.
+          if (chars[i + 1] === '्') { letters.push({ ch: c, val: '–', n: null, skip: true }); continue }
+          v = KATA[c];
+        } else if ('अआइईउऊऋएऐओऔ'.indexOf(c) >= 0) v = 0;
+      } else if (sysKey === 'greek') v = GREEK[c] ?? null;
+      else if (sysKey === 'hebrew') v = HEBREW[c] ?? null;
+      else if (sysKey === 'arabic') v = ARABIC[c] ?? null;
+      else if (sysKey === 'coptic') v = COPTIC[c] ?? null;
+      else if (sysKey === 'english') { const n = c.charCodeAt(0) - 64; v = (n >= 1 && n <= 26) ? n : null }
+      letters.push({ ch: c, val: v === null ? '—' : String(v), n: v, skip: false });
+    }
+    const valued = letters.filter(l => l.n !== null);
+    const skipped = letters.filter(l => l.n === null && !l.skip).length;
+    let total, sumLine = '', digitLine = '';
+    if (positional) {
+      const digits = valued.map(l => l.n);
+      digitLine = digits.join(' ') || '—';
+      total = digits.length ? digits.slice().reverse().join('') : '0';
+    } else {
+      const t = valued.reduce((s, l) => s + l.n, 0);
+      total = String(t);
+      sumLine = valued.length ? valued.map(l => l.n).join(' + ') + ' = ' + t : '—';
+    }
+    let root = String(total).split('').reduce((a, b) => a + Number(b), 0);
+    while (root > 9) root = String(root).split('').reduce((a, b) => a + Number(b), 0);
+    const CORPUS = {
+      greek: { 598: [{ word: 'ΘΕΟΥΡΓΙΑ', gloss: 'the work of the gods', source: 'title' }, { word: 'ΤΕΛΕΤΗ ΝΥΚΤΟΣ', gloss: 'rite of the night', source: 'journal · 2025-11' }] },
+      hebrew: { 73: [{ word: 'חכמה', gloss: 'ḥokhmah — wisdom', source: 'index' }] },
+      arabic: { 256: [{ word: 'نور', gloss: 'nūr — light', source: 'index' }] },
+      coptic: { 825: [{ word: 'ⲛⲟⲩⲧⲉ', gloss: 'noute — god', source: 'index' }] },
+      english: {}, devanagari: {}
+    };
+    const matches = (CORPUS[sysKey] ?? {})[Number(total)] ?? [];
+    return {
+      word: raw, letters: letters, total: total, sumLine: sumLine, digitLine: digitLine,
+      root: String(root), parity: Number(total) % 2 === 0 ? 'even' : 'odd',
+      letterCount: String(valued.length),
+      isAdditive: !positional, isPositional: positional,
+      resultHeading: positional ? 'The encoding' : 'The sum',
+      systemFlag: S.label, systemShort: S.short, dirAttr: S.dir,
+      diacriticLabel: S.dia, numeralNote: S.numerals, variantNote: S.variants, methodProse: S.prose,
+      isGreek: sysKey === 'greek', isHebrew: sysKey === 'hebrew', isArabic: sysKey === 'arabic',
+      isCoptic: sysKey === 'coptic', isDevanagari: positional, isEnglish: sysKey === 'english',
+      grMark: sysKey === 'greek' ? '✓' : '', hebMark: sysKey === 'hebrew' ? '✓' : '',
+      arMark: sysKey === 'arabic' ? '✓' : '', coMark: sysKey === 'coptic' ? '✓' : '',
+      dvMark: positional ? '✓' : '', enMark: sysKey === 'english' ? '✓' : '',
+      hasMatches: matches.length > 0, noMatches: matches.length === 0 && !positional, matches: matches,
+      hasUnreckonable: skipped > 0, skippedCount: String(skipped),
+      shareUrl: 'theourgia.com/isopsephy?w=' + encodeURIComponent(raw) + '&system=' + sysKey,
+      copyLabel: this.state.copied ? 'Copied' : 'Copy link',
+      setWord: e => this.setState({ word: e.target.value, copied: false }),
+      pickGreek: () => this.setState({ sys: 'greek', word: SYS.greek.sample, copied: false }),
+      pickHebrew: () => this.setState({ sys: 'hebrew', word: SYS.hebrew.sample, copied: false }),
+      pickArabic: () => this.setState({ sys: 'arabic', word: SYS.arabic.sample, copied: false }),
+      pickCoptic: () => this.setState({ sys: 'coptic', word: SYS.coptic.sample, copied: false }),
+      pickDevanagari: () => this.setState({ sys: 'devanagari', word: SYS.devanagari.sample, copied: false }),
+      pickEnglish: () => this.setState({ sys: 'english', word: SYS.english.sample, copied: false }),
+      tryGreek: () => this.setState({ sys: 'greek', word: 'ΘΕΟΥΡΓΙΑ', copied: false }),
+      tryHebrew: () => this.setState({ sys: 'hebrew', word: 'חכמה', copied: false }),
+      tryArabic: () => this.setState({ sys: 'arabic', word: 'نور', copied: false }),
+      tryCoptic: () => this.setState({ sys: 'coptic', word: 'ⲛⲟⲩⲧⲉ', copied: false }),
+      tryDevanagari: () => this.setState({ sys: 'devanagari', word: 'भारत', copied: false }),
+      tryEnglish: () => this.setState({ sys: 'english', word: 'WISDOM', copied: false }),
+      tryBroken: () => this.setState({ sys: 'greek', word: 'ΘΕΟΣ light', copied: false }),
+      copyLink: () => { this.setState({ copied: true }); setTimeout(() => this.setState({ copied: false }), 1600) }
+    };
+  }
+}
+</script>
+</body>
+</html>

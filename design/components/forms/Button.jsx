@@ -1,0 +1,20 @@
+import React from 'react';
+function css(id,txt){if(typeof document!=='undefined'&&!document.getElementById(id)){const s=document.createElement('style');s.id=id;s.textContent=txt;document.head.appendChild(s)}}
+export function Button({variant='primary',size='md',disabled=false,loading=false,href,type='button',onClick,iconLeft,iconRight,children,...rest}){
+  css('sh-button',`.sh-btn{--_bg:var(--accent);--_fg:var(--on-accent);--_bd:transparent;appearance:none;display:inline-flex;align-items:center;justify-content:center;gap:8px;font-family:var(--font-body);font-weight:600;border-radius:var(--radius-sm);border:var(--border-w) solid var(--_bd);background:var(--_bg);color:var(--_fg);cursor:pointer;text-decoration:none;line-height:1;white-space:nowrap;transition:background var(--dur-1) var(--ease-out),color var(--dur-1) var(--ease-out),border-color var(--dur-1) var(--ease-out);position:relative}
+.sh-btn[data-size=sm]{font-size:var(--text-xs);padding:8px 14px;min-height:32px}.sh-btn[data-size=md]{font-size:var(--text-sm);padding:10px 18px;min-height:40px}.sh-btn[data-size=lg]{font-size:var(--text-body);padding:13px 24px;min-height:48px}
+.sh-btn:hover{--_bg:var(--accent-hover)}.sh-btn:active{transform:translateY(1px)}
+.sh-btn[data-variant=secondary]{--_bg:transparent;--_fg:var(--accent);--_bd:color-mix(in srgb,var(--accent) 55%,transparent)}.sh-btn[data-variant=secondary]:hover{--_bg:var(--accent-wash);--_fg:var(--accent-hover);--_bd:var(--accent-hover)}
+.sh-btn[data-variant=ghost]{--_bg:transparent;--_fg:var(--accent);--_bd:transparent}.sh-btn[data-variant=ghost]:hover{--_bg:var(--surface-veil);--_fg:var(--accent-hover)}
+.sh-btn[data-variant=live]{--_bg:var(--live);--_fg:var(--surface-card)}
+.sh-btn[disabled],.sh-btn[data-disabled=true]{opacity:.45;cursor:not-allowed;pointer-events:none}
+.sh-btn[data-loading=true]{color:transparent}.sh-btn[data-loading=true]>*{visibility:hidden}.sh-btn[data-loading=true]::after{content:"";visibility:visible;position:absolute;inset:0;margin:auto;width:14px;height:14px;border-radius:99px;border:2px solid color-mix(in srgb,var(--_fg) 30%,transparent);border-top-color:var(--_fg);animation:sh-spin .7s linear infinite}
+.sh-btn[data-variant=secondary][data-loading=true]::after,.sh-btn[data-variant=ghost][data-loading=true]::after{border-color:color-mix(in srgb,var(--accent) 30%,transparent);border-top-color:var(--accent)}
+@keyframes sh-spin{to{transform:rotate(360deg)}}`);
+  const Tag=href&&!disabled?'a':'button';
+  return <Tag className="sh-btn" data-variant={variant} data-size={size} data-loading={loading||undefined} data-disabled={disabled||undefined}
+    href={href} type={Tag==='button'?type:undefined} disabled={Tag==='button'?(disabled||loading):undefined}
+    aria-busy={loading||undefined} onClick={onClick} {...rest}>
+    {iconLeft}<span>{children}</span>{iconRight}
+  </Tag>;
+}
