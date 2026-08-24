@@ -106,27 +106,79 @@ templates, Dawn/Dusk themes. **Not implemented yet.**
 - `docs/DEPLOY.md` — the runbook.
 - `docs/adr/0001-astrology-licensing.md` — the licence boundary and its amendment.
 
-## The festival research finished — with gaps
+## FIRST TASK — close the three festival gaps
 
 Output is in `~/Documents/development/shruti-research/` (outside the repo:
-working material, partly unverified). **Read its `README.md` first.**
+working material, partly unverified). Read its `README.md` first.
 
-**71 Hindu entries and 45 Attic entries**, all cited, confidence graded. Three
-things need doing before any of it is packed:
+**71 Hindu entries and 45 Attic entries**, all cited, confidence graded
+`attested` / `disputed` / `reconstructed`. Sourcing quality is good — real loci
+(Plutarch *Theseus* 24, Harpokration s.v. εἰρεσιώνη, Demosthenes 24.26) and the
+agents recorded disagreement rather than resolving it.
 
-1. **No entry carries `dayRule`** — the schema given to the agents predated that
-   discovery. Verified for 2026: Vasant Pañcamī, Holikā Dahan and Holi resolve
-   exactly right on the sunrise default; **Mahā Śivarātri comes back a day late
-   because it needs `nishitha`**. A pass adding the rule to the handful that
-   need it is required.
-2. **The assembly agent dropped the Hindu half** — its report is Attic only. The
-   Hindu entries were recovered from `journal.jsonl` and are therefore
-   *unverified by the audit pass* that the Attic set received.
-3. **17 of 68 Hindu anchors error on resolve.** 49 resolve, 2 are legitimately
-   kṣaya. The rest need triage.
+Three gaps, all diagnosed, in the order to fix them.
 
-The resolver, the MBF writer and the anchor validation all work — this is a data
-problem, not an engine problem.
+### Gap 1 — no entry carries `dayRule`
+
+**Cause: the schema handed to the agents predated the discovery.** Day-ownership
+is not one rule — most observances go to the tithi at sunrise, but Dīpāvalī is
+kept at *pradoṣa*, Mahā Śivarātri and Janmāṣṭamī at *niśītha*, Vijayadaśamī at
+*aparāhṇa*, Gaṇeśa Caturthī at *madhyāhna*.
+
+Measured against published 2026 almanacs:
+
+| festival | resolved | almanac | |
+|---|---|---|---|
+| Vasant Pañcamī | 23 Jan | 23 Jan | ✓ |
+| Holikā Dahan | 3 Mar | 3 Mar | ✓ |
+| Holi | 4 Mar | 4 Mar | ✓ |
+| **Mahā Śivarātri** | **16 Feb** | **15 Feb** | ✗ needs `nishitha` |
+
+The sunrise default is right for most and wrong for a known handful. **Do not
+add `dayRule` to everything** — add it only where the tradition actually uses a
+different moment, and cite why in the entry's note. `DAY_RULES` in
+`shruti_astro/core/festivals.py` has the five.
+
+Verify by resolving a year and diffing against a published pañcāṅga, not by
+inspection.
+
+### Gap 2 — the Hindu entries never went through the audit pass
+
+The assembly agent's report contains **only the Attic corpus**. The 71 Hindu
+entries were recovered from `journal.jsonl`, where each agent's structured
+result is recorded — so they exist and are complete, but they skipped the
+adversarial verification the Attic set received.
+
+Run them through the same audit: anchor correctness, the amānta/pūrṇimānta trap,
+citations that do not actually support the date, anything graded `attested` that
+is really `disputed`, and initiatory material reproduced in detail rather than
+merely named. The six raw corpora are in `shruti-research/corpora/`.
+
+### Gap 3 — a resolver feature, not a data defect
+
+**All 17 failures use `"month": "*"`.** They are the *recurring* observances —
+Ekādaśī twice a lunation, Pradoṣa, Sankaṣṭī Caturthī, Amāvāsyā, Pūrṇimā. The
+agents encoded "every month" sensibly; `resolve_lunar` simply rejects a wildcard.
+
+These matter more than the annual festivals for daily practice, so this is worth
+doing properly:
+
+- Accept `month: "*"` and return **every** occurrence in the year, not one date
+- The return type changes — a recurring anchor yields a list, an annual one a
+  single date. Decide that shape before writing it
+- They also need `dayRule`: Pradoṣa is kept at *pradoṣa* by definition, and
+  Ekādaśī has its own conventions
+- 49 of 68 resolve today; 2 are legitimately kṣaya (a tithi owning no civil day)
+
+Then pack both corpora as MBF via `shruti_astro/packs/mbf.py` and resolve a full
+year of each against the engine before shipping.
+
+### One limit that belongs in the UI, not just a file
+
+The report says plainly: *"every date here is a festival-calendar date, and the
+archon's civil calendar demonstrably diverged from it — a crescent-anchored
+computation approximates an ancient date, it does not reproduce one."* The Attic
+tool should say that where people read it.
 
 ## Still pending
 
