@@ -166,6 +166,20 @@ citations that do not actually support the date, anything graded `attested` that
 is really `disputed`, and initiatory material reproduced in detail rather than
 merely named. The six raw corpora are in `shruti-research/corpora/`.
 
+### Gap 3 — CLOSED
+
+All 68 lunar anchors resolve: **50 annual, 14 recurring, 4 legitimately kṣaya,
+0 failing** — 206 dated occurrences across 2026.
+
+Three things were built. `month: "*"` returns **every** occurrence in the year,
+with a return type that genuinely differs from an annual anchor's. `month:
+"adhika"` resolves only inside intercalary months, so an empty list in an
+ordinary year is the right answer. And a doubled tithi is **marked, not
+deduped** — on a vṛddhi Ekādaśī the Smārta and Vaiṣṇava traditions fast on
+different days, and dropping one would make that ruling for the practitioner.
+
+The original diagnosis:
+
 ### Gap 3 — four causes, two already fixed
 
 The 17 break down as: **13×** `month: "*"`, **2×** `Caitra` (a spelling variant
