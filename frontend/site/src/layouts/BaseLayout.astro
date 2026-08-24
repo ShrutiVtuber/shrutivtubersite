@@ -9,6 +9,7 @@ import "../styles/global.css";
 import "../styles/site.css";
 import SiteHeader from "../components/chrome/SiteHeader.astro";
 import SiteFooter from "../components/chrome/SiteFooter.astro";
+import CookieNotice from "../components/brand/CookieNotice.astro";
 import { site, type LiveStatus, type LinkGroups, PATHS } from "../lib/api";
 import { badgeFrom } from "../lib/live";
 import type { SocialLink } from "../components/brand/SocialLinkRow.astro";
@@ -54,6 +55,7 @@ const socials: SocialLink[] = Object.values(links?.groups ?? {})
     <SiteHeader live={badge} />
     {bare ? <slot /> : <main id="main" class="site-main"><slot /></main>}
     <SiteFooter socials={socials} />
+    <CookieNotice />
   </body>
 </html>
 

@@ -30,7 +30,7 @@ const ELSEWHERE: [string, string][] = [
   ["/press", "Press & media kit"],
   ["/fan-works", "Fan works"],
   ["/guidelines", "Derivative work guidelines"],
-  ["/support", "Support"],
+  ["/support", "Support the work"],
   ["/contact", "Contact"],
 ];
 const year = new Date().getUTCFullYear();
@@ -55,7 +55,16 @@ const year = new Date().getUTCFullYear();
     </div>
     <div class="imprint-rule"><LegalImprint /></div>
     <div class="legal">
-      <p>© ShrutiVTuber, LLC · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a></p>
+      {/* One addition to the delivered footer, and the reason is concrete: the
+          design assumed an admin SPA the owner would bookmark, and without a
+          link the only way in is to remember the path — which is how a site
+          owner ends up signing in at the reader form and concluding the
+          password is wrong. The page itself is auth-guarded, so the link
+          reveals nothing. */}
+      <p>
+        © ShrutiVTuber, LLC · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a>
+        · <a href="/admin" class="admin-link">Admin</a>
+      </p>
       <span class="seal seal-ring" title="Soror Eu. A.">S∴E.A.</span>
     </div>
   </div>
@@ -75,4 +84,5 @@ const year = new Date().getUTCFullYear();
     border-top: var(--border-w) solid var(--line);
   }
   .site-footer .legal p a { color: inherit; }
+  .admin-link { opacity: 0.7; }
 </style>

@@ -1,0 +1,122 @@
+---
+/* Past readings.
+ *
+ * Readings do not expire. Someone who liked last October's should be able to
+ * find it, and someone arriving in March should be able to read back rather
+ * than meet an empty page because this month's twelve are not written yet.
+ */
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import SectionHeader from "../../components/brand/SectionHeader.astro";
+import EmptyState from "../../components/feedback/EmptyState.astro";
+import Button from "../../components/forms/Button.astro";
+import { site } from "../../lib/api";
+import { SIGNS } from "../../lib/signs";
+
+const sign = SIGNS.includes(Astro.url.searchParams.get("sign") ?? "")
+  ? Astro.url.searchParams.get("sign")!
+  : "";
+
+interface Archive {
+  period: string; sign: string | null; current: string;
+  periods: { covers: string; signs: string[]; count: number }[];
+}
+const data = await site<Archive>(
+  `/api/horoscopes/archive?period=monthly${sign ? `&sign=${sign}` : ""}`,
+);
+const periods = data?.periods ?? [];
+
+const NAME = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+const monthName = (covers: string) => {
+  const m = /^(\d{4})-(\d{2})$/.exec(covers);
+  if (!m) return covers;
+  return new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, 1))
+    .toLocaleDateString("en-GB", { month: "long", year: "numeric", timeZone: "UTC" });
+};
+---
+
+<BaseLayout
+  title={sign ? `Every ${NAME(sign)} reading — Shruti` : "Past readings — Shruti"}
+  description="Every horoscope published so far. They do not expire."
+>
+  <div class="page archive">
+    <SectionHeader
+      as="h1" glyph="⁂" eyebrow="Archive"
+      title={sign ? `Every ${NAME(sign)} reading` : "Past readings"}
+      body="Readings stay up. Nothing here expires."
+    />
+
+    <nav class="filter" aria-label="Filter by sign">
+      <a href="/horoscopes/archive" aria-current={!sign ? "page" : undefined}>All signs</a>
+      {
+        SIGNS.map((s) => (
+          <a href={`/horoscopes/archive?sign=${s}`} aria-current={s === sign ? "page" : undefined}>
+            {NAME(s)}
+          </a>
+        ))
+      }
+    </nav>
+
+    {
+      periods.length === 0 ? (
+        <EmptyState
+          glyph="○"
+          title="Nothing published yet"
+          body="Once a month's twelve readings go up they stay here, and this fills in behind them."
+        >
+          <Button slot="action" variant="secondary" href="/horoscopes">This month</Button>
+        </EmptyState>
+      ) : (
+        <ul class="periods">
+          {
+            periods.map((p) => (
+              <li>
+                <div class="p-head">
+                  <span class="p-name">{monthName(p.covers)}</span>
+                  {p.covers === data?.current && <span class="p-now">current</span>}
+                  <span class="t-tabular p-count">{p.count} of 12</span>
+                </div>
+                <div class="p-signs">
+                  {
+                    (sign ? [sign] : p.signs).map((s) => (
+                      <a href={`/horoscopes/${s}/monthly?covers=${p.covers}`}>{NAME(s)}</a>
+                    ))
+                  }
+                </div>
+              </li>
+            ))
+          }
+        </ul>
+      )
+    }
+  </div>
+</BaseLayout>
+
+<style>
+  .archive { display: grid; gap: var(--space-5); }
+  .filter { display: flex; gap: 4px; flex-wrap: wrap; }
+  .filter a {
+    font: 500 var(--text-xs) var(--font-body); color: var(--ink-soft); text-decoration: none;
+    padding: 7px 12px; border-radius: var(--radius-full);
+    border: var(--border-w) solid var(--line); min-height: 36px;
+    display: inline-flex; align-items: center;
+  }
+  .filter a:hover { border-color: var(--line-strong); color: var(--ink); }
+  .filter a[aria-current="page"] { background: var(--accent-wash); border-color: color-mix(in srgb, var(--accent) 50%, transparent); color: var(--accent); }
+
+  .periods { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-4); }
+  .periods li { border-top: var(--border-w) solid var(--line); padding-top: var(--space-4); }
+  .p-head { display: flex; gap: 12px; align-items: baseline; flex-wrap: wrap; }
+  .p-name { font: 600 var(--text-h3) var(--font-display); color: var(--ink); }
+  .p-now {
+    font: 600 0.625rem var(--font-mono); letter-spacing: var(--tracking-caps);
+    text-transform: uppercase; color: var(--accent);
+  }
+  .p-count { font: 400 var(--text-xs) var(--font-mono); color: var(--ink-faint); margin-left: auto; }
+  .p-signs { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+  .p-signs a {
+    font: 400 var(--text-sm) var(--font-body); color: var(--ink-soft); text-decoration: none;
+    border: var(--border-w) solid var(--line); border-radius: var(--radius-sm);
+    padding: 6px 12px; min-height: 36px; display: inline-flex; align-items: center;
+  }
+  .p-signs a:hover { border-color: var(--accent); color: var(--accent); }
+</style>

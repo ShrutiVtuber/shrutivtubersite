@@ -232,3 +232,45 @@ async def publish(
         row.published_at = row.published_at or now
     await session.commit()
     return {"ok": True, "published": len(SIGNS), "covers": body.covers}
+
+
+@router.get("/archive")
+async def archive(
+    sign: str | None = None, period: str = "monthly",
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """
+    Every published period, newest first — optionally for one sign.
+
+    Readings do not expire. Someone who liked last October's should be able to
+    find it, and someone arriving in March should be able to read back rather
+    than meet an empty page because the month's twelve are not written yet.
+    """
+    if period not in PERIODS:
+        raise HTTPException(400, f"unknown period; choose from {list(PERIODS)}")
+
+    query = select(Horoscope).where(
+        Horoscope.period == period, Horoscope.published.is_(True)
+    )
+    if sign:
+        if sign not in SIGNS:
+            raise HTTPException(404, "no such sign")
+        query = query.where(Horoscope.sign == sign)
+
+    rows = (await session.execute(query.order_by(Horoscope.covers.desc()))).scalars().all()
+
+    # Group by the period covered, so the archive reads as a list of months
+    # rather than a list of a hundred and forty-four readings.
+    periods: dict[str, list[str]] = {}
+    for r in rows:
+        periods.setdefault(r.covers, []).append(r.sign)
+
+    return {
+        "period": period,
+        "sign": sign,
+        "current": _current(period),
+        "periods": [
+            {"covers": covers, "signs": sorted(signs), "count": len(signs)}
+            for covers, signs in sorted(periods.items(), reverse=True)
+        ],
+    }

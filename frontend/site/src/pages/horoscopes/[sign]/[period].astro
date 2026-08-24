@@ -25,7 +25,12 @@ interface Reading {
   sign: string; period: string; covers: string; published: boolean;
   bodyMd: string; byline: string; availablePeriods: string[];
 }
-const data = await site<Reading>(`/api/horoscopes/${sign}/${period}`);
+/* A past reading is addressable: readings do not expire, and one someone
+   liked should still be there next year. */
+const covers = Astro.url.searchParams.get("covers") ?? "";
+const data = await site<Reading>(
+  `/api/horoscopes/${sign}/${period}${covers ? `?covers=${encodeURIComponent(covers)}` : ""}`,
+);
 if (!data) return Astro.rewrite("/404");
 
 const me = await account(Astro);
@@ -51,7 +56,7 @@ const GLYPH: Record<string, string> = {
     <PeriodSwitcher
       available={data.availablePeriods.length ? data.availablePeriods : ["monthly"]}
       current={period}
-      hrefFor={(p) => `/horoscopes/${sign}/${p}`}
+      hrefFor={(p) => `/horoscopes/${sign}/${p}${covers ? `?covers=${covers}` : ""}`}
     />
 
     {
@@ -68,14 +73,17 @@ const GLYPH: Record<string, string> = {
       )
     }
 
-    <p class="back"><a href="/horoscopes">← All twelve signs</a></p>
+    <p class="back">
+      <a href={`/horoscopes${covers ? `?covers=${covers}` : ""}`}>← All twelve signs</a>
+      <a href={`/horoscopes/archive?sign=${sign}`}>Every {NAME} reading →</a>
+    </p>
   </div>
 </BaseLayout>
 
 <style>
   .reading { max-width: 720px; display: grid; gap: var(--space-4); }
   .reading-head { display: flex; gap: var(--space-4); align-items: baseline; flex-wrap: wrap; }
-  .back { margin: var(--space-5) 0 0; font: 400 var(--text-sm) var(--font-body); }
+  .back { margin: var(--space-5) 0 0; font: 400 var(--text-sm) var(--font-body); display: flex; gap: var(--space-5); flex-wrap: wrap; }
   .back a { color: var(--accent); text-decoration: none; }
   .back a:hover { text-decoration: underline; }
 </style>

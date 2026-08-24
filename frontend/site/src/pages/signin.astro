@@ -102,6 +102,10 @@ if (Astro.request.method === "POST") {
               </Button>
             </div>
             <p class="auth-alt">No account? <a href="/signup">Make one</a>.</p>
+            {/* Reader accounts and the site owner's admin are separate systems
+                with separate credentials. Saying so here costs nothing and
+                saves the owner concluding her password is broken. */}
+            <p class="admin-hint">Looking for the site admin? That is <a href="/admin">a separate sign-in</a>.</p>
           </form>
         </>
       )
@@ -126,4 +130,6 @@ if (Astro.request.method === "POST") {
   .auth-failed { font: 400 var(--text-sm) var(--font-body); color: var(--live); margin: 0; }
   .auth-alt { font: 400 var(--text-sm) var(--font-body); color: var(--ink-soft); margin: 0; }
   .auth-alt a { color: var(--accent); }
+  .admin-hint { font: 400 var(--text-xs) var(--font-body); color: var(--ink-faint); margin: 0; }
+  .admin-hint a { color: var(--accent); }
 </style>

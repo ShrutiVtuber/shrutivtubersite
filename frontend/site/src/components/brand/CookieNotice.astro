@@ -1,0 +1,84 @@
+---
+/* The cookie notice — and it is a NOTICE, not a consent banner.
+ *
+ * The design says do not build a cookie banner, and it is right: under
+ * ePrivacy, strictly necessary cookies need no consent, and this site sets
+ * nothing else. There is no analytics cookie, no advertising cookie and no
+ * third-party script, so a banner asking permission would be asking about a
+ * choice that does not exist — and training people to click "accept" on
+ * something that was never optional.
+ *
+ * What IS required is DISCLOSURE. So: one line, dismissed with one button,
+ * remembered locally, and a link to the full table in the privacy policy.
+ * No "accept", no "reject", no preferences dialog, because there is nothing
+ * to decide.
+ */
+---
+
+<div class="cookie-notice" data-cookie-notice hidden>
+  <p>
+    This site sets only the cookies it needs to work — a sign-in session and a
+    form-security token. No analytics cookies, no advertising, no third parties, so there is
+    nothing here to consent to. <a href="/privacy#cookies">What is set, and why</a>.
+  </p>
+  <button type="button" data-cookie-dismiss>Got it</button>
+</div>
+
+<style>
+  .cookie-notice {
+    position: fixed;
+    left: var(--space-4);
+    right: var(--space-4);
+    bottom: var(--space-4);
+    z-index: 60;
+    max-width: 640px;
+    margin-inline: auto;
+    display: flex;
+    gap: var(--space-4);
+    align-items: center;
+    flex-wrap: wrap;
+    background: var(--surface-card);
+    border: var(--border-w) solid var(--line-strong);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-3);
+    padding: var(--space-4);
+  }
+  .cookie-notice[hidden] { display: none; }
+  .cookie-notice p {
+    margin: 0;
+    flex: 1 1 320px;
+    font: 400 var(--text-sm) / 1.6 var(--font-body);
+    color: var(--ink-soft);
+  }
+  .cookie-notice a { color: var(--accent); }
+  .cookie-notice button {
+    appearance: none;
+    min-height: 40px;
+    padding: 0 16px;
+    font: 600 var(--text-sm) var(--font-body);
+    color: var(--on-accent);
+    background: var(--accent);
+    border: var(--border-w) solid var(--accent);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+  }
+  .cookie-notice button:hover { background: var(--accent-hover); }
+</style>
+
+<script is:inline>
+  (function () {
+    var notice = document.querySelector("[data-cookie-notice]");
+    if (!notice) return;
+    var KEY = "shruti-cookie-notice";
+    /* localStorage, not a cookie: it would be absurd to set a cookie to
+       remember that you have been told about cookies. */
+    try {
+      if (localStorage.getItem(KEY) === "seen") return;
+    } catch (e) { /* storage blocked — show it, that is the safe direction */ }
+    notice.hidden = false;
+    notice.querySelector("[data-cookie-dismiss]").addEventListener("click", function () {
+      notice.hidden = true;
+      try { localStorage.setItem(KEY, "seen"); } catch (e) {}
+    });
+  })();
+</script>

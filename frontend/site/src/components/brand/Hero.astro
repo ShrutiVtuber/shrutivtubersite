@@ -17,11 +17,20 @@ interface Props {
   artAlt?: string;
   clouds?: string | null;
   minHeight?: number;
+  /** Full-bleed: the sky spans the viewport, the words stay in the column. */
+  bleed?: boolean;
 }
-const { greeting, title, subtitle, art, artAlt = "", clouds, minHeight = 420 } = Astro.props;
+const {
+  greeting, title, subtitle, art, artAlt = "", clouds, minHeight = 420, bleed = false,
+} = Astro.props;
 ---
 
-<section class="sh-hero" data-art={art ? "present" : "absent"} style={`min-height:${minHeight}px`}>
+<section
+  class="sh-hero"
+  data-art={art ? "present" : "absent"}
+  data-bleed={bleed || undefined}
+  style={`min-height:${minHeight}px`}
+>
   {clouds && <img class="sh-hero-clouds" src={clouds} alt="" aria-hidden="true" />}
   <div class="sh-hero-stars" aria-hidden="true"></div>
   {!art && <div class="sh-hero-moon" aria-hidden="true"></div>}
@@ -83,6 +92,42 @@ const { greeting, title, subtitle, art, artAlt = "", clouds, minHeight = 420 } =
     gap: 16px;
     padding: clamp(24px, 5vw, 56px);
     max-width: 60ch;
+  }
+
+  /* Full-bleed: the SKY spans the viewport while the words stay in the page
+   * column. The panel breaks out with a viewport-width trick rather than being
+   * hoisted out of `.page`, so the hero stays one component and every caller
+   * keeps the same markup.
+   *
+   * The corners lose their radius because a rounded rectangle that touches
+   * both edges of the screen reads as a mistake rather than a card.
+   */
+  .sh-hero[data-bleed] {
+    width: 100vw;
+    margin-left: calc(50% - 50vw);
+    margin-right: calc(50% - 50vw);
+    border-radius: 0;
+    min-height: min(76vh, 680px);
+    align-items: center;
+  }
+  .sh-hero[data-bleed] .sh-hero-inner {
+    /* Back inside the column, and aligned with everything below it. */
+    max-width: min(60ch, var(--page-max));
+    margin-inline: auto;
+    width: 100%;
+    padding-inline: var(--page-pad);
+    box-sizing: border-box;
+  }
+  .sh-hero[data-bleed][data-art="present"] .sh-hero-inner {
+    max-width: var(--page-max);
+  }
+  .sh-hero[data-bleed][data-art="present"] .sh-hero-inner > * {
+    max-width: min(56ch, 58%);
+  }
+  .sh-hero[data-bleed] .sh-hero-art { right: max(var(--page-pad), calc(50vw - var(--page-max) / 2)); }
+  @media (max-width: 720px) {
+    .sh-hero[data-bleed] { min-height: min(70vh, 560px); }
+    .sh-hero[data-bleed][data-art="present"] .sh-hero-inner > * { max-width: 100%; }
   }
   .sh-hero-greet {
     font-family: var(--font-body);

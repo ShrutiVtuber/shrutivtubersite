@@ -14,6 +14,7 @@ import SocialLinkRow from "../components/brand/SocialLinkRow.astro";
 import Button from "../components/forms/Button.astro";
 import ProjectCard from "../components/cards/ProjectCard.astro";
 import ScheduleItem from "../components/tables/ScheduleItem.astro";
+import SignPicker from "../components/navigation/SignPicker.astro";
 import { site, type LiveStatus, type LinkGroups, type Project, PATHS } from "../lib/api";
 import { badgeFrom } from "../lib/live";
 import type { SocialLink } from "../components/brand/SocialLinkRow.astro";
@@ -27,12 +28,29 @@ interface ScheduleRow {
   notesMd: string | null;
 }
 
-const [live, links, projects, schedule] = await Promise.all([
+interface HoroscopeIndex {
+  covers: string;
+  readings: { sign: string; published: boolean; bodyMd: string }[];
+}
+
+const [live, links, projects, schedule, horoscopes] = await Promise.all([
   site<LiveStatus>(PATHS.live),
   site<LinkGroups>(PATHS.links),
   site<Project[]>(PATHS.projects),
   site<ScheduleRow[]>(PATHS.schedule),
+  site<HoroscopeIndex>("/api/horoscopes?period=monthly"),
 ]);
+
+/* Only teased when there is something to read. A sign picker leading to twelve
+   empty pages is worse than no teaser. */
+const readings = horoscopes?.readings ?? [];
+const anyReading = readings.some((r) => r.published);
+const monthName = (() => {
+  const m = /^(\d{4})-(\d{2})$/.exec(horoscopes?.covers ?? "");
+  if (!m) return "";
+  return new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, 1))
+    .toLocaleDateString("en-GB", { month: "long", timeZone: "UTC" });
+})();
 
 const badge = badgeFrom(live);
 const socials: SocialLink[] = Object.values(links?.groups ?? {})
@@ -48,14 +66,62 @@ const next = (schedule ?? [])[0] ?? null;
    6.5MB, and the readme is explicit that the sky is fully designed without
    it. Optimising that asset is a task, not a licence to ship it as-is. */
 const AVATAR = "/brand/avatar-square.png";
+
+/* Named by the question each one answers, not by what it is. "Pañcāṅga" means
+   nothing to someone who has not met it; "the five limbs of the day, and when
+   each ends" tells them whether they want it. */
+const INSTRUMENTS = [
+  {
+    glyph: "☾", name: "Day at a glance", href: "/today", wide: true,
+    answers: "What the sky is doing right now, where you are — luminaries, stations, the planetary hour, and today in four reckonings.",
+  },
+  {
+    glyph: "☉", name: "Solar stations", href: "/tools/solar-stations",
+    answers: "Sunrise, noon, sunset and midnight for a month ahead, exportable to your calendar.",
+  },
+  {
+    glyph: "☾", name: "Lunar stations", href: "/tools/lunar-stations",
+    answers: "Moonrise, culmination, moonset and nadir — with the phase beside them.",
+  },
+  {
+    glyph: "☉", name: "Planetary hours", href: "/tools/planetary-hours",
+    answers: "The day divided by its own light, so an hour is only sixty minutes twice a year.",
+  },
+  {
+    glyph: "◐", name: "Pañcāṅga", href: "/tools/pancanga",
+    answers: "The five limbs of the day, each with the moment it ends.",
+  },
+  {
+    glyph: "☾", name: "Hindu calendar", href: "/tools/hindu-calendar",
+    answers: "The lunisolar year, its months and its festivals — amānta or pūrṇimānta, your choice.",
+  },
+  {
+    glyph: "☽", name: "Attic calendar", href: "/tools/attic-calendar",
+    answers: "The month of Athens, opened at the noumenia and counted backwards through its last third.",
+  },
+  {
+    glyph: "✶", name: "Natal chart", href: "/tools/natal-chart",
+    answers: "A figure for a moment and a place, Hellenistic or Vedic — and honest about an unknown birth time.",
+  },
+  {
+    glyph: "Σ", name: "Isopsephy", href: "/tools/isopsephy",
+    answers: "Letter-reckoning in six scripts. Runs on your machine; nothing typed leaves it.",
+  },
+  {
+    glyph: "●", name: "Sigil generator", href: "/tools/sigil-generator",
+    answers: "Intent reduced and drawn, every step shown. Also on your machine only.",
+  },
+];
 ---
 
 <BaseLayout
   title="Shruti — instruments for magick"
   description="Software for astrology, theurgy and divination — built live on stream from Athens."
 >
-  <div class="page">
-    <Hero
+  {/* Outside `.page` so the sky can reach both edges; the Hero puts its own
+      words back into the column. */}
+  <Hero
+      bleed
       greeting="Welcome · Καλώς ήρθατε · स्वागत"
       title="I build instruments for magick."
       subtitle="Software for astrology, theurgy and divination — built live on stream from Athens."
@@ -82,8 +148,34 @@ const AVATAR = "/brand/avatar-square.png";
           <SocialLinkRow links={socials} size={16} />
         </div>
       </Fragment>
-    </Hero>
-  </div>
+  </Hero>
+
+  {/* The instruments, above the fold's neighbours, because they are the reason
+      to come back — a visitor who leaves without knowing these run here has
+      missed the site. Each names what it answers rather than what it is. */}
+  <section class="section page">
+    <div class="section-head">
+      <SectionHeader
+        glyph="✶"
+        eyebrow="Run them here"
+        title="Instruments, in your browser"
+        body="Working software for practice — no install, no account, and they answer for wherever you are."
+      />
+      <Button variant="ghost" href="/today">Day at a glance →</Button>
+    </div>
+    <div class="instruments">
+      {
+        INSTRUMENTS.map((i) => (
+          <a class="instrument" href={i.href} data-wide={i.wide || undefined}>
+            <span class="i-glyph t-glyph" aria-hidden="true">{i.glyph}</span>
+            <span class="i-name">{i.name}</span>
+            <span class="i-answers">{i.answers}</span>
+            <span class="i-go" aria-hidden="true">→</span>
+          </a>
+        ))
+      }
+    </div>
+  </section>
 
   <section class="section page">
     <div class="section-head">
@@ -111,6 +203,26 @@ const AVATAR = "/brand/avatar-square.png";
       )
     }
   </section>
+
+  {
+    anyReading && (
+      <section class="section page">
+        <div class="section-head">
+          <SectionHeader
+            glyph="☾"
+            eyebrow="Horoscopes"
+            title={monthName ? `${monthName}, one per sign` : "This month, one per sign"}
+            body="Twelve readings a month, written by hand and signed Soror Eu. A. Pick a sign — or save a nativity and yours comes up first."
+          />
+          <Button variant="ghost" href="/horoscopes">All twelve →</Button>
+        </div>
+        <SignPicker
+          signs={readings.map((r) => ({ sign: r.sign, published: r.published }))}
+          hrefFor={(s) => `/horoscopes/${s}/monthly`}
+        />
+      </section>
+    )
+  }
 
   <section class="section page">
     <div class="section-head">
@@ -145,6 +257,50 @@ const AVATAR = "/brand/avatar-square.png";
 
 <style>
   .hero-foot-row { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+
+  .instruments {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: var(--space-3);
+  }
+  .instrument {
+    position: relative;
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    grid-template-areas: "glyph name go" "glyph answers answers";
+    gap: 2px var(--space-3);
+    align-items: baseline;
+    padding: var(--space-4);
+    background: var(--surface-card);
+    border: var(--border-w) solid var(--line);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-1);
+    text-decoration: none;
+    transition:
+      border-color var(--dur-1) var(--ease-out),
+      box-shadow var(--dur-1) var(--ease-out);
+  }
+  /* Hover deepens and strengthens; it does not lift or scale. */
+  .instrument:hover { border-color: var(--line-strong); box-shadow: var(--shadow-2); }
+  .instrument:hover .i-name { color: var(--accent-hover); }
+  .instrument:hover .i-go { color: var(--accent); transform: translateX(2px); }
+  /* The one that answers the most gets the width, not a different colour. */
+  .instrument[data-wide] { grid-column: 1 / -1; }
+  .instrument[data-wide] .i-name { font-size: var(--text-h3); }
+  .i-glyph { grid-area: glyph; font: 400 1.5rem var(--font-display); color: var(--rose); line-height: 1; }
+  .i-name { grid-area: name; font: 600 var(--text-h4) var(--font-display); color: var(--ink); transition: color var(--dur-1) var(--ease-out); }
+  .i-answers {
+    grid-area: answers;
+    font: 400 var(--text-sm) / 1.55 var(--font-body);
+    color: var(--ink-soft);
+    margin-top: 4px;
+  }
+  .i-go {
+    grid-area: go;
+    font: 400 var(--text-body) var(--font-body);
+    color: var(--ink-faint);
+    transition: color var(--dur-1) var(--ease-out), transform var(--dur-1) var(--ease-out);
+  }
   .quiet-empty {
     font-family: var(--font-body);
     font-size: var(--text-body);

@@ -19,12 +19,16 @@ import { renderMarkdown } from "../../lib/markdown";
 import { sunSign } from "../../lib/signs";
 
 const period = Astro.url.searchParams.get("period") ?? "monthly";
+/* Readings do not expire. `covers` opens a past month; without it you get the
+   current one. */
+const covers = Astro.url.searchParams.get("covers") ?? "";
+const coversQuery = covers ? `&covers=${encodeURIComponent(covers)}` : "";
 
 interface Index {
   period: string; covers: string; availablePeriods: string[];
   readings: { sign: string; published: boolean; bodyMd: string }[];
 }
-const data = await site<Index>(`/api/horoscopes?period=${encodeURIComponent(period)}`);
+const data = await site<Index>(`/api/horoscopes?period=${encodeURIComponent(period)}${coversQuery}`);
 const me = await account(Astro);
 const yours = me?.nativity ? sunSign(me.nativity.birthDate) : null;
 
@@ -38,15 +42,18 @@ const NAME = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 <BaseLayout title="Horoscopes — Shruti" description="Twelve readings a month, one per sign, written by hand.">
   <div class="page horoscopes">
     <SectionHeader
-      as="h1" glyph="☾" eyebrow="Horoscopes" title="This month"
+      as="h1" glyph="☾" eyebrow="Horoscopes" title={data?.covers && data.covers !== new Date().toISOString().slice(0, 7) ? data.covers : "This month"}
       body="Twelve a month, one per sign, written by hand."
     />
 
-    <PeriodSwitcher
-      available={data?.availablePeriods ?? ["monthly"]}
-      current={period}
-      hrefFor={(p) => `/horoscopes?period=${p}`}
-    />
+    <div class="controls">
+      <PeriodSwitcher
+        available={data?.availablePeriods ?? ["monthly"]}
+        current={period}
+        hrefFor={(p) => `/horoscopes?period=${p}`}
+      />
+      <a class="archive-link" href="/horoscopes/archive">Past readings →</a>
+    </div>
 
     {
       yours && yourReading?.published && (
@@ -54,7 +61,7 @@ const NAME = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
           <p class="t-eyebrow">Your sign</p>
           <h2>{NAME(yours)}</h2>
           <Prose html={yourHtml} byline="Soror Eu. A." />
-          <div><Button variant="secondary" href={`/horoscopes/${yours}/${period}`}>Open the reading</Button></div>
+          <div><Button variant="secondary" href={`/horoscopes/${yours}/${period}${covers ? `?covers=${covers}` : ""}`}>Open the reading</Button></div>
         </section>
       )
     }
@@ -72,7 +79,7 @@ const NAME = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
         <SignPicker
           signs={readings.map((r) => ({ sign: r.sign, published: r.published }))}
           yours={yours ?? undefined}
-          hrefFor={(s) => `/horoscopes/${s}/${period}`}
+          hrefFor={(s) => `/horoscopes/${s}/${period}${covers ? `?covers=${covers}` : ""}`}
         />
       ) : (
         <EmptyState
@@ -87,6 +94,9 @@ const NAME = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 <style>
   .horoscopes { display: grid; gap: var(--space-5); }
+  .controls { display: flex; gap: var(--space-4); align-items: center; flex-wrap: wrap; }
+  .archive-link { margin-left: auto; font: 500 var(--text-sm) var(--font-body); color: var(--accent); text-decoration: none; }
+  .archive-link:hover { text-decoration: underline; }
   .yours-band {
     background: var(--accent-wash);
     border: var(--border-w) solid color-mix(in srgb, var(--accent) 40%, transparent);
