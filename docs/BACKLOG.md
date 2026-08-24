@@ -307,3 +307,56 @@ this is one component and one retrofit pass rather than nine.
 Open question for the owner: which gazetteer. Theourgia already solved this on
 mobile — reuse its source and its data shape rather than picking a second one,
 so a place resolved in one product means the same thing in the other.
+
+## Cloudflare R2 — what to create
+
+The storage layer is built and tested; it uses R2 the moment four settings are
+present and falls back to local disk otherwise. Nothing is blocked, but images
+are currently on the server's own disk.
+
+**The existing Cloudflare token cannot do this.** It was scoped for DNS-01 ACME
+and lives on the server in `/etc/caddy/caddy.env`. R2 needs its own credential.
+
+### In the Cloudflare dashboard
+
+1. **R2 → Create bucket.** Name it `shrutivtuber-media`. Location: automatic,
+   or hint EU since the server is in Germany.
+2. **R2 → Manage API tokens → Create API token.** Permission: *Object Read &
+   Write*, scoped to that one bucket. Copy the **Access Key ID** and **Secret
+   Access Key** — the secret is shown once.
+3. **Public access.** Either enable the bucket's `r2.dev` subdomain (fine to
+   start), or connect a custom domain such as `media.shrutivtuber.com`, which is
+   better: it survives a bucket rename and keeps the URLs on your own domain.
+4. Note the **Account ID** from the R2 overview page.
+
+### Then set, in `.env`
+
+```
+SHRUTI_R2_ACCOUNT_ID=…
+SHRUTI_R2_BUCKET=shrutivtuber-media
+SHRUTI_R2_ACCESS_KEY_ID=…
+SHRUTI_R2_SECRET_ACCESS_KEY=…
+SHRUTI_R2_PUBLIC_BASE=https://media.shrutivtuber.com
+```
+
+**Escape any `$` in those values as `$$`** — docker compose interpolates `$VAR`
+inside `.env` values, which is what shredded the argon2 admin hash earlier.
+
+### What happens then
+
+New uploads go to R2 and are served from `SHRUTI_R2_PUBLIC_BASE`. Files already
+on disk keep resolving to `/media/*`, because each row records the backend it
+used — without that, switching R2 on would repoint every existing URL at a
+bucket that does not contain those files and every image would 404 at once.
+
+Moving the existing files across is a separate, small job: upload each, flip
+`storage_backend` to `r2`. Not worth doing before there is much to move.
+
+### Not yet done
+
+- **Signed URLs.** Everything stored is public art, so public read is right for
+  now. If private media ever appears — an unpublished commission, a member-only
+  file — it needs presigned GETs, and the signer for that is already here.
+- **Deleting from the bucket.** Removing a Media row does not remove the object.
+  Content-addressed keys make that safe rather than leaky (an orphan costs
+  storage, not exposure), but it should be tidied eventually.

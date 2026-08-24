@@ -21,8 +21,12 @@ router = APIRouter(prefix="/api/content", tags=["content"])
 def _media_payload(m: Media | None) -> dict | None:
     if m is None:
         return None
+    from shruti.core.storage import public_url
+
     return {
-        "url": f"/media/{m.filename}",
+        # Resolved per row: a file stored locally before R2 was configured must
+        # keep pointing at /media/*, not at a bucket it was never put in.
+        "url": public_url(m.filename) if m.storage_backend == "r2" else f"/media/{m.filename}",
         "alt": m.alt_text,
         "width": m.width,
         "height": m.height,

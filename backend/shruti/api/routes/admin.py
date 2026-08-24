@@ -122,10 +122,6 @@ async def upload_media(
     digest = hashlib.sha256(data).hexdigest()[:32]
     filename = f"{digest}{ALLOWED_IMAGE[file.content_type]}"
 
-    root = Path(s.media_root)
-    root.mkdir(parents=True, exist_ok=True)
-    (root / filename).write_bytes(data)
-
     existing = (await session.execute(
         select(Media).where(Media.filename == filename)
     )).scalars().first()
@@ -143,8 +139,16 @@ async def upload_media(
     except Exception:                              # noqa: BLE001 — SVG has no raster size
         pass
 
+    # Storage decides where it goes: R2 when configured, disk otherwise, and
+    # disk again if R2 is unreachable — an upload should not be lost because a
+    # bucket is having a bad day.
+    from shruti.core.storage import put as store_media
+
+    stored = await store_media(filename, data, file.content_type)
+
     row = Media(filename=filename, mime_type=file.content_type,
-                width=width, height=height, size_bytes=len(data))
+                width=width, height=height, size_bytes=len(data),
+                storage_backend=stored.backend)
     session.add(row)
     await session.commit()
     await session.refresh(row)
@@ -305,3 +309,32 @@ async def delete_item(
     await session.delete(row)
     await session.commit()
     return Response(status_code=204)
+
+
+@router.get("/media")
+async def list_media(
+    session: AsyncSession = Depends(get_session),
+    _: str = Depends(require_admin),
+) -> list[dict]:
+    """Everything uploaded, newest first, with where it actually lives."""
+    from shruti.core.storage import public_url
+
+    rows = (
+        await session.execute(select(Media).order_by(Media.id.desc()))
+    ).scalars().all()
+    return [
+        {
+            "id": m.id,
+            "filename": m.filename,
+            "url": public_url(m.filename) if m.storage_backend == "r2" else f"/media/{m.filename}",
+            "mimeType": m.mime_type,
+            "width": m.width,
+            "height": m.height,
+            "sizeBytes": m.size_bytes,
+            "altText": m.alt_text,
+            "credit": m.credit,
+            "storage": m.storage_backend,
+            "createdAt": m.created_at.isoformat() if m.created_at else None,
+        }
+        for m in rows
+    ]

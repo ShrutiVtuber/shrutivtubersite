@@ -1,0 +1,124 @@
+---
+/* Media — upload art, see what is stored and where.
+ *
+ * Every image on this site is a NULLABLE reference with a designed absent
+ * state, so uploading is never urgent — which is exactly why this screen says
+ * plainly where each file lives. A bucket that is half-configured, or one that
+ * was switched on after some files were already on disk, is the kind of thing
+ * that produces a page of broken images and no explanation.
+ */
+import AdminLayout from "../../layouts/AdminLayout.astro";
+import CsrfField from "../../components/forms/CsrfField.astro";
+import Button from "../../components/forms/Button.astro";
+import Badge from "../../components/navigation/Badge.astro";
+import { asAdmin, ADMIN_COOKIE } from "../../lib/admin";
+import { SITE_API } from "../../lib/api";
+import { verifyCsrf } from "../../lib/csrf";
+
+let notice = "";
+let failed = "";
+
+if (Astro.request.method === "POST") {
+  const form = await Astro.request.formData();
+  if (!verifyCsrf(Astro.cookies, form)) {
+    failed = "That did not upload. Reload the page and try again.";
+  } else {
+    const file = form.get("file");
+    if (!(file instanceof File) || file.size === 0) {
+      failed = "Choose a file first.";
+    } else {
+      /* Forwarded as multipart to the backend, which is where the type
+         allow-list and the size limit are enforced — not here, because a
+         check in the browser or in a proxy is a courtesy, not a control. */
+      const out = new FormData();
+      out.append("file", file, file.name);
+      const token = Astro.cookies.get(ADMIN_COOKIE)?.value;
+      const r = await fetch(`${SITE_API}/api/admin/media`, {
+        method: "POST",
+        headers: token ? { cookie: `${ADMIN_COOKIE}=${token}` } : {},
+        body: out,
+      });
+      const body = await r.json().catch(() => null);
+      notice = r.ok ? `Uploaded — stored on ${body?.storage_backend ?? "disk"}.` : "";
+      failed = r.ok ? "" : (body?.detail ?? "That did not upload.");
+    }
+  }
+}
+
+const list = await asAdmin(Astro, "/api/admin/media");
+const items: any[] = Array.isArray(list.body) ? list.body : [];
+const onR2 = items.filter((m) => m.storage === "r2").length;
+const kb = (n: number) => `${Math.round(n / 1024)} KB`;
+---
+
+<AdminLayout title="Media">
+  <div class="head">
+    <h1 class="adm-h">Media</h1>
+    <Badge tone={onR2 > 0 ? "accent" : "faint"}>
+      {onR2 > 0 ? `${onR2} of ${items.length} on R2` : "storing on disk"}
+    </Badge>
+  </div>
+
+  {notice && <p class="adm-ok" role="status">{notice}</p>}
+  {failed && <p class="adm-bad" role="alert">{failed}</p>}
+
+  <form method="POST" enctype="multipart/form-data" class="adm-card upload">
+    <CsrfField />
+    <label class="field">
+      <span class="adm-lbl">Image</span>
+      <input class="adm-input" type="file" name="file" accept="image/png,image/jpeg,image/webp,image/avif,image/svg+xml" required />
+    </label>
+    <div><Button type="submit">Upload</Button></div>
+    <p class="adm-note">
+      PNG, JPEG, WebP, AVIF or SVG. Files are named by their own SHA-256, so the same image
+      uploaded twice is stored once and its URL never changes.
+    </p>
+  </form>
+
+  {
+    items.length === 0 ? (
+      <p class="adm-note">Nothing uploaded yet. Every art slot on the site has a designed
+      absent state, so there is no hurry.</p>
+    ) : (
+      <div class="grid">
+        {
+          items.map((m) => (
+            <figure class="item">
+              <a href={m.url} class="thumb">
+                <img src={m.url} alt={m.altText || m.filename} loading="lazy" />
+              </a>
+              <figcaption>
+                <span class="t-tabular name">{m.filename.slice(0, 14)}…</span>
+                <span class="meta">
+                  {m.width && m.height ? `${m.width}×${m.height} · ` : ""}{kb(m.sizeBytes)}
+                </span>
+                <span class="store" data-r2={m.storage === "r2" || undefined}>{m.storage}</span>
+              </figcaption>
+            </figure>
+          ))
+        }
+      </div>
+    )
+  }
+</AdminLayout>
+
+<style>
+  .head { display: flex; gap: var(--space-4); align-items: baseline; flex-wrap: wrap; }
+  .upload { max-width: 520px; }
+  .field { display: grid; gap: 4px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: var(--space-4); }
+  .item { margin: 0; display: grid; gap: 6px; }
+  .thumb {
+    display: block; aspect-ratio: 1; border: var(--border-w) solid var(--line);
+    border-radius: var(--radius-md); overflow: hidden; background: var(--surface-inset);
+  }
+  .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  figcaption { display: grid; gap: 2px; }
+  .name { font: 400 var(--text-xs) var(--font-mono); color: var(--ink); }
+  .meta { font: 400 var(--text-xs) var(--font-mono); color: var(--ink-faint); }
+  .store {
+    font: 600 0.625rem var(--font-mono); letter-spacing: var(--tracking-caps);
+    text-transform: uppercase; color: var(--ink-faint);
+  }
+  .store[data-r2] { color: var(--accent); }
+</style>

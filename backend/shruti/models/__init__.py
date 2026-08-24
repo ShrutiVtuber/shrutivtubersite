@@ -54,6 +54,11 @@ class Media(TimestampMixin, table=True):
     width: Optional[int] = None
     height: Optional[int] = None
     size_bytes: int = 0
+    # Where this one actually landed. Files uploaded before R2 was switched
+    # on are still on disk, and must keep resolving to /media/* rather than to
+    # a bucket that does not contain them.
+    storage_backend: str = "local"      # local | r2
+
     alt_text: str = ""
     credit: str = ""          # illustrator/rigger attribution, shown where used
     credit_url: str = ""
