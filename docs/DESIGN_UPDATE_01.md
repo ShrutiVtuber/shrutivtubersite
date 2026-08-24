@@ -9,12 +9,17 @@ changed since the copy you were sent. Nothing else has moved.
 
 ## 1. Answer to your question: build the tool page template next
 
-Not the press kit — that one is actively cut, and the reason is worth knowing:
-the only indie VTuber press kit we could find renders **nine zeroes** for its
-live follower statistics, because the automation breaks and nobody notices. A
-sponsor reading nine zeroes concludes the audience is zero. It does more harm
-than having no page. Contact is worth building, but it is a form and an
-afternoon.
+Not the press kit *first* — but do design it, we simply won't publish it until
+the numbers justify it. Two constraints when you do build it:
+
+- **The statistics block must be hand-authored, not an automated widget.** The
+  only indie VTuber press kit we could find renders **nine zeroes** for its live
+  follower counts, because the automation broke and nobody noticed. A sponsor
+  reading nine zeroes concludes the audience is zero. Automation is the failure
+  mode here, so design a block someone updates deliberately.
+- **No rate card.** "Enquire" instead, even at launch.
+
+Contact is worth building too, but it is a form and an afternoon.
 
 **The tool pages are the site's only real differentiator.** Six pages off one
 template, each a working instrument running in the browser:
@@ -54,7 +59,28 @@ actually builds. No other VTuber can ship this.
   to trust the astrology — so the link is a feature of the design, not a footer
   obligation.
 
-If you want a second surface after this: **`/work`**, with a real per-project
+### The natal chart tool has three jobs beyond computing
+
+The backend is built and serving both traditions. What the design has to carry:
+
+1. **Pull a chart.** Birth date, time and place, plus the tradition toggle. The
+   Vedic side needs an ayanāṁśa selector; the Hellenistic side needs a house
+   system selector. Sensible defaults, both changeable.
+2. **Print it nicely.** A real print stylesheet — this is a deliverable, not an
+   afterthought. Practitioners print charts and keep them in physical files, so
+   an A4/Letter layout that puts the wheel, the position table and the
+   birth data on one page without clipping is genuinely used. Test it.
+3. **Share it.** Every parameter belongs in the URL, so a chart is a link. A
+   shareable chart is the site's best organic distribution: someone posts their
+   chart in a Discord and the link carries the tool with it. Design an OG
+   preview image for that link.
+
+Note the two traditions render *differently*, not just with different labels —
+a Vedic chart is conventionally a square North or South Indian diagram, a
+Hellenistic one a circular wheel. Both are legitimate and the toggle should
+switch the diagram, not merely relabel a wheel.
+
+If you want a third surface after this: **`/work`**, with a real per-project
 credit structure (Name · Role · Stack · Licence · Status).
 
 ---
