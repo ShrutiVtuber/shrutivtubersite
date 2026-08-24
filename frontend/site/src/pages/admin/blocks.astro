@@ -1,0 +1,203 @@
+---
+/* Page blocks — visibility, order, and editing, on one screen.
+ *
+ * The site's whole content model is that a block can be hidden and unhidden
+ * without a deploy, and that art is nullable. So this screen's job is to make
+ * "show this" and "hide this" one click, and to make the fact that something
+ * is hidden obvious at a glance rather than something to go looking for.
+ *
+ * Every table defaults to HIDDEN. Nothing half-done ships by accident.
+ */
+import AdminLayout from "../../layouts/AdminLayout.astro";
+import CsrfField from "../../components/forms/CsrfField.astro";
+import Button from "../../components/forms/Button.astro";
+import Badge from "../../components/navigation/Badge.astro";
+import { asAdmin, KINDS } from "../../lib/admin";
+import { verifyCsrf } from "../../lib/csrf";
+
+const kind = KINDS.some((k) => k.kind === Astro.url.searchParams.get("kind"))
+  ? Astro.url.searchParams.get("kind")!
+  : "sections";
+const spec = KINDS.find((k) => k.kind === kind)!;
+const editing = Astro.url.searchParams.get("edit");
+
+let notice = "";
+let failed = "";
+
+if (Astro.request.method === "POST") {
+  const form = await Astro.request.formData();
+  if (!verifyCsrf(Astro.cookies, form)) {
+    failed = "That did not save. Reload the page and try again.";
+  } else {
+    const action = String(form.get("action") ?? "");
+    const id = String(form.get("id") ?? "");
+
+    if (action === "visibility") {
+      const r = await asAdmin(Astro, `/api/admin/${kind}/${id}/visibility`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ visible: form.get("visible") === "1" }),
+      });
+      notice = r.ok ? "Updated." : "";
+      failed = r.ok ? "" : (r.body?.detail ?? "That did not change.");
+    }
+
+    if (action === "save" || action === "create") {
+      /* Only the fields this table actually has are sent — the form renders
+         from the row it is editing, so it cannot invent a column. */
+      const payload: Record<string, unknown> = {};
+      for (const [key, value] of form.entries()) {
+        if (["action", "id", "_csrf", "kind"].includes(key)) continue;
+        const s = String(value);
+        payload[key] = s === "on" ? true : /^-?\d+$/.test(s) && key !== "body_md" ? Number(s) : s;
+      }
+      const r = action === "create"
+        ? await asAdmin(Astro, `/api/admin/${kind}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          })
+        : await asAdmin(Astro, `/api/admin/${kind}/${id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+      notice = r.ok ? "Saved." : "";
+      failed = r.ok ? "" : (r.body?.detail ?? "That did not save.");
+    }
+
+    if (action === "delete") {
+      const r = await asAdmin(Astro, `/api/admin/${kind}/${id}`, { method: "DELETE" });
+      notice = r.ok ? "Deleted." : "";
+      failed = r.ok ? "" : (r.body?.detail ?? "That did not delete.");
+    }
+  }
+}
+
+const list = await asAdmin(Astro, `/api/admin/${kind}`);
+const rows: any[] = Array.isArray(list.body) ? list.body : [];
+const row = editing ? rows.find((r) => String(r.id) === editing) : null;
+
+/* Which fields to show, per table. Long text gets a textarea. */
+const LONG = new Set(["body_md", "bodyMd", "notes_md", "notesMd", "wording"]);
+const SKIP = new Set(["id", "created_at", "updated_at", "createdAt", "updatedAt", "media", "visible", "position"]);
+const fieldsOf = (r: any) => Object.keys(r).filter((k) => !SKIP.has(k));
+const label = (r: any) =>
+  r.title || r.name || r.label || r.key || r.slug || r.artist || r.platform || `#${r.id}`;
+---
+
+<AdminLayout title={spec.label}>
+  <div class="head">
+    <h1 class="adm-h">{spec.label}</h1>
+    <nav class="kinds">
+      {
+        KINDS.map((k) => (
+          <a href={`/admin/blocks?kind=${k.kind}`} aria-current={k.kind === kind ? "page" : undefined}>
+            {k.label}
+          </a>
+        ))
+      }
+    </nav>
+  </div>
+
+  {notice && <p class="adm-ok" role="status">{notice}</p>}
+  {failed && <p class="adm-bad" role="alert">{failed}</p>}
+
+  {
+    row ? (
+      <form method="POST" class="adm-card editor">
+        <CsrfField />
+        <input type="hidden" name="action" value="save" />
+        <input type="hidden" name="id" value={row.id} />
+        <h2 class="h2">Editing {label(row)}</h2>
+        {
+          fieldsOf(row).map((k) => (
+            <label class="field">
+              <span class="adm-lbl">{k.replace(/_/g, " ").replace(/([A-Z])/g, " $1")}</span>
+              {
+                LONG.has(k)
+                  ? <textarea class="adm-area" name={k} rows="10">{row[k] ?? ""}</textarea>
+                  : typeof row[k] === "boolean"
+                    ? <input type="checkbox" name={k} checked={row[k]} />
+                    : <input class="adm-input" name={k} value={row[k] ?? ""} />
+              }
+            </label>
+          ))
+        }
+        <div class="row-actions">
+          <Button type="submit">Save</Button>
+          <a class="cancel" href={`/admin/blocks?kind=${kind}`}>Cancel</a>
+        </div>
+      </form>
+    ) : (
+      <>
+        <p class="adm-note">
+          Nothing appears on the site until it is marked visible. Hidden is the default, so nothing
+          half-finished ships by accident — and a hidden row is dimmed here rather than tucked away.
+        </p>
+
+        <div class="rows">
+          {
+            rows.length === 0 ? (
+              <p class="adm-note">No {spec.label.toLowerCase()} yet.</p>
+            ) : (
+              rows.map((r) => (
+                <div class="row" data-hidden={!r.visible || undefined}>
+                  <div class="row-main">
+                    <span class="row-label">{label(r)}</span>
+                    {r.page && <span class="row-sub">on /{r.page}</span>}
+                    {r.eyebrow && <span class="row-sub">{r.eyebrow}</span>}
+                  </div>
+                  <Badge tone={r.visible ? "accent" : "faint"}>{r.visible ? "visible" : "hidden"}</Badge>
+                  <div class="row-actions">
+                    <form method="POST" class="inline">
+                      <CsrfField />
+                      <input type="hidden" name="action" value="visibility" />
+                      <input type="hidden" name="id" value={r.id} />
+                      <input type="hidden" name="visible" value={r.visible ? "0" : "1"} />
+                      <Button type="submit" variant="ghost" size="sm">
+                        {r.visible ? "Hide" : "Show"}
+                      </Button>
+                    </form>
+                    <a class="edit" href={`/admin/blocks?kind=${kind}&edit=${r.id}`}>Edit</a>
+                  </div>
+                </div>
+              ))
+            )
+          }
+        </div>
+      </>
+    )
+  }
+</AdminLayout>
+
+<style>
+  .head { display: flex; gap: var(--space-4); align-items: baseline; flex-wrap: wrap; }
+  .kinds { display: flex; gap: 2px; flex-wrap: wrap; margin-left: auto; }
+  .kinds a {
+    font: 500 var(--text-xs) var(--font-body); color: var(--ink-soft); text-decoration: none;
+    padding: 7px 11px; border-radius: var(--radius-sm);
+  }
+  .kinds a:hover { color: var(--ink); background: var(--surface-veil); }
+  .kinds a[aria-current="page"] { color: var(--accent); background: var(--accent-wash); }
+
+  .rows { display: grid; gap: 6px; }
+  .row {
+    display: flex; gap: var(--space-4); align-items: center; flex-wrap: wrap;
+    background: var(--surface-card); border: var(--border-w) solid var(--line);
+    border-radius: var(--radius-sm); padding: 12px 14px;
+  }
+  /* Hidden is dimmed, not hidden from you. */
+  .row[data-hidden] { opacity: 0.6; border-style: dashed; }
+  .row-main { display: grid; gap: 2px; min-width: 0; flex: 1; }
+  .row-label { font: 500 var(--text-body) var(--font-body); color: var(--ink); }
+  .row-sub { font: 400 var(--text-xs) var(--font-mono); color: var(--ink-faint); }
+  .row-actions { display: flex; gap: 10px; align-items: center; }
+  .inline { display: inline; }
+  .edit, .cancel { font: 500 var(--text-sm) var(--font-body); color: var(--accent); text-decoration: none; }
+  .edit:hover, .cancel:hover { text-decoration: underline; }
+
+  .editor { gap: var(--space-4); max-width: 760px; }
+  .h2 { font: 600 var(--text-h3) var(--font-display); color: var(--ink); margin: 0; }
+  .field { display: grid; gap: 4px; }
+</style>

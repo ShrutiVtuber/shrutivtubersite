@@ -1,0 +1,79 @@
+---
+/* The inbox: contact messages and the question box.
+ *
+ * Both are stored before they are sent, so a failed send never loses what
+ * someone wrote — this is where you read them either way.
+ */
+import AdminLayout from "../../layouts/AdminLayout.astro";
+import { asAdmin } from "../../lib/admin";
+
+const [messages, questions] = await Promise.all([
+  asAdmin(Astro, "/api/admin/inbox/messages"),
+  asAdmin(Astro, "/api/admin/inbox/questions"),
+]);
+const msgs: any[] = Array.isArray(messages.body) ? messages.body : [];
+const qs: any[] = Array.isArray(questions.body) ? questions.body : [];
+---
+
+<AdminLayout title="Inbox">
+  <h1 class="adm-h">Inbox</h1>
+
+  <section class="adm-card">
+    <h2 class="h2">Messages <span class="count">{msgs.length}</span></h2>
+    {
+      msgs.length === 0 ? (
+        <p class="adm-note">Nothing yet.</p>
+      ) : (
+        <ul class="items">
+          {
+            msgs.map((m) => (
+              <li>
+                <div class="meta">
+                  <span class="who">{m.name}</span>
+                  <a class="addr" href={`mailto:${m.email}`}>{m.email}</a>
+                  <span class="kind">{m.kind}</span>
+                  <span class="when t-tabular">{(m.createdAt ?? "").slice(0, 16).replace("T", " ")}</span>
+                </div>
+                <p class="body">{m.body}</p>
+              </li>
+            ))
+          }
+        </ul>
+      )
+    }
+  </section>
+
+  <section class="adm-card">
+    <h2 class="h2">Questions <span class="count">{qs.length}</span></h2>
+    {
+      qs.length === 0 ? (
+        <p class="adm-note">Nothing yet.</p>
+      ) : (
+        <ul class="items">
+          {
+            qs.map((q) => (
+              <li>
+                <div class="meta">
+                  <span class="when t-tabular">{(q.createdAt ?? "").slice(0, 16).replace("T", " ")}</span>
+                </div>
+                <p class="body">{q.body ?? q.question}</p>
+              </li>
+            ))
+          }
+        </ul>
+      )
+    }
+  </section>
+</AdminLayout>
+
+<style>
+  .h2 { font: 600 var(--text-h3) var(--font-display); color: var(--ink); margin: 0; display: flex; gap: 10px; align-items: baseline; }
+  .count { font: 400 var(--text-sm) var(--font-mono); color: var(--ink-faint); }
+  .items { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
+  .items li { border-top: var(--border-w) solid var(--line); padding-top: 12px; }
+  .meta { display: flex; gap: 12px; align-items: baseline; flex-wrap: wrap; }
+  .who { font: 500 var(--text-body) var(--font-body); color: var(--ink); }
+  .addr { font: 400 var(--text-sm) var(--font-mono); color: var(--accent); }
+  .kind, .when { font: 400 var(--text-xs) var(--font-mono); color: var(--ink-faint); }
+  .body { font: 400 var(--text-sm) / 1.7 var(--font-body); color: var(--ink-soft); margin: 6px 0 0; max-width: 72ch; white-space: pre-wrap; }
+</style>

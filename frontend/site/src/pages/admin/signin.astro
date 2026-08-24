@@ -1,0 +1,61 @@
+---
+/* Admin sign-in. The one admin page that cannot require a session. */
+import AdminLayout from "../../layouts/AdminLayout.astro";
+import CsrfField from "../../components/forms/CsrfField.astro";
+import Button from "../../components/forms/Button.astro";
+import { SITE_API } from "../../lib/api";
+import { verifyCsrf } from "../../lib/csrf";
+import { redirectWithCookies } from "../../lib/redirect";
+import { signedIn } from "../../lib/admin";
+
+const next = Astro.url.searchParams.get("next") || "/admin";
+let failed = "";
+
+if (Astro.request.method === "POST") {
+  const form = await Astro.request.formData();
+  if (!verifyCsrf(Astro.cookies, form)) {
+    failed = "That did not send. Reload the page and try again.";
+  } else {
+    const r = await fetch(`${SITE_API}/api/admin/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: String(form.get("email") ?? ""),
+        password: String(form.get("password") ?? ""),
+      }),
+    });
+    // redirectWithCookies, not Astro.redirect: the latter builds a new
+    // Response and drops the Set-Cookie that just signed you in.
+    if (r.ok) return redirectWithCookies(String(form.get("next") ?? "/admin"), r);
+    failed = "Email or password is wrong.";
+  }
+} else if (await signedIn(Astro)) {
+  return Astro.redirect(next);
+}
+---
+
+<AdminLayout title="Sign in" open>
+  <div class="signin-wrap">
+    <h1 class="adm-h">Sign in</h1>
+    <form method="POST" class="adm-card signin-form">
+      <CsrfField />
+      <input type="hidden" name="next" value={next} />
+      {failed && <p class="adm-bad" role="alert">{failed}</p>}
+      <label class="field">
+        <span class="adm-lbl">Email</span>
+        <input class="adm-input" type="email" name="email" required autocomplete="username" autofocus />
+      </label>
+      <label class="field">
+        <span class="adm-lbl">Password</span>
+        <input class="adm-input" type="password" name="password" required autocomplete="current-password" />
+      </label>
+      <div><Button type="submit">Sign in</Button></div>
+    </form>
+  </div>
+</AdminLayout>
+
+<style>
+  .signin-wrap { max-width: 380px; display: grid; gap: var(--space-4); }
+  .signin-form { gap: var(--space-4); }
+  .field { display: grid; gap: 4px; }
+</style>

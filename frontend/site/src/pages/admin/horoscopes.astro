@@ -15,7 +15,7 @@
  * Publishing is blocked until all twelve exist, because AN EMPTY READING IS
  * WORSE THAN A LATE ONE.
  */
-import BaseLayout from "../../layouts/BaseLayout.astro";
+import AdminLayout from "../../layouts/AdminLayout.astro";
 import SectionHeader from "../../components/brand/SectionHeader.astro";
 import Badge from "../../components/navigation/Badge.astro";
 import Prose from "../../components/content/Prose.astro";
@@ -55,22 +55,6 @@ if (Astro.request.method === "POST") {
     });
     notice = r.ok ? "Draft saved." : "";
     failed = r.ok ? "" : ((await r.json().catch(() => null))?.detail ?? "That did not save.");
-  } else if (String(form.get("action")) === "signin") {
-    /* Signing in happens on this page rather than at a route of its own: the
-       admin SPA owns /admin*, and adding a second server-rendered path under
-       it would mean a second Caddy exception to unpick later. */
-    const r = await fetch(`${SITE_API}/api/admin/login`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        email: String(form.get("email") ?? ""),
-        password: String(form.get("password") ?? ""),
-      }),
-    });
-    if (r.ok) {
-      return redirectWithCookies(Astro.url.pathname + Astro.url.search, r);
-    }
-    failed = "Email or password is wrong.";
   } else if (String(form.get("action")) === "publish") {
     const r = await fetch(`${SITE_API}/api/horoscopes/publish`, {
       method: "POST",
@@ -90,7 +74,6 @@ interface Drafts {
   drafts: { sign: string; bodyMd: string; published: boolean }[];
 }
 const r = await fetch(`${SITE_API}/api/horoscopes/drafts?period=monthly&covers=${covers}`, { headers });
-const needsSignIn = r.status === 401;
 const data: Drafts | null = r.ok ? await r.json() : null;
 
 const current = data?.drafts.find((d) => d.sign === sign);
@@ -102,8 +85,8 @@ const GLYPH: Record<string, string> = {
 };
 ---
 
-<BaseLayout title="Horoscopes — admin" description="Write the twelve monthly readings.">
-  <div class="page authoring">
+<AdminLayout title="Horoscopes">
+  <div class="authoring">
     <div class="head">
       <SectionHeader as="h1" glyph="☾" eyebrow="Admin" title="Horoscopes" />
       {
@@ -129,15 +112,7 @@ const GLYPH: Record<string, string> = {
     {failed && <p class="failed" role="alert">{failed}</p>}
 
     {
-      needsSignIn ? (
-        <form method="POST" class="signin">
-          <CsrfField />
-          <input type="hidden" name="action" value="signin" />
-          <label class="field"><span class="lbl">Email</span><input type="email" name="email" required autocomplete="username" /></label>
-          <label class="field"><span class="lbl">Password</span><input type="password" name="password" required autocomplete="current-password" /></label>
-          <div><Button type="submit">Sign in</Button></div>
-        </form>
-      ) : !data ? (
+      !data ? (
         <p class="failed">Could not load the drafts.</p>
       ) : (
         <>
@@ -212,7 +187,7 @@ const GLYPH: Record<string, string> = {
       )
     }
   </div>
-</BaseLayout>
+</AdminLayout>
 
 <style>
   .authoring { display: grid; gap: var(--space-4); }
@@ -259,14 +234,4 @@ const GLYPH: Record<string, string> = {
   }
   .empty-preview { font: 400 var(--text-sm) / 1.7 var(--font-body); color: var(--ink-faint); margin: 0; }
   .publish { border-top: var(--border-w) solid var(--line); padding-top: var(--space-4); }
-  .signin {
-    display: grid; gap: 12px; max-width: 360px;
-    background: var(--surface-card); border: var(--border-w) solid var(--line);
-    border-radius: var(--radius-md); padding: var(--space-5);
-  }
-  .signin input {
-    font: 400 var(--text-sm) var(--font-body); color: var(--ink); background: var(--surface-page);
-    border: var(--border-w) solid var(--line); border-radius: var(--radius-sm);
-    padding: 8px 10px; min-height: 40px; width: 100%; box-sizing: border-box;
-  }
 </style>

@@ -1,0 +1,16 @@
+---
+/* Signing out. POST only — a link that logs you out can be triggered by an
+   image tag on someone else's page. */
+import { SITE_API } from "../../lib/api";
+import { redirectWithCookies } from "../../lib/redirect";
+import { ADMIN_COOKIE } from "../../lib/admin";
+
+if (Astro.request.method !== "POST") return Astro.redirect("/admin");
+
+const token = Astro.cookies.get(ADMIN_COOKIE)?.value;
+const r = await fetch(`${SITE_API}/api/admin/logout`, {
+  method: "POST",
+  headers: token ? { cookie: `${ADMIN_COOKIE}=${token}` } : {},
+});
+return redirectWithCookies("/admin/signin", r);
+---

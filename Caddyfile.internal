@@ -42,16 +42,15 @@
 		header Cache-Control "public, max-age=604800"
 	}
 
-	# ── Horoscope authoring, server-rendered ────────────────────────────────
+	# ── Admin ───────────────────────────────────────────────────────────────
 	#
-	# The design specifies a React SPA for the admin and that SPA does not
-	# exist yet — /srv/admin is empty, so the handler below serves nothing.
-	# The horoscope editor is needed before the shell it belongs in, so it is
-	# an Astro page and this route reaches it. It sits ABOVE the SPA handler
-	# because /admin* would otherwise swallow it.
-	#
-	# Delete this block when the SPA exists and the editor moves into it.
-	handle /admin/horoscopes* {
+	# Server-rendered by Astro rather than a separate React SPA. The design
+	# specified an SPA; nothing was ever built at /srv/admin, so the old
+	# handler here served a 404 to anyone who typed /admin. Building it as
+	# Astro pages means one stack, one build, one set of components and the
+	# same tokens, and it works without JavaScript — which for a CMS someone
+	# operates from a phone in a hotel is worth more than an SPA.
+	handle /admin* {
 		reverse_proxy site:4321 {
 			header_up X-Real-IP {http.request.header.X-Real-IP}
 			header_up X-Forwarded-For {http.request.header.X-Forwarded-For}
@@ -63,16 +62,6 @@
 		}
 	}
 
-	# ── Admin SPA — where you edit pages and swap art in without a deploy ────
-	handle /admin* {
-		root * /srv/admin
-		try_files {path} /index.html
-		file_server
-		header {
-			Cache-Control "no-store"
-			X-Robots-Tag "noindex, nofollow"
-		}
-	}
 
 	# ── Everything else: the Astro site (SSR) ────────────────────────────────
 	#

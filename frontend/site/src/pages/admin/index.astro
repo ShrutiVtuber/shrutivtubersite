@@ -1,0 +1,77 @@
+---
+/* Admin overview — what needs attention, and the way in to everything else. */
+import AdminLayout from "../../layouts/AdminLayout.astro";
+import Badge from "../../components/navigation/Badge.astro";
+import { asAdmin, KINDS } from "../../lib/admin";
+
+const now = new Date();
+const thisMonth = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
+
+const [horoscopes, messages, questions, sections] = await Promise.all([
+  asAdmin(Astro, `/api/horoscopes/drafts?period=monthly&covers=${thisMonth}`),
+  asAdmin(Astro, "/api/admin/inbox/messages"),
+  asAdmin(Astro, "/api/admin/inbox/questions"),
+  asAdmin(Astro, "/api/admin/sections"),
+]);
+
+const written = horoscopes.body?.written ?? 0;
+const published = horoscopes.body?.published ?? false;
+const msgCount = Array.isArray(messages.body) ? messages.body.length : 0;
+const qCount = Array.isArray(questions.body) ? questions.body.length : 0;
+const rows = Array.isArray(sections.body) ? sections.body : [];
+const hidden = rows.filter((s: any) => !s.visible).length;
+---
+
+<AdminLayout title="Overview">
+  <h1 class="adm-h">Overview</h1>
+
+  <div class="cards">
+    <a class="adm-card tile" href="/admin/horoscopes">
+      <span class="adm-lbl">This month's horoscopes</span>
+      <span class="big">{written} <span class="of">of 12</span></span>
+      <Badge tone={published ? "accent" : written === 12 ? "rose" : "faint"}>
+        {published ? "published" : written === 12 ? "ready to publish" : "in progress"}
+      </Badge>
+    </a>
+
+    <a class="adm-card tile" href="/admin/inbox">
+      <span class="adm-lbl">Inbox</span>
+      <span class="big">{msgCount + qCount}</span>
+      <span class="sub">{msgCount} messages · {qCount} questions</span>
+    </a>
+
+    <a class="adm-card tile" href="/admin/blocks">
+      <span class="adm-lbl">Page blocks</span>
+      <span class="big">{rows.length}</span>
+      <span class="sub">{hidden} hidden</span>
+    </a>
+  </div>
+
+  <section class="adm-card">
+    <h2 class="h2">Everything you can edit</h2>
+    <p class="adm-note">
+      Each of these is a table with a visible flag and an order. Nothing appears on the site until
+      it is marked visible — the default is hidden, so nothing half-done ships by accident.
+    </p>
+    <div class="kinds">
+      {KINDS.map((k) => <a class="kind" href={`/admin/blocks?kind=${k.kind}`}>{k.label}</a>)}
+    </div>
+  </section>
+</AdminLayout>
+
+<style>
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: var(--space-4); }
+  .tile { text-decoration: none; align-content: start; }
+  .tile:hover { border-color: var(--line-strong); }
+  .big { font: 500 2.2rem var(--font-display); color: var(--ink); line-height: 1; font-variant-numeric: tabular-nums; }
+  .of { font-size: var(--text-body); color: var(--ink-faint); }
+  .sub { font: 400 var(--text-sm) var(--font-body); color: var(--ink-soft); }
+  .h2 { font: 600 var(--text-h3) var(--font-display); color: var(--ink); margin: 0; }
+  .kinds { display: flex; gap: 8px; flex-wrap: wrap; }
+  .kind {
+    font: 500 var(--text-sm) var(--font-body); color: var(--ink-soft); text-decoration: none;
+    border: var(--border-w) solid var(--line); border-radius: var(--radius-full);
+    padding: 8px 14px; min-height: 40px; display: inline-flex; align-items: center;
+  }
+  .kind:hover { border-color: var(--accent); color: var(--accent); }
+</style>
