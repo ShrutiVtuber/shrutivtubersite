@@ -1,0 +1,72 @@
+# shrutivtuber.com — VTuber site production deploy
+# Drop-in for /etc/caddy/Caddyfile.d/ (imported by /etc/caddy/Caddyfile).
+# Reverse-proxies to this stack's internal Caddy on 127.0.0.1:8200.
+#
+# Port map on agent-house:
+#   8090  daskalos      8190  theourgia      8200  shrutivtuber (this)      8210  astropractise
+#
+# Requires CLOUDFLARE_API_TOKEN_SHRUTI in /etc/caddy/caddy.env — a token
+# scoped Zone:DNS:Edit on the shrutivtuber.com zone, matching the per-tenant
+# token convention already used by theourgia.
+#
+# Install:
+#   sudo install -m 644 deploy/shrutivtuber.caddy /etc/caddy/Caddyfile.d/
+#   sudo caddy-reload
+
+shrutivtuber.com {
+    encode gzip zstd
+
+    tls {
+        dns cloudflare {env.CLOUDFLARE_API_TOKEN_SHRUTI}
+    }
+
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        X-Content-Type-Options "nosniff"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        Permissions-Policy "interest-cohort=()"
+        # 'unsafe-inline' covers the no-flash theme script and design-system
+        # inline styles. img-src allows data: for inlined marks. YouTube/Twitch
+        # embeds need frame-src; drop those entries if embeds are removed.
+        Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self'; frame-src https://www.youtube-nocookie.com https://player.twitch.tv; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+        -Server
+    }
+
+    reverse_proxy 127.0.0.1:8200 {
+        flush_interval -1
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+        transport http {
+            versions 1.1 2
+        }
+    }
+
+    log {
+        output stderr
+        format console
+    }
+}
+
+www.shrutivtuber.com {
+    tls {
+        dns cloudflare {env.CLOUDFLARE_API_TOKEN_SHRUTI}
+    }
+    redir https://shrutivtuber.com{uri} permanent
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# /journal — BeeRanked
+#
+# Preferred: mount at the Cloudflare edge so requests never reach this box.
+# Nothing goes here in that case.
+#
+# Origin fallback: insert INSIDE the shrutivtuber.com block ABOVE the
+# catch-all reverse_proxy —
+#
+#     handle /journal* {
+#         reverse_proxy https://<beeranked-host> {
+#             header_up Host <beeranked-host>
+#         }
+#     }
+# ─────────────────────────────────────────────────────────────────────────────

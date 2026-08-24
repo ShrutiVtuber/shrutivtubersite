@@ -54,8 +54,21 @@ client secret never leaves the backend; that is the main reason it exists.
 | `frontend/site/` | Astro 6, SSR via node adapter |
 | `frontend/admin/` | React 19 + Vite admin SPA |
 | `frontend/shared/` | design tokens shared by both |
-| `deploy/` | host Caddy block to append on the VPS |
+| `deploy/` | Caddy drop-in for `/etc/caddy/Caddyfile.d/` |
 | `assets/rescued/` | salvaged from the old WordPress site |
+
+## Production host
+
+`agent-house` — Debian 13, 4 vCPU / 15 GB RAM, 150 GB disk. Already runs
+theourgia (8190), astropractise (8210) and daskalos (8090); this stack takes
+**8200**. Host Caddy terminates TLS and imports per-tenant drop-ins from
+`/etc/caddy/Caddyfile.d/`.
+
+```bash
+ssh -i ~/.ssh/agent-house-access-theourgia theourgia@178.105.106.225
+```
+
+Deploy root: `/srv/shrutivtuber/prod`.
 
 ## Local
 
@@ -72,8 +85,12 @@ Site on <http://localhost:8200>, API docs on <http://localhost:8200/api/docs>.
 docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 ```
 
-Append `deploy/Caddyfile.host.example` to the box's `/etc/caddy/Caddyfile`,
-then `caddy validate` and `systemctl reload caddy`.
+Install the Caddy drop-in on the host:
+
+```bash
+sudo install -m 644 deploy/shrutivtuber.caddy /etc/caddy/Caddyfile.d/
+sudo caddy-reload
+```
 
 ## Status
 
