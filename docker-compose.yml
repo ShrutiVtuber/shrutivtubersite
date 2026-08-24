@@ -80,10 +80,12 @@ services:
         condition: service_healthy
     env_file: [.env]
     environment:
+      # Where to ask what the sky was doing, for journal entries.
+      SHRUTI_ASTRO_INTERNAL: http://shruti-astro:8000
       SHRUTI_DATABASE_URL: postgresql+asyncpg://${SHRUTI_POSTGRES_USER:-shruti}:${SHRUTI_POSTGRES_PASSWORD}@postgres:5432/${SHRUTI_POSTGRES_DB:-shruti}
     volumes:
       - media:/app/media
-    networks: [shruti]
+    networks: [shruti, shruti-interop]
 
   postgres:
     image: postgres:17-alpine

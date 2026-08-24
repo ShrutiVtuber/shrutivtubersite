@@ -1,0 +1,142 @@
+---
+/* The sky a journal entry was written under.
+ *
+ * Theourgia's rule, kept: this is the MACHINE'S HALF of the record. It is
+ * read-only, it describes the moment the entry was published rather than the
+ * moment you are reading it, and every absence states its reason rather than
+ * showing a blank.
+ *
+ * Rendered from stored values. Nothing is cast here — an index of twenty
+ * entries would otherwise cast twenty charts.
+ */
+export interface Sky {
+  slug: string;
+  at: string | null;
+  place: { lat: number; lon: number; name: string };
+  summary: string;
+  reading: any | null;
+  failureReason: string;
+}
+interface Props {
+  sky: Sky | null;
+  /** `line` for an index card, `panel` for the entry itself. */
+  variant?: "line" | "panel";
+}
+const { sky, variant = "panel" } = Astro.props;
+
+const r = sky?.reading ?? null;
+const moon = r?.moon?.tropical ?? null;
+const sun = r?.sun?.tropical ?? null;
+const hour = r?.planetaryHours?.current ?? null;
+const attic = r?.reckonings?.attic ?? null;
+const hindu = r?.reckonings?.hindu ?? null;
+const thelemic = r?.reckonings?.thelemic ?? null;
+const deg = (d: number | undefined) => (d == null ? "" : `${d.toFixed(1)}°`);
+---
+
+{
+  variant === "line" ? (
+    sky?.summary ? <span class="sky-line">{sky.summary}</span> : null
+  ) : !sky ? null : (
+    <aside class="sky-panel">
+      <p class="t-eyebrow">Written under</p>
+      {
+        sky.failureReason ? (
+          /* Never a blank. The reason is the record. */
+          <p class="sky-absent">
+            <span class="t-glyph" aria-hidden="true">◐</span> The sky was not captured for this
+            entry — {sky.failureReason}. It is not re-cast later, because the sky of the moment it
+            was written is the only one that would be true.
+          </p>
+        ) : (
+          <>
+            <dl class="sky-rows">
+              {
+                sun && (
+                  <div>
+                    <dt><span class="t-glyph" aria-hidden="true">☉</span> Sun</dt>
+                    <dd class="t-tabular">{deg(sun.degree)} {sun.sign}</dd>
+                  </div>
+                )
+              }
+              {
+                moon && (
+                  <div>
+                    <dt><span class="t-glyph" aria-hidden="true">☾</span> Moon</dt>
+                    <dd class="t-tabular">{deg(moon.degree)} {moon.sign}</dd>
+                  </div>
+                )
+              }
+              {
+                hour?.ruler && (
+                  <div>
+                    <dt><span class="t-glyph" aria-hidden="true">☿</span> Hour</dt>
+                    <dd>{hour.ruler}</dd>
+                  </div>
+                )
+              }
+              {
+                attic?.greek && (
+                  <div>
+                    <dt>Attic</dt>
+                    <dd lang="el">{attic.greek} {attic.day}</dd>
+                  </div>
+                )
+              }
+              {
+                hindu?.tithi && (
+                  <div>
+                    <dt>Hindu</dt>
+                    <dd>{hindu.month} {hindu.tithi}</dd>
+                  </div>
+                )
+              }
+              {
+                thelemic?.formatted && (
+                  <div class="wide">
+                    <dt>Thelemic</dt>
+                    <dd>{thelemic.formatted}</dd>
+                  </div>
+                )
+              }
+            </dl>
+            <p class="sky-foot t-tabular">
+              {sky.at?.slice(0, 16).replace("T", " ")} UTC
+              {sky.place.name ? ` · ${sky.place.name}` : ""}
+            </p>
+          </>
+        )
+      }
+    </aside>
+  )
+}
+
+<style>
+  .sky-line { font: 400 var(--text-xs) var(--font-mono); color: var(--ink-faint); }
+  .sky-panel {
+    background: var(--surface-inset);
+    border: var(--border-w) solid var(--line);
+    border-radius: var(--radius-md);
+    padding: var(--space-4);
+    display: grid;
+    gap: 10px;
+  }
+  .sky-panel .t-eyebrow { margin: 0; }
+  .sky-rows { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 0 var(--space-4); margin: 0; }
+  .sky-rows > div { display: flex; gap: 10px; align-items: baseline; padding: 7px 0; border-bottom: var(--border-w) solid var(--line); }
+  .sky-rows > div.wide { grid-column: 1 / -1; }
+  .sky-rows dt {
+    font: 600 var(--text-micro) var(--font-body);
+    letter-spacing: var(--tracking-eyebrow);
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    display: inline-flex;
+    gap: 6px;
+    align-items: baseline;
+  }
+  .sky-rows dt .t-glyph { color: var(--rose); letter-spacing: 0; }
+  .sky-rows dd { margin: 0 0 0 auto; font: 400 var(--text-sm) var(--font-body); color: var(--ink); }
+  .sky-foot { font: 400 var(--text-xs) var(--font-mono); color: var(--ink-faint); margin: 0; }
+  .sky-absent { font: 400 var(--text-sm) / 1.7 var(--font-body); color: var(--ink-soft); margin: 0; max-width: 62ch; }
+  .sky-absent .t-glyph { color: var(--rose); }
+</style>

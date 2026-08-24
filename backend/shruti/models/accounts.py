@@ -28,9 +28,7 @@ from typing import Optional
 
 from sqlmodel import Field
 
-from shruti.models import UTC_TS
-
-from shruti.models import TimestampMixin
+from shruti.models import UTC_TS, TimestampMixin
 
 
 class User(TimestampMixin, table=True):
@@ -178,3 +176,51 @@ class Issue(TimestampMixin, table=True):
     letter_md: str = ""
     sent_at: Optional[datetime] = Field(default=None, sa_type=UTC_TS)
     visible: bool = Field(default=False)
+
+
+class JournalSky(TimestampMixin, table=True):
+    """
+    The sky at the moment a journal entry was published.
+
+    Theourgia stamps every record with what the world was doing when it was
+    made, and a journal of practice deserves the same. The rules it follows,
+    which this keeps:
+
+      - **The captured instant is the moment being described**, not the moment
+        of capture and not a re-reading later. An entry written under a Mars
+        hour was written under a Mars hour; re-casting it next year would
+        quietly replace that with something else.
+      - **It is the machine's half of the record and is not editable.** Being
+        able to edit it would make the record untrustworthy. There is no admin
+        surface for changing these values, only for capturing them.
+      - **Every absence states its reason.** A null sky carries why, so a
+        reader sees "the ephemeris could not be reached" rather than a blank.
+
+    Stored rather than recomputed on read, which is the other half of the
+    point: rendering a journal index should not cast twelve charts.
+
+    Keyed by the entry's slug, because the entries themselves live in
+    BeeRanked. This table holds only what BeeRanked cannot know.
+    """
+
+    __tablename__ = "journal_sky"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    # The BeeRanked entry this describes, one to one.
+    slug: str = Field(index=True, unique=True)
+
+    # The moment described. Not the moment of capture.
+    at: datetime = Field(sa_type=UTC_TS)
+    lat: float = 0.0
+    lon: float = 0.0
+    place_name: str = ""
+
+    # The whole reading as the daemon returned it, so a renderer can show more
+    # later without a migration and without re-casting anything.
+    reading: str = ""            # JSON
+
+    # A short line for indexes and cards, composed once at capture.
+    summary: str = ""
+
+    # Why `reading` is empty. Empty itself when the capture succeeded.
+    failure_reason: str = ""
