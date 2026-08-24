@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -10,7 +11,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
 from shruti.core.db import get_session
+from shruti.core.mail import send
 from shruti.models import ContactMessage, Question, ScheduleEntry
+
+log = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api", tags=["public"])
 
@@ -67,17 +71,37 @@ async def post_contact(
         # Silently accept so the bot doesn't learn it was caught.
         return {"status": "accepted"}
 
-    session.add(
-        ContactMessage(
-            kind=payload.kind,
-            name=payload.name,
-            email=str(payload.email),
-            subject=payload.subject,
-            body=payload.body,
-            source_ip=request.headers.get("X-Real-IP", request.client.host if request.client else ""),
-        )
+    message = ContactMessage(
+        kind=payload.kind,
+        name=payload.name,
+        email=str(payload.email),
+        subject=payload.subject,
+        body=payload.body,
+        source_ip=request.headers.get("X-Real-IP", request.client.host if request.client else ""),
     )
+    session.add(message)
+    # Commit BEFORE attempting the send. The database is the source of truth:
+    # if Resend is down or misconfigured the message is still on disk and can
+    # be re-sent. A form that loses what someone typed because a third party
+    # had an outage is worse than a form with no email at all.
     await session.commit()
+
+    result = await send(
+        subject=f"[{payload.kind}] {payload.subject or 'Message from the site'}",
+        body=(
+            f"From: {payload.name} <{payload.email}>\n"
+            f"Kind: {payload.kind}\n\n"
+            f"{payload.body}\n"
+        ),
+        # Their address goes in Reply-To, never in From — putting it in From
+        # fails SPF for their domain and gets the mail filed as spam.
+        reply_to=str(payload.email),
+    )
+    if not result.sent:
+        log.warning("contact message %s stored but not mailed: %s",
+                    message.id, result.error)
+
+    # The visitor's experience does not depend on the send succeeding.
     return {"status": "accepted"}
 
 
@@ -93,8 +117,17 @@ async def post_question(
 ) -> dict:
     if payload.website:
         return {"status": "accepted"}
-    session.add(Question(body=payload.body, asked_by=payload.asked_by))
+
+    question = Question(body=payload.body, asked_by=payload.asked_by)
+    session.add(question)
     await session.commit()
+
+    # A notification, not the question itself in a queue somewhere else.
+    await send(
+        subject="A new question was asked",
+        body=(f"{payload.asked_by or 'Anonymous'} asked:\n\n{payload.body}\n\n"
+              f"Nothing is public until you approve it.\n"),
+    )
     return {"status": "accepted"}
 
 

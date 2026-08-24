@@ -33,8 +33,12 @@ class Settings(BaseSettings):
     youtube_channel_id: str = ""
     youtube_api_key: str = ""
 
-    # Contact
+    # Contact / transactional email
     contact_to: str = ""
+    resend_api_key: str = ""
+    # Must be an address on a domain verified in Resend. Never the visitor's
+    # own address — that fails SPF for their domain.
+    resend_from: str = ""
     smtp_host: str = ""
     smtp_port: int = 587
     smtp_user: str = ""
