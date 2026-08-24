@@ -16,7 +16,21 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Optional
 
+from sqlalchemy import DateTime
 from sqlmodel import Field, SQLModel
+
+
+# TIMESTAMPTZ, not TIMESTAMP.
+#
+# SQLModel maps a bare `datetime` to TIMESTAMP WITHOUT TIME ZONE, which rejects
+# the tz-aware values this app produces. Every instant here is UTC and must stay
+# unambiguous — a schedule row that loses its offset is a stream announced at the
+# wrong hour.
+#
+# Use sa_type, not sa_column: TimestampMixin is inherited by every table, and a
+# single Column instance cannot be attached to more than one table. A type
+# instance can.
+UTC_TS = DateTime(timezone=True)
 
 
 def _now() -> datetime:
@@ -24,8 +38,8 @@ def _now() -> datetime:
 
 
 class TimestampMixin(SQLModel):
-    created_at: datetime = Field(default_factory=_now, nullable=False)
-    updated_at: datetime = Field(default_factory=_now, nullable=False)
+    created_at: datetime = Field(default_factory=_now, nullable=False, sa_type=UTC_TS)
+    updated_at: datetime = Field(default_factory=_now, nullable=False, sa_type=UTC_TS)
 
 
 # ── media ───────────────────────────────────────────────────────────────────
@@ -99,9 +113,19 @@ class Credit(TimestampMixin, table=True):
 
 
 class SocialLink(TimestampMixin, table=True):
+    """
+    A typed link taxonomy, not one flat "socials" blob.
+
+    Research finding: serious VTuber sites group links as Channels / Socials /
+    Supports / Code. Her Supports row legitimately holds GitHub Sponsors and a
+    Theourgia hosted tier, which a typical VTuber's cannot — collapsing that
+    into one row throws away the thing that differentiates her.
+    """
+
     __tablename__ = "social_link"
 
     id: Optional[int] = Field(default=None, primary_key=True)
+    category: str = Field(default="socials", index=True)  # channels|socials|supports|code
     platform: str            # twitch | youtube | discord | twitter | github | linkedin
     url: str
     label: str = ""
@@ -128,6 +152,29 @@ class Project(TimestampMixin, table=True):
     media_id: Optional[int] = Field(default=None, foreign_key="media.id")
 
 
+class Tool(TimestampMixin, table=True):
+    """
+    A browser-runnable tool page (planetary hours, Attic calendar, isopsephy...).
+
+    The single strongest site-level idea in the research: each is a bookmarkable
+    return-visit asset, an SEO surface, a landing destination for short-form
+    clips, and a working demo of Theourgia — all in one page. Precedent:
+    kawaentertainment.com ships browser tools as its primary site content.
+    """
+
+    __tablename__ = "tool"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    slug: str = Field(index=True, unique=True)
+    name: str
+    summary: str = ""
+    body_md: str = ""
+    locale: str = Field(default="en", index=True)   # en | el — Greek pages are uncontested
+    position: int = Field(default=0)
+    visible: bool = Field(default=False)
+    media_id: Optional[int] = Field(default=None, foreign_key="media.id")
+
+
 # ── schedule ────────────────────────────────────────────────────────────────
 class ScheduleEntry(TimestampMixin, table=True):
     """
@@ -139,7 +186,7 @@ class ScheduleEntry(TimestampMixin, table=True):
 
     id: Optional[int] = Field(default=None, primary_key=True)
     title: str
-    starts_at: datetime = Field(index=True)     # UTC
+    starts_at: datetime = Field(index=True, nullable=False, sa_type=UTC_TS)  # UTC
     duration_minutes: Optional[int] = None
     platform: str = "twitch"
     url: str = ""
@@ -171,7 +218,7 @@ class Question(TimestampMixin, table=True):
     asked_by: str = ""
     approved: bool = Field(default=False)
     answered_md: str = ""
-    answered_at: Optional[datetime] = None
+    answered_at: Optional[datetime] = Field(default=None, nullable=True, sa_type=UTC_TS)
 
 
 # ── settings ────────────────────────────────────────────────────────────────
@@ -186,5 +233,5 @@ class SiteSetting(TimestampMixin, table=True):
 
 __all__ = [
     "Media", "Section", "ProfileField", "Credit", "SocialLink",
-    "Project", "ScheduleEntry", "ContactMessage", "Question", "SiteSetting",
+    "Project", "Tool", "ScheduleEntry", "ContactMessage", "Question", "SiteSetting",
 ]

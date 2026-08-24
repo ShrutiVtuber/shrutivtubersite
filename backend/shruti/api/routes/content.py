@@ -84,14 +84,35 @@ async def get_profile(session: AsyncSession = Depends(get_session)) -> dict:
     }
 
 
+# Render order for the typed link taxonomy. Anything unrecognised sorts last
+# rather than vanishing.
+_LINK_GROUPS = ("channels", "socials", "supports", "code")
+
+
 @router.get("/links")
-async def get_links(session: AsyncSession = Depends(get_session)) -> list[dict]:
+async def get_links(session: AsyncSession = Depends(get_session)) -> dict:
+    """
+    Links grouped by category, not one flat list.
+
+    Channels / Socials / Supports / Code. The Supports group is where GitHub
+    Sponsors and a hosted Theourgia tier live — a distinction a typical VTuber
+    links block has no use for, and the reason this is grouped at all.
+    """
     rows = (
         await session.execute(
             select(SocialLink).where(SocialLink.visible.is_(True)).order_by(SocialLink.position)
         )
     ).scalars().all()
-    return [{"platform": r.platform, "url": r.url, "label": r.label} for r in rows]
+
+    grouped: dict[str, list[dict]] = {}
+    for r in rows:
+        grouped.setdefault(r.category, []).append(
+            {"platform": r.platform, "url": r.url, "label": r.label}
+        )
+
+    ordered = {g: grouped[g] for g in _LINK_GROUPS if g in grouped}
+    ordered.update({g: v for g, v in grouped.items() if g not in _LINK_GROUPS})
+    return {"groups": ordered}
 
 
 @router.get("/projects")
