@@ -4,6 +4,7 @@ import BaseLayout from "../../layouts/BaseLayout.astro";
 import EmptyState from "../../components/feedback/EmptyState.astro";
 import Button from "../../components/forms/Button.astro";
 import { SITE_API } from "../../lib/api";
+import { redirectWithCookies } from "../../lib/redirect";
 
 const token = Astro.url.searchParams.get("token") ?? "";
 let failed = "";
@@ -11,11 +12,7 @@ let failed = "";
 if (token) {
   try {
     const response = await fetch(`${SITE_API}/api/account/link?token=${encodeURIComponent(token)}`);
-    if (response.ok) {
-      const cookie = response.headers.get("set-cookie");
-      if (cookie) Astro.response.headers.append("set-cookie", cookie);
-      return Astro.redirect("/account");
-    }
+    if (response.ok) return redirectWithCookies("/account", response);
     const body = await response.json().catch(() => null);
     failed = body?.detail ?? "That link did not work.";
   } catch {

@@ -14,6 +14,7 @@ import CsrfField from "../components/forms/CsrfField.astro";
 import Button from "../components/forms/Button.astro";
 import { SITE_API } from "../lib/api";
 import { verifyCsrf } from "../lib/csrf";
+import { redirectWithCookies } from "../lib/redirect";
 
 const method = Astro.url.searchParams.get("method") === "password" ? "password" : "link";
 let sent = false;
@@ -35,9 +36,11 @@ if (Astro.request.method === "POST") {
       });
       const body = await response.json().catch(() => null);
       if (response.ok) {
+        if (body?.signedIn) return redirectWithCookies("/account", response);
+        // The "check your email" path renders rather than redirects, so
+        // appending here is safe.
         const cookie = response.headers.get("set-cookie");
         if (cookie) Astro.response.headers.append("set-cookie", cookie);
-        if (body?.signedIn) return Astro.redirect("/account");
         sent = true;
       } else {
         failed = body?.detail ?? "That did not work.";

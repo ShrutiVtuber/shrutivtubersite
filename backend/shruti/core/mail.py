@@ -41,6 +41,7 @@ async def send(
     body: str,
     reply_to: str | None = None,
     to: str | None = None,
+    html: str | None = None,
 ) -> SendResult:
     """
     Send one message. Never raises — a failed send must not fail the request
@@ -62,8 +63,13 @@ async def send(
         "from": sender,
         "to": [recipient],
         "subject": subject,
+        # Both parts, always, when there is an HTML one. A client that will not
+        # render the HTML gets a real message rather than an empty frame, and
+        # the plain part is what a screen reader and a text client see first.
         "text": body,
     }
+    if html:
+        payload["html"] = html
     if reply_to:
         payload["reply_to"] = [reply_to]
 

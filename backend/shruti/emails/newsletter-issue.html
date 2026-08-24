@@ -1,0 +1,124 @@
+<!-- Copied VERBATIM from the design bundle's email/newsletter-issue.html.
+     Only the demo links became slots; the markup, the inlined styles
+     and the dark-mode overrides are the designer's and are not to be
+     touched. Assume a hostile client: images blocked, <style> stripped,
+     dark mode forced. There is NO tracking pixel and there must not be. -->
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light dark"><meta name="supported-color-schemes" content="light dark"><title>The monthly letter — September 2026</title>
+<style>
+/* Email CSS is hostile territory: assume half of this is stripped. Every critical style is also
+   inlined on the element. No webfonts — clients block them; the stacks fall back to system serif. */
+body{margin:0;padding:0;background:#F1ECEF;-webkit-text-size-adjust:100%}
+table{border-collapse:collapse}
+img{border:0;line-height:100%;outline:none;text-decoration:none;display:block}
+a{color:#33639C}
+.sh{display:none!important;visibility:hidden;opacity:0;height:0;width:0;overflow:hidden;mso-hide:all}
+@media (prefers-color-scheme:dark){
+  body,.bg{background:#0D1220!important}
+  .card{background:#1A2138!important}
+  .ink{color:#E9E6F0!important}
+  .soft{color:#B3B9D2!important}
+  .faint{color:#8B93AF!important}
+  .rule{border-color:#2E3752!important}
+  .inset{background:#121829!important}
+  a,.acc{color:#8FBEE8!important}
+  .rose{color:#E0A4BC!important}
+}
+@media (max-width:620px){
+  .pad{padding-left:20px!important;padding-right:20px!important}
+  .stack{display:block!important;width:100%!important}
+  .h1{font-size:28px!important}
+}
+</style></head>
+<body style="margin:0;padding:0;background:#F1ECEF">
+<div class="sh">Your September reading, what I built this month, and a letter. — Shruti</div>
+<table class="bg" role="presentation" width="100%" style="background:#F1ECEF">
+<tr><td align="center" style="padding:28px 12px">
+<table role="presentation" width="600" class="card" style="width:600px;max-width:600px;background:#FFFFFF;border:1px solid #DCD6DC;border-radius:10px">
+
+<tr><td class="pad" style="padding:28px 32px 20px">
+<table role="presentation" width="100%"><tr>
+<td><span class="ink" style="font:500 24px Georgia,'Times New Roman',serif;color:#26304A">Shruti</span></td>
+<td align="right"><span class="faint" style="font:400 11px 'JetBrains Mono',Consolas,monospace;color:#6E7890">№ 09 · September 2026</span></td>
+</tr></table>
+</td></tr>
+
+<tr><td class="pad" style="padding:0 32px"><div class="rule" style="border-top:1px solid #DCD6DC;height:1px;line-height:1px">&nbsp;</div></td></tr>
+
+<tr><td class="pad" style="padding:26px 32px 8px">
+<span class="faint" style="font:600 11px Helvetica,Arial,sans-serif;letter-spacing:2px;text-transform:uppercase;color:#6E7890">Your reading</span>
+</td></tr>
+<tr><td class="pad" style="padding:0 32px 6px">
+<span class="rose" style="font:400 22px Georgia,'Times New Roman',serif;color:#A85A76">&#9805;</span>
+<span class="h1 ink" style="font:600 26px Georgia,'Times New Roman',serif;color:#26304A"> Virgo</span>
+</td></tr>
+<tr><td class="pad" style="padding:0 32px 18px">
+<p class="soft" style="margin:0;font:400 17px/1.65 Georgia,'Times New Roman',serif;color:#4A5470">A month for finishing, which is not the same as a month for starting.</p>
+</td></tr>
+<tr><td class="pad" style="padding:0 32px 22px">
+<p class="ink" style="margin:0 0 14px;font:400 16px/1.7 Georgia,'Times New Roman',serif;color:#26304A">Mercury, your ruler, spends the first fortnight in your own sign and the second in Libra, which is the difference between thinking about your own work and thinking about someone else’s opinion of it. Do the private part first.</p>
+<p class="ink" style="margin:0 0 14px;font:400 16px/1.7 Georgia,'Times New Roman',serif;color:#26304A">The stationary retrograde of Saturn on the 9th sits in your seventh, so an agreement you have been carrying alone stops being carryable alone. Say the true thing about it early in the month, while there is still room to alter terms rather than only to leave.</p>
+<p style="margin:0"><a href="{{site_url}}" class="acc" style="font:600 14px Helvetica,Arial,sans-serif;color:#33639C;text-decoration:none">Read the full reading &rarr;</a></p>
+</td></tr>
+<tr><td class="pad" style="padding:0 32px 4px">
+<span class="faint" style="font:400 11px 'JetBrains Mono',Consolas,monospace;color:#6E7890">Your sign comes from the nativity saved on your account. <a href="{{site_url}}" style="color:#6E7890">Change it</a></span>
+</td></tr>
+
+<tr><td class="pad" style="padding:24px 32px 0"><div class="rule" style="border-top:1px solid #DCD6DC;height:1px;line-height:1px">&nbsp;</div></td></tr>
+<tr><td class="pad" style="padding:22px 32px 8px">
+<span class="faint" style="font:600 11px Helvetica,Arial,sans-serif;letter-spacing:2px;text-transform:uppercase;color:#6E7890">The letter</span>
+</td></tr>
+<tr><td class="pad" style="padding:0 32px 20px">
+<p class="ink" style="margin:0 0 14px;font:400 16px/1.7 Georgia,'Times New Roman',serif;color:#26304A">I rewrote the sigil compiler twice this month and threw the second one away. The first version was clever and the third is legible, and I have decided that legible is the higher virtue in a tool someone else has to trust.</p>
+<p class="ink" style="margin:0 0 14px;font:400 16px/1.7 Georgia,'Times New Roman',serif;color:#26304A">Saturn stations on the 9th. I have been putting off a conversation about how much of Theourgia I can carry alone, and the sky is not subtle about that sort of thing.</p>
+<p class="ink" style="margin:0;font:400 16px/1.7 Georgia,'Times New Roman',serif;color:#26304A">Until next month —</p>
+<p class="rose" style="margin:10px 0 0;font:400 17px Georgia,'Times New Roman',serif;color:#A85A76">Shruti</p>
+</td></tr>
+
+<tr><td class="pad" style="padding:8px 32px 0"><div class="rule" style="border-top:1px solid #DCD6DC;height:1px;line-height:1px">&nbsp;</div></td></tr>
+<tr><td class="pad" style="padding:22px 32px 8px">
+<span class="faint" style="font:600 11px Helvetica,Arial,sans-serif;letter-spacing:2px;text-transform:uppercase;color:#6E7890">Streams and videos</span>
+</td></tr>
+<tr><td class="pad" style="padding:0 32px 20px">
+<table role="presentation" width="100%">
+<tr><td style="padding:9px 0;border-bottom:1px solid #DCD6DC" class="rule">
+<a href="{{site_url}}" class="ink" style="font:600 15px Georgia,'Times New Roman',serif;color:#26304A;text-decoration:none">Building the ayanāṁśa selector</a><br>
+<span class="faint" style="font:400 11px 'JetBrains Mono',Consolas,monospace;color:#6E7890">stream · 14 Aug · 3h 20m · Twitch</span>
+</td></tr>
+<tr><td style="padding:9px 0;border-bottom:1px solid #DCD6DC" class="rule">
+<a href="{{site_url}}" class="ink" style="font:600 15px Georgia,'Times New Roman',serif;color:#26304A;text-decoration:none">Why a planetary hour is not sixty minutes</a><br>
+<span class="faint" style="font:400 11px 'JetBrains Mono',Consolas,monospace;color:#6E7890">video · 21 Aug · 12m · YouTube</span>
+</td></tr>
+<tr><td style="padding:9px 0">
+<a href="{{site_url}}" class="ink" style="font:600 15px Georgia,'Times New Roman',serif;color:#26304A;text-decoration:none">Six divination systems, one schema</a><br>
+<span class="faint" style="font:400 11px 'JetBrains Mono',Consolas,monospace;color:#6E7890">article · 11 Aug · a data model that respects the differences instead of flattening them</span>
+</td></tr>
+</table>
+</td></tr>
+
+<!-- Slot reserved for courses and services. Leave it in the template; do not build a shop yet. -->
+<tr><td class="pad" style="padding:4px 32px 24px">
+<table role="presentation" width="100%" class="inset" style="background:#ECE7EB;border-radius:8px"><tr><td style="padding:16px 18px">
+<span class="faint" style="font:600 11px Helvetica,Arial,sans-serif;letter-spacing:2px;text-transform:uppercase;color:#6E7890">Courses and services</span><br>
+<span class="soft" style="font:400 14px/1.6 Helvetica,Arial,sans-serif;color:#4A5470">Nothing open yet. When there is, it appears here — this is the slot, held deliberately so it does not have to be squeezed in later.</span>
+</td></tr></table>
+</td></tr>
+
+<tr><td class="pad inset" style="padding:22px 32px;background:#ECE7EB;border-radius:0 0 10px 10px">
+<p class="faint" style="margin:0 0 10px;font:400 11px/1.8 'JetBrains Mono',Consolas,monospace;color:#6E7890">
+ShrutiVTuber, LLC<br>
+Registered office (virtual): [street, no.] · [postcode] Athens, GR<br>
+business@shrutivtuber.com<br>
+GEMI [000000000000] · VAT EL[000000000]
+</p>
+<p class="faint" style="margin:0;font:400 11px/1.8 'JetBrains Mono',Consolas,monospace;color:#6E7890">
+You get this because you confirmed your address on 24 Aug 2026.<br>
+<a href="{{site_url}}" style="color:#33639C" class="acc">Unsubscribe in one click</a> · <a href="{{site_url}}" style="color:#33639C" class="acc">Choose what you get</a> · <a href="{{site_url}}" style="color:#33639C" class="acc">Pause it</a> · <a href="{{site_url}}" style="color:#33639C" class="acc">Read in a browser</a>
+</p>
+</td></tr>
+
+</table>
+<table role="presentation" width="600" style="width:600px;max-width:600px"><tr><td align="center" style="padding:14px 24px">
+<span class="faint" style="font:400 10px/1.7 'JetBrains Mono',Consolas,monospace;color:#6E7890">No images, no tracking pixel, no open counting. If this letter looks plain, that is why.</span>
+</td></tr></table>
+</td></tr></table>
+</body></html>

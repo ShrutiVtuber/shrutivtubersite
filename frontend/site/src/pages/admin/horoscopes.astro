@@ -1,0 +1,272 @@
+---
+/* Horoscope authoring — the design's admin `Horoscopes` tab.
+ *
+ * DIVERGENCE, flagged rather than quiet: the design specifies a small React
+ * SPA for the admin, and that SPA does not exist yet — `frontend/admin` is
+ * empty. Building one tab of a shell that has not been built is not possible,
+ * so this is the same screen rendered server-side, with the same layout and
+ * the same rules. When the SPA is built, this moves into it.
+ *
+ * The design's reasoning is what shapes it: writing twelve of anything monthly
+ * is a chore, and a bad editor is how a monthly feature becomes a quarterly
+ * one. So the sign row, the progress count, the editor and the preview are all
+ * on ONE SCREEN with no navigating away and back.
+ *
+ * Publishing is blocked until all twelve exist, because AN EMPTY READING IS
+ * WORSE THAN A LATE ONE.
+ */
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import SectionHeader from "../../components/brand/SectionHeader.astro";
+import Badge from "../../components/navigation/Badge.astro";
+import Prose from "../../components/content/Prose.astro";
+import CsrfField from "../../components/forms/CsrfField.astro";
+import Button from "../../components/forms/Button.astro";
+import { SITE_API } from "../../lib/api";
+import { verifyCsrf } from "../../lib/csrf";
+import { renderMarkdown } from "../../lib/markdown";
+import { redirectWithCookies } from "../../lib/redirect";
+
+const ADMIN_COOKIE = "shruti_session";
+const adminToken = Astro.cookies.get(ADMIN_COOKIE)?.value;
+const headers = adminToken ? { cookie: `${ADMIN_COOKIE}=${adminToken}` } : {};
+
+const now = new Date();
+const thisMonth = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
+const covers = Astro.url.searchParams.get("covers") ?? thisMonth;
+const sign = Astro.url.searchParams.get("sign") ?? "aries";
+
+let notice = "";
+let failed = "";
+
+if (Astro.request.method === "POST") {
+  const form = await Astro.request.formData();
+  if (!verifyCsrf(Astro.cookies, form)) {
+    failed = "That did not save. Reload the page and try again.";
+  } else if (String(form.get("action")) === "draft") {
+    const r = await fetch(`${SITE_API}/api/horoscopes/draft`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", ...headers },
+      body: JSON.stringify({
+        sign: String(form.get("sign") ?? ""),
+        period: "monthly",
+        covers: String(form.get("covers") ?? covers),
+        body_md: String(form.get("body_md") ?? ""),
+      }),
+    });
+    notice = r.ok ? "Draft saved." : "";
+    failed = r.ok ? "" : ((await r.json().catch(() => null))?.detail ?? "That did not save.");
+  } else if (String(form.get("action")) === "signin") {
+    /* Signing in happens on this page rather than at a route of its own: the
+       admin SPA owns /admin*, and adding a second server-rendered path under
+       it would mean a second Caddy exception to unpick later. */
+    const r = await fetch(`${SITE_API}/api/admin/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: String(form.get("email") ?? ""),
+        password: String(form.get("password") ?? ""),
+      }),
+    });
+    if (r.ok) {
+      return redirectWithCookies(Astro.url.pathname + Astro.url.search, r);
+    }
+    failed = "Email or password is wrong.";
+  } else if (String(form.get("action")) === "publish") {
+    const r = await fetch(`${SITE_API}/api/horoscopes/publish`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...headers },
+      body: JSON.stringify({ period: "monthly", covers: String(form.get("covers") ?? covers) }),
+    });
+    const body = await r.json().catch(() => null);
+    notice = r.ok ? `Published all twelve for ${covers}.` : "";
+    // The refusal names how many are missing, rather than just saying no.
+    failed = r.ok ? "" : (body?.detail ?? "Publishing was refused.");
+  }
+}
+
+interface Drafts {
+  period: string; covers: string; written: number; total: number;
+  published: boolean;
+  drafts: { sign: string; bodyMd: string; published: boolean }[];
+}
+const r = await fetch(`${SITE_API}/api/horoscopes/drafts?period=monthly&covers=${covers}`, { headers });
+const needsSignIn = r.status === 401;
+const data: Drafts | null = r.ok ? await r.json() : null;
+
+const current = data?.drafts.find((d) => d.sign === sign);
+const previewHtml = current?.bodyMd ? await renderMarkdown(current.bodyMd) : "";
+const NAME = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+const GLYPH: Record<string, string> = {
+  aries: "♈", taurus: "♉", gemini: "♊", cancer: "♋", leo: "♌", virgo: "♍",
+  libra: "♎", scorpio: "♏", sagittarius: "♐", capricorn: "♑", aquarius: "♒", pisces: "♓",
+};
+---
+
+<BaseLayout title="Horoscopes — admin" description="Write the twelve monthly readings.">
+  <div class="page authoring">
+    <div class="head">
+      <SectionHeader as="h1" glyph="☾" eyebrow="Admin" title="Horoscopes" />
+      {
+        data && (
+          <Badge tone={data.written === data.total ? "accent" : "faint"}>
+            {data.written} of {data.total} written
+          </Badge>
+        )
+      }
+      <form method="GET" class="month">
+        <input type="hidden" name="sign" value={sign} />
+        <label><span class="lbl">Month</span><input type="month" name="covers" value={covers} /></label>
+        <Button type="submit" size="sm" variant="secondary">Open</Button>
+      </form>
+    </div>
+
+    <p class="why">
+      Twelve fields, one per sign. The sign list, the progress count and the preview stay on this
+      screen — no navigating away and back.
+    </p>
+
+    {notice && <p class="notice" role="status">{notice}</p>}
+    {failed && <p class="failed" role="alert">{failed}</p>}
+
+    {
+      needsSignIn ? (
+        <form method="POST" class="signin">
+          <CsrfField />
+          <input type="hidden" name="action" value="signin" />
+          <label class="field"><span class="lbl">Email</span><input type="email" name="email" required autocomplete="username" /></label>
+          <label class="field"><span class="lbl">Password</span><input type="password" name="password" required autocomplete="current-password" /></label>
+          <div><Button type="submit">Sign in</Button></div>
+        </form>
+      ) : !data ? (
+        <p class="failed">Could not load the drafts.</p>
+      ) : (
+        <>
+          <nav class="signs" aria-label="Signs">
+            {
+              data.drafts.map((d) => (
+                <a
+                  href={`/admin/horoscopes?covers=${covers}&sign=${d.sign}`}
+                  data-current={d.sign === sign || undefined}
+                  data-written={d.bodyMd.trim() ? "" : undefined}
+                >
+                  <span class="t-glyph" aria-hidden="true">{GLYPH[d.sign]}</span>
+                  <span>{NAME(d.sign)}</span>
+                </a>
+              ))
+            }
+          </nav>
+
+          <div class="cols">
+            <form method="POST" class="editor">
+              <CsrfField />
+              <input type="hidden" name="action" value="draft" />
+              <input type="hidden" name="sign" value={sign} />
+              <input type="hidden" name="covers" value={covers} />
+              <label class="field">
+                <span class="lbl">{NAME(sign)} — reading</span>
+                <textarea
+                  name="body_md" rows="16" maxlength="8000"
+                  placeholder="Two or three paragraphs. Name the timing — a station, an ingress, a lunation — and say plainly what it asks."
+                >{current?.bodyMd ?? ""}</textarea>
+              </label>
+              <div class="actions">
+                <Button type="submit">Save draft</Button>
+                <span class="hint">
+                  {data.written === data.total ? "ready" : "publishing needs all twelve"}
+                </span>
+              </div>
+            </form>
+
+            <aside class="preview">
+              <span class="lbl">Preview · exactly the reading page</span>
+              {
+                previewHtml ? (
+                  <Prose html={previewHtml} byline="Soror Eu. A." />
+                ) : (
+                  <p class="empty-preview">
+                    Nothing written for {NAME(sign)} yet. An empty reading is worse than a late one.
+                  </p>
+                )
+              }
+            </aside>
+          </div>
+
+          <form method="POST" class="publish">
+            <CsrfField />
+            <input type="hidden" name="action" value="publish" />
+            <input type="hidden" name="covers" value={covers} />
+            <Button type="submit" variant={data.written === data.total ? "primary" : "secondary"}>
+              Publish {covers}
+            </Button>
+            <span class="hint">
+              {
+                data.published
+                  ? "Already published — saving a draft updates the live reading."
+                  : data.written === data.total
+                    ? "All twelve are written."
+                    : `${data.total - data.written} still unwritten; publishing will be refused and will say which.`
+              }
+            </span>
+          </form>
+        </>
+      )
+    }
+  </div>
+</BaseLayout>
+
+<style>
+  .authoring { display: grid; gap: var(--space-4); }
+  .head { display: flex; gap: var(--space-4); align-items: baseline; flex-wrap: wrap; }
+  .month { display: flex; gap: 8px; align-items: end; margin-left: auto; }
+  .month label { display: grid; gap: 4px; }
+  .lbl { font: 600 var(--text-micro) var(--font-body); letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; color: var(--ink-faint); }
+  .month input {
+    font: 400 var(--text-sm) var(--font-body); color: var(--ink); background: var(--surface-page);
+    border: var(--border-w) solid var(--line); border-radius: var(--radius-sm); padding: 8px 10px; min-height: 40px;
+  }
+  .why { font: 400 var(--text-sm) / 1.6 var(--font-body); color: var(--ink-soft); margin: 0; max-width: 70ch; }
+  .notice { font: 400 var(--text-sm) var(--font-body); color: var(--accent); margin: 0; }
+  .failed { font: 400 var(--text-sm) var(--font-body); color: var(--live); margin: 0; max-width: 70ch; }
+
+  .signs { display: flex; gap: 4px; flex-wrap: wrap; }
+  .signs a {
+    display: inline-flex; gap: 6px; align-items: center; padding: 8px 12px;
+    border: var(--border-w) solid var(--line); border-radius: var(--radius-full);
+    text-decoration: none; font: 500 var(--text-sm) var(--font-body); color: var(--ink-soft);
+    min-height: 40px;
+  }
+  .signs a:hover { border-color: var(--line-strong); color: var(--ink); }
+  .signs a[data-current] { background: var(--accent-wash); border-color: color-mix(in srgb, var(--accent) 50%, transparent); color: var(--accent); }
+  /* Unwritten signs are quiet, not hidden — the point is seeing what is left. */
+  .signs a[data-written] { opacity: 0.55; }
+  .signs .t-glyph { color: var(--rose); }
+
+  .cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+  @media (max-width: 880px) { .cols { grid-template-columns: 1fr; } }
+  .editor { display: grid; gap: 12px; }
+  .field { display: grid; gap: 4px; }
+  .editor textarea {
+    font: 400 var(--text-body) / var(--leading-body) var(--font-display);
+    color: var(--ink); background: var(--surface-card);
+    border: var(--border-w) solid var(--line); border-radius: var(--radius-sm);
+    padding: 12px 14px; width: 100%; box-sizing: border-box; resize: vertical;
+  }
+  .actions, .publish { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  .hint { font: 400 var(--text-xs) var(--font-mono); color: var(--ink-faint); }
+  .preview {
+    border: var(--border-w) solid var(--line); border-radius: var(--radius-md);
+    background: var(--surface-card); padding: 20px 22px; display: grid; gap: 10px;
+  }
+  .empty-preview { font: 400 var(--text-sm) / 1.7 var(--font-body); color: var(--ink-faint); margin: 0; }
+  .publish { border-top: var(--border-w) solid var(--line); padding-top: var(--space-4); }
+  .signin {
+    display: grid; gap: 12px; max-width: 360px;
+    background: var(--surface-card); border: var(--border-w) solid var(--line);
+    border-radius: var(--radius-md); padding: var(--space-5);
+  }
+  .signin input {
+    font: 400 var(--text-sm) var(--font-body); color: var(--ink); background: var(--surface-page);
+    border: var(--border-w) solid var(--line); border-radius: var(--radius-sm);
+    padding: 8px 10px; min-height: 40px; width: 100%; box-sizing: border-box;
+  }
+</style>

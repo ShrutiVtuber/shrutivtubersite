@@ -522,7 +522,15 @@ async def _send_magic_link(email: str) -> None:
 
 
 async def _send_optin(email: str, token: str) -> None:
-    url = f"{_site_url()}/newsletter/confirm?token={token}"
+    """
+    The mandatory double opt-in mail, in the designer's own template.
+
+    Sent as HTML because the template's whole point is that it survives a
+    hostile client, with a plain-text body alongside for the ones that want it.
+    """
+    from shruti.core.emails import optin_confirm, site_url
+
+    url = f"{site_url()}/newsletter/confirm?token={token}"
     await send_mail(
         subject="Confirm the monthly letter",
         body=(
@@ -532,6 +540,7 @@ async def _send_optin(email: str, token: str) -> None:
             "If you did not ask for this, do nothing — an unconfirmed address "
             "is never sent to."
         ),
+        html=optin_confirm(token),
         to=email,
     )
 
