@@ -1,0 +1,357 @@
+---
+/* Natal chart — `templates/natal-chart/`.
+ *
+ * The disagreement: WHICH SKY, WHOSE HOUSES. Hellenistic reads a tropical
+ * zodiac from the equinox with whole-sign places, sect and rulership, and no
+ * orbs. Vedic reads a sidereal zodiac with bhāva houses and graha dṛṣṭi. They
+ * sit about 24° apart, which is enough to move the Sun a whole sign.
+ *
+ * NOTHING IS ROUNDED BEFORE DISPLAY AND NOTHING IS INTERPRETED. The tables are
+ * the primary reading; the wheel is a figure drawn from the same numbers.
+ *
+ * THE UNKNOWN BIRTH TIME IS THE STATE THAT MATTERS. The ascendant moves a
+ * degree every four minutes, so with no time the angles, houses, sect and the
+ * lots that depend on them are UNDEFINED — and the tool must not guess. The
+ * daemon has no flag for this: given a date with no time it will happily
+ * compute angles from midnight, which is a fabricated ascendant. So the page
+ * enforces it: noon for the planets, the Moon given as a range across the day,
+ * and everything ascendant-dependent withheld and named.
+ */
+import ToolLayout from "../../layouts/ToolLayout.astro";
+import DisagreementControl from "../../components/tools/DisagreementControl.astro";
+import CannotCompute from "../../components/tools/CannotCompute.astro";
+import { askAstro } from "../../lib/api";
+
+const q = Astro.url.searchParams;
+const tradition = q.get("tradition") === "vedic" ? "vedic" : "hellenistic";
+const date = q.get("date") ?? "";
+const time = q.get("time") ?? "";
+const unknownTime = q.get("unknownTime") === "1" || (!!date && !time);
+const lat = Number(q.get("lat") ?? 37.9838);
+const lon = Number(q.get("lon") ?? 23.7275);
+const place = q.get("place") ?? "";
+const HOUSE_SYSTEMS = ["whole_sign", "placidus", "equal", "porphyry", "regiomontanus", "campanus"];
+const houseSystem = HOUSE_SYSTEMS.includes(q.get("house_system") ?? "") ? q.get("house_system")! : "whole_sign";
+
+interface Body {
+  name: string; longitude: number; retrograde: boolean; speed: number;
+  /* Absent for Rāhu and Ketu: the nodes have no essential dignity, which is a
+     fact about the scheme rather than missing data. They still have a sign. */
+  dignities?: { sign: string; degree: number; domicile?: boolean; exaltation?: boolean; detriment?: boolean; fall?: boolean };
+  house?: number;
+}
+interface Payload {
+  tradition: string; zodiac: string; when: string; houseSystem: string; ayanamsa: string | null;
+  angles: { ascendant: number; midheaven: number; descendant: number; imumCoeli: number };
+  bodies: Body[];
+  sect?: { isDay: boolean; luminary: string; benefic: string; malefic: string };
+  places?: { place: number; name: string; sign: string; ruler: string }[];
+  lots?: Record<string, number>;
+  aspects: { basis: string; configurations: { from: string; to: string; aspect: string; separationSigns?: number }[] };
+  diagram?: { kind: string; svg: string };
+  lagna?: unknown; nakshatraOfMoon?: unknown; dasha?: unknown;
+}
+
+const SIGNS = [
+  "Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo",
+  "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces",
+];
+/* The nodes carry no dignities, so sign and degree come off the longitude
+   rather than being left blank. */
+const signOf = (b: Body) => b.dignities?.sign ?? SIGNS[Math.floor((b.longitude % 360) / 30)];
+const degreeOf = (b: Body) => b.dignities?.degree ?? Number((b.longitude % 30).toFixed(4));
+const dignityWords = (b: Body) =>
+  b.dignities
+    ? [b.dignities.domicile && "domicile", b.dignities.exaltation && "exaltation",
+       b.dignities.detriment && "detriment", b.dignities.fall && "fall"].filter(Boolean).join(" · ")
+    : "";
+
+/* Noon when the time is unknown: it is the least-wrong instant for the
+   planets and it is stated, not hidden. */
+const moment = date ? `${date}T${unknownTime ? "12:00" : time || "12:00"}:00` : "";
+const chartUrl = (t: string) =>
+  `/chart?when=${encodeURIComponent(moment)}&lat=${lat}&lon=${lon}&tradition=${t}&house_system=${houseSystem}`;
+
+const answer = date ? await askAstro<Payload>(chartUrl(tradition)) : null;
+const d = answer?.data ?? null;
+
+/* The Moon as a range, since it can move 12–15° across a day and the time is
+   unknown. Two extra reads at the ends of the day — not an estimate. */
+let moonRange: { start: string; end: string } | null = null;
+if (date && unknownTime) {
+  const [a, b] = await Promise.all([
+    askAstro<Payload>(`/chart?when=${encodeURIComponent(`${date}T00:00:00`)}&lat=${lat}&lon=${lon}&tradition=${tradition}`),
+    askAstro<Payload>(`/chart?when=${encodeURIComponent(`${date}T23:59:00`)}&lat=${lat}&lon=${lon}&tradition=${tradition}`),
+  ]);
+  const moonOf = (p: Payload | null) => p?.bodies.find((x) => x.name === "Moon");
+  const m0 = moonOf(a.data), m1 = moonOf(b.data);
+  if (m0 && m1) {
+    moonRange = {
+      start: `${degreeOf(m0).toFixed(2)}° ${signOf(m0)}`,
+      end: `${degreeOf(m1).toFixed(2)}° ${signOf(m1)}`,
+    };
+  }
+}
+
+const sunSign = (p: Payload) => {
+  const s = p.bodies.find((b) => b.name === "Sun");
+  return s ? `Sun in ${signOf(s)}` : "—";
+};
+const ASPECT_BASIS: Record<string, string> = {
+  whole_sign: "sign-based, then by degree — aspects between non-aspecting signs are not listed however close the degrees",
+  drishti: "graha dṛṣṭi — whole-sign and asymmetric, by rule rather than by orb",
+};
+---
+
+<ToolLayout
+  title="Natal chart"
+  description="A figure for a moment and a place. The tables are the reading; the wheel is drawn from the same numbers."
+  glyph="✶"
+  rule={tradition === "vedic" ? "sidereal zodiac, graha dṛṣṭi" : "tropical zodiac, whole-sign places"}
+  ruleLabel="tradition"
+  place={place || (date ? `${lat.toFixed(2)}, ${lon.toFixed(2)}` : undefined)}
+  date={date || undefined}
+  disclosure="○"
+  reckoned="Positions come from Swiss Ephemeris and are shown as computed, not rounded first and not interpreted. Which zodiac they are read against, and which houses they are placed in, is the choice above — the two traditions sit about twenty-four degrees apart, which is enough to move the Sun a whole sign for the same birth."
+>
+  <div slot="parameters" class="params">
+    <DisagreementControl
+      legend="Which sky, whose houses"
+      name="tradition"
+      value={tradition}
+      keep={{ date, time, lat: String(lat), lon: String(lon), place, house_system: houseSystem, ...(unknownTime ? { unknownTime: "1" } : {}) }}
+      options={[
+        {
+          value: "hellenistic",
+          name: "Hellenistic",
+          rule: "Tropical zodiac measured from the equinox, whole-sign places, sect and rulership, no orbs.",
+          consequence: d && tradition === "hellenistic" ? sunSign(d) : "tropical",
+        },
+        {
+          value: "vedic",
+          name: "Vedic",
+          rule: "Sidereal zodiac, bhāva houses, graha dṛṣṭi. About 24° back from tropical.",
+          consequence: d && tradition === "vedic" ? sunSign(d) : "sidereal",
+        },
+      ]}
+    />
+    <hr class="param-rule" />
+    <form class="param-panel" method="GET">
+      <input type="hidden" name="tradition" value={tradition} />
+      <label><span>Birth date</span><input type="date" name="date" value={date} required /></label>
+      <label><span>Birth time</span><input type="time" name="time" value={time} disabled={unknownTime} /></label>
+      <label class="check">
+        <input type="checkbox" name="unknownTime" value="1" checked={unknownTime} />
+        <span class="check-label">I don't know my birth time</span>
+      </label>
+      <label><span>Place</span><input type="text" name="place" value={place} /></label>
+      <label><span>Latitude</span><input type="number" name="lat" value={lat} step="0.0001" min="-90" max="90" /></label>
+      <label><span>Longitude</span><input type="number" name="lon" value={lon} step="0.0001" min="-180" max="180" /></label>
+      <label>
+        <span>Houses</span>
+        <select name="house_system">
+          {HOUSE_SYSTEMS.map((h) => <option value={h} selected={h === houseSystem}>{h.replace(/_/g, " ")}</option>)}
+        </select>
+      </label>
+      <button type="submit">Cast</button>
+    </form>
+    <p class="privacy">
+      Birth data in a link is birth data in a browser history. This page puts the date, time and
+      place in the URL so a reckoning can be shared or re-opened — bear that in mind before sending
+      one on.
+    </p>
+  </div>
+
+  {
+    !date ? (
+      <p class="prompt">Give a date, a place, and a time if you know it.</p>
+    ) : !d ? (
+      <CannotCompute
+        title="The chart could not be cast"
+        why={answer?.detail || "The ephemeris could not be reached. That is a failure on my side, not a fact about the sky."}
+      />
+    ) : (
+      <>
+        {
+          unknownTime && (
+            <CannotCompute
+              mark="◐"
+              title="Without a birth time, the angles are undefined"
+              why="The ascendant moves a degree every four minutes, so an unknown time leaves the ascendant, midheaven, the houses and the sect genuinely undefined — not approximate. They are withheld below rather than filled in from an assumed midnight, because a fabricated ascendant is worse than an absent one. The planets are given for noon, and the Moon as the range it covers across the day."
+              alternatives={[
+                "Read the planetary positions, which move little across a day — except the Moon, whose range is given.",
+                "Rectify the time from known events with an astrologer, and come back with it.",
+                "Leave the angles undefined, which is the honest state of the chart.",
+              ]}
+            />
+          )
+        }
+
+        <section class="positions">
+          <h2>Positions</h2>
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">Body</th><th scope="col">Longitude</th>
+                <th scope="col">Sign</th><th scope="col">House</th><th scope="col">Dignity</th>
+              </tr>
+            </thead>
+            <tbody>
+              {
+                d.bodies.map((b) => (
+                  <tr>
+                    <th scope="row">{b.name}{b.retrograde && <span class="retro" title="retrograde"> ℞</span>}</th>
+                    <td class="t-tabular">{b.longitude}°</td>
+                    <td>{signOf(b)} <span class="t-tabular faint">{degreeOf(b)}°</span></td>
+                    <td class="t-tabular">
+                      {unknownTime ? <span class="undef">undefined</span> : (b.house ?? "—")}
+                    </td>
+                    <td class="dig">{dignityWords(b) || "—"}</td>
+                  </tr>
+                ))
+              }
+            </tbody>
+          </table>
+          {
+            unknownTime && moonRange && (
+              <p class="moon-range">
+                <strong>Moon across the day:</strong>{" "}
+                <span class="t-tabular">{moonRange.start}</span> at midnight to{" "}
+                <span class="t-tabular">{moonRange.end}</span> at the day's end.
+              </p>
+            )
+          }
+        </section>
+
+        <section class="angles">
+          <h2>Angles</h2>
+          {
+            unknownTime ? (
+              <p class="undef-block">
+                ◐ Ascendant, midheaven, descendant and imum coeli are undefined without a birth
+                time. Nothing is shown here because there is nothing true to show.
+              </p>
+            ) : (
+              <dl>
+                <div><dt>Ascendant</dt><dd class="t-tabular">{d.angles.ascendant}°</dd></div>
+                <div><dt>Midheaven</dt><dd class="t-tabular">{d.angles.midheaven}°</dd></div>
+                <div><dt>Descendant</dt><dd class="t-tabular">{d.angles.descendant}°</dd></div>
+                <div><dt>Imum coeli</dt><dd class="t-tabular">{d.angles.imumCoeli}°</dd></div>
+              </dl>
+            )
+          }
+        </section>
+
+        {
+          d.sect && !unknownTime && (
+            <section class="sect">
+              <h2>Sect</h2>
+              <p>
+                A <strong>{d.sect.isDay ? "day" : "night"}</strong> chart. Luminary of the sect:
+                {" "}{d.sect.luminary}. Benefic of the sect: {d.sect.benefic}. Malefic:
+                {" "}{d.sect.malefic}.
+              </p>
+            </section>
+          )
+        }
+        {
+          d.sect && unknownTime && (
+            <section class="sect">
+              <h2>Sect</h2>
+              <p class="undef-block">
+                ◐ Sect depends on whether the Sun was above or below the horizon, which needs the
+                time. Undefined.
+              </p>
+            </section>
+          )
+        }
+
+        <section class="aspects">
+          <h2>Configurations</h2>
+          <p class="aspect-basis">{ASPECT_BASIS[d.aspects.basis] ?? d.aspects.basis}</p>
+          <ul>
+            {
+              d.aspects.configurations.map((c) => (
+                <li>
+                  <span class="a-pair">{c.from} — {c.to}</span>
+                  <span class="a-kind">{c.aspect}</span>
+                  {c.separationSigns != null && <span class="t-tabular a-sep">{c.separationSigns} signs</span>}
+                </li>
+              ))
+            }
+          </ul>
+          {d.aspects.configurations.length === 0 && <p class="faint">No configurations by this rule.</p>}
+        </section>
+
+        {
+          d.diagram?.svg && (
+            <section class="wheel">
+              <h2>The figure</h2>
+              <div class="wheel-frame" set:html={d.diagram.svg} />
+              <p class="wheel-note">
+                Drawn from the same numbers as the tables above. The tables remain the reading.
+              </p>
+            </section>
+          )
+        }
+      </>
+    )
+  }
+</ToolLayout>
+
+<style>
+  .params { display: grid; gap: var(--space-4); }
+  .param-rule { border: 0; border-top: var(--border-w) solid var(--line); margin: 0; }
+  .param-panel { display: flex; gap: var(--space-3); flex-wrap: wrap; align-items: end; }
+  .param-panel label { display: grid; gap: 4px; }
+  .param-panel > label > span { font: 600 var(--text-micro) var(--font-body); letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; color: var(--ink-faint); }
+  .param-panel input, .param-panel select {
+    font: 400 var(--text-sm) var(--font-body); color: var(--ink); background: var(--surface-page);
+    border: var(--border-w) solid var(--line); border-radius: var(--radius-sm); padding: 8px 10px; min-height: 40px;
+  }
+  .param-panel .check { display: flex; gap: 8px; align-items: center; min-height: 40px; }
+  .param-panel .check input { min-height: 0; accent-color: var(--accent); }
+  /* Not an error, not a warning — a first-class choice. */
+  .check-label { font: 400 var(--text-sm) var(--font-body) !important; color: var(--ink) !important; text-transform: none !important; letter-spacing: normal !important; }
+  .param-panel button {
+    appearance: none; min-height: 40px; padding: 0 16px; font: 600 var(--text-sm) var(--font-body);
+    color: var(--on-accent); background: var(--accent); border: var(--border-w) solid var(--accent);
+    border-radius: var(--radius-sm); cursor: pointer;
+  }
+  .privacy { font: 400 var(--text-xs) / 1.6 var(--font-body); color: var(--ink-faint); margin: 0; max-width: 66ch; }
+  .prompt { font: 400 var(--text-body) var(--font-body); color: var(--ink-soft); margin: 0; }
+
+  section h2 { font: 600 var(--text-h4) var(--font-display); color: var(--ink); margin: 0 0 8px; }
+  .positions table { width: 100%; border-collapse: collapse; }
+  .positions th[scope="col"] {
+    text-align: left; font: 600 var(--text-micro) var(--font-body); letter-spacing: var(--tracking-eyebrow);
+    text-transform: uppercase; color: var(--ink-faint); padding: 0 10px 8px 0; border-bottom: var(--border-w) solid var(--line-strong);
+  }
+  .positions td, .positions tbody th { padding: 8px 10px 8px 0; border-bottom: var(--border-w) solid var(--line); text-align: left; }
+  .positions tbody th { font: 500 var(--text-body) var(--font-body); color: var(--ink); }
+  .positions td { font: 400 var(--text-sm) var(--font-body); color: var(--ink-soft); }
+  .positions .t-tabular { font-family: var(--font-mono); }
+  .retro { color: var(--rose); }
+  .faint { color: var(--ink-faint); font-size: var(--text-xs); }
+  .undef { color: var(--ink-faint); font-style: italic; }
+  .dig { font-size: var(--text-xs); }
+  .moon-range { font: 400 var(--text-sm) / 1.7 var(--font-body); color: var(--ink-soft); margin: 10px 0 0; max-width: 62ch; }
+
+  .angles dl { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0 var(--space-4); margin: 0; }
+  .angles dl > div { display: flex; gap: 10px; align-items: baseline; padding: 8px 0; border-bottom: var(--border-w) solid var(--line); }
+  .angles dt { font: 600 var(--text-micro) var(--font-body); letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; color: var(--ink-faint); }
+  .angles dd { margin: 0 0 0 auto; font: 400 var(--text-sm) var(--font-mono); color: var(--ink); }
+  .undef-block { font: 400 var(--text-sm) / 1.7 var(--font-body); color: var(--rose); margin: 0; max-width: 62ch; }
+  .sect p { font: 400 var(--text-sm) / 1.7 var(--font-body); color: var(--ink-soft); margin: 0; max-width: 62ch; }
+
+  .aspect-basis { font: 400 var(--text-xs) / 1.6 var(--font-body); color: var(--ink-faint); margin: 0 0 8px; max-width: 66ch; }
+  .aspects ul { list-style: none; margin: 0; padding: 0; }
+  .aspects li { display: flex; gap: 12px; align-items: baseline; padding: 6px 0; border-bottom: var(--border-w) solid var(--line); }
+  .a-pair { font: 500 var(--text-sm) var(--font-body); color: var(--ink); min-width: 160px; }
+  .a-kind { font: 400 var(--text-sm) var(--font-body); color: var(--ink-soft); }
+  .a-sep { margin-left: auto; font: 400 var(--text-xs) var(--font-mono); color: var(--ink-faint); }
+
+  .wheel-frame { max-width: 640px; }
+  .wheel-frame :global(svg) { width: 100%; height: auto; color: var(--ink); }
+  .wheel-note { font: 400 var(--text-xs) var(--font-body); color: var(--ink-faint); margin: 8px 0 0; }
+</style>

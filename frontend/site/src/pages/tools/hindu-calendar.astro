@@ -1,0 +1,256 @@
+---
+/* Hindu calendar — `templates/hindu-calendar/`.
+ *
+ * The year-level companion to the pañcāṅga's day view: the months with their
+ * Gregorian spans and festivals, the era lines, and the sixty-year Jovian
+ * saṁvatsara.
+ *
+ * The disagreement: WHERE THE MONTH BEGINS. Amānta ends at the new moon
+ * (south and west, Śaka); pūrṇimānta ends at the full (north, Vikrama). They
+ * AGREE through the bright fortnight and diverge in the dark one, which is why
+ * a date can carry two different month names and neither is wrong.
+ *
+ * ADHIKA MĀSA carries no festivals — they wait for the nija month. That rule is
+ * authentic and is kept.
+ */
+import ToolLayout from "../../layouts/ToolLayout.astro";
+import DisagreementControl from "../../components/tools/DisagreementControl.astro";
+import CannotCompute from "../../components/tools/CannotCompute.astro";
+import { askAstro } from "../../lib/api";
+
+const q = Astro.url.searchParams;
+const ATHENS = { lat: 37.9838, lon: 23.7275 };
+const UJJAIN = { lat: 23.1765, lon: 75.7885, label: "Ujjain · 23.18°N 75.79°E" };
+const lat = Number(q.get("lat") ?? UJJAIN.lat);
+const lon = Number(q.get("lon") ?? UJJAIN.lon);
+const place = q.get("place") ?? (q.has("lat") ? `${lat.toFixed(2)}, ${lon.toFixed(2)}` : UJJAIN.label);
+const reckoning = q.get("reckoning") === "purnimanta" ? "purnimanta" : "amanta";
+const authority = q.get("authority") === "surya_siddhanta" ? "surya_siddhanta" : "drik";
+const year = Number(q.get("year") ?? new Date().getUTCFullYear());
+
+interface Month {
+  name: string; index: number; adhika: boolean; kshaya: boolean;
+  start: string; end: string; festivals?: { key: string; name: string; date: string }[];
+}
+interface Payload {
+  gregorianYear: number; reckoning: string; authority: string;
+  eras: { vikrama: number; shaka: number; kali: number; bengali: number; samvatsara: { index: number; name: string } };
+  hasAdhikaMasa: boolean; hasKshayaMasa: boolean; monthCount: number; months: Month[];
+}
+
+const url = (r: string, a: string) =>
+  `/hindu-year?year=${year}&lat=${lat}&lon=${lon}&reckoning=${r}&authority=${a}`;
+const [answer, otherAnswer] = await Promise.all([
+  askAstro<Payload>(url(reckoning, authority)),
+  askAstro<Payload>(url(reckoning === "amanta" ? "purnimanta" : "amanta", authority)),
+]);
+const d = answer.data;
+const other = otherAnswer.data;
+
+/* The consequence to show is the month name a date carries under each scheme —
+   the concrete thing that differs, not an abstraction. */
+const monthNow = (p: Payload | null) => {
+  if (!p) return null;
+  const today = new Date().toISOString().slice(0, 10);
+  const m = p.months.find((x) => x.start <= today && today <= x.end);
+  return m ? `${m.name}${m.adhika ? " (adhika)" : ""}` : null;
+};
+const mineNow = monthNow(reckoning === "amanta" ? d : other);
+const theirsNow = monthNow(reckoning === "amanta" ? other : d);
+
+/* The two schemes AGREE through the bright fortnight and only part in the
+ * dark one. On an agreeing day both options would show the same month name and
+ * the control would look inert — so it says that it agrees, and why, rather
+ * than leaving a reader to conclude the choice does nothing. The design's own
+ * demo sidesteps this by picking a dark-fortnight date; saying it out loud is
+ * better than choosing a flattering day.
+ */
+const schemesAgree = !!mineNow && mineNow === theirsNow;
+const consequence = (which: "amanta" | "purnimanta") => {
+  const name = which === "amanta" ? mineNow : theirsNow;
+  if (!name) return "—";
+  return schemesAgree
+    ? `today is ${name} — both agree in the bright fortnight`
+    : `today is ${name}`;
+};
+const RULE_NAME: Record<string, string> = {
+  amanta: "month ends at the new moon",
+  purnimanta: "month ends at the full moon",
+};
+---
+
+<ToolLayout
+  title="Hindu calendar"
+  native="पञ्चाङ्ग · वर्ष"
+  description="The lunisolar year: its months with their Gregorian spans, the eras that count it, and the festivals each month carries."
+  glyph="☾"
+  rule={RULE_NAME[reckoning]}
+  ruleLabel="month ends"
+  place={place}
+  date={String(year)}
+  disclosure="○"
+  reckoned="A lunar month is one lunation, and the year is twelve of them — about eleven days short of the solar year. When a lunar month contains no solar transition an intercalary month is inserted, adhika māsa, and the year runs to thirteen. The rarer opposite, kṣaya māsa, removes one. Festivals never fall in an adhika month: they wait for the nija month that follows, and that rule is authentic rather than a simplification."
+>
+  <div slot="parameters" class="params">
+    <DisagreementControl
+      legend="Where the month begins"
+      name="reckoning"
+      value={reckoning}
+      keep={{ lat: String(lat), lon: String(lon), place, authority, year: String(year) }}
+      options={[
+        {
+          value: "amanta",
+          name: "Amānta",
+          rule: "The month ends at the new moon. Southern and western India; the Śaka era counts this way.",
+          consequence: consequence("amanta"),
+        },
+        {
+          value: "purnimanta",
+          name: "Pūrṇimānta",
+          rule: "The month ends at the full moon. Northern India; the Vikrama era counts this way.",
+          consequence: consequence("purnimanta"),
+        },
+      ]}
+    />
+    <hr class="param-rule" />
+    <form class="param-panel" method="GET">
+      <input type="hidden" name="reckoning" value={reckoning} />
+      <label><span>Year</span><input type="number" name="year" value={year} min="1900" max="2100" /></label>
+      <label><span>Place</span><input type="text" name="place" value={place} /></label>
+      <label><span>Latitude</span><input type="number" name="lat" value={lat} step="0.0001" min="-90" max="90" /></label>
+      <label><span>Longitude</span><input type="number" name="lon" value={lon} step="0.0001" min="-180" max="180" /></label>
+      <label>
+        <span>Authority</span>
+        <select name="authority">
+          <option value="drik" selected={authority === "drik"}>Dṛk gaṇita — modern ephemeris</option>
+          <option value="surya_siddhanta" selected={authority === "surya_siddhanta"}>Sūrya Siddhānta — classical tables</option>
+        </select>
+      </label>
+      <button type="submit">Show</button>
+    </form>
+  </div>
+
+  {
+    !d ? (
+      <CannotCompute
+        title="The calendar could not be computed"
+        why={answer.detail || "The ephemeris could not be reached, so this year cannot be laid out right now."}
+      />
+    ) : (
+      <>
+        <section class="eras">
+          <h2>The year</h2>
+          <dl>
+            <div><dt>Vikrama Saṁvat</dt><dd class="t-tabular">{d.eras.vikrama}</dd></div>
+            <div><dt>Śaka Saṁvat</dt><dd class="t-tabular">{d.eras.shaka}</dd></div>
+            <div><dt>Kali Yuga</dt><dd class="t-tabular">{d.eras.kali}</dd></div>
+            <div><dt>Bengali San</dt><dd class="t-tabular">{d.eras.bengali}</dd></div>
+            <div><dt>Saṁvatsara</dt><dd>{d.eras.samvatsara.name} <span class="t-tabular faint">({d.eras.samvatsara.index}/60)</span></dd></div>
+            <div><dt>Months</dt><dd class="t-tabular">{d.monthCount}</dd></div>
+          </dl>
+        </section>
+
+        {
+          d.hasAdhikaMasa && (
+            <p class="note">
+              This year carries an <strong>adhika māsa</strong> — an intercalary month, inserted
+              because a lunar month contained no solar transition. It carries no festivals: they
+              wait for the <em>nija</em> month that follows.
+            </p>
+          )
+        }
+        {
+          d.hasKshayaMasa && (
+            <p class="note">
+              This year carries a <strong>kṣaya māsa</strong>, the rarer opposite — a month removed
+              rather than added.
+            </p>
+          )
+        }
+
+        <section class="months">
+          <h2>Months</h2>
+          <table>
+            <thead>
+              <tr><th scope="col">Month</th><th scope="col">From</th><th scope="col">To</th><th scope="col">Festivals</th></tr>
+            </thead>
+            <tbody>
+              {
+                d.months.map((m) => (
+                  <tr data-adhika={m.adhika || undefined} data-kshaya={m.kshaya || undefined}>
+                    <th scope="row">
+                      {m.name}
+                      {m.adhika && <span class="tag">adhika</span>}
+                      {m.kshaya && <span class="tag">kṣaya</span>}
+                    </th>
+                    <td class="t-tabular">{m.start}</td>
+                    <td class="t-tabular">{m.end}</td>
+                    <td class="fest">
+                      {
+                        m.adhika
+                          ? <span class="fest-none">none — they wait for the nija month</span>
+                          : (m.festivals ?? []).length > 0
+                            ? (m.festivals ?? []).map((f) => <span class="fest-one">{f.name} <span class="t-tabular faint">{f.date.slice(5)}</span></span>)
+                            : <span class="fest-none">—</span>
+                      }
+                    </td>
+                  </tr>
+                ))
+              }
+            </tbody>
+          </table>
+        </section>
+
+        <p class="note">
+          Amānta and pūrṇimānta <strong>agree through the bright fortnight and diverge in the
+          dark one</strong>. A date in the dark fortnight therefore carries two different month
+          names, and neither is a mistake — which is why this page offers both rather than
+          picking one.
+        </p>
+      </>
+    )
+  }
+</ToolLayout>
+
+<style>
+  .params { display: grid; gap: var(--space-4); }
+  .param-rule { border: 0; border-top: var(--border-w) solid var(--line); margin: 0; }
+  .param-panel { display: flex; gap: var(--space-3); flex-wrap: wrap; align-items: end; }
+  .param-panel label { display: grid; gap: 4px; }
+  .param-panel > label > span { font: 600 var(--text-micro) var(--font-body); letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; color: var(--ink-faint); }
+  .param-panel input, .param-panel select {
+    font: 400 var(--text-sm) var(--font-body); color: var(--ink); background: var(--surface-page);
+    border: var(--border-w) solid var(--line); border-radius: var(--radius-sm); padding: 8px 10px; min-height: 40px;
+  }
+  .param-panel button {
+    appearance: none; min-height: 40px; padding: 0 16px; font: 600 var(--text-sm) var(--font-body);
+    color: var(--on-accent); background: var(--accent); border: var(--border-w) solid var(--accent);
+    border-radius: var(--radius-sm); cursor: pointer;
+  }
+
+  .eras h2, .months h2 { font: 600 var(--text-h4) var(--font-display); color: var(--ink); margin: 0 0 8px; }
+  .eras dl { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 0 var(--space-4); margin: 0; }
+  .eras dl > div { display: flex; gap: 10px; align-items: baseline; padding: 8px 0; border-bottom: var(--border-w) solid var(--line); }
+  .eras dt { font: 600 var(--text-micro) var(--font-body); letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; color: var(--ink-faint); }
+  .eras dd { margin: 0 0 0 auto; font: 400 var(--text-sm) var(--font-body); color: var(--ink); }
+  .faint { color: var(--ink-faint); font-size: var(--text-xs); }
+
+  .months table { width: 100%; border-collapse: collapse; }
+  .months th[scope="col"] {
+    text-align: left; font: 600 var(--text-micro) var(--font-body); letter-spacing: var(--tracking-eyebrow);
+    text-transform: uppercase; color: var(--ink-faint); padding: 0 10px 8px 0;
+    border-bottom: var(--border-w) solid var(--line-strong);
+  }
+  .months td, .months tbody th { padding: 9px 10px 9px 0; border-bottom: var(--border-w) solid var(--line); text-align: left; vertical-align: top; }
+  .months tbody th { font: 500 var(--text-body) var(--font-display); color: var(--ink); white-space: nowrap; }
+  .months td { font: 400 var(--text-sm) var(--font-mono); color: var(--ink-soft); }
+  .months tr[data-adhika] { background: var(--rose-wash); }
+  .tag {
+    margin-left: 8px; font: 600 0.625rem var(--font-mono); letter-spacing: var(--tracking-caps);
+    text-transform: uppercase; color: var(--rose);
+  }
+  .fest { font-family: var(--font-body) !important; }
+  .fest-one { display: block; }
+  .fest-none { color: var(--ink-faint); font-style: italic; }
+  .note { font: 400 var(--text-sm) / 1.7 var(--font-body); color: var(--ink-soft); margin: 0; max-width: 66ch; }
+</style>
