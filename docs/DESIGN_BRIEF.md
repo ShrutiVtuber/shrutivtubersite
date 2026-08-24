@@ -20,7 +20,16 @@ Her published work, which is the proof behind the brand:
   ledger, federation. Authored under her magickal motto.
 - **BeeRanked** (<https://beeranked.online>) — a commercial SEO CMS SaaS.
 
-She is a practising Greek theurgist under Hekate and an OTO member. Based in
+She is a **multi-tradition initiate**, and this is not eclecticism-as-aesthetic
+— these are three distinct initiatory lineages held at once:
+
+- **Hellenic** — Greek theurgy under Hekate; the Attic lunisolar calendar
+- **Śākta Tantra** — initiated into the Mahāvidyā; tarpaṇam, mantra japa
+- **Thelema** — O.T.O., under the motto Soror Eu. A.
+
+Design consequence: **do not make this a Greek-only visual identity.** A design
+that reads as purely Hellenic misrepresents her and will be visibly wrong to the
+practitioners she most wants to reach. Based in
 Athens (GMT+3). Secondary texture, not the thesis: polyglot — the current site
 greets in English, Greek and Hindi, and the old archive is French study notes.
 
@@ -52,6 +61,23 @@ people already know both names. So the footer must carry a proper legal imprint
 (entity name, a *virtual office* address, role email, company and VAT number).
 Design the footer to hold it from day one; retrofitting an imprint is how home
 addresses leak.
+
+### The convergence worth designing around
+
+The three traditions genuinely meet at one place, and it is already in her
+existing art: **the twilight junctures.**
+
+- *Sandhyā* in the Indian traditions literally means the junctures — dawn and
+  dusk — and is when tarpaṇam and mantra practice are performed.
+- Greek practice likewise anchors to dawn, dusk and the lunar stations; the
+  Theourgia phone app is built around moonrise, culmination, moonset and nadir.
+- Her existing `Clouds.png` is, independently, a dusk sky.
+
+So the palette sampled in §2 is not a decorative choice — **dawn and dusk are
+the subject.** That also gives light and dark themes a real meaning rather than
+an inversion: they are the same sky at its two junctures. Take this as the
+strongest available design thesis; it is true of the practice, true of the
+software, and already true of the art she owns.
 
 ### Tone
 
@@ -190,6 +216,19 @@ clear-space rules, hex codes), and a business enquiry route.
 ### 8. Fan works gallery
 Curated fan art with prominent artist credit and links. Grid, lightbox,
 submission CTA.
+
+### 9a. Restricted material — a design requirement, not just an editorial one
+
+She holds initiations that carry genuine restrictions on what may be published.
+Some of what she practises **cannot go on a public website at all**, and some
+may be named but not detailed. Theourgia already models this — it ships
+closed-tradition flags as a feature.
+
+So the site needs a **visible content-marking convention**: a consistent mark
+that distinguishes public commentary from restricted practice material, applied
+at page and section level. Design it as a first-class typographic element, not
+an afterthought badge. It doubles as a trust signal — practitioners read
+"this person knows what may not be said" as a credential.
 
 ### 9. Derivative work guidelines
 The fan-art policy — commercial use, NSFW stance, **AI-training stance**,
