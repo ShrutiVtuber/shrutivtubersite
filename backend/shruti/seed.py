@@ -25,7 +25,7 @@ LINKS = [
     ("channels", "youtube",  "https://www.youtube.com/channel/UCl15ks3uuVLrgpojeLqd2Dg", "YouTube", 20, True),
     ("socials",  "discord",  "https://discord.gg/Q8FW4AZNS6",                          "Discord",  30, True),
     ("socials",  "twitter",  "https://twitter.com/ShrutiVTuber",                       "X",        40, True),
-    ("code",     "github",   "https://github.com/ShrutiVtuber",                       "GitHub",   50, True),
+    ("code",     "github",   "https://github.com/ShrutiVtuber",                        "GitHub",   50, True),
     # Hidden by default. The old site linked github.com/ShrutiVtuber, which has
     # none of the actual work on it; the account above does.
     ("code",     "github-brand", "https://github.com/ShrutiVtuber",                    "GitHub (brand)", 51, False),
@@ -40,6 +40,9 @@ PROJECTS = [
         slug="theourgia", name="Theourgia", position=10, visible=True, status="active",
         tagline="A magickal journal CMS and practitioner's toolkit.",
         site_url="https://theourgia.com",
+        # Left blank deliberately: the public repo lives on a separate account
+        # and linking it from here reintroduces exactly the cross-account
+        # linkage this brand is keeping apart. theourgia.com is enough.
         repo_url="",
         body_md=(
             "Attic lunar calendar with observance days, Swiss Ephemeris astrology, "

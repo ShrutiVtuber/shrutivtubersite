@@ -17,3 +17,6 @@ media/
 .idea/
 .vscode/
 assets/shruti-brand-assets.zip
+
+# Research notes live outside the repo — they analyse identity linkage.
+docs/RESEARCH_BRIEF.md
