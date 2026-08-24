@@ -52,6 +52,29 @@ work regardless of which git remote they came from.
 6. **The main site backend stays non-AGPL** and never imports an astrology
    module. Its only access is the HTTP call.
 
+## Implemented
+
+`shruti-astro` — https://github.com/ShrutiVtuber/shruti-astro — **public**, as
+AGPL §13 requires. Runs on `127.0.0.1:8201` beside the website stack. Ships the
+§13 source offer in a response header and via `GET /version`, which reports the
+build SHA so consuming pages link the tree actually running.
+
+## The obligation is an asset, not a cost
+
+Worth stating plainly, because it reframes the whole decision: publishing this
+source is the **distribution channel**, not a tax on it.
+
+The research measured the audience response precisely. Show HN submissions
+matching "astrology" max out at 5 points across all 61 of them. Occult-adjacent
+*engineering* is a different story entirely — the Ritman Library digitisation hit
+504 points, DeployTarot 206, a spellbook-syntax esolang 176. **The rule is: ship
+the history and the engineering, never the belief.** A public AGPL repo doing
+correct calendrical astronomy — unequal planetary hours, the irregular karaṇa
+cycle, polar-latitude refusals — is the version that lands with developers.
+
+And the tool pages are where short-form clips should land. Never send a Short to
+a homepage; send it to a thing the viewer can immediately use.
+
 ## Consequences
 
 - The compose stack gains one service and one internal hostname.
