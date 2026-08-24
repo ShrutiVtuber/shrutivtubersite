@@ -18,6 +18,13 @@ shrutivtuber.com {
 
     tls {
         dns cloudflare {env.CLOUDFLARE_API_TOKEN_SHRUTI}
+        # certmagic verifies the _acme-challenge TXT has propagated before
+        # telling Let's Encrypt to check. Hetzner's recursive resolvers would
+        # not return authoritative nameservers for this freshly-delegated zone
+        # ("could not determine authoritative nameservers"), so point the
+        # propagation check at public resolvers instead.
+        resolvers 1.1.1.1 8.8.8.8
+        propagation_timeout 5m
     }
 
     header {
@@ -51,6 +58,8 @@ shrutivtuber.com {
 www.shrutivtuber.com {
     tls {
         dns cloudflare {env.CLOUDFLARE_API_TOKEN_SHRUTI}
+        resolvers 1.1.1.1 8.8.8.8
+        propagation_timeout 5m
     }
     redir https://shrutivtuber.com{uri} permanent
 }
