@@ -41,8 +41,13 @@ const [live, links, projects, schedule, horoscopes] = await Promise.all([
   site<HoroscopeIndex>("/api/horoscopes?period=monthly"),
 ]);
 
-/* Only teased when there is something to read. A sign picker leading to twelve
-   empty pages is worse than no teaser. */
+/* The SIGN PICKER waits for something to read — twelve links to twelve empty
+   pages is worse than no picker. The SECTION does not: hiding it entirely
+   meant that on the day the site went public, with nothing written yet, the
+   homepage did not mention horoscopes at all and nobody could learn the
+   feature existed. So the header always stands and the picker is what fills
+   in, which is the same rule the rest of the site follows — an absent state
+   is designed, not a deletion. */
 const readings = horoscopes?.readings ?? [];
 const anyReading = readings.some((r) => r.published);
 const monthName = (() => {
@@ -260,25 +265,35 @@ const INSTRUMENTS = [
     }
   </section>
 
-  {
-    anyReading && (
-      <section class="section page">
-        <div class="section-head">
-          <SectionHeader
-            glyph="☾"
-            eyebrow="Horoscopes"
-            title={monthName ? `${monthName}, one per sign` : "This month, one per sign"}
-            body="Twelve readings a month, written by hand and signed Soror Eu. A. Pick a sign — or save a nativity and yours comes up first."
-          />
-          <Button variant="ghost" href="/horoscopes">All twelve →</Button>
-        </div>
+  <section class="section page">
+    <div class="section-head">
+      <SectionHeader
+        glyph="☾"
+        eyebrow="Horoscopes"
+        title={monthName ? `${monthName}, one per sign` : "This month, one per sign"}
+        body="Twelve readings a month, written by hand and signed Soror Eu. A. Pick a sign — or save a nativity and yours comes up first."
+      />
+      <Button variant="ghost" href="/horoscopes">
+        {anyReading ? "All twelve →" : "How they work →"}
+      </Button>
+    </div>
+    {
+      anyReading ? (
         <SignPicker
           signs={readings.map((r) => ({ sign: r.sign, published: r.published }))}
           hrefFor={(s) => `/horoscopes/${s}/monthly`}
         />
-      </section>
-    )
-  }
+      ) : (
+        /* No date promised. A month named here and missed reads as an
+           abandoned site, which is a worse thing to say than "not yet". */
+        <p class="horo-absent">
+          ○ The first set is not up yet. When it is, twelve go up together — and
+          every past month stays readable in <a href="/horoscopes/archive">the archive</a>
+          rather than being replaced.
+        </p>
+      )
+    }
+  </section>
 
   <section class="section page">
     <div class="section-head">
@@ -312,6 +327,12 @@ const INSTRUMENTS = [
 </BaseLayout>
 
 <style>
+  .horo-absent {
+    font: 400 var(--text-body) / var(--leading-body) var(--font-body);
+    color: var(--ink-faint); margin: 0; max-width: 62ch;
+  }
+  .horo-absent a { color: var(--accent); }
+
   .hero-foot-row { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
 
   .account-invite {
