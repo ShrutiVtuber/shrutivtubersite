@@ -5,6 +5,7 @@
  * do not build one; the slot is held deliberately.
  */
 import BaseLayout from "../layouts/BaseLayout.astro";
+import Prose from "../components/content/Prose.astro";
 import SectionHeader from "../components/brand/SectionHeader.astro";
 import Button from "../components/forms/Button.astro";
 import Badge from "../components/navigation/Badge.astro";
@@ -14,6 +15,7 @@ import { site, PATHS, type LinkGroups } from "../lib/api";
 
 const [sections, links] = await Promise.all([pageSections("support"), site<LinkGroups>(PATHS.links)]);
 const intro = sections.find((s) => s.key === "intro");
+const extra = sections.filter((s) => s.key !== "intro");
 
 /* Ko-fi only if it is actually one of her links. No invented destination. */
 const kofi = Object.values(links?.groups ?? {}).flat()
@@ -33,6 +35,8 @@ const TIERS = [
     items: ["Everything in Lamplighter", "Monthly practice notes, signed Soror Eu. A.", "A vote on the next instrument"],
   },
 ];
+
+/* Every block the admin has added to /support. */
 ---
 
 <BaseLayout title="Support the work — Shruti" description="Streams are free and the tools are open source. Support keeps the bench lit.">
@@ -81,6 +85,25 @@ const TIERS = [
       body="Designs are commissioned before anything is printed — nothing exists that I wouldn't wear. Discord hears first when that changes."
     />
   </div>
+
+    {/* Anything else the admin has put on this page. Only `intro` used to
+        render, so a block added in the admin simply did not appear — which
+        makes the editor feel broken rather than the page feel empty. */}
+    {
+      extra.length > 0 && (
+        <div class="page-sections">
+          {
+            extra.map((s) => (
+              <section class="page-section">
+                {s.title && <h2>{s.title}</h2>}
+                <Prose html={s.html} />
+              </section>
+            ))
+          }
+        </div>
+      )
+    }
+
 </BaseLayout>
 
 <style>
@@ -108,4 +131,8 @@ const TIERS = [
   .tier li { font: 400 var(--text-sm) / 1.5 var(--font-body); color: var(--ink-soft); }
   .tier-absent { font: 400 var(--text-xs) var(--font-mono); color: var(--ink-faint); }
   .tiers-note { font: 400 var(--text-sm) var(--font-mono); color: var(--ink-soft); margin: var(--space-5) 0 var(--space-6); }
+
+  .page-sections { display: grid; gap: var(--space-6); margin-top: var(--space-6); }
+  .page-section { display: grid; gap: var(--space-3); }
+  .page-section h2 { font: 600 var(--text-h3) var(--font-display); color: var(--ink); margin: 0; }
 </style>

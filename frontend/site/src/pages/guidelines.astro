@@ -4,9 +4,15 @@
  * wording is the thing people rely on.
  */
 import BaseLayout from "../layouts/BaseLayout.astro";
+import { pageSections } from "../lib/content";
+import Prose from "../components/content/Prose.astro";
 import SectionHeader from "../components/brand/SectionHeader.astro";
 import DisclosureRule from "../components/brand/DisclosureRule.astro";
 import Button from "../components/forms/Button.astro";
+
+/* Every block the admin has added to /guidelines. */
+const sections = await pageSections("guidelines");
+const extra = sections.filter((s) => s.key !== "intro");
 ---
 
 <BaseLayout
@@ -73,6 +79,25 @@ import Button from "../components/forms/Button.astro";
       <Button variant="ghost" href="/fan-works">See fan works</Button>
     </div>
   </div>
+
+    {/* Anything else the admin has put on this page. Only `intro` used to
+        render, so a block added in the admin simply did not appear — which
+        makes the editor feel broken rather than the page feel empty. */}
+    {
+      extra.length > 0 && (
+        <div class="page-sections">
+          {
+            extra.map((s) => (
+              <section class="page-section">
+                {s.title && <h2>{s.title}</h2>}
+                <Prose html={s.html} />
+              </section>
+            ))
+          }
+        </div>
+      )
+    }
+
 </BaseLayout>
 
 <style>
@@ -85,4 +110,8 @@ import Button from "../components/forms/Button.astro";
   .k-no { color: var(--live); }
   .signed { font: 400 var(--text-sm) var(--font-mono); color: var(--ink-soft); margin: 14px 0 0; }
   .actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: var(--space-5); }
+
+  .page-sections { display: grid; gap: var(--space-6); margin-top: var(--space-6); }
+  .page-section { display: grid; gap: var(--space-3); }
+  .page-section h2 { font: 600 var(--text-h3) var(--font-display); color: var(--ink); margin: 0; }
 </style>

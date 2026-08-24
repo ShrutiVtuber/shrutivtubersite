@@ -9,6 +9,8 @@
  * different inboxes so neither buries the other.
  */
 import BaseLayout from "../layouts/BaseLayout.astro";
+import { pageSections } from "../lib/content";
+import Prose from "../components/content/Prose.astro";
 import SectionHeader from "../components/brand/SectionHeader.astro";
 import TextField from "../components/forms/TextField.astro";
 import TextArea from "../components/forms/TextArea.astro";
@@ -67,6 +69,10 @@ if (Astro.request.method === "POST") {
     }
   }
 }
+
+/* Every block the admin has added to /contact. */
+const sections = await pageSections("contact");
+const extra = sections.filter((s) => s.key !== "intro");
 ---
 
 <BaseLayout title="Contact — Shruti" description="Business enquiries and everything else, routed separately.">
@@ -124,6 +130,25 @@ if (Astro.request.method === "POST") {
       )
     }
   </div>
+
+    {/* Anything else the admin has put on this page. Only `intro` used to
+        render, so a block added in the admin simply did not appear — which
+        makes the editor feel broken rather than the page feel empty. */}
+    {
+      extra.length > 0 && (
+        <div class="page-sections">
+          {
+            extra.map((s) => (
+              <section class="page-section">
+                {s.title && <h2>{s.title}</h2>}
+                <Prose html={s.html} />
+              </section>
+            ))
+          }
+        </div>
+      )
+    }
+
 </BaseLayout>
 
 <style>
@@ -148,4 +173,8 @@ if (Astro.request.method === "POST") {
     margin: 0;
   }
   .hp { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+
+  .page-sections { display: grid; gap: var(--space-6); margin-top: var(--space-6); }
+  .page-section { display: grid; gap: var(--space-3); }
+  .page-section h2 { font: 600 var(--text-h3) var(--font-display); color: var(--ink); margin: 0; }
 </style>

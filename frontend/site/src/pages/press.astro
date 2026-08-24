@@ -12,6 +12,7 @@
  * a zero.
  */
 import BaseLayout from "../layouts/BaseLayout.astro";
+import Prose from "../components/content/Prose.astro";
 import SectionHeader from "../components/brand/SectionHeader.astro";
 import Button from "../components/forms/Button.astro";
 import EmptyState from "../components/feedback/EmptyState.astro";
@@ -19,6 +20,7 @@ import { pageSections } from "../lib/content";
 
 const sections = await pageSections("press");
 const intro = sections.find((s) => s.key === "intro");
+const extra = sections.filter((s) => s.key !== "intro");
 ---
 
 <BaseLayout title="Press & media kit — Shruti" description="Brand-safety statement, asset pack and the business route.">
@@ -67,6 +69,25 @@ const intro = sections.find((s) => s.key === "intro");
       </EmptyState>
     </section>
   </div>
+
+    {/* Anything else the admin has put on this page. Only `intro` used to
+        render, so a block added in the admin simply did not appear — which
+        makes the editor feel broken rather than the page feel empty. */}
+    {
+      extra.length > 0 && (
+        <div class="page-sections">
+          {
+            extra.map((s) => (
+              <section class="page-section">
+                {s.title && <h2>{s.title}</h2>}
+                <Prose html={s.html} />
+              </section>
+            ))
+          }
+        </div>
+      )
+    }
+
 </BaseLayout>
 
 <style>
@@ -80,4 +101,8 @@ const intro = sections.find((s) => s.key === "intro");
   }
   .press-note { font-family: var(--font-body); }
   .press-block a { color: var(--accent); }
+
+  .page-sections { display: grid; gap: var(--space-6); margin-top: var(--space-6); }
+  .page-section { display: grid; gap: var(--space-3); }
+  .page-section h2 { font: 600 var(--text-h3) var(--font-display); color: var(--ink); margin: 0; }
 </style>
