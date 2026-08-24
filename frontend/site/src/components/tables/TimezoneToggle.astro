@@ -1,0 +1,96 @@
+---
+/* Ported from `components/tables/TimezoneToggle.jsx`; contract in
+ * `TimezoneToggle.d.ts`.
+ *
+ * The reference reads the visitor's zone from Intl at render time, which is a
+ * browser API. Server-side we cannot know it, so the label starts as the
+ * neutral "Your time" and a script fills the zone name in. The toggle itself
+ * works by rewriting the times already on the page — no round trip.
+ */
+interface Props { value?: "local" | "athens"; }
+const { value = "athens" } = Astro.props;
+---
+
+<div class="sh-tz" role="group" aria-label="Timezone" data-tz-toggle>
+  <button type="button" aria-pressed={value === "local"} data-tz="local">
+    Your time <span class="sh-tz-zone" data-tz-zone></span>
+  </button>
+  <button type="button" aria-pressed={value === "athens"} data-tz="athens">
+    Athens <span class="sh-tz-zone">GMT+3</span>
+  </button>
+</div>
+
+<style>
+  .sh-tz {
+    display: inline-flex;
+    border: var(--border-w) solid var(--line);
+    border-radius: var(--radius-full);
+    padding: 2px;
+    background: var(--surface-card);
+    gap: 2px;
+    font-family: var(--font-body);
+  }
+  .sh-tz button {
+    appearance: none;
+    border: 0;
+    background: transparent;
+    font-size: var(--text-xs);
+    font-weight: 600;
+    color: var(--ink-faint);
+    padding: 6px 12px;
+    border-radius: var(--radius-full);
+    cursor: pointer;
+    line-height: 1;
+    display: inline-flex;
+    gap: 6px;
+    align-items: center;
+    transition: color var(--dur-1) var(--ease-out), background var(--dur-1) var(--ease-out);
+  }
+  .sh-tz button:hover { color: var(--ink); }
+  .sh-tz button[aria-pressed="true"] { background: var(--surface-veil); color: var(--ink); }
+  .sh-tz-zone { font-family: var(--font-mono); font-weight: 400; font-size: 10px; color: var(--ink-faint); }
+</style>
+
+<script is:inline>
+  (function () {
+    var group = document.querySelector("[data-tz-toggle]");
+    if (!group) return;
+    var zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    var label = group.querySelector("[data-tz-zone]");
+    if (label) label.textContent = zone.split("/").pop().replace(/_/g, " ");
+
+    function render(mode) {
+      document.querySelectorAll("[data-local-time]").forEach(function (slot) {
+        var row = slot.closest(".sh-sched");
+        var primary = row && row.querySelector(".sh-sc-t1");
+        var when = new Date(slot.getAttribute("data-local-time"));
+        if (isNaN(when) || !primary) return;
+        var fmt = function (tz) {
+          return new Intl.DateTimeFormat("en-GB", {
+            hour: "2-digit", minute: "2-digit", hour12: false, timeZone: tz,
+          }).format(when);
+        };
+        if (mode === "local") {
+          primary.textContent = fmt(zone) + " your time";
+          slot.textContent = fmt("Europe/Athens") + " Athens";
+        } else {
+          primary.textContent = fmt("Europe/Athens") + " Athens";
+          slot.textContent = fmt(zone) + " your time";
+        }
+        slot.hidden = false;
+        slot.setAttribute("data-done", "");
+      });
+    }
+
+    group.querySelectorAll("button").forEach(function (button) {
+      button.addEventListener("click", function () {
+        group.querySelectorAll("button").forEach(function (b) {
+          b.setAttribute("aria-pressed", String(b === button));
+        });
+        render(button.getAttribute("data-tz"));
+      });
+    });
+    var pressed = group.querySelector('button[aria-pressed="true"]');
+    render(pressed ? pressed.getAttribute("data-tz") : "athens");
+  })();
+</script>

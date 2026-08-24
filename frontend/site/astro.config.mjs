@@ -11,6 +11,15 @@ import { defineConfig } from "astro/config";
 // integration, matching how theourgia does it.
 export default defineConfig({
   output: "server",
+
+  // Astro's own origin check is off because it cannot work here: behind Caddy
+  // the Node adapter reports Astro.url.origin as "http://localhost" whatever
+  // Host and X-Forwarded-Host say, so it rejected same-origin form POSTs from
+  // a real browser. CSRF is enforced in src/lib/csrf.ts instead, with a signed
+  // double-submit token that does not depend on the proxy being truthful about
+  // the host. Every form carries <CsrfField /> and every handler calls
+  // verifyCsrf().
+  security: { checkOrigin: false },
   adapter: node({ mode: "standalone" }),
   server: { host: "127.0.0.1", port: 4321 },
   vite: {

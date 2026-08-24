@@ -1,0 +1,10 @@
+---
+/* The hidden half of the double-submit pair. Every form that POSTs must
+ * include this, or `verifyCsrf` rejects the submission.
+ *
+ * The token is read from locals, not minted here: see `src/middleware.ts` for
+ * why a cookie set during streaming never reaches the browser.
+ */
+import { CSRF_FIELD } from "../../lib/csrf";
+---
+<input type="hidden" name={CSRF_FIELD} value={Astro.locals.csrf} />

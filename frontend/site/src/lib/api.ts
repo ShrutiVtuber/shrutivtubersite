@@ -9,7 +9,7 @@
  * fetched renders its designed absent state. One endpoint being down must not
  * blank the page.
  */
-const SITE_API = import.meta.env.SHRUTI_API_INTERNAL ?? "http://backend:8000";
+export const SITE_API = import.meta.env.SHRUTI_API_INTERNAL ?? "http://backend:8000";
 const ASTRO_API = import.meta.env.SHRUTI_ASTRO_INTERNAL ?? "http://shruti-astro:8000";
 
 async function get<T>(base: string, path: string, timeoutMs = 6000): Promise<T | null> {

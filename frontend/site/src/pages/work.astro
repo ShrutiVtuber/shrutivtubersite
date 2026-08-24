@@ -1,0 +1,192 @@
+---
+/* Work — ported from `ui_kits/site/Work.jsx`.
+ *
+ * "The page that makes her different," per the handoff. Its load-bearing
+ * feature is the per-project credit table — Name · Role · Stack · Licence ·
+ * Status — which is what another engineer looks for and what stops the page
+ * reading as an app-store listing.
+ *
+ * Role, stack and licence are columns on the project now, and where one is
+ * blank it renders the absent grammar rather than a guess. Four real projects
+ * are in the database; inventing a stack for them would be exactly the fault
+ * the brief forbids.
+ */
+import BaseLayout from "../layouts/BaseLayout.astro";
+import SectionHeader from "../components/brand/SectionHeader.astro";
+import ProjectCard from "../components/cards/ProjectCard.astro";
+import EmptyState from "../components/feedback/EmptyState.astro";
+import Button from "../components/forms/Button.astro";
+import { site, PATHS, type Project } from "../lib/api";
+
+interface FullProject extends Project {
+  role: string;
+  stack: string;
+  licence: string;
+  contributors: string;
+  media: { url: string; alt: string } | null;
+}
+
+const projects = (await site<FullProject[]>(PATHS.projects)) ?? [];
+
+const STATUS_WORD: Record<string, string> = {
+  active: "Active", maintained: "Maintained", archived: "Archived",
+};
+
+const INSTRUMENTS: [string, string, string, string][] = [
+  ["☉", "Planetary hours", "The day divided by its own light.", "/tools/planetary-hours"],
+  ["☽", "Attic calendar", "The lunisolar month, kept current.", "/tools/attic-calendar"],
+  ["◐", "Pañcāṅga", "The five limbs of the day.", "/tools/pancanga"],
+  ["☾", "Hindu calendar", "The lunisolar year and its festivals.", "/tools/hindu-calendar"],
+  ["Σ", "Isopsephy", "Letter-reckoning in six scripts.", "/tools/isopsephy"],
+  ["✶", "Natal chart", "A figure for a moment and a place.", "/tools/natal-chart"],
+  ["●", "Sigil generator", "Intent, reduced and drawn.", "/tools/sigil-generator"],
+];
+---
+
+<BaseLayout
+  title="Work — Shruti"
+  description="A portfolio of instruments: working software for magickal and astrological practice."
+>
+  <div class="page">
+    <SectionHeader
+      as="h1"
+      glyph="✶"
+      eyebrow="The work"
+      title="A portfolio of instruments"
+      body="Not an app-store listing. Each of these is a working tool, shipped and maintained — most of it built live on stream. Every entry carries its role, stack, licence and status, because that is what another engineer wants to know."
+    />
+
+    {
+      projects.length > 0 ? (
+        <div class="grid-2 work-grid">
+          {projects.map((p) => {
+            const rows: [string, string][] = [
+              ["Name", p.name],
+              ["Role", p.role],
+              ["Stack", p.stack],
+              ["Licence", p.licence],
+              ["Status", STATUS_WORD[p.status] ?? p.status],
+            ];
+            return (
+              <div class="work-entry">
+                <ProjectCard
+                  name={p.name}
+                  tagline={p.tagline}
+                  description={p.bodyMd}
+                  status={(p.status as "active" | "maintained" | "archived") ?? "active"}
+                  repoHref={p.repoUrl || undefined}
+                  liveHref={p.siteUrl || undefined}
+                  screenshot={p.media?.url ?? null}
+                  meta={[p.licence, p.stack].filter(Boolean).join(" · ") || undefined}
+                />
+                <div>
+                  <h3 class="work-credits-head">Credits</h3>
+                  <dl class="sh-pft" data-cols="1">
+                    {rows.map(([label, value]) => (
+                      <div class="sh-pft-row">
+                        <dt class="sh-pft-label">{label}</dt>
+                        <span class="sh-pft-dots" aria-hidden="true" />
+                        {/* Blank is not "unknown for ever" — it is not recorded
+                            yet, and saying so is what gets it recorded. */}
+                        <dd class="sh-pft-value" data-absent={!value}>
+                          {value || "not recorded yet"}
+                        </dd>
+                      </div>
+                    ))}
+                  </dl>
+                  {p.contributors && <p class="work-contributors">{p.contributors}</p>}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <EmptyState
+          glyph="○"
+          title="Nothing published here yet"
+          body="Projects are added in the admin, and each carries its own credit table."
+        />
+      )
+    }
+
+    <SectionHeader
+      as="h2"
+      glyph="☿"
+      title="Instruments you can run here"
+      body="Seven of Theourgia's tools run on their own pages — the software demonstrating itself, no install."
+    />
+    <div class="instrument-grid">
+      {
+        INSTRUMENTS.map(([glyph, name, desc, href]) => (
+          <a class="instrument" href={href}>
+            <span aria-hidden="true" class="instrument-glyph t-glyph">{glyph}</span>
+            <span class="instrument-name">{name}</span>
+            <span class="instrument-desc">{desc}</span>
+          </a>
+        ))
+      }
+    </div>
+
+    <EmptyState
+      glyph="◐"
+      title="What follows"
+      body="The next instrument is chosen on stream. Suggestions land in the Discord's #workbench channel."
+    >
+      <Button slot="action" variant="secondary" href="/contact">Get in touch</Button>
+    </EmptyState>
+  </div>
+</BaseLayout>
+
+<style>
+  .work-grid { margin-top: var(--space-6); }
+  .work-entry { display: grid; gap: var(--space-5); align-content: start; }
+  .work-credits-head {
+    font: 600 var(--text-micro) var(--font-body);
+    letter-spacing: var(--tracking-eyebrow);
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin: 0 0 10px;
+  }
+  .work-contributors {
+    font: 400 var(--text-xs) / 1.6 var(--font-mono);
+    color: var(--ink-faint);
+    margin: 10px 0 0;
+  }
+  .sh-pft-value[data-absent="true"] {
+    color: var(--ink-faint);
+    font-style: italic;
+    font-size: var(--text-sm);
+  }
+  .instrument-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 12px;
+    margin-top: var(--space-5);
+  }
+  .instrument {
+    display: block;
+    background: var(--surface-card);
+    border: var(--border-w) solid var(--line);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-1);
+    padding: 16px;
+    text-decoration: none;
+    transition: border-color var(--dur-1) var(--ease-out), box-shadow var(--dur-1) var(--ease-out);
+  }
+  .instrument:hover { border-color: var(--line-strong); box-shadow: var(--shadow-2); }
+  .instrument:hover .instrument-name { color: var(--accent-hover); }
+  .instrument-glyph { font: 400 1.25rem var(--font-display); color: var(--rose); }
+  .instrument-name {
+    display: block;
+    margin-top: 8px;
+    font: 600 var(--text-h4) var(--font-display);
+    color: var(--ink);
+    transition: color var(--dur-1) var(--ease-out);
+  }
+  .instrument-desc {
+    display: block;
+    margin-top: 4px;
+    font: 400 var(--text-xs) / 1.5 var(--font-body);
+    color: var(--ink-soft);
+  }
+</style>

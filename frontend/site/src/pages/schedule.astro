@@ -1,0 +1,78 @@
+---
+/* Schedule — ported from `ui_kits/site/Schedule.jsx`.
+ *
+ * The designed empty state is the current reality and the handoff says so
+ * outright, so it is not a fallback here — it is the page most visitors will
+ * see until streams are scheduled. Never fake liveness.
+ */
+import BaseLayout from "../layouts/BaseLayout.astro";
+import SectionHeader from "../components/brand/SectionHeader.astro";
+import ScheduleItem from "../components/tables/ScheduleItem.astro";
+import TimezoneToggle from "../components/tables/TimezoneToggle.astro";
+import EmptyState from "../components/feedback/EmptyState.astro";
+import Button from "../components/forms/Button.astro";
+import { site, PATHS } from "../lib/api";
+
+interface ScheduleRow {
+  title: string; startsAt: string; durationMinutes: number | null;
+  platform: string | null; url: string | null; notesMd: string | null;
+}
+const rows = (await site<ScheduleRow[]>(PATHS.schedule)) ?? [];
+const now = Date.now();
+const statusOf = (r: ScheduleRow): "live" | "upcoming" | "past" => {
+  const start = new Date(r.startsAt).getTime();
+  const end = start + (r.durationMinutes ?? 120) * 60_000;
+  if (now >= start && now <= end) return "live";
+  return now > end ? "past" : "upcoming";
+};
+---
+
+<BaseLayout title="Schedule — Shruti" description="Upcoming streams, authored in Athens and shown in your timezone.">
+  <div class="page">
+    <div class="section-head">
+      <SectionHeader
+        as="h1" glyph="☾" eyebrow="Schedule" title="Upcoming streams"
+        body="Authored in Athens (GMT+3); times shown in your zone."
+      />
+      {rows.length > 0 && <TimezoneToggle value="athens" />}
+    </div>
+
+    {
+      rows.length === 0 ? (
+        <EmptyState
+          glyph="○"
+          title="The sky is quiet"
+          body="Nothing scheduled yet — streams are announced on Discord first, and the calendar fills at the new moon."
+        >
+          <Button slot="action" variant="secondary" href="/contact">Get in touch</Button>
+        </EmptyState>
+      ) : (
+        <div class="schedule-rows">
+          {rows.map((r) => (
+            <ScheduleItem
+              title={r.title}
+              startISO={r.startsAt}
+              durationMin={r.durationMinutes ?? undefined}
+              topic={r.platform ?? undefined}
+              status={statusOf(r)}
+              href={r.url ?? undefined}
+            />
+          ))}
+        </div>
+      )
+    }
+
+    <p class="schedule-note">
+      Conversions use your system timezone.
+    </p>
+  </div>
+</BaseLayout>
+
+<style>
+  .schedule-rows { display: grid; gap: var(--space-3); margin-top: var(--space-5); }
+  .schedule-note {
+    font: 400 var(--text-xs) / 1.6 var(--font-body);
+    color: var(--ink-faint);
+    margin: var(--space-5) 0 0;
+  }
+</style>

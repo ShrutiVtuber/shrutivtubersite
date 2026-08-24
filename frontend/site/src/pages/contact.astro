@@ -1,0 +1,151 @@
+---
+/* Contact — ported from `ui_kits/site/Contact.jsx`.
+ *
+ * A real POST form handled on this route, so it works with scripting off.
+ * The reference validates in React state; here the server validates, calls the
+ * backend, and re-renders with the field errors verbatim from the design.
+ *
+ * Two routes in, deliberately: business mail and everything else land in
+ * different inboxes so neither buries the other.
+ */
+import BaseLayout from "../layouts/BaseLayout.astro";
+import SectionHeader from "../components/brand/SectionHeader.astro";
+import TextField from "../components/forms/TextField.astro";
+import TextArea from "../components/forms/TextArea.astro";
+import SelectField from "../components/forms/SelectField.astro";
+import Button from "../components/forms/Button.astro";
+import EmptyState from "../components/feedback/EmptyState.astro";
+import CsrfField from "../components/forms/CsrfField.astro";
+import { SITE_API } from "../lib/api";
+import { verifyCsrf } from "../lib/csrf";
+
+let sent = false;
+let failed = "";
+const errors: Record<string, string> = {};
+const values = { topic: "", name: "", email: "", msg: "" };
+
+if (Astro.request.method === "POST") {
+  const form = await Astro.request.formData();
+
+  /* Rejected before anything is read out of the form. A submission without a
+     matching token is not a user with a typo, it is a cross-site post. */
+  if (!verifyCsrf(Astro.cookies, form)) {
+    failed = "That did not send. Reload the page and try again.";
+  }
+  values.topic = String(form.get("topic") ?? "");
+  values.name = String(form.get("name") ?? "");
+  values.email = String(form.get("email") ?? "");
+  values.msg = String(form.get("msg") ?? "");
+  const honeypot = String(form.get("website") ?? "");
+
+  /* Error copy is the design's, verbatim — the wording is part of the design. */
+  if (!failed) {
+  if (!values.topic) errors.topic = "Pick a route so this lands in the right inbox.";
+  if (!values.name.trim()) errors.name = "Please add a name — a handle is fine.";
+  if (!/^\S+@\S+\.\S+$/.test(values.email)) errors.email = "That address doesn’t look complete.";
+  if (values.msg.trim().length < 10) errors.msg = "A sentence or two helps me reply well.";
+  }
+
+  if (!failed && Object.keys(errors).length === 0) {
+    try {
+      const response = await fetch(`${SITE_API}/api/contact`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          kind: values.topic === "business" ? "business" : "general",
+          name: values.name,
+          email: values.email,
+          subject: "",
+          body: values.msg,
+          website: honeypot,
+        }),
+      });
+      if (response.ok) sent = true;
+      else failed = "That did not send. The address above works, and always will.";
+    } catch {
+      failed = "That did not send. The address above works, and always will.";
+    }
+  }
+}
+---
+
+<BaseLayout title="Contact — Shruti" description="Business enquiries and everything else, routed separately.">
+  <div class="page">
+    <SectionHeader
+      as="h1" glyph="☿" eyebrow="Contact" title="Two routes in"
+      body="Business goes to one inbox, everything else to another — pick the right one and it gets answered faster."
+    />
+
+    <div class="grid-2 contact-cards">
+      <div class="contact-card">
+        <h2>Business enquiries</h2>
+        <p>Sponsorships, events, press. The brand-safety statement and asset pack are in the press kit.</p>
+        <span class="contact-addr">business@shrutivtuber.com</span>
+        <div><Button variant="ghost" href="/press">Open the press kit</Button></div>
+      </div>
+      <div class="contact-card">
+        <h2>Everything else</h2>
+        <p>Fan works, questions, edge cases, hellos.</p>
+        <span class="contact-addr">hello@shrutivtuber.com</span>
+      </div>
+    </div>
+
+    {
+      sent ? (
+        <EmptyState
+          glyph="☾"
+          title="Sent — thank you."
+          body="Replies come from hello@shrutivtuber.com, usually within two working days. Business mail may take one more."
+        >
+          <Button slot="action" variant="secondary" href="/contact">Send another</Button>
+        </EmptyState>
+      ) : (
+        <form method="POST" novalidate class="contact-form">
+          <CsrfField />
+          {failed && <p class="contact-failed" role="alert">{failed}</p>}
+          <SelectField
+            label="Route" name="topic" required placeholder="Choose one"
+            value={values.topic} error={errors.topic}
+            options={[
+              { value: "business", label: "Business — sponsorship, events, press" },
+              { value: "general", label: "Everything else" },
+            ]}
+          />
+          <TextField label="Name" name="name" required value={values.name} error={errors.name} autocomplete="name" />
+          <TextField label="Email" name="email" type="email" required value={values.email} error={errors.email} autocomplete="email" />
+          <TextArea label="Message" name="msg" required rows={6} maxlength={5000} value={values.msg} error={errors.msg} />
+          {/* Honeypot: a real person never fills this; bots fill everything. */}
+          <div class="hp" aria-hidden="true">
+            <label for="website">Website</label>
+            <input id="website" name="website" type="text" tabindex="-1" autocomplete="off" />
+          </div>
+          <div><Button type="submit">Send</Button></div>
+        </form>
+      )
+    }
+  </div>
+</BaseLayout>
+
+<style>
+  .contact-cards { margin-top: var(--space-6); }
+  .contact-card {
+    background: var(--surface-card);
+    border: var(--border-w) solid var(--line);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-1);
+    padding: 20px;
+    display: grid;
+    gap: 8px;
+    align-content: start;
+  }
+  .contact-card h2 { font: 600 var(--text-h3) var(--font-display); color: var(--ink); margin: 0; }
+  .contact-card p { font: 400 var(--text-sm) / 1.55 var(--font-body); color: var(--ink-soft); margin: 0; }
+  .contact-addr { font: 400 var(--text-sm) var(--font-mono); color: var(--ink); }
+  .contact-form { display: grid; gap: 18px; max-width: 560px; margin-top: var(--space-6); }
+  .contact-failed {
+    font: 400 var(--text-sm) / 1.55 var(--font-body);
+    color: var(--live);
+    margin: 0;
+  }
+  .hp { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+</style>

@@ -147,6 +147,17 @@ class Project(TimestampMixin, table=True):
     repo_url: str = ""
     site_url: str = ""
     status: str = "active"   # active | maintained | archived
+
+    # The credit table the /work design mandates: Name · Role · Stack ·
+    # Licence · Status. It is what makes the page read as a portfolio of
+    # instruments rather than an app-store listing, and it is the first thing
+    # another engineer looks for — so these are columns, not prose buried in
+    # body_md where nothing can query or render them consistently.
+    role: str = ""           # "Author · maintainer", "Founder · lead developer"
+    stack: str = ""          # "Astro · TypeScript · Postgres · Swiss Ephemeris"
+    licence: str = ""        # "AGPL-3.0", "Proprietary"
+    contributors: str = ""   # the mono footnote under the table
+
     position: int = Field(default=0)
     visible: bool = Field(default=True)
     media_id: Optional[int] = Field(default=None, foreign_key="media.id")
