@@ -1,0 +1,69 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# HOST Caddy — add this block to the existing /etc/caddy/Caddyfile on the box
+# that already serves theourgia.com. Do not replace the file; append.
+#
+# Prerequisite: CLOUDFLARE_API_TOKEN is already in /etc/caddy/caddy.env for the
+# theourgia blocks. The token needs Zone:DNS:Edit on the shrutivtuber.com zone
+# too — either widen the existing token or add a second one.
+#
+# After editing:  caddy validate --config /etc/caddy/Caddyfile
+#                 systemctl reload caddy
+# ─────────────────────────────────────────────────────────────────────────────
+
+shrutivtuber.com {
+	encode gzip zstd
+
+	tls {
+		dns cloudflare {env.CLOUDFLARE_API_TOKEN}
+	}
+
+	reverse_proxy 127.0.0.1:8200 {
+		flush_interval -1
+		header_up X-Real-IP {remote_host}
+		header_up X-Forwarded-For {remote_host}
+		header_up X-Forwarded-Proto {scheme}
+		transport http {
+			versions 1.1 2
+		}
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "interest-cohort=()"
+		-Server
+	}
+
+	log {
+		output stdout
+		format console
+	}
+}
+
+www.shrutivtuber.com {
+	tls {
+		dns cloudflare {env.CLOUDFLARE_API_TOKEN}
+	}
+	redir https://shrutivtuber.com{uri} permanent
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# NOTE ON /journal — BeeRanked
+#
+# Preferred: mount /journal at the Cloudflare edge, so requests never touch
+# this box at all. Nothing goes here in that case.
+#
+# Fallback, if you mount at the origin instead, insert INSIDE the
+# shrutivtuber.com block ABOVE the catch-all reverse_proxy:
+#
+#     handle /journal* {
+#         reverse_proxy https://<your-beeranked-host> {
+#             header_up Host <your-beeranked-host>
+#         }
+#     }
+#
+# and advertise both sitemaps from robots.txt:
+#     Sitemap: https://shrutivtuber.com/sitemap.xml
+#     Sitemap: https://shrutivtuber.com/journal/sitemap.xml
+# ─────────────────────────────────────────────────────────────────────────────

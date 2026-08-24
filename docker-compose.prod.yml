@@ -1,0 +1,46 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# shrutivtuber.com — production overlay
+#
+# ALWAYS deploy with both files:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# Every service sets mem_limit, cpus and log rotation. This is deliberate:
+# the 2026-08-18 theourgia prelaunch audit flagged "no memory/CPU limits on any
+# container on the single VPS" as a MEDIUM finding. Adding a second public
+# property to that box is the moment it stops being theoretical — an unbounded
+# postgres log or an OOM-happy neighbour takes down BOTH sites.
+#
+# Total budget here is ~1.4 GB, sized for a small marketing site.
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+  caddy:
+    mem_limit: 128m
+    cpus: "0.25"
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "5" }
+
+  site:
+    command: ["node", "./dist/server/entry.mjs"]
+    mem_limit: 384m
+    cpus: "0.50"
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "5" }
+
+  backend:
+    command: ["uvicorn", "shruti.api.app:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "${SHRUTI_WORKERS:-2}"]
+    mem_limit: 384m
+    cpus: "0.50"
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "5" }
+
+  postgres:
+    # No host port in production. Reachable only on the internal network.
+    mem_limit: 512m
+    cpus: "0.50"
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "5" }

@@ -1,0 +1,55 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Internal Caddy — plain HTTP on 8080, published to the host on 127.0.0.1:8200.
+# The HOST Caddy terminates TLS and reverse-proxies to us. No TLS here.
+# ─────────────────────────────────────────────────────────────────────────────
+
+:8080 {
+	encode gzip zstd
+
+	# ── API ──────────────────────────────────────────────────────────────────
+	handle /api/* {
+		reverse_proxy backend:8000 {
+			header_up X-Real-IP {http.request.header.X-Real-IP}
+			header_up X-Forwarded-For {http.request.header.X-Forwarded-For}
+			header_up X-Forwarded-Proto {http.request.header.X-Forwarded-Proto}
+		}
+	}
+
+	# ── Uploaded art / media ─────────────────────────────────────────────────
+	handle /media/* {
+		root * /srv
+		file_server
+		header Cache-Control "public, max-age=604800"
+	}
+
+	# ── Admin SPA — where you edit pages and swap art in without a deploy ────
+	handle /admin* {
+		root * /srv/admin
+		try_files {path} /index.html
+		file_server
+		header {
+			Cache-Control "no-store"
+			X-Robots-Tag "noindex, nofollow"
+		}
+	}
+
+	# ── Everything else: the Astro site (SSR) ────────────────────────────────
+	handle {
+		reverse_proxy site:4321 {
+			header_up X-Real-IP {http.request.header.X-Real-IP}
+			header_up X-Forwarded-For {http.request.header.X-Forwarded-For}
+			header_up X-Forwarded-Proto {http.request.header.X-Forwarded-Proto}
+		}
+	}
+
+	header {
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+
+	log {
+		output stdout
+		format console
+	}
+}

@@ -1,0 +1,99 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# shrutivtuber.com — base compose stack
+#
+# Runs alongside theourgia on the same host but shares NOTHING with it:
+# its own postgres, its own volumes, its own network, its own deploy root.
+# The only shared resource is the host Caddy, which routes by hostname.
+#
+#   host Caddy :443  ──►  127.0.0.1:${SHRUTI_HOST_PORT:-8200}  ──►  caddy
+#                                                                    ├─► site  (Astro SSR)
+#                                                                    ├─► admin (static)
+#                                                                    └─► backend (FastAPI)
+#
+# Production overlay (resource limits, log rotation) lives in
+# docker-compose.prod.yml — always deploy with BOTH files.
+# ─────────────────────────────────────────────────────────────────────────────
+
+name: shruti
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on: [site, backend]
+    ports:
+      # Loopback only. TLS is the host Caddy's job.
+      - "127.0.0.1:${SHRUTI_HOST_PORT:-8200}:8080"
+    volumes:
+      - ./Caddyfile.internal:/etc/caddy/Caddyfile:ro
+      - admin_dist:/srv/admin:ro
+      - media:/srv/media:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks: [shruti]
+
+  site:
+    build:
+      context: ./frontend
+      dockerfile: site/Dockerfile
+    restart: unless-stopped
+    depends_on: [backend]
+    environment:
+      # Server-side fetches talk to the backend over the internal network.
+      SHRUTI_API_INTERNAL: http://backend:8000
+      SHRUTI_SITE_URL: ${SHRUTI_SITE_URL:-http://localhost:8200}
+      HOST: 0.0.0.0
+      PORT: 4321
+    networks: [shruti]
+
+  admin:
+    # Builds the admin SPA into a named volume that caddy serves at /admin.
+    # Not a long-running service — it exits once the bundle is written.
+    build:
+      context: ./frontend
+      dockerfile: admin/Dockerfile
+    volumes:
+      - admin_dist:/out
+    networks: [shruti]
+
+  backend:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file: [.env]
+    environment:
+      SHRUTI_DATABASE_URL: postgresql+asyncpg://${SHRUTI_POSTGRES_USER:-shruti}:${SHRUTI_POSTGRES_PASSWORD}@postgres:5432/${SHRUTI_POSTGRES_DB:-shruti}
+    volumes:
+      - media:/app/media
+    networks: [shruti]
+
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${SHRUTI_POSTGRES_USER:-shruti}
+      POSTGRES_PASSWORD: ${SHRUTI_POSTGRES_PASSWORD}
+      POSTGRES_DB: ${SHRUTI_POSTGRES_DB:-shruti}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${SHRUTI_POSTGRES_USER:-shruti} -d ${SHRUTI_POSTGRES_DB:-shruti}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks: [shruti]
+
+volumes:
+  postgres_data:
+  admin_dist:
+  media:
+  caddy_data:
+  caddy_config:
+
+networks:
+  shruti:
+    name: shruti

@@ -1,0 +1,17 @@
+# Dev overlay:  docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+# Exposes postgres on 5433 (never 5432 — that's theourgia's) and hot-reloads.
+services:
+  postgres:
+    ports:
+      - "127.0.0.1:${SHRUTI_POSTGRES_DEV_HOST_PORT:-5433}:5432"
+
+  backend:
+    command: ["uvicorn", "shruti.api.app:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    volumes:
+      - ./backend:/app
+      - media:/app/media
+
+  site:
+    command: ["pnpm", "--filter", "@shruti/site", "dev", "--host", "0.0.0.0", "--port", "4321"]
+    volumes:
+      - ./frontend:/app
