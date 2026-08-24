@@ -378,6 +378,28 @@ def _moment(value: int | None) -> datetime | None:
     return datetime.fromtimestamp(value, tz=timezone.utc) if value else None
 
 
+def _period_end(subscription: dict) -> int | None:
+    """
+    When the paid period runs out.
+
+    **Stripe moved this.** It used to sit on the subscription; on current API
+    versions it lives on each subscription ITEM, and reading only the old
+    place silently yields nothing. Silently is the problem — the renewal date
+    and the "your access lasts until" date are the single most useful fact in
+    the reminder and the cancellation email, and a missing fact is dropped
+    from those templates rather than printed blank. The email still sends and
+    still looks fine, having quietly lost the thing the reader wanted.
+
+    Both places are read, newest first, so this keeps working across the
+    version change in either direction.
+    """
+    items = (subscription.get("items") or {}).get("data") or []
+    for item in items:
+        if item.get("current_period_end"):
+            return item["current_period_end"]
+    return subscription.get("current_period_end")
+
+
 async def _tell(
     session: AsyncSession, to: str, built: tuple[str, str] | None
 ) -> None:
@@ -485,7 +507,7 @@ async def _upsert(
         row.stripe_subscription_id = subscription.get("id", "")
         row.status = subscription.get("status", "")
         row.cancel_at_period_end = bool(subscription.get("cancel_at_period_end"))
-        row.current_period_end = _moment(subscription.get("current_period_end"))
+        row.current_period_end = _moment(_period_end(subscription))
         tier = (subscription.get("metadata") or {}).get("tier", "")
         if tier:
             row.tier = tier
@@ -508,6 +530,17 @@ async def _email_for(session: AsyncSession, customer_id: str) -> str:
     The account's address is preferred over the one Stripe holds: somebody who
     changed their email here and not there should still be reachable, and this
     is the address they see on their own account page.
+
+    **Falling back to Stripe is not belt-and-braces, it is the fix for a real
+    silent failure.** The address arrives with `checkout.session.completed`,
+    and it is tempting to assume that always lands before
+    `customer.subscription.created`. Stripe does not order webhooks, and a
+    subscription made from the dashboard produces no checkout event at all —
+    so the row can genuinely have no address when the cancellation email is
+    due. `_tell` does nothing without one, which means the person who just
+    cancelled hears nothing and the failure looks exactly like success. Asking
+    Stripe costs one call, only when the address is missing, and it is then
+    remembered.
     """
     row = await _supporter(session, customer_id)
     if row is None:
@@ -518,7 +551,19 @@ async def _email_for(session: AsyncSession, customer_id: str) -> str:
         ).scalar_one_or_none()
         if user and user.email:
             return user.email
-    return row.email
+    if row.email:
+        return row.email
+
+    try:
+        customer = stripe.Customer.retrieve(customer_id)
+    except Exception as exc:                       # noqa: BLE001
+        log.warning("customer %s could not be read: %s", customer_id, type(exc).__name__)
+        return ""
+    found = (customer.get("email") or "") if not customer.get("deleted") else ""
+    if found:
+        row.email = found
+        await session.commit()
+    return found
 
 
 async def _tier_for(session: AsyncSession, customer_id: str) -> str:
@@ -600,7 +645,7 @@ async def webhook(
                 tier=(subscription.get("metadata") or {}).get("tier", ""),
                 amount=price.get("unit_amount"),
                 currency=price.get("currency", "eur"),
-                renews_on=_moment(subscription.get("current_period_end")),
+                renews_on=_moment(_period_end(subscription)),
                 imprint=imprint,
             ))
         elif email and obj.get("mode") == "payment":
@@ -637,7 +682,7 @@ async def webhook(
                     session, await _email_for(session, customer_id),
                     emails.subscription_cancelled(
                         tier=tier,
-                        ends_on=_moment(obj.get("current_period_end")),
+                        ends_on=_moment(_period_end(obj)),
                         imprint=imprint,
                     ),
                 )

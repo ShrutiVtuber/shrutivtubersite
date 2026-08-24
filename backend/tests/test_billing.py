@@ -227,3 +227,30 @@ def test_a_trailing_slash_does_not_defeat_the_allowlist(configured) -> None:
 
     configured(site_url="https://shrutivtuber.com/", env="prod")
     assert resolve("https://shrutivtuber.com/") == "https://shrutivtuber.com"
+
+
+# ── the field Stripe moved ──────────────────────────────────────────────────
+
+def test_the_period_end_is_read_from_the_subscription_item() -> None:
+    """
+    Stripe moved `current_period_end` from the subscription onto each item.
+    Reading only the old place yields nothing, and nothing is the worst
+    possible outcome here: the renewal date and the "access until" date are
+    dropped from those emails rather than printed blank, so the mail still
+    sends, still looks right, and has quietly lost the fact the reader opened
+    it for.
+    """
+    modern = {"id": "sub_1", "items": {"data": [{"current_period_end": 1_790_292_206}]}}
+    assert billing._period_end(modern) == 1_790_292_206
+
+
+def test_the_old_shape_still_works() -> None:
+    """Read newest-first, but keep the old place, so this survives the version
+    change in either direction."""
+    legacy = {"id": "sub_1", "current_period_end": 1_700_000_000, "items": {"data": [{}]}}
+    assert billing._period_end(legacy) == 1_700_000_000
+
+
+def test_no_period_end_anywhere_is_none_not_a_crash() -> None:
+    assert billing._period_end({"id": "sub_1"}) is None
+    assert billing._period_end({"id": "sub_1", "items": {"data": []}}) is None
