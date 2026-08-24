@@ -33,6 +33,10 @@ class Settings(BaseSettings):
     youtube_channel_id: str = ""
     youtube_api_key: str = ""
 
+    # Which platform the "watch now" button points at during a simulcast. Both
+    # are reported either way; this only decides the single call to action.
+    primary_platform: str = "twitch"
+
     # Contact / transactional email
     contact_to: str = ""
     resend_api_key: str = ""
