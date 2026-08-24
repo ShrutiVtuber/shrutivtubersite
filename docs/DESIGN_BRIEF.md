@@ -186,6 +186,32 @@ each a name plus link); and the two-names section where Shruti and Soror Eu. A.
 are explained. Costume/outfit gallery — design it, even though art will fill in
 later.
 
+### 2b. The tool pages ← **build this template first**
+
+Six pages off one template. This is the site's only real differentiator and it
+is what the designer should build before anything else: planetary hours · today
+in the Attic calendar · pañcāṅga · isopsephy · natal chart · sigil generator.
+
+The template needs, as first-class elements:
+
+- **A tradition toggle.** Sophia practises Hellenistic *and* Vedic, and the two
+  disagree on something as basic as when the Sun rises — the Hellenistic
+  definition is the upper limb of the visible disc with refraction, the Indian
+  one is the centre of the disc without it. They differ by about 4.6 minutes in
+  Athens, which is enough to change the answer. **Neither is the default-correct
+  one.** The toggle is a real control the user operates, not a settings-page
+  preference, and both options need a one-line explanation next to them.
+- **A parameter panel** — location, date/time, and per-tool options such as
+  ayanāṁśa (six choices, because practitioners genuinely disagree).
+- **A designed "cannot compute" state.** At polar latitudes the Sun does not
+  rise, and the tool says so rather than inventing an answer. This state will be
+  seen and must look deliberate.
+- **A result that can be linked and shared** — the parameters belong in the URL.
+- **A source link.** These tools are AGPL and the licence obliges an offer of
+  source for the running version. Treat it as a credibility mark, not fine print:
+  the developer audience reads "here is the engineering" as the reason to trust
+  the astrology.
+
 ### 3. Work ← *the page that makes her different*
 Theourgia, BeeRanked, and whatever follows. Per project: name, tagline,
 description, status (active / maintained / archived), repo link, live link,
