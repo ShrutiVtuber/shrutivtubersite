@@ -1,0 +1,153 @@
+---
+/* About — ported from `ui_kits/site/About.jsx`.
+ *
+ * The page exists to keep TWO VOICES VISUALLY DISTINCT: a practitioner
+ * Description and a character Lore block. Conflating them is the failure mode
+ * the handoff says this page exists to avoid.
+ *
+ * Prose comes from the database so it is editable without a deploy. The
+ * profile fields and credits are NOT seeded — the bundle's are sample values
+ * and the readme forbids inventing an oshi mark — so they render their absent
+ * states until supplied.
+ */
+import BaseLayout from "../layouts/BaseLayout.astro";
+import SectionHeader from "../components/brand/SectionHeader.astro";
+import Prose from "../components/content/Prose.astro";
+import ProfileFieldTable from "../components/tables/ProfileFieldTable.astro";
+import CreditList from "../components/tables/CreditList.astro";
+import FanArtCard from "../components/cards/FanArtCard.astro";
+import EmptyState from "../components/feedback/EmptyState.astro";
+import Badge from "../components/navigation/Badge.astro";
+import { pageSections, profile } from "../lib/content";
+
+const [sections, who] = await Promise.all([pageSections("about"), profile()]);
+const fields = who?.fields ?? [];
+const credits = (who?.credits ?? []).map((c) => ({
+  role: c.role, name: c.name, href: c.url, note: c.note,
+}));
+---
+
+<BaseLayout
+  title="About — Shruti"
+  description="VTuber, theurgist and toolmaker. Three initiatory lineages, held at once."
+>
+  <div class="page">
+    <SectionHeader
+      as="h1"
+      glyph="☾"
+      eyebrow="About"
+      title="Shruti"
+      body="VTuber · theurgist · toolmaker. Athens, GMT+3."
+    />
+
+    <div class="about-cols">
+      <div>
+        {
+          sections.length > 0 ? (
+            sections.map((s) => (
+              /* The section's own title is a heading in the flow, not part of
+                 its markdown body — Prose renders `html` OR its slot, never
+                 both, so it goes above rather than inside. "intro" is skipped
+                 because the page heading above already carries it. */
+              <div class="about-block">
+                {s.title && s.key !== "intro" && <h3 class="about-block-title">{s.title}</h3>}
+                <Prose html={s.html} />
+              </div>
+            ))
+          ) : (
+            <EmptyState
+              glyph="○"
+              title="Nothing written here yet"
+              body="This page is edited in the admin — the words go in there, not in a deploy."
+            />
+          )
+        }
+      </div>
+
+      <div class="about-side">
+        <div>
+          <h3 class="side-head">Profile</h3>
+          {
+            fields.length > 0 ? (
+              <ProfileFieldTable columns={1} fields={fields} />
+            ) : (
+              /* Not a placeholder for sample values. The bundle's birthday,
+                 height and debut are sample data, and the readme is explicit
+                 that no oshi mark exists and one must not be invented. */
+              <p class="side-absent">
+                Profile fields are not set yet. They are added in the admin, one at a time.
+              </p>
+            )
+          }
+        </div>
+        <div>
+          <h3 class="side-head">Credits</h3>
+          {
+            credits.length > 0 ? (
+              <CreditList dense credits={credits} />
+            ) : (
+              <p class="side-absent">
+                No credits recorded yet — the commissions are still in progress.
+              </p>
+            )
+          }
+        </div>
+      </div>
+    </div>
+
+    <section class="section costumes">
+      <div class="section-head">
+        <SectionHeader
+          glyph="✶"
+          eyebrow="Costumes"
+          title="Outfits"
+          body="Art arrives incrementally — empty slots are part of the design."
+        />
+        <Badge tone="rose">3 commissions open</Badge>
+      </div>
+      <div class="grid-3">
+        <FanArtCard image={null} artist="base model" platform="in progress" />
+        <FanArtCard image={null} artist="festival outfit" platform="planned" />
+        <FanArtCard image={null} artist="dev-stream hoodie" platform="planned" />
+      </div>
+    </section>
+  </div>
+</BaseLayout>
+
+<style>
+  .about-cols {
+    display: grid;
+    grid-template-columns: 1.4fr 1fr;
+    gap: var(--space-7);
+    align-items: start;
+    margin-top: var(--space-6);
+  }
+  .about-cols > div:first-child { display: grid; gap: var(--space-5); }
+  .about-block { display: grid; gap: var(--space-3); }
+  .about-block-title {
+    font-family: var(--font-display);
+    font-size: var(--text-h3);
+    font-weight: 600;
+    line-height: var(--leading-heading);
+    color: var(--ink);
+    margin: 0;
+  }
+  .about-side { display: grid; gap: var(--space-6); }
+  .side-head {
+    font: 600 var(--text-micro) var(--font-body);
+    letter-spacing: var(--tracking-eyebrow);
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin: 0 0 10px;
+  }
+  .side-absent {
+    font-family: var(--font-body);
+    font-size: var(--text-sm);
+    line-height: var(--leading-body);
+    color: var(--ink-faint);
+    margin: 0;
+    max-width: 38ch;
+  }
+  .costumes { margin-top: var(--space-7); }
+  @media (max-width: 860px) { .about-cols { grid-template-columns: 1fr; } }
+</style>

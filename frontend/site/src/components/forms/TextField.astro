@@ -1,0 +1,36 @@
+---
+/* Ported from `components/forms/TextField.jsx`; contract in `TextField.d.ts`.
+   Styles live in `styles/forms.css` — the reference shares one sheet across
+   all the field components. */
+interface Props {
+  label: string; name?: string; hint?: string; error?: string; success?: string;
+  required?: boolean; optionalLabel?: boolean; disabled?: boolean;
+  id?: string; type?: string; value?: string; placeholder?: string;
+  autocomplete?: string; inputmode?: string;
+}
+const {
+  label, name, hint, error, success, required, optionalLabel, disabled,
+  id, type = "text", value, placeholder, autocomplete, inputmode, ...rest
+} = Astro.props;
+const fid = id ?? `sh-tf-${name ?? label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
+---
+<div class="sh-field" data-invalid={!!error} data-disabled={!!disabled}>
+  <label class="sh-f-label" for={fid}>
+    {label}
+    {required && <span class="sh-f-req" aria-hidden="true">*</span>}
+    {!required && optionalLabel && <span class="sh-f-optional">optional</span>}
+  </label>
+  <input
+    class="sh-f-ctrl" id={fid} name={name ?? fid} type={type} value={value}
+    placeholder={placeholder} autocomplete={autocomplete} inputmode={inputmode}
+    required={required} disabled={disabled} aria-invalid={!!error}
+    aria-describedby={error ? `${fid}-err` : hint ? `${fid}-hint` : undefined}
+    {...rest}
+  />
+  {
+    error ? <span class="sh-f-error" id={`${fid}-err`} role="alert">{error}</span>
+    : success ? <span class="sh-f-ok">{success}</span>
+    : hint ? <span class="sh-f-hint" id={`${fid}-hint`}>{hint}</span>
+    : null
+  }
+</div>

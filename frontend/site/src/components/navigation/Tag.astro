@@ -1,0 +1,18 @@
+---
+/* Ported from `components/navigation/Tag.jsx`; contract in `Tag.d.ts`. */
+interface Props { label: string; href?: string; active?: boolean; count?: number; }
+const { label, href, active = false, count } = Astro.props;
+const Tg = href ? "a" : "button";
+---
+<Tg class="sh-tagc" data-active={active} href={href} type={href ? undefined : "button"}
+    aria-pressed={href ? undefined : active || undefined}>
+  {label}{count != null && <span class="sh-tag-n">{count}</span>}
+</Tg>
+
+<style>
+.sh-tagc{display:inline-flex;align-items:center;gap:6px;font-family:var(--font-body);font-size:var(--text-xs);font-weight:500;color:var(--ink-soft);background:var(--surface-veil);border:var(--border-w) solid transparent;border-radius:var(--radius-full);padding:5px 12px;text-decoration:none;cursor:pointer;line-height:1;transition:color var(--dur-1) var(--ease-out),border-color var(--dur-1) var(--ease-out),background var(--dur-1) var(--ease-out)}
+.sh-tagc:hover{color:var(--accent-hover);border-color:color-mix(in srgb,var(--accent) 40%,transparent)}
+.sh-tagc:active{transform:translateY(1px)}
+.sh-tagc[data-active="true"]{background:var(--accent-wash);border-color:color-mix(in srgb,var(--accent) 50%,transparent);color:var(--accent)}
+.sh-tag-n{font-family:var(--font-mono);font-size:10px;color:var(--ink-faint);font-variant-numeric:tabular-nums}
+</style>

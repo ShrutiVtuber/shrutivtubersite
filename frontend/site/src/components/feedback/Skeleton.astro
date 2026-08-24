@@ -1,0 +1,35 @@
+---
+/* Ported from `components/feedback/Skeleton.jsx`; contract in
+   `Skeleton.d.ts`. */
+interface Props {
+  variant?: "line" | "text" | "rect" | "circle";
+  width?: string | number; height?: string | number; lines?: number;
+}
+const { variant = "line", width, height, lines = 1 } = Astro.props;
+const px = (v: string | number | undefined, fallback: string) =>
+  v == null ? fallback : typeof v === "number" ? `${v}px` : v;
+const dim =
+  variant === "circle"
+    ? `width:${px(width, "40px")};height:${px(width, "40px")}`
+    : `width:${px(width, "100%")};height:${px(height, variant === "rect" ? "96px" : "12px")}`;
+---
+{
+  variant === "text" && lines > 1 ? (
+    <span class="sh-skel-group" aria-hidden="true">
+      {Array.from({ length: lines }).map((_, i) => (
+        <span class="sh-skel" data-variant="line"
+              style={`height:${px(height, "12px")};width:${i === lines - 1 ? "62%" : px(width, "100%")}`} />
+      ))}
+    </span>
+  ) : (
+    <span class="sh-skel" data-variant={variant} aria-hidden="true" style={dim} />
+  )
+}
+
+<style>
+.sh-skel{display:block;background:var(--surface-veil);border-radius:4px;animation:sh-skel-pulse 1.6s var(--ease-in-out) infinite}
+.sh-skel[data-variant="rect"]{border-radius:var(--radius-md)}
+.sh-skel[data-variant="circle"]{border-radius:999px}
+.sh-skel-group{display:grid;gap:8px}
+@keyframes sh-skel-pulse{0%,100%{opacity:1}50%{opacity:.55}}
+</style>

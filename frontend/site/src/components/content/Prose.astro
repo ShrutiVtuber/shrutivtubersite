@@ -1,0 +1,43 @@
+---
+/* Ported from `components/content/Prose.jsx`; contract in `Prose.d.ts`.
+ *
+ * This is also the SPEC that BeeRanked's journal output has to match — the
+ * handoff is explicit that /journal is a spec, not a page to build here.
+ *
+ * `byline` sets the seal: magickal writing signs "Soror Eu. A.", everything
+ * else signs "Shruti".
+ */
+interface Props { html?: string; lang?: string; byline?: string; class?: string; }
+const { html, lang, byline, class: klass = "" } = Astro.props;
+---
+<div class:list={["sh-prose", klass]} lang={lang}>
+  {html ? <Fragment set:html={html} /> : <slot />}
+  {byline && <div class="sh-prose-byline"><span class="seal seal-line">{byline}</span></div>}
+</div>
+
+<style is:global>
+  .sh-prose { font-family: var(--font-display); font-size: var(--text-prose); line-height: var(--leading-prose); color: var(--ink); max-width: var(--measure-prose); }
+  .sh-prose > * + * { margin-top: 1em; }
+  .sh-prose h2, .sh-prose h3 { font-weight: 600; line-height: var(--leading-heading); margin-top: 1.6em; }
+  .sh-prose h2 { font-size: var(--text-h2); }
+  .sh-prose h3 { font-size: var(--text-h3); }
+  .sh-prose a { color: var(--accent); }
+  .sh-prose a:hover { color: var(--accent-hover); }
+  .sh-prose strong { font-weight: 600; }
+  .sh-prose blockquote { margin: 1.4em 0; padding: 2px 0 2px 20px; border-left: 2px solid var(--rose); font-style: italic; color: var(--ink-soft); }
+  .sh-prose code { font-family: var(--font-mono); font-size: 0.82em; background: var(--surface-veil); border: var(--border-w) solid var(--line); border-radius: 4px; padding: 1px 5px; }
+  .sh-prose pre { font-family: var(--font-mono); font-size: 0.78em; line-height: 1.6; background: var(--surface-inset); border: var(--border-w) solid var(--line); border-radius: var(--radius-md); padding: 16px 18px; overflow: auto; }
+  .sh-prose pre code { background: none; border: 0; padding: 0; }
+  .sh-prose hr { border: 0; margin: 2em 0; text-align: center; }
+  .sh-prose hr::after { content: "⁂"; font-size: 0.9em; color: var(--ink-faint); letter-spacing: 0.4em; }
+  .sh-prose ul, .sh-prose ol { padding-left: 1.3em; }
+  .sh-prose li + li { margin-top: 0.4em; }
+  .sh-prose li::marker { color: var(--ink-faint); }
+  .sh-prose figure { margin: 1.6em 0; }
+  .sh-prose figcaption { font-family: var(--font-body); font-size: var(--text-xs); color: var(--ink-faint); margin-top: 8px; }
+  .sh-prose img { border-radius: var(--radius-md); border: var(--border-w) solid var(--line); max-width: 100%; }
+  .sh-prose table { width: 100%; border-collapse: collapse; font-family: var(--font-body); font-size: var(--text-sm); }
+  .sh-prose th { text-align: left; font-size: var(--text-micro); letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; color: var(--ink-faint); font-weight: 600; padding: 8px 12px 8px 0; border-bottom: var(--border-w) solid var(--line-strong); }
+  .sh-prose td { padding: 10px 12px 10px 0; border-bottom: var(--border-w) solid var(--line); }
+  .sh-prose-byline { font-family: var(--font-body); font-size: var(--text-sm); color: var(--ink-faint); margin-top: 2.4em; display: flex; align-items: center; gap: 12px; }
+</style>

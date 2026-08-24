@@ -14,6 +14,14 @@ export default defineConfig({
   adapter: node({ mode: "standalone" }),
   server: { host: "127.0.0.1", port: 4321 },
   vite: {
+    ssr: {
+      // The production image ships `dist/` and almost no node_modules — Astro
+      // bundles what it needs into the server entry. markdown-remark is left
+      // external by default and then cannot be resolved at runtime, so it has
+      // to be bundled in explicitly. It renders the section bodies the admin
+      // writes, which are markdown in the database.
+      noExternal: ["@astrojs/markdown-remark"],
+    },
     // The API is same-origin in production (Caddy routes /api/*), so there is
     // no CORS surface. In dev, proxy to the running stack so the site behaves
     // the same way.

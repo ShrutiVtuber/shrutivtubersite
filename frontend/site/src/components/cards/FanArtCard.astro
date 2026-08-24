@@ -1,0 +1,76 @@
+---
+/* Ported from `components/cards/FanArtCard.jsx`; contract in
+ * `FanArtCard.d.ts`.
+ *
+ * ARTIST CREDIT IS THE LOUDEST TEXT — that is the design's rule for this card,
+ * and it is why the credit sits at full weight while the title is a quiet
+ * italic. Fan art is never recoloured. The image is nullable and its absent
+ * state is the sky with a hairline star, used for costume slots awaiting
+ * commission.
+ */
+interface Props {
+  image?: string | null;
+  title?: string;
+  artist: string;
+  artistHref?: string;
+  platform?: string;
+}
+const { image, title, artist, artistHref, platform } = Astro.props;
+---
+
+<figure class="sh-fan">
+  {
+    image ? (
+      <a class="sh-fan-img" href={image} aria-label={`Open ${title || "fan art"} by ${artist}`}>
+        <img src={image} alt={title || `Fan art by ${artist}`} loading="lazy" />
+      </a>
+    ) : (
+      <span class="sh-fan-img" data-empty="true">
+        <span data-glyph class="t-glyph" aria-hidden="true">✶</span>
+      </span>
+    )
+  }
+  <figcaption class="sh-fan-credit">
+    <span class="sh-fan-by">art by</span>
+    {
+      artistHref
+        ? <a class="sh-fan-artist" href={artistHref}>{artist}</a>
+        : <span class="sh-fan-artist">{artist}</span>
+    }
+    {platform && <span class="sh-fan-by">on {platform}</span>}
+  </figcaption>
+  {title && <span class="sh-fan-title">“{title}”</span>}
+</figure>
+
+<style>
+  .sh-fan { display: grid; gap: 8px; font-family: var(--font-body); margin: 0; }
+  .sh-fan-img {
+    position: relative;
+    aspect-ratio: 1;
+    border-radius: var(--radius-md);
+    border: var(--border-w) solid var(--line);
+    overflow: hidden;
+    background: var(--surface-veil);
+    cursor: zoom-in;
+    padding: 0;
+    appearance: none;
+    display: block;
+    width: 100%;
+    transition: border-color var(--dur-1) var(--ease-out), box-shadow var(--dur-1) var(--ease-out);
+  }
+  .sh-fan-img:hover { border-color: var(--line-strong); box-shadow: var(--shadow-2); }
+  .sh-fan-img img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .sh-fan-img[data-empty="true"] {
+    display: grid;
+    place-items: center;
+    cursor: default;
+    background: linear-gradient(180deg, var(--sky-zenith), var(--sky-mid) 58%, var(--sky-horizon));
+  }
+  .sh-fan-img [data-glyph] { font-family: var(--font-display); font-size: 34px; color: color-mix(in srgb, var(--ink) 45%, transparent); }
+  .sh-fan-credit { display: flex; align-items: baseline; gap: 6px; font-size: var(--text-sm); flex-wrap: wrap; }
+  .sh-fan-by { color: var(--ink-faint); font-size: var(--text-xs); }
+  .sh-fan-artist { font-weight: 600; color: var(--ink); }
+  a.sh-fan-artist { color: var(--ink); text-decoration-color: color-mix(in srgb, var(--accent) 40%, transparent); }
+  a.sh-fan-artist:hover { color: var(--accent-hover); }
+  .sh-fan-title { color: var(--ink-soft); font-style: italic; font-family: var(--font-display); font-size: var(--text-sm); }
+</style>

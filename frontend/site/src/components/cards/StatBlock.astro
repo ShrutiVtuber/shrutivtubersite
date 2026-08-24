@@ -1,0 +1,22 @@
+---
+/* Ported from `components/cards/StatBlock.jsx`; contract in `StatBlock.d.ts`.
+   Used on the press kit. NEVER render a zero here — see the brief: a sponsor
+   reading nine zeroes concludes the audience is zero. If a figure is unknown,
+   hide the block. */
+interface Props { value: string; label: string; note?: string; glyph?: string; }
+const { value, label, note, glyph } = Astro.props;
+---
+<div class="sh-stat">
+  {glyph && <span class="sh-st-glyph t-glyph" aria-hidden="true">{glyph}</span>}
+  <span class="sh-st-label">{label}</span>
+  <span class="sh-st-value">{value}</span>
+  {note && <span class="sh-st-note">{note}</span>}
+</div>
+
+<style>
+.sh-stat{display:grid;gap:6px;padding:18px 20px;background:var(--surface-card);border:var(--border-w) solid var(--line);border-radius:var(--radius-md);font-family:var(--font-body);position:relative}
+.sh-st-value{font-family:var(--font-display);font-size:2.4rem;line-height:1;font-weight:500;color:var(--ink);font-variant-numeric:tabular-nums lining-nums}
+.sh-st-label{font-size:var(--text-micro);font-weight:600;letter-spacing:var(--tracking-eyebrow);text-transform:uppercase;color:var(--ink-faint)}
+.sh-st-note{font-size:var(--text-xs);color:var(--ink-soft)}
+.sh-st-glyph{position:absolute;top:14px;right:16px;font-family:var(--font-display);font-size:18px;color:var(--rose)}
+</style>
