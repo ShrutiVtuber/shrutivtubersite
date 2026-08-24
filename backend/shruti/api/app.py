@@ -8,7 +8,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from shruti.api.routes import content, live, public
+from shruti.api.routes import admin, content, live, public
 from shruti.core.config import get_settings
 
 logging.basicConfig(level=logging.INFO)
@@ -50,3 +50,4 @@ async def health() -> dict[str, str]:
 app.include_router(live.router)
 app.include_router(content.router)
 app.include_router(public.router)
+app.include_router(admin.router)
