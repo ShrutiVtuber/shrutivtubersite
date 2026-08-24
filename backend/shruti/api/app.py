@@ -9,8 +9,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from shruti.api.routes import (
-    accounts, admin, content, horoscopes, journal, live, newsletter, places,
-    public,
+    accounts, admin, content, horoscopes, journal, live, newsletter, passkeys,
+    places, public,
 )
 from shruti.core.config import get_settings
 
@@ -58,4 +58,5 @@ app.include_router(accounts.router)
 app.include_router(newsletter.router)
 app.include_router(horoscopes.router)
 app.include_router(journal.router)
+app.include_router(passkeys.router)
 app.include_router(admin.router)

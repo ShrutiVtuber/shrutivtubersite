@@ -11,6 +11,7 @@
 import AdminLayout from "../../layouts/AdminLayout.astro";
 import CsrfField from "../../components/forms/CsrfField.astro";
 import Button from "../../components/forms/Button.astro";
+import PasskeySignIn from "../../components/auth/PasskeySignIn.astro";
 import { SITE_API } from "../../lib/api";
 import { verifyCsrf } from "../../lib/csrf";
 import { redirectWithCookies } from "../../lib/redirect";
@@ -135,6 +136,11 @@ try {
       ) : (
         <>
           <h1 class="adm-h">Sign in</h1>
+          {/* Only after the site is claimed, and only useful once a passkey
+              has been added from Settings — but shown regardless, because a
+              phone that has one should not have to be told where to look. */}
+          <PasskeySignIn prefix="/api/passkeys/admin" next={next} label="Sign in with a passkey" bare />
+          <p class="alt-or">or use your password</p>
           <form method="POST" class="adm-card form">
             <CsrfField />
             <input type="hidden" name="action" value="signin" />
@@ -167,6 +173,10 @@ try {
     font: 400 var(--text-xs) var(--font-mono); color: var(--ink-soft);
     background: var(--surface-inset); border: var(--border-w) solid var(--line);
     border-radius: var(--radius-sm); padding: 10px 12px; margin: 0; overflow-x: auto;
+  }
+  .alt-or {
+    font: 400 var(--text-xs) var(--font-body); color: var(--ink-faint); margin: 0;
+    text-transform: uppercase; letter-spacing: 0.08em;
   }
   .alt { font: 400 var(--text-sm) var(--font-body); margin: 0; }
   .alt a { color: var(--accent); }

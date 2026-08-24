@@ -15,6 +15,7 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
 import CsrfField from "../../components/forms/CsrfField.astro";
 import Button from "../../components/forms/Button.astro";
 import Badge from "../../components/navigation/Badge.astro";
+import PasskeyList, { type PasskeyRow } from "../../components/auth/PasskeyList.astro";
 import { asAdmin } from "../../lib/admin";
 import { verifyCsrf } from "../../lib/csrf";
 
@@ -51,6 +52,8 @@ if (Astro.request.method === "POST") {
 }
 
 const read = await asAdmin(Astro, "/api/admin/settings?prefix=imprint.");
+const keyRead = await asAdmin(Astro, "/api/passkeys/admin");
+const passkeys: PasskeyRow[] = keyRead.ok ? (keyRead.body?.passkeys ?? []) : [];
 const values: Record<string, string> = read.body?.settings ?? {};
 const on = values["imprint.visible"] === "1";
 const complete = Boolean(values["imprint.entity"]?.trim() && values["imprint.email"]?.trim());
@@ -102,6 +105,22 @@ const live = on && complete;
 
     <div><Button type="submit">Save</Button></div>
   </form>
+
+  <section class="adm-card">
+    <h2 class="h2">Passkeys</h2>
+    <p class="adm-note">
+      Sign in to the admin with Face ID, a fingerprint or your phone's PIN instead of typing a
+      password on a phone keyboard. A passkey is a keypair held by the device — Apple and Google
+      are told nothing and no request reaches them, which is why this is here and
+      &ldquo;Sign in with Google&rdquo; is not.
+    </p>
+    <p class="adm-note">
+      An admin passkey always asks for the face, the finger or the PIN, never merely for an
+      unlocked phone: this one rewrites the site. Your password keeps working, so removing every
+      passkey cannot lock you out.
+    </p>
+    <PasskeyList passkeys={passkeys} prefix="/api/passkeys/admin" />
+  </section>
 </AdminLayout>
 
 <style>

@@ -224,3 +224,42 @@ class JournalSky(TimestampMixin, table=True):
 
     # Why `reading` is empty. Empty itself when the capture succeeded.
     failure_reason: str = ""
+
+
+class Passkey(TimestampMixin, table=True):
+    """
+    A registered passkey — WebAuthn credential.
+
+    **Why passkeys rather than "sign in with Google".** A passkey is a keypair
+    held by the device or the platform keychain. Signing in with one tells
+    Apple or Google nothing about this site, sends them no request, and hands
+    this site no third-party identity to store. It is a phone unlock rather
+    than a federated login, which is both the nicer experience and the more
+    private one — and on a site whose whole posture is minimal data sharing,
+    OAuth would have been the odd choice.
+
+    One row per credential, because a person reasonably has several: the phone,
+    the laptop, a hardware key in a drawer.
+
+    `sign_count` is the authenticator's own counter. Where a device provides it,
+    a value that goes BACKWARDS means the credential has probably been cloned,
+    and the sign-in is refused rather than merely logged. Many platform
+    authenticators always send zero, which is not a warning and is treated as
+    "not supported" rather than as a failure.
+    """
+
+    __tablename__ = "passkey"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    # Exactly one of these. A passkey belongs to a reader or to the operator.
+    user_id: Optional[int] = Field(default=None, foreign_key="site_user.id", index=True)
+    is_operator: bool = Field(default=False, index=True)
+
+    credential_id: str = Field(index=True, unique=True)   # base64url
+    public_key: str = ""                                  # base64url COSE key
+    sign_count: int = 0
+    transports: str = ""                                  # "internal,hybrid"
+
+    # So a person can tell one key from another when removing it.
+    label: str = ""
+    last_used_at: Optional[datetime] = Field(default=None, sa_type=UTC_TS)

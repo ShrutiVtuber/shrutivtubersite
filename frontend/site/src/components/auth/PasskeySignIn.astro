@@ -1,0 +1,74 @@
+---
+/* "Use a passkey" — the sign-in half.
+ *
+ * A passkey is a keypair held by the phone or the laptop's keychain. Signing
+ * in with one is Face ID, a fingerprint or a device PIN, and it sends Apple
+ * and Google nothing: it is a phone unlock, not a federated login. That is why
+ * this site has it and does not have "Sign in with Google" — the convenience
+ * without the third party.
+ *
+ * Hidden until the script confirms the browser can do WebAuthn. A control that
+ * appears and then fails is worse than one that was never offered, and there
+ * is no honest way to know in advance server-side.
+ */
+import Button from "../forms/Button.astro";
+
+interface Props {
+  /** `/api/passkeys` for readers, `/api/passkeys/admin` for the operator. */
+  prefix?: string;
+  next?: string;
+  label?: string;
+  /** The admin chrome styles its own controls; the site uses Button. */
+  bare?: boolean;
+}
+const {
+  prefix = "/api/passkeys",
+  next = "/account",
+  label = "Use a passkey",
+  bare = false,
+} = Astro.props;
+---
+
+<div class="pk" data-passkey-block hidden>
+  {
+    bare ? (
+      <button
+        type="button" class="pk-btn"
+        data-passkey-signin data-passkey-prefix={prefix} data-passkey-next={next}
+      >
+        {label}
+      </button>
+    ) : (
+      <Button
+        type="button" variant="secondary"
+        data-passkey-signin data-passkey-prefix={prefix} data-passkey-next={next}
+      >
+        {label}
+      </Button>
+    )
+  }
+  <p class="pk-why">
+    Face ID, a fingerprint, or your phone. Nothing is sent to Apple or Google — a passkey
+    lives on your device, not with them.
+  </p>
+  <p class="pk-msg" id="pk-status" role="alert" hidden></p>
+</div>
+
+<script is:inline src="/passkeys.js"></script>
+
+<style is:global>
+  .pk { display: grid; gap: 8px; justify-items: start; }
+  .pk-why {
+    font: 400 var(--text-xs) / 1.6 var(--font-body); color: var(--ink-faint);
+    margin: 0; max-width: 46ch;
+  }
+  .pk-msg { font: 400 var(--text-sm) var(--font-body); color: var(--ink-soft); margin: 0; }
+  .pk-bad { color: var(--live); }
+  .pk-btn {
+    font: 500 var(--text-sm) var(--font-body); color: var(--ink);
+    background: var(--surface-card); border: var(--border-w) solid var(--line-strong);
+    border-radius: var(--radius-sm); padding: 9px 16px; cursor: pointer;
+  }
+  .pk-btn:hover { background: var(--surface-veil); }
+  .pk-btn[disabled] { opacity: 0.6; cursor: default; }
+</style>

@@ -1,0 +1,106 @@
+---
+/* The passkeys someone has registered, and the control that adds another.
+ *
+ * A list rather than a single on/off, because a person reasonably has several:
+ * the phone, the laptop, a hardware key in a drawer. Each carries when it was
+ * added and when it was last used — the two facts that let someone recognise
+ * a key they no longer have and remove it.
+ */
+export interface PasskeyRow {
+  id: number;
+  label: string;
+  addedAt: string | null;
+  lastUsedAt: string | null;
+}
+
+interface Props {
+  passkeys: PasskeyRow[];
+  prefix?: string;
+  /** Rendered inside the admin chrome rather than the site card. */
+  bare?: boolean;
+}
+const { passkeys, prefix = "/api/passkeys", bare = false } = Astro.props;
+
+const day = (iso: string | null) =>
+  iso ? new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "";
+---
+
+<div class="pk-manage" data-passkey-block hidden>
+  {
+    passkeys.length > 0 ? (
+      <ul class="pk-list">
+        {passkeys.map((key) => (
+          <li class="pk-row">
+            <div>
+              <span class="pk-name">{key.label}</span>
+              <span class="pk-meta">
+                added {day(key.addedAt)}
+                {key.lastUsedAt ? ` · last used ${day(key.lastUsedAt)}` : " · not used yet"}
+              </span>
+            </div>
+            <button
+              type="button" class="pk-remove"
+              data-passkey-remove={key.id} data-passkey-prefix={prefix}
+            >
+              Remove
+            </button>
+          </li>
+        ))}
+      </ul>
+    ) : (
+      <p class="pk-empty">No passkeys yet.</p>
+    )
+  }
+
+  <div class="pk-add">
+    <label class="pk-field">
+      <span class="pk-lbl">Name this one</span>
+      <input class="pk-input" id="pk-label" placeholder="My phone" maxlength="60" />
+      <span class="pk-hint">Only so you can tell it from the others later.</span>
+    </label>
+    <button
+      type="button" class="pk-btn"
+      data-passkey-add data-passkey-prefix={prefix}
+    >
+      Add a passkey
+    </button>
+  </div>
+  <p class="pk-msg" id="pk-status" role="alert" hidden></p>
+</div>
+
+<noscript>
+  <p class="pk-empty">
+    Passkeys need JavaScript — the browser API has no form equivalent. Everything else on this
+    page works without it.
+  </p>
+</noscript>
+
+<script is:inline src="/passkeys.js"></script>
+
+<style is:global>
+  .pk-manage { display: grid; gap: var(--space-4); }
+  .pk-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+  .pk-row {
+    display: flex; justify-content: space-between; align-items: center; gap: 12px;
+    border: var(--border-w) solid var(--line); border-radius: var(--radius-sm);
+    padding: 10px 14px; background: var(--surface-inset);
+  }
+  .pk-name { display: block; font: 500 var(--text-sm) var(--font-body); color: var(--ink); }
+  .pk-meta { display: block; font: 400 var(--text-xs) var(--font-body); color: var(--ink-faint); }
+  .pk-empty { font: 400 var(--text-sm) var(--font-body); color: var(--ink-faint); margin: 0; }
+  .pk-remove {
+    font: 500 var(--text-xs) var(--font-body); color: var(--ink-soft);
+    background: none; border: var(--border-w) solid var(--line); border-radius: var(--radius-sm);
+    padding: 6px 12px; cursor: pointer;
+  }
+  .pk-remove:hover { color: var(--live); border-color: var(--live); }
+  .pk-add { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; }
+  .pk-field { display: grid; gap: 4px; }
+  .pk-lbl { font: 500 var(--text-sm) var(--font-body); color: var(--ink); }
+  .pk-hint { font: 400 var(--text-xs) var(--font-body); color: var(--ink-faint); }
+  .pk-input {
+    font: 400 var(--text-sm) var(--font-body); color: var(--ink);
+    background: var(--surface-card); border: var(--border-w) solid var(--line-strong);
+    border-radius: var(--radius-sm); padding: 9px 12px; min-width: 220px;
+  }
+</style>

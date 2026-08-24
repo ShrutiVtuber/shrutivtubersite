@@ -12,6 +12,7 @@ import SectionHeader from "../components/brand/SectionHeader.astro";
 import TextField from "../components/forms/TextField.astro";
 import CsrfField from "../components/forms/CsrfField.astro";
 import Button from "../components/forms/Button.astro";
+import PasskeySignIn from "../components/auth/PasskeySignIn.astro";
 import { SITE_API } from "../lib/api";
 import { verifyCsrf } from "../lib/csrf";
 import { redirectWithCookies } from "../lib/redirect";
@@ -83,6 +84,11 @@ if (Astro.request.method === "POST") {
             as="h1" glyph="☾" eyebrow="Sign in" title="Welcome back"
             body="By emailed link, or with a password if you set one."
           />
+          {/* Above the email field, because for anyone who has one it is the
+              shortest path in — and it is the only method here that never
+              involves waiting for a message to arrive. */}
+          <PasskeySignIn next="/account" label="Sign in with a passkey" />
+          <p class="or">or</p>
           <nav class="method-switch" aria-label="Sign-in method">
             <a href="/signin" aria-current={method === "link" ? "page" : undefined}>Emailed link</a>
             <a href="/signin?method=password" aria-current={method === "password" ? "page" : undefined}>Password</a>
@@ -115,6 +121,10 @@ if (Astro.request.method === "POST") {
 
 <style>
   .auth { max-width: 620px; }
+  .or {
+    font: 400 var(--text-xs) var(--font-body); color: var(--ink-faint);
+    margin: var(--space-4) 0 0; text-transform: uppercase; letter-spacing: 0.08em;
+  }
   .auth-form { display: grid; gap: var(--space-5); margin-top: var(--space-5); }
   .method-switch { display: flex; gap: 4px; margin-top: var(--space-5); }
   .method-switch a {
