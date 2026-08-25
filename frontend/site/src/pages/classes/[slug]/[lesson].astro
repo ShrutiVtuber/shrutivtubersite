@@ -176,11 +176,15 @@ const done = here >= 0 ? all[here].done : false;
 </BaseLayout>
 
 <style>
+  /* Wider than a reading page and padded like one. A lesson carries its
+     outline beside it, which needs room the prose pages do not — but the
+     padding matches, so the reader does not sit at a different distance from
+     the edge than every other page on the site. */
   .reader {
     display: grid; gap: var(--space-6);
     grid-template-columns: minmax(0, 1fr);
-    padding: var(--space-5) var(--space-5) var(--space-7);
-    max-width: 84rem; margin: 0 auto;
+    max-width: 1440px; margin: 0 auto;
+    padding: 0 var(--page-pad) var(--space-7);
   }
   @media (min-width: 940px) {
     .reader { grid-template-columns: 20rem minmax(0, 1fr); gap: var(--space-7); }

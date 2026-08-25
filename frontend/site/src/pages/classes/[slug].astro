@@ -60,7 +60,7 @@ const grantedBy = course.access.reason.startsWith("tier:")
 ---
 
 <BaseLayout title={`${course.title} — Shruti`} description={course.tagline}>
-  <div class="container course">
+  <div class="page course">
     <header class="head">
       {course.kind === "workshop" && when && <p class="when">{when}</p>}
       <h1>{course.title}</h1>

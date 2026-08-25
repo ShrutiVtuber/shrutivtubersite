@@ -50,7 +50,7 @@ const money = `${(product.priceCents / 100).toFixed(2)} ${product.currency.toUpp
 ---
 
 <BaseLayout title={`${product.name} — Shruti`} description={product.tagline}>
-  <div class="container product">
+  <div class="page product">
     <div class="shots">
       <div class="shot" data-empty={!lead}>
         {lead && <img src={lead.url} alt={lead.alt || product.name} />}
