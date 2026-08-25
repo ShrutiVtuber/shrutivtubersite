@@ -91,43 +91,46 @@ say so rather than improvising.
 She has already made "the Shruti VTuber company thing" in BeeRanked Studio and
 done nothing else, so expect an empty org.
 
-### How rebetichord does the same thing — study this first
+### rebetichord is a REFERENCE FOR HOW IT LOOKS, not a template to follow
 
-`~/Documents/development/bouzouki-project` is the working precedent, and it is
-worth an hour before writing anything:
+She was explicit: *"We don't have to do what rebetichord does please don't do
+that actually."* She pointed at it because `/news` reads like a nice blog and
+she wants that quality — **not** because its architecture should be copied.
+
+So: look at the rendering and the page inventory for ideas about what a good
+content section contains. Then build it the way this site is built.
+
+`~/Documents/development/bouzouki-project` holds it, if you want the reference:
 
 - `BEERANKED_DESIGN_REQUEST.md` — the design brief for their `/news`. Reads as
   a specification of every page type a BeeRanked section can have.
-- `news-chrome/server.py` — their injector. **The key architectural fact**: a
-  `beeranked-agent` on the VPS polls `…/api/agent/manifest` every ~30s and
-  writes rendered content into a directory (`/home/rebetichord/beeranked/content`,
-  mounted read-only). The injector reads those FILES, extracts the data, and
-  re-emits the site's own page skeletons. BeeRanked's own chrome and CSS are
-  stripped.
-- `frontend/Caddyfile` — `handle /news*` → strip prefix → the injector.
-
-**Do not copy their architecture wholesale.** Theirs exists because their site
-is a React SPA that has to be booted to render its chrome. Shruti's site is
-Astro SSR, so an Astro route can read the synced content and render it inside
-`BaseLayout` directly — real header, real footer, real tokens, no sidecar, no
-second service. That is simpler and better here.
+- `news-chrome/server.py` — a sidecar that boots their React SPA to get the
+  site chrome around the content. **We need none of this.** Astro renders on
+  the server, so a route can render BeeRanked content inside `BaseLayout` and
+  get the real header, footer and tokens for free.
 
 ### The shape to aim for
 
-1. A `beeranked-agent` (or equivalent sync) on the server writing content into
-   a directory the site container can read.
-2. `frontend/site/src/pages/journal/[...slug].astro` reading that content,
-   rendering inside `BaseLayout`.
-3. `/journal` itself as the index: posts and changelog entries interleaved,
-   changelog entries marked as what they are.
-4. Styling in the site's own tokens. The design system is in `design/` —
-   `design_handoff_shrutivtuber/` has the component library.
+**Ask the MCP what it offers first.** It may expose content directly, which
+would mean no file sync at all — a route that queries BeeRanked and renders.
+Do not assume the agent-and-directory arrangement is required just because
+rebetichord uses it; find out, then choose.
 
-**Security note, taken seriously by rebetichord and worth repeating**:
-BeeRanked output is remote-controlled content served on the same origin as the
-auth cookie. Their injector escapes and sanitises every extracted fragment
-before re-emitting it. Whatever renders BeeRanked HTML here must do the same —
-`set:html` on untrusted markup is an XSS hole on a site with sessions.
+Then, roughly:
+
+1. Astro routes under `frontend/site/src/pages/journal/`, rendering inside
+   `BaseLayout`.
+2. `/journal` as the index: posts and changelog interleaved, changelog entries
+   marked as what they are.
+3. The site's own tokens throughout. The design system is in `design/` —
+   `design_handoff_shrutivtuber/` has the component library, and the tools
+   pages are the closest existing example of long-form content in this theme.
+
+**BeeRanked is trusted here** — it is her partner's product and she owns the
+content in it. Rendering its HTML directly is the normal thing to do, the same
+way any site renders its own CMS's output. Do not build a sanitising pipeline
+around it; that was rebetichord's answer to a different situation and it is not
+this one.
 
 ### One thing already built for this
 
