@@ -25,6 +25,18 @@ interface Imprint {
 }
 const imprint = await site<Imprint>("/api/content/imprint");
 
+/* WHO holds the copyright, and only if that is actually known.
+ *
+ * This said "© ShrutiVTuber, LLC" on every page of the site, hardcoded. No
+ * such company has been registered — whether to register one is still an open
+ * question — so the footer was asserting a legal entity into existence on
+ * every page load. That is the same mistake as the bracketed registry number
+ * in the imprint, except it was not bracketed, so it read as fact.
+ *
+ * The entity comes from the imprint when it is filled in and switched on. Until
+ * then it is the name of the person who made the site, which is true. */
+const holder = imprint?.visible && imprint.entity ? imprint.entity : "Shruti";
+
 const SITE: [string, string][] = [
   ["/work", "Work"],
   ["/today", "Day at a glance"],
@@ -88,7 +100,7 @@ const year = new Date().getUTCFullYear();
           password is wrong. The page itself is auth-guarded, so the link
           reveals nothing. */}
       <p>
-        © ShrutiVTuber, LLC · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a>
+        © {year} {holder} · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a>
         · <a href="/admin" class="admin-link">Admin</a>
       </p>
       <span class="seal seal-ring" title="Soror Eu. A.">S∴E.A.</span>
