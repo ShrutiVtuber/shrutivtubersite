@@ -135,7 +135,14 @@ Try /api/health
 		# appear, which is close to undiagnosable. Add `payment=(self
 		# "https://js.stripe.com")` when Stripe lands rather than a blanket
 		# deny that has to be reversed.
-		Permissions-Policy "camera=(), microphone=(), geolocation=(self), usb=(), interest-cohort=()"
+		#
+		# `interest-cohort` is NOT on this list either, and its absence is the
+		# fix rather than an omission. It opted out of FLoC, Chrome abandoned
+		# FLoC, and the token is now simply unrecognised — so every page load
+		# logged "Unrecognized feature: interest-cohort" in the console. A
+		# header that errors is worse than no header: it trains whoever is
+		# looking to ignore console noise on this site.
+		Permissions-Policy "camera=(), microphone=(), geolocation=(self), usb=()"
 		# HSTS is set by the HOST Caddy, which is the one that terminates TLS.
 		# Setting it here as well would send it over the plain-HTTP hop, where
 		# it means nothing and only invites confusion about who owns it.
