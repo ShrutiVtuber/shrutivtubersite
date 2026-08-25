@@ -31,6 +31,69 @@ const ADMIN_COOKIE = "shruti_session";
 /** The only admin paths reachable without a session. */
 const OPEN_ADMIN = new Set(["/admin/signin", "/admin/signout", "/admin/reset"]);
 
+/* ── the holding page ──────────────────────────────────────────────────────
+ *
+ * While it is on, every visitor gets it and she gets the real site, so she can
+ * finish building in the open without anyone else seeing a half-made page.
+ *
+ * These paths stay reachable regardless, and each for a reason rather than by
+ * habit:
+ *
+ *   /privacy, /terms      the holding page links to them, and a legal page
+ *                         behind a wall is not a legal page
+ *   /newsletter/confirm   the double opt-in link, which the holding page's own
+ *                         form sends. Gate this and subscribing silently
+ *                         cannot complete — the one flow the page exists for
+ *   /newsletter/*         unsubscribe and preferences, for the same reason
+ *   /admin*               she has to be able to sign in to turn it off
+ *   /coming-soon          the page itself, or the rewrite loops
+ */
+const ALWAYS_OPEN = [
+  "/privacy", "/terms", "/coming-soon",
+  "/newsletter/confirm", "/newsletter/unsubscribed", "/newsletter/preferences",
+];
+
+/** Assets and machine endpoints, which a holding page must not swallow. */
+const PASS_THROUGH = /^\/(_astro|_image|api|media|favicon|apple-touch-icon|icon-|social-card|robots\.txt|sitemap\.xml|site\.webmanifest|passkeys\.js|first-paint\.js|brand\/)/;
+
+/* Asked once and remembered briefly. The middleware runs on EVERY request, and
+ * a database round trip per asset would be absurd — but the toggle has to take
+ * effect quickly enough that she does not think it is broken, so the window is
+ * seconds rather than minutes. */
+let holdingState: { on: boolean; at: number } | null = null;
+const HOLDING_TTL_MS = 5_000;
+
+async function holdingPageIsOn(): Promise<boolean> {
+  const now = Date.now();
+  if (holdingState && now - holdingState.at < HOLDING_TTL_MS) return holdingState.on;
+  try {
+    const r = await fetch(`${SITE_API}/api/content/site-state`);
+    if (!r.ok) throw new Error(String(r.status));
+    const body = await r.json();
+    holdingState = { on: Boolean(body?.comingSoon), at: now };
+  } catch {
+    /* If the backend cannot be asked, keep the LAST KNOWN answer, and default
+     * to showing the site rather than the holding page. Getting this backwards
+     * would mean a backend hiccup takes the whole live site down and replaces
+     * it with "coming soon", which is far worse than briefly showing a site
+     * that was meant to be hidden. */
+    holdingState = { on: holdingState?.on ?? false, at: now };
+  }
+  return holdingState.on;
+}
+
+async function isOperator(token: string | undefined): Promise<boolean> {
+  if (!token) return false;
+  try {
+    const r = await fetch(`${SITE_API}/api/admin/me`, {
+      headers: { cookie: `${ADMIN_COOKIE}=${token}` },
+    });
+    return r.ok;
+  } catch {
+    return false;
+  }
+}
+
 export const onRequest = defineMiddleware(async (context, next) => {
   const secure =
     context.url.protocol === "https:" ||
@@ -38,22 +101,28 @@ export const onRequest = defineMiddleware(async (context, next) => {
   context.locals.csrf = csrfToken(context.cookies, secure);
 
   const path = context.url.pathname;
+  const token = context.cookies.get(ADMIN_COOKIE)?.value;
+
   if (path === "/admin" || path.startsWith("/admin/")) {
     if (!OPEN_ADMIN.has(path)) {
-      const token = context.cookies.get(ADMIN_COOKIE)?.value;
-      let ok = false;
-      if (token) {
-        try {
-          const r = await fetch(`${SITE_API}/api/admin/me`, {
-            headers: { cookie: `${ADMIN_COOKIE}=${token}` },
-          });
-          ok = r.ok;
-        } catch {
-          ok = false;
-        }
-      }
-      if (!ok) {
+      if (!(await isOperator(token))) {
         return context.redirect(`/admin/signin?next=${encodeURIComponent(path)}`, 303);
+      }
+    }
+    return next();
+  }
+
+  /* The holding page stands in front of everything else — unless she is signed
+   * in, in which case she gets the real site and can work on it in public
+   * without publishing it. */
+  if (!PASS_THROUGH.test(path) && !ALWAYS_OPEN.includes(path)) {
+    if (await holdingPageIsOn()) {
+      if (!(await isOperator(token))) {
+        /* A REWRITE, not a redirect: the visitor stays at the URL they asked
+         * for. A redirect would rewrite every shared link to /coming-soon and
+         * leave those links pointing at a page that will not exist after
+         * launch. */
+        return context.rewrite("/coming-soon");
       }
     }
   }

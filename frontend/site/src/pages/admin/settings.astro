@@ -41,6 +41,24 @@ if (Astro.request.method === "POST") {
     const values: Record<string, string> = {};
     for (const [key] of FIELDS) values[key] = String(form.get(key) ?? "").trim();
     values["imprint.visible"] = form.get("visible") === "1" ? "1" : "0";
+    if (String(form.get("action") ?? "") === "site-state") {
+      /* "1" and "0" rather than present/absent, because absent means ON — a
+         fresh deploy must hold the door until somebody opens it. */
+      const r = await asAdmin(Astro, "/api/admin/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          values: { "site.coming_soon": form.get("live") === "1" ? "0" : "1" },
+        }),
+      });
+      notice = r.ok
+        ? form.get("live") === "1"
+          ? "The site is live. Everyone sees it now."
+          : "The holding page is up. Only you see the site."
+        : "";
+      failed = r.ok ? "" : "That did not save.";
+    }
+
     const r = await asAdmin(Astro, "/api/admin/settings", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
@@ -52,6 +70,9 @@ if (Astro.request.method === "POST") {
 }
 
 const read = await asAdmin(Astro, "/api/admin/settings?prefix=imprint.");
+const stateRead = await asAdmin(Astro, "/api/admin/settings?prefix=site.");
+const holdingOn = (stateRead.ok ? stateRead.body?.settings ?? {} : {})["site.coming_soon"] !== "0";
+
 const keyRead = await asAdmin(Astro, "/api/passkeys/admin");
 const passkeys: PasskeyRow[] = keyRead.ok ? (keyRead.body?.passkeys ?? []) : [];
 const values: Record<string, string> = read.body?.settings ?? {};
@@ -70,6 +91,35 @@ const live = on && complete;
 
   {notice && <p class="adm-ok" role="status">{notice}</p>}
   {failed && <p class="adm-bad" role="alert">{failed}</p>}
+
+  <section class="adm-card state">
+    <div class="state-head">
+      <h2 class="h2">Who can see the site</h2>
+      <Badge tone={holdingOn ? "faint" : "accent"}>
+        {holdingOn ? "holding page is up" : "live to everyone"}
+      </Badge>
+    </div>
+    <p class="adm-note">
+      {
+        holdingOn
+          ? "Visitors get the holding page — the countdown, the reckonings and the newsletter form. You are signed in, so you get the real site and can keep working on it in public without publishing it."
+          : "Everyone gets the real site."
+      }
+    </p>
+    <p class="adm-note">
+      Either way, the privacy policy, the terms and the newsletter confirmation link stay
+      reachable. The confirmation link especially: gate that and subscribing from the holding
+      page silently cannot finish.
+    </p>
+    <form method="POST">
+      <CsrfField />
+      <input type="hidden" name="action" value="site-state" />
+      <input type="hidden" name="live" value={holdingOn ? "1" : "0"} />
+      <Button type="submit">
+        {holdingOn ? "Take the site live" : "Put the holding page back up"}
+      </Button>
+    </form>
+  </section>
 
   <form method="POST" class="adm-card">
     <h2 class="h2">Legal imprint</h2>
@@ -124,6 +174,9 @@ const live = on && complete;
 </AdminLayout>
 
 <style>
+  .state { display: grid; gap: var(--space-3); }
+  .state-head { display: flex; gap: var(--space-4); align-items: baseline; flex-wrap: wrap; }
+
   .head { display: flex; gap: var(--space-4); align-items: baseline; flex-wrap: wrap; }
   .h2 { font: 600 var(--text-h3) var(--font-display); color: var(--ink); margin: 0; }
   .fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: var(--space-4); }

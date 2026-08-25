@@ -1,0 +1,266 @@
+---
+/* The holding page — `design_handoff_coming_soon/index.html`.
+ *
+ * The designer shipped this as a finished, self-contained file and asked for
+ * it to be DEPLOYED rather than rebuilt, with four wiring jobs. Their markup,
+ * CSS and countdown script are here verbatim; what changed is only the five
+ * points README §3 names, each marked below.
+ *
+ * It is an Astro page rather than a static file for one reason: she needs to
+ * toggle it from the admin and to bypass it while signed in. A file on disk
+ * can do neither. That is not "rebuilding it in a framework" — there is no
+ * component tree, no client bundle and no CSS pipeline here; the page ships
+ * the same bytes it was given, with real values substituted.
+ *
+ * ONE DELIBERATE DEVIATION, flagged rather than silent. The handoff says to
+ * ship the bracketed imprint — `GEMI [000000000000]`, `[street, no.]` — until
+ * the company is registered. She had already decided the opposite for the main
+ * site, and the same reasoning applies more strongly here: a registry number
+ * that looks like a registry number and is not one is a false claim on the one
+ * page the whole internet will see first. The block stays, as the handoff
+ * insists; it carries the real imprint when it exists and the contact address
+ * until then.
+ */
+import { site, astro, askAstro, SITE_API, PATHS, type LiveStatus, type LinkGroups } from "../lib/api";
+import { verifyCsrf } from "../lib/csrf";
+/* Imported raw and inlined rather than linked, so the holding page is one
+   request. It is a single screen that should be up before a spinner would
+   have appeared. */
+import CSS from "../styles/coming-soon.css?raw";
+
+const ATHENS = { lat: 37.9838, lon: 23.7275, label: "Athens" };
+
+/* ── job 2: the subscribe form, working without JavaScript ───────────────── */
+let sent = false;
+let failed = "";
+if (Astro.request.method === "POST") {
+  const form = await Astro.request.formData();
+  if (!verifyCsrf(Astro.cookies, form)) {
+    failed = "That did not send. Reload the page and try again.";
+  } else {
+    try {
+      const r = await fetch(`${SITE_API}/api/newsletter/subscribe`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: String(form.get("email") ?? "").trim(),
+          // The double opt-in is mandatory and the page says so; this is the
+          // agreement the copy describes, recorded at the point of collection.
+          consent: true,
+        }),
+      });
+      if (r.ok) sent = true;
+      else failed = (await r.json().catch(() => null))?.detail ?? "That did not work.";
+    } catch {
+      failed = "That did not work.";
+    }
+  }
+}
+
+interface Station { name: string; at: string; occurred: boolean; dedication: string }
+interface Stations { table: { date: string; stations: Station[] }[] }
+interface Today { reckonings: Record<string, any> }
+
+const [stationsAnswer, todayAnswer, live, links] = await Promise.all([
+  askAstro<Stations>(`/stations?lat=${ATHENS.lat}&lon=${ATHENS.lon}&days=2&body=sun&preset=hellenic`),
+  askAstro<Today>(`/today?lat=${ATHENS.lat}&lon=${ATHENS.lon}`),
+  site<LiveStatus>(PATHS.live),
+  site<LinkGroups>(PATHS.links),
+]);
+
+/* ── job 1: real station times, in place of the placeholder S array ──────── */
+const GLYPH: Record<string, string> = {
+  sunrise: "☉︎", noon: "☉︎", sunset: "☉︎", midnight: "☾︎",
+};
+const stations = (stationsAnswer.data?.table ?? [])
+  .flatMap((d) => d.stations)
+  .filter((s) => s.at)
+  .map((s) => ({
+    at: s.at,
+    name: s.name.charAt(0).toUpperCase() + s.name.slice(1),
+    glyph: GLYPH[s.name] ?? "☉︎",
+    who: s.dedication || "",
+  }));
+
+/* ── job 4: the reckonings, from /today rather than hardcoded ────────────── */
+const r = todayAnswer.data?.reckonings ?? {};
+const reck = {
+  attic: r.attic ? `${r.attic.day} ${r.attic.greek}` : "—",
+  hindu: r.hindu
+    ? `${r.hindu.month} ${r.hindu.tithi} · Vikrama ${r.hindu.vikrama}`
+    : "—",
+  thelemic: r.thelemic?.anno
+    ? r.thelemic.anno
+    : r.thelemic
+      ? `Anno ${r.thelemic.year} ☉ in ${r.thelemic.sun?.sign ?? ""}`
+      : "—",
+};
+
+/* ── job 3: real links, or none. Four dead language links are worse than no
+   switcher, which README §3 explicitly allows, so the switcher is gone. ─── */
+const WANTED = ["twitch", "youtube", "bluesky", "discord", "github"];
+const LABELS: Record<string, string> = {
+  twitch: "Twitch", youtube: "YouTube", bluesky: "Bluesky",
+  discord: "Discord", github: "The code",
+};
+const all = Object.values(links?.groups ?? {}).flat();
+const pills = WANTED
+  .map((p) => all.find((l) => l.platform === p))
+  .filter((l): l is NonNullable<typeof l> => Boolean(l?.url))
+  .map((l) => ({ url: l.url, label: LABELS[l.platform] ?? l.label }));
+
+interface Imprint {
+  visible: boolean; entity?: string; street?: string; postcode?: string;
+  city?: string; country?: string; email?: string; registry?: string; vat?: string;
+}
+const imprint = await site<Imprint>("/api/content/imprint");
+const escape = (t: string) =>
+  t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+const imprintHtml = imprint?.visible && imprint.entity
+  ? [
+      escape(imprint.entity),
+      [imprint.street, [imprint.postcode, imprint.city].filter(Boolean).join(" "), imprint.country]
+        .filter(Boolean).map(escape).join(" · "),
+      escape(imprint.email ?? ""),
+      [imprint.registry, imprint.vat].filter(Boolean).map(escape).join(" · "),
+    ].filter(Boolean).join("<br>")
+  : "business@shrutivtuber.com";
+const holder = imprint?.visible && imprint.entity ? imprint.entity : "Shruti";
+
+const badge = live?.anyLive ? "live" : "offline";
+const year = new Date().getUTCFullYear();
+const csrf = Astro.locals.csrf;
+const consentDefault =
+  "One letter a month: what shipped, what the sky is doing, and the occasional paid thing. " +
+  "You will get a confirmation email first and are not subscribed until you click it. " +
+  "Leave in one click, any time.";
+const consentSent =
+  "A confirmation link is on its way. The subscription only begins once you click it — " +
+  "nothing is added to a list before then.";
+---
+
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Shruti — instruments for magick</title>
+<meta name="description" content="Instruments for magick — an ephemeris, four calendars, planetary hours and letter-reckoning. The site is being built; the sky is not waiting." />
+{/* Stays until the full site launches — handoff §4. */}
+<meta name="robots" content="noindex" />
+<meta property="og:title" content="Shruti — instruments for magick" />
+<meta property="og:description" content="The site is being built. The sky is not waiting." />
+<meta property="og:type" content="website" />
+<link rel="icon" href="/favicon.ico" sizes="any" />
+<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400..700;1,400&family=Commissioner:wght@300..700&family=JetBrains+Mono:wght@400;600&family=Noto+Serif+Devanagari:wght@400..600&family=Mukta:wght@400;600&display=swap" />
+<style is:global set:html={CSS}></style>
+</head>
+<body>
+<div class="sky">
+<div class="sky-stars"></div>
+<header>
+<span class="mark">Shruti</span>
+{/* Never says live unless she is — handoff §4. */}
+<span class="status"><i></i>{badge === "live" ? "live now · building" : "offline · building"}</span>
+</header>
+<main>
+<div class="panel veil">
+<div style="display:grid;gap:12px">
+<p class="eyebrow">shrutivtuber.com · in construction</p>
+<h1>The site is being built.<br />The sky is not waiting.</h1>
+<p class="lede">Instruments for magick — an ephemeris, four calendars, planetary hours, letter-reckoning — built in the open and given away. The pages are still going up. Below is the sky over Athens as of this moment, which is the only part that was never going to wait for a launch date.</p>
+</div>
+<div class="card">
+<div style="display:flex;align-items:baseline;gap:8px 12px;flex-wrap:wrap">
+<p class="eyebrow">Next station · {ATHENS.label}</p>
+<span class="tab" id="clock" style="margin-left:auto;font-family:var(--font-mono);font-size:var(--text-xs);color:var(--ink-faint)">—</span>
+</div>
+<div class="next">
+<span class="g glyph" id="sglyph" aria-hidden="true">☉︎</span>
+<div style="display:grid;gap:2px;min-width:0"><h2 id="sname">—</h2><span class="who" id="swho"></span></div>
+<div class="count"><b class="tab" id="scount">—</b><span class="tab" id="sat">—</span></div>
+</div>
+<div class="bar" aria-hidden="true"><div id="sbar"></div></div>
+<div class="reck">
+<p class="eyebrow" style="margin-bottom:3px">Today, in every reckoning kept here</p>
+<div class="r"><span>Gregorian</span><i></i><b class="tab" id="greg">—</b></div>
+<div class="r"><span>Attic</span><i></i><b>{reck.attic}</b></div>
+<div class="r"><span>Hindu · amānta</span><i></i><b>{reck.hindu}</b></div>
+<div class="r"><span>Thelemic</span><i></i><b>{reck.thelemic}</b></div>
+<p class="fine">Swiss Ephemeris · amānta reckoning · sunrise taken as the upper limb clearing the horizon. The finished instruments let you change every one of those.</p>
+</div>
+</div>
+<div style="display:grid;gap:12px">
+<div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap">
+<h2 style="margin:0;font-family:var(--font-display);font-size:var(--text-h4);font-weight:600">Hear when it opens</h2>
+<span style="font-family:var(--font-mono);font-size:.625rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--rose)">one letter a month</span>
+</div>
+<form id="sub" method="POST">
+<input type="hidden" name="_csrf" value={csrf} />
+<label><span>Email address</span><input type="email" name="email" required placeholder="you@example.com" autocomplete="email" /></label>
+<button type="submit" id="subbtn">{sent ? "Check your email" : "Send me the letter"}</button>
+</form>
+<p class="consent" id="consent">{sent ? consentSent : failed ? failed : consentDefault}</p>
+</div>
+<div class="where">
+<p class="eyebrow">Until then, she is here</p>
+{/* Real links only — a pill with nowhere to go is worse than one fewer. */}
+{pills.length > 0 && (
+  <div class="pills">{pills.map((p) => <a href={p.url} rel="me noopener">{p.label}</a>)}</div>
+)}
+<p style="margin:0;font-size:var(--text-xs);line-height:1.6;color:var(--ink-faint)">Streams run most weeks from Athens. The repositories are public already — the instruments exist before the pages that will explain them.</p>
+</div>
+</div>
+</main>
+<div class="sky-horizon"></div>
+<footer>
+<div class="foot">
+<p class="imprint" set:html={imprintHtml}></p>
+<p>© <span id="yr">{year}</span> {holder} · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a></p>
+<span class="seal" title="Soror Eu. A.">S∴E.A.</span>
+</div>
+</footer>
+</div>
+
+{/* The stations, handed to the script as data rather than through
+    `define:vars`.
+   
+    Explicit on purpose: the value is visible in view-source, it survives
+    whatever Astro decides to do with a script tag, and the designer's script
+    stays the file they wrote rather than one Astro has rewritten.
+   
+    `is:inline` is required here. Without it Astro treats any <script> as
+    JavaScript to process and bundle, and a block of JSON does not survive
+    that. */}
+<script is:inline type="application/json" id="stations" set:html={JSON.stringify(stations)}></script>
+
+{/* The designer's countdown, unchanged except that S is now real. The maths
+    was already correct; it needed correct inputs, not new logic. */}
+<script is:inline>
+var S = JSON.parse(document.getElementById('stations').textContent || '[]');
+function pad(n){return String(n).padStart(2,'0')}
+function tick(){
+  if(!S.length) return;
+  var now=new Date();
+  var next=null,prev=null;
+  for(var i=0;i<S.length;i++){ var t=new Date(S[i].at); if(t>now){ next=S[i]; prev=S[i-1]||null; break; } }
+  if(!next){ next=S[S.length-1]; prev=S[S.length-2]||null; }
+  var nt=new Date(next.at), pt=prev?new Date(prev.at):new Date(nt.getTime()-6*3600*1000);
+  var left=Math.max(0,(nt-now)/1000), span=Math.max(1,(nt-pt)/1000);
+  var h=Math.floor(left/3600), m=Math.floor(left%3600/60), s=Math.floor(left%60);
+  document.getElementById('clock').textContent=pad(now.getHours())+':'+pad(now.getMinutes())+':'+pad(now.getSeconds());
+  document.getElementById('sglyph').textContent=next.glyph;
+  document.getElementById('sname').textContent=next.name;
+  document.getElementById('swho').textContent=next.who;
+  document.getElementById('scount').textContent='in '+(h>0?h+'h '+pad(m)+'m':m+'m '+pad(s)+'s');
+  document.getElementById('sat').textContent='at '+pad(nt.getHours())+':'+pad(nt.getMinutes())+' local';
+  document.getElementById('sbar').style.width=Math.max(0,Math.min(100,(span-left)/span*100)).toFixed(1)+'%';
+  document.getElementById('greg').textContent=now.toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short',year:'numeric'});
+}
+tick();setInterval(tick,1000);
+</script>
+</body>
+</html>

@@ -192,3 +192,17 @@ async def get_imprint(session: AsyncSession = Depends(get_session)) -> dict:
     from shruti.core.settings_store import imprint
 
     return await imprint(session)
+
+
+@router.get("/site-state")
+async def site_state(session: AsyncSession = Depends(get_session)) -> dict:
+    """
+    What the front of the site should be.
+
+    Public and unauthenticated on purpose: the Astro middleware asks this on
+    every request, and making it require a credential would mean shipping one
+    to a process that has no user.
+    """
+    from shruti.core.settings_store import coming_soon
+
+    return {"comingSoon": await coming_soon(session)}

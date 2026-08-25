@@ -29,6 +29,11 @@ IMPRINT_KEYS = (
 
 IMPRINT_VISIBLE = "imprint.visible"
 
+# The holding page. On until she turns it off — a site that goes live by
+# accident is worse than one that stays dark a day longer, so the default is
+# the safe direction rather than the convenient one.
+COMING_SOON = "site.coming_soon"
+
 
 async def get_many(session: AsyncSession, keys: tuple[str, ...] | list[str]) -> dict[str, str]:
     rows = (
@@ -86,3 +91,16 @@ async def imprint(session: AsyncSession) -> dict:
         "registry": values.get("imprint.registry", ""),
         "vat": values.get("imprint.vat", ""),
     }
+
+
+async def coming_soon(session: AsyncSession) -> bool:
+    """
+    Whether the holding page stands in front of the site.
+
+    Absent means ON. A fresh deploy has no row, and the first visitor to a
+    brand-new deployment should meet the holding page rather than a site its
+    owner has not walked yet — so "not configured" resolves to the careful
+    answer, not the convenient one.
+    """
+    values = await get_many(session, (COMING_SOON,))
+    return values.get(COMING_SOON, "1") != "0"

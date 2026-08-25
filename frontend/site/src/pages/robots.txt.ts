@@ -10,6 +10,8 @@
  */
 import type { APIRoute } from "astro";
 
+import { SITE_API } from "../lib/api";
+
 /* The origin comes from configuration, NOT from the request.
  *
  * Behind Caddy the Node adapter reports `Astro.url.origin` as
@@ -19,8 +21,33 @@ import type { APIRoute } from "astro";
 const SITE = (import.meta.env.SHRUTI_SITE_URL ?? "https://shrutivtuber.com").replace(/\/$/, "");
 
 
-export const GET: APIRoute = () => {
+export const GET: APIRoute = async () => {
   const origin = SITE;
+
+  /* While the holding page is up, ask crawlers to stay away entirely.
+   *
+   * Every real page is behind the gate and would be served the holding page,
+   * so a crawler following the sitemap would index one `noindex` page a
+   * hundred times over. Worse, anything it did keep would be a snapshot of a
+   * site that is not finished — and a stale first impression in search
+   * outlives the holding page by months. */
+  let holding = false;
+  try {
+    const r = await fetch(`${SITE_API}/api/content/site-state`);
+    if (r.ok) holding = Boolean((await r.json())?.comingSoon);
+  } catch {
+    /* Unreachable backend: assume live, and let the normal rules apply. A
+       robots.txt that disallows everything because of a blip is the more
+       expensive mistake — it can take weeks to be re-crawled. */
+  }
+
+  if (holding) {
+    return new Response(
+      `User-agent: *\nDisallow: /\n`,
+      { headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" } },
+    );
+  }
+
   const body = `User-agent: *
 Allow: /
 Disallow: /admin
