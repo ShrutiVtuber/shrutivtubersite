@@ -35,42 +35,21 @@
 		}
 	}
 
-	# ── /journal — the BeeRanked content section ─────────────────────────────
+	# ── /journal ─────────────────────────────────────────────────────────────
 	#
-	# Static files written by the beeranked agent, served straight from disk.
-	# No per-request dependency on their service: if the agent stops, the last
-	# sync keeps serving.
+	# NOT served from disk. The agent writes BeeRanked's pages into the volume,
+	# and Astro reads them there and renders their CONTENT inside the site's own
+	# layout — so the section gets the real SiteHeader and SiteFooter, the live
+	# badge and the session state included, rather than a static copy of them
+	# that drifts every time the nav changes.
 	#
-	# **This is deliberately declared AFTER the site handler is decided but
-	# routed BEFORE it**, so understand the consequence: these files never pass
-	# through Astro, which means the holding-page gate in the site middleware
-	# does NOT apply to them. That is the right trade for a content section
-	# whose whole purpose is to be crawled and read — but it means /journal is
-	# public the moment this route exists, holding page or not.
+	# Rebetichord boots its React bundle to achieve the same thing. Astro
+	# already renders on the server, so there is nothing to boot.
 	#
-	# Until she has walked it, the agent is not installed on production and
-	# this handler finds an empty directory and 404s, which is the honest
-	# state for a section with nothing in it yet.
-	# `redir`, not a `handle` block, and that matters.
-	#
-	# Caddy's `/journal/*` matcher ALSO matches the bare `/journal`, and
-	# `handle_path` then strips the whole thing — leaving file_server an empty
-	# path, which it answers with 200 and zero bytes. A blank page rather than
-	# a 404, so nothing in the logs looks wrong and the browser is handed
-	# `<html><head></head><body></body></html>`.
-	#
-	# Putting a `handle` block above it does not help: Caddy sorts directives
-	# by its own order, not by where they appear in the file, and `handle_path`
-	# is evaluated first either way. `redir` sorts ahead of both.
+	# The redirect stays here rather than in the app: Caddy's `/journal/*` also
+	# matches the bare `/journal`, and letting the proxy see a stripped path was
+	# what served a 200 with an empty body.
 	redir /journal /journal/ 301
-
-	handle_path /journal/* {
-		root * /srv/journal
-		file_server
-		header {
-			Cache-Control "public, max-age=300"
-		}
-	}
 
 	# ── Uploaded art / media ─────────────────────────────────────────────────
 	handle /media/* {

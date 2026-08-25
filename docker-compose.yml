@@ -57,6 +57,13 @@ services:
       SHRUTI_SITE_URL: ${SHRUTI_SITE_URL:-http://localhost:8200}
       HOST: 0.0.0.0
       PORT: 4321
+      # Where the beeranked agent's synced pages land, for the /journal routes.
+      SHRUTI_JOURNAL_DIR: /srv/journal
+    volumes:
+      # Written by the agent, read here. The journal renders inside the site's
+      # own layout rather than being served as loose files, so the section gets
+      # the REAL header and footer rather than a copy of them.
+      - journal:/srv/journal:ro
     networks: [shruti, shruti-interop]
 
 

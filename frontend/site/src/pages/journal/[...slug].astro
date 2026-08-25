@@ -1,0 +1,132 @@
+---
+/* The journal — BeeRanked's content inside the site's own layout.
+ *
+ * The header and footer here are the REAL components, not a copy: the same
+ * SiteHeader and SiteFooter every other page renders, with the live badge,
+ * the mobile drawer and the session state they always have. Editing the
+ * site's nav updates this section automatically, because there is nothing
+ * here to keep in step.
+ *
+ * Rebetichord achieves this by booting its React bundle inside an injector
+ * sidecar, because a SPA has to run to render its own chrome. Astro renders on
+ * the server already, so the same result needs no sidecar, no bundle and no
+ * second process — only a route that reads what the agent synced.
+ */
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import { page } from "../../lib/journal";
+
+export const prerender = false;
+
+const slug = Astro.params.slug ?? "";
+const parts = slug.split("/").filter(Boolean);
+
+const found = await page(parts);
+if (!found) {
+  return new Response(null, { status: 404, statusText: "Not found" });
+}
+---
+
+<BaseLayout title={`${found.title} — Shruti`} description={found.description}>
+  <div class="journal" data-journal>
+    <Fragment set:html={found.html} />
+  </div>
+</BaseLayout>
+
+<style is:global>
+  /* The section inherits the site's tokens because it renders inside the
+     site's layout — one palette, one set of fonts, one theme, and no second
+     copy of any of them to keep in step.
+   
+     BeeRanked's own stylesheets are deliberately not carried across: they ship
+     `:root` blocks of their own, and `--accent` is a name both systems use, so
+     injecting them turned this site's header links rose. Everything below
+     styles their markup in the site's own tokens instead. */
+
+  [data-journal] { display: block; }
+
+  /* Their pages carry a full-width container; the site's <main> already sets
+     the measure, so it is neutralised rather than fought. */
+  [data-journal] .container { max-width: none; padding: 0; width: 100%; }
+
+  /* ── reading ─────────────────────────────────────────────────────────── */
+  [data-journal] .prose,
+  [data-journal] article > p,
+  [data-journal] article > ul,
+  [data-journal] article > ol {
+    max-width: 66ch;
+  }
+  [data-journal] p,
+  [data-journal] li {
+    font: 400 var(--text-body) / var(--leading-body) var(--font-body);
+    color: var(--ink-soft);
+  }
+  [data-journal] h1,
+  [data-journal] h2,
+  [data-journal] h3,
+  [data-journal] h4 {
+    font-family: var(--font-display);
+    color: var(--ink);
+    text-wrap: balance;
+    margin: 0;
+  }
+  [data-journal] h1 { font: 600 var(--text-h1) / 1.12 var(--font-display); letter-spacing: -0.01em; }
+  [data-journal] h2 { font: 600 var(--text-h3) / 1.25 var(--font-display); margin-top: var(--space-7); }
+  [data-journal] h3 { font: 600 var(--text-h4) var(--font-display); margin-top: var(--space-5); }
+  [data-journal] p { margin: 0 0 1.1em; }
+  [data-journal] strong { color: var(--ink); font-weight: 600; }
+  [data-journal] a { color: var(--accent); text-underline-offset: 2px; }
+
+  [data-journal] blockquote {
+    margin: var(--space-5) 0;
+    padding: 2px 0 2px var(--space-4);
+    border-left: 2px solid var(--rose);
+    color: var(--ink-faint);
+  }
+  [data-journal] code {
+    font: 400 0.875em var(--font-mono);
+    background: var(--surface-inset);
+    border: var(--border-w) solid var(--line);
+    border-radius: var(--radius-sm);
+    padding: 0.12em 0.4em;
+  }
+  [data-journal] pre {
+    background: var(--surface-inset);
+    border: var(--border-w) solid var(--line);
+    border-radius: var(--radius-md);
+    padding: var(--space-4);
+    overflow-x: auto;
+    max-width: 100%;
+    font: 400 var(--text-xs) / 1.7 var(--font-mono);
+  }
+  [data-journal] pre code { background: none; border: 0; padding: 0; font-size: inherit; }
+
+  /* Wide content scrolls in its own box; the page never moves sideways. */
+  [data-journal] table {
+    display: block;
+    overflow-x: auto;
+    max-width: 100%;
+    border-collapse: collapse;
+    font-size: var(--text-sm);
+    margin: var(--space-5) 0;
+  }
+  [data-journal] th {
+    text-align: left;
+    font: 600 var(--text-micro) var(--font-body);
+    letter-spacing: var(--tracking-eyebrow);
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    border-bottom: var(--border-w) solid var(--line-strong);
+    padding: 10px 12px;
+    white-space: nowrap;
+  }
+  [data-journal] td {
+    border-bottom: var(--border-w) solid var(--line);
+    padding: 11px 12px;
+    vertical-align: top;
+    color: var(--ink-soft);
+  }
+  [data-journal] ul, [data-journal] ol { padding-left: 1.25em; }
+  [data-journal] li { margin: 0.35em 0; }
+  [data-journal] img { max-width: 100%; height: auto; border-radius: var(--radius-md); }
+  [data-journal] hr { border: 0; border-top: var(--border-w) solid var(--line); margin: var(--space-6) 0; }
+</style>
