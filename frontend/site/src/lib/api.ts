@@ -138,3 +138,19 @@ export interface ShopProduct {
   /** All of them, in order; the first is the one above. */
   photos: { url: string; alt: string }[];
 }
+
+
+/**
+ * Where this site actually lives, for any URL that leaves the page.
+ *
+ * **Never build one of these from `Astro.url`.** Behind Caddy the Node adapter
+ * reports `Astro.url.origin` as "http://localhost" whatever Host and
+ * X-Forwarded-Host say — the same fact that forced Astro's own origin check
+ * off in astro.config.mjs. A canonical tag or a sitemap built that way is
+ * invisibly wrong until somebody opens it; a **share link** built that way is
+ * worse, because it is handed to another person and simply does not work.
+ *
+ * That has now had to be remembered in five places, so it lives here once.
+ */
+export const SITE_URL =
+  (import.meta.env.SHRUTI_SITE_URL ?? "https://shrutivtuber.com").replace(/\/$/, "");

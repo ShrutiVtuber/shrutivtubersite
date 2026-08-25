@@ -1,0 +1,120 @@
+---
+/* A chart somebody shared — what the friend sees.
+ *
+ * The birth date, time and place are NOT printed here, and the address carries
+ * none of them either. That is worth doing: it keeps the moment out of a
+ * browser history, out of a forwarded link, out of a screenshot of the address
+ * bar, and away from anybody who is not an astrologer.
+ *
+ * It does not, and cannot, keep it from somebody who reads charts. The
+ * ascendant gives the birth time to within a few minutes; the planets give the
+ * date. The figure IS the birth data, drawn. The person who made this link was
+ * told exactly that before they made it, which is the only honest way to offer
+ * a feature whose privacy has a hard limit.
+ *
+ * Nothing here says whose chart it is unless they typed a name into the label.
+ */
+import BaseLayout from "../../../layouts/BaseLayout.astro";
+import SectionHeader from "../../../components/brand/SectionHeader.astro";
+import ChartFigure from "../../../components/chart/ChartFigure.astro";
+import EmptyState from "../../../components/feedback/EmptyState.astro";
+import { site } from "../../../lib/api";
+
+export const prerender = false;
+
+const token = Astro.params.token ?? "";
+const c = await site<any>(`/api/charts/s/${token}`).catch(() => null);
+
+const TRADITION = { hellenistic: "Hellenistic", vedic: "Vedic" };
+const FIGURE = { wheel: "a wheel", north: "a North Indian square", south: "a South Indian square" };
+---
+
+<BaseLayout
+  title="A shared chart — Shruti"
+  description="A chart somebody chose to show you."
+  noindex
+>
+  <div class="page shared">
+    {
+      !c ? (
+        <EmptyState
+          glyph="○"
+          title="There is nothing at this address"
+          body="The link may be mistyped, or the person who made it may have taken it back. A shared chart stops working the moment they decide it should."
+        />
+      ) : (
+        <>
+          <SectionHeader
+            as="h1"
+            glyph="✶"
+            eyebrow="Shared with you"
+            title={c.label || "A chart"}
+          />
+
+          <ChartFigure
+            date={c.birthDate}
+            time={c.birthTime}
+            timeUnknown={c.timeUnknown}
+            lat={c.lat}
+            lon={c.lon}
+            tradition={c.tradition}
+            houseSystem={c.houseSystem}
+            figure={c.figure}
+            caption={`${TRADITION[c.tradition] ?? c.tradition}, drawn as ${FIGURE[c.figure] ?? c.figure}.`}
+          />
+
+          {
+            c.timeUnknown && (
+              <p class="undef">
+                ◐ The birth time was not known, so the ascendant, the houses and
+                everything that depends on them are undefined rather than
+                approximate. The planets are drawn for noon.
+              </p>
+            )
+          }
+
+          <p class="fine">
+            This page does not print the date, the time or the place — the
+            person who shared it kept those. What you are looking at was drawn
+            from them.
+          </p>
+
+          <section class="yours">
+            <h2>Cast your own</h2>
+            <p class="fine">
+              The same instrument, free, and it works without an account. It
+              says what it cannot compute rather than guessing — an unknown
+              birth time leaves the angles undefined instead of inventing them.
+            </p>
+            <p>
+              <a class="sh-btn" data-variant="primary" data-size="md" href="/tools/natal-chart" data-track="chart:from-share">
+                <span>Cast a chart</span>
+              </a>
+            </p>
+          </section>
+        </>
+      )
+    }
+  </div>
+</BaseLayout>
+
+<style>
+  .shared { max-width: 720px; display: grid; gap: var(--space-5); justify-items: center; }
+  .fine {
+    font: 400 var(--text-sm) / 1.7 var(--font-body); color: var(--ink-soft);
+    margin: 0; max-width: 58ch; text-align: center;
+  }
+  .undef {
+    font: 400 var(--text-sm) / 1.7 var(--font-body); color: var(--ink);
+    margin: 0; max-width: 58ch;
+    border-left: 2px solid var(--rose); padding-left: var(--space-3);
+  }
+  .yours {
+    display: grid; gap: var(--space-3); justify-items: center; text-align: center;
+    padding: var(--space-5); width: 100%; box-sizing: border-box;
+    background: var(--surface-veil);
+    border: var(--border-w) solid var(--line);
+    border-radius: var(--radius-md);
+  }
+  .yours h2 { font: 600 var(--text-h4) var(--font-display); color: var(--ink); margin: 0; }
+</style>

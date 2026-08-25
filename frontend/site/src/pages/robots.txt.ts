@@ -7,6 +7,12 @@
  * The disallowed paths are not secrets — they are guarded server-side — but a
  * crawler following them produces sign-in pages in search results and a pile
  * of pointless load. `/api/` is excluded because indexing JSON helps nobody.
+ *
+ * `/chart/` is here for a stronger reason than tidiness. Those pages are
+ * reached by an unguessable token and every one of them carries somebody's
+ * chart, which is their birth data drawn. They already send `noindex`; this
+ * says it a second way, because a shared link that turns up in a search
+ * result is a failure nobody would notice until it had happened.
  */
 import type { APIRoute } from "astro";
 
@@ -55,6 +61,7 @@ Disallow: /account
 Disallow: /signin
 Disallow: /signup
 Disallow: /api/
+Disallow: /chart/
 
 Sitemap: ${origin}/sitemap.xml
 `;

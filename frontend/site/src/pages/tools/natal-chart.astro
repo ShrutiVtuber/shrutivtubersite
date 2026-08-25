@@ -21,7 +21,58 @@ import ToolLayout from "../../layouts/ToolLayout.astro";
 import PlaceField from "../../components/forms/PlaceField.astro";
 import DisagreementControl from "../../components/tools/DisagreementControl.astro";
 import CannotCompute from "../../components/tools/CannotCompute.astro";
+import KeepChart from "../../components/chart/KeepChart.astro";
 import { askAstro } from "../../lib/api";
+import { account, asReader } from "../../lib/account";
+import { verifyCsrf } from "../../lib/csrf";
+
+export const prerender = false;
+
+let keepFailed = "";
+
+/* Keeping happens BEFORE the chart is read back, because it ends in a
+   redirect: rendering the whole page and then throwing it away would be work
+   nobody sees. */
+if (Astro.request.method === "POST") {
+  const form = await Astro.request.formData();
+  if (!verifyCsrf(Astro.cookies, form)) {
+    keepFailed = "That did not save. Reload the page and try again.";
+  } else {
+    const p = Astro.url.searchParams;
+    const kept = await asReader(Astro, "/api/charts", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        label: String(form.get("label") ?? "").slice(0, 80),
+        tradition: p.get("tradition") === "vedic" ? "vedic" : "hellenistic",
+        house_system: p.get("house_system") ?? "whole_sign",
+        figure: p.get("tradition") === "vedic"
+          ? (p.get("vedic_style") === "south" ? "south" : "north")
+          : "wheel",
+        birth_date: p.get("date") ?? "",
+        birth_time: p.get("time") || null,
+        time_unknown: p.get("unknownTime") === "1" || !p.get("time"),
+        place_name: p.get("place") ?? "",
+        lat: Number(p.get("lat") ?? 0),
+        lon: Number(p.get("lon") ?? 0),
+        consent: form.get("consent") === "1",
+      }),
+    });
+    if (kept.ok && kept.body?.ownerToken) {
+      return Astro.redirect(`/chart/${kept.body.ownerToken}`, 303);
+    }
+    keepFailed = kept.status === 400
+      ? "A chart cannot be kept without agreeing to the birth data being stored."
+      : "That did not save. It is a failure on this side, not something you did.";
+  }
+}
+
+/* Only to decide whether to ask for a consent already on file. Signed out is
+   the ordinary case here and not a lesser one. */
+const reader = await account(Astro);
+const hasNativityConsent = !!reader?.consents?.some(
+  (c) => c.kind === "nativity" && c.granted,
+);
 
 const q = Astro.url.searchParams;
 const tradition = q.get("tradition") === "vedic" ? "vedic" : "hellenistic";
@@ -332,6 +383,12 @@ const ASPECT_BASIS: Record<string, string> = {
             </section>
           )
         }
+
+          <KeepChart
+            signedIn={!!reader}
+            hasNativityConsent={hasNativityConsent}
+            failed={keepFailed}
+          />
       </>
     )
   }

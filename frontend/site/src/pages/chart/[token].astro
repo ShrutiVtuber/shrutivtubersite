@@ -1,0 +1,274 @@
+---
+/* A chart somebody kept — theirs.
+ *
+ * Reached by the owner token, which is unguessable and carries no birth data,
+ * so this address can sit in a browser history without the date, time and
+ * place sitting there with it.
+ *
+ * Everything on this page is the owner's: the moment in full, the controls to
+ * share and unshare, and the button that deletes it. That last one is here
+ * rather than behind an email because this holds special-category data for
+ * people who may never have made an account, and a right to erasure that
+ * requires writing to somebody is not much of a right.
+ */
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import SectionHeader from "../../components/brand/SectionHeader.astro";
+import ChartFigure from "../../components/chart/ChartFigure.astro";
+import CsrfField from "../../components/forms/CsrfField.astro";
+import Button from "../../components/forms/Button.astro";
+import EmptyState from "../../components/feedback/EmptyState.astro";
+import { asReader, account } from "../../lib/account";
+import { SITE_URL } from "../../lib/api";
+import { verifyCsrf } from "../../lib/csrf";
+
+export const prerender = false;
+
+const token = Astro.params.token ?? "";
+let notice = "";
+let failed = "";
+
+if (Astro.request.method === "POST") {
+  const form = await Astro.request.formData();
+  if (!verifyCsrf(Astro.cookies, form)) {
+    failed = "That did not go through. Reload the page and try again.";
+  } else {
+    const action = String(form.get("action") ?? "");
+    if (action === "share") {
+      const r = await asReader(Astro, `/api/charts/o/${token}/share`, { method: "POST" });
+      notice = r.ok ? "There is a link to hand out now." : "";
+      if (!r.ok) failed = "The link could not be made.";
+    } else if (action === "unshare") {
+      const r = await asReader(Astro, `/api/charts/o/${token}/share`, { method: "DELETE" });
+      notice = r.ok ? "The link has been taken back. It no longer opens anything." : "";
+      if (!r.ok) failed = "The link could not be taken back.";
+    } else if (action === "claim") {
+      const r = await asReader(Astro, `/api/charts/o/${token}/claim`, { method: "POST" });
+      notice = r.ok ? "This chart is on your account now, and will not expire." : "";
+      if (!r.ok) failed = "It could not be added to your account.";
+    } else if (action === "forget") {
+      const r = await asReader(Astro, `/api/charts/o/${token}`, { method: "DELETE" });
+      if (r.ok) return Astro.redirect("/tools/natal-chart", 303);
+      failed = "It could not be deleted.";
+    }
+  }
+}
+
+const call = await asReader(Astro, `/api/charts/o/${token}`);
+const c = call.ok ? call.body : null;
+const gone = call.status === 404 || call.status === 410;
+const reader = await account(Astro);
+
+/* SITE_URL, not Astro.url: behind Caddy the latter says "localhost", and a
+   share link that says localhost is a link that does not work. */
+const shareUrl = c?.shareToken ? `${SITE_URL}/chart/s/${c.shareToken}` : "";
+const TRADITION = { hellenistic: "Hellenistic", vedic: "Vedic" };
+const FIGURE = { wheel: "wheel", north: "North Indian", south: "South Indian" };
+const readable = (iso: string | null) =>
+  iso ? new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" }) : "";
+---
+
+<BaseLayout title="Your chart — Shruti" description="A chart you kept." noindex>
+  <div class="page chart-page">
+    {
+      !c ? (
+        <EmptyState
+          glyph="○"
+          title={gone ? "There is no chart at this address" : "That could not be opened"}
+          body={
+            gone
+              ? "The link may be mistyped, the chart may have been deleted, or — if it was kept without an account — it may have passed its year."
+              : "Something failed on this side. Try again in a moment."
+          }
+        />
+      ) : (
+        <>
+          <SectionHeader as="h1" glyph="✶" eyebrow="Kept" title={c.label || "Your chart"} />
+
+          {notice && <p class="ok">{notice}</p>}
+          {failed && <p class="bad">{failed}</p>}
+
+          <div class="chart-grid">
+            <ChartFigure
+              date={c.birthDate}
+              time={c.birthTime}
+              timeUnknown={c.timeUnknown}
+              lat={c.lat}
+              lon={c.lon}
+              tradition={c.tradition}
+              houseSystem={c.houseSystem}
+              figure={c.figure}
+            />
+
+            <div class="chart-facts">
+              <h2>The moment</h2>
+              <dl>
+                <div><dt>Date</dt><dd>{c.birthDate}</dd></div>
+                <div>
+                  <dt>Time</dt>
+                  <dd>{c.timeUnknown ? "unknown — the angles are undefined" : c.birthTime}</dd>
+                </div>
+                {c.placeName && <div><dt>Place</dt><dd>{c.placeName}</dd></div>}
+                <div><dt>Sky</dt><dd>{TRADITION[c.tradition] ?? c.tradition}</dd></div>
+                <div><dt>Figure</dt><dd>{FIGURE[c.figure] ?? c.figure}</dd></div>
+              </dl>
+              <p class="fine">
+                Only you see this part. Whoever holds a share link sees the
+                drawing, not these words.
+              </p>
+              <p class="more">
+                <a href={`/tools/natal-chart?date=${c.birthDate}&time=${c.birthTime ?? ""}&lat=${c.lat}&lon=${c.lon}&place=${encodeURIComponent(c.placeName ?? "")}&tradition=${c.tradition}&house_system=${c.houseSystem}&vedic_style=${c.figure === "south" ? "south" : "north"}${c.timeUnknown ? "&unknownTime=1" : ""}`}>
+                  Open the full reading
+                </a>
+              </p>
+            </div>
+          </div>
+
+          <section class="panel">
+            <h2>Hand it to somebody</h2>
+            {
+              c.shared ? (
+                <>
+                  <p class="fine">Shared since {readable(c.sharedAt)}.</p>
+                  <label class="link-out">
+                    <span>The link</span>
+                    <input type="text" readonly value={shareUrl} onclick="this.select()" />
+                  </label>
+                  <form method="POST">
+                    <CsrfField />
+                    <input type="hidden" name="action" value="unshare" />
+                    <Button type="submit" variant="secondary">Take the link back</Button>
+                  </form>
+                  <p class="fine">
+                    Taking it back stops the link working. It cannot un-send it,
+                    and it cannot un-see what has been seen.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p class="fine">
+                    This makes a second link, separate from the one you are on.
+                    Yours keeps working whatever you do to theirs.
+                  </p>
+                  <p class="warn">
+                    Before you do: the page they land on will not print your
+                    birth date, time or place. It will show the chart — and a
+                    chart is your birth data, drawn. Somebody who reads charts
+                    can get the time to within a few minutes from the ascendant
+                    and the date from the planets. Share it with people you
+                    would tell.
+                  </p>
+                  <form method="POST">
+                    <CsrfField />
+                    <input type="hidden" name="action" value="share" />
+                    <Button type="submit" data-track="chart:shared">Make a link to share</Button>
+                  </form>
+                </>
+              )
+            }
+          </section>
+
+          {
+            !c.mine && (
+              <section class="panel">
+                <h2>{reader ? "Add it to your account" : "Keep it without minding a link"}</h2>
+                {
+                  reader ? (
+                    <>
+                      <p class="fine">
+                        You are signed in. Adding this chart to your account puts
+                        it in a list you can find without this link, and lifts
+                        the expiry — there is somebody to ask, so it does not
+                        need to lapse.
+                      </p>
+                      <form method="POST">
+                        <CsrfField />
+                        <input type="hidden" name="action" value="claim" />
+                        <Button type="submit" data-track="chart:claimed">Add to my account</Button>
+                      </form>
+                    </>
+                  ) : (
+                    <>
+                      <p class="fine">
+                        This chart is held until {readable(c.expiresAt)}, and that
+                        goes back a year every time you open it. Bookmark this
+                        page — it is the only way back.
+                      </p>
+                      <p class="fine">
+                        With an account it sits in a list instead, with nothing
+                        to mind and no expiry, and you can come back to it from
+                        any device.
+                      </p>
+                      <p>
+                        <a class="sh-btn" data-variant="secondary" data-size="md" href={`/signup?next=${encodeURIComponent(Astro.url.pathname)}`}>
+                          <span>Make an account</span>
+                        </a>
+                      </p>
+                    </>
+                  )
+                }
+              </section>
+            )
+          }
+
+          <section class="panel">
+            <h2>Take it out of the record</h2>
+            <p class="fine">
+              Deletes this chart and the birth data with it, now, without asking
+              anybody. There is no undo.
+            </p>
+            <form method="POST" onsubmit="return confirm('Delete this chart and its birth data?')">
+              <CsrfField />
+              <input type="hidden" name="action" value="forget" />
+              <Button type="submit" variant="secondary">Delete this chart</Button>
+            </form>
+          </section>
+        </>
+      )
+    }
+  </div>
+</BaseLayout>
+
+<style>
+  .chart-page { max-width: 860px; display: grid; gap: var(--space-6); }
+  .ok { font: 400 var(--text-sm) var(--font-body); color: var(--accent); margin: 0; }
+  .bad { font: 400 var(--text-sm) var(--font-body); color: var(--live); margin: 0; }
+
+  .chart-grid { display: grid; gap: var(--space-5); grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; }
+  .chart-facts h2, .panel h2 { font: 600 var(--text-h4) var(--font-display); color: var(--ink); margin: 0 0 var(--space-3); }
+  .chart-facts dl { display: grid; gap: 10px; margin: 0 0 var(--space-3); }
+  .chart-facts div { display: flex; gap: var(--space-3); align-items: baseline; }
+  .chart-facts dt {
+    font: 600 var(--text-micro) var(--font-body); letter-spacing: var(--tracking-eyebrow);
+    text-transform: uppercase; color: var(--ink-faint); min-width: 6ch;
+  }
+  .chart-facts dd { font: 400 var(--text-sm) var(--font-body); color: var(--ink); margin: 0; }
+
+  .panel {
+    display: grid; gap: var(--space-3); justify-items: start;
+    padding: var(--space-5);
+    background: var(--surface-veil);
+    border: var(--border-w) solid var(--line);
+    border-radius: var(--radius-md);
+  }
+  .fine { font: 400 var(--text-sm) / 1.7 var(--font-body); color: var(--ink-soft); margin: 0; max-width: 62ch; }
+  .more { margin: 0; font: 400 var(--text-sm) var(--font-body); }
+  .warn {
+    font: 400 var(--text-sm) / 1.7 var(--font-body); color: var(--ink); margin: 0; max-width: 62ch;
+    border-left: 2px solid var(--rose); padding-left: var(--space-3);
+  }
+  .link-out { display: grid; gap: 6px; width: 100%; }
+  .link-out span {
+    font: 600 var(--text-micro) var(--font-body); letter-spacing: var(--tracking-eyebrow);
+    text-transform: uppercase; color: var(--ink-faint);
+  }
+  .link-out input {
+    font: 400 var(--text-sm) var(--font-mono, var(--font-body)); color: var(--ink);
+    background: var(--surface-page); border: var(--border-w) solid var(--line);
+    border-radius: var(--radius-sm); padding: 8px 10px; min-height: 40px; width: 100%;
+    box-sizing: border-box;
+  }
+
+  @media (max-width: 720px) {
+    .chart-grid { grid-template-columns: 1fr; }
+  }
+</style>

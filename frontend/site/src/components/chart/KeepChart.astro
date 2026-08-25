@@ -1,0 +1,122 @@
+---
+/* "Keep this chart" — and the offer of an account, which is not the same thing.
+ *
+ * The order matters and it is the whole of the design here. Keeping works
+ * **signed out**. Somebody who has just cast their chart can keep it in one
+ * press, and is then told an account would hold it for them. The account is
+ * offered because it is genuinely better — a list instead of a link to mind,
+ * and no expiry — not because the door is shut without one. A wall here would
+ * convert worse and deserve to.
+ *
+ * The consent is real, not a formality: birth data used for an astrological
+ * reading arguably reveals philosophical belief, which makes it
+ * special-category data, so keeping it needs explicit consent and the wording
+ * shown here is the wording stored. Somebody already signed in has given it
+ * against their account and is not asked twice — asking twice for the same
+ * permission is how people learn to click past permissions.
+ */
+import CsrfField from "../forms/CsrfField.astro";
+import Button from "../forms/Button.astro";
+import { CONSENTS } from "../../lib/consents";
+
+interface Props {
+  signedIn: boolean;
+  /** Already given the nativity consent on their account. */
+  hasNativityConsent?: boolean;
+  failed?: string;
+}
+const { signedIn, hasNativityConsent = false, failed } = Astro.props;
+const nativity = CONSENTS.find((c) => c.kind === "nativity")!;
+const asks = !signedIn || !hasNativityConsent;
+---
+
+<section class="keep">
+  <h2>Keep this chart</h2>
+  <p class="keep-why">
+    Kept, it gets its own address you can come back to — and a separate link
+    you can hand to somebody, which you can take back later without losing your
+    own.
+  </p>
+
+  {failed && <p class="keep-bad">{failed}</p>}
+
+  <form method="POST" class="keep-form">
+    <CsrfField />
+    <input type="hidden" name="action" value="keep" />
+    <label class="keep-name">
+      <span>Call it something</span>
+      <input type="text" name="label" maxlength="80" placeholder="Mine" autocomplete="off" />
+    </label>
+
+    {
+      asks ? (
+        <label class="keep-consent">
+          <input type="checkbox" name="consent" value="1" required />
+          <span>{nativity.wording}</span>
+        </label>
+      ) : (
+        <p class="keep-note">
+          Your account already carries this consent, so you are not being asked
+          again. You can withdraw it from your account at any time, which
+          deletes the birth data.
+        </p>
+      )
+    }
+
+    <div class="keep-go">
+      <Button type="submit" data-track="chart:kept">Keep it</Button>
+      {
+        !signedIn && (
+          <span class="keep-alt">
+            or <a href="/signup?next=/tools/natal-chart">make an account</a> and
+            it is kept for you, in a list, with nothing to mind
+          </span>
+        )
+      }
+    </div>
+
+    {
+      !signedIn && (
+        <p class="keep-fine">
+          Kept without an account, a chart is held for a year and the clock goes
+          back every time you open it. That is not tidying up: the consent behind it
+          cannot be renewed by asking somebody there is no way to reach.
+        </p>
+      )
+    }
+  </form>
+</section>
+
+<style>
+  .keep {
+    display: grid; gap: var(--space-3);
+    padding: var(--space-5);
+    background: var(--surface-veil);
+    border: var(--border-w) solid var(--line);
+    border-radius: var(--radius-md);
+  }
+  .keep h2 { font: 600 var(--text-h4) var(--font-display); color: var(--ink); margin: 0; }
+  .keep-why, .keep-note, .keep-fine {
+    font: 400 var(--text-sm) / 1.7 var(--font-body); color: var(--ink-soft);
+    margin: 0; max-width: 60ch;
+  }
+  .keep-fine { color: var(--ink-faint); font-size: var(--text-xs); }
+  .keep-bad { font: 400 var(--text-sm) var(--font-body); color: var(--live); margin: 0; }
+  .keep-form { display: grid; gap: var(--space-3); }
+  .keep-name { display: grid; gap: 6px; max-width: 32ch; }
+  .keep-name span {
+    font: 600 var(--text-micro) var(--font-body); letter-spacing: var(--tracking-eyebrow);
+    text-transform: uppercase; color: var(--ink-faint);
+  }
+  .keep-name input {
+    font: 400 var(--text-sm) var(--font-body); color: var(--ink);
+    background: var(--surface-page); border: var(--border-w) solid var(--line);
+    border-radius: var(--radius-sm); padding: 8px 10px; min-height: 40px; width: 100%;
+    box-sizing: border-box;
+  }
+  .keep-consent { display: flex; gap: 10px; align-items: flex-start; max-width: 62ch; }
+  .keep-consent span { font: 400 var(--text-sm) / 1.6 var(--font-body); color: var(--ink); }
+  .keep-consent input { margin-top: 4px; flex: none; }
+  .keep-go { display: flex; gap: var(--space-3); align-items: center; flex-wrap: wrap; }
+  .keep-alt { font: 400 var(--text-sm) / 1.6 var(--font-body); color: var(--ink-soft); max-width: 44ch; }
+</style>

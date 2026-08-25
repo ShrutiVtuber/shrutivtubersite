@@ -1,0 +1,88 @@
+---
+/* One chart, drawn.
+ *
+ * Casts from the ephemeris and renders whichever figure was asked for. Used by
+ * the natal tool, by a saved chart, by a shared one and by the Today page, so
+ * that all four are the same drawing from the same numbers rather than four
+ * near-agreeing pictures.
+ *
+ * The figure is never the reading. Everywhere this appears, the numbers appear
+ * too — that is the design's order and it is the right one, because a wheel is
+ * a way of seeing what a table already says.
+ */
+import { askAstro } from "../../lib/api";
+
+interface Props {
+  date: string;
+  /** null or "" when unknown, which is a state and not a gap. */
+  time?: string | null;
+  timeUnknown?: boolean;
+  lat: number;
+  lon: number;
+  tradition?: string;
+  houseSystem?: string;
+  /** wheel | north | south */
+  figure?: string;
+  /** Shown under the drawing. Never the birth data on a shared page. */
+  caption?: string;
+}
+const {
+  date, time, timeUnknown = false, lat, lon,
+  tradition = "hellenistic", houseSystem = "whole_sign",
+  figure = "wheel", caption,
+} = Astro.props;
+
+/* Noon when the time is unknown: the least-wrong instant for the planets, and
+   said out loud rather than hidden. The angles stay undefined either way. */
+const moment = `${date}T${timeUnknown ? "12:00" : time || "12:00"}:00`;
+
+/* The Vedic square is asked for by name; a wheel is what the Hellenistic
+   branch draws anyway. Asking for `north` on a Hellenistic chart would get a
+   wheel back, which is correct rather than a silent failure. */
+const style = figure === "south" ? "south" : "north";
+const answer = await askAstro<{
+  diagram?: { kind: string; svg: string };
+  angles?: { ascendant: number };
+}>(
+  `/chart?when=${encodeURIComponent(moment)}&lat=${lat}&lon=${lon}` +
+  `&tradition=${tradition}&house_system=${houseSystem}&vedic_style=${style}`,
+);
+const svg = answer?.data?.diagram?.svg ?? "";
+---
+
+{
+  svg ? (
+    <figure class="chart-figure">
+      <div class="chart-frame" set:html={svg} />
+      {caption && <figcaption>{caption}</figcaption>}
+    </figure>
+  ) : (
+    <p class="chart-missing">
+      The figure could not be drawn — the ephemeris did not answer. That is a
+      failure on this side, not a fact about the sky.
+    </p>
+  )
+}
+
+<style>
+  .chart-figure { margin: 0; display: grid; gap: var(--space-3); justify-items: center; }
+  /* The drawing uses currentColor throughout, so it follows light and dark
+     without a second palette. */
+  .chart-frame {
+    width: 100%;
+    max-width: 420px;
+    color: var(--ink);
+  }
+  .chart-frame :global(svg) { width: 100%; height: auto; display: block; }
+  figcaption {
+    font: 400 var(--text-sm) / 1.6 var(--font-body);
+    color: var(--ink-soft);
+    text-align: center;
+    max-width: 46ch;
+  }
+  .chart-missing {
+    font: 400 var(--text-sm) / 1.7 var(--font-body);
+    color: var(--ink-soft);
+    margin: 0;
+  }
+</style>
