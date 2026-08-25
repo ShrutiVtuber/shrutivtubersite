@@ -557,6 +557,130 @@ async def delete_question(
     return Response(status_code=204)
 
 
+# ── buying one ──────────────────────────────────────────────────────────────
+
+class EnrolIn(BaseModel):
+    slug: str
+
+
+@router.post("/enrol")
+async def enrol(
+    body: EnrolIn, request: Request, session: AsyncSession = Depends(get_session)
+) -> dict:
+    """
+    Take a class: pay for it, or claim a free place.
+
+    Signing in first is required and not negotiable — a class is something
+    somebody comes back to for years, and there is nowhere to put an
+    entitlement without an account to hang it on.
+
+    A free course with seats is an RSVP rather than a purchase: no money moves,
+    a ticket is issued, and the seat count goes down so she knows how many are
+    coming.
+    """
+    from shruti.api.routes.accounts import current_user
+    from shruti.core.access import grant, may_open
+
+    user = await current_user(request, session)
+    if user is None:
+        raise HTTPException(401, "sign in first — a class needs somewhere to live")
+
+    course = (
+        await session.execute(
+            select(Course).where(Course.slug == body.slug, Course.visible.is_(True))
+        )
+    ).scalar_one_or_none()
+    if course is None:
+        raise HTTPException(404, "no such course")
+
+    already, reason = await may_open(user, course, session)
+    if already:
+        return {"ok": True, "alreadyYours": True, "reason": reason}
+
+    taken = await _seats_taken(course.id, session)
+    if course.seats is not None and taken >= course.seats:
+        raise HTTPException(409, "there are no places left")
+
+    # Free, but counted: an RSVP.
+    if course.price_cents <= 0:
+        await grant(user.id, course.id,
+                    "ticket" if course.kind == "workshop" else "gift", session)
+        return {"ok": True, "granted": True, "paid": False}
+
+    if not course.stripe_price_id:
+        raise HTTPException(503, "this is not finished being set up")
+
+    from shruti.api.routes.billing import _site_url
+    from shruti.core import shop as stripe_shop
+
+    site = _site_url(request)
+    stripe = stripe_shop._client()
+    args = {
+        "mode": "payment",
+        "line_items": [{"price": course.stripe_price_id, "quantity": 1}],
+        "success_url": f"{site}/classes/{course.slug}?welcome=1",
+        "cancel_url": f"{site}/classes/{course.slug}",
+        "automatic_tax": {"enabled": True},
+        "allow_promotion_codes": True,
+        # The webhook needs to know who this is for. The reference survives the
+        # redirect and is not something the browser can rewrite on the way back.
+        "client_reference_id": str(user.id),
+        "metadata": {"course_slug": course.slug, "kind": course.kind},
+    }
+    if user.email:
+        args["customer_email"] = user.email
+
+    return {"ok": True, "url": stripe.checkout.Session.create(**args)["url"]}
+
+
+async def _seats_taken(course_id: int, session: AsyncSession) -> int:
+    """
+    How many places are gone.
+
+    Counts entitlements rather than orders, because a place given away and a
+    place sold both fill a room.
+    """
+    from shruti.models import Entitlement
+
+    rows = (
+        await session.execute(
+            select(Entitlement).where(
+                Entitlement.course_id == course_id,
+                Entitlement.revoked_at.is_(None),
+            )
+        )
+    ).scalars().all()
+    return len(rows)
+
+
+async def record_enrolment(event_object: dict, session: AsyncSession):
+    """
+    Grant a course from a completed checkout.
+
+    Called by the webhook and idempotent through `grant`, because Stripe
+    retries by design and somebody must not end up with two of anything — nor,
+    worse, with nothing because the second attempt raised.
+    """
+    from shruti.core.access import grant
+
+    slug = (event_object.get("metadata") or {}).get("course_slug") or ""
+    reference = event_object.get("client_reference_id")
+    if not slug or not reference or not str(reference).isdigit():
+        return None
+
+    course = (
+        await session.execute(select(Course).where(Course.slug == slug))
+    ).scalar_one_or_none()
+    if course is None:
+        return None
+
+    return await grant(
+        int(reference), course.id,
+        "ticket" if course.kind == "workshop" else "purchase",
+        session,
+    )
+
+
 # ── what a reader sees ──────────────────────────────────────────────────────
 #
 # Declared AFTER the admin routes, and that is not stylistic. `/{slug}` sits in

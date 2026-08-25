@@ -298,3 +298,29 @@ generous.
 
 This API version wants `PromotionCode.create(promotion={"type": "coupon",
 "coupon": id})`. Passing `coupon=` is refused outright as an unknown parameter.
+
+## A full pass over tablet and phone — after the current features
+
+Her ask, and a real one: **the site should be in its tablet layout well before
+anything would break, with room to spare**, so nobody ever meets a broken
+state at some exact pixel.
+
+What prompted it: at 1089px the header nav wrapped "Journal" onto a second
+line. That one was caused by adding Classes and Shop to the nav — nine items
+where seven fitted — and the drawer only took over at 960px. The breakpoint is
+1160px now, which has room, and the rule is written above it in the stylesheet:
+**adding a nav item means checking that number again.**
+
+That is the cause fixed, not the pass. The pass is still to do:
+
+- [ ] Every page walked at 1440 / 1180 / 1024 / 834 / 768 / 430 / 375
+- [ ] The breakpoints are a set, not a scatter — the site currently uses 560,
+      620, 640, 720, 860, 880, 900, 940, 960, which is nine numbers doing the
+      work of about four
+- [ ] Nothing switches layout at the pixel it would otherwise break; every
+      switch has buffer
+- [ ] The reader's sidebar on a phone — it stacks today, but stacking a
+      forty-lesson outline above the video means scrolling past all of it
+- [ ] Tables and wide blocks scroll inside themselves rather than the page
+- [ ] Admin screens too, which are currently built for a desktop and used from
+      one — worth checking rather than assuming

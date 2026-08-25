@@ -739,6 +739,47 @@ async def _upsert(
         if tier:
             row.tier = tier
 
+    # A membership just started, changed or ended, so what it includes has to
+    # follow. Done here rather than at each of the three call sites, because
+    # this is the one function all of them go through and a fourth would
+    # eventually forget.
+    #
+    # **Progress is never touched by this.** Losing a membership takes the
+    # materials and leaves every tick, so coming back is coming back.
+    await session.commit()
+    await _follow_entitlements(row, session)
+
+
+async def _follow_entitlements(row: Supporter, session: AsyncSession) -> None:
+    """
+    Bring somebody's class access in line with what they now pay for.
+
+    Kept quiet on failure. A subscription is recorded whatever happens here;
+    losing the webhook because a course lookup went wrong would be trading a
+    payment record for an access record, which is the wrong way round.
+    """
+    from shruti.core.access import sync_tier_entitlements
+    from shruti.models.accounts import User
+
+    user = None
+    if row.user_id:
+        user = await session.get(User, row.user_id)
+    if user is None and row.email:
+        user = (
+            await session.execute(select(User).where(User.email == row.email.lower()))
+        ).scalars().first()
+    if user is None:
+        # Somebody supporting without an account. Nothing to grant a class to
+        # until they make one, and nothing lost by waiting.
+        return
+
+    try:
+        result = await sync_tier_entitlements(user, session)
+        if result["granted"] or result["revoked"]:
+            log.info("classes for %s: %s", row.email or row.user_id, result)
+    except Exception:                                  # noqa: BLE001
+        log.exception("could not follow entitlements for %s", row.email or row.user_id)
+
 
 async def _supporter(session: AsyncSession, customer_id: str) -> Supporter | None:
     if not customer_id:
@@ -839,6 +880,15 @@ async def webhook(
         # first and separately: a jumper is not a membership, and running it
         # through the supporter path would make a one-off purchase look like
         # somebody subscribing.
+        # A class or a workshop ticket. Handled first and separately, for the
+        # same reason a jumper is: it is a one-off purchase and running it
+        # through the supporter path would make it look like a subscription.
+        if (obj.get("metadata") or {}).get("course_slug"):
+            from shruti.api.routes.classes import record_enrolment
+
+            await record_enrolment(obj, session)
+            return {"received": True}
+
         if (obj.get("metadata") or {}).get("product_slug"):
             from shruti.api.routes.shop import deliver, record_order
 

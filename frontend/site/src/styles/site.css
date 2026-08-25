@@ -91,7 +91,13 @@
   cursor: pointer;
   min-height: 44px;
 }
-@media (max-width: 960px) { .site-nav { display: none; } .nav-toggle { display: inline-flex; } }
+/* The nav becomes a drawer well before it would wrap, not at the pixel where
+   it does. Nine items at 960px wrapped "Journal" onto a second line — which is
+   not a layout, it is a break somebody sees — so this sits high enough to have
+   room to spare.
+   ADDING A NAV ITEM MEANS CHECKING THIS NUMBER AGAIN. It went wrong the moment
+   Classes and Shop arrived. */
+@media (max-width: 1160px) { .site-nav { display: none; } .nav-toggle { display: inline-flex; } }
 .nav-toggle:hover { border-color: var(--accent); color: var(--accent); }
 .acct-link {
   font: 600 var(--text-xs)/1 var(--font-body);
