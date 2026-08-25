@@ -162,14 +162,22 @@ Documentation deliberately gets neither. The design gives it a provenance block
 instant. **That block is not built yet**; it is the obvious next piece for docs
 pages.
 
-### A daemon bug this turned up
+### A daemon bug this turned up — fixed
 
-`shruti-astro` returns `planetaryHours.current: null` for a moment that falls in
-the night that began the *previous* UTC day. Probed across 2026-08-25:
+`shruti-astro` returned `planetaryHours.current: null` for any moment falling in
+the night that began the *previous* UTC day, so anything published between
+midnight and dawn lost its planetary hour. All four seeded entries had.
 
-    02:30Z → null      05:00Z → Sun     12:00Z → Mars
-    20:00Z → Sun       22:30Z → Moon
+The cause was `sun_events`: it brackets a calendar day starting from UTC
+midnight, so before dawn it returns the sunrise still to come and the hours
+describe a cycle beginning *after* the moment. `sun_cycle` now returns the cycle
+a moment is actually in. Two corrections fell out of it — the day ruler before
+dawn is the previous day's, since the planetary day runs sunrise to sunrise, and
+`next` no longer goes blank at the last hour of the night.
 
-So an entry published between midnight and dawn loses its planetary hour — all
-four seeded entries did. The record block simply omits the line, which is
-honest, but the fix belongs in theourgia's ephemeris service, not here.
+Fixed in shruti-astro (`fb91725`), deployed, and the stored records recaptured:
+same instant, corrected arithmetic, which is what `recapture` is for.
+
+The Thelemic line was changed at the same time (`662bcc9`): signs as glyphs
+beside the luminaries rather than spelled out, and dated **e.v.** rather than
+æræ novæ.
