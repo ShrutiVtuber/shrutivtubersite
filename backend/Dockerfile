@@ -24,6 +24,11 @@ CMD ["uvicorn", "shruti.api.app:app", "--host", "0.0.0.0", "--port", "8000", "--
 FROM base AS prod
 COPY alembic.ini ./
 COPY alembic ./alembic
+# The seeders ship too. Page copy, the legal pages and the money terms
+# are all seeded rather than hard-coded, and production needed them —
+# it had no page blocks at all and both legal pages were blank, because
+# the scripts that write them were only ever on a laptop.
+COPY scripts ./scripts
 RUN useradd --create-home --uid 10001 shruti \
  && mkdir -p /app/media && chown -R shruti:shruti /app
 USER shruti

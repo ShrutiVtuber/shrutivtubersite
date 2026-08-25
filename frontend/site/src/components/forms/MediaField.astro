@@ -84,32 +84,56 @@ const current = value === null || value === "" ? "" : String(value);
   .mf-row { display: flex; gap: 14px; align-items: flex-start; flex-wrap: wrap; }
 
   .mf-preview {
-    margin: 0; width: 128px; min-height: 96px; display: grid; gap: 4px;
+    margin: 0; width: 140px; min-height: 104px; display: grid; gap: 6px;
     place-content: center; text-align: center;
-    border: 1px dashed var(--line, #d8d2cc); border-radius: 8px; padding: 8px;
-    background: var(--surface-2, #faf7f4); overflow: hidden;
+    border: var(--border-w) dashed color-mix(in srgb, var(--accent) 35%, transparent);
+    border-radius: var(--radius-sm); padding: 10px;
+    background: var(--surface-veil); overflow: hidden;
   }
   .mf-preview img { max-width: 100%; max-height: 120px; border-radius: 4px; display: block; }
   .mf-preview figcaption { font-size: 11px; opacity: .7; word-break: break-word; }
-  .mf-preview:not([data-empty]) { border-style: solid; }
+  .mf-preview:not([data-empty]) {
+    border-style: solid;
+    border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+  }
 
   .mf-controls { flex: 1 1 260px; display: grid; gap: 8px; min-width: 0; }
   .mf-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 
+  /* The site's own button colours, not a grey outline on white — which is
+     what these were, and read as disabled rather than as something to press. */
   .mf-btn {
     display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
-    padding: 6px 12px; border-radius: 6px; font-size: 13px;
-    border: 1px solid var(--line, #d8d2cc); background: var(--surface, #fff);
+    padding: 8px 14px; border-radius: var(--radius-sm); line-height: 1;
+    font-family: var(--font-body); font-size: var(--text-xs); font-weight: 600;
+    border: var(--border-w) solid transparent;
+    background: var(--accent); color: var(--on-accent);
+    transition: background var(--dur-1) var(--ease-out),
+                color var(--dur-1) var(--ease-out),
+                border-color var(--dur-1) var(--ease-out);
   }
-  .mf-btn:hover { border-color: var(--accent, #a8577a); }
+  .mf-btn:hover { background: var(--accent-hover); }
+  .mf-btn:active { transform: translateY(1px); }
   .mf-btn input[type="file"] { display: none; }
-  .mf-btn--quiet { opacity: .85; }
+
+  /* The secondary variant: accent on its own wash, so it is still legibly a
+     button without competing with the primary one. */
+  .mf-btn--quiet {
+    background: transparent;
+    color: var(--accent);
+    border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+  }
+  .mf-btn--quiet:hover {
+    background: var(--accent-wash);
+    color: var(--accent-hover);
+    border-color: var(--accent-hover);
+  }
 
   .mf-naming { display: grid; gap: 6px; grid-template-columns: 1fr 1fr; }
   @media (max-width: 560px) { .mf-naming { grid-template-columns: 1fr; } }
 
   .mf-status { margin: 0; font-size: 12px; min-height: 1em; opacity: .8; }
-  .mf-status[data-bad] { color: var(--bad, #a33); opacity: 1; }
+  .mf-status[data-bad] { color: var(--live, #a33); opacity: 1; }
 
   .mf-library { display: grid; gap: 8px; }
   .mf-grid {
@@ -121,7 +145,7 @@ const current = value === null || value === "" ? "" : String(value);
     background: none; cursor: pointer; line-height: 0;
   }
   .mf-pick img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 4px; }
-  .mf-pick:hover, .mf-pick:focus-visible { border-color: var(--accent, #a8577a); }
+  .mf-pick:hover, .mf-pick:focus-visible { border-color: var(--accent); }
   .mf-pick span {
     display: block; font-size: 10px; line-height: 1.3; padding-top: 2px;
     opacity: .75; word-break: break-word;

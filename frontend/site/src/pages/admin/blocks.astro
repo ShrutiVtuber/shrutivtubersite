@@ -14,6 +14,7 @@ import MediaField from "../../components/forms/MediaField.astro";
 import Button from "../../components/forms/Button.astro";
 import Badge from "../../components/navigation/Badge.astro";
 import { asAdmin, KINDS } from "../../lib/admin";
+import { GROUP_ORDER, MEDIA_USE, specFor } from "../../lib/adminFields";
 import { verifyCsrf } from "../../lib/csrf";
 
 const kind = KINDS.some((k) => k.kind === Astro.url.searchParams.get("kind"))
@@ -85,10 +86,27 @@ const list = await asAdmin(Astro, `/api/admin/${kind}`);
 const rows: any[] = Array.isArray(list.body) ? list.body : [];
 const row = editing ? rows.find((r) => String(r.id) === editing) : null;
 
-/* Which fields to show, per table. Long text gets a textarea. */
-const LONG = new Set(["body_md", "bodyMd", "notes_md", "notesMd", "wording"]);
-/* Rendered as a picture with an upload on it, not as a number to look up. */
-const MEDIA = new Set(["media_id", "mediaId"]);
+/* Fields grouped the way someone filling them in would expect, rather than in
+   whatever order the table happens to return its columns. */
+function grouped(r: any): [string, string[]][] {
+  const groups = new Map<string, string[]>();
+  for (const key of fieldsOf(r)) {
+    const g = specFor(kind, key).group ?? "Details";
+    (groups.get(g) ?? groups.set(g, []).get(g)!).push(key);
+  }
+  const seen = [...groups.keys()];
+  seen.sort((a, b) => {
+    const ia = GROUP_ORDER.indexOf(a), ib = GROUP_ORDER.indexOf(b);
+    return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
+  });
+  return seen.map((g) => [g, groups.get(g)!]);
+}
+
+const mediaUse = MEDIA_USE[kind];
+const mediaUnused = !!mediaUse && "unused" in mediaUse;
+/* Named as the person would say it, for the sentence explaining that this kind
+   has nowhere to show an image. */
+const spec_kindLabel = (KINDS.find((k) => k.kind === kind)?.label ?? kind).toLowerCase();
 const SKIP = new Set(["id", "created_at", "updated_at", "createdAt", "updatedAt", "media", "visible", "position"]);
 const fieldsOf = (r: any) => Object.keys(r).filter((k) => !SKIP.has(k));
 const label = (r: any) =>
@@ -120,19 +138,69 @@ const label = (r: any) =>
         <input type="hidden" name="id" value={row.id} />
         <h2 class="h2">Editing {label(row)}</h2>
         {
-          fieldsOf(row).map((k) => (
-            <label class="field">
-              <span class="adm-lbl">{k.replace(/_/g, " ").replace(/([A-Z])/g, " $1")}</span>
+          grouped(row).map(([group, keys]) => (
+            <section class="group">
+              <h3 class="group-head">{group}</h3>
               {
-                MEDIA.has(k)
-                  ? <MediaField name={k} value={row[k] ?? null} label="Image" />
-                  : LONG.has(k)
-                    ? <textarea class="adm-area" name={k} rows="10">{row[k] ?? ""}</textarea>
-                    : typeof row[k] === "boolean"
-                      ? <input type="checkbox" name={k} checked={row[k]} />
-                      : <input class="adm-input" name={k} value={row[k] ?? ""} />
+                keys.map((k) => {
+                  const spec = specFor(kind, k);
+                  const value = row[k];
+                  return spec.type === "media" ? (
+                    mediaUnused ? (
+                      <p class="adm-note unused">
+                        <strong>{spec.label}:</strong> nothing on the site draws an image
+                        for {spec_kindLabel}.
+                        Uploading one here would store a picture that never appears, so
+                        the picker is not offered.
+                      </p>
+                    ) : (
+                      <div class="field">
+                        <MediaField
+                          name={k}
+                          value={value ?? null}
+                          label={(mediaUse as any).label}
+                        />
+                        <p class="hint">{(mediaUse as any).where}</p>
+                      </div>
+                    )
+                  ) : spec.type === "checkbox" || typeof value === "boolean" ? (
+                    <div class="field field--check">
+                      <label class="check">
+                        <input type="checkbox" name={k} checked={!!value} />
+                        <span>{spec.label}</span>
+                      </label>
+                      {spec.help && <p class="hint">{spec.help}</p>}
+                    </div>
+                  ) : (
+                    <label class="field">
+                      <span class="adm-lbl">{spec.label}</span>
+                      {
+                        spec.type === "textarea"
+                          ? <textarea class="adm-area" name={k} rows="10">{value ?? ""}</textarea>
+                          : spec.type === "select"
+                            ? (
+                              <select class="adm-input" name={k}>
+                                {(spec.options ?? []).map((o) => (
+                                  <option value={o.value} selected={value === o.value}>{o.label}</option>
+                                ))}
+                              </select>
+                            )
+                            : (
+                              <input
+                                class="adm-input"
+                                type={spec.type === "url" ? "url" : spec.type === "number" ? "number" : "text"}
+                                name={k}
+                                value={value ?? ""}
+                                placeholder={spec.placeholder}
+                              />
+                            )
+                      }
+                      {spec.help && <p class="hint">{spec.help}</p>}
+                    </label>
+                  );
+                })
               }
-            </label>
+            </section>
           ))
         }
         <div class="row-actions">
@@ -211,4 +279,37 @@ const label = (r: any) =>
   .editor { gap: var(--space-4); max-width: 760px; }
   .h2 { font: 600 var(--text-h3) var(--font-display); color: var(--ink); margin: 0; }
   .field { display: grid; gap: 4px; }
+
+  /* Grouped, so a form of fourteen boxes reads as four short questions rather
+     than one long one. */
+  .group { display: grid; gap: var(--space-3); }
+  .group-head {
+    margin: 0;
+    font: 600 var(--text-xs) var(--font-mono);
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--accent);
+    padding-bottom: 4px;
+    border-bottom: var(--border-w) solid var(--accent-wash);
+  }
+
+  /* What the field is for, under the field. The editor used to say nothing at
+     all, which is why filling it in was a guess you had to go and check. */
+  .hint {
+    margin: 0;
+    font: 400 var(--text-xs) var(--font-body);
+    color: var(--ink-soft);
+    max-width: 62ch;
+  }
+
+  .field--check { gap: 6px; }
+  .check { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+  .check span { font: 500 var(--text-sm) var(--font-body); color: var(--ink); }
+  .check input { width: 18px; height: 18px; accent-color: var(--accent); }
+
+  .unused {
+    border-left: 2px solid var(--accent-wash);
+    padding-left: var(--space-3);
+    max-width: 62ch;
+  }
 </style>

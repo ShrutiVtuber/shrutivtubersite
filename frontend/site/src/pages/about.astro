@@ -13,6 +13,7 @@
 import BaseLayout from "../layouts/BaseLayout.astro";
 import SectionHeader from "../components/brand/SectionHeader.astro";
 import Prose from "../components/content/Prose.astro";
+import SectionFigure from "../components/blocks/SectionFigure.astro";
 import ProfileFieldTable from "../components/tables/ProfileFieldTable.astro";
 import CreditList from "../components/tables/CreditList.astro";
 import FanArtCard from "../components/cards/FanArtCard.astro";
@@ -51,6 +52,7 @@ const credits = (who?.credits ?? []).map((c) => ({
                  because the page heading above already carries it. */
               <div class="about-block">
                 {s.title && s.key !== "intro" && <h3 class="about-block-title">{s.title}</h3>}
+                <SectionFigure media={s.media} title={s.title} />
                 <Prose html={s.html} />
               </div>
             ))

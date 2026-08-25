@@ -1,0 +1,45 @@
+---
+/* A page block's picture.
+ *
+ * Page blocks have carried a `media_id` since the schema was written and the
+ * API has always returned it, but nothing ever drew it — so choosing an image
+ * for a block stored a row and changed no page. An upload control that does
+ * nothing is worse than none, so either it renders or it should not be
+ * offered; this is the first half of that.
+ *
+ * Above the prose rather than beside it: the blocks are a single text column
+ * on every page that uses them, and a floated image would need a second column
+ * that none of those pages has.
+ */
+interface Props {
+  media: { url: string; alt: string } | null;
+  /** Falls back to the block's own title when no alt text was written. */
+  title?: string;
+}
+const { media, title } = Astro.props;
+---
+{
+  media && (
+    <figure class="sec-fig">
+      <img
+        src={media.url}
+        alt={media.alt || title || ""}
+        loading="lazy"
+        decoding="async"
+      />
+    </figure>
+  )
+}
+
+<style>
+  .sec-fig {
+    margin: 0 0 var(--space-5);
+  }
+  .sec-fig img {
+    display: block;
+    width: 100%;
+    height: auto;
+    border-radius: var(--radius-sm);
+    border: var(--border-w) solid var(--line);
+  }
+</style>

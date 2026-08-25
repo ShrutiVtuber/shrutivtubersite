@@ -10,6 +10,7 @@
 import BaseLayout from "../layouts/BaseLayout.astro";
 import SectionHeader from "../components/brand/SectionHeader.astro";
 import Prose from "../components/content/Prose.astro";
+import SectionFigure from "../components/blocks/SectionFigure.astro";
 import LegalImprint from "../components/brand/LegalImprint.astro";
 import EmptyState from "../components/feedback/EmptyState.astro";
 import { pageSections } from "../lib/content";
@@ -33,6 +34,7 @@ const sections = await pageSections("terms");
           {sections.map((s) => (
             <section id={s.key}>
               {s.title && <h2>{s.title}</h2>}
+              <SectionFigure media={s.media} title={s.title} />
               <Prose html={s.html} />
             </section>
           ))}

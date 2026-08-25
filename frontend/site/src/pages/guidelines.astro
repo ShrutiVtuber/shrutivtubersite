@@ -6,6 +6,7 @@
 import BaseLayout from "../layouts/BaseLayout.astro";
 import { pageSections } from "../lib/content";
 import Prose from "../components/content/Prose.astro";
+import SectionFigure from "../components/blocks/SectionFigure.astro";
 import SectionHeader from "../components/brand/SectionHeader.astro";
 import DisclosureRule from "../components/brand/DisclosureRule.astro";
 import Button from "../components/forms/Button.astro";
@@ -90,6 +91,7 @@ const extra = sections.filter((s) => s.key !== "intro");
             extra.map((s) => (
               <section class="page-section">
                 {s.title && <h2>{s.title}</h2>}
+                <SectionFigure media={s.media} title={s.title} />
                 <Prose html={s.html} />
               </section>
             ))
