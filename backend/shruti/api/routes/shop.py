@@ -508,7 +508,7 @@ async def deliver(order: Order, session: AsyncSession) -> None:
         site = _site_url(None)
         body = (
             f"Thank you — {order.product_name} is yours.\n\n"
-            f"Download it here:\n{site}/shop/download/{order.download_token}\n\n"
+            f"Download it here:\n{site}/api/shop/download/{order.download_token}\n\n"
             "The link is yours and does not expire. Keep this message if you "
             "want to download it again later.\n\n"
             f"Paid: {money}"

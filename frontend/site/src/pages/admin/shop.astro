@@ -1,0 +1,437 @@
+---
+/* The shop: what is for sale, and what has been bought.
+ *
+ * Products live in this database and are mirrored to Stripe on every save, so
+ * this screen is where a thing becomes sellable — and where it says plainly
+ * when it is not. A saved row that quietly cannot be bought is the worst
+ * outcome here, so "not on sale yet" carries its reason.
+ *
+ * The two kinds differ in exactly two places and the form says so: a physical
+ * thing has stock and collects an address, a digital one delivers a file.
+ */
+import AdminLayout from "../../layouts/AdminLayout.astro";
+import CsrfField from "../../components/forms/CsrfField.astro";
+import Button from "../../components/forms/Button.astro";
+import Badge from "../../components/navigation/Badge.astro";
+import MediaField from "../../components/forms/MediaField.astro";
+import { asAdmin, ADMIN_COOKIE } from "../../lib/admin";
+import { SITE_API } from "../../lib/api";
+import { verifyCsrf } from "../../lib/csrf";
+
+export const prerender = false;
+
+let notice = "";
+let failed = "";
+
+function auth(): Record<string, string> {
+  const token = Astro.cookies.get(ADMIN_COOKIE)?.value;
+  return token ? { cookie: `${ADMIN_COOKIE}=${token}` } : {};
+}
+
+const num = (form: FormData, key: string): number | null => {
+  const raw = String(form.get(key) ?? "").trim();
+  return raw === "" ? null : Number(raw);
+};
+
+if (Astro.request.method === "POST") {
+  const form = await Astro.request.formData();
+  if (!verifyCsrf(Astro.cookies, form)) {
+    failed = "That did not save. Reload the page and try again.";
+  } else {
+    const action = String(form.get("action") ?? "");
+    const id = String(form.get("id") ?? "");
+
+    if (action === "upload-file") {
+      const file = form.get("file");
+      if (!(file instanceof File) || file.size === 0) {
+        failed = "Choose a file first.";
+      } else {
+        const out = new FormData();
+        out.append("file", file, file.name);
+        const r = await fetch(`${SITE_API}/api/shop/admin/files`, {
+          method: "POST", headers: auth(), body: out,
+        });
+        const body = await r.json().catch(() => null);
+        notice = r.ok ? `Uploaded ${body?.name}. Attach it to a digital product below.` : "";
+        failed = r.ok ? "" : (body?.detail ?? "That did not upload.");
+      }
+    }
+
+    if (action === "save" || action === "create") {
+      /* Prices are typed in euros because that is what she is thinking in, and
+         stored in cents because money in a float is how a cent goes missing. */
+      const euros = String(form.get("price") ?? "0").replace(",", ".");
+      const payload: Record<string, unknown> = {
+        slug: String(form.get("slug") ?? ""),
+        name: String(form.get("name") ?? ""),
+        kind: String(form.get("kind") ?? "digital"),
+        tagline: String(form.get("tagline") ?? ""),
+        body_md: String(form.get("body_md") ?? ""),
+        price_cents: Math.round(Number(euros || 0) * 100),
+        tax_code: String(form.get("tax_code") ?? "txcd_10000000"),
+        media_id: num(form, "media_id"),
+        file_id: num(form, "file_id"),
+        stock: num(form, "stock"),
+        visible: String(form.get("visible") ?? "off") === "on",
+        position: Number(form.get("position") ?? 0),
+      };
+      const r = action === "create"
+        ? await asAdmin(Astro, "/api/shop/admin/products", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify(payload),
+          })
+        : await asAdmin(Astro, `/api/shop/admin/products/${id}`, {
+            method: "PATCH",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+
+      if (!r.ok) {
+        failed = r.body?.detail ?? "That did not save.";
+      } else if (r.body?.stripeError) {
+        /* Saved here, missing there. Said plainly, because a product Stripe
+           does not know about cannot be bought however good it looks. */
+        failed = `Saved, but Stripe did not take it: ${r.body.stripeError}`;
+      } else {
+        notice = "Saved, and in step with Stripe.";
+      }
+    }
+
+    if (action === "delete" && id) {
+      const r = await asAdmin(Astro, `/api/shop/admin/products/${id}`, { method: "DELETE" });
+      notice = r.ok ? "Deleted." : "";
+      failed = r.ok ? "" : (r.body?.detail ?? "That could not be deleted.");
+    }
+
+    if (action === "fulfilment" && id) {
+      const r = await asAdmin(Astro, `/api/shop/admin/orders/${id}/fulfilment`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ fulfilment: String(form.get("fulfilment") ?? "sent") }),
+      });
+      notice = r.ok ? "Order updated." : "";
+      failed = r.ok ? "" : (r.body?.detail ?? "That did not update.");
+    }
+  }
+}
+
+const editing = Astro.url.searchParams.get("edit") ?? "";
+const creating = Astro.url.searchParams.get("new") === "1";
+
+const [list, orderList, fileList] = await Promise.all([
+  asAdmin(Astro, "/api/shop/admin/products"),
+  asAdmin(Astro, "/api/shop/admin/orders"),
+  asAdmin(Astro, "/api/shop/admin/files"),
+]);
+const products: any[] = Array.isArray(list.body) ? list.body : [];
+const orders: any[] = Array.isArray(orderList.body) ? orderList.body : [];
+const files: any[] = Array.isArray(fileList.body) ? fileList.body : [];
+
+const BLANK = {
+  id: "", slug: "", name: "", kind: "digital", tagline: "", body_md: "",
+  price_cents: 0, tax_code: "txcd_10000000", media_id: null, file_id: null,
+  stock: null, visible: false, position: 0,
+};
+const row = creating ? BLANK : products.find((p) => String(p.id) === editing) ?? null;
+
+const money = (cents: number, currency = "eur") =>
+  `${(cents / 100).toFixed(2)} ${currency.toUpperCase()}`;
+const toSend = orders.filter((o) => o.fulfilment === "to_send");
+---
+
+<AdminLayout title="Shop">
+  <div class="head">
+    <h1 class="adm-h">Shop</h1>
+    {toSend.length > 0 && <Badge tone="rose">{toSend.length} to post</Badge>}
+  </div>
+
+  {notice && <p class="adm-ok" role="status">{notice}</p>}
+  {failed && <p class="adm-bad" role="alert">{failed}</p>}
+
+  {
+    row ? (
+      <form method="POST" class="adm-card editor">
+        <CsrfField />
+        <input type="hidden" name="action" value={creating ? "create" : "save"} />
+        {!creating && <input type="hidden" name="id" value={row.id} />}
+        <h2 class="h2">{creating ? "New product" : `Editing ${row.name}`}</h2>
+
+        <section class="group">
+          <h3 class="group-head">What it is</h3>
+          <label class="field">
+            <span class="adm-lbl">Kind</span>
+            <select class="adm-input" name="kind">
+              <option value="digital" selected={row.kind === "digital"}>
+                Digital — a file they download
+              </option>
+              <option value="physical" selected={row.kind === "physical"}>
+                Physical — something you post
+              </option>
+            </select>
+            <p class="hint">
+              Physical collects an address at checkout and counts stock. Digital
+              delivers a file and does neither.
+            </p>
+          </label>
+          <label class="field">
+            <span class="adm-lbl">Name</span>
+            <input class="adm-input" name="name" value={row.name} required />
+          </label>
+          <label class="field">
+            <span class="adm-lbl">Address on the site</span>
+            <input class="adm-input" name="slug" value={row.slug} required placeholder="attic-calendar-print" />
+            <p class="hint">It will live at /shop/&lt;this&gt;. Changing it breaks any link already shared.</p>
+          </label>
+          <label class="field">
+            <span class="adm-lbl">Tagline</span>
+            <input class="adm-input" name="tagline" value={row.tagline} />
+          </label>
+          <label class="field">
+            <span class="adm-lbl">Description</span>
+            <textarea class="adm-area" name="body_md" rows="8">{row.body_md}</textarea>
+            <p class="hint">Markdown.</p>
+          </label>
+        </section>
+
+        <section class="group">
+          <h3 class="group-head">Picture</h3>
+          <MediaField name="media_id" value={row.media_id} label="Photo" />
+          <p class="hint">Appears in the shop and on the product's own page.</p>
+        </section>
+
+        <section class="group">
+          <h3 class="group-head">Money</h3>
+          <label class="field">
+            <span class="adm-lbl">Price, in euros</span>
+            <input class="adm-input" name="price" value={(row.price_cents / 100).toFixed(2)}
+                   inputmode="decimal" required />
+            <p class="hint">
+              The number people pay — tax is included in it. Changing this makes
+              a new price in Stripe and retires the old one, so anything already
+              sold keeps what it was sold at.
+            </p>
+          </label>
+          <label class="field">
+            <span class="adm-lbl">Stripe tax code</span>
+            <input class="adm-input" name="tax_code" value={row.tax_code} />
+            <p class="hint">
+              <code>txcd_10000000</code> is general digital goods.
+              Physical things want their own — a jumper is not taxed like a book.
+            </p>
+          </label>
+        </section>
+
+        <section class="group">
+          <h3 class="group-head">Delivering it</h3>
+          <label class="field">
+            <span class="adm-lbl">File, for a digital product</span>
+            <select class="adm-input" name="file_id">
+              <option value="">— none —</option>
+              {files.map((f) => (
+                <option value={f.id} selected={String(row.file_id) === String(f.id)}>
+                  {f.name} ({Math.round(f.sizeBytes / 1024)} KB)
+                </option>
+              ))}
+            </select>
+            <p class="hint">
+              A digital product without a file cannot go on sale. Upload one below.
+            </p>
+          </label>
+          <label class="field">
+            <span class="adm-lbl">Stock, for a physical one</span>
+            <input class="adm-input" name="stock" value={row.stock ?? ""} inputmode="numeric"
+                   placeholder="leave blank for no limit" />
+            <p class="hint">Counts down as they sell. At zero it shows as sold out rather than vanishing.</p>
+          </label>
+        </section>
+
+        <section class="group">
+          <h3 class="group-head">Publishing</h3>
+          <div class="field field--check">
+            <input type="hidden" name="visible" value="off" />
+            <label class="check">
+              <input type="checkbox" name="visible" checked={row.visible} />
+              <span>On sale</span>
+            </label>
+          </div>
+          <label class="field">
+            <span class="adm-lbl">Order</span>
+            <input class="adm-input" name="position" value={row.position} inputmode="numeric" />
+          </label>
+        </section>
+
+        <div class="row-actions">
+          <Button type="submit">{creating ? "Add it" : "Save"}</Button>
+          <a class="cancel" href="/admin/shop">Cancel</a>
+        </div>
+      </form>
+    ) : (
+      <>
+        <div class="list-actions">
+          <Button href="/admin/shop?new=1">Add a product</Button>
+        </div>
+
+        <div class="rows">
+          {
+            products.length === 0 ? (
+              <p class="adm-note">Nothing for sale yet — “Add a product” is where it starts.</p>
+            ) : (
+              products.map((p) => (
+                <div class="row" data-hidden={!p.visible || undefined}>
+                  <div class="row-main">
+                    <span class="row-label">{p.name}</span>
+                    <span class="row-sub">
+                      {p.kind} · {money(p.price_cents, p.currency)}
+                      {p.stock !== null && ` · ${p.stock} left`}
+                    </span>
+                  </div>
+                  {!p.sellable && <Badge tone="faint">not sellable yet</Badge>}
+                  <Badge tone={p.visible ? "accent" : "faint"}>
+                    {p.visible ? "on sale" : "off sale"}
+                  </Badge>
+                  <div class="row-actions">
+                    <a class="edit" href={`/admin/shop?edit=${p.id}`}>Edit</a>
+                    <form method="POST" class="inline" data-confirm={`Delete ${p.name}?`}>
+                      <CsrfField />
+                      <input type="hidden" name="action" value="delete" />
+                      <input type="hidden" name="id" value={p.id} />
+                      <button type="submit" class="danger">Delete</button>
+                    </form>
+                  </div>
+                </div>
+              ))
+            )
+          }
+        </div>
+
+        <form method="POST" enctype="multipart/form-data" class="adm-card">
+          <CsrfField />
+          <input type="hidden" name="action" value="upload-file" />
+          <h2 class="h2">Files for digital products</h2>
+          <p class="adm-note">
+            PDF, epub, zip, audio, video or an image. Stored apart from the media
+            library and never served from a public path — a buyer reaches one
+            through their own link and nobody else can.
+          </p>
+          <label class="field">
+            <span class="adm-lbl">Upload</span>
+            <input class="adm-input" type="file" name="file" required />
+          </label>
+          <div><Button type="submit">Upload</Button></div>
+          {
+            files.length > 0 && (
+              <ul class="items">
+                {files.map((f) => (
+                  <li>
+                    <span class="who">{f.name}</span>
+                    <span class="when t-tabular">{Math.round(f.sizeBytes / 1024)} KB · {f.storage}</span>
+                  </li>
+                ))}
+              </ul>
+            )
+          }
+        </form>
+
+        <section class="adm-card">
+          <h2 class="h2">Orders <span class="count">{orders.length}</span></h2>
+          {
+            orders.length === 0 ? (
+              <p class="adm-note">Nothing has sold yet.</p>
+            ) : (
+              <ul class="items">
+                {orders.map((o) => (
+                  <li>
+                    <div class="meta">
+                      <span class="who">{o.product} ×{o.quantity}</span>
+                      <span class="when t-tabular">{money(o.amount, o.currency)}</span>
+                      <span class="when t-tabular">{(o.placedAt ?? "").slice(0, 10)}</span>
+                      {o.fulfilment !== "none" && (
+                        <Badge tone={o.fulfilment === "sent" ? "accent" : "rose"}>
+                          {o.fulfilment === "sent" ? "posted" : "to post"}
+                        </Badge>
+                      )}
+                    </div>
+                    <p class="body">{o.email}</p>
+                    {
+                      o.shipping && (
+                        <p class="body addr">
+                          {[o.shipping.name, o.shipping.address?.line1, o.shipping.address?.line2,
+                            o.shipping.address?.postal_code, o.shipping.address?.city,
+                            o.shipping.address?.country].filter(Boolean).join(", ")}
+                        </p>
+                      )
+                    }
+                    {
+                      o.fulfilment === "to_send" && (
+                        <form method="POST" class="inline">
+                          <CsrfField />
+                          <input type="hidden" name="action" value="fulfilment" />
+                          <input type="hidden" name="id" value={o.id} />
+                          <input type="hidden" name="fulfilment" value="sent" />
+                          <Button type="submit" variant="ghost" size="sm">Mark as posted</Button>
+                        </form>
+                      )
+                    }
+                  </li>
+                ))}
+              </ul>
+            )
+          }
+        </section>
+      </>
+    )
+  }
+</AdminLayout>
+
+<style>
+  .head { display: flex; gap: var(--space-4); align-items: baseline; flex-wrap: wrap; }
+  .editor { display: grid; gap: var(--space-5); max-width: 760px; }
+  .group { display: grid; gap: var(--space-3); }
+  .group-head {
+    margin: 0; font: 600 var(--text-xs) var(--font-mono); letter-spacing: .08em;
+    text-transform: uppercase; color: var(--accent); padding-bottom: 4px;
+    border-bottom: var(--border-w) solid var(--accent-wash);
+  }
+  .field { display: grid; gap: 4px; }
+  .field--check { gap: 6px; }
+  .check { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+  .check input { width: 18px; height: 18px; accent-color: var(--accent); }
+  .hint { margin: 0; font: 400 var(--text-xs) var(--font-body); color: var(--ink-soft); max-width: 62ch; }
+  .list-actions { margin-bottom: var(--space-4); }
+  .rows { display: grid; gap: 6px; margin-bottom: var(--space-5); }
+  .row {
+    display: flex; gap: var(--space-3); align-items: center; flex-wrap: wrap;
+    padding: var(--space-3); border: var(--border-w) solid var(--line);
+    border-radius: var(--radius-sm); background: var(--surface-card);
+  }
+  .row[data-hidden] { opacity: .6; border-style: dashed; }
+  .row-main { display: grid; gap: 2px; min-width: 0; flex: 1; }
+  .row-label { font: 500 var(--text-body) var(--font-body); color: var(--ink); }
+  .row-sub { font: 400 var(--text-xs) var(--font-mono); color: var(--ink-faint); }
+  .row-actions { display: flex; gap: var(--space-3); align-items: center; }
+  .inline { display: inline; }
+  .h2 { font: 600 var(--text-h3) var(--font-display); color: var(--ink); margin: 0; }
+  .edit, .cancel { font: 500 var(--text-sm) var(--font-body); color: var(--accent); text-decoration: none; }
+  .edit:hover, .cancel:hover { text-decoration: underline; }
+  .danger {
+    appearance: none; background: none; border: 0; padding: 0; cursor: pointer;
+    font: 500 var(--text-sm) var(--font-body); color: var(--live);
+  }
+  .danger:hover { text-decoration: underline; }
+  .items { list-style: none; margin: var(--space-3) 0 0; padding: 0; display: grid; gap: var(--space-3); }
+  .meta { display: flex; gap: var(--space-3); align-items: baseline; flex-wrap: wrap; }
+  .who { font: 500 var(--text-sm) var(--font-body); color: var(--ink); }
+  .when { font: 400 var(--text-xs) var(--font-mono); color: var(--ink-faint); }
+  .body { margin: 2px 0 0; font: 400 var(--text-sm) var(--font-body); color: var(--ink-soft); }
+  .addr { font-family: var(--font-mono); font-size: var(--text-xs); }
+  .count { font: 400 var(--text-xs) var(--font-mono); color: var(--ink-faint); }
+</style>
+
+<script>
+  document.querySelectorAll<HTMLFormElement>("form[data-confirm]").forEach((form) => {
+    form.addEventListener("submit", (event) => {
+      if (!window.confirm(form.dataset.confirm ?? "Delete this?")) event.preventDefault();
+    });
+  });
+</script>

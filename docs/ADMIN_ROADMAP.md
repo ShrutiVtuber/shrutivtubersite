@@ -11,8 +11,8 @@ and in-place media upload where a template actually draws the picture.
 Left, in the order agreed:
 
 1. ~~User management~~ — done
-2. **Merchandise** ← next — physical *and* digital
-3. **Discount codes** — Stripe coupons and promotion codes
+2. ~~Merchandise~~ — infrastructure done — physical *and* digital
+3. **Discount codes** ← next — Stripe coupons and promotion codes
 4. **Classes and workshops** — sold and hosted on the site, "like kotobaseed
    has". Explicitly **after the site itself is done**; not now.
 
@@ -165,3 +165,32 @@ So the shop splits along a line that is real rather than convenient:
 Physical sales pass `managed_payments: {enabled: false}`, because they cannot
 work otherwise. That is the piece worth an accountant's attention **before the
 first physical thing sells** — not the digital pricing, which is handled.
+
+
+## Merchandise — where it got to (2026-08-25)
+
+Working infrastructure, verified against the real Stripe account:
+
+- `/admin/shop` — add, edit, delete, put on sale. The picture goes in in place.
+  A product that cannot be bought says why rather than looking fine.
+- Prices are typed in euros and stored in cents. Changing one makes a new
+  Stripe price and retires the old, so anything already sold keeps what it was
+  sold at.
+- `/shop` and `/shop/<slug>` — the shop, rendered from this database. Buying
+  posts to our own API, which makes the session; nothing touching a card runs
+  on this box.
+- Physical: address collected, stock counted down at the webhook, order lands
+  as "to post" with the address and a button to mark it posted.
+- Digital: a file, uploaded separately from media, delivered by a link in the
+  receipt that does not expire.
+- Orders are written from the webhook and keyed on the session, so a retry
+  changes nothing.
+
+### Still to do here when there are real products
+
+- **Product file delete.** Files can be uploaded and attached; there is no way
+  to remove one yet.
+- **More than one photograph per product.** One today.
+- **Refunds** are done in the Stripe dashboard; nothing here reflects them.
+- **`shop_ship_to` is `["GR"]`** — every country she will actually post to has
+  to be added, and adding one is a promise to post there.

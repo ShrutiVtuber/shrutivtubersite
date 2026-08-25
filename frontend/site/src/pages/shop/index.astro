@@ -1,0 +1,89 @@
+---
+/* The shop.
+ *
+ * Rendered from this database rather than from Stripe, so a page load is not a
+ * network call to somebody else's service — Stripe is what takes the money,
+ * not what draws the page.
+ *
+ * Sold out is shown rather than hidden. A thing that exists and cannot be had
+ * today is different from a thing that does not exist, and quietly removing it
+ * makes the shop look emptier than it is.
+ */
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import SectionHeader from "../../components/brand/SectionHeader.astro";
+import EmptyState from "../../components/feedback/EmptyState.astro";
+import { site, PATHS, type ShopProduct } from "../../lib/api";
+
+export const prerender = false;
+
+const products = (await site<ShopProduct[]>(PATHS.products)) ?? [];
+const money = (p: ShopProduct) =>
+  `${(p.priceCents / 100).toFixed(2)} ${p.currency.toUpperCase()}`;
+---
+
+<BaseLayout title="Shop — Shruti" description="Things to buy: printed matter, files, and the odd object.">
+  <div class="container">
+    <SectionHeader
+      glyph="✶"
+      eyebrow="Shop"
+      title="Things you can have"
+      body="Printed matter, files, and the odd object. Prices include tax."
+    />
+
+    {
+      products.length === 0 ? (
+        <EmptyState
+          glyph="○"
+          title="Nothing for sale yet"
+          body="There will be. The instruments are free and always will be; this is for the things that cost something to make."
+        />
+      ) : (
+        <div class="shop-grid">
+          {products.map((p) => (
+            <a class="shop-card" href={`/shop/${p.slug}`} data-sold={p.soldOut || undefined}>
+              <div class="shot" data-empty={!p.media}>
+                {p.media
+                  ? <img src={p.media.url} alt={p.media.alt || p.name} loading="lazy" />
+                  : <span class="plate">no photograph yet</span>}
+              </div>
+              <div class="body">
+                <span class="name">{p.name}</span>
+                {p.tagline && <span class="dek">{p.tagline}</span>}
+                <span class="price">
+                  {money(p)}
+                  {p.soldOut && <span class="sold">sold out</span>}
+                </span>
+              </div>
+            </a>
+          ))}
+        </div>
+      )
+    }
+  </div>
+</BaseLayout>
+
+<style>
+  .shop-grid {
+    display: grid; gap: var(--space-5); margin-top: var(--space-6);
+    grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr));
+  }
+  .shop-card {
+    display: grid; gap: var(--space-3); text-decoration: none; color: inherit;
+    border: var(--border-w) solid var(--line); border-radius: var(--radius-md);
+    overflow: hidden; background: var(--surface-card);
+    transition: border-color var(--dur-1) var(--ease-out);
+  }
+  .shop-card:hover { border-color: var(--accent); }
+  .shop-card[data-sold] { opacity: .75; }
+  .shot { aspect-ratio: 4 / 3; display: grid; place-items: center; background: var(--surface-veil); }
+  .shot img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .plate { font: 400 var(--text-xs) var(--font-mono); color: var(--ink-faint); }
+  .body { display: grid; gap: 4px; padding: 0 var(--space-4) var(--space-4); }
+  .name { font: 500 var(--text-h4) var(--font-display); color: var(--ink); }
+  .dek { font: 400 var(--text-sm) var(--font-body); color: var(--ink-soft); }
+  .price {
+    display: flex; gap: var(--space-3); align-items: baseline;
+    font: 500 var(--text-sm) var(--font-mono); color: var(--accent);
+  }
+  .sold { font: 400 var(--text-xs) var(--font-mono); color: var(--ink-faint); }
+</style>

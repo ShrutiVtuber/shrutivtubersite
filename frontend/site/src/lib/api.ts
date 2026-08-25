@@ -83,6 +83,8 @@ export const PATHS = {
   projects: "/api/content/projects",
   profile: "/api/content/profile",
   page: (name: string) => `/api/content/page/${name}`,
+  products: "/api/shop/products",
+  product: (slug: string) => `/api/shop/products/${slug}`,
 } as const;
 
 export interface LinkGroups {
@@ -116,4 +118,17 @@ export interface LiveStatus {
     watchUrl: string;
     error: string | null;
   }[];
+}
+
+export interface ShopProduct {
+  slug: string;
+  name: string;
+  kind: "physical" | "digital";
+  tagline: string;
+  bodyMd: string;
+  priceCents: number;
+  currency: string;
+  /** A real state, and not the same as absent. */
+  soldOut: boolean;
+  media: { url: string; alt: string } | null;
 }

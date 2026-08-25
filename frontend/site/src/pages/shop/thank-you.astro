@@ -1,0 +1,37 @@
+---
+/* After Stripe.
+ *
+ * Says thank you and nothing more. The order is written by the webhook, not by
+ * this page — a buyer who closes the tab has still bought the thing, and one
+ * who reloads has not bought it twice. So this makes no claim about what has
+ * been recorded; it points at the email, which is where the actual thing is.
+ */
+import BaseLayout from "../../layouts/BaseLayout.astro";
+
+export const prerender = false;
+---
+
+<BaseLayout title="Thank you — Shruti" description="Your order.">
+  <div class="container thanks">
+    <span class="glyph" aria-hidden="true">✶&#xFE0E;</span>
+    <h1>Thank you</h1>
+    <p>
+      That went through. A receipt is on its way to the address you gave — and
+      if you bought something to download, the link is in it.
+    </p>
+    <p class="quiet">
+      Nothing else is needed from you. If the email has not arrived in a few
+      minutes, check the spam folder, and then write to me and I will sort it out.
+    </p>
+    <p><a class="back" href="/shop">Back to the shop</a></p>
+  </div>
+</BaseLayout>
+
+<style>
+  .thanks { max-width: 56ch; margin-top: var(--space-7); display: grid; gap: var(--space-3); }
+  .glyph { font-size: var(--text-h2); color: var(--accent); }
+  h1 { margin: 0; font: 600 var(--text-h2) var(--font-display); color: var(--ink); }
+  p { margin: 0; font: 400 var(--text-body) var(--font-body); color: var(--ink); }
+  .quiet { color: var(--ink-soft); font-size: var(--text-sm); }
+  .back { color: var(--accent); }
+</style>
