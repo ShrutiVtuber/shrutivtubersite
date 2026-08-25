@@ -116,6 +116,9 @@ const readable = (iso: string | null) =>
                 drawing, not these words.
               </p>
               <p class="more">
+                <a href={`/chart/print/${token}`}>Print it, or save it as a PDF</a>
+              </p>
+              <p class="more">
                 <a href={`/tools/natal-chart?date=${c.birthDate}&time=${c.birthTime ?? ""}&lat=${c.lat}&lon=${c.lon}&place=${encodeURIComponent(c.placeName ?? "")}&tradition=${c.tradition}&house_system=${c.houseSystem}&vedic_style=${c.figure === "south" ? "south" : "north"}${c.timeUnknown ? "&unknownTime=1" : ""}`}>
                   Open the full reading
                 </a>

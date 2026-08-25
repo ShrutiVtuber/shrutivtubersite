@@ -1,0 +1,281 @@
+---
+/* A chart on paper.
+ *
+ * Rendered for A4 and printed by the browser, which is what makes it a real
+ * PDF rather than an approximation of one: the figure stays vector, the type
+ * is the site's own, and every astrological glyph renders — none of which
+ * survives a server-side PDF built on a font that has no ♈ in it.
+ *
+ * **The watermark never crosses the chart or the table.** She asked for that
+ * specifically and it is the whole constraint here: the marks live in the
+ * outer margins and the footer band, which are areas that carry nothing to
+ * read. A diagonal stamp across the middle is the obvious way to watermark a
+ * page and it would ruin the one thing the page is for.
+ *
+ * Takes either token. An owner token prints the moment in full; a share token
+ * prints the figure and leaves the moment off, exactly as the shared page
+ * does — printing must not become the way round the thing sharing protects.
+ */
+import ChartFigure from "../../../components/chart/ChartFigure.astro";
+import EmptyState from "../../../components/feedback/EmptyState.astro";
+import { asReader } from "../../../lib/account";
+import { site, SITE_URL, askAstro } from "../../../lib/api";
+import "../../../styles/global.css";
+import "../../../styles/site.css";
+
+export const prerender = false;
+
+const token = Astro.params.token ?? "";
+
+/* Owner first, then share. A share token is not an owner token and must not
+   be treated as one — the fallback narrows what is shown, it does not widen
+   what is reachable. */
+const ownerCall = await asReader(Astro, `/api/charts/o/${token}`);
+let c: any = ownerCall.ok ? ownerCall.body : null;
+let asOwner = !!c;
+if (!c) {
+  c = await site<any>(`/api/charts/s/${token}`).catch(() => null);
+}
+
+const TRADITION = { hellenistic: "Hellenistic", vedic: "Vedic" };
+const FIGURE = { wheel: "wheel", north: "North Indian square", south: "South Indian square" };
+
+/* The placements, so the sheet carries the reading and not only the picture.
+   The tables are the reading — that is the design's order everywhere else and
+   paper is no reason to invert it. */
+const moment = c
+  ? `${c.birthDate}T${c.timeUnknown ? "12:00" : c.birthTime || "12:00"}:00`
+  : "";
+const cast = c
+  ? await askAstro<any>(
+      `/chart?when=${encodeURIComponent(moment)}&lat=${c.lat}&lon=${c.lon}` +
+      `&tradition=${c.tradition}&house_system=${c.houseSystem}` +
+      `&vedic_style=${c.figure === "south" ? "south" : "north"}&diagram=false`,
+    )
+  : null;
+const bodies: any[] = cast?.data?.bodies ?? [];
+const SIGNS = ["Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo",
+               "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces"];
+const signOf = (b: any) => b.dignities?.sign ?? SIGNS[Math.floor((b.longitude % 360) / 30)];
+const degOf = (b: any) => (b.longitude % 30).toFixed(2);
+
+const printed = new Date().toLocaleDateString("en-GB", {
+  day: "numeric", month: "long", year: "numeric",
+});
+const host = SITE_URL.replace(/^https?:\/\//, "");
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{c?.label || "Chart"} — Shruti</title>
+    <meta name="robots" content="noindex, nofollow" />
+  </head>
+  <body class="sheet-body">
+    {
+      !c ? (
+        <div class="page">
+          <EmptyState
+            glyph="○"
+            title="There is nothing at this address"
+            body="The link may be mistyped, or the chart may have been deleted or its share taken back."
+          />
+        </div>
+      ) : (
+        <>
+          <div class="bar no-print">
+            <p>
+              This page is laid out for A4. Print it, and choose
+              <strong> Save as PDF</strong> as the destination.
+            </p>
+            <button type="button" id="go" data-track="chart:printed">Print or save as PDF</button>
+            <a href={asOwner ? `/chart/${token}` : `/chart/s/${token}`}>Back to the chart</a>
+          </div>
+
+          <article class="sheet">
+            {/* Margin marks. Outside the type area, so they cross nothing. */}
+            <span class="edge left" aria-hidden="true">{host}</span>
+            <span class="edge right" aria-hidden="true">{host}</span>
+
+            <header class="sheet-head">
+              <span class="seal" aria-hidden="true">S∴E.A.</span>
+              <div>
+                <h1>{c.label || "A chart"}</h1>
+                <p class="sub">
+                  {TRADITION[c.tradition] ?? c.tradition} · {FIGURE[c.figure] ?? c.figure}
+                </p>
+              </div>
+            </header>
+
+            <div class="sheet-figure">
+              <ChartFigure
+                date={c.birthDate}
+                time={c.birthTime}
+                timeUnknown={c.timeUnknown}
+                lat={c.lat}
+                lon={c.lon}
+                tradition={c.tradition}
+                houseSystem={c.houseSystem}
+                figure={c.figure}
+              />
+            </div>
+
+            {
+              asOwner && (
+                <section class="moment">
+                  <h2>The moment</h2>
+                  <p>
+                    <span class="t-tabular">{c.birthDate}</span>
+                    {c.timeUnknown
+                      ? <span> · birth time unknown</span>
+                      : <span class="t-tabular"> · {c.birthTime}</span>}
+                    {c.placeName && <span> · {c.placeName}</span>}
+                  </p>
+                </section>
+              )
+            }
+
+            {
+              c.timeUnknown && (
+                <p class="undef">
+                  ◐ The birth time was not known. The ascendant, the houses and
+                  everything resting on them are undefined rather than
+                  approximate, and are not printed. The planets are given for
+                  noon.
+                </p>
+              )
+            }
+
+            {
+              bodies.length > 0 && (
+                <section class="places">
+                  <h2>Positions</h2>
+                  <table>
+                    <thead>
+                      <tr><th>Body</th><th>Sign</th><th>Degree</th></tr>
+                    </thead>
+                    <tbody>
+                      {bodies.map((b: any) => (
+                        <tr>
+                          <td>{b.name}{b.retrograde ? " ℞" : ""}</td>
+                          <td>{signOf(b)}</td>
+                          <td class="t-tabular">{degOf(b)}°</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </section>
+              )
+            }
+
+            {/* The footer band. Below everything, over nothing. */}
+            <footer class="sheet-foot">
+              <span>{host}</span>
+              <span>Printed {printed}</span>
+              <span>Not advice. Nothing here is medical, legal or financial.</span>
+            </footer>
+          </article>
+        </>
+      )
+    }
+
+    <script>
+      document.getElementById("go")?.addEventListener("click", () => window.print());
+    </script>
+
+    <style>
+      .sheet-body { background: var(--surface-page); color: var(--ink); margin: 0; }
+
+      .bar {
+        display: flex; gap: var(--space-4); align-items: center; flex-wrap: wrap;
+        padding: var(--space-4); max-width: 820px; margin: 0 auto;
+        font: 400 var(--text-sm) var(--font-body); color: var(--ink-soft);
+      }
+      .bar p { margin: 0; max-width: 46ch; }
+      .bar button {
+        font: 500 var(--text-sm) var(--font-body); color: var(--surface-page);
+        background: var(--accent); border: 0; border-radius: var(--radius-sm);
+        padding: 10px 16px; min-height: 40px; cursor: pointer;
+      }
+      .bar a { color: var(--accent); }
+
+      .sheet {
+        position: relative;
+        max-width: 820px; margin: 0 auto var(--space-8);
+        padding: var(--space-7) var(--space-8);
+        background: var(--surface-card);
+        border: var(--border-w) solid var(--line);
+        border-radius: var(--radius-md);
+      }
+      .sheet-head { display: flex; gap: var(--space-4); align-items: baseline; margin-bottom: var(--space-5); }
+      .sheet-head h1 { font: 600 var(--text-h2) var(--font-display); color: var(--ink); margin: 0; }
+      .sub { font: 400 var(--text-sm) var(--font-body); color: var(--ink-soft); margin: 4px 0 0; }
+      .seal { font: 600 var(--text-sm) var(--font-display); color: var(--ink-faint); }
+
+      .sheet-figure { display: flex; justify-content: center; margin: var(--space-5) 0; }
+      .moment h2, .places h2 {
+        font: 600 var(--text-micro) var(--font-body); letter-spacing: var(--tracking-eyebrow);
+        text-transform: uppercase; color: var(--ink-faint); margin: 0 0 8px;
+      }
+      .moment p { font: 400 var(--text-body) var(--font-body); color: var(--ink); margin: 0 0 var(--space-4); }
+      .undef {
+        font: 400 var(--text-sm) / 1.6 var(--font-body); color: var(--ink);
+        border-left: 2px solid var(--rose); padding-left: var(--space-3);
+        margin: 0 0 var(--space-4); max-width: 62ch;
+      }
+      table { border-collapse: collapse; width: 100%; }
+      th, td {
+        font: 400 var(--text-sm) var(--font-body); color: var(--ink);
+        text-align: left; padding: 5px 10px 5px 0;
+        border-bottom: var(--border-w) solid var(--line);
+      }
+      th {
+        font-weight: 600; font-size: var(--text-micro); letter-spacing: var(--tracking-eyebrow);
+        text-transform: uppercase; color: var(--ink-faint);
+      }
+
+      /* The marks. In the margins on screen and on paper, and never anywhere
+         a reader needs to look. */
+      .edge {
+        position: absolute; top: 50%; font: 400 9px var(--font-body);
+        letter-spacing: 0.24em; text-transform: uppercase; color: var(--ink-faint);
+        opacity: 0.5; white-space: nowrap;
+      }
+      .edge.left { left: 10px; transform: translateY(-50%) rotate(180deg); writing-mode: vertical-rl; }
+      .edge.right { right: 10px; transform: translateY(-50%); writing-mode: vertical-rl; }
+
+      .sheet-foot {
+        display: flex; gap: var(--space-4); justify-content: space-between; flex-wrap: wrap;
+        margin-top: var(--space-6); padding-top: var(--space-3);
+        border-top: var(--border-w) solid var(--line);
+        font: 400 var(--text-xs) var(--font-body); color: var(--ink-faint);
+      }
+
+      @media print {
+        @page { size: A4; margin: 14mm; }
+        .no-print { display: none !important; }
+        /* Paper is white whatever the screen was. Forcing the palette here
+           rather than trusting the theme keeps a dark-mode reader from
+           printing a black rectangle. */
+        .sheet-body { background: #fff; color: #111; }
+        /* Horizontal padding is what keeps the margin marks OUT of the type
+           area. With padding:0 the content runs to the page margin and the
+           marks — which are positioned against this box — end up beside the
+           text rather than outside it. Measured, not assumed: a test walks
+           the bounding boxes and fails if a mark touches any of them. */
+        .sheet {
+          max-width: none; margin: 0; padding: 0 11mm; border: 0; background: #fff;
+          break-inside: avoid;
+        }
+        .edge.left { left: 0; }
+        .edge.right { right: 0; }
+        .sheet-head h1 { color: #111; }
+        table, th, td { color: #111; border-color: #ccc; }
+        .edge { color: #999; opacity: 0.65; }
+        .places { break-inside: avoid; }
+      }
+    </style>
+  </body>
+</html>

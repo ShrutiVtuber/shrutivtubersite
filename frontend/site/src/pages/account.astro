@@ -88,6 +88,12 @@ if (!me) return Astro.redirect("/signin");
 
 const state = Object.fromEntries(me.consents.map((c) => [c.kind, c]));
 
+/* Kept charts. Listed here rather than on a page of their own: this is where
+   somebody looks for the things the site is holding for them, and a chart is
+   one of those. */
+const chartCall = await asReader(Astro, "/api/charts/mine");
+const charts: any[] = Array.isArray(chartCall.body) ? chartCall.body : [];
+
 /* Fetched here rather than in the browser so the list is already on the page:
    the passkey CONTROLS need JavaScript, but reading what you have registered
    should not. */
@@ -164,6 +170,35 @@ const TRADITIONS = [
           <p class="quiet">
             Storing birth data needs its own consent, below. Nothing is kept until it is given.
           </p>
+        )
+      }
+    </section>
+
+    <section class="card">
+      <h2>Your charts</h2>
+      {
+        charts.length === 0 ? (
+          <div class="stack">
+            <p class="quiet">
+              None kept yet. A chart you keep gets its own address, and a separate link you can
+              hand to somebody and take back later without losing your own.
+            </p>
+            <div><Button variant="secondary" href="/tools/natal-chart">Cast one</Button></div>
+          </div>
+        ) : (
+          <ul class="charts">
+            {charts.map((c) => (
+              <li>
+                <a href={`/chart/${c.ownerToken}`}>{c.label || "Untitled"}</a>
+                <span class="t-tabular faint">{c.birthDate}</span>
+                <span class="faint">
+                  {c.tradition === "vedic" ? "Vedic" : "Hellenistic"}
+                  {c.figure === "south" ? " · South Indian" : c.figure === "north" ? " · North Indian" : ""}
+                </span>
+                {c.shared && <span class="shared-mark">shared</span>}
+              </li>
+            ))}
+          </ul>
         )
       }
     </section>
@@ -321,6 +356,15 @@ const TRADITIONS = [
 </BaseLayout>
 
 <style>
+  .charts { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+  .charts li { display: flex; gap: var(--space-3); align-items: baseline; flex-wrap: wrap; }
+  .charts a { font: 500 var(--text-body) var(--font-body); color: var(--accent); text-decoration: none; }
+  .charts a:hover { text-decoration: underline; }
+  .shared-mark {
+    font: 600 var(--text-micro) var(--font-body); letter-spacing: var(--tracking-eyebrow);
+    text-transform: uppercase; color: var(--rose);
+  }
+
   .account { max-width: 780px; display: grid; gap: var(--space-5); }
   .card {
     background: var(--surface-card); border: var(--border-w) solid var(--line);

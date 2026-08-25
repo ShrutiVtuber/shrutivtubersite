@@ -16,6 +16,7 @@ import SectionHeader from "../components/brand/SectionHeader.astro";
 import NextStation from "../components/tables/NextStation.astro";
 import Button from "../components/forms/Button.astro";
 import Badge from "../components/navigation/Badge.astro";
+import ChartFigure from "../components/chart/ChartFigure.astro";
 import { astro } from "../lib/api";
 import { GLYPHS } from "../lib/stations";
 
@@ -164,14 +165,19 @@ const moonProgress = today ? (today.moon.tropical.degree % 30) / 30 : 0;
 
           <section class="block span2">
             <h2>The sky over {place || "your coordinates"}</h2>
-            {/* Art-absent plate in the design; the real SVG figure is the
-                natal-chart instrument's job and links from there. */}
-            <div class="sky-plate">
-              <span class="sky-caption t-tabular">
-                asc {today.sky.ascendant.toFixed(2)}° · mc {today.sky.midheaven.toFixed(2)}°
-              </span>
-              <span class="sky-horizon" aria-hidden="true" />
-            </div>
+            {/* The real figure, not a plate.
+                Drawn for the same instant the numbers below are read at —
+                `today.at` goes to the ephemeris verbatim — so the wheel and
+                the list cannot drift into disagreeing. The list stays: the
+                tables are the reading and the wheel is a way of seeing what
+                they already say. */}
+            <ChartFigure
+              date={(today.at ?? "").slice(0, 10)}
+              time={(today.at ?? "").slice(11, 16)}
+              lat={lat}
+              lon={lon}
+              caption={`asc ${today.sky.ascendant.toFixed(2)}° · mc ${today.sky.midheaven.toFixed(2)}°`}
+            />
             <ul class="bodies">
               {today.sky.bodies.map((b: any) => (
                 <li>
