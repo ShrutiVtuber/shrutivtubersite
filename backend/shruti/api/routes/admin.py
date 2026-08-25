@@ -30,7 +30,7 @@ from shruti.core.auth import authenticate, issue_token
 from shruti.core.config import get_settings
 from shruti.core.db import get_session
 from shruti.models.accounts import User
-from shruti.models import (BannedEmail, FanArt, 
+from shruti.models import (BannedEmail, FanArt, Product, 
     ContactMessage, Credit, Media, ProfileField, Project, Question,
     ScheduleEntry, Section, SocialLink, Tool,
 )
@@ -470,6 +470,7 @@ MEDIA_USERS: tuple[tuple[type, str], ...] = (
     (Project, "project"),
     (Tool, "tool"),
     (FanArt, "fan work"),
+    (Product, "product"),
 )
 
 
