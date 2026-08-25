@@ -74,8 +74,12 @@ extract structured data per page type, then render Astro components.
 - [x] Sitemap
 - [x] 404 inside the section
 - [x] Type marks carry `&#xFE0E;` or zodiac glyphs go colour-emoji
-- [ ] No horizontal scroll at 320 (their audit method)
-- [ ] Deployed and checked live
+- [~] No horizontal scroll at 320 — checked statically, not in a browser:
+      the only rule that can exceed 320 is `.j-table{min-width:520px}`, and
+      every table is wrapped in `.j-scroll` (`overflow-x:auto`) by the
+      parser — verified in the rendered HTML. No headless browser is
+      installed here, so the designer's `_audit.html` has not been run.
+- [x] Deployed — see the note on verifying it below
 
 ## Gotchas already paid for
 
@@ -117,3 +121,22 @@ Not done: **pagination** (nothing has a second page yet) and the
   font-localisation commit shipped it and prod had been falling back to system
   fonts ever since. Fixed and verified: the faces parse and the woff2 serves as
   `font/woff2`.
+
+
+## Verifying it on production
+
+The holding page stands in front of every journal URL, so from outside they all
+answer 200 with the coming-soon page — including a path that should 404. That
+is the holding page working, not the journal failing.
+
+Getting through the gate needs her admin session; the middleware bypass is a
+valid operator cookie and nothing else. So the render check on production is
+hers to do: sign in, then walk
+
+    /journal/  /journal/all/  /journal/sitemap/  /journal/blog/  /journal/docs/
+    /journal/blog/nothing-was-ever-retrograde/  /journal/docs/casting-a-chart/
+    /journal/nope/   ← should be the section's 404
+
+What was verified from here: the containers are healthy, production carries the
+same nine synced pages the local run was checked against, and the font fix is
+live and public (0 malformed faces, woff2 served as `font/woff2`).
