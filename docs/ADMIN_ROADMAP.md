@@ -94,3 +94,50 @@ normalised form.
 
 There is no password to read and none to set on their behalf. That is the
 design, not a gap: the only door is a link to their own address.
+
+
+## Merchandise — the plan
+
+### On "doesn't Stripe handle the tax?"
+
+It handles the part a program can. Stripe Tax works out the right VAT for each
+customer from their location and the product's tax code, and applies the EU
+one-stop-shop rules for digital goods. What it cannot do is **register** her
+where she owes, or **file** the returns — those stay hers, and physical goods
+can create obligations digital ones do not.
+
+So it is not a blocker. Her call, recorded: build the infrastructure now and
+adjust the tax setup when there are real products to sell.
+
+What that means for the build: the tax code is **per product**, not a constant,
+and `tax_behavior` is a setting rather than baked in. Digital pricing is
+inclusive today; physical may want exclusive, and that must be changeable
+without a migration.
+
+### Shape
+
+Two kinds, one table. `physical` collects a shipping address at checkout and
+has stock; `digital` delivers a file and does not. Everything else — name,
+price, picture, description — is common, and splitting them into two tables
+would mean writing every screen twice.
+
+Mirrored to Stripe rather than owned by it: a row here, a Product and a Price
+there, kept in step on save. The site needs to render a shop from its own
+database without a network call per page, and Stripe needs to be the thing that
+takes the money.
+
+### Order of work
+
+1. `Product` model, migration, Stripe sync on save
+2. Admin: list, create, edit, activate — with the picture in place
+3. Public shop and product pages
+4. Checkout: shipping collected for physical, not for digital
+5. `Order` from the webhook, and the digital download
+6. Discount codes — Stripe coupons and promotion codes, after the above
+
+### Known gap to solve on the way
+
+Media uploads are **images only** (`ALLOWED_IMAGE`). A digital product is a PDF
+or a zip or audio, so product files need their own allow-list and must not be
+servable from the public media path — a paid file behind a guessable URL is not
+a paid file.
