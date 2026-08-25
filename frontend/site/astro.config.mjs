@@ -29,7 +29,11 @@ export default defineConfig({
       // external by default and then cannot be resolved at runtime, so it has
       // to be bundled in explicitly. It renders the section bodies the admin
       // writes, which are markdown in the database.
-      noExternal: ["@astrojs/markdown-remark"],
+      // node-html-parser joins it for the same reason: the journal route reads
+      // BeeRanked's synced pages with it, and left external it resolves at
+      // build time and is missing at run time — a 500 on every journal
+      // request.
+      noExternal: ["@astrojs/markdown-remark", "node-html-parser"],
     },
     // The API is same-origin in production (Caddy routes /api/*), so there is
     // no CORS surface. In dev, proxy to the running stack so the site behaves

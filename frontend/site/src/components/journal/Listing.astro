@@ -1,0 +1,98 @@
+---
+/* The hub, the indexes, the category archives and all-content.
+ *
+ * One component because they are one design: a masthead, an optional feature,
+ * and a grid — differing only in what fills them. Splitting them into four
+ * would be four places for the rhythm to drift apart.
+ */
+import Card from "./Card.astro";
+import Glyph from "./Glyph.astro";
+import Masthead from "./Masthead.astro";
+import { GLYPH, KIND_LABEL, type Entry } from "../../lib/journal/types";
+import { byMonth, shortDate } from "../../lib/journal/format";
+
+interface Props {
+  eyebrow: string;
+  title: string;
+  lede?: string;
+  count?: string;
+  entries: Entry[];
+  /** The hub leads with the newest entry, full width. */
+  feature?: boolean;
+  /** all-content groups chronologically by month. */
+  grouped?: boolean;
+  emptyTitle?: string;
+  emptyBody?: string;
+}
+const {
+  eyebrow, title, lede, count, entries,
+  feature = false, grouped = false,
+  emptyTitle = "Nothing published yet",
+  emptyBody = "The writing goes up here as it is finished. Until then the instruments are the thing to look at.",
+} = Astro.props;
+
+const [first, ...rest] = entries;
+/* One entry is a feature, never a grid of one — the guide is explicit, and a
+   single card in a three-column grid reads like something failed to load. */
+const showGrid = feature ? rest.length > 0 : entries.length > 0;
+const gridItems = feature ? rest : entries;
+---
+<main class="j-page">
+  <Masthead eyebrow={eyebrow} title={title} lede={lede} count={count} />
+
+  {
+    entries.length === 0 && (
+      <div class="j-empty j-empty--sky">
+        <Glyph mark="☾" />
+        <p class="j-empty-title">{emptyTitle}</p>
+        <p class="j-empty-body">{emptyBody}</p>
+        <a class="j-more" href="https://shrutivtuber.com/today">Day at a glance →</a>
+      </div>
+    )
+  }
+
+  {
+    feature && first && (
+      <a class="j-feature" href={first.href}>
+        <div class="j-feature-media j-plate j-plate--media">
+          {first.cover
+            ? <img src={first.cover} alt="" />
+            : <Glyph mark={GLYPH[first.kind]} />}
+        </div>
+        <div class="j-feature-body">
+          <span class="j-eyebrow j-eyebrow--rose">
+            <Glyph mark={GLYPH[first.kind]} /> Latest · {KIND_LABEL[first.kind]}
+          </span>
+          <span class="j-feature-title">{first.title}</span>
+          {first.dek && <p class="j-feature-dek">{first.dek}</p>}
+          <span class="j-card-date">{shortDate(first.date)}</span>
+        </div>
+      </a>
+    )
+  }
+
+  {
+    grouped
+      ? byMonth(entries).map(([month, items]) => (
+          <>
+            <div class="j-month-head">
+              <h2>{month}</h2>
+              <span class="j-rule"></span>
+              <span class="j-row-date">{items.length}</span>
+            </div>
+            <div class="j-grid">{items.map((e) => <Card entry={e} />)}</div>
+          </>
+        ))
+      : showGrid && (
+          <>
+            {feature && (
+              <div class="j-section-head">
+                <h2>Recently</h2>
+                <a class="j-more" href="/journal/all/">All content →</a>
+              </div>
+            )}
+            <div class="j-grid">{gridItems.map((e) => <Card entry={e} />)}</div>
+          </>
+        )
+  }
+</main>

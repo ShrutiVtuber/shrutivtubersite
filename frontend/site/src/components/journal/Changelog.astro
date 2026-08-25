@@ -1,0 +1,50 @@
+---
+/* The changelog index: one row per release.
+ *
+ * Nothing here is written by hand. Releases come from the repositories at tag
+ * time, which is the whole point of the arrangement — the version, the date
+ * and the summary are whatever shipped, not a retelling.
+ */
+import Glyph from "./Glyph.astro";
+import Masthead from "./Masthead.astro";
+import { GLYPH, type Release } from "../../lib/journal/types";
+import { shortDate } from "../../lib/journal/format";
+
+interface Props { title: string; lede?: string; releases: Release[] }
+const { title, lede, releases } = Astro.props;
+---
+<main class="j-page">
+  <Masthead eyebrow="Changelog" title={title} lede={lede} />
+
+  {
+    releases.length === 0 ? (
+      <div class="j-empty j-empty--sky">
+        <Glyph mark={GLYPH.changelog} />
+        <h2>No releases yet</h2>
+        <p>
+          Releases are pulled from the repositories when they are tagged. Nothing
+          has been tagged since the section went up.
+        </p>
+      </div>
+    ) : (
+      <div class="j-log">
+        {releases.map((r) => (
+          <a class="j-log-row" href={r.href}>
+            <span class="j-log-v">{r.version}</span>
+            <span class="j-log-body">
+              {r.summary && <span class="j-log-sum">{r.summary}</span>}
+              {Object.keys(r.counts).length > 0 && (
+                <span class="j-log-counts">
+                  {Object.entries(r.counts).map(([k, n]) => (
+                    <span class={k === "security" ? "is-security" : undefined}>{k} {n}</span>
+                  ))}
+                </span>
+              )}
+            </span>
+            {r.date && <span class="j-log-date">{shortDate(r.date)}</span>}
+          </a>
+        ))}
+      </div>
+    )
+  }
+</main>

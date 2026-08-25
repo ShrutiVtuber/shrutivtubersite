@@ -23,3 +23,7 @@ docs/RESEARCH_BRIEF.md
 
 # Design packages arrive as zips; the extracted tree in design/ is what we track.
 *.zip
+
+# pnpm content-addressable store — written when a container runs pnpm against
+# the mounted repo. Build detritus, not source.
+.pnpm-store/

@@ -1,0 +1,25 @@
+---
+/* A miss inside the journal.
+ *
+ * Not the site's 404: a reader who has got this far was looking for something
+ * in the section, and the two places that can still answer them are the full
+ * list and the sitemap. The status is set by the route, not here — this is
+ * only what it looks like.
+ */
+---
+<main class="j-404">
+  <div class="j-veil">
+    <span class="j-empty-glyph j-glyph" style="color:var(--rose-hover)" aria-hidden="true">○</span>
+    <p class="j-eyebrow">404 · inside the journal</p>
+    <h1>Nothing is filed here</h1>
+    <p>
+      The address is well formed and the entry is not. It may have been renamed,
+      or it may never have existed — I would rather say so than show you a search
+      page dressed as an answer.
+    </p>
+    <div class="j-actions">
+      <a class="j-btn" href="/journal/all/">All content</a>
+      <a class="j-btn j-btn--quiet" href="/journal/sitemap/">Sitemap</a>
+    </div>
+  </div>
+</main>

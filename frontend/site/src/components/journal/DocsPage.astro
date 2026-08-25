@@ -1,0 +1,79 @@
+---
+/* A documentation page: sidebar, body, and a table-of-contents rail.
+ *
+ * Three rails need the tighter measure — the guide's one intentional
+ * difference from the rest of the section, because two rails will not fit at
+ * 56/68. Under three headings the TOC rail carries small print instead and the
+ * body column does not move.
+ */
+import { type JournalPage } from "../../lib/journal/types";
+import { shortDate } from "../../lib/journal/format";
+
+interface Props { page: JournalPage }
+const { page } = Astro.props;
+const hasToc = page.toc.length >= 3;
+---
+<main class="j-page j-page--docs">
+  <div class="j-shell j-shell--docs">
+    <nav class="j-nav-rail" aria-label="Documentation">
+      {
+        page.nav.map((group) => (
+          <div class="j-nav-group">
+            <p class="j-eyebrow">{group.label}</p>
+            {group.links.map((l) => (
+              <a class="j-nav-link" href={l.href} aria-current={l.current ? "page" : undefined}>
+                {l.label}
+              </a>
+            ))}
+          </div>
+        ))
+      }
+    </nav>
+
+    <article class="j-col j-col--narrow">
+      {
+        page.crumbs.length > 0 && (
+          <nav class="j-bc" aria-label="Breadcrumb">
+            {page.crumbs.map((c) => (
+              <>
+                <a href={c.href}>{c.label}</a>
+                <span class="j-bc-sep" aria-hidden="true">›</span>
+              </>
+            ))}
+            <span aria-current="page">{page.title}</span>
+          </nav>
+        )
+      }
+      <h1 class="j-h1 j-h1--entry">{page.title}</h1>
+      {page.deck && <p class="j-deck">{page.deck}</p>}
+      <div class="j-prose" set:html={page.body} />
+    </article>
+
+    <aside class={`j-rail--toc${hasToc ? "" : " j-rail--static"}`}
+           aria-label={hasToc ? "On this page" : "About this page"}>
+      <div class="j-rail-group">
+        {
+          hasToc ? (
+            <>
+              <p class="j-eyebrow">On this page</p>
+              {page.toc.map((t) => (
+                <a class={`j-toc-link${t.level > 2 ? " j-toc-link--sub" : ""}`} href={`#${t.id}`}>
+                  {t.text}
+                </a>
+              ))}
+            </>
+          ) : (
+            <>
+              <p class="j-eyebrow">Last reviewed</p>
+              <p class="j-rail-note j-mono">{shortDate(page.date)}</p>
+              <p class="j-eyebrow">Source</p>
+              <p class="j-rail-note">
+                <a href="https://github.com/ShrutiVtuber/shruti-astro">shruti-astro</a>
+              </p>
+            </>
+          )
+        }
+      </div>
+    </aside>
+  </div>
+</main>

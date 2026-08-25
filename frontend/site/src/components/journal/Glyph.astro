@@ -1,0 +1,13 @@
+---
+/* A type mark.
+ *
+ * The variation selector is not decoration. Without U+FE0E a browser is free
+ * to render ☾ ♄ ♈ from a colour emoji font, which ignores `color` entirely —
+ * the mark comes out as a picture in someone else's palette instead of type in
+ * the site's rose. The designer's guide calls this out and it is easy to lose
+ * in a refactor, so it lives in one component.
+ */
+interface Props { mark: string; label?: string }
+const { mark, label } = Astro.props;
+---
+<span class="j-glyph" aria-hidden={label ? undefined : "true"} aria-label={label}>{mark}&#xFE0E;</span>

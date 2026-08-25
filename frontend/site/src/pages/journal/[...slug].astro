@@ -1,20 +1,26 @@
 ---
-/* The journal — BeeRanked's content inside the site's own layout.
+/* The journal.
  *
- * The header and footer here are the REAL components, not a copy: the same
- * SiteHeader and SiteFooter every other page renders, with the live badge,
- * the mobile drawer and the session state they always have. Editing the
- * site's nav updates this section automatically, because there is nothing
- * here to keep in step.
+ * BeeRanked's agent syncs published pages to disk; this route reads them for
+ * their DATA and renders the designer's skeleton inside the site's own layout.
+ * So the section gets the REAL SiteHeader and SiteFooter — live badge, mobile
+ * drawer, session state — and the content is the design, not BeeRanked's
+ * default wearing a stylesheet.
  *
- * Rebetichord achieves this by booting its React bundle inside an injector
- * sidecar, because a SPA has to run to render its own chrome. Astro renders on
- * the server already, so the same result needs no sidecar, no bundle and no
- * second process — only a route that reads what the agent synced.
+ * Their markup is never passed through. That was the earlier arrangement and
+ * it is what the designer's package replaces.
  */
 import BaseLayout from "../../layouts/BaseLayout.astro";
-import { page } from "../../lib/journal";
-import "../../styles/journal.css";
+import Article from "../../components/journal/Article.astro";
+import AzPage from "../../components/journal/AzPage.astro";
+import Changelog from "../../components/journal/Changelog.astro";
+import DocsPage from "../../components/journal/DocsPage.astro";
+import Listing from "../../components/journal/Listing.astro";
+import Masthead from "../../components/journal/Masthead.astro";
+import NotFound from "../../components/journal/NotFound.astro";
+import ReleasePage from "../../components/journal/ReleasePage.astro";
+import { read } from "../../lib/journal/parse";
+import { KIND_LABEL } from "../../lib/journal/types";
 import "../../styles/journal.css";
 
 export const prerender = false;
@@ -22,15 +28,76 @@ export const prerender = false;
 const slug = Astro.params.slug ?? "";
 const parts = slug.split("/").filter(Boolean);
 
-const found = await page(parts);
-if (!found) {
-  return new Response(null, { status: 404, statusText: "Not found" });
+const page = await read(parts);
+
+/* A miss inside the section gets the section's own 404, not the site's: the
+   reader was looking for an entry, and the two things that can still help are
+   in here. The status is still 404 — it looks like a page, but nothing is
+   allowed to tell a crawler this address resolved. */
+if (!page) {
+  Astro.response.status = 404;
 }
+
+/* Related entries come from the section's own index rather than from the
+   article, because BeeRanked does not put them in the page and a "continue
+   reading" block that links nowhere is worse than none. */
+let related = page?.entries ?? [];
+if (page && (page.type === "article" || page.type === "docs" || page.type === "wiki")) {
+  const index = await read([parts[0]]);
+  const here = `/journal/${parts.join("/")}/`;
+  related = (index?.entries ?? []).filter((e) => e.href !== here);
+}
+
+const LEDE: Record<string, string> = {
+  hub: "Notes on practice, and on the software written as practice. Documentation for the instruments, and what changed in them.",
+  all: "Everything in the section, newest first.",
+  sitemap:
+    "Every page in the section, as the engine knows it. The machine-readable one is at /journal/sitemap.xml.",
+};
 ---
 
-<BaseLayout title={`${found.title} — Shruti`} description={found.description}>
+<BaseLayout
+  title={page ? `${page.title} — Shruti` : "Nothing is filed here — Shruti"}
+  description={page?.description}
+>
   <div class="journal" data-journal>
-    <Fragment set:html={found.html} />
+    {
+      !page ? <NotFound />
+      : page.type === "article" || page.type === "wiki"
+        ? <Article page={page} related={related} />
+        : page.type === "docs"
+          ? <DocsPage page={page} />
+          : page.type === "changelog"
+            ? <Changelog title={page.title} lede={page.lede} releases={page.releases} />
+            : page.type === "changelog-entry" && page.release
+              ? <ReleasePage release={page.release} crumbs={page.crumbs} body={page.body} />
+              : page.type === "sitemap"
+                ? (
+                    <main class="j-page">
+                      <Masthead eyebrow="Journal" title={page.title} lede={page.lede || LEDE.sitemap} />
+                      <AzPage groups={page.groups} />
+                    </main>
+                  )
+                : page.type === "index" && page.kind === "wiki"
+                  ? (
+                      <main class="j-page">
+                        <Masthead eyebrow={KIND_LABEL.wiki} title={page.title} lede={page.lede}
+                                  count={page.count > 0 ? `${page.count} ${page.count === 1 ? "article" : "articles"}` : undefined} />
+                        <AzPage groups={page.groups} />
+                      </main>
+                    )
+                  : page.type === "hub"
+                    ? <Listing eyebrow="Journal" title="Writing, documentation, and what changed"
+                               lede={LEDE.hub} entries={page.entries} feature />
+                    : page.type === "all"
+                      ? <Listing eyebrow="Everything" title="All content"
+                                 lede={LEDE.all} entries={page.entries} grouped />
+                      : <Listing
+                          eyebrow={page.type === "category" ? "Category" : KIND_LABEL[page.kind]}
+                          title={page.title}
+                          lede={page.lede}
+                          count={page.count > 0 ? `${page.count} ${page.count === 1 ? "entry" : "entries"}` : undefined}
+                          entries={page.entries} />
+    }
   </div>
 </BaseLayout>
-

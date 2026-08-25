@@ -1,0 +1,108 @@
+---
+/* An article, in the designer's skeleton.
+ *
+ * Every block is a SIBLING inside `.j-col` — breadcrumb, plate, title, deck,
+ * meta, prose, instrument, notes, record, next. That is the guide's one rule,
+ * and it is the rule the sister project learned the hard way: blocks in their
+ * own containers end up at three different left edges and the page reads
+ * amateurish however well each piece is styled.
+ *
+ * The rail is never deleted. With fewer than three headings it carries small
+ * print instead, so the reading column's left edge is identical on every entry.
+ */
+import Glyph from "./Glyph.astro";
+import Card from "./Card.astro";
+import SkyRecordBlock from "./SkyRecord.astro";
+import { GLYPH, KIND_LABEL, type JournalPage } from "../../lib/journal/types";
+import { longDate, shortDate } from "../../lib/journal/format";
+
+interface Props { page: JournalPage; related: JournalPage["entries"] }
+const { page, related } = Astro.props;
+
+const hasToc = page.toc.length >= 3;
+---
+<main class="j-page">
+  <div class="j-shell">
+    <article class="j-col">
+      {
+        page.crumbs.length > 0 && (
+          <nav class="j-bc" aria-label="Breadcrumb">
+            {page.crumbs.map((c) => (
+              <>
+                <a href={c.href}>{c.label}</a>
+                <span class="j-bc-sep" aria-hidden="true">›</span>
+              </>
+            ))}
+            <span aria-current="page">{page.title}</span>
+          </nav>
+        )
+      }
+
+      {
+        page.cover ? (
+          <figure class="j-cover">
+            <div class="j-cover-frame"><img src={page.cover} alt="" /></div>
+          </figure>
+        ) : (
+          /* The art-absent state, designed rather than left blank: most entries
+             have no cover and the plate has to look deliberate. */
+          <div class="j-plate j-plate--entry" role="img"
+               aria-label="Sky plate — this entry has no cover art">
+            <Glyph mark={GLYPH[page.kind]} />
+            <span class="j-plate-note">{KIND_LABEL[page.kind].toLowerCase()} · no cover art</span>
+            <span class="j-plate-note">{shortDate(page.date)}</span>
+          </div>
+        )
+      }
+
+      <h1 class="j-h1 j-h1--entry">{page.title}</h1>
+      {page.deck && <p class="j-deck">{page.deck}</p>}
+
+      <div class="j-meta">
+        <span>By <a href="https://shrutivtuber.com" rel="author">Shruti</a></span>
+        {page.date && <span class="j-bc-sep" aria-hidden="true">·</span>}
+        {page.date && <time datetime={page.date}>{longDate(page.date)}</time>}
+      </div>
+
+      <div class="j-prose" set:html={page.body} />
+
+      {page.sky && <SkyRecordBlock sky={page.sky} when={longDate(page.date)} />}
+
+      {
+        related.length > 0 && (
+          <section class="j-next">
+            <p class="j-eyebrow">Continue reading</p>
+            <div class="j-next-grid">
+              {related.slice(0, 3).map((e) => <Card entry={e} variant="next" />)}
+            </div>
+          </section>
+        )
+      }
+    </article>
+
+    <aside class={`j-rail${hasToc ? "" : " j-rail--static"}`}
+           aria-label={hasToc ? "On this page" : "About this entry"}>
+      <div class="j-rail-group">
+        {
+          hasToc ? (
+            <>
+              <p class="j-eyebrow">On this page</p>
+              {page.toc.map((t) => (
+                <a class={`j-toc-link${t.level > 2 ? " j-toc-link--sub" : ""}`} href={`#${t.id}`}>
+                  {t.text}
+                </a>
+              ))}
+            </>
+          ) : (
+            <>
+              <p class="j-eyebrow">Filed under</p>
+              <p class="j-rail-note">{KIND_LABEL[page.kind]}</p>
+              {page.date && <p class="j-eyebrow">Published</p>}
+              {page.date && <p class="j-rail-note j-mono">{shortDate(page.date)}</p>}
+            </>
+          )
+        }
+      </div>
+    </aside>
+  </div>
+</main>

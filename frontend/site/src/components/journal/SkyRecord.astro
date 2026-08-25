@@ -1,0 +1,49 @@
+---
+/* The sky when an entry was published.
+ *
+ * Stored with the entry at publish time and never recomputed — so it still
+ * says what the sky said, which is the entire point of recording it. It ends
+ * the article and never sits above the prose: it is a record, not a header.
+ *
+ * Rendered only when there is a real record. An invented one would be worse
+ * than none, because the whole claim of the block is that it is true.
+ */
+import Glyph from "./Glyph.astro";
+import type { SkyRecord } from "../../lib/journal/types";
+
+interface Props { sky: SkyRecord; when: string }
+const { sky, when } = Astro.props;
+
+const rows: [string, string, boolean][] = [
+  ["Sun · tropical", sky.sunTropical, true],
+  ["Sun · sidereal, Lahiri", sky.sunSidereal, true],
+  ["Moon · tropical", sky.moonTropical, true],
+  ["Moon · sidereal, Lahiri", sky.moonSidereal, true],
+  ["Tithi", sky.tithi, false],
+  ["Nakṣatra", sky.nakshatra, false],
+  ["Attic", sky.attic, false],
+  ["Thelemic", sky.thelemic, true],
+];
+---
+<section class="j-record" aria-label="The sky when this was published">
+  <div class="j-record-head">
+    <p class="j-eyebrow">The sky when this was published</p>
+    <span class="j-glyph" aria-hidden="true">☉&#xFE0E; ☾&#xFE0E;</span>
+  </div>
+  <div class="j-leaders">
+    {
+      rows.filter(([, v]) => v).map(([k, v, glyph]) => (
+        <div class="j-leader">
+          <span class="j-leader-k">{k}</span>
+          <span class="j-leader-fill"></span>
+          <span
+            class={`j-leader-v${glyph ? " j-glyph" : ""}${k === "Attic" ? " j-leader-v--greek" : ""}`}
+            lang={k === "Attic" ? "grc" : undefined}
+            set:html={glyph ? v.replace(/([♈-♓☉☾])/g, "$1&#xFE0E;") : v}
+          />
+        </div>
+      ))
+    }
+  </div>
+  <p class="j-record-foot">{sky.rule} Recorded at publication and never recomputed{when ? `, on ${when}` : ""}.</p>
+</section>

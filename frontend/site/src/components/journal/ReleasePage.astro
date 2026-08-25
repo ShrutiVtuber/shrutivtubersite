@@ -1,0 +1,73 @@
+---
+/* One release.
+ *
+ * The six groups are emitted in the order the design fixes — added, changed,
+ * fixed, deprecated, removed, security — never in the order the source wrote
+ * them, so two releases read the same way. A group with nothing in it is not
+ * printed; an empty "Removed" heading says less than its absence.
+ */
+import { longDate } from "../../lib/journal/format";
+import type { Crumb, Release } from "../../lib/journal/types";
+
+interface Props { release: Release; crumbs: Crumb[]; body?: string }
+const { release, crumbs, body } = Astro.props;
+
+const LABEL: Record<string, string> = {
+  added: "Added", changed: "Changed", fixed: "Fixed",
+  deprecated: "Deprecated", removed: "Removed", security: "Security",
+};
+---
+<main class="j-page">
+  <div class="j-shell">
+    <article class="j-col">
+      <nav class="j-bc" aria-label="Breadcrumb">
+        <a href="/journal/">Journal</a>
+        <span class="j-bc-sep" aria-hidden="true">›</span>
+        <a href="/journal/changelog/">Changelog</a>
+        <span class="j-bc-sep" aria-hidden="true">›</span>
+        <span aria-current="page" class="j-mono">{release.version}</span>
+      </nav>
+
+      {/* Inline, as the designer's reference has it — their stylesheet is
+          copied across verbatim so it can be re-delivered, and these three
+          rules exist only on this page. */}
+      <div style="display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;margin-bottom:10px">
+        <h1 class="j-h1 j-h1--version">{release.version}</h1>
+        {release.title && (
+          <span class="j-mono" style="font-size:var(--text-sm);color:var(--ink-soft)">
+            {release.title}
+          </span>
+        )}
+      </div>
+
+      {
+        release.date && (
+          <div class="j-meta">
+            <time datetime={release.date}>released {longDate(release.date)}</time>
+          </div>
+        )
+      }
+
+      {release.summary && <p class="j-lede" style="margin-bottom:36px">{release.summary}</p>}
+
+      {
+        release.groups.length > 0 && (
+          <div class="j-groups">
+            {release.groups.map((g) => (
+              <div class="j-group">
+                <p class="j-eyebrow">{LABEL[g.key] ?? g.key}</p>
+                <ul>{g.notes.map((n) => <li set:html={n} />)}</ul>
+              </div>
+            ))}
+          </div>
+        )
+      }
+
+      {
+        /* Anything the release said beyond the six groups — a migration note,
+           a warning — still belongs on the page. */
+        release.groups.length === 0 && body && <div class="j-prose" set:html={body} />
+      }
+    </article>
+  </div>
+</main>

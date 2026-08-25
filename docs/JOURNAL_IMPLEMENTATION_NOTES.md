@@ -54,24 +54,26 @@ extract structured data per page type, then render Astro components.
 
 ## Checklist
 
-- [ ] `node-html-parser` added to the site package
-- [ ] `journal.css` copied into the site and imported by the route
-- [ ] Type detection: which page type is this path?
-- [ ] Shared: `.j-page` / `.j-shell` / `.j-col` / `.j-rail` layout components
-- [ ] Card + row components (`.j-card`, `.j-row`, `.j-feature`)
-- [ ] Hub (populated / empty / single)
-- [ ] All content
-- [ ] Blog index (first / page N / empty) + pagination
-- [ ] Category archive
-- [ ] Article (cover / no cover) + TOC rail + static rail fallback
+- [x] `node-html-parser` added to the site package
+- [x] `journal.css` copied into the site and imported by the route
+- [x] Type detection: which page type is this path?
+- [x] Shared: `.j-page` / `.j-shell` / `.j-col` / `.j-rail` layout components
+- [x] Card + row components (`.j-card`, `.j-row`, `.j-feature`)
+- [x] Hub (populated / empty / single)
+- [x] All content
+- [x] Blog index (first / empty) — pagination waits for a second page of entries
+- [x] Category archive
+- [x] Article (cover / no cover) + TOC rail + static rail fallback
 - [ ] Sky-at-publication block, from the stored record
-- [ ] Docs index
-- [ ] Docs page (TOC / no TOC) + sidebar + provenance
-- [ ] Wiki index (A–Z) + wiki article (graded table)
-- [ ] Changelog list + entry (six groups, fixed order)
-- [ ] Sitemap
-- [ ] 404 inside the section
-- [ ] Type marks carry `&#xFE0E;` or zodiac glyphs go colour-emoji
+- [x] Docs index
+- [x] Docs page (TOC / no TOC) + sidebar + provenance
+- [x] Wiki index (A–Z) + wiki article — **no grade dots**: the designer's
+      legend (attested / reconstructed / disputed) has no source in BeeRanked,
+      and inventing one would be inventing scholarship. Add when there is data.
+- [x] Changelog list + entry (six groups, fixed order)
+- [x] Sitemap
+- [x] 404 inside the section
+- [x] Type marks carry `&#xFE0E;` or zodiac glyphs go colour-emoji
 - [ ] No horizontal scroll at 320 (their audit method)
 - [ ] Deployed and checked live
 
@@ -84,3 +86,34 @@ extract structured data per page type, then render Astro components.
   together or the omitted ones are cleared.
 - Never put angle-bracket tag syntax in the BeeRanked plugin CSS — it is
   injected into the page and the extractor used to match it.
+
+
+## Where it got to (2026-08-25)
+
+Every route the section can serve today answers 200 with the real site header
+and footer, and a miss answers 404 with the section's own page:
+
+    /journal/            /journal/all/         /journal/sitemap/
+    /journal/blog/       /journal/docs/        /journal/<kind>/<slug>/
+
+Built but unverified against real content, because none is synced yet:
+**changelog list**, **changelog entry**, **category**, **wiki index**. The
+changelog source is GitHub and she has still to wire it in Studio; categories
+appear when she files something. `releasesFrom` and `changeGroups` are written
+against the general shape of a release list rather than a specific markup —
+check them against the first real release.
+
+Not done: **pagination** (nothing has a second page yet) and the
+**sky-at-publication** record (`/api/journal/sky` exists; nothing reads it).
+
+### Two bugs found on the way
+
+- `node-html-parser` was left external by Vite, so it resolved at build and was
+  missing at run time — 500 on every journal URL. It is in `noExternal` now,
+  beside `@astrojs/markdown-remark`, which was there for exactly this reason.
+- **All 47 `@font-face` rules were malformed** — `url(url('…'))` — in both
+  `frontend/shared/src/tokens/fonts-local.css` and
+  `frontend/site/public/fonts/faces.css`. Nothing to do with the journal; the
+  font-localisation commit shipped it and prod had been falling back to system
+  fonts ever since. Fixed and verified: the faces parse and the woff2 serves as
+  `font/woff2`.

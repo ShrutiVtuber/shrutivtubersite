@@ -1,0 +1,54 @@
+---
+/* The leader-line index: the sitemap, and the wiki filed A–Z.
+ *
+ * One component for both because the design is one design — a heading with a
+ * rule running off it, then rows whose titles and dates are pulled apart by a
+ * leader. Only the headings differ: content types on the sitemap, letters in
+ * the wiki.
+ */
+import Glyph from "./Glyph.astro";
+import { GLYPH, type AzGroup } from "../../lib/journal/types";
+import { rowDate } from "../../lib/journal/format";
+
+interface Props { groups: AzGroup[] }
+const { groups } = Astro.props;
+
+/* Packed into two columns by weight rather than by count, so a long group and
+   a short one do not leave one side of the page hanging. The grid is auto-fill
+   underneath, so these collapse to a single column when there is no room. */
+const COLS = 2;
+const cols: AzGroup[][] = Array.from({ length: COLS }, () => []);
+const load = new Array(COLS).fill(0);
+for (const g of groups) {
+  const i = load.indexOf(Math.min(...load));
+  cols[i].push(g);
+  load[i] += g.rows.length + 2; // the heading takes room too
+}
+---
+<div class="j-az">
+  {
+    cols.filter((c) => c.length > 0).map((col) => (
+      <div class="j-az-col">
+        {col.map((g, i) => (
+          <>
+            <div class="j-az-letter" style={i > 0 ? "margin-top:16px" : undefined}>
+              <h2>
+                {g.kind && <Glyph mark={GLYPH[g.kind]} />}
+                {g.label}{g.count > 0 && <> · {g.count}</>}
+              </h2>
+              <span class="j-rule"></span>
+            </div>
+            {g.rows.map((r) => (
+              <a class="j-row" href={r.href}>
+                <span class="j-row-name">{r.title}</span>
+                <span class="j-leader-fill"></span>
+                {r.date && <span class="j-row-date">{rowDate(r.date)}</span>}
+              </a>
+            ))}
+            {g.more && <a class="j-more" href={g.more}>See them all →</a>}
+          </>
+        ))}
+      </div>
+    ))
+  }
+</div>

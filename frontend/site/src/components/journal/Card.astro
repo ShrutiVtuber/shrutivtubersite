@@ -1,0 +1,27 @@
+---
+/* One entry in a grid. */
+import Glyph from "./Glyph.astro";
+import { GLYPH, KIND_LABEL, type Entry } from "../../lib/journal/types";
+import { shortDate } from "../../lib/journal/format";
+
+interface Props { entry: Entry; variant?: "card" | "next" }
+const { entry, variant = "card" } = Astro.props;
+const cls = variant === "next" ? "j-next-card" : "j-card";
+---
+<a class={cls} href={entry.href}>
+  {
+    variant === "card" && (
+      <span class="j-card-media j-plate j-plate--card">
+        {entry.cover
+          ? <img src={entry.cover} alt="" loading="lazy" />
+          : <Glyph mark={GLYPH[entry.kind]} />}
+      </span>
+    )
+  }
+  <span class="j-eyebrow j-eyebrow--rose">
+    <Glyph mark={GLYPH[entry.kind]} /> {KIND_LABEL[entry.kind]}
+  </span>
+  <span class={variant === "next" ? "j-next-title" : "j-card-title"}>{entry.title}</span>
+  {entry.dek && variant === "card" && <span class="j-card-dek">{entry.dek}</span>}
+  <span class="j-card-date">{entry.updated ? "updated " : ""}{shortDate(entry.date)}</span>
+</a>
