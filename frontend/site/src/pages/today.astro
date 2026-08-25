@@ -18,6 +18,7 @@ import Button from "../components/forms/Button.astro";
 import Badge from "../components/navigation/Badge.astro";
 import ChartFigure from "../components/chart/ChartFigure.astro";
 import { astro } from "../lib/api";
+import { account } from "../lib/account";
 import { GLYPHS } from "../lib/stations";
 
 const q = Astro.url.searchParams;
@@ -38,7 +39,28 @@ interface Today {
   undefined: string[];
 }
 
-const today = await astro<Today>(`/today?lat=${lat}&lon=${lon}`);
+/* Whether there is a nativity to read transits against.
+ *
+ * Everything else on this page works from a location alone and always will —
+ * the daemon's own docstring says a page that is only a teaser for signing up
+ * gets no signups, and that is right. This block is the one exception, because
+ * it genuinely cannot be computed without knowing where somebody was born. */
+const reader = await account(Astro);
+const nat = reader?.nativity ?? null;
+
+/* Noon when the birth time is unknown. That is fine for the planets, which
+   barely move across a day, and NOT fine for the angles — the ascendant moves
+   a degree every four minutes, so an ascendant computed from an assumed noon
+   is fabricated. The daemon computes it anyway and warns; this page withholds
+   it, which is the standard the natal instrument already holds to. */
+const natalMoment = nat
+  ? `${nat.birthDate}T${nat.timeUnknown ? "12:00" : nat.birthTime || "12:00"}:00`
+  : "";
+const natalQuery = nat
+  ? `&natal=${encodeURIComponent(natalMoment)}&natal_lat=${nat.lat}&natal_lon=${nat.lon}`
+  : "";
+
+const today = await astro<Today>(`/today?lat=${lat}&lon=${lon}${natalQuery}`);
 const undef: string[] = today?.undefined ?? [];
 
 /* Polar: the hours divide sunrise to sunset, so with no sunrise there is
@@ -46,7 +68,24 @@ const undef: string[] = today?.undefined ?? [];
 const sunToday = today?.stations?.sun?.today ?? [];
 const noSunrise = sunToday.length > 0 && !sunToday.find((s) => s.name === "sunrise")?.occurred;
 
-const signedIn = false;   // accounts are not built yet; the signed-out state is the honest one
+const signedIn = !!reader;
+
+/* Grouped by the transiting body, because "what is the Moon doing to me"
+   is the question somebody actually has — a flat list of forty-five lines
+   sorted by nothing is data rather than an answer. */
+const crossings: { from: string; to: string; aspect: string; separationSigns?: number }[] =
+  today?.transits?.configurations ?? [];
+const ORDER = ["Moon", "Sun", "Mercury", "Venus", "Mars", "Jupiter", "Saturn",
+               "Uranus", "Neptune", "Pluto", "Rahu", "Ketu"];
+const strip = (s: string) => s.replace(/^(transit|natal) /, "");
+const byBody = ORDER
+  .map((body) => ({
+    body,
+    hits: crossings
+      .filter((c) => strip(c.from) === body && c.from.startsWith("transit "))
+      .map((c) => ({ to: strip(c.to), aspect: c.aspect })),
+  }))
+  .filter((g) => g.hits.length > 0);
 
 const fmtDeg = (d: number) => `${d.toFixed(1)}°`;
 const moonProgress = today ? (today.moon.tropical.degree % 30) / 30 : 0;
@@ -192,8 +231,53 @@ const moonProgress = today ? (today.moon.tropical.degree % 30) / 30 : 0;
           <section class="block span2">
             <h2>Transits</h2>
             {
-              signedIn && today.transits ? (
-                <p class="why">—</p>
+              signedIn && nat && byBody.length > 0 ? (
+                <>
+                  <p class="why">
+                    Where the sky is now, against where it was when you were born.
+                    Whole-sign, the same rule the natal instrument uses — no orbs,
+                    so a configuration either holds or it does not.
+                  </p>
+                  <ul class="transits">
+                    {byBody.map((g) => (
+                      <li>
+                        <span class="tr-body">{g.body}</span>
+                        <span class="tr-hits">
+                          {g.hits.map((h, i) => (
+                            <>
+                              {i > 0 && <span class="tr-sep"> · </span>}
+                              <span class="tr-aspect">{h.aspect}</span>
+                              <span class="tr-to"> natal {h.to}</span>
+                            </>
+                          ))}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                  {
+                    nat.timeUnknown ? (
+                      <p class="tr-undef">
+                        ◐ Your birth time is not known, so transits to the
+                        ascendant, the midheaven and the houses are undefined and
+                        are not shown. The ascendant moves a degree every four
+                        minutes; one computed from an assumed noon would be
+                        invented, not approximate. The planetary transits above
+                        do not depend on it.
+                      </p>
+                    ) : (
+                      <p class="tr-angles t-tabular">
+                        natal asc {today.transits.natalAngles.ascendant.toFixed(2)}° ·
+                        mc {today.transits.natalAngles.midheaven.toFixed(2)}°
+                      </p>
+                    )
+                  }
+                </>
+              ) : signedIn && nat ? (
+                <p class="why">
+                  Nothing in the sky is making a whole-sign configuration to your
+                  chart right now. That is an answer, not a gap — with no orbs, a
+                  configuration either holds or it does not.
+                </p>
               ) : (
                 /* Invitation, not a wall. No blur, no lock, no fake preview,
                    no count of what is missing. */
@@ -205,7 +289,11 @@ const moonProgress = today ? (today.moon.tropical.degree % 30) / 30 : 0;
                   <p class="invite-quiet">
                     No account? The page above is the whole page. This is an invitation, not a wall.
                   </p>
-                  <div><Button variant="secondary" href="/signup">Save a nativity</Button></div>
+                  <div>
+                    <Button variant="secondary" href={signedIn ? "/nativity" : "/signup?next=/today"}>
+                      {signedIn ? "Add your nativity" : "Save a nativity"}
+                    </Button>
+                  </div>
                 </div>
               )
             }
@@ -339,6 +427,17 @@ const moonProgress = today ? (today.moon.tropical.degree % 30) / 30 : 0;
   .body-pos { color: var(--ink-soft); font-family: var(--font-mono); font-size: var(--text-xs); }
   .retro { color: var(--rose); font-family: var(--font-display); }
 
+  .transits { list-style: none; margin: 0 0 var(--space-3); padding: 0; display: grid; gap: 8px; }
+  .transits li { display: grid; grid-template-columns: 8ch minmax(0, 1fr); gap: var(--space-3); align-items: baseline; }
+  .tr-body { font: 600 var(--text-sm) var(--font-body); color: var(--ink); }
+  .tr-hits { font: 400 var(--text-sm) / 1.7 var(--font-body); color: var(--ink-soft); }
+  .tr-aspect { color: var(--ink); }
+  .tr-sep { color: var(--ink-faint); }
+  .tr-angles { font: 400 var(--text-xs) var(--font-body); color: var(--ink-faint); margin: 0; }
+  .tr-undef {
+    font: 400 var(--text-sm) / 1.7 var(--font-body); color: var(--ink); margin: 0;
+    max-width: 62ch; border-left: 2px solid var(--rose); padding-left: var(--space-3);
+  }
   .invite { display: grid; gap: 10px; }
   .invite p { font: 400 var(--text-body) / var(--leading-body) var(--font-body); color: var(--ink-soft); margin: 0; max-width: 62ch; }
   .invite-quiet { font-size: var(--text-sm) !important; color: var(--ink-faint) !important; }
