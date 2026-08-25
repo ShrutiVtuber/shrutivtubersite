@@ -43,11 +43,30 @@ function fileFor(slugParts: string[]): string | null {
   return candidate;
 }
 
+/* Blank out <style> and <script> bodies before looking for anything.
+ *
+ * Not defensive tidiness — a real bug. A CSS comment in the BeeRanked plugin
+ * contained the words "it sits outside <main>", that CSS is injected into the
+ * page, and the extractor below took the FIRST `<main` it found. It spent a
+ * deploy rendering the middle of a stylesheet comment as the article.
+ *
+ * Text inside style and script is not markup, so it should never be searched
+ * as if it were. Replaced with spaces rather than removed so every offset
+ * still lines up with the original string. */
+const withoutCode = (html: string): string =>
+  html.replace(
+    /<(style|script)\b[^>]*>[\s\S]*?<\/\1>/gi,
+    (m) => " ".repeat(m.length),
+  );
+
 const between = (html: string, open: RegExp, close: string): string => {
-  const start = html.search(open);
+  const searchable = withoutCode(html);
+  const start = searchable.search(open);
   if (start < 0) return "";
-  const from = html.indexOf(">", start) + 1;
-  const end = html.lastIndexOf(close);
+  const from = searchable.indexOf(">", start) + 1;
+  const end = searchable.lastIndexOf(close);
+  // Sliced from the ORIGINAL, so the real <style> and <script> inside the
+  // region survive; only the search ignored them.
   return end > from ? html.slice(from, end) : "";
 };
 

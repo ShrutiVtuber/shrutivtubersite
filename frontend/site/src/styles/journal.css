@@ -1,0 +1,230 @@
+/* The journal's content, styled in the site's own tokens.
+ *
+ * BeeRanked's markup, this site's design. Their stylesheets are deliberately
+ * not carried across — they ship `:root` blocks of their own and `--accent` is
+ * a name both systems use, so injecting them turned the site's header links
+ * rose. Everything here targets their class names and expresses every value
+ * through the tokens the rest of the site already uses, which is why the
+ * section follows Dawn and Dusk without a second palette to maintain.
+ *
+ * Scoped under [data-journal] so nothing can reach the real chrome.
+ */
+
+[data-journal] { display: block; }
+
+/* Their containers are full-width; the site's <main> already sets the
+   measure, so they are neutralised rather than fought. */
+[data-journal] .container,
+[data-journal] .container-wide { max-width: none; padding: 0; width: 100%; }
+
+/* The section supplies its own rhythm from the first element down, so the
+   layout's top padding would sit on top of the hero's and read as the gap
+   nobody meant — the same band that needed removing under the homepage hero. */
+.site-main:has(> .journal) { padding-top: 0; }
+
+/* ── the hub's cover card ────────────────────────────────────────────────
+   The cover art is an SVG gradient placeholder for a coverless post. Given no
+   height it expands to fill the viewport, which is what turned the front of
+   the journal into a wall of orange. */
+[data-journal] .hero { margin: 0 0 var(--space-7); }
+[data-journal] .cover-card {
+  display: grid;
+  text-decoration: none;
+  border: var(--border-w) solid var(--line);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background: var(--surface-card);
+  box-shadow: var(--shadow-1);
+  transition: border-color var(--dur-2) var(--ease-out);
+}
+[data-journal] .cover-card:hover { border-color: var(--line-strong); }
+[data-journal] .cover-media {
+  aspect-ratio: 16 / 6;
+  max-height: 260px;
+  overflow: hidden;
+  background: var(--surface-inset);
+}
+[data-journal] .cover-media svg,
+[data-journal] .cover-media img {
+  width: 100%; height: 100%; object-fit: cover; display: block;
+}
+[data-journal] .cover-kicker,
+[data-journal] .tt-kicker,
+[data-journal] .cover-date,
+[data-journal] .tt-date {
+  font: 600 var(--text-micro) var(--font-body);
+  letter-spacing: var(--tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+[data-journal] .cover-card > :not(.cover-media) { padding-inline: var(--space-5); }
+[data-journal] .cover-kicker { padding-top: var(--space-4); }
+[data-journal] .cover-title {
+  font: 600 var(--text-h3) / 1.2 var(--font-display);
+  color: var(--ink);
+  margin: 6px 0;
+  display: block;
+  text-wrap: balance;
+}
+[data-journal] .cover-date { padding-bottom: var(--space-4); }
+
+/* ── listings ─────────────────────────────────────────────────────────── */
+[data-journal] .section-head {
+  display: flex; gap: var(--space-4); align-items: baseline;
+  flex-wrap: wrap; margin-bottom: var(--space-4);
+}
+[data-journal] .section-head h2,
+[data-journal] .block > h2 {
+  font: 600 var(--text-h3) var(--font-display); color: var(--ink); margin: 0;
+}
+[data-journal] .more { margin-left: auto; font: 500 var(--text-sm) var(--font-body); }
+
+[data-journal] .tthumbs { display: grid; gap: 2px; }
+[data-journal] .tt-row {
+  display: grid;
+  grid-template-columns: 92px 1fr;
+  gap: var(--space-4);
+  align-items: center;
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  text-decoration: none;
+  transition: background var(--dur-2) var(--ease-out);
+}
+[data-journal] .tt-row:hover { background: var(--surface-veil); }
+[data-journal] .tt-thumb {
+  aspect-ratio: 16 / 10; border-radius: var(--radius-sm); overflow: hidden;
+  background: var(--surface-inset);
+}
+[data-journal] .tt-thumb svg,
+[data-journal] .tt-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+[data-journal] .tt-body { display: grid; gap: 3px; min-width: 0; }
+[data-journal] .tt-title {
+  font: 500 var(--text-body) var(--font-body); color: var(--ink); text-wrap: balance;
+}
+@media (max-width: 560px) {
+  [data-journal] .tt-row { grid-template-columns: 64px 1fr; gap: var(--space-3); }
+}
+
+/* ── documentation: the sidebar is the point of a docs page ──────────── */
+[data-journal] .docs-shell {
+  display: grid;
+  grid-template-columns: minmax(0, 15rem) minmax(0, 1fr);
+  gap: var(--space-7);
+  align-items: start;
+}
+[data-journal] .docs-toc-rail { display: none; }
+@media (min-width: 1180px) {
+  [data-journal] .docs-shell {
+    grid-template-columns: minmax(0, 14rem) minmax(0, 1fr) minmax(0, 12rem);
+  }
+  [data-journal] .docs-toc-rail { display: block; }
+}
+@media (max-width: 860px) {
+  [data-journal] .docs-shell { grid-template-columns: 1fr; gap: var(--space-5); }
+  [data-journal] .docs-sidebar {
+    border-bottom: var(--border-w) solid var(--line);
+    padding-bottom: var(--space-4);
+  }
+}
+[data-journal] .docs-sidebar,
+[data-journal] .docs-toc-sticky { position: sticky; top: var(--space-6); }
+[data-journal] .docs-nav-section,
+[data-journal] .wiki-toc-title {
+  font: 600 var(--text-micro) var(--font-body);
+  letter-spacing: var(--tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin: var(--space-4) 0 8px;
+}
+[data-journal] .docs-nav-list,
+[data-journal] .docs-index-list,
+[data-journal] .wiki-toc-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+[data-journal] .docs-nav-link,
+[data-journal] .docs-index-link {
+  display: block; padding: 7px 10px; border-radius: var(--radius-sm);
+  font: 400 var(--text-sm) var(--font-body); color: var(--ink-soft); text-decoration: none;
+}
+[data-journal] .docs-nav-link:hover,
+[data-journal] .docs-index-link:hover { background: var(--surface-veil); color: var(--ink); }
+[data-journal] .docs-nav-link.is-active,
+[data-journal] .is-active > .docs-nav-link {
+  background: var(--accent-wash); color: var(--accent); font-weight: 500;
+}
+[data-journal] .docs-breadcrumb {
+  font: 400 var(--text-xs) var(--font-body); color: var(--ink-faint);
+  display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: var(--space-4);
+}
+[data-journal] .docs-breadcrumb-current { color: var(--ink-soft); }
+[data-journal] .docs-title { font: 600 var(--text-h1) / 1.12 var(--font-display); margin: 0; }
+[data-journal] .docs-meta,
+[data-journal] .byline-author {
+  font: 400 var(--text-sm) var(--font-body); color: var(--ink-faint);
+}
+
+/* ── prose ────────────────────────────────────────────────────────────── */
+[data-journal] .prose,
+[data-journal] .docs-body,
+[data-journal] .wiki-body { max-width: 68ch; }
+[data-journal] p,
+[data-journal] li {
+  font: 400 var(--text-body) / var(--leading-body) var(--font-body);
+  color: var(--ink-soft);
+}
+[data-journal] h1, [data-journal] h2, [data-journal] h3, [data-journal] h4 {
+  font-family: var(--font-display); color: var(--ink); text-wrap: balance; margin: 0;
+}
+[data-journal] h1 { font: 600 var(--text-h1) / 1.12 var(--font-display); letter-spacing: -0.01em; }
+[data-journal] h2 { font: 600 var(--text-h3) / 1.25 var(--font-display); margin-top: var(--space-7); }
+[data-journal] h3 { font: 600 var(--text-h4) var(--font-display); margin-top: var(--space-5); }
+[data-journal] p { margin: 0 0 1.1em; }
+[data-journal] strong { color: var(--ink); font-weight: 600; }
+[data-journal] a { color: var(--accent); text-underline-offset: 2px; }
+[data-journal] blockquote {
+  margin: var(--space-5) 0; padding: 2px 0 2px var(--space-4);
+  border-left: 2px solid var(--rose); color: var(--ink-faint);
+}
+[data-journal] code {
+  font: 400 0.875em var(--font-mono); background: var(--surface-inset);
+  border: var(--border-w) solid var(--line); border-radius: var(--radius-sm);
+  padding: 0.12em 0.4em;
+}
+[data-journal] pre {
+  background: var(--surface-inset); border: var(--border-w) solid var(--line);
+  border-radius: var(--radius-md); padding: var(--space-4);
+  overflow-x: auto; max-width: 100%;
+  font: 400 var(--text-xs) / 1.7 var(--font-mono);
+}
+[data-journal] pre code { background: none; border: 0; padding: 0; font-size: inherit; }
+
+/* Wide content scrolls in its own box; the page never moves sideways. */
+[data-journal] .table-wrap { overflow-x: auto; max-width: 100%; }
+[data-journal] table {
+  border-collapse: collapse; width: 100%; font-size: var(--text-sm);
+  margin: var(--space-5) 0;
+}
+[data-journal] th {
+  text-align: left; font: 600 var(--text-micro) var(--font-body);
+  letter-spacing: var(--tracking-eyebrow); text-transform: uppercase;
+  color: var(--ink-faint); border-bottom: var(--border-w) solid var(--line-strong);
+  padding: 10px 12px; white-space: nowrap;
+}
+[data-journal] td {
+  border-bottom: var(--border-w) solid var(--line);
+  padding: 11px 12px; vertical-align: top; color: var(--ink-soft);
+}
+[data-journal] ul, [data-journal] ol { padding-left: 1.25em; }
+[data-journal] li { margin: 0.35em 0; }
+[data-journal] img { max-width: 100%; height: auto; border-radius: var(--radius-md); }
+[data-journal] hr { border: 0; border-top: var(--border-w) solid var(--line); margin: var(--space-6) 0; }
+
+/* Their chrome is stripped upstream, but a stray copy must never render. */
+[data-journal] .site-footer,
+[data-journal] .footer-brand,
+[data-journal] .footer-thesis,
+[data-journal] .sh-socials,
+[data-journal] .seal { display: none; }
+
+[data-journal] .sr-only {
+  position: absolute; width: 1px; height: 1px; overflow: hidden;
+  clip: rect(0 0 0 0); white-space: nowrap;
+}

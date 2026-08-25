@@ -32,6 +32,7 @@ from shruti.core.live import _twitch_app_token
 log = logging.getLogger(__name__)
 
 YOUTUBE_RSS = "https://www.youtube.com/feeds/videos.xml?channel_id={channel_id}"
+YOUTUBE_PLAYLIST = "https://www.googleapis.com/youtube/v3/playlistItems"
 TWITCH_USERS = "https://api.twitch.tv/helix/users"
 TWITCH_VIDEOS = "https://api.twitch.tv/helix/videos"
 
@@ -55,10 +56,58 @@ def _unescape(text: str) -> str:
 
 
 async def _youtube(client: httpx.AsyncClient) -> list[dict]:
+    """
+    Recent uploads. RSS first, the Data API as a fallback.
+
+    RSS is free and needs no key, which is why it is tried first. It is also
+    not a supported product: it began returning 404 and 500 for a channel it
+    had served minutes earlier, and the videos page emptied. The uploads
+    playlist answers the same question for ONE quota unit — the uploads
+    playlist id is the channel id with its `UC` prefix swapped for `UU` — so
+    the fallback costs almost nothing and removes a dependency on an endpoint
+    nobody promises.
+    """
     s = get_settings()
     if not s.youtube_channel_id:
         return []
-    r = await client.get(YOUTUBE_RSS.format(channel_id=s.youtube_channel_id), timeout=10.0)
+    try:
+        return await _youtube_rss(client, s.youtube_channel_id)
+    except Exception as exc:                       # noqa: BLE001
+        log.info("youtube RSS unavailable (%s); using the Data API", type(exc).__name__)
+    return await _youtube_api(client, s)
+
+
+async def _youtube_api(client: httpx.AsyncClient, s) -> list[dict]:
+    if not s.youtube_api_key:
+        return []
+    uploads = "UU" + s.youtube_channel_id[2:]
+    r = await client.get(
+        YOUTUBE_PLAYLIST,
+        params={"part": "snippet,contentDetails", "playlistId": uploads,
+                "maxResults": 12, "key": s.youtube_api_key},
+        timeout=12.0,
+    )
+    r.raise_for_status()
+    out = []
+    for item in r.json().get("items", []):
+        snippet = item.get("snippet") or {}
+        vid = (item.get("contentDetails") or {}).get("videoId", "")
+        if not vid:
+            continue
+        out.append({
+            "platform": "youtube",
+            "id": vid,
+            "title": snippet.get("title", "") or "Untitled",
+            "href": f"https://www.youtube.com/watch?v={vid}",
+            "thumb": f"/api/videos/thumb/youtube/{vid}",
+            "date": (snippet.get("publishedAt") or "")[:10],
+            "duration": "",
+        })
+    return out
+
+
+async def _youtube_rss(client: httpx.AsyncClient, channel_id: str) -> list[dict]:
+    r = await client.get(YOUTUBE_RSS.format(channel_id=channel_id), timeout=10.0)
     r.raise_for_status()
 
     out = []
@@ -138,6 +187,18 @@ async def recent(force: bool = False) -> list[dict]:
                 log.warning("%s videos unavailable: %s", name, type(exc).__name__)
 
     videos.sort(key=lambda v: v.get("date") or "", reverse=True)
-    _CACHE["at"] = now
-    _CACHE["videos"] = videos
-    return videos
+
+    # An empty result is NOT cached over a good one.
+    #
+    # Both platforms failing is far more likely to be an upstream hiccup than
+    # a channel that suddenly has no videos, and caching the empty answer
+    # turned a momentary 404 from YouTube's RSS into fifteen minutes of a
+    # videos page saying she has never streamed. Keeping the last good list is
+    # the honest failure: slightly stale beats confidently empty.
+    if videos or not _CACHE["videos"]:
+        _CACHE["at"] = now
+        _CACHE["videos"] = videos
+        return videos
+
+    log.warning("no videos from any platform; keeping the previous list")
+    return _CACHE["videos"]
