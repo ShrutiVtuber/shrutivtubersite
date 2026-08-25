@@ -343,3 +343,84 @@ class BannedEmail(TimestampMixin, table=True):
     # Kept so the list can be read at all: "s…a@gmail.com" is enough to
     # recognise one you are looking for without being an address.
     hint: str = ""
+
+
+class SavedChart(TimestampMixin, table=True):
+    """
+    A chart somebody kept, with or without an account.
+
+    **Two tokens, not one, and the reason is the whole design.** `owner_token`
+    is how the person gets back to their own chart; `share_token` is what they
+    hand to a friend. One token would make those the same string, so sharing
+    would mean giving away your only way in, and unsharing would be impossible
+    — you cannot take a link back out of somebody's messages, but you can stop
+    it working.
+
+    Neither token is guessable and neither carries birth data. That keeps the
+    date, time and place out of the URL, out of a browser history and out of a
+    screenshot of the address bar. It does **not** keep them from a person who
+    can read a chart: the ascendant gives the birth time to within a few
+    minutes and the planets give the date. So the figure is the data, drawn,
+    and the share dialogue says so rather than implying a privacy the drawing
+    cannot provide.
+
+    **This row holds special-category data.** Birth data used for an
+    astrological reading arguably reveals philosophical belief, so its lawful
+    basis is explicit consent — the same rule as `Nativity`. An account holder
+    has that consent on record against their account. Somebody without an
+    account has no account to hang it on, so the consent is evidenced *here*,
+    verbatim and versioned, on the row it justifies. Consent you cannot
+    evidence is consent you do not have.
+
+    And because it cannot be renewed by asking somebody we have no address
+    for, an ownerless chart **expires**. Opening it puts the clock back.
+    """
+
+    __tablename__ = "saved_chart"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+
+    # Opaque, unguessable, and carrying nothing. See the class docstring.
+    owner_token: str = Field(index=True, unique=True)
+    # Null until they choose to share; nulled again when they take it back.
+    share_token: Optional[str] = Field(default=None, index=True, unique=True)
+
+    # Null for a chart kept without an account. Set when one is made later,
+    # so signing up brings the chart along rather than stranding it.
+    user_id: Optional[int] = Field(default=None, foreign_key="site_user.id", index=True)
+
+    # Theirs to write. Shown to whoever holds a share link, so it is the one
+    # field that must never be pre-filled with anything private.
+    label: str = ""
+
+    # Which reckoning, kept so re-opening draws the same chart rather than
+    # today's defaults.
+    tradition: str = "hellenistic"        # hellenistic | vedic
+    house_system: str = "whole_sign"
+    # wheel | north | south. North and South Indian are different diagrams,
+    # not styles of one, and some people want to see both.
+    figure: str = "wheel"
+
+    # The moment. `time_unknown` is a first-class state: without a time the
+    # angles are undefined, and the chart says so rather than guessing.
+    birth_date: str = ""                              # ISO date
+    birth_time: Optional[str] = Field(default=None)   # HH:MM
+    time_unknown: bool = False
+    place_name: str = ""
+    lat: float = 0.0
+    lon: float = 0.0
+
+    # The consent that makes holding the above lawful, stored verbatim so the
+    # record still says what this person actually read after the wording
+    # changes. Empty when the chart belongs to an account, where the consent
+    # lives on the account.
+    consent_version: str = ""
+    consent_wording: str = ""
+    consent_source: str = ""
+    consent_at: Optional[datetime] = Field(default=None, sa_type=UTC_TS)
+
+    shared_at: Optional[datetime] = Field(default=None, sa_type=UTC_TS)
+    last_seen_at: Optional[datetime] = Field(default=None, sa_type=UTC_TS)
+    # Null for a chart with an owner. Set, and pushed forward on every
+    # opening, for one without.
+    expires_at: Optional[datetime] = Field(default=None, sa_type=UTC_TS)

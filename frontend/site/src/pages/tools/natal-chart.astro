@@ -32,6 +32,12 @@ const lat = Number(q.get("lat") ?? 37.9838);
 const lon = Number(q.get("lon") ?? 23.7275);
 const place = q.get("place") ?? "";
 const HOUSE_SYSTEMS = ["whole_sign", "placidus", "equal", "porphyry", "regiomontanus", "campanus"];
+/* North and South Indian are different diagrams, not two styles of one: the
+   North figure fixes the houses and moves the signs, the South figure fixes
+   the signs. Some people read one, some the other, and some want both — so it
+   is a choice on the page rather than a decision made for them. */
+const FIGURES = ["north", "south"];
+const vedicStyle = FIGURES.includes(q.get("vedic_style") ?? "") ? q.get("vedic_style")! : "north";
 const houseSystem = HOUSE_SYSTEMS.includes(q.get("house_system") ?? "") ? q.get("house_system")! : "whole_sign";
 
 interface Body {
@@ -48,7 +54,16 @@ interface Payload {
   sect?: { isDay: boolean; luminary: string; benefic: string; malefic: string };
   places?: { place: number; name: string; sign: string; ruler: string }[];
   lots?: Record<string, number>;
-  aspects: { basis: string; configurations: { from: string; to: string; aspect: string; separationSigns?: number }[] };
+  /* Hellenistic returns `configurations`; Vedic returns `drishti`. Not a
+     naming inconsistency to smooth over — a whole-sign configuration and a
+     graha dṛṣṭi are different claims about the sky, and one is not the other
+     translated. Reading whichever is absent gives `undefined.map`, which is a
+     500 on every Vedic chart. */
+  aspects: {
+    basis: string;
+    configurations?: { from: string; to: string; aspect: string; separationSigns?: number }[];
+    drishti?: { from: string; to: string; aspect: string; mutual?: boolean }[];
+  };
   diagram?: { kind: string; svg: string };
   lagna?: unknown; nakshatraOfMoon?: unknown; dasha?: unknown;
 }
@@ -71,10 +86,15 @@ const dignityWords = (b: Body) =>
    planets and it is stated, not hidden. */
 const moment = date ? `${date}T${unknownTime ? "12:00" : time || "12:00"}:00` : "";
 const chartUrl = (t: string) =>
-  `/chart?when=${encodeURIComponent(moment)}&lat=${lat}&lon=${lon}&tradition=${t}&house_system=${houseSystem}`;
+  `/chart?when=${encodeURIComponent(moment)}&lat=${lat}&lon=${lon}&tradition=${t}` +
+  `&house_system=${houseSystem}&vedic_style=${vedicStyle}`;
 
 const answer = date ? await askAstro<Payload>(chartUrl(tradition)) : null;
 const d = answer?.data ?? null;
+
+/* Whichever of the two this tradition returned. Neither carries both. */
+const looks: { from: string; to: string; aspect: string; separationSigns?: number; mutual?: boolean }[] =
+  d ? (d.aspects.configurations ?? d.aspects.drishti ?? []) : [];
 
 /* The Moon as a range, since it can move 12–15° across a day and the time is
    unknown. Two extra reads at the ends of the day — not an estimate. */
@@ -152,6 +172,22 @@ const ASPECT_BASIS: Record<string, string> = {
           {HOUSE_SYSTEMS.map((h) => <option value={h} selected={h === houseSystem}>{h.replace(/_/g, " ")}</option>)}
         </select>
       </label>
+      {
+        /* Only for the Vedic sky. A North Indian square drawn for a
+           Hellenistic chart is exactly the relabelling that gives away
+           software which has not understood the difference. */
+        tradition === "vedic" ? (
+          <label>
+            <span>Figure</span>
+            <select name="vedic_style">
+              <option value="north" selected={vedicStyle === "north"}>North Indian</option>
+              <option value="south" selected={vedicStyle === "south"}>South Indian</option>
+            </select>
+          </label>
+        ) : (
+          <input type="hidden" name="vedic_style" value={vedicStyle} />
+        )
+      }
       <button type="submit" data-track="tool:used" data-track-tool="natal-chart">Cast</button>
     </form>
     <p class="privacy">
@@ -268,20 +304,21 @@ const ASPECT_BASIS: Record<string, string> = {
         }
 
         <section class="aspects">
-          <h2>Configurations</h2>
+          <h2>{tradition === "vedic" ? "Dṛṣṭi" : "Configurations"}</h2>
           <p class="aspect-basis">{ASPECT_BASIS[d.aspects.basis] ?? d.aspects.basis}</p>
           <ul>
             {
-              d.aspects.configurations.map((c) => (
+              looks.map((c) => (
                 <li>
                   <span class="a-pair">{c.from} — {c.to}</span>
                   <span class="a-kind">{c.aspect}</span>
                   {c.separationSigns != null && <span class="t-tabular a-sep">{c.separationSigns} signs</span>}
+                  {c.mutual && <span class="a-sep">mutual</span>}
                 </li>
               ))
             }
           </ul>
-          {d.aspects.configurations.length === 0 && <p class="faint">No configurations by this rule.</p>}
+          {looks.length === 0 && <p class="faint">No configurations by this rule.</p>}
         </section>
 
         {
