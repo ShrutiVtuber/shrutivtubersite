@@ -255,3 +255,42 @@ If it lands wrong when she sees it, a designer pass can follow — but a handoff
 before anything exists would be designing in the dark, and the journal is the
 evidence that a handoff is worth it when the thing is a new visual world. This
 is not that.
+
+
+## Settled: Bunny, for now
+
+**Her call, and the reasoning is right.** Courses start around €30–50, where
+Cloudflare would take between a tenth and a quarter of each sale. As courses
+grow toward €150 the difference becomes noise and she moves to Cloudflare to
+keep one provider and one bill.
+
+Which makes provider-agnosticism a requirement rather than a nicety: it is a
+planned migration, not a hypothetical one. Every lesson carries its provider
+and its id, and both can be live at once.
+
+## Implementation checklist
+
+- [ ] Models: Course, Module, Lesson, QuizQuestion, Entitlement, Enrolment,
+      LessonProgress, CourseTier
+- [ ] Migration
+- [ ] Admin: courses, modules, lessons, reordering
+- [ ] Admin: which tiers include which course
+- [ ] The reader — sidebar, typed lessons, ticks, complete & continue
+- [ ] Entitlement checks: purchased, or a live tier, or free preview
+- [ ] Selling a course — Stripe product, checkout, webhook grant
+- [ ] Revoking on cancellation, keeping progress
+- [ ] Bunny player + signed playback tokens
+- [ ] Quizzes, self-check
+- [ ] Workshops: seats, tickets, Daily room, recording delivery
+
+## Gotchas this codebase has already paid for
+
+- Route ordering: `/{kind}` catch-alls swallow what follows them.
+- A decorator applies to whatever function comes next — do not insert a helper
+  between one and its handler.
+- Astro: a ternary branch holds ONE expression; two siblings need a fragment.
+  Arrow functions with type annotations inside a template do not parse.
+- Checkboxes post nothing when unticked; they need a hidden partner.
+- Match on content, not on indentation copied from a terminal dump.
+- The media-in-use guard is hand-written: a new model with a `media_id` must be
+  added to `MEDIA_USERS` or the test fails, correctly.
