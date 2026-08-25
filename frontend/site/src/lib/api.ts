@@ -62,7 +62,8 @@ async function ask<T>(base: string, path: string, timeoutMs = 8000): Promise<Ans
   }
 }
 
-export const askAstro = <T,>(path: string) => ask<T>(ASTRO_API, path);
+export const askAstro = <T,>(path: string, timeoutMs = 8000) =>
+  ask<T>(ASTRO_API, path, timeoutMs);
 
 export const site = <T,>(path: string) => get<T>(SITE_API, path);
 export const astro = <T,>(path: string) => get<T>(ASTRO_API, path);

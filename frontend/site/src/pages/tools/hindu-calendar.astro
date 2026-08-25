@@ -18,6 +18,7 @@ import PlaceField from "../../components/forms/PlaceField.astro";
 import DisagreementControl from "../../components/tools/DisagreementControl.astro";
 import CannotCompute from "../../components/tools/CannotCompute.astro";
 import { askAstro } from "../../lib/api";
+import { byMonth, corpus } from "../../lib/festivals";
 
 const q = Astro.url.searchParams;
 const ATHENS = { lat: 37.9838, lon: 23.7275 };
@@ -41,12 +42,32 @@ interface Payload {
 
 const url = (r: string, a: string) =>
   `/hindu-year?year=${year}&lat=${lat}&lon=${lon}&reckoning=${r}&authority=${a}`;
-const [answer, otherAnswer] = await Promise.all([
+const [answer, otherAnswer, corpusData] = await Promise.all([
   askAstro<Payload>(url(reckoning, authority)),
   askAstro<Payload>(url(reckoning === "amanta" ? "purnimanta" : "amanta", authority)),
+  /* The corpus. `/hindu-year` returns months and never festivals, so the
+     column the designer put in this table has always rendered a dash — the
+     join was simply never made, and seventy-two entries sat behind /festivals
+     unreachable from the page built to show them. A lunar year overlaps its
+     neighbours at both ends, so both adjacent years are asked for. */
+  /* Two years, not three. The table's first month opens in the previous
+     December, so the year before is needed; the year after contributes
+     nothing and costs another eleven seconds. */
+  corpus("hindu", [year - 1, year], lat, lon),
 ]);
 const d = answer.data;
 const other = otherAnswer.data;
+
+/* Attached by SPAN CONTAINMENT, never by matching Gregorian month numbers: a
+   lunar month starts mid-Gregorian-month by definition. An adhika māsa is
+   skipped, because its festivals wait for the nija month that follows — the
+   rule the table already states and would otherwise contradict. */
+if (d && corpusData) {
+  const grouped = byMonth(d.months, corpusData.festivals);
+  d.months.forEach((m, i) => {
+    m.festivals = m.adhika ? [] : grouped[i];
+  });
+}
 
 /* The consequence to show is the month name a date carries under each scheme —
    the concrete thing that differs, not an abstraction. */
@@ -74,6 +95,15 @@ const consequence = (which: "amanta" | "purnimanta") => {
     ? `today is ${name} — both agree in the bright fortnight`
     : `today is ${name}`;
 };
+/* The API returns full ISO timestamps with microseconds. A month boundary is
+   a moment, and the exact moment matters to the computation — but printing
+   `2026-01-18T19:52:01.668470+00:00` in a table cell is showing a reader the
+   machine's working rather than the answer. */
+const spanDay = (iso: string) =>
+  new Date(iso).toLocaleDateString("en-GB", {
+    day: "numeric", month: "short", year: "numeric",
+  });
+
 const RULE_NAME: Record<string, string> = {
   amanta: "month ends at the new moon",
   purnimanta: "month ends at the full moon",
@@ -182,8 +212,8 @@ const RULE_NAME: Record<string, string> = {
                       {m.adhika && <span class="tag">adhika</span>}
                       {m.kshaya && <span class="tag">kṣaya</span>}
                     </th>
-                    <td class="t-tabular">{m.start}</td>
-                    <td class="t-tabular">{m.end}</td>
+                    <td class="t-tabular">{spanDay(m.start)}</td>
+                    <td class="t-tabular">{spanDay(m.end)}</td>
                     <td class="fest">
                       {
                         m.adhika
@@ -198,6 +228,22 @@ const RULE_NAME: Record<string, string> = {
               }
             </tbody>
           </table>
+
+          {
+            corpusData && (
+              <p class="fest-provenance">
+                {corpusData.counts.entries} festivals in the corpus,
+                {" "}{corpusData.counts.dated} dated across the months shown.
+                {corpusData.undated.length > 0 && (
+                  <>
+                    {" "}Kept but deliberately undated:
+                    {" "}{corpusData.undated.map((u) => u.name).join(", ")} — a plausible date
+                    would make the table look complete and make it wrong.
+                  </>
+                )}
+              </p>
+            )
+          }
         </section>
 
         <p class="note">
@@ -212,6 +258,11 @@ const RULE_NAME: Record<string, string> = {
 </ToolLayout>
 
 <style>
+  .fest-provenance {
+    font: 400 var(--text-xs) / 1.7 var(--font-body); color: var(--ink-faint);
+    margin: var(--space-3) 0 0; max-width: 78ch;
+  }
+
   .params { display: grid; gap: var(--space-4); }
   .param-rule { border: 0; border-top: var(--border-w) solid var(--line); margin: 0; }
   .param-panel { display: flex; gap: var(--space-3); flex-wrap: wrap; align-items: end; }

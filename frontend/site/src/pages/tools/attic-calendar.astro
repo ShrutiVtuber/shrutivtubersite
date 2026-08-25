@@ -18,6 +18,8 @@ import PlaceField from "../../components/forms/PlaceField.astro";
 import DisagreementControl from "../../components/tools/DisagreementControl.astro";
 import CannotCompute from "../../components/tools/CannotCompute.astro";
 import { askAstro } from "../../lib/api";
+import FestivalMonths from "../../components/tools/FestivalMonths.astro";
+import { byMonth, corpus } from "../../lib/festivals";
 
 const q = Astro.url.searchParams;
 const ATHENS = { lat: 37.9838, lon: 23.7275, label: "Athens · 37.98°N 23.73°E" };
@@ -45,10 +47,36 @@ const params = (r: string) => {
   if (when) p.set("when", when);
   return p;
 };
-const [answer, otherAnswer] = await Promise.all([
+/* The year the Attic one OPENS in. It begins at the first new moon after the
+   summer solstice, so between January and midsummer today sits inside the year
+   that opened last summer — asking for the current Gregorian year would show a
+   table that has not started yet. */
+const now = new Date();
+const atticStart = now.getUTCMonth() >= 6 ? now.getUTCFullYear() : now.getUTCFullYear() - 1;
+
+interface AtticMonth {
+  name: string; greek: string; index: number; intercalary: boolean;
+  start: string; end: string; days: number; full: boolean;
+}
+interface YearPayload {
+  startYear: number; monthCount: number; intercalary: boolean; spans: string;
+  months: AtticMonth[];
+}
+
+const [answer, otherAnswer, yearAnswer, corpusData] = await Promise.all([
   askAstro<Payload>(`/attic-calendar?${params(reckoning)}`),
   askAstro<Payload>(`/attic-calendar?${params(reckoning === "conjunction" ? "visibility" : "conjunction")}`),
+  askAstro<YearPayload>(
+    `/attic-year?year=${atticStart}&lat=${lat}&lon=${lon}&reckoning=${reckoning}`,
+  ),
+  /* Both Gregorian years, because an Attic year straddles them and asking for
+     one would lose half the festivals. */
+  corpus("attic", [atticStart, atticStart + 1], lat, lon),
 ]);
+const atticYear = yearAnswer.data;
+const grouped = atticYear && corpusData
+  ? byMonth(atticYear.months, corpusData.festivals)
+  : [];
 const d = answer.data;
 const other = otherAnswer.data;
 
@@ -150,6 +178,22 @@ const RULE_NAME: Record<string, string> = {
               mark="◐"
               title="The crescent could not be caught here"
               why={d.reckoning.note}
+            />
+          )
+        }
+
+        {
+          /* The corpus, finally reachable from the page built for it. Absent
+             only if the daemon could not answer — an empty month is a designed
+             row, not a missing section. */
+          atticYear && corpusData && (
+            <FestivalMonths
+              months={atticYear.months}
+              grouped={grouped}
+              undated={corpusData.undated}
+              counts={corpusData.counts}
+              verificationNote={corpusData.verificationNote}
+              emptyMonthNote="Poseideon II is the intercalary month; the festivals of Poseideon keep to the first."
             />
           )
         }

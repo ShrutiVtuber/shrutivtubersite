@@ -18,6 +18,15 @@ import { defineMiddleware } from "astro:middleware";
 import { csrfToken } from "./lib/csrf";
 import { SITE_API } from "./lib/api";
 
+/* Imported for its side effect: loading it starts warming the festival cache.
+ *
+ * Middleware is loaded when the server boots; a route module is not loaded
+ * until somebody asks for that route. Putting the warm behind the calendar
+ * pages meant it fired for the first time on the first request to one of
+ * them, so that visitor still waited the full thirty seconds and the warm
+ * helped only the second. Here it runs at boot, before anyone has asked. */
+import "./lib/festivals";
+
 const ADMIN_COOKIE = "shruti_session";
 /** The only admin paths reachable without a session. */
 const OPEN_ADMIN = new Set(["/admin/signin", "/admin/signout", "/admin/reset"]);

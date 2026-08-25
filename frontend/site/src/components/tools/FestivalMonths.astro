@@ -1,0 +1,207 @@
+---
+/* A lunisolar year, month by month, with what each month carries.
+ *
+ * Shared by the Attic and Hindu calendars, because the two need the same
+ * table and the honesty rules are identical: a day the corpus grades as
+ * DISPUTED says so beside the date, and an entry it refuses to date is listed
+ * as undated rather than given a guessed day. Hiding either would make a
+ * reconstruction look like a record.
+ */
+import type { Festival, Undated } from "../../lib/festivals";
+import { CONFIDENCE_NOTE } from "../../lib/festivals";
+
+export interface MonthRow {
+  name: string;
+  displayName?: string;
+  greek?: string;
+  index: number;
+  start: string;
+  end: string;
+  days?: number;
+  full?: boolean;
+  intercalary?: boolean;
+  /** An adhika māsa holds none, and the reason belongs on the row. */
+  carriesFestivals?: boolean;
+}
+
+interface Props {
+  months: MonthRow[];
+  grouped: Festival[][];
+  undated?: Undated[];
+  /** e.g. "Poseideon II" or "adhika māsa" — what the repeat is called here. */
+  emptyMonthNote?: string;
+  counts?: { entries: number; dated: number; undated: number };
+  verificationNote?: string;
+}
+const {
+  months, grouped, undated = [], emptyMonthNote = "",
+  counts, verificationNote = "",
+} = Astro.props;
+
+const day = (iso: string) =>
+  new Date(iso + "T12:00:00Z").toLocaleDateString("en-GB", {
+    day: "numeric", month: "short", timeZone: "UTC",
+  });
+
+const today = new Date().toISOString().slice(0, 10);
+
+/* Everything is computed HERE, and the markup below only reads.
+ *
+ * Not a style preference: Astro's compiler scans the template for tags, and a
+ * `<=` inside a JSX expression is read as the start of one. The build fails
+ * with an error about Fragment shorthand that names a line nowhere near the
+ * comparison. The same trap ate a regex literal on another page. Keeping
+ * operators out of the markup is the reliable way to not meet it again.
+ */
+const rows = months.map((m, i) => {
+  const from = m.start.slice(0, 10);
+  const to = m.end.slice(0, 10);
+  return {
+    month: m,
+    label: m.displayName || m.name,
+    span: `${day(m.start)} – ${day(m.end)}`,
+    here: today >= from && today <= to,
+    barren: m.carriesFestivals === false,
+    festivals: (grouped[i] ?? []).map((f) => ({
+      ...f,
+      when: f.spanDays > 1 ? `${day(f.date)} – ${day(f.end)}` : day(f.date),
+      graded: f.confidence !== "attested",
+      gradeNote: CONFIDENCE_NOTE[f.confidence] ?? "",
+    })),
+  };
+});
+---
+
+<section class="fmonths">
+  <div class="fm-head">
+    <h2>The year, month by month</h2>
+    {
+      counts && (
+        <p class="fm-count t-tabular">
+          {counts.entries} in the corpus · {counts.dated} dated across this year
+          {counts.undated > 0 && <> · {counts.undated} undated</>}
+        </p>
+      )
+    }
+  </div>
+
+  <ol class="fm-list">
+    {
+      rows.map((row) => (
+        <li class="fm-month" aria-current={row.here ? "date" : undefined}>
+          <div class="fm-when">
+            <span class="fm-name">
+              {row.label}
+              {row.month.greek && <span class="fm-greek"> {row.month.greek}</span>}
+            </span>
+            <span class="fm-span t-tabular">
+              {row.span}
+              {row.month.days && <span class="fm-len"> · {row.month.days} days</span>}
+            </span>
+            {row.here && <span class="fm-now">now</span>}
+          </div>
+
+          <div class="fm-what">
+            {
+              row.barren ? (
+                <p class="fm-none">{emptyMonthNote || "This month carries no festivals."}</p>
+              ) : row.festivals.length === 0 ? (
+                <p class="fm-none">Nothing dated to this month.</p>
+              ) : (
+                <ul class="fm-fests">
+                  {row.festivals.map((f) => (
+                    <li class="fm-fest">
+                      <div class="fm-fest-head">
+                        <span class="fm-fest-name">{f.name}</span>
+                        <span class="fm-fest-date t-tabular">{f.when}</span>
+                      </div>
+                      {f.summary && <p class="fm-fest-sum">{f.summary}</p>}
+                      {/* Grading is the honesty. A reconstruction shown as a
+                          record is the failure this corpus exists to avoid,
+                          so anything not attested says so. */}
+                      {f.graded && (
+                        <p class="fm-grade">
+                          <span class="fm-grade-word">{f.confidence}</span>
+                          {f.gradeNote && <> — {f.gradeNote}</>}
+                        </p>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )
+            }
+          </div>
+        </li>
+      ))
+    }
+  </ol>
+
+  {
+    undated.length > 0 && (
+      <div class="fm-undated">
+        <h3>Kept, and deliberately not dated</h3>
+        <p class="fm-undated-why">
+          These are real festivals with no day any source gives. A plausible date would make
+          the table look complete and make the tool wrong, so the entry stays and the gap is
+          shown instead.
+        </p>
+        <ul>
+          {undated.map((u) => (
+            <li>
+              <span class="fm-fest-name">{u.name}</span>
+              {u.reason && <span class="fm-undated-reason"> — {u.reason}</span>}
+            </li>
+          ))}
+        </ul>
+      </div>
+    )
+  }
+
+  {verificationNote && <p class="fm-verify">{verificationNote}</p>}
+</section>
+
+<style>
+  .fmonths { display: grid; gap: var(--space-4); }
+  .fm-head { display: flex; gap: var(--space-4); align-items: baseline; flex-wrap: wrap; }
+  .fmonths h2 { font: 600 var(--text-h3) var(--font-display); color: var(--ink); margin: 0; }
+  .fm-count { font: 400 var(--text-xs) var(--font-mono); color: var(--ink-faint); margin: 0; }
+
+  .fm-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; }
+  .fm-month {
+    display: grid; grid-template-columns: minmax(0, 15rem) 1fr; gap: var(--space-4);
+    padding: var(--space-4) 0; border-top: var(--border-w) solid var(--line);
+  }
+  .fm-month:last-child { border-bottom: var(--border-w) solid var(--line); }
+  .fm-month[aria-current="date"] { background: var(--accent-wash); }
+  @media (max-width: 700px) { .fm-month { grid-template-columns: 1fr; gap: 8px; } }
+
+  .fm-when { display: grid; gap: 3px; align-content: start; }
+  .fm-name { font: 600 var(--text-body) var(--font-display); color: var(--ink); }
+  .fm-greek { font-weight: 400; color: var(--ink-soft); }
+  .fm-span { font: 400 var(--text-sm) var(--font-mono); color: var(--ink-soft); }
+  .fm-len { color: var(--ink-faint); }
+  .fm-now {
+    justify-self: start; font: 500 var(--text-xs) var(--font-body); color: var(--accent);
+    text-transform: uppercase; letter-spacing: .08em;
+  }
+
+  .fm-none { font: 400 var(--text-sm) var(--font-body); color: var(--ink-faint); margin: 0; font-style: italic; }
+  .fm-fests { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-3); }
+  .fm-fest { display: grid; gap: 3px; }
+  .fm-fest-head { display: flex; gap: var(--space-3); align-items: baseline; justify-content: space-between; }
+  .fm-fest-name { font: 500 var(--text-body) var(--font-body); color: var(--ink); }
+  .fm-fest-date { font: 400 var(--text-sm) var(--font-mono); color: var(--ink-soft); white-space: nowrap; }
+  .fm-fest-sum { font: 400 var(--text-sm) / 1.6 var(--font-body); color: var(--ink-soft); margin: 0; max-width: 68ch; }
+  .fm-grade { font: 400 var(--text-xs) var(--font-body); color: var(--ink-faint); margin: 0; }
+  .fm-grade-word { color: var(--rose); text-transform: uppercase; letter-spacing: .06em; font-weight: 500; }
+
+  .fm-undated {
+    border: var(--border-w) solid var(--line); border-radius: var(--radius-md);
+    background: var(--surface-inset); padding: var(--space-4); display: grid; gap: 8px;
+  }
+  .fm-undated h3 { font: 600 var(--text-h4) var(--font-display); color: var(--ink); margin: 0; }
+  .fm-undated-why { font: 400 var(--text-sm) / 1.6 var(--font-body); color: var(--ink-soft); margin: 0; max-width: 68ch; }
+  .fm-undated ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+  .fm-undated-reason { font: 400 var(--text-sm) var(--font-body); color: var(--ink-faint); }
+  .fm-verify { font: 400 var(--text-xs) / 1.7 var(--font-body); color: var(--ink-faint); margin: 0; max-width: 78ch; }
+</style>
