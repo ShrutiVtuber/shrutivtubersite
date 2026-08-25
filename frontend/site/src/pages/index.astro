@@ -16,6 +16,7 @@ import Button from "../components/forms/Button.astro";
 import ProjectCard from "../components/cards/ProjectCard.astro";
 import ScheduleItem from "../components/tables/ScheduleItem.astro";
 import SignPicker from "../components/navigation/SignPicker.astro";
+import SponsorRow from "../components/brand/SponsorRow.astro";
 import { site, type LiveStatus, type LinkGroups, type Project, PATHS } from "../lib/api";
 import { pageSections } from "../lib/content";
 import { badgeFrom } from "../lib/live";
@@ -101,6 +102,11 @@ const AVATAR = "/brand/avatar-square.png";
 /* Named by the question each one answers, not by what it is. "Pañcāṅga" means
    nothing to someone who has not met it; "the five limbs of the day, and when
    each ends" tells them whether they want it. */
+/* At most three — the API caps it, and drops any whose sponsorship has ended,
+   so the loudest page on the site never thanks somebody who stopped months
+   ago. */
+const sponsors = (await site<any[]>("/api/content/sponsors/featured")) ?? [];
+
 const INSTRUMENTS = [
   {
     glyph: "☾", name: "Day at a glance", href: "/today", wide: true,
@@ -211,6 +217,11 @@ const INSTRUMENTS = [
       }
     </div>
   </section>
+
+  {/* After the instruments and before the account invitation: somebody who has
+      just seen what the site does is the right person to read who pays for it,
+      and it must not be the first thing anybody meets. */}
+  <SponsorRow sponsors={sponsors} />
 
   {/* An INVITATION, not a teaser. The design's rule for the signed-out state
       is that the free half must be fully useful on its own — "if the page is a

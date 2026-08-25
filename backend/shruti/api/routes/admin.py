@@ -32,7 +32,7 @@ from shruti.core.db import get_session
 from shruti.models.accounts import User
 from shruti.models import (BannedEmail, Course, FanArt, Product, ProductPhoto, 
     ContactMessage, Credit, Media, ProfileField, Project, Question,
-    ScheduleEntry, Section, SocialLink, Tool,
+    ScheduleEntry, Section, SocialLink, Sponsor, Tool,
 )
 
 log = logging.getLogger(__name__)
@@ -48,6 +48,7 @@ EDITABLE: dict[str, type[SQLModel]] = {
     "credits": Credit,
     "schedule": ScheduleEntry,
     "fan-art": FanArt,
+    "sponsors": Sponsor,
 }
 
 ALLOWED_IMAGE = {
@@ -473,7 +474,28 @@ MEDIA_USERS: tuple[tuple[type, str], ...] = (
     (Product, "product"),
     (ProductPhoto, "product photograph"),
     (Course, "class or workshop"),
+    (Sponsor, "sponsor"),
 )
+
+
+def _media_columns(model: type) -> tuple[str, ...]:
+    """
+    Every column on this model that points at `media.id`, found rather than
+    listed.
+
+    The loop used to check `model.media_id` and nothing else. Sponsor carries
+    two — a mark for light backgrounds and one for dark — and the second would
+    have been invisible to the guard: deleting that image would have succeeded,
+    blanked the logo on a live page, and turned up later looking like a
+    different bug. Reading the foreign keys means the next model with two is
+    covered without anybody remembering.
+    """
+    out = []
+    for column in model.__table__.columns:                       # type: ignore[attr-defined]
+        for fk in column.foreign_keys:
+            if fk.target_fullname == "media.id":
+                out.append(column.name)
+    return tuple(out)
 
 
 @router.delete("/media/{media_id}", status_code=204)
@@ -496,15 +518,18 @@ async def delete_media(
 
     used: list[str] = []
     for model, noun in MEDIA_USERS:
-        rows = (
-            await session.execute(select(model).where(model.media_id == media_id))
-        ).scalars().all()
-        for r in rows:
-            label = (
-                getattr(r, "title", None) or getattr(r, "name", None)
-                or getattr(r, "key", None) or f"#{r.id}"
-            )
-            used.append(f"{noun} \u201c{label}\u201d")
+        for column in _media_columns(model):
+            rows = (
+                await session.execute(
+                    select(model).where(getattr(model, column) == media_id)
+                )
+            ).scalars().all()
+            for r in rows:
+                label = (
+                    getattr(r, "title", None) or getattr(r, "name", None)
+                    or getattr(r, "key", None) or f"#{r.id}"
+                )
+                used.append(f"{noun} \u201c{label}\u201d")
 
     if used:
         raise HTTPException(

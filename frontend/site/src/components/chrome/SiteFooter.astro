@@ -49,6 +49,11 @@ const SITE: [string, string][] = [
   ["/horoscopes", "Horoscopes"],
   ["/journal", "Journal"],
   ["/about", "About"],
+  /* Not in the header: that nav is already at the width where it wraps into
+     the drawer, and adding an eleventh item moves that number again. The
+     landing page's sponsor row links here directly, which is where somebody
+     actually goes looking for it. */
+  ["/partners", "Partners"],
 ];
 const ELSEWHERE: [string, string][] = [
   ["/newsletter", "The monthly letter"],

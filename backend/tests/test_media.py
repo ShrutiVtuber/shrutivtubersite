@@ -58,22 +58,46 @@ def test_every_model_with_a_media_id_is_checked_before_deleting():
     not fail loudly — deletion would simply stop noticing that table, and the
     first sign would be a blank picture on a live page.
     """
-    from shruti import models
+    import shruti.models as models
+    import shruti.models.accounts  # noqa: F401 — registers the rest of the tables
+
+    def media_columns(model: type) -> set[str]:
+        # Only real tables. A SQLModel declared with table=False can still carry
+        # a __tablename__ and has no __table__ at all.
+        table = getattr(model, "__table__", None)
+        if table is None:
+            return set()
+        out = set()
+        for column in table.columns:
+            for fk in column.foreign_keys:
+                if fk.target_fullname == "media.id":
+                    out.add(column.name)
+        return out
 
     with_media = {
-        model.__name__
+        model.__name__: media_columns(model)
         for model in vars(models).values()
         if isinstance(model, type)
         and getattr(model, "__tablename__", None)
-        and "media_id" in getattr(model, "model_fields", {})
+        and media_columns(model)
     }
     checked = {model.__name__ for model, _noun in admin.MEDIA_USERS}
 
-    assert with_media, "no model has a media_id — this test is looking in the wrong place"
-    assert with_media == checked, (
-        f"not checked before deleting media: {sorted(with_media - checked)}; "
-        f"checked but no longer has a media_id: {sorted(checked - with_media)}"
+    assert with_media, "no model points at media — this test is looking in the wrong place"
+    assert set(with_media) == checked, (
+        f"not checked before deleting media: {sorted(set(with_media) - checked)}; "
+        f"checked but no longer points at media: {sorted(checked - set(with_media))}"
     )
+
+    # And every COLUMN, not just every model. Sponsor carries two — a mark for
+    # light backgrounds and one for dark — and a guard that only looked at
+    # `media_id` would have deleted the dark one without noticing.
+    for model, _noun in admin.MEDIA_USERS:
+        found = set(admin._media_columns(model))
+        assert found == with_media[model.__name__], (
+            f"{model.__name__}: the guard checks {sorted(found)} but the table "
+            f"points at media from {sorted(with_media[model.__name__])}"
+        )
 
 
 # ── removing the file itself ────────────────────────────────────────────────

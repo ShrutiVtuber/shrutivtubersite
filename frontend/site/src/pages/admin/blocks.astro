@@ -117,6 +117,15 @@ const mediaUnused = !!mediaUse && "unused" in mediaUse;
 /* Named as the person would say it, for the sentence explaining that this kind
    has nowhere to show an image. */
 const spec_kindLabel = (KINDS.find((k) => k.kind === kind)?.label ?? kind).toLowerCase();
+/* A colour input demands exactly #RRGGBB and shows black for anything else.
+   Written here rather than inline because a regex's `{6}` inside a template
+   attribute closes the expression early — the braces are counted by the
+   template parser, not parsed as a regex. Same trap as a TypeScript annotation
+   in a template arrow function. */
+const HEX = /^#[0-9a-fA-F]{6}$/;
+const swatchValue = (v: unknown) =>
+  typeof v === "string" && HEX.test(v) ? v : "#000000";
+
 const SKIP = new Set(["id", "created_at", "updated_at", "createdAt", "updatedAt", "media", "visible", "position"]);
 const fieldsOf = (r: any) => Object.keys(r).filter((k) => !SKIP.has(k));
 const label = (r: any) =>
@@ -218,15 +227,31 @@ const label = (r: any) =>
                                   </noscript>
                                 </>
                               )
-                              : (
-                                <input
-                                  class="adm-input"
-                                  type={spec.type === "url" ? "url" : spec.type === "number" ? "number" : "text"}
-                                  name={k}
-                                  value={value ?? ""}
-                                  placeholder={spec.placeholder}
-                                />
-                              )
+                              : spec.type === "colour"
+                                ? (
+                                  /* A swatch AND a hex box, because both are how
+                                     people actually work: a brand colour arrives
+                                     as "#2B1B3D" to paste, and a colour being
+                                     nudged wants a picker. The text field is the
+                                     one that posts; the swatch writes into it. */
+                                  <div class="colour">
+                                    <input type="color" class="swatch" data-colour-pick
+                                           value={swatchValue(value)}
+                                           aria-label={`${spec.label} — pick a colour`} />
+                                    <input class="adm-input hex" name={k} value={value ?? ""}
+                                           data-colour-hex placeholder={spec.placeholder ?? "#2B1B3D"}
+                                           maxlength="7" spellcheck="false" />
+                                  </div>
+                                )
+                                : (
+                                  <input
+                                    class="adm-input"
+                                    type={spec.type === "url" ? "url" : spec.type === "number" ? "number" : "text"}
+                                    name={k}
+                                    value={value ?? ""}
+                                    placeholder={spec.placeholder}
+                                  />
+                                )
                       }
                       {spec.help && <p class="hint">{spec.help}</p>}
                     </label>
@@ -305,7 +330,31 @@ const label = (r: any) =>
   }
 </AdminLayout>
 
+<script>
+  /* Swatch and hex box, kept in step. The hex box is the one that posts, so the
+     swatch only ever writes into it — never the reverse at submit time, or a
+     colour typed as `#abc` would be silently rewritten to whatever the picker
+     rounded it to. */
+  document.querySelectorAll(".colour").forEach((box) => {
+    const pick = box.querySelector("[data-colour-pick]") as HTMLInputElement | null;
+    const hex = box.querySelector("[data-colour-hex]") as HTMLInputElement | null;
+    if (!pick || !hex) return;
+    pick.addEventListener("input", () => { hex.value = pick.value.toUpperCase(); });
+    hex.addEventListener("input", () => {
+      if (/^#[0-9a-fA-F]{6}$/.test(hex.value)) pick.value = hex.value;
+    });
+  });
+</script>
+
 <style>
+  .colour { display: flex; gap: 10px; align-items: center; }
+  .colour .swatch {
+    width: 44px; height: 40px; padding: 0; flex: none; cursor: pointer;
+    border: var(--border-w) solid var(--line); border-radius: var(--radius-sm);
+    background: none;
+  }
+  .colour .hex { font-family: var(--font-mono, var(--font-body)); text-transform: uppercase; }
+
   .head { display: flex; gap: var(--space-4); align-items: baseline; flex-wrap: wrap; }
   .kinds { display: flex; gap: 2px; flex-wrap: wrap; margin-left: auto; }
   .kinds a {

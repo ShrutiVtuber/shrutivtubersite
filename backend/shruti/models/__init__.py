@@ -185,6 +185,60 @@ class Project(TimestampMixin, table=True):
     media_id: Optional[int] = Field(default=None, foreign_key="media.id")
 
 
+class Sponsor(TimestampMixin, table=True):
+    """
+    Somebody paying to keep the channel running, and owed a proper place.
+
+    **The colours are columns, not a stylesheet.** A sponsor arrives with a
+    brand and the brand is theirs: BeeRanked's dark plum is not a decision this
+    site gets to make, and it will be a different colour for the next one. So
+    the background and the ink are stored per sponsor and set inline, which is
+    the one place on this site where hard-coded colour is correct.
+
+    `featured` puts them on the landing page — at most three, because a fourth
+    turns a thank-you into an ad break. Everyone else is on /partners, which is
+    the page that can actually say who they are and why she works with them. A
+    logo with no sentence beside it asks a viewer to trust somebody on the
+    strength of a rectangle.
+    """
+
+    __tablename__ = "sponsor"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    slug: str = Field(index=True, unique=True)
+    name: str = ""
+    # The one line under the logo on the landing page. Short by design.
+    tagline: str = ""
+    # The real introduction, on /partners. Markdown.
+    body_md: str = ""
+
+    url: str = ""
+    # What the link says. "Try BeeRanked" reads better than a bare domain, and
+    # she is the one who knows what was agreed.
+    cta_label: str = ""
+
+    # Theirs, not the site's. Hex, validated at the edge rather than trusted.
+    background: str = ""
+    ink: str = ""
+
+    # A separate mark for dark backgrounds, where one exists. Without it the
+    # single logo is used on both, which is right for a wordmark that already
+    # reads either way and wrong for one that does not.
+    media_id: Optional[int] = Field(default=None, foreign_key="media.id")
+    media_dark_id: Optional[int] = Field(default=None, foreign_key="media.id")
+
+    # On the landing page. Capped in the route, not here — a database
+    # constraint would make the fourth one an error rather than a decision.
+    featured: bool = Field(default=False, index=True)
+
+    # So a sponsorship can end without the record of it being deleted.
+    since: str = ""            # ISO date, or ""
+    until: str = ""            # ISO date, or "" while it is running
+
+    position: int = Field(default=0)
+    visible: bool = Field(default=True)
+
+
 class Tool(TimestampMixin, table=True):
     """
     A browser-runnable tool page (planetary hours, Attic calendar, isopsephy...).

@@ -14,7 +14,7 @@
 
 export type FieldType =
   | "text" | "textarea" | "url" | "slug" | "select" | "checkbox" | "media"
-  | "number" | "datetime";
+  | "number" | "datetime" | "colour";
 
 export interface FieldSpec {
   label: string;
@@ -53,6 +53,10 @@ export const MEDIA_USE: Record<string, { label: string; where: string } | { unus
   // one. The column exists, so the day a tool page wants an illustration this
   // is one line — but until then, saying so beats a control that does nothing.
   tools: { unused: true },
+  sponsors: {
+    label: "Logo",
+    where: "Their mark, on the landing-page card and on the Partners page. Give it room — a logo cropped to a square is somebody's brand mishandled.",
+  },
 };
 
 const STATUS = [
@@ -120,6 +124,61 @@ export const FIELDS: Record<string, Record<string, FieldSpec>> = {
     contributors: {
       label: "Contributors", group: "Details",
       help: "Names besides yours, if any.",
+    },
+    slug: COMMON.slug,
+  },
+
+  sponsors: {
+    name: { label: "Name", group: "Content", placeholder: "BeeRanked" },
+    tagline: {
+      label: "One line", group: "Content",
+      placeholder: "The content engine behind the journal.",
+      help: "Shown under the logo on the home page. Keep it to a phrase — the card is small and three lines of it stops being a thank-you.",
+    },
+    body_md: {
+      ...COMMON.body_md,
+      label: "Who they are",
+      help: "Markdown, shown on the Partners page. This is the part that earns them anything: say what they do, why you use it, and what it is good for. A logo with no sentence beside it asks a viewer to trust a rectangle.",
+    },
+    media_id: { label: "Logo", type: "media", group: "Image" },
+    media_dark_id: {
+      label: "Logo for dark backgrounds", type: "media", group: "Image",
+      help: "Only if their mark needs a different version on dark. Left empty, the one above is used everywhere.",
+    },
+    url: {
+      label: "Where it goes", type: "url", group: "Links",
+      placeholder: "https://beeranked.com",
+      help: "Use whatever tracking link they gave you, if they gave you one.",
+    },
+    cta_label: {
+      label: "What the link says", group: "Links",
+      placeholder: "Try BeeRanked",
+      help: "Blank falls back to “Visit”. Their own wording usually reads better.",
+    },
+    background: {
+      label: "Their background colour", type: "colour", group: "Brand",
+      placeholder: "#2B1B3D",
+      help: "From their brand guide. This is the one place on the site that stores a colour — a sponsor's brand is theirs, not the site's.",
+    },
+    ink: {
+      label: "Their text colour", type: "colour", group: "Brand",
+      placeholder: "#FFFFFF",
+      help: "Must be readable on the background above. The card shows you both together before you save.",
+    },
+    featured: {
+      label: "Show on the home page",
+      type: "checkbox", group: "Publishing",
+      help: "The home page shows at most three, in order, after the instruments. Tick a fourth and the first three win — a fourth card turns a thank-you into an ad break. Everyone else appears on Partners, which is where they get a proper introduction anyway.",
+    },
+    since: {
+      label: "Sponsoring since", group: "Details",
+      placeholder: "2026-08-01",
+      help: "ISO date. Shown on the Partners page as “since August 2026”.",
+    },
+    until: {
+      label: "Until", group: "Details",
+      placeholder: "2027-08-01",
+      help: "Leave blank while it is running. Filling it in does not hide them — it records that it ended, so a past sponsor can be kept on the page honestly rather than deleted.",
     },
     slug: COMMON.slug,
   },

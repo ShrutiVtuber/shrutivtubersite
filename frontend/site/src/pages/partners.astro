@@ -1,0 +1,202 @@
+---
+/* Who pays for the channel, and enough about them to be worth reading.
+ *
+ * The landing page has room for a logo and a line. This is where a sponsor
+ * gets an actual introduction — what they do, why she uses it, what it is
+ * good for — because a logo with no sentence beside it asks a viewer to trust
+ * a rectangle. It is also the page that makes the arrangement legible: the
+ * disclosure at the top is there whether or not anybody asks for it.
+ *
+ * A past sponsor is kept, marked, and not deleted. Somebody who paid for the
+ * lights last year still paid for them.
+ */
+import BaseLayout from "../layouts/BaseLayout.astro";
+import SectionHeader from "../components/brand/SectionHeader.astro";
+import Prose from "../components/content/Prose.astro";
+import SectionFigure from "../components/blocks/SectionFigure.astro";
+import EmptyState from "../components/feedback/EmptyState.astro";
+import { pageSections } from "../lib/content";
+import { site } from "../lib/api";
+import { renderMarkdown } from "../lib/markdown";
+
+export const prerender = false;
+
+interface Sponsor {
+  slug: string; name: string; tagline: string; bodyMd: string;
+  url: string; ctaLabel: string; background: string; ink: string;
+  media: { url: string; alt: string } | null;
+  mediaDark: { url: string; alt: string } | null;
+  featured: boolean; since: string; until: string;
+}
+
+const all = (await site<Sponsor[]>("/api/content/sponsors")) ?? [];
+const today = new Date().toISOString().slice(0, 10);
+const current = all.filter((s) => !s.until || s.until >= today);
+const past = all.filter((s) => s.until && s.until < today);
+
+const sections = await pageSections("partners");
+
+const month = (iso: string) => {
+  if (!iso) return "";
+  const d = new Date(`${iso}T00:00:00Z`);
+  return Number.isNaN(d.getTime())
+    ? ""
+    : d.toLocaleDateString("en-GB", { month: "long", year: "numeric", timeZone: "UTC" });
+};
+
+const bodies = await Promise.all(all.map((s) => renderMarkdown(s.bodyMd || "")));
+const bodyFor = (slug: string) => bodies[all.findIndex((s) => s.slug === slug)] ?? "";
+---
+
+<BaseLayout
+  title="Partners — Shruti"
+  description="The sponsors who pay for the channel, who they are, and what they make."
+>
+  <div class="page partners">
+    <SectionHeader
+      as="h1" glyph="✦" eyebrow="Partners"
+      title="Who keeps this running"
+      body="The channel costs money to make and these are the people covering it. Everything below is a paid arrangement, and saying so is the point of this page."
+    />
+
+    <p class="disclosure">
+      <strong>How this works.</strong> These are sponsorships: money changes
+      hands. What none of them buy is a say in what gets written, what gets
+      computed, or what any instrument on this site says — and no sponsor has
+      ever seen a page before it went up. If that stops being true, this
+      paragraph changes before anything else does.
+    </p>
+
+    {
+      all.length === 0 ? (
+        <EmptyState
+          glyph="○"
+          title="No sponsors yet"
+          body="When somebody sponsors the channel they appear here, with a proper introduction rather than a logo on its own."
+        />
+      ) : (
+        <>
+          <ul class="p-list">
+            {current.map((s) => (
+              <li class="p-card">
+                <div
+                  class="p-mark"
+                  style={s.background ? `background:${s.background};${s.ink ? `color:${s.ink};` : ""}` : undefined}
+                  data-plain={!s.background || undefined}
+                >
+                  {s.media
+                    ? <img src={s.media.url} alt={s.media.alt || s.name} loading="lazy" />
+                    : <span class="p-wordmark">{s.name}</span>}
+                </div>
+
+                <div class="p-words">
+                  <h2>{s.name}</h2>
+                  {s.tagline && <p class="p-tag">{s.tagline}</p>}
+                  {s.since && <p class="p-since">Sponsoring the channel since {month(s.since)}.</p>}
+                  {s.bodyMd && <Prose html={bodyFor(s.slug)} />}
+                  {
+                    s.url && (
+                      <p class="p-go">
+                        <a href={s.url} rel="sponsored noopener" target="_blank"
+                           data-track="sponsor:clicked" data-track-tool={s.slug}>
+                          {s.ctaLabel} →
+                        </a>
+                      </p>
+                    )
+                  }
+                </div>
+              </li>
+            ))}
+          </ul>
+
+          {
+            past.length > 0 && (
+              <section class="p-past">
+                <h2>Previously</h2>
+                <p class="p-past-lead">
+                  These sponsored the channel and no longer do. They are still
+                  here because they still paid for the lights.
+                </p>
+                <ul>
+                  {past.map((s) => (
+                    <li>
+                      <span class="p-past-name">{s.name}</span>
+                      <span class="p-past-when">
+                        {month(s.since)}{s.since && s.until ? " – " : ""}{month(s.until)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )
+          }
+        </>
+      )
+    }
+
+    {/* Anything the admin has added to this page. */}
+    {
+      sections.length > 0 && (
+        <div class="page-sections">
+          {sections.map((s) => (
+            <section class="page-section">
+              {s.title && <h2>{s.title}</h2>}
+              <SectionFigure media={s.media} title={s.title} />
+              <Prose html={s.html} />
+            </section>
+          ))}
+        </div>
+      )
+    }
+  </div>
+</BaseLayout>
+
+<style>
+  .partners { max-width: 900px; display: grid; gap: var(--space-6); }
+  .disclosure {
+    font: 400 var(--text-body) / var(--leading-body) var(--font-body);
+    color: var(--ink-soft); margin: 0; max-width: 68ch;
+    border-left: 2px solid var(--accent); padding-left: var(--space-4);
+  }
+  .disclosure strong { color: var(--ink); }
+
+  .p-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-6); }
+  .p-card {
+    display: grid; gap: var(--space-5);
+    grid-template-columns: minmax(0, 260px) minmax(0, 1fr);
+    align-items: start;
+    padding-top: var(--space-5);
+    border-top: var(--border-w) solid var(--line);
+  }
+  .p-mark {
+    display: grid; place-items: center; min-height: 140px;
+    padding: var(--space-5); border-radius: var(--radius-md);
+    border: var(--border-w) solid transparent;
+  }
+  .p-mark[data-plain] { background: var(--surface-card); border-color: var(--line); color: var(--ink); }
+  .p-mark img { max-width: 100%; max-height: 68px; width: auto; height: auto; display: block; }
+  .p-wordmark { font: 600 var(--text-h4) var(--font-display); }
+
+  .p-words h2 { font: 600 var(--text-h3) var(--font-display); color: var(--ink); margin: 0; }
+  .p-tag { font: 400 var(--text-body) var(--font-body); color: var(--ink); margin: 6px 0 0; }
+  .p-since {
+    font: 600 var(--text-micro) var(--font-body); letter-spacing: var(--tracking-eyebrow);
+    text-transform: uppercase; color: var(--ink-faint); margin: 10px 0 var(--space-3);
+  }
+  .p-go { margin: var(--space-4) 0 0; }
+  .p-go a { font: 500 var(--text-body) var(--font-body); color: var(--accent); text-decoration: none; }
+  .p-go a:hover { text-decoration: underline; }
+
+  .p-past { border-top: var(--border-w) solid var(--line); padding-top: var(--space-5); }
+  .p-past h2 { font: 600 var(--text-h4) var(--font-display); color: var(--ink); margin: 0 0 8px; }
+  .p-past-lead { font: 400 var(--text-sm) / 1.7 var(--font-body); color: var(--ink-soft); margin: 0 0 var(--space-4); max-width: 60ch; }
+  .p-past ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+  .p-past li { display: flex; gap: var(--space-3); align-items: baseline; flex-wrap: wrap; }
+  .p-past-name { font: 500 var(--text-body) var(--font-body); color: var(--ink); }
+  .p-past-when { font: 400 var(--text-sm) var(--font-body); color: var(--ink-faint); }
+
+  @media (max-width: 720px) {
+    .p-card { grid-template-columns: 1fr; }
+    .p-mark { min-height: 110px; }
+  }
+</style>

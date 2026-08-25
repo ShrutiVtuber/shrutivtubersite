@@ -8,12 +8,18 @@ before the art exists, and you unhide blocks from Athens as they arrive.
 
 from __future__ import annotations
 
+import re
+from datetime import date
+
 from fastapi import APIRouter, Depends
+from sqlalchemy.orm import aliased
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
 from shruti.core.db import get_session
-from shruti.models import Credit, FanArt, Media, ProfileField, Project, Section, SocialLink
+from shruti.models import (
+    Credit, FanArt, Media, ProfileField, Project, Section, SocialLink, Sponsor,
+)
 
 router = APIRouter(prefix="/api/content", tags=["content"])
 
@@ -148,6 +154,85 @@ async def get_projects(session: AsyncSession = Depends(get_session)) -> list[dic
         }
         for p, m in rows
     ]
+
+
+# At most three on the landing page. The cap lives here rather than in the
+# database, so a fourth sponsor is a decision she makes and not an error she
+# hits — she can tick a fourth and see the first three win, which is the
+# behaviour the admin's help text promises.
+FEATURED_SPONSORS = 3
+
+# A colour arriving from the admin is written into a style attribute, so it is
+# checked rather than trusted: anything that is not exactly #RRGGBB is dropped
+# and the card falls back to the site's own surface. Not a security fix on its
+# own — the value is escaped anyway — but a typo should look like a plain card,
+# not like a broken one.
+_HEX = re.compile(r"^#[0-9a-fA-F]{6}$")
+
+
+def _sponsor_payload(s: Sponsor, light: Media | None, dark: Media | None) -> dict:
+    return {
+        "slug": s.slug,
+        "name": s.name,
+        "tagline": s.tagline,
+        "bodyMd": s.body_md,
+        "url": s.url,
+        "ctaLabel": s.cta_label or "Visit",
+        "background": s.background if _HEX.match(s.background or "") else "",
+        "ink": s.ink if _HEX.match(s.ink or "") else "",
+        "media": _media_payload(light),
+        # Falls back to the light mark rather than to nothing: one wordmark that
+        # reads on both is the common case, and a missing logo is worse than a
+        # slightly-wrong one.
+        "mediaDark": _media_payload(dark) or _media_payload(light),
+        "featured": s.featured,
+        "since": s.since,
+        "until": s.until,
+    }
+
+
+async def _sponsor_rows(session: AsyncSession):
+    light = aliased(Media)
+    dark = aliased(Media)
+    return (
+        await session.execute(
+            select(Sponsor, light, dark)
+            .join(light, Sponsor.media_id == light.id, isouter=True)
+            .join(dark, Sponsor.media_dark_id == dark.id, isouter=True)
+            .where(Sponsor.visible.is_(True))
+            .order_by(Sponsor.position, Sponsor.id)
+        )
+    ).all()
+
+
+@router.get("/sponsors")
+async def get_sponsors(session: AsyncSession = Depends(get_session)) -> list[dict]:
+    """Everyone on the Partners page, current and past, in her order."""
+    return [_sponsor_payload(s, light, dark) for s, light, dark in await _sponsor_rows(session)]
+
+
+@router.get("/sponsors/featured")
+async def get_featured_sponsors(
+    session: AsyncSession = Depends(get_session),
+) -> list[dict]:
+    """
+    The landing page's row, capped.
+
+    A sponsor whose `until` has passed is not featured even if the tick is
+    still on — the home page is the loudest place on the site and it should not
+    be thanking somebody who stopped six months ago.
+    """
+    today = date.today().isoformat()
+    out = []
+    for s, light, dark in await _sponsor_rows(session):
+        if not s.featured:
+            continue
+        if s.until and s.until < today:
+            continue
+        out.append(_sponsor_payload(s, light, dark))
+        if len(out) == FEATURED_SPONSORS:
+            break
+    return out
 
 
 @router.get("/fan-art")

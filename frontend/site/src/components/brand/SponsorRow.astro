@@ -1,0 +1,134 @@
+---
+/* The people paying for the lights.
+ *
+ * **Their colours, not the site's.** A sponsor arrives with a brand and the
+ * brand is theirs — BeeRanked's plum is not a decision this site gets to make.
+ * So the background and the ink come out of the database and go inline, which
+ * is the one place on this site where a hard-coded colour is right. Anything
+ * that is not exactly #RRGGBB was already dropped by the API, and a card with
+ * no colours falls back to the site's own surface rather than to nothing.
+ *
+ * At most three, and that cap is on purpose: a fourth turns a thank-you into
+ * an ad break. Everyone else lives on /partners, where there is room to say
+ * who they actually are.
+ *
+ * `rel="sponsored"` on every link, because that is what these are. Search
+ * engines ask to be told, it costs nothing, and not saying so is the kind of
+ * small dishonesty that is expensive later.
+ */
+interface Sponsor {
+  slug: string;
+  name: string;
+  tagline: string;
+  url: string;
+  ctaLabel: string;
+  background: string;
+  ink: string;
+  media: { url: string; alt: string } | null;
+  mediaDark: { url: string; alt: string } | null;
+}
+interface Props {
+  sponsors: Sponsor[];
+  /** The Partners page repeats the row without the "see all" link. */
+  bare?: boolean;
+}
+const { sponsors, bare = false } = Astro.props;
+---
+
+{
+  sponsors.length > 0 && (
+    <section class="section page sponsors">
+      <div class="s-head">
+        <div>
+          <span class="t-eyebrow">With thanks to</span>
+          <h2>Who keeps this running</h2>
+          <p class="s-lead">
+            The channel is paid for by these. Nothing on this site is behind
+            them, and none of them chose what is written here — but the lights
+            are on because of them.
+          </p>
+        </div>
+        {!bare && <a class="s-all" href="/partners">All partners →</a>}
+      </div>
+
+      <ul class="s-list" data-count={sponsors.length}>
+        {sponsors.map((s) => (
+          <li>
+            <a
+              class="s-card"
+              href={s.url || "/partners"}
+              rel="sponsored noopener"
+              target={s.url ? "_blank" : undefined}
+              data-track="sponsor:clicked"
+              data-track-tool={s.slug}
+              style={
+                s.background
+                  ? `background:${s.background};${s.ink ? `color:${s.ink};` : ""}--s-ink:${s.ink || "currentColor"}`
+                  : undefined
+              }
+              data-plain={!s.background || undefined}
+            >
+              {s.media ? (
+                <img class="s-logo" src={s.media.url} alt={s.media.alt || s.name} loading="lazy" />
+              ) : (
+                <span class="s-name">{s.name}</span>
+              )}
+              {s.tagline && <span class="s-tag">{s.tagline}</span>}
+              <span class="s-go" aria-hidden="true">{s.ctaLabel} →</span>
+            </a>
+          </li>
+        ))}
+      </ul>
+    </section>
+  )
+}
+
+<style>
+  .sponsors { display: grid; gap: var(--space-5); }
+  .s-head { display: flex; gap: var(--space-5); align-items: flex-end; justify-content: space-between; flex-wrap: wrap; }
+  .s-head h2 { font: 600 var(--text-h3) var(--font-display); color: var(--ink); margin: 6px 0 0; }
+  .s-lead {
+    font: 400 var(--text-body) / var(--leading-body) var(--font-body);
+    color: var(--ink-soft); margin: 10px 0 0; max-width: 58ch;
+  }
+  .s-all { font: 500 var(--text-sm) var(--font-body); color: var(--accent); text-decoration: none; white-space: nowrap; }
+  .s-all:hover { text-decoration: underline; }
+
+  .s-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-4); }
+  /* One, two or three — the row is even at every count rather than leaving a
+     stretched single card or an orphan on its own line. */
+  .s-list[data-count="1"] { grid-template-columns: minmax(0, 1fr); max-width: 460px; }
+  .s-list[data-count="2"] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .s-list[data-count="3"] { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+
+  .s-card {
+    display: grid; gap: 12px; align-content: start; justify-items: start;
+    min-height: 168px; padding: var(--space-5);
+    border-radius: var(--radius-md);
+    border: var(--border-w) solid transparent;
+    text-decoration: none;
+    transition: transform var(--dur-2) var(--ease-out), box-shadow var(--dur-2) var(--ease-out);
+  }
+  .s-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-2); }
+  /* A sponsor who gave no colours still gets a card, on the site's surface. */
+  .s-card[data-plain] {
+    background: var(--surface-card);
+    border-color: var(--line);
+    color: var(--ink);
+  }
+  .s-logo { max-width: 190px; max-height: 52px; width: auto; height: auto; display: block; }
+  .s-name { font: 600 var(--text-h4) var(--font-display); }
+  .s-tag { font: 400 var(--text-sm) / 1.6 var(--font-body); opacity: 0.86; }
+  .s-go {
+    margin-top: auto; font: 600 var(--text-micro) var(--font-body);
+    letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; opacity: 0.8;
+  }
+
+  @media (max-width: 960px) {
+    .s-list[data-count="3"] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+  @media (max-width: 640px) {
+    .s-list, .s-list[data-count="2"], .s-list[data-count="3"] { grid-template-columns: 1fr; }
+    .s-list[data-count="1"] { max-width: none; }
+  }
+</style>
