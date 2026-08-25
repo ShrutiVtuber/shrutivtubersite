@@ -40,6 +40,8 @@ const toPost = (Array.isArray(shopOrders.body) ? shopOrders.body : [])
 
 const peopleList = await asAdmin(Astro, "/api/admin/users");
 const people: any[] = Array.isArray(peopleList.body) ? peopleList.body : [];
+const useCall = await asAdmin(Astro, "/api/insight/summary?days=7");
+const use = useCall.body ?? {};
 const skyList = await asAdmin(Astro, "/api/journal/entries");
 const skyEntries: any[] = skyList.body?.entries ?? [];
 ---
@@ -104,6 +106,12 @@ const skyEntries: any[] = skyList.body?.entries ?? [];
       <span class="sub">
         {skyEntries.filter((e: any) => e.written).length} with a writing sky
       </span>
+    </a>
+
+    <a class="adm-card tile" href="/admin/insight">
+      <span class="adm-lbl">Use, this week</span>
+      <span class="big">{use.views ?? 0}</span>
+      <span class="sub">{use.visitors ?? 0} different people</span>
     </a>
 
     <a class="adm-card tile" href="/admin/blocks">

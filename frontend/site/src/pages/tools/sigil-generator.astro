@@ -214,8 +214,8 @@ const keepVowels = q.get("vowels") === "keep";
       figureOut.innerHTML =
         `<h2>The figure</h2><div class="sig-figure-frame" data-svg>${svg}</div>` +
         `<div class="sig-actions">` +
-        `<button type="button" data-download="svg">Download SVG</button>` +
-        `<button type="button" data-download="png">Download PNG · 2048px</button>` +
+        `<button type="button" data-download="svg" data-track="tool:used" data-track-tool="sigil-generator">Download SVG</button>` +
+        `<button type="button" data-download="png" data-track="tool:used" data-track-tool="sigil-generator">Download PNG · 2048px</button>` +
         `<a href="?letters=${encodeURIComponent(r.unique.join(""))}&weight=${o.weight}&enclosure=${o.enclosure}${o.keepVowels ? "&vowels=keep" : ""}">Link to this figure</a>` +
         `</div>` +
         `<p class="never-leaves">The link carries the letter set, never the statement.</p>`;

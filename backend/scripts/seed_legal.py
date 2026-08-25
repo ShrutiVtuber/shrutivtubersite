@@ -54,11 +54,54 @@ What happens when you use them:
 Server logs record ordinary request information — the page, the time, the
 response code. They are not used to build a profile and are not shared.
 """),
+    ("counting", "What is counted, and how to say no", 25, """
+This site counts how much it is used. It does this itself, on its own server,
+and no other company is involved — no Google Analytics, no advertising network,
+no pixel from anywhere.
+
+What is recorded, when you open a page or press a tool's button: the page, the
+date, which tool, the site you arrived from if there was one, and **a number
+that stands in for you**. That number is a one-way hash of your IP address,
+your browser's identifying string, the date, and a secret held on the server.
+
+Read that last part slowly, because it is the whole of the design:
+
+- **Your address is never written down.** It goes into the hash and stops there.
+  It is not in a column, not in an export, not in a backup.
+- **The number cannot be turned back into you.** A hash does not run backwards,
+  and there is no table matching numbers to people, here or anywhere.
+- **The number changes at midnight**, because the date is inside it. So the
+  same person on Tuesday and on Wednesday are two different numbers, and
+  nothing on this site can tell they were the same visit. Following anybody
+  across days is not something that is declined here — it is something that
+  cannot be done.
+- **Nothing you type is ever sent.** A tool reports that it was used. It does
+  not report your birth time, your city, your question or your statement.
+
+That is why there is no consent banner for this. Consent is required for
+personal data, and a number that changes daily, cannot be reversed, and is
+never joined to anything is not personal data. Asking anyway would be theatre —
+and worse than theatre, because a count that only includes the third of people
+who click "yes" is a misleading count, which is a worse thing to run a website
+on than no count at all.
+
+**If you would rather not be counted, you can refuse, and the refusal is
+honoured.** Three ways, all of which work before anything is sent:
+
+- Turn on **Global Privacy Control** or **Do Not Track** in your browser. Both
+  are respected here. Neither is legally binding on this site; both are obeyed.
+- Use the switch on this page. It writes one word into your own browser's
+  storage. It never reaches the server, and it does not identify you.
+- Block the request to `/api/insight/beacon`. It will fail quietly and the
+  page will work normally, because nothing on this site depends on being
+  counted.
+"""),
     ("cookies", "Cookies, and why there is no consent banner", 30, """
 This site sets **only strictly necessary cookies**, which under the ePrivacy
 rules do not require consent — but do require telling you about. There is no
 analytics cookie, no advertising cookie, and no third-party script setting
-anything.
+anything. The counting described in the section above sets no cookie either,
+and writes nothing to your browser unless you use the switch to turn it off.
 
 | Name | What it is for | How long |
 |---|---|---|
@@ -66,10 +109,11 @@ anything.
 | `shruti_reader` | Your sign-in session, if you have an account. | 30 days |
 | `shruti_session` | The site owner's admin session. Never set for readers. | 12 hours |
 
-Two things are kept in your browser's local storage rather than in a cookie:
+Three things are kept in your browser's local storage rather than in a cookie:
 your **light/dark preference**, so the page does not flash white before it
-loads, and a note that you have **seen the cookie notice**, so it is not shown
-again. Neither leaves your device and neither is readable by this server.
+loads, a note that you have **seen the cookie notice**, so it is not shown
+again, and — only if you set it — your **choice not to be counted**. None of
+them leave your device and none are readable by this server.
 
 There is no consent banner because there is nothing to consent to. A banner
 asking permission for cookies that are not optional would be asking about a
@@ -141,8 +185,10 @@ You also have the right to complain to a supervisory authority.
   directly, so it does see your IP; self-hosting the fonts would remove that and
   is a known open item.
 
-There is no analytics provider, no advertising network, and no social tracking
-pixel.
+**No analytics company is on this list**, and that is not an omission. How much
+the site is used is counted by the site itself, on the same server, and the
+figures never leave it. There is no advertising network and no social tracking
+pixel either.
 """),
     ("changes", "Changes", 80, """
 This page is edited in place rather than replaced. Material changes will be

@@ -128,7 +128,7 @@ const RULE_NAME: Record<string, string> = {
       <input type="hidden" name="reckoning" value={reckoning} />
       <label><span>Date</span><input type="date" name="when" value={when} /></label>
       <PlaceField lat={lat} lon={lon} place={place} />
-      <button type="submit">Show</button>
+      <button type="submit" data-track="tool:used" data-track-tool="attic-calendar">Show</button>
     </form>
   </div>
 

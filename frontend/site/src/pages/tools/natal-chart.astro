@@ -152,7 +152,7 @@ const ASPECT_BASIS: Record<string, string> = {
           {HOUSE_SYSTEMS.map((h) => <option value={h} selected={h === houseSystem}>{h.replace(/_/g, " ")}</option>)}
         </select>
       </label>
-      <button type="submit">Cast</button>
+      <button type="submit" data-track="tool:used" data-track-tool="natal-chart">Cast</button>
     </form>
     <p class="privacy">
       Birth data in a link is birth data in a browser history. This page puts the date, time and

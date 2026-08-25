@@ -530,6 +530,49 @@ class Order(TimestampMixin, table=True):
 
 
 
+
+class Visit(TimestampMixin, table=True):
+    """
+    One page opened, or one tool used.
+
+    **There is no cookie and no identifier that outlives a day.** `visitor` is a
+    hash of the address, the browser string, today's date and a server secret —
+    which means the same person is one number today and a different number
+    tomorrow, the number cannot be turned back into an address, and nobody who
+    stole this table could work out who anybody is.
+
+    That is not an accident of implementation, it is the whole design. It is
+    what makes "how many people used the isopsephy tool this week" answerable
+    without tracking anybody, and it is why this needs no consent banner: there
+    is nothing stored that identifies a person, so there is nothing to consent
+    to.
+
+    The cost, stated plainly: returning visitors cannot be told from new ones
+    across days. That is the trade, and it is the right way round.
+    """
+
+    __tablename__ = "visit"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    # The date, kept separately so counting by day does not mean date maths on
+    # every row of a growing table.
+    day: str = Field(index=True)                  # YYYY-MM-DD
+
+    path: str = Field(index=True)
+    # Empty for a page being opened; otherwise what happened on it.
+    event: str = Field(default="", index=True)
+    # A little JSON, for "which tool" or "which sign". Never anything typed by
+    # a visitor — a tool's input is theirs, not something to collect.
+    props: str = ""
+
+    # Today's hash. Not an account, not a cookie, not reversible.
+    visitor: str = Field(index=True)
+
+    # Where they came from, reduced to a host. The full URL of a referring page
+    # can carry a search query, which is somebody's words.
+    referrer: str = ""
+
+
 # ── classes and workshops ───────────────────────────────────────────────────
 
 class Course(TimestampMixin, table=True):

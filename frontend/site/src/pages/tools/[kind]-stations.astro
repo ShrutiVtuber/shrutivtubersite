@@ -144,7 +144,7 @@ const polarReason = noRiseOrSet
           {PRESETS.map((p) => <option value={p.value} selected={p.value === preset}>{p.label}</option>)}
         </select>
       </label>
-      <Button type="submit" size="sm">Show</Button>
+      <Button type="submit" size="sm" data-track="tool:used" data-track-tool="stations">Show</Button>
     </form>
 
     {

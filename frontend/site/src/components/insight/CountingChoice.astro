@@ -1,0 +1,99 @@
+---
+/* The switch the privacy page promises.
+ *
+ * It writes one word into this browser's own storage and never talks to the
+ * server, which is what makes it honest: a refusal that had to be recorded
+ * server-side would mean identifying the person refusing in order to remember
+ * that they did not want to be identified.
+ *
+ * It renders as "counting is on" and corrects itself on load, because the page
+ * is server-rendered and the server genuinely does not know what this browser
+ * chose. With scripting off it stays a plain sentence rather than a dead
+ * control.
+ */
+---
+
+<div class="choice" data-counting-choice hidden>
+  <p class="state" data-counting-state>Checking…</p>
+  <button type="button" class="sh-btn" data-variant="secondary" data-size="sm" data-counting-toggle>
+    <span data-counting-label>…</span>
+  </button>
+  <p class="fine" data-counting-fine></p>
+</div>
+
+<noscript>
+  <p class="fine">
+    Scripting is off in this browser, so nothing on this page has been counted —
+    the counting needs scripting to happen at all.
+  </p>
+</noscript>
+
+<script>
+  (() => {
+    const box = document.querySelector("[data-counting-choice]") as HTMLElement | null;
+    if (!box) return;
+    const state = box.querySelector("[data-counting-state]") as HTMLElement;
+    const label = box.querySelector("[data-counting-label]") as HTMLElement;
+    const fine = box.querySelector("[data-counting-fine]") as HTMLElement;
+    const button = box.querySelector("[data-counting-toggle]") as HTMLButtonElement;
+
+    /* A browser-level refusal outranks the switch and cannot be overridden
+       from here — offering a button that appears to turn counting back on
+       while the browser still says no would be a lie in the other direction. */
+    const browserSaysNo =
+      (navigator as any).globalPrivacyControl === true ||
+      navigator.doNotTrack === "1" ||
+      (window as any).doNotTrack === "1";
+
+    const read = () => {
+      try { return localStorage.getItem("shruti_counting") === "no"; }
+      catch { return false; }
+    };
+
+    const draw = () => {
+      const off = browserSaysNo || read();
+      state.textContent = off
+        ? "This browser is not being counted."
+        : "This browser is being counted, in the way described above.";
+      if (browserSaysNo) {
+        label.textContent = "Your browser has already said no";
+        button.disabled = true;
+        fine.textContent =
+          "Global Privacy Control or Do Not Track is on in this browser, and it is being respected. Turn it off there if you change your mind.";
+        return;
+      }
+      button.disabled = false;
+      label.textContent = off ? "Count this browser again" : "Do not count this browser";
+      fine.textContent = off
+        ? "Your choice is stored on this device only. Clearing site data will forget it."
+        : "";
+    };
+
+    button.addEventListener("click", () => {
+      try {
+        if (read()) localStorage.removeItem("shruti_counting");
+        else localStorage.setItem("shruti_counting", "no");
+      } catch {
+        fine.textContent =
+          "This browser will not let the site remember anything, so the switch cannot be saved. Do Not Track, or blocking /api/insight/beacon, will work.";
+        return;
+      }
+      draw();
+    });
+
+    box.hidden = false;
+    draw();
+  })();
+</script>
+
+<style>
+  .choice {
+    display: grid; gap: var(--space-3); justify-items: start;
+    padding: var(--space-4); margin-top: var(--space-4);
+    background: var(--surface-veil); border-radius: var(--radius-md);
+    border: var(--border-w) solid var(--line);
+  }
+  .state { font: 500 var(--text-body) var(--font-body); color: var(--ink); margin: 0; }
+  .fine { font: 400 var(--text-sm) / 1.7 var(--font-body); color: var(--ink-soft); margin: 0; max-width: 62ch; }
+  .fine:empty { display: none; }
+</style>

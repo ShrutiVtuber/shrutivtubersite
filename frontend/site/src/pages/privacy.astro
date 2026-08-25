@@ -13,6 +13,7 @@ import Prose from "../components/content/Prose.astro";
 import SectionFigure from "../components/blocks/SectionFigure.astro";
 import LegalImprint from "../components/brand/LegalImprint.astro";
 import EmptyState from "../components/feedback/EmptyState.astro";
+import CountingChoice from "../components/insight/CountingChoice.astro";
 import { pageSections } from "../lib/content";
 import { site } from "../lib/api";
 
@@ -36,6 +37,7 @@ const sections = await pageSections("privacy");
               {s.title && <h2>{s.title}</h2>}
               <SectionFigure media={s.media} title={s.title} />
               <Prose html={s.html} />
+              {s.key === "counting" && <CountingChoice />}
             </section>
           ))}
         </div>

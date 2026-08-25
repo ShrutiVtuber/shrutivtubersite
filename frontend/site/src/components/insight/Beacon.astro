@@ -1,0 +1,79 @@
+---
+/* Counting a page, and things done on it.
+ *
+ * No cookie is set and nothing is written to the browser. The server turns the
+ * address into a number that changes at midnight and stores that; this side
+ * holds nothing at all between page loads.
+ *
+ * It is deferred and it is tiny, and if it fails nothing happens — a page that
+ * broke because a counter did would be a bad trade for knowing which tool is
+ * popular.
+ *
+ * Tools report themselves by putting `data-track="tool:name"` on anything a
+ * visitor presses. **Never send what they typed** — which tool, not what they
+ * asked it.
+ *
+ * Three ways to not be counted, all honoured before the first beacon: Global
+ * Privacy Control, Do Not Track, and a switch on the privacy page that writes
+ * one word to this browser's own storage. None of them are required of us —
+ * there is no personal data here to consent to — and all of them are honoured
+ * anyway, because somebody who has said no meant it whether or not the law
+ * agrees they had to be asked.
+ */
+---
+<script>
+  (() => {
+    /* Asked not to, in any of the ways there are to ask. Read before anything
+       is sent, and a storage that throws (private mode, blocked site data)
+       means counting rather than crashing. */
+    let refused = false;
+    try {
+      refused =
+        (navigator as any).globalPrivacyControl === true ||
+        navigator.doNotTrack === "1" ||
+        (window as any).doNotTrack === "1" ||
+        localStorage.getItem("shruti_counting") === "no";
+    } catch {
+      refused = false;
+    }
+    if (refused) return;
+
+    const send = (event = "", props = {}) => {
+      const body = JSON.stringify({
+        path: location.pathname,
+        event,
+        props,
+        referrer: document.referrer || "",
+      });
+      /* sendBeacon survives the page being closed, which a fetch does not —
+         somebody who reads a page and leaves still read it. */
+      try {
+        if (navigator.sendBeacon) {
+          navigator.sendBeacon("/api/insight/beacon", new Blob([body], { type: "application/json" }));
+          return;
+        }
+        fetch("/api/insight/beacon", {
+          method: "POST", body, keepalive: true,
+          headers: { "content-type": "application/json" },
+        }).catch(() => {});
+      } catch {
+        /* Nothing to do and nothing worth telling anybody. */
+      }
+    };
+
+    send();
+
+    /* One listener for the whole page rather than one per control, so a tool
+       opts in by adding an attribute and nothing has to be wired up. */
+    document.addEventListener("click", (e) => {
+      const el = (e.target as HTMLElement | null)?.closest?.("[data-track]");
+      if (!el) return;
+      const name = el.getAttribute("data-track") || "";
+      if (!name) return;
+      const props: Record<string, string> = {};
+      const tool = el.getAttribute("data-track-tool");
+      if (tool) props.tool = tool;
+      send(name, props);
+    }, { passive: true });
+  })();
+</script>

@@ -1,0 +1,275 @@
+---
+/* How much things get used.
+ *
+ * There is no third party in this page. The numbers come from her own
+ * database, counted from beacons her own site sends, and nobody outside the
+ * building has ever seen them.
+ *
+ * A visitor here is a number that exists for one day: a hash of address,
+ * browser, the date and a server secret. So "visitors" means "different
+ * people today", the same person on Tuesday and Wednesday is two, and no row
+ * can be followed past midnight. That is a real limit and it is on the page
+ * rather than in a comment, because a number whose meaning is hidden gets
+ * read as a different number.
+ */
+import AdminLayout from "../../layouts/AdminLayout.astro";
+import CsrfField from "../../components/forms/CsrfField.astro";
+import Button from "../../components/forms/Button.astro";
+import { asAdmin } from "../../lib/admin";
+import { verifyCsrf } from "../../lib/csrf";
+
+export const prerender = false;
+
+let notice = "";
+let failed = "";
+
+if (Astro.request.method === "POST") {
+  const form = await Astro.request.formData();
+  if (!verifyCsrf(Astro.cookies, form)) {
+    failed = "That did not go through. Reload the page and try again.";
+  } else if (String(form.get("action") ?? "") === "forget") {
+    const r = await asAdmin(Astro, "/api/insight/all", { method: "DELETE" });
+    if (r.ok) notice = "Everything counted has been thrown away.";
+    else failed = "That did not work. Nothing was deleted.";
+  }
+}
+
+const asked = Number(Astro.url.searchParams.get("days") ?? 30);
+const days = [7, 30, 90].includes(asked) ? asked : 30;
+
+const [summaryCall, journeyCall] = await Promise.all([
+  asAdmin(Astro, `/api/insight/summary?days=${days}`),
+  asAdmin(Astro, `/api/insight/journeys?days=${Math.min(days, 30)}`),
+]);
+const s = summaryCall.body ?? {};
+const j = journeyCall.body ?? {};
+
+const byDay: { day: string; views: number; visitors: number }[] = s.byDay ?? [];
+const peak = Math.max(1, ...byDay.map((d) => d.views));
+const tools: { name: string; count: number; people: number }[] = s.tools ?? [];
+const topPages: { name: string; count: number }[] = s.topPages ?? [];
+const referrers: { name: string; count: number }[] = s.referrers ?? [];
+const events: { name: string; count: number }[] = s.events ?? [];
+const landings: { name: string; count: number }[] = j.landings ?? [];
+const steps: { name: string; count: number }[] = j.steps ?? [];
+
+const busiest = tools.length ? Math.max(...tools.map((t) => t.count)) : 1;
+const readable = (iso: string) =>
+  new Date(iso + "T00:00:00Z").toLocaleDateString("en-GB", {
+    day: "numeric", month: "short", timeZone: "UTC",
+  });
+---
+
+<AdminLayout title="Use">
+  <h1 class="adm-h">Use</h1>
+
+  {notice && <p class="adm-ok">{notice}</p>}
+  {failed && <p class="adm-bad">{failed}</p>}
+
+  <p class="adm-note">
+    Counted here, on this server, with no third party involved and no cookie
+    set. A visitor is a number made from an address, a browser and the date,
+    which means the same person counts once a day and cannot be recognised
+    tomorrow — so a week of visitors is not seven days of the same people
+    added up.
+  </p>
+
+  <nav class="spans" aria-label="How far back">
+    {[7, 30, 90].map((n) => (
+      <a href={`/admin/insight?days=${n}`} aria-current={n === days ? "page" : undefined}>
+        {n} days
+      </a>
+    ))}
+  </nav>
+
+  <div class="cards">
+    <div class="adm-card tile">
+      <span class="adm-lbl">Pages seen</span>
+      <span class="big">{s.views ?? 0}</span>
+    </div>
+    <div class="adm-card tile">
+      <span class="adm-lbl">Different people</span>
+      <span class="big">{s.visitors ?? 0}</span>
+      <span class="of">counted a day at a time</span>
+    </div>
+    <div class="adm-card tile">
+      <span class="adm-lbl">Tools used</span>
+      <span class="big">{tools.reduce((n, t) => n + t.count, 0)}</span>
+    </div>
+  </div>
+
+  <section class="adm-card">
+    <h2 class="adm-lbl">By day</h2>
+    {byDay.length === 0 ? (
+      <p class="adm-note">Nothing counted yet.</p>
+    ) : (
+      <ol class="chart">
+        {byDay.map((d) => (
+          <li>
+            <span class="bar" style={`height: ${Math.round((d.views / peak) * 100)}%`}
+                  title={`${readable(d.day)} — ${d.views} pages, ${d.visitors} people`}></span>
+          </li>
+        ))}
+      </ol>
+    )}
+    {byDay.length > 0 && (
+      <p class="ends">
+        <span>{readable(byDay[0].day)}</span>
+        <span>{readable(byDay[byDay.length - 1].day)}</span>
+      </p>
+    )}
+  </section>
+
+  <section class="adm-card">
+    <h2 class="adm-lbl">Tools</h2>
+    {tools.length === 0 ? (
+      <p class="adm-note">
+        No tool has been used yet in this window. Every tool records the moment
+        somebody presses its button — not what they typed into it.
+      </p>
+    ) : (
+      <ul class="ranked">
+        {tools.map((t) => (
+          <li>
+            <span class="who">{t.name}</span>
+            <span class="run"><span class="fill" style={`width: ${Math.round((t.count / busiest) * 100)}%`}></span></span>
+            <span class="num">{t.count} <span class="of">by {t.people}</span></span>
+          </li>
+        ))}
+      </ul>
+    )}
+  </section>
+
+  <div class="pair">
+    <section class="adm-card">
+      <h2 class="adm-lbl">Most seen pages</h2>
+      {topPages.length === 0 ? <p class="adm-note">Nothing yet.</p> : (
+        <ul class="plain">
+          {topPages.map((p) => (
+            <li><span class="who">{p.name}</span><span class="num">{p.count}</span></li>
+          ))}
+        </ul>
+      )}
+    </section>
+
+    <section class="adm-card">
+      <h2 class="adm-lbl">Where they arrived from</h2>
+      {referrers.length === 0 ? (
+        <p class="adm-note">
+          Nobody has arrived from another site yet — or they came without
+          saying, which is normal.
+        </p>
+      ) : (
+        <ul class="plain">
+          {referrers.map((r) => (
+            <li><span class="who">{r.name}</span><span class="num">{r.count}</span></li>
+          ))}
+        </ul>
+      )}
+    </section>
+  </div>
+
+  <div class="pair">
+    <section class="adm-card">
+      <h2 class="adm-lbl">Where they came in</h2>
+      {landings.length === 0 ? <p class="adm-note">Nothing yet.</p> : (
+        <ul class="plain">
+          {landings.map((l) => (
+            <li><span class="who">{l.name}</span><span class="num">{l.count}</span></li>
+          ))}
+        </ul>
+      )}
+    </section>
+
+    <section class="adm-card">
+      <h2 class="adm-lbl">Where they went next</h2>
+      {steps.length === 0 ? (
+        <p class="adm-note">
+          No second page yet. This only follows one visit within one day, and
+          stops at midnight.
+        </p>
+      ) : (
+        <ul class="plain">
+          {steps.map((step) => (
+            <li><span class="who">{step.name}</span><span class="num">{step.count}</span></li>
+          ))}
+        </ul>
+      )}
+    </section>
+  </div>
+
+  {events.length > 0 && (
+    <section class="adm-card">
+      <h2 class="adm-lbl">Everything else recorded</h2>
+      <ul class="plain">
+        {events.map((e) => (
+          <li><span class="who">{e.name}</span><span class="num">{e.count}</span></li>
+        ))}
+      </ul>
+    </section>
+  )}
+
+  <section class="adm-card">
+    <h2 class="adm-lbl">Throw it all away</h2>
+    <p class="adm-note">
+      Deletes every row, for every day. There is no undo and no backup of it —
+      which is the point of having the button.
+    </p>
+    <form method="POST" onsubmit="return confirm('Delete everything counted, for every day?')">
+      <CsrfField />
+      <input type="hidden" name="action" value="forget" />
+      <Button type="submit" variant="secondary">Forget everything</Button>
+    </form>
+  </section>
+</AdminLayout>
+
+<style>
+  .spans { display: flex; gap: 2px; }
+  .spans a {
+    font: 500 var(--text-sm) var(--font-body); color: var(--ink-soft);
+    text-decoration: none; padding: 8px 12px; border-radius: var(--radius-sm);
+    min-height: 40px; display: inline-flex; align-items: center;
+  }
+  .spans a:hover { color: var(--ink); background: var(--surface-veil); }
+  .spans a[aria-current="page"] { color: var(--accent); background: var(--accent-wash); }
+
+  .cards { display: grid; gap: var(--space-4); grid-template-columns: repeat(3, 1fr); }
+  .tile { align-content: start; }
+  .big { font: 600 var(--text-h2) var(--font-display); color: var(--ink); line-height: 1; }
+  .of { font: 400 var(--text-xs) var(--font-body); color: var(--ink-faint); }
+
+  /* A bar per day. Deliberately no library: it is one number per column and a
+     chart package would be more code than the whole feature. */
+  .chart {
+    list-style: none; margin: 0; padding: 0; display: flex; gap: 2px;
+    align-items: flex-end; height: 120px;
+  }
+  .chart li { flex: 1; height: 100%; display: flex; align-items: flex-end; }
+  .bar {
+    width: 100%; min-height: 2px; background: var(--accent);
+    border-radius: 2px 2px 0 0; opacity: 0.85;
+  }
+  .ends {
+    display: flex; justify-content: space-between; margin: 0;
+    font: 400 var(--text-xs) var(--font-body); color: var(--ink-faint);
+  }
+
+  .ranked, .plain { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+  .ranked li { display: grid; grid-template-columns: minmax(0, 12ch) 1fr auto; gap: var(--space-3); align-items: center; }
+  .plain li { display: flex; gap: var(--space-3); align-items: baseline; justify-content: space-between; }
+  .who {
+    font: 400 var(--text-sm) var(--font-body); color: var(--ink);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .num { font: 500 var(--text-sm) var(--font-body); color: var(--ink-soft); white-space: nowrap; }
+  .run { background: var(--surface-veil); border-radius: 999px; height: 8px; overflow: hidden; }
+  .fill { display: block; height: 100%; background: var(--accent); border-radius: 999px; }
+
+  .pair { display: grid; gap: var(--space-4); grid-template-columns: 1fr 1fr; }
+
+  @media (max-width: 720px) {
+    .cards { grid-template-columns: 1fr; }
+    .pair { grid-template-columns: 1fr; }
+    .ranked li { grid-template-columns: minmax(0, 10ch) 1fr auto; }
+  }
+</style>

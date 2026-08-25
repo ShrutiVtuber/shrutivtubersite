@@ -8,6 +8,13 @@
  * choice that does not exist — and training people to click "accept" on
  * something that was never optional.
  *
+ * The site does count its own use, and this line says so rather than leaving it
+ * to be discovered. That counting sets no cookie, so it does not turn this
+ * notice into a banner — but a notice that listed cookies while something else
+ * went uncounted-for would be technically complete and practically misleading,
+ * which is the thing this component exists to avoid. The link goes to the
+ * section that explains it and carries the switch to turn it off.
+ *
  * What IS required is DISCLOSURE. So: one line, dismissed with one button,
  * remembered locally, and a link to the full table in the privacy policy.
  * No "accept", no "reject", no preferences dialog, because there is nothing
@@ -18,8 +25,10 @@
 <div class="cookie-notice" data-cookie-notice hidden>
   <p>
     This site sets only the cookies it needs to work — a sign-in session and a
-    form-security token. No analytics cookies, no advertising, no third parties, so there is
-    nothing here to consent to. <a href="/privacy#cookies">What is set, and why</a>.
+    form-security token. No advertising and no third parties. It counts its own pages without
+    a cookie and without knowing who you are, and you can
+    <a href="/privacy#counting">turn that off</a> or read
+    <a href="/privacy#cookies">what is set, and why</a>.
   </p>
   <button type="button" data-cookie-dismiss>Got it</button>
 </div>
