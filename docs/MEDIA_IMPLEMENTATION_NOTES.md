@@ -55,7 +55,7 @@ site and launch. Her words, condensed:
 - [x] `blocks.astro` renders `media_id` with it, for all four kinds
 - [x] Media page: search, tag filter, rename/retag/delete per item
 - [x] Tests
-- [ ] Deployed and checked
+- [x] Deployed and checked
 
 ## Gotchas already paid for on this codebase
 

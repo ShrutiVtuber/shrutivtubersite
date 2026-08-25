@@ -287,8 +287,7 @@ and its id, and both can be live at once.
 **The LMS proper**
 
 - [x] Admin screens — building a course is API-only today
-- [ ] Uploading video from the admin, straight to Bunny rather than through us
-      (the id can be pasted in today, which works but is a chore)
+- [x] Uploading video from the admin, straight to Bunny rather than through us
 - [x] The reader — sidebar, ticks, complete & continue, the player
 - [x] Re-fetch a stale playback token instead of showing an error
 - [x] `/lessons/{id}/file` — the gap is closed
