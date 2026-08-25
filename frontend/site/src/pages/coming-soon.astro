@@ -172,6 +172,8 @@ const holder = imprint?.visible && imprint.entity ? imprint.entity : "Shruti";
 const source = versionAnswer.data;
 const badge = live?.anyLive ? "live" : "offline";
 const year = new Date().getUTCFullYear();
+import Beacon from "../components/insight/Beacon.astro";
+
 const csrf = Astro.locals.csrf;
 const consentDefault =
   "One letter a month: what shipped, what the sky is doing, and the occasional paid thing. " +
@@ -314,5 +316,12 @@ function tick(){
 }
 tick();setInterval(tick,1000);
 </script>
+{/* Counted like the rest of the site — which while the holding page is up
+    means counted INSTEAD of the rest of the site, since this is the only page
+    most people see. It records the path they asked for rather than
+    /coming-soon, because the middleware rewrites rather than redirects, so
+    the dashboard answers the more useful question: what are people trying to
+    reach while the door is shut. */}
+<Beacon />
 </body>
 </html>
