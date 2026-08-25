@@ -57,23 +57,59 @@ as she described — so nothing needs a special case.
 ### 1. Where the video lives — the one that costs money
 
 Product files cap at 512 MB and are served whole. A 285-minute lecture is not
-that. Real video needs transcoding, adaptive streaming, and a signed URL so a
-paid course is not one right-click from being redistributed.
+that. Real video needs transcoding, adaptive streaming, and a way to stop a
+paid course being one shared link from free.
 
-**Recommendation: Cloudflare Stream.** She is already on Cloudflare for R2 and
-DNS, it transcodes and serves adaptive HLS, and it does signed playback tokens
-without extra machinery. Priced per minute stored and per minute delivered —
-**check the current rate before committing**, because it is the one running
-cost this feature adds.
+#### Why YouTube does not work here, even privately
 
-The alternatives, briefly: **Bunny Stream** is cheaper and perfectly good;
-**Mux** is the best tooling and the most expensive; **plain R2** is cheapest and
-means no adaptive streaming, no signed playback, and one enormous file per
-lecture, which is the option that looks fine until somebody watches on a train.
+She asked, and it is the right question to ask before paying for anything.
+
+- **Unlisted** means anyone holding the link can watch, forever, with no
+  account. One student pasting it into a Discord is the whole course gone.
+  There is no access control — that is what unlisted *means*.
+- **Private** means only Google accounts she has individually invited, capped
+  at 100, and private videos cannot be embedded for anyone outside that list.
+  It does not scale and it forces every student to have a Google account.
+- Either way, every student's viewing goes to Google, on a site that
+  [self-hosts its fonts specifically so it stops sending visitors to Google].
+
+So: unlisted is free and leaks; private does not work at all. Worth knowing
+rather than assuming, and the honest version is that YouTube is not built to
+sell access to something.
+
+#### The four that are
+
+| | Access control | Adaptive | Cost shape | Work |
+|---|---|---|---|---|
+| **Cloudflare Stream** | signed tokens, expiring | yes | per minute stored + delivered | small |
+| **Bunny Stream** | token auth, referrer lock | yes | storage + bandwidth, cheapest | small |
+| **Vimeo** | domain-locked embeds | yes | flat monthly tier | smallest |
+| **Mux** | signed playback | yes | per minute, dearest | small |
+
+- **Cloudflare Stream** — already her provider for R2 and DNS, so one account
+  fewer and one bill fewer. Signed playback tokens expire, so a shared link
+  dies. <https://developers.cloudflare.com/stream/> ·
+  <https://developers.cloudflare.com/stream/pricing/> ·
+  <https://developers.cloudflare.com/stream/viewing-videos/securing-your-stream/>
+- **Bunny Stream** — reliably the cheapest of the four and genuinely good.
+  A separate account and a separate bill. <https://bunny.net/stream/> ·
+  <https://bunny.net/pricing/stream/>
+- **Vimeo** — flat monthly rather than per-minute, which is easier to predict
+  when she does not know her audience yet. Domain-locked embedding is built
+  for exactly this. Least work of the four. <https://vimeo.com/features/video-privacy>
+- **Mux** — best tooling, dearest, and aimed at people with more video than
+  she has. <https://www.mux.com/pricing/video>
+
+**Recommendation: Cloudflare Stream**, on the grounds that it is one fewer
+account and one fewer bill and the signed-token model is exactly right for a
+paid course. **Bunny if the bill matters more than the tidiness**, which at
+launch it might. Either is a small integration and the choice is not
+irreversible — the player is behind one component and one field on a lesson.
 
 ### 2. The live platform
 
-**Recommendation: Daily.co**, which is what she already had in mind. Chat and
+**Settled: Daily.co**, which is what she already had in mind, and she will
+price workshops against its per-participant cost. Chat and
 raised hands come with their prebuilt call UI rather than needing to be built,
 cloud recording is a flag, and the API is small enough to wire in a day.
 
@@ -84,25 +120,24 @@ work up front because more of the room UI is hers to assemble.
 **Zoom** is not recommended: it works, and it puts a third party's branding and
 account requirements between her and the people who paid her.
 
-### 3. Quizzes — what are they for?
+### 3. Quizzes — self-check. Settled.
 
-Two honest options, and they build differently:
+**Her answer: self-check.** Nothing graded, nothing gateable, no pass mark.
 
-- **Self-check.** Answers revealed, nothing recorded beyond "attempted". Good
-  for "did that land?". Simple.
-- **Graded, with a pass mark.** A score is stored, a lesson can require a pass
-  before continuing, and someone can fail. More to build, and it changes what a
-  class *is* — a thing you can get wrong.
+Certification, where she runs one, happens outside the quiz entirely: a written
+lesson explains how the examination works, and the examination itself is a live
+reading watched by her or an assistant, or a written test sent to her. So the
+quiz never has to carry the weight of deciding whether somebody passed
+something — which is what makes it small.
 
-Default if she does not care: self-check, because it cannot make somebody feel
-they failed a class they paid for.
+### 4. The workshop recording. Settled.
 
-### 4. One check on her own words
+**Confirmed:** the recording of the workshop they attended — one recording, the
+same for everyone in that session. Not a per-attendee camera recording.
 
-*"they get a copy of their session in email"* — read here as **the recording of
-the workshop they attended**, one recording shared by everyone in that session.
-Not a per-attendee recording of their own camera. Worth confirming, because the
-second is a very different feature.
+**And delivered as one package at the end of the whole workshop**, not after
+each day. A three-day workshop sends one thing once, so somebody has all of it
+in one place rather than three emails to keep track of.
 
 ## For her accountant, before the first sale
 
@@ -132,3 +167,41 @@ a sidebar, a list with ticks, and a content pane. It will be built in the
 site's own language rather than as a copy of Teachable's, and if that lands
 wrong a designer pass can follow — but a handoff before anything exists would
 be designing in the dark.
+
+
+## What she needs to get, and what only she can get
+
+Everything below is an account or a key that has to come from her hands. The
+plan does not wait on any of it — the LMS is built against a video reference
+and a room id, so both slot in at the end.
+
+**Video** — whichever of the four she picks:
+
+| | What is needed |
+|---|---|
+| Cloudflare Stream | account id (already held, same as R2) + an API token with Stream:Edit |
+| Bunny Stream | account, a video library, its library id + API key |
+| Vimeo | a plan that allows domain-locked embedding + an access token |
+| Mux | access token id + secret |
+
+**Daily.co** — an account and an API key.
+<https://docs.daily.co/reference/rest-api> · <https://www.daily.co/pricing>
+
+**Nothing else.** Stripe already has everything it needs for selling classes
+and tickets; the live keys are the same swap already planned, not a new one.
+Resend already sends the mail that will carry a workshop recording.
+
+Same handling as always: she writes them into a file, says where, they are
+installed without passing through a terminal or a chat, and the file is deleted.
+
+## Design — no handoff
+
+The tokens and the existing components cover this. It is a sidebar, a list with
+ticks, and a content pane, and the site already has buttons, badges, prose,
+empty states, cards and a type scale. It will be built in the site's own
+language rather than as a copy of Teachable's.
+
+If it lands wrong when she sees it, a designer pass can follow — but a handoff
+before anything exists would be designing in the dark, and the journal is the
+evidence that a handoff is worth it when the thing is a new visual world. This
+is not that.
