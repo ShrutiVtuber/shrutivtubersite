@@ -122,6 +122,19 @@ class Settings(BaseSettings):
         return bool(self.stripe_secret_key)
 
     @property
+    def stripe_is_test(self) -> bool:
+        """
+        Whether the keys in use are test keys.
+
+        Worth asking out loud, because a production site running test keys
+        looks exactly like one that works: checkout opens, the card form
+        accepts a test number, the thank-you page appears — and no money moves.
+        The failure is silent and on the wrong side of the sale, so it is
+        surfaced rather than left to be noticed.
+        """
+        return self.stripe_secret_key.startswith("sk_test")
+
+    @property
     def is_production(self) -> bool:
         return self.env.lower() in {"production", "prod"}
 

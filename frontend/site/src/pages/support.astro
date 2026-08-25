@@ -67,6 +67,8 @@ interface Billing {
   configured: boolean;
   tiers: StripeTier[];
   oneOff: { min: number; max: number; default: number; currency: string } | null;
+  /** Test keys take a card and move no money. */
+  testMode?: boolean;
 }
 
 const [sections, billing] = await Promise.all([
@@ -128,6 +130,15 @@ const offerable = (key: string) => open && (key === "one-off" || priced.has(key)
     />
 
     {failed && <p class="pay-failed" role="alert">{failed}</p>}
+
+    {
+      billing?.testMode && (
+        <p class="testmode" role="status">
+          <strong>Test mode.</strong> Cards are accepted and nothing is charged.
+          Nobody can actually support the work until the live keys are in.
+        </p>
+      )
+    }
 
     <div class="tiers">
       {
@@ -232,6 +243,18 @@ const offerable = (key: string) => open && (key === "one-off" || priced.has(key)
 </BaseLayout>
 
 <style>
+  /* Loud on purpose. A site taking test cards looks exactly like one that
+     works — the failure is silent and on the wrong side of the sale. */
+  .testmode {
+    margin: 0 0 var(--space-4);
+    padding: var(--space-3) var(--space-4);
+    border: var(--border-w) solid var(--live);
+    border-radius: var(--radius-sm);
+    background: color-mix(in srgb, var(--live) 8%, transparent);
+    font: 400 var(--text-sm) var(--font-body);
+    color: var(--ink);
+  }
+
   .pay-failed { font: 400 var(--text-sm) var(--font-body); color: var(--live); margin: 0; }
   .tier-form { display: grid; gap: var(--space-3); justify-items: start; }
   .tier-tbd { color: var(--ink-faint); }

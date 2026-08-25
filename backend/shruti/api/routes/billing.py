@@ -117,7 +117,8 @@ async def tiers() -> dict:
     """
     s = get_settings()
     if not s.stripe_secret_key:
-        return {"configured": False, "tiers": [], "oneOff": None}
+        return {"configured": False, "tiers": [], "oneOff": None,
+                "testMode": s.stripe_is_test}
 
     client = _client()
     out = []
@@ -139,6 +140,9 @@ async def tiers() -> dict:
         })
 
     return {
+        # Said on every money screen, because a site taking test cards looks
+        # exactly like one that works.
+        "testMode": s.stripe_is_test,
         "configured": True,
         "tiers": out,
         "oneOff": {"min": ONE_OFF_MIN, "max": ONE_OFF_MAX, "default": ONE_OFF_DEFAULT,
