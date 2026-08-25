@@ -7,7 +7,6 @@
 #
 #   host Caddy :443  ──►  127.0.0.1:${SHRUTI_HOST_PORT:-8200}  ──►  caddy
 #                                                                    ├─► site  (Astro SSR)
-#                                                                    ├─► admin (static)
 #                                                                    └─► backend (FastAPI)
 #
 # Production overlay (resource limits, log rotation) lives in
@@ -31,7 +30,6 @@ services:
       - "127.0.0.1:${SHRUTI_HOST_PORT:-8200}:8080"
     volumes:
       - ./Caddyfile.internal:/etc/caddy/Caddyfile:ro
-      - admin_dist:/srv/admin:ro
       - media:/srv/media:ro
       - caddy_data:/data
       - caddy_config:/config
@@ -60,16 +58,12 @@ services:
       PORT: 4321
     networks: [shruti, shruti-interop]
 
-  admin:
-    profiles: ["web"]
-    # Builds the admin SPA into a named volume that caddy serves at /admin.
-    # Not a long-running service — it exits once the bundle is written.
-    build:
-      context: .
-      dockerfile: frontend/admin/Dockerfile
-    volumes:
-      - admin_dist:/out
-    networks: [shruti]
+
+  # There is no `admin` service. The admin was specified as a separate React
+  # SPA built into a volume that caddy served at /admin, and it was never
+  # written — nothing under frontend/admin is tracked, so its build context
+  # did not exist and `--profile web` could not come up at all. It is Astro
+  # pages inside `site` now, which caddy already routes /admin* to.
 
   backend:
     build:
@@ -106,7 +100,6 @@ services:
 
 volumes:
   postgres_data:
-  admin_dist:
   media:
   caddy_data:
   caddy_config:
