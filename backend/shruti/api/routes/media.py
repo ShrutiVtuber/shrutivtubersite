@@ -22,8 +22,12 @@ from __future__ import annotations
 
 import re
 
-from fastapi import APIRouter, HTTPException, Response
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlmodel import select
+from fastapi import APIRouter, Depends, HTTPException, Response
 
+from shruti.core.db import get_session
+from shruti.models import Media
 from shruti.core.storage import fetch, r2_configured
 
 router = APIRouter(prefix="/api/media", tags=["media"])
@@ -39,12 +43,25 @@ SAFE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,180}$")
 # and link checkers, and Cloudflare sits in front of this. Starlette drops the
 # body for HEAD itself, so one handler answers both correctly.
 @router.api_route("/{filename}", methods=["GET", "HEAD"])
-async def serve(filename: str) -> Response:
+async def serve(
+    filename: str, session: AsyncSession = Depends(get_session)
+) -> Response:
     if not SAFE.match(filename) or ".." in filename:
         raise HTTPException(404, "no such file")
     if not r2_configured():
         # Caddy owns /media/ in this case; nothing here should answer and
         # pretend otherwise.
+        raise HTTPException(404, "no such file")
+
+    # Only actual media. The bucket also holds the files people have PAID for,
+    # and a proxy that serves whatever name it is given hands those out to
+    # anyone who guesses one — which is not a guess at all once a name appears
+    # in a receipt or a log. So the media table is the allow-list: if it is not
+    # a row here, this route does not know about it.
+    known = (
+        await session.execute(select(Media).where(Media.filename == filename))
+    ).scalar_one_or_none()
+    if known is None:
         raise HTTPException(404, "no such file")
 
     got = await fetch(filename)

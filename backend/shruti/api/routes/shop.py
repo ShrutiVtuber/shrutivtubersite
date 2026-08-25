@@ -17,7 +17,7 @@ import logging
 import secrets
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, File, HTTPException, Request, Response, UploadFile
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
@@ -384,3 +384,194 @@ async def record_order(event_object: dict, session: AsyncSession) -> Order | Non
     await session.commit()
     await session.refresh(order)
     return order
+
+
+# ── the file a digital product delivers ─────────────────────────────────────
+
+# What a digital product may be. Deliberately narrow and deliberately not the
+# image list: these are things somebody buys and downloads, not things the site
+# displays. Anything executable is absent on purpose.
+ALLOWED_FILES = {
+    "application/pdf": ".pdf",
+    "application/epub+zip": ".epub",
+    "application/zip": ".zip",
+    "audio/mpeg": ".mp3",
+    "audio/flac": ".flac",
+    "audio/wav": ".wav",
+    "video/mp4": ".mp4",
+    "image/png": ".png",
+    "image/jpeg": ".jpg",
+    "text/plain": ".txt",
+}
+
+# Larger than an image, because an album or a video is not an image.
+MAX_FILE_MB = 512
+
+
+@router.post("/admin/files", status_code=201, dependencies=[Depends(require_admin)])
+async def upload_file(
+    file: UploadFile = File(...), session: AsyncSession = Depends(get_session)
+) -> dict:
+    """
+    Store a file a digital product will deliver.
+
+    Content-hashed like media, and for the same reasons — the same file
+    uploaded twice is stored once. The name it was uploaded under is kept
+    separately, because a download called `9f2c…d1.zip` is not something
+    anybody can use.
+
+    It never becomes a media row: media is served straight off a public path by
+    Caddy, and a paid file behind a guessable URL is not a paid file.
+    """
+    import hashlib
+
+    if file.content_type not in ALLOWED_FILES:
+        raise HTTPException(
+            415,
+            f"unsupported type {file.content_type!r}; allowed: {sorted(ALLOWED_FILES)}",
+        )
+
+    data = await file.read()
+    if not data:
+        raise HTTPException(422, "the file is empty")
+    if len(data) > MAX_FILE_MB * 1024 * 1024:
+        raise HTTPException(413, f"file is larger than {MAX_FILE_MB} MB")
+
+    digest = hashlib.sha256(data).hexdigest()[:32]
+    stored = f"product-{digest}{ALLOWED_FILES[file.content_type]}"
+
+    existing = (
+        await session.execute(
+            select(ProductFile).where(ProductFile.stored_name == stored)
+        )
+    ).scalar_one_or_none()
+    if existing is not None:
+        return _file_payload(existing) | {"deduped": True}
+
+    from shruti.core.storage import put
+
+    put_result = await put(stored, data, file.content_type)
+    row = ProductFile(
+        stored_name=stored,
+        original_name=file.filename or stored,
+        mime_type=file.content_type,
+        size_bytes=len(data),
+        storage_backend=put_result.backend,
+    )
+    session.add(row)
+    await session.commit()
+    await session.refresh(row)
+    return _file_payload(row)
+
+
+def _file_payload(f: ProductFile) -> dict:
+    return {
+        "id": f.id,
+        "name": f.original_name,
+        "mimeType": f.mime_type,
+        "sizeBytes": f.size_bytes,
+        "storage": f.storage_backend,
+    }
+
+
+@router.get("/admin/files", dependencies=[Depends(require_admin)])
+async def list_files(session: AsyncSession = Depends(get_session)) -> list[dict]:
+    rows = (
+        await session.execute(select(ProductFile).order_by(ProductFile.id.desc()))
+    ).scalars().all()
+    return [_file_payload(f) for f in rows]
+
+
+# ── delivery ────────────────────────────────────────────────────────────────
+
+async def deliver(order: Order, session: AsyncSession) -> None:
+    """
+    Tell them it worked, and how to get what they bought.
+
+    Sent for both kinds. A physical buyer gets a receipt and what happens next;
+    a digital one gets the link. Neither needs an account — asking someone to
+    register to collect a thing they have already paid for is a way of losing
+    the sale after taking the money.
+    """
+    from shruti.api.routes.billing import _site_url
+    from shruti.core import mail
+
+    if not order.email:
+        log.warning("order %s has no address to send to", order.id)
+        return
+
+    money = f"{order.amount_total_cents / 100:.2f} {order.currency.upper()}"
+
+    if order.download_token:
+        # No request here — this runs from the webhook — so the configured
+        # site URL is the only honest answer.
+        site = _site_url(None)
+        body = (
+            f"Thank you — {order.product_name} is yours.\n\n"
+            f"Download it here:\n{site}/shop/download/{order.download_token}\n\n"
+            "The link is yours and does not expire. Keep this message if you "
+            "want to download it again later.\n\n"
+            f"Paid: {money}"
+        )
+    else:
+        body = (
+            f"Thank you — your order for {order.product_name} has been "
+            f"received.\n\nIt will be posted to the address you gave at "
+            "checkout, and you will hear from me when it goes.\n\n"
+            f"Paid: {money}"
+        )
+
+    await mail.send(subject=f"Your order — {order.product_name}", to=order.email, body=body)
+
+
+@router.get("/download/{token}")
+async def download(token: str, session: AsyncSession = Depends(get_session)):
+    """
+    The file somebody bought.
+
+    The token is the proof of purchase. It does not expire, because a thing
+    that was bought stays bought — a link that dies in seven days turns a sale
+    into a support request. It is long enough not to be guessed, and it is
+    counted so an obviously-shared one can be noticed.
+    """
+    order = (
+        await session.execute(
+            select(Order).where(Order.download_token == token)
+        )
+    ).scalar_one_or_none()
+    if order is None or not token:
+        raise HTTPException(404, "no such download")
+
+    product = await session.get(Product, order.product_id) if order.product_id else None
+    file_row = (
+        await session.get(ProductFile, product.file_id)
+        if product and product.file_id else None
+    )
+    if file_row is None:
+        raise HTTPException(
+            410,
+            "this download is not available — please reply to your receipt and "
+            "it will be sorted out by hand.",
+        )
+
+    from shruti.core.storage import fetch
+
+    found = await fetch(file_row.stored_name)
+    if found is None:
+        raise HTTPException(410, "the file is missing; please reply to your receipt")
+
+    data, content_type = found
+    order.downloads += 1
+    await session.commit()
+
+    return Response(
+        content=data,
+        media_type=content_type or file_row.mime_type or "application/octet-stream",
+        headers={
+            # The name they uploaded, not the hash it is stored under.
+            "Content-Disposition":
+                f'attachment; filename="{file_row.original_name}"',
+            # Never cached by anything in between: it is one person's purchase.
+            "Cache-Control": "private, no-store",
+        },
+    )

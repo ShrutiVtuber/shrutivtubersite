@@ -608,6 +608,18 @@ async def webhook(
     imprint = await _current_imprint(session)
 
     if kind == "checkout.session.completed":
+        # A shop purchase carries the product on the session. It is handled
+        # first and separately: a jumper is not a membership, and running it
+        # through the supporter path would make a one-off purchase look like
+        # somebody subscribing.
+        if (obj.get("metadata") or {}).get("product_slug"):
+            from shruti.api.routes.shop import deliver, record_order
+
+            order = await record_order(obj, session)
+            if order is not None:
+                await deliver(order, session)
+            return {"received": True}
+
         customer_id = obj.get("customer") or ""
         reference = obj.get("client_reference_id")
         email = (obj.get("customer_details") or {}).get("email", "") or ""
