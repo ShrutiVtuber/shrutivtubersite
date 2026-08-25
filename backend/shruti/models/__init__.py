@@ -352,6 +352,28 @@ class Product(TimestampMixin, table=True):
     position: int = Field(default=0)
 
 
+class ProductPhoto(TimestampMixin, table=True):
+    """
+    One of a product's photographs.
+
+    A table rather than more columns, because "how many pictures does a thing
+    get" is not a question with an answer — a jumper wants front, back and a
+    detail; a print wants one. Columns would pick a number and be wrong for
+    everything else.
+
+    `media_id` on Product stays as the first photograph, so nothing that
+    already reads it breaks; the rows here are the gallery, and the first of
+    them is the one the shop leads with.
+    """
+
+    __tablename__ = "product_photo"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    product_id: int = Field(foreign_key="product.id", index=True)
+    media_id: int = Field(foreign_key="media.id", index=True)
+    position: int = Field(default=0)
+
+
 class ProductFile(TimestampMixin, table=True):
     """
     The file a digital product delivers.

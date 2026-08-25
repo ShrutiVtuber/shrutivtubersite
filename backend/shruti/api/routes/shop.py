@@ -26,7 +26,7 @@ from shruti.api.deps import require_admin
 from shruti.core import shop as stripe_shop
 from shruti.core.config import get_settings
 from shruti.core.db import get_session
-from shruti.models import Media, Order, Product, ProductFile
+from shruti.models import Media, Order, Product, ProductFile, ProductPhoto
 
 log = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/shop", tags=["shop"])
@@ -34,7 +34,8 @@ router = APIRouter(prefix="/api/shop", tags=["shop"])
 KINDS = ("physical", "digital")
 
 
-def _public(p: Product, media: Media | None) -> dict:
+def _public(p: Product, media: Media | None,
+            photos: list[Media] | None = None) -> dict:
     from shruti.core.storage import public_url
 
     return {
@@ -52,7 +53,34 @@ def _public(p: Product, media: Media | None) -> dict:
             "url": public_url(media.filename, media.storage_backend),
             "alt": media.alt_text,
         },
+        "photos": [
+            {"url": public_url(m.filename, m.storage_backend), "alt": m.alt_text}
+            for m in (photos or [])
+        ],
     }
+
+
+async def _photos_for(product_ids: list[int], session: AsyncSession) -> dict[int, list[Media]]:
+    """
+    Every product's pictures in one query.
+
+    One query per product would be a query per card on the shop page, which is
+    the shape of slow that only shows up once there is stock.
+    """
+    if not product_ids:
+        return {}
+    rows = (
+        await session.execute(
+            select(ProductPhoto, Media)
+            .join(Media, ProductPhoto.media_id == Media.id)
+            .where(ProductPhoto.product_id.in_(product_ids))
+            .order_by(ProductPhoto.position, ProductPhoto.id)
+        )
+    ).all()
+    out: dict[int, list[Media]] = {}
+    for link, media in rows:
+        out.setdefault(link.product_id, []).append(media)
+    return out
 
 
 @router.get("/products")
@@ -66,7 +94,8 @@ async def list_products(session: AsyncSession = Depends(get_session)) -> list[di
             .order_by(Product.position, Product.id)
         )
     ).all()
-    return [_public(p, m) for p, m in rows]
+    photos = await _photos_for([p.id for p, _m in rows if p.id], session)
+    return [_public(p, m, photos.get(p.id)) for p, m in rows]
 
 
 @router.get("/products/{slug}")
@@ -80,7 +109,8 @@ async def read_product(slug: str, session: AsyncSession = Depends(get_session)) 
     ).first()
     if row is None:
         raise HTTPException(404, "no such product")
-    return _public(row[0], row[1])
+    photos = await _photos_for([row[0].id], session)
+    return _public(row[0], row[1], photos.get(row[0].id))
 
 
 # ── buying ──────────────────────────────────────────────────────────────────
@@ -133,8 +163,10 @@ async def checkout(
         # An address, because it has to be posted. Only for the kind that does
         # — asking a buyer of a PDF where they live is collecting something for
         # no reason.
+        from shruti.core.shipping import allowed
+
         session_args["shipping_address_collection"] = {
-            "allowed_countries": get_settings().shop_ship_to or ["GR"],
+            "allowed_countries": allowed(get_settings().shop_ship_to),
         }
         # Managed Payments makes Stripe the merchant of record, which is why
         # the memberships need no VAT registration of their own — and it does
@@ -480,6 +512,182 @@ async def list_files(session: AsyncSession = Depends(get_session)) -> list[dict]
         await session.execute(select(ProductFile).order_by(ProductFile.id.desc()))
     ).scalars().all()
     return [_file_payload(f) for f in rows]
+
+
+class PhotoIn(BaseModel):
+    media_id: int
+
+
+@router.get("/admin/products/{product_id}/photos", dependencies=[Depends(require_admin)])
+async def admin_photos(
+    product_id: int, session: AsyncSession = Depends(get_session)
+) -> list[dict]:
+    from shruti.core.storage import public_url
+
+    rows = (
+        await session.execute(
+            select(ProductPhoto, Media)
+            .join(Media, ProductPhoto.media_id == Media.id)
+            .where(ProductPhoto.product_id == product_id)
+            .order_by(ProductPhoto.position, ProductPhoto.id)
+        )
+    ).all()
+    return [
+        {
+            "id": link.id,
+            "mediaId": media.id,
+            "url": public_url(media.filename, media.storage_backend),
+            "alt": media.alt_text,
+            "position": link.position,
+        }
+        for link, media in rows
+    ]
+
+
+@router.post("/admin/products/{product_id}/photos", status_code=201,
+             dependencies=[Depends(require_admin)])
+async def add_photo(
+    product_id: int, body: PhotoIn, session: AsyncSession = Depends(get_session)
+) -> dict:
+    """
+    Add a photograph to the end of a product's set.
+
+    The same picture twice is refused rather than added twice: a gallery that
+    shows one thing repeatedly reads as a bug, and a bug in a shop reads as an
+    untrustworthy shop.
+    """
+    product = await session.get(Product, product_id)
+    if product is None:
+        raise HTTPException(404, "no such product")
+
+    already = (
+        await session.execute(
+            select(ProductPhoto).where(
+                ProductPhoto.product_id == product_id,
+                ProductPhoto.media_id == body.media_id,
+            )
+        )
+    ).scalar_one_or_none()
+    if already is not None:
+        return {"ok": True, "id": already.id, "alreadyThere": True}
+
+    existing = (
+        await session.execute(
+            select(ProductPhoto).where(ProductPhoto.product_id == product_id)
+        )
+    ).scalars().all()
+    row = ProductPhoto(
+        product_id=product_id, media_id=body.media_id,
+        position=(max((p.position for p in existing), default=-1) + 1),
+    )
+    session.add(row)
+
+    # The first one is also the one the shop leads with, so the old column
+    # keeps meaning what it always meant.
+    if not existing:
+        product.media_id = body.media_id
+
+    await session.commit()
+    await session.refresh(row)
+    return {"ok": True, "id": row.id}
+
+
+@router.delete("/admin/products/{product_id}/photos/{photo_id}", status_code=204,
+               dependencies=[Depends(require_admin)])
+async def remove_photo(
+    product_id: int, photo_id: int, session: AsyncSession = Depends(get_session)
+):
+    """
+    Take a photograph off a product. The picture itself stays in the library.
+    """
+    row = await session.get(ProductPhoto, photo_id)
+    if row is None or row.product_id != product_id:
+        raise HTTPException(404, "no such photo")
+    await session.delete(row)
+    await session.commit()
+    await _releads(product_id, session)
+    return Response(status_code=204)
+
+
+class OrderIn(BaseModel):
+    """The ids in the order they should appear."""
+
+    photo_ids: list[int]
+
+
+@router.post("/admin/products/{product_id}/photos/order",
+             dependencies=[Depends(require_admin)])
+async def reorder_photos(
+    product_id: int, body: OrderIn, session: AsyncSession = Depends(get_session)
+) -> dict:
+    rows = {
+        r.id: r
+        for r in (
+            await session.execute(
+                select(ProductPhoto).where(ProductPhoto.product_id == product_id)
+            )
+        ).scalars().all()
+    }
+    for index, photo_id in enumerate(body.photo_ids):
+        row = rows.get(photo_id)
+        if row is not None:
+            row.position = index
+    await session.commit()
+    await _releads(product_id, session)
+    return {"ok": True}
+
+
+async def _releads(product_id: int, session: AsyncSession) -> None:
+    """
+    Keep `product.media_id` pointing at whichever photograph is now first.
+
+    Reordering or removing changes which one leads, and the column that the
+    rest of the site reads has to follow — otherwise the shop card and the
+    product page disagree about the same product.
+    """
+    first = (
+        await session.execute(
+            select(ProductPhoto)
+            .where(ProductPhoto.product_id == product_id)
+            .order_by(ProductPhoto.position, ProductPhoto.id)
+        )
+    ).scalars().first()
+    product = await session.get(Product, product_id)
+    if product is not None:
+        product.media_id = first.media_id if first else None
+        await session.commit()
+
+
+@router.delete("/admin/files/{file_id}", status_code=204,
+               dependencies=[Depends(require_admin)])
+async def delete_file(file_id: int, session: AsyncSession = Depends(get_session)):
+    """
+    Remove a file, and the stored bytes with it.
+
+    **Refused while a product still delivers it.** Deleting it out from under
+    one would leave every buyer of that product with a link to nothing — and
+    they would find out, not her, and only after paying.
+    """
+    row = await session.get(ProductFile, file_id)
+    if row is None:
+        raise HTTPException(404, "no such file")
+
+    using = (
+        await session.execute(select(Product).where(Product.file_id == file_id))
+    ).scalars().all()
+    if using:
+        raise HTTPException(
+            409,
+            "still delivered by " + ", ".join(f"\u201c{p.name}\u201d" for p in using)
+            + ". Point those at another file first, and then this can go.",
+        )
+
+    from shruti.core.storage import delete as delete_stored
+
+    await delete_stored(row.stored_name, row.storage_backend)
+    await session.delete(row)
+    await session.commit()
+    return Response(status_code=204)
 
 
 # ── delivery ────────────────────────────────────────────────────────────────

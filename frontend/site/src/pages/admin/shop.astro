@@ -17,6 +17,7 @@ import MediaField from "../../components/forms/MediaField.astro";
 import { asAdmin, ADMIN_COOKIE } from "../../lib/admin";
 import { SITE_API } from "../../lib/api";
 import { verifyCsrf } from "../../lib/csrf";
+import { DIGITAL_CODES, PHYSICAL_CODES } from "../../lib/taxCodes";
 
 export const prerender = false;
 
@@ -98,6 +99,44 @@ if (Astro.request.method === "POST") {
       }
     }
 
+    if (action === "add-photo" && id) {
+      const r = await asAdmin(Astro, `/api/shop/admin/products/${id}/photos`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ media_id: Number(form.get("media_id") ?? 0) }),
+      });
+      notice = r.ok
+        ? (r.body?.alreadyThere ? "That photograph is already on this one." : "Photograph added.")
+        : "";
+      failed = r.ok ? "" : (r.body?.detail ?? "That photograph was not added.");
+    }
+
+    if (action === "remove-photo" && id) {
+      const photo = String(form.get("photo_id") ?? "");
+      const r = await asAdmin(Astro, `/api/shop/admin/products/${id}/photos/${photo}`,
+                              { method: "DELETE" });
+      notice = r.ok ? "Photograph removed. It is still in the media library." : "";
+      failed = r.ok ? "" : (r.body?.detail ?? "That did not come off.");
+    }
+
+    if (action === "order-photos" && id) {
+      const ids = String(form.get("photo_ids") ?? "")
+        .split(",").map((n) => Number(n)).filter(Boolean);
+      const r = await asAdmin(Astro, `/api/shop/admin/products/${id}/photos/order`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ photo_ids: ids }),
+      });
+      notice = r.ok ? "Order saved." : "";
+      failed = r.ok ? "" : (r.body?.detail ?? "That order did not save.");
+    }
+
+    if (action === "delete-file" && id) {
+      const r = await asAdmin(Astro, `/api/shop/admin/files/${id}`, { method: "DELETE" });
+      notice = r.ok ? "File deleted." : "";
+      failed = r.ok ? "" : (r.body?.detail ?? "That file could not be deleted.");
+    }
+
     if (action === "delete" && id) {
       const r = await asAdmin(Astro, `/api/shop/admin/products/${id}`, { method: "DELETE" });
       notice = r.ok ? "Deleted." : "";
@@ -135,6 +174,27 @@ const BLANK = {
 };
 const row = creating ? BLANK : products.find((p) => String(p.id) === editing) ?? null;
 
+/* Photographs belong to a product that exists, so a new one shows the single
+   picker and becomes its own first photograph on save. */
+const photos: any[] = row && !creating
+  ? (await asAdmin(Astro, `/api/shop/admin/products/${row.id}/photos`)).body ?? []
+  : [];
+
+/* The order each "make it lead" button would produce, worked out here rather
+   than in the template — an arrow function inside an attribute expression is
+   one of the few things the Astro parser will not take. */
+photos.forEach((ph: any, i: number) => {
+  ph.first = i === 0;
+  ph.leads = i === 0 ? "leads" : String(i + 1);
+});
+
+const leadOrder = new Map<number, string>(
+  photos.map((ph: any) => [
+    ph.id,
+    [ph.id, ...photos.filter((o: any) => o.id !== ph.id).map((o: any) => o.id)].join(","),
+  ]),
+);
+
 const money = (cents: number, currency = "eur") =>
   `${(cents / 100).toFixed(2)} ${currency.toUpperCase()}`;
 const toSend = orders.filter((o) => o.fulfilment === "to_send");
@@ -151,6 +211,7 @@ const toSend = orders.filter((o) => o.fulfilment === "to_send");
 
   {
     row ? (
+      <>
       <form method="POST" class="adm-card editor">
         <CsrfField />
         <input type="hidden" name="action" value={creating ? "create" : "save"} />
@@ -195,9 +256,20 @@ const toSend = orders.filter((o) => o.fulfilment === "to_send");
         </section>
 
         <section class="group">
-          <h3 class="group-head">Picture</h3>
-          <MediaField name="media_id" value={row.media_id} label="Photo" />
-          <p class="hint">Appears in the shop and on the product's own page.</p>
+          <h3 class="group-head">Photographs</h3>
+          {creating && <MediaField name="media_id" value={row.media_id} label="First photograph" />}
+          {creating && (
+            <p class="hint">
+              More can be added once it exists — save it first and the rest of
+              the set appears here.
+            </p>
+          )}
+          {!creating && (
+            <p class="hint">
+              Managed just below, where they can be added, removed and
+              reordered without saving the rest of this first.
+            </p>
+          )}
         </section>
 
         <section class="group">
@@ -213,11 +285,24 @@ const toSend = orders.filter((o) => o.fulfilment === "to_send");
             </p>
           </label>
           <label class="field">
-            <span class="adm-lbl">Stripe tax code</span>
-            <input class="adm-input" name="tax_code" value={row.tax_code} />
+            <span class="adm-lbl">What is it, for tax</span>
+            <select class="adm-input" name="tax_code" data-tax>
+              <optgroup label="Digital" data-tax-group="digital">
+                {DIGITAL_CODES.map((c) => (
+                  <option value={c.id} selected={row.tax_code === c.id}>{c.label}</option>
+                ))}
+              </optgroup>
+              <optgroup label="Physical" data-tax-group="physical">
+                {PHYSICAL_CODES.map((c) => (
+                  <option value={c.id} selected={row.tax_code === c.id}>{c.label}</option>
+                ))}
+              </optgroup>
+            </select>
             <p class="hint">
-              <code>txcd_10000000</code> is general digital goods.
-              Physical things want their own — a jumper is not taxed like a book.
+              Stripe works the VAT out from this and where the buyer is. A jumper
+              is not taxed like a book, and neither is taxed like a download —
+              so it changes with the kind, and it is worth getting right before
+              the first one sells.
             </p>
           </label>
         </section>
@@ -266,6 +351,54 @@ const toSend = orders.filter((o) => o.fulfilment === "to_send");
           <a class="cancel" href="/admin/shop">Cancel</a>
         </div>
       </form>
+
+      {!creating && (
+        <section class="adm-card">
+          <h2 class="h2">Photographs of {row.name}</h2>
+          {photos.length === 0 && (
+            <p class="adm-note">
+              None yet. The first one added is the one the shop leads with.
+            </p>
+          )}
+          {photos.length > 0 && (
+            <ol class="shots shots--managed">
+              {photos.map((ph) => (
+                <li>
+                  <img src={ph.url} alt={ph.alt || ""} loading="lazy" />
+                  <span class="shot-n">{ph.leads}</span>
+                  <form method="POST" class="shot-remove">
+                    <CsrfField />
+                    <input type="hidden" name="action" value="remove-photo" />
+                    <input type="hidden" name="id" value={row.id} />
+                    <input type="hidden" name="photo_id" value={ph.id} />
+                    <button type="submit" class="danger">Remove</button>
+                  </form>
+                  {!ph.first && (
+                    <form method="POST" class="shot-first">
+                      <CsrfField />
+                      <input type="hidden" name="action" value="order-photos" />
+                      <input type="hidden" name="id" value={row.id} />
+                      <input type="hidden" name="photo_ids" value={leadOrder.get(ph.id)} />
+                      <button type="submit" class="quiet">Make it lead</button>
+                    </form>
+                  )}
+                </li>
+              ))}
+            </ol>
+          )}
+
+          <form method="POST" class="add-photo">
+            <CsrfField />
+            <input type="hidden" name="action" value="add-photo" />
+            <input type="hidden" name="id" value={row.id} />
+            <MediaField name="media_id" value={null} label="Add a photograph" />
+            <div><Button type="submit" variant="secondary">Add it to this product</Button></div>
+          </form>
+        </section>
+      )}
+      </>
+
+
     ) : (
       <>
         <div class="list-actions">
@@ -398,6 +531,29 @@ const toSend = orders.filter((o) => o.fulfilment === "to_send");
   .check { display: flex; align-items: center; gap: 8px; cursor: pointer; }
   .check input { width: 18px; height: 18px; accent-color: var(--accent); }
   .hint { margin: 0; font: 400 var(--text-xs) var(--font-body); color: var(--ink-soft); max-width: 62ch; }
+  .shots {
+    list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-3);
+    grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  }
+  .shots li { position: relative; display: grid; gap: 4px; }
+  .shots--managed li { align-content: start; }
+  .shot-remove, .shot-first { display: block; }
+  .quiet {
+    appearance: none; background: none; border: 0; padding: 0; cursor: pointer;
+    font: 500 var(--text-xs) var(--font-body); color: var(--accent);
+  }
+  .quiet:hover { text-decoration: underline; }
+  .add-photo { display: grid; gap: var(--space-3); margin-top: var(--space-4); }
+  .shots img {
+    width: 100%; aspect-ratio: 1; object-fit: cover; display: block;
+    border-radius: var(--radius-sm); border: var(--border-w) solid var(--line);
+  }
+  .shot-n {
+    position: absolute; left: 4px; bottom: 4px; padding: 1px 6px;
+    border-radius: 99px; background: var(--accent); color: var(--on-accent);
+    font: 500 10px var(--font-mono);
+  }
+
   .list-actions { margin-bottom: var(--space-4); }
   .rows { display: grid; gap: 6px; margin-bottom: var(--space-5); }
   .row {
@@ -429,6 +585,41 @@ const toSend = orders.filter((o) => o.fulfilment === "to_send");
 </style>
 
 <script>
+  import { DEFAULT_CODE } from "../../lib/taxCodes";
+
+  /* The tax code follows the kind.
+   *
+   * Both sets of codes are in the select; only the one matching the chosen
+   * kind is offered. Without this, picking "physical" leaves a digital code
+   * sitting on it — which saves, and is wrong in the way that does not show up
+   * until a tax return.
+   */
+  const kindBox = document.querySelector<HTMLSelectElement>('select[name="kind"]');
+  const taxBox = document.querySelector<HTMLSelectElement>("[data-tax]");
+
+  function fitTaxToKind(changed: boolean) {
+    if (!kindBox || !taxBox) return;
+    const kind = kindBox.value;
+    let firstOfKind = "";
+    taxBox.querySelectorAll<HTMLElement>("[data-tax-group]").forEach((group) => {
+      const mine = group.dataset.taxGroup === kind;
+      group.hidden = !mine;
+      group.querySelectorAll<HTMLOptionElement>("option").forEach((option) => {
+        option.disabled = !mine;
+        if (mine && !firstOfKind) firstOfKind = option.value;
+      });
+    });
+    const chosen = taxBox.selectedOptions[0];
+    // Changing the kind starts from that kind's usual code; on load, whatever
+    // was saved is kept as long as it belongs to this kind.
+    if (changed || !chosen || chosen.disabled) {
+      taxBox.value = (changed ? DEFAULT_CODE[kind] : "") || firstOfKind;
+    }
+  }
+
+  kindBox?.addEventListener("change", () => fitTaxToKind(true));
+  fitTaxToKind(false);
+
   document.querySelectorAll<HTMLFormElement>("form[data-confirm]").forEach((form) => {
     form.addEventListener("submit", (event) => {
       if (!window.confirm(form.dataset.confirm ?? "Delete this?")) event.preventDefault();

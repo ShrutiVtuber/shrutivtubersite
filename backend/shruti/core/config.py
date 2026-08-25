@@ -85,9 +85,11 @@ class Settings(BaseSettings):
     # physical goods sold elsewhere often are not priced that way, and finding
     # that out should not need a migration.
     stripe_tax_behavior: str = "inclusive"
-    # Where physical things can be posted. Narrow to begin with on purpose —
-    # a country on this list is a promise to actually post there.
-    shop_ship_to: list[str] = ["GR"]
+    # Where physical things can be posted. Empty means everywhere Stripe will
+    # take an address for, which is the honest reading of "I have not said".
+    # Narrowing it is a decision to make deliberately, not one to arrive at by
+    # leaving a default alone.
+    shop_ship_to: list[str] = []
     stripe_publishable_key: str = ""
     # Signs the webhook. Without it every webhook is refused, because an
     # unverified webhook is an open endpoint for inventing subscriptions.

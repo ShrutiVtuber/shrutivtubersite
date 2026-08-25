@@ -105,7 +105,10 @@ export interface Project {
      typed against this and not against the payload — had no screenshot to
      pass and passed null instead. A project's picture then appeared on /work
      and nowhere else. */
+  /** The first photograph, kept for anything that only wants one. */
   media: { url: string; alt: string } | null;
+  /** All of them, in order, the first being the one above. */
+  photos: { url: string; alt: string }[];
 }
 
 export interface LiveStatus {
@@ -130,5 +133,8 @@ export interface ShopProduct {
   currency: string;
   /** A real state, and not the same as absent. */
   soldOut: boolean;
+  /** The first photograph, for anything that only wants one. */
   media: { url: string; alt: string } | null;
+  /** All of them, in order; the first is the one above. */
+  photos: { url: string; alt: string }[];
 }

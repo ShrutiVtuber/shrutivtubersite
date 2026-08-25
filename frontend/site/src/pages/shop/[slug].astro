@@ -40,16 +40,29 @@ if (Astro.request.method === "POST") {
   }
 }
 
+/* The first photograph leads; the rest sit under it. Falls back to `media` so
+   a product from before there were several still shows its one. */
+const gallery = product.photos?.length ? product.photos : product.media ? [product.media] : [];
+const [lead, ...rest] = gallery;
+
 const html = await renderMarkdown(product.bodyMd);
 const money = `${(product.priceCents / 100).toFixed(2)} ${product.currency.toUpperCase()}`;
 ---
 
 <BaseLayout title={`${product.name} — Shruti`} description={product.tagline}>
   <div class="container product">
-    <div class="shot" data-empty={!product.media}>
-      {product.media
-        ? <img src={product.media.url} alt={product.media.alt || product.name} />
-        : <span class="plate">no photograph yet</span>}
+    <div class="shots">
+      <div class="shot" data-empty={!lead}>
+        {lead && <img src={lead.url} alt={lead.alt || product.name} />}
+        {!lead && <span class="plate">no photograph yet</span>}
+      </div>
+      {rest.length > 0 && (
+        <ol class="more">
+          {rest.map((ph: { url: string; alt: string }) => (
+            <li><img src={ph.url} alt={ph.alt || product.name} loading="lazy" /></li>
+          ))}
+        </ol>
+      )}
     </div>
 
     <div class="detail">
@@ -93,6 +106,15 @@ const money = `${(product.priceCents / 100).toFixed(2)} ${product.currency.toUpp
     grid-template-columns: minmax(0, 1fr);
   }
   @media (min-width: 860px) { .product { grid-template-columns: 1fr 1fr; } }
+  .shots { display: grid; gap: var(--space-3); align-content: start; }
+  .more {
+    list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-3);
+    grid-template-columns: repeat(auto-fill, minmax(88px, 1fr));
+  }
+  .more img {
+    width: 100%; aspect-ratio: 1; object-fit: cover; display: block;
+    border-radius: var(--radius-sm); border: var(--border-w) solid var(--line);
+  }
   .shot {
     display: grid; place-items: center; background: var(--surface-veil);
     border: var(--border-w) solid var(--line); border-radius: var(--radius-md);

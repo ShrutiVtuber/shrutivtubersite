@@ -186,11 +186,36 @@ Working infrastructure, verified against the real Stripe account:
 - Orders are written from the webhook and keyed on the session, so a retry
   changes nothing.
 
-### Still to do here when there are real products
+### Since then
 
-- **Product file delete.** Files can be uploaded and attached; there is no way
-  to remove one yet.
-- **More than one photograph per product.** One today.
+- **Several photographs per product.** Add, remove, and "make it lead" —
+  which also moves `product.media_id`, so the card and the page never disagree
+  about the same product.
+- **Product files can be deleted**, and are refused while a product still
+  delivers one: taking it away would leave every buyer of that product with a
+  link to nothing, and they would be the ones to find out.
+- **Shipping is worldwide** — 235 countries, everything Stripe accepts an
+  address for, with the handful it refuses excluded so one bad code cannot
+  fail a whole checkout. Narrowing it is now a deliberate act rather than a
+  default left alone.
+- **Tax codes are a picker, and follow the kind.** Real codes read off
+  Stripe's own list: tangible goods, printed books, clothing, jewellery for
+  physical; electronically supplied services, digital books, audiobooks for
+  digital. Choosing "physical" no longer leaves a digital code sitting on it.
+
+### Still to do here
+
 - **Refunds** are done in the Stripe dashboard; nothing here reflects them.
-- **`shop_ship_to` is `["GR"]`** — every country she will actually post to has
-  to be added, and adding one is a promise to post there.
+
+### Not a code problem: Stripe is not configured on production
+
+`/api/billing/tiers` answers `configured: false` there, because **all five
+Stripe values are missing from production's `.env`** — the secret key, the
+publishable key, the webhook secret, and both tier price IDs.
+
+That is why the support page shows no prices and no "any amount" box: with no
+`oneOff` in the payload the input is not rendered at all. Both of those
+complaints are one cause. Locally, where the test keys are set, the page shows
+€3 / €5 / €11 and the amount box.
+
+Setting them is hers — they are live keys. `scripts/set-secret.sh` is the way.
