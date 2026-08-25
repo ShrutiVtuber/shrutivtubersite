@@ -64,3 +64,77 @@ def test_the_payload_hash_is_of_the_actual_body():
 def test_urls_fall_back_to_local_when_r2_is_not_configured():
     """A half-configured bucket must not produce URLs that 404."""
     assert public_url("abc.png") == "/media/abc.png"
+
+
+# ── where a stored file is read from ────────────────────────────────────────
+
+def test_r2_with_no_public_base_serves_through_the_site(monkeypatch) -> None:
+    """
+    The case that was broken, and broken invisibly.
+
+    R2 configured without a public base used to hand back `/media/<name>`.
+    That path is Caddy reading local disk, and with R2 on the file is not
+    there — so every uploaded image 404'd while the database row looked
+    completely correct.
+    """
+    from shruti.core.config import get_settings
+    from shruti.core.storage import public_url
+
+    for key, value in (
+        ("R2_ACCOUNT_ID", "acct"), ("R2_BUCKET", "b"),
+        ("R2_ACCESS_KEY_ID", "ak"), ("R2_SECRET_ACCESS_KEY", "sk"),
+        ("R2_PUBLIC_BASE", ""),
+    ):
+        monkeypatch.setenv(f"SHRUTI_{key}", value)
+    get_settings.cache_clear()
+    try:
+        assert public_url("x.png") == "/api/media/x.png"
+    finally:
+        get_settings.cache_clear()
+
+
+def test_a_public_base_is_used_when_there_is_one(monkeypatch) -> None:
+    from shruti.core.config import get_settings
+    from shruti.core.storage import public_url
+
+    for key, value in (
+        ("R2_ACCOUNT_ID", "acct"), ("R2_BUCKET", "b"),
+        ("R2_ACCESS_KEY_ID", "ak"), ("R2_SECRET_ACCESS_KEY", "sk"),
+        ("R2_PUBLIC_BASE", "https://media.example.com/"),
+    ):
+        monkeypatch.setenv(f"SHRUTI_{key}", value)
+    get_settings.cache_clear()
+    try:
+        assert public_url("x.png") == "https://media.example.com/x.png"
+    finally:
+        get_settings.cache_clear()
+
+
+def test_without_r2_the_disk_path_is_still_right(monkeypatch) -> None:
+    from shruti.core.config import get_settings
+    from shruti.core.storage import public_url
+
+    monkeypatch.setenv("SHRUTI_R2_ACCOUNT_ID", "")
+    monkeypatch.setenv("SHRUTI_R2_BUCKET", "")
+    get_settings.cache_clear()
+    try:
+        assert public_url("x.png") == "/media/x.png"
+    finally:
+        get_settings.cache_clear()
+
+
+# ── the filename guard ──────────────────────────────────────────────────────
+
+def test_only_generated_filenames_reach_the_bucket() -> None:
+    """A key with a slash or a `..` turns a read of one object into a read of
+    somebody else's prefix. Uploader-generated names are content-addressed, so
+    anything not of that shape is refused rather than forwarded."""
+    from shruti.api.routes.media import SAFE
+
+    for good in ("a.png", "abc123.jpg", "x_y-z.webp", "A1.gif"):
+        assert SAFE.match(good), good
+    for bad in (
+        "../secret", "a/b.png", "..", ".hidden", "/etc/passwd",
+        "a b.png", "a?b.png", "", "x" * 300,
+    ):
+        assert not SAFE.match(bad), bad

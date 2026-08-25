@@ -164,15 +164,69 @@ async def _put_r2(filename: str, data: bytes, content_type: str) -> Stored:
     if r.status_code >= 300:
         raise RuntimeError(f"R2 returned {r.status_code}")
 
-    base = (s.r2_public_base or "").rstrip("/")
-    url = f"{base}/{filename}" if base else f"/media/{filename}"
-    return Stored(key=filename, url=url, backend="r2")
+    return Stored(key=filename, url=public_url(filename), backend="r2")
 
 
 def public_url(filename: str) -> str:
-    """Where a stored file is read from, without needing the row's backend."""
+    """
+    Where a stored file is read from, without needing the row's backend.
+
+    Three cases, and the middle one is the one that used to be wrong:
+
+      - a public base is set — a custom domain or r2.dev — so use it;
+      - R2 is on with no public base, so serve it through this site, because
+        `/media/` is Caddy reading local disk and the file is not there;
+      - no R2 at all, so `/media/` is right and Caddy has the file.
+    """
     s = get_settings()
     base = (getattr(s, "r2_public_base", "") or "").rstrip("/")
     if base and r2_configured():
         return f"{base}/{filename}"
+    if r2_configured():
+        return f"/api/media/{filename}"
     return f"/media/{filename}"
+
+
+async def fetch(filename: str) -> tuple[bytes, str] | None:
+    """
+    Read one object back out of R2. `(bytes, content type)`, or None.
+
+    **This exists because "R2 write-only" was not a working state.** With the
+    bucket configured but no public base, `put` stored the file in R2 and
+    handed back `/media/<name>` — a path Caddy serves from local disk, where
+    the file is not. Every image uploaded would have 404'd, and the row would
+    have looked completely correct while it happened.
+
+    The alternative was Cloudflare's r2.dev subdomain, and serving through the
+    site is better anyway: one origin rather than a third-party hostname in the
+    markup, no dependence on a dashboard toggle, and r2.dev is rate-limited and
+    documented as not for production. The site is already behind Cloudflare, so
+    the caching that mattered is not lost.
+    """
+    if not r2_configured():
+        return None
+    s = get_settings()
+    host = f"{s.r2_account_id}.r2.cloudflarestorage.com"
+    path = f"/{s.r2_bucket}/{filename}"
+    amz_date = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+
+    headers = authorization_header(
+        method="GET", host=host, path=path, payload=b"",
+        access_key=s.r2_access_key_id, secret_key=s.r2_secret_access_key,
+        region="auto", service="s3", amz_date=amz_date,
+        # Signed as empty, because a GET has no body and the signature covers
+        # the header list — sending a Content-Type here that was not signed is
+        # the usual way this fails with an unhelpful AccessDenied.
+        content_type="",
+    )
+    headers.pop("Content-Type", None)
+
+    try:
+        async with httpx.AsyncClient(timeout=20.0) as client:
+            r = await client.get(f"https://{host}{path}", headers=headers)
+    except Exception as exc:                       # noqa: BLE001
+        log.warning("R2 fetch failed (%s)", type(exc).__name__)
+        return None
+    if r.status_code != 200:
+        return None
+    return r.content, r.headers.get("content-type", "application/octet-stream")
