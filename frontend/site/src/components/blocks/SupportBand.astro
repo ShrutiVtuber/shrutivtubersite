@@ -1,0 +1,111 @@
+---
+/* Become a Swara.
+ *
+ * Near the top because that is where it is read, and after the hero rather
+ * than in it because the hero already asks for two things and a third would
+ * make all three quieter.
+ *
+ * The words come from a page block, so they can be changed without a deploy —
+ * this is the copy most likely to be tuned, and having it hard-coded would
+ * mean asking a developer to reword an invitation.
+ *
+ * The price is the cheapest membership actually on offer, read from the same
+ * place /support reads it. A number invented here would drift from the real
+ * one the moment a tier changed, and the first person to notice would be
+ * somebody who clicked expecting one figure and met another.
+ */
+import Button from "../forms/Button.astro";
+import type { RenderedSection } from "../../lib/content";
+
+interface Tier { amount: number | null; currency: string; interval: string }
+interface Props {
+  block?: RenderedSection | null;
+  tiers?: Tier[];
+}
+const { block, tiers = [] } = Astro.props;
+
+const priced = tiers.filter((t) => typeof t.amount === "number" && t.amount > 0);
+const cheapest = priced.length
+  ? priced.reduce((low, t) => ((t.amount ?? 0) < (low.amount ?? 0) ? t : low))
+  : null;
+
+const from = cheapest
+  ? new Intl.NumberFormat("en-IE", {
+      style: "currency",
+      currency: cheapest.currency || "EUR",
+      minimumFractionDigits: (cheapest.amount ?? 0) % 100 === 0 ? 0 : 2,
+    }).format((cheapest.amount ?? 0) / 100)
+  : "";
+
+const title = block?.title || "Become a Swara";
+const body =
+  block?.bodyMd?.trim() ||
+  "The streams are free and the instruments are open source, and they stay that way. Swaras are the people who keep the bench lit — the ephemeris server, the art, and the hours the software takes.";
+const cta = block?.linkLabel || "Support the work";
+const href = block?.linkUrl || "/support";
+---
+
+<section class="swara" aria-labelledby="swara-title">
+  <div class="swara-inner">
+    <div class="swara-words">
+      <p class="swara-eyebrow">
+        <span class="swara-glyph" aria-hidden="true">♪&#xFE0E;</span>
+        {block?.eyebrow || "Swaras"}
+      </p>
+      <h2 id="swara-title">{title}</h2>
+      <p class="swara-body">{body}</p>
+    </div>
+    <div class="swara-act">
+      <Button size="lg" href={href}>{cta}</Button>
+      {from && <p class="swara-from">from {from} a {cheapest?.interval || "month"}</p>}
+    </div>
+  </div>
+</section>
+
+<style>
+  .swara {
+    margin: var(--space-6) 0 0;
+  }
+  .swara-inner {
+    display: flex;
+    gap: var(--space-5);
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    padding: var(--space-5) var(--space-6);
+    border: var(--border-w) solid color-mix(in srgb, var(--accent) 40%, transparent);
+    border-radius: var(--radius-md);
+    background: var(--accent-wash);
+  }
+  .swara-words { flex: 1 1 32ch; display: grid; gap: 6px; min-width: 0; }
+  .swara-eyebrow {
+    margin: 0;
+    display: flex; align-items: center; gap: 8px;
+    font: 500 var(--text-xs) var(--font-mono);
+    letter-spacing: .08em; text-transform: uppercase;
+    color: var(--accent);
+  }
+  .swara-glyph { font-size: var(--text-sm); }
+  h2 {
+    margin: 0;
+    font: 600 var(--text-h3) var(--font-display);
+    color: var(--ink);
+  }
+  .swara-body {
+    margin: 0;
+    font: 400 var(--text-body) / var(--leading-body) var(--font-body);
+    color: var(--ink-soft);
+    max-width: 62ch;
+  }
+  .swara-act { display: grid; gap: 6px; justify-items: start; }
+  .swara-from {
+    margin: 0;
+    font: 400 var(--text-xs) var(--font-mono);
+    color: var(--ink-soft);
+  }
+
+  @media (max-width: 640px) {
+    .swara-inner { padding: var(--space-4); }
+    .swara-act { justify-self: stretch; }
+  }
+</style>

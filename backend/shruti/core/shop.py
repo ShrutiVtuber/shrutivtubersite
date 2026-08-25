@@ -78,8 +78,22 @@ def sync(product: Any, *, interval: str = "") -> tuple[str, str]:
         "shippable": getattr(product, "kind", "") == "physical",
     }
 
-    if product.stripe_product_id:
-        stripe_product = stripe.Product.modify(product.stripe_product_id, **payload)
+    product_id = product.stripe_product_id
+
+    # A tier carried over from the environment knows its price and not its
+    # product. Creating one then would leave the row pointing at a product with
+    # no relation to the price people are actually billed against — the admin
+    # would show one name and the invoice another. The price knows which
+    # product it belongs to, so ask it.
+    if not product_id and product.stripe_price_id:
+        try:
+            product_id = stripe.Price.retrieve(product.stripe_price_id)["product"]
+        except Exception:                              # noqa: BLE001
+            log.info("price %s could not be read; making a product",
+                     product.stripe_price_id)
+
+    if product_id:
+        stripe_product = stripe.Product.modify(product_id, **payload)
     else:
         stripe_product = stripe.Product.create(**payload)
 

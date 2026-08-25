@@ -9,6 +9,7 @@
 import BaseLayout from "../layouts/BaseLayout.astro";
 import Hero from "../components/brand/Hero.astro";
 import SectionHeader from "../components/brand/SectionHeader.astro";
+import SupportBand from "../components/blocks/SupportBand.astro";
 import LiveBadge from "../components/brand/LiveBadge.astro";
 import SocialLinkRow from "../components/brand/SocialLinkRow.astro";
 import Button from "../components/forms/Button.astro";
@@ -16,6 +17,7 @@ import ProjectCard from "../components/cards/ProjectCard.astro";
 import ScheduleItem from "../components/tables/ScheduleItem.astro";
 import SignPicker from "../components/navigation/SignPicker.astro";
 import { site, type LiveStatus, type LinkGroups, type Project, PATHS } from "../lib/api";
+import { pageSections } from "../lib/content";
 import { badgeFrom } from "../lib/live";
 import type { SocialLink } from "../components/brand/SocialLinkRow.astro";
 
@@ -51,6 +53,17 @@ const [live, links, projects, schedule, horoscopes] = await Promise.all([
  * With nothing chosen it behaves as it always did and shows the first two, so
  * the section is never empty just because nobody has ticked anything yet.
  */
+/* The invitation to support, and the prices it quotes. Both are fetched here
+   rather than inside the band, because a component that fetches is a component
+   that fetches again the next time somebody uses it. */
+const [homeBlocks, billing] = await Promise.all([
+  pageSections("home"),
+  site<{ tiers: { amount: number | null; currency: string; interval: string }[] }>(
+    "/api/billing/tiers",
+  ),
+]);
+const swaraBlock = homeBlocks.find((b) => b.key === "support-cta") ?? null;
+
 const featured = (projects ?? []).filter((p) => p.featured);
 const leading = (featured.length > 0 ? featured : (projects ?? [])).slice(0, 2);
 
@@ -167,6 +180,10 @@ const INSTRUMENTS = [
         </div>
       </Fragment>
   </Hero>
+
+  <div class="page">
+    <SupportBand block={swaraBlock} tiers={billing?.tiers ?? []} />
+  </div>
 
   {/* The instruments, above the fold's neighbours, because they are the reason
       to come back — a visitor who leaves without knowing these run here has
