@@ -99,5 +99,13 @@ const LEDE: Record<string, string> = {
                           count={page.count > 0 ? `${page.count} ${page.count === 1 ? "entry" : "entries"}` : undefined}
                           entries={page.entries} />
     }
+
+    {/* BeeRanked's own schema.org blocks, passed straight through.
+        Valid in the body as well as the head — Google documents both — and
+        keeping them here confines the change to the journal instead of adding
+        a head slot to the layout every other page shares. */}
+    {page.structuredData.map((block) => (
+      <script type="application/ld+json" set:html={block} />
+    ))}
   </div>
 </BaseLayout>

@@ -85,3 +85,50 @@ def test_the_shared_page_does_not_print_the_place_name():
         "the shared view must not print the birth place — the API does not "
         "even send it"
     )
+
+
+# ── structured data, which is the whole point of the journal ────────────────
+
+def test_the_home_page_says_who_this_is():
+    """
+    Without a Person on the home page, nothing outside the site knows that the
+    name, the Twitch channel and the GitHub account are one person — so the
+    profiles compete in search results instead of reinforcing each other.
+    """
+    base = (SRC / "layouts" / "BaseLayout.astro").read_text()
+    assert '"@type": "Person"' in base
+    assert '"@type": "WebSite"' in base
+    assert "sameAs" in base
+    assert 'application/ld+json' in base
+
+
+def test_the_person_block_is_built_after_the_links_it_reads():
+    """
+    It was written above `socials` and threw "Cannot access 'socials' before
+    initialization" — a 500 on the front page, caused by a tag added to help
+    search engines find it.
+    """
+    base = (SRC / "layouts" / "BaseLayout.astro").read_text()
+    assert base.index("const socials") < base.index("const jsonLd")
+
+
+def test_the_journal_keeps_the_structured_data_it_is_given():
+    """
+    BeeRanked writes BlogPosting, BreadcrumbList and Organization, with URLs
+    already pointing at shrutivtuber.com. The route read only <main> and threw
+    all of it away, so the pages built to be found were the ones telling search
+    engines least about themselves.
+    """
+    parse = (SRC / "lib" / "journal" / "parse.ts").read_text()
+    assert 'script[type="application/ld+json"]' in parse
+    assert "structuredData" in parse
+
+    page = (SRC / "pages" / "journal" / "[...slug].astro").read_text()
+    assert "page.structuredData.map" in page
+
+
+def test_a_malformed_block_is_dropped_rather_than_emitted():
+    """Invalid JSON-LD is worse than none — it can invalidate the whole page."""
+    parse = (SRC / "lib" / "journal" / "parse.ts").read_text()
+    window = parse[parse.index("structuredData: string[]"):][:700]
+    assert "JSON.parse" in window and "catch" in window

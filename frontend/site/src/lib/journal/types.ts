@@ -147,5 +147,16 @@ export interface JournalPage {
   groups: AzGroup[];
   releases: Release[];
   release: Release | null;
+  /**
+   * BeeRanked's own schema.org blocks, verbatim.
+   *
+   * The whole point of a content engine is that it writes correct structured
+   * data, and it does: BlogPosting, BreadcrumbList and Organization, with URLs
+   * already pointing at shrutivtuber.com and the real social profiles. The
+   * journal route was reading only `<main>` and throwing every one of them
+   * away — so the pages built to be found were the pages telling search
+   * engines the least about themselves.
+   */
+  structuredData: string[];
   sky: import("./sky").Moments;
 }

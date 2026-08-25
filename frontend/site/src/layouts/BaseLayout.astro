@@ -33,12 +33,57 @@ const [live, links] = await Promise.all([
 ]);
 const badge = badgeFrom(live);
 
+
 /* Only what the admin has marked visible reaches the footer. LinkedIn is
    hidden deliberately and that is a content decision, not a layout one — the
    footer renders whatever comes back and nothing more. */
 const socials: SocialLink[] = Object.values(links?.groups ?? {})
   .flat()
   .map((l) => ({ platform: l.platform, href: l.url, label: l.label }));
+
+/* Who this is, in a form a search engine can read.
+ *
+ * Only /videos carried any structured data. Without a Person on the home page
+ * nothing outside the site knows that "Shruti" the name and the Twitch
+ * channel and the GitHub account are one person — so the profiles compete in
+ * search results instead of reinforcing each other, and a knowledge panel
+ * cannot be built at all. `sameAs` is the claim that ties them together, and
+ * it is the single highest-value tag a creator site can carry.
+ *
+ * Emitted only on the home page. Repeating a Person on every page says the
+ * same thing forty times and dilutes which URL is the canonical one for it. */
+const isHome = Astro.url.pathname === "/";
+const jsonLd = isHome
+  ? {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "WebSite",
+          "@id": `${siteUrl}/#website`,
+          url: siteUrl,
+          name: "Shruti",
+          description:
+            "Instruments for magickal and astrological practice — an ephemeris, " +
+            "four calendars, planetary hours and letter-reckoning.",
+          inLanguage: "en",
+          publisher: { "@id": `${siteUrl}/#person` },
+        },
+        {
+          "@type": "Person",
+          "@id": `${siteUrl}/#person`,
+          name: "Shruti",
+          alternateName: "Soror Eu. A.",
+          url: siteUrl,
+          description:
+            "VTuber and engineer building open-source instruments for magickal " +
+            "and astrological practice, live on stream.",
+          /* The links the admin has marked visible, and no others. A sameAs
+             pointing at a profile she has hidden would out it. */
+          sameAs: socials.map((l) => l.href).filter(Boolean),
+        },
+      ],
+    }
+  : null;
 ---
 
 <!doctype html>
@@ -58,6 +103,8 @@ const socials: SocialLink[] = Object.values(links?.groups ?? {})
     <link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/site.webmanifest" />
+
+    {jsonLd && <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />}
     <meta name="theme-color" content="#121829" media="(prefers-color-scheme: dark)" />
     <meta name="theme-color" content="#F8F6F3" media="(prefers-color-scheme: light)" />
 

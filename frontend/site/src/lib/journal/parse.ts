@@ -341,6 +341,22 @@ export async function read(parts: string[]): Promise<JournalPage | null> {
   const main = root.querySelector("main");
   if (!main) return null;
 
+  /* Carried through untouched. It already names her domain, her Organization
+     and her real profiles, so rewriting any of it would only be a chance to
+     get it wrong. Parsed first though — a malformed block is dropped rather
+     than emitted, because invalid JSON-LD is worse than none: a search engine
+     that chokes on one block may ignore the rest of the page's markup. */
+  const structuredData: string[] = [];
+  for (const node of root.querySelectorAll('script[type="application/ld+json"]')) {
+    const raw = node.textContent?.trim() ?? "";
+    if (!raw) continue;
+    try {
+      structuredData.push(JSON.stringify(JSON.parse(raw)));
+    } catch {
+      /* Not ours to fix, and not worth failing a page over. */
+    }
+  }
+
   const type = typeOf(parts);
   const kind = kindOf(parts);
   const prose = main.querySelector(".prose, .docs-body, .wiki-body");
@@ -407,6 +423,7 @@ export async function read(parts: string[]): Promise<JournalPage | null> {
     groups,
     releases: type === "changelog" ? releasesFrom(main) : [],
     release,
+    structuredData,
     /* Only a written piece has a moment, and in the design only an article
        shows one. Documentation carries a provenance block instead — which
        ephemeris, which flags — because a page that is revised has no single
