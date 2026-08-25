@@ -78,6 +78,18 @@ class Settings(BaseSettings):
     # Checkout, and managing or cancelling a subscription happens on Stripe's
     # hosted Customer Portal. That is not laziness — it keeps the site outside
     # PCI scope entirely, and the Portal IS the one-click cancellation.
+    # ── video, for classes ──────────────────────────────────────────────
+    # Bunny first because at thirty euros a course Cloudflare would take a
+    # quarter of the sale. Cloudflare later, when a course is worth a hundred
+    # and fifty and one provider matters more than the money.
+    bunny_library_id: str = ""
+    bunny_stream_api_key: str = ""
+    bunny_cdn_hostname: str = ""
+    # What makes a playback URL expire. Without it a paid lecture is one
+    # copied link from being public.
+    bunny_token_auth_key: str = ""
+    cloudflare_stream_domain: str = ""
+
     stripe_secret_key: str = ""
     # Whether a listed price already contains the tax. Inclusive is what the
     # memberships use and what a European shopper expects — the number on the

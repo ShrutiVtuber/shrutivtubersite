@@ -11,7 +11,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from shruti.api.routes import (
-    accounts, admin, billing, content, horoscopes, journal, live, media,
+    accounts, admin, billing, classes, content, horoscopes, journal, live, media,
     newsletter, passkeys, places, public, shop, videos,
 )
 from shruti.core.config import get_settings
@@ -111,6 +111,7 @@ async def health() -> dict[str, str]:
 app.include_router(live.router)
 app.include_router(content.router)
 app.include_router(shop.router)
+app.include_router(classes.router)
 app.include_router(public.router)
 app.include_router(places.router)
 app.include_router(accounts.router)
