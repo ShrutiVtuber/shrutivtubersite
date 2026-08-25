@@ -20,6 +20,7 @@ these files must not receive.
 from __future__ import annotations
 
 import os
+from html import escape as _escape
 from functools import lru_cache
 from pathlib import Path
 
@@ -56,9 +57,73 @@ def optin_confirm(token: str, imprint: dict | None = None) -> str:
     )
 
 
-def newsletter_issue(imprint: dict | None = None) -> str:
+def _letter_html(markdown: str) -> str:
+    """
+    Her prose, in the designer's paragraph style.
+
+    Deliberately not a markdown engine. An email client is hostile ground —
+    half the stylesheet is stripped, so every rule that matters has to be
+    inlined on the element — and a general renderer produces bare <p> and <h2>
+    tags carrying none of that. Paragraphs, a blank-line break and nothing
+    else is what a letter needs, and what it cannot get wrong.
+
+    Everything is escaped. What she types is text, and a stray `<` in a letter
+    about a `<span>` should read as a `<`, not vanish.
+    """
+    paras = [p.strip() for p in (markdown or "").replace("\r\n", "\n").split("\n\n")]
+    paras = [p for p in paras if p]
+    if not paras:
+        return ""
+    style = ("margin:0 0 14px;font:400 16px/1.7 Georgia,'Times New Roman',serif;"
+             "color:#26304A")
+    last = ("margin:0;font:400 16px/1.7 Georgia,'Times New Roman',serif;"
+            "color:#26304A")
+    out = []
+    for i, para in enumerate(paras):
+        text = _escape(para).replace("\n", "<br>")
+        out.append(f'<p class="ink" style="{last if i == len(paras) - 1 else style}">{text}</p>')
+    return "\n".join(out)
+
+
+def newsletter_issue(
+    *,
+    subject: str,
+    letter_md: str,
+    issue_line: str = "",
+    preheader: str = "",
+    unsubscribe_url: str = "",
+    preferences_url: str = "",
+    browser_url: str = "",
+    confirmed_on: str = "",
+    reading_html: str = "",
+    videos_html: str = "",
+    imprint: dict | None = None,
+) -> str:
+    """
+    One issue, for one subscriber.
+
+    **The unsubscribe link is per-subscriber and must be real.** It used to be
+    `{{site_url}}` — the designer's stand-in — which would have shipped a
+    letter whose one-click unsubscribe went to the front page. That is a legal
+    requirement, not a nicety, and it is the kind of thing nobody notices until
+    somebody who wants out cannot get out.
+
+    `reading_html` and `videos_html` are empty by default. The mock-up carried
+    invented article titles in those places; an empty section is honest and an
+    invented one is not.
+    """
     return render(
         "newsletter-issue.html",
+        subject=_escape(subject),
+        preheader=_escape(preheader or subject),
+        issue_line=_escape(issue_line),
+        letter=_letter_html(letter_md),
+        reading=reading_html,
+        videos=videos_html,
+        unsubscribe_url=_escape(unsubscribe_url, quote=True) or site_url(),
+        preferences_url=_escape(preferences_url, quote=True) or site_url(),
+        browser_url=_escape(browser_url, quote=True) or site_url(),
+        confirmed_on=f" on {_escape(confirmed_on)}" if confirmed_on else "",
         site_url=site_url(),
         footer_legal=legal_footer(imprint),
     )
@@ -78,7 +143,7 @@ def newsletter_issue(imprint: dict | None = None) -> str:
 # and the confirmation that a cancellation was received — and under EU consumer
 # law the first of those is owed on a durable medium. So this covers the gap.
 
-from html import escape as _escape
+
 
 
 def _fact_rows(rows: list[tuple[str, str]]) -> str:

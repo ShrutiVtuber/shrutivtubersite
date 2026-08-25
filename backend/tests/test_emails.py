@@ -7,7 +7,20 @@ import pytest
 
 from shruti.core.emails import newsletter_issue, optin_confirm
 
-TEMPLATES = (optin_confirm("test-token-123"), newsletter_issue())
+# The issue template now needs a real issue: it used to render the designer's
+# mock-up, complete with invented article titles, from no arguments at all.
+TEMPLATES = (
+    optin_confirm("test-token-123"),
+    newsletter_issue(
+        subject="A letter",
+        letter_md="A paragraph.\n\nAnd another.",
+        issue_line="August 2026",
+        unsubscribe_url="https://example.test/newsletter/unsubscribed?token=t",
+        preferences_url="https://example.test/newsletter/preferences?token=t",
+        browser_url="https://example.test/newsletter/archive/a-letter",
+        confirmed_on="1 August 2026",
+    ),
+)
 
 
 @pytest.mark.parametrize("html", TEMPLATES)

@@ -40,6 +40,12 @@ const toPost = (Array.isArray(shopOrders.body) ? shopOrders.body : [])
 
 const peopleList = await asAdmin(Astro, "/api/admin/users");
 const people: any[] = Array.isArray(peopleList.body) ? peopleList.body : [];
+const [letterCall, reachCall] = await Promise.all([
+  asAdmin(Astro, "/api/newsletter/admin/issues"),
+  asAdmin(Astro, "/api/newsletter/admin/audience"),
+]);
+const letters: any[] = Array.isArray(letterCall.body) ? letterCall.body : [];
+const reach = reachCall.body ?? {};
 const useCall = await asAdmin(Astro, "/api/insight/summary?days=7");
 const use = useCall.body ?? {};
 const skyList = await asAdmin(Astro, "/api/journal/entries");
@@ -105,6 +111,14 @@ const skyEntries: any[] = skyList.body?.entries ?? [];
       <span class="big">{skyEntries.length}</span>
       <span class="sub">
         {skyEntries.filter((e: any) => e.written).length} with a writing sky
+      </span>
+    </a>
+
+    <a class="adm-card tile" href="/admin/newsletter">
+      <span class="adm-lbl">The letter</span>
+      <span class="big">{letters.length}</span>
+      <span class="sub">
+        {letters.filter((i: any) => i.sentAt).length} sent · {reach.wouldReceive ?? 0} would receive
       </span>
     </a>
 

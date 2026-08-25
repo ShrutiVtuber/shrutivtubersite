@@ -1,0 +1,274 @@
+---
+/* Writing the letter, and sending it.
+ *
+ * This was the gap the audit found. Everything around the newsletter existed —
+ * the subscribe form, the double opt-in, the one-click unsubscribe, the
+ * preference centre, the public archive — and there was no way to write an
+ * issue or send one. The site had been collecting confirmed addresses against
+ * a table nothing ever wrote a row to, while promising a letter a month.
+ *
+ * Two rules the page enforces rather than asks about:
+ *
+ *   - **A sent issue cannot be edited.** The archive has to be the letter
+ *     people actually read.
+ *   - **Sending happens once.** A second send would put the same letter in the
+ *     same inboxes, which is the mistake that costs a list.
+ *
+ * The test send exists because the alternative is finding a typo in five
+ * hundred inboxes, and it renders through exactly the same path as the real
+ * one.
+ */
+import AdminLayout from "../../layouts/AdminLayout.astro";
+import CsrfField from "../../components/forms/CsrfField.astro";
+import Button from "../../components/forms/Button.astro";
+import Badge from "../../components/navigation/Badge.astro";
+import { asAdmin } from "../../lib/admin";
+import { verifyCsrf } from "../../lib/csrf";
+
+export const prerender = false;
+
+let notice = "";
+let failed = "";
+
+if (Astro.request.method === "POST") {
+  const form = await Astro.request.formData();
+  if (!verifyCsrf(Astro.cookies, form)) {
+    failed = "That did not save. Reload the page and try again.";
+  } else {
+    const action = String(form.get("action") ?? "");
+    const id = String(form.get("id") ?? "");
+    const payload = {
+      subject: String(form.get("subject") ?? ""),
+      letter_md: String(form.get("letter_md") ?? ""),
+      slug: String(form.get("slug") ?? ""),
+      visible: form.get("visible") === "on",
+    };
+
+    if (action === "create") {
+      const r = await asAdmin(Astro, "/api/newsletter/admin/issues", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (r.ok) return Astro.redirect(`/admin/newsletter?open=${r.body.id}`, 303);
+      failed = r.body?.detail ?? "That could not be created.";
+    } else if (action === "save") {
+      const r = await asAdmin(Astro, `/api/newsletter/admin/issues/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      notice = r.ok ? "Saved." : "";
+      if (!r.ok) failed = r.body?.detail ?? "That did not save.";
+    } else if (action === "delete") {
+      const r = await asAdmin(Astro, `/api/newsletter/admin/issues/${id}`, { method: "DELETE" });
+      if (r.ok) return Astro.redirect("/admin/newsletter", 303);
+      failed = r.body?.detail ?? "That could not be deleted.";
+    } else if (action === "test") {
+      const r = await asAdmin(Astro, `/api/newsletter/admin/issues/${id}/test`, { method: "POST" });
+      notice = r.ok && r.body?.sent
+        ? "Test sent to your own address. Read it before sending the real one."
+        : "";
+      if (!notice) failed = r.body?.error ?? r.body?.detail ?? "The test did not send.";
+    } else if (action === "send") {
+      const r = await asAdmin(Astro, `/api/newsletter/admin/issues/${id}/send`, { method: "POST" });
+      if (r.ok) {
+        notice = `Sent to ${r.body.sent} of ${r.body.of}.` +
+          (r.body.failed ? ` ${r.body.failed} did not go through — the log has why.` : "");
+      } else {
+        failed = r.body?.detail ?? "That did not send.";
+      }
+    }
+  }
+}
+
+const [issueCall, audienceCall] = await Promise.all([
+  asAdmin(Astro, "/api/newsletter/admin/issues"),
+  asAdmin(Astro, "/api/newsletter/admin/audience"),
+]);
+const issues: any[] = Array.isArray(issueCall.body) ? issueCall.body : [];
+const reach = audienceCall.body ?? {};
+
+const openId = Astro.url.searchParams.get("open") ?? "";
+const open = issues.find((i) => String(i.id) === openId) ?? null;
+const readable = (iso: string | null) =>
+  iso ? new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" }) : "";
+---
+
+<AdminLayout title="The letter">
+  <h1 class="adm-h">The letter</h1>
+
+  {notice && <p class="adm-ok">{notice}</p>}
+  {failed && <p class="adm-bad">{failed}</p>}
+
+  <div class="cards">
+    <div class="adm-card tile">
+      <span class="adm-lbl">Would receive the next one</span>
+      <span class="big">{reach.wouldReceive ?? 0}</span>
+      <span class="of">confirmed, not unsubscribed, not paused</span>
+    </div>
+    <div class="adm-card tile">
+      <span class="adm-lbl">Confirmed</span>
+      <span class="big">{reach.confirmed ?? 0}</span>
+      <span class="of">{reach.unconfirmed ?? 0} never confirmed — never written to</span>
+    </div>
+    <div class="adm-card tile">
+      <span class="adm-lbl">Paused or gone</span>
+      <span class="big">{(reach.paused ?? 0) + (reach.unsubscribed ?? 0)}</span>
+      <span class="of">{reach.paused ?? 0} paused · {reach.unsubscribed ?? 0} unsubscribed</span>
+    </div>
+  </div>
+
+  <section class="adm-card">
+    <h2 class="adm-lbl">Issues</h2>
+    {
+      issues.length === 0 ? (
+        <p class="adm-note">None written yet.</p>
+      ) : (
+        <ul class="issues">
+          {issues.map((i) => (
+            <li>
+              <a href={`/admin/newsletter?open=${i.id}`}>{i.subject || "Untitled"}</a>
+              <Badge tone={i.sentAt ? "accent" : "faint"}>
+                {i.sentAt ? `sent ${readable(i.sentAt)}` : "draft"}
+              </Badge>
+              {i.sentAt && !i.visible && <span class="hidden-mark">hidden from the archive</span>}
+            </li>
+          ))}
+        </ul>
+      )
+    }
+  </section>
+
+  {
+    open ? (
+      <section class="adm-card">
+        <h2 class="adm-lbl">{open.sentAt ? "Sent — read only" : "Writing"}</h2>
+        {
+          open.sentAt && (
+            <p class="adm-note">
+              This went out on {readable(open.sentAt)}. Its words cannot change:
+              the archive has to be the letter people actually read. A correction
+              is a new issue, which is also what an erratum is.
+            </p>
+          )
+        }
+        <form method="POST" class="write">
+          <CsrfField />
+          <input type="hidden" name="action" value="save" />
+          <input type="hidden" name="id" value={open.id} />
+          <label>
+            <span class="adm-lbl">Subject</span>
+            <input class="adm-input" name="subject" value={open.subject} maxlength="200"
+                   readonly={open.sentAt ? true : undefined} />
+          </label>
+          <label>
+            <span class="adm-lbl">The letter</span>
+            <textarea class="adm-area" name="letter_md" rows="16"
+                      readonly={open.sentAt ? true : undefined}>{open.letterMd}</textarea>
+            <p class="hint">
+              Plain paragraphs, separated by a blank line. Not markdown — an email
+              client strips half a stylesheet, so each paragraph is styled on the
+              element and anything cleverer would arrive looking like nothing.
+            </p>
+          </label>
+          {!open.sentAt && (
+            <label>
+              <span class="adm-lbl">Its address in the archive</span>
+              <input class="adm-input" name="slug" value={open.slug} maxlength="80" />
+            </label>
+          )}
+          <label class="check">
+            <input type="checkbox" name="visible" checked={open.visible} />
+            <span>Show in the public archive</span>
+          </label>
+          <div><Button type="submit" variant="secondary">Save</Button></div>
+        </form>
+
+        <div class="acts">
+          <form method="POST">
+            <CsrfField />
+            <input type="hidden" name="action" value="test" />
+            <input type="hidden" name="id" value={open.id} />
+            <Button type="submit" variant="secondary">Send a test to myself</Button>
+          </form>
+
+          {
+            open.sentAt ? (
+              <p class="adm-note">Already sent. It cannot be sent again.</p>
+            ) : (
+              <form method="POST"
+                    onsubmit={`return confirm('Send this to ${reach.wouldReceive ?? 0} people? It cannot be unsent.')`}>
+                <CsrfField />
+                <input type="hidden" name="action" value="send" />
+                <input type="hidden" name="id" value={open.id} />
+                <Button type="submit" data-track="newsletter:sent">
+                  Send to {reach.wouldReceive ?? 0}
+                </Button>
+              </form>
+            )
+          }
+
+          {
+            !open.sentAt && (
+              <form method="POST" onsubmit="return confirm('Delete this draft?')">
+                <CsrfField />
+                <input type="hidden" name="action" value="delete" />
+                <input type="hidden" name="id" value={open.id} />
+                <Button type="submit" variant="secondary">Delete the draft</Button>
+              </form>
+            )
+          }
+        </div>
+      </section>
+    ) : (
+      <section class="adm-card">
+        <h2 class="adm-lbl">Start one</h2>
+        <form method="POST" class="write">
+          <CsrfField />
+          <input type="hidden" name="action" value="create" />
+          <label>
+            <span class="adm-lbl">Subject</span>
+            <input class="adm-input" name="subject" maxlength="200" placeholder="The monthly letter — September" required />
+          </label>
+          <label>
+            <span class="adm-lbl">The letter</span>
+            <textarea class="adm-area" name="letter_md" rows="10" placeholder="Blank line between paragraphs."></textarea>
+          </label>
+          <div><Button type="submit">Start it</Button></div>
+        </form>
+      </section>
+    )
+  }
+</AdminLayout>
+
+<style>
+  .cards { display: grid; gap: var(--space-4); grid-template-columns: repeat(3, 1fr); }
+  .tile { align-content: start; }
+  .big { font: 600 var(--text-h2) var(--font-display); color: var(--ink); line-height: 1; }
+  .of { font: 400 var(--text-xs) var(--font-body); color: var(--ink-faint); }
+
+  .issues { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+  .issues li { display: flex; gap: var(--space-3); align-items: baseline; flex-wrap: wrap; }
+  .issues a { font: 500 var(--text-body) var(--font-body); color: var(--accent); text-decoration: none; }
+  .issues a:hover { text-decoration: underline; }
+  .hidden-mark {
+    font: 600 var(--text-micro) var(--font-body); letter-spacing: var(--tracking-eyebrow);
+    text-transform: uppercase; color: var(--ink-faint);
+  }
+
+  .write { display: grid; gap: var(--space-4); max-width: 70ch; }
+  .write label { display: grid; gap: 6px; }
+  .check { display: flex; gap: 10px; align-items: center; }
+  .check span { font: 400 var(--text-sm) var(--font-body); color: var(--ink); }
+  .hint { font: 400 var(--text-xs) / 1.6 var(--font-body); color: var(--ink-faint); margin: 0; max-width: 62ch; }
+  .acts {
+    display: flex; gap: var(--space-4); flex-wrap: wrap; align-items: center;
+    margin-top: var(--space-5); padding-top: var(--space-4);
+    border-top: var(--border-w) solid var(--line);
+  }
+
+  @media (max-width: 720px) {
+    .cards { grid-template-columns: 1fr; }
+  }
+</style>
