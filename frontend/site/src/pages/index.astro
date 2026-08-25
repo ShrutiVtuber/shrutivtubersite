@@ -315,7 +315,7 @@ const INSTRUMENTS = [
               status={(p.status as "active" | "maintained" | "archived") ?? "active"}
               repoHref={p.repoUrl || undefined}
               liveHref={p.siteUrl || undefined}
-              screenshot={null}
+              screenshot={p.media?.url ?? null}
             />
           ))}
         </div>

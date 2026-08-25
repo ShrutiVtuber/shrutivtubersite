@@ -23,7 +23,6 @@ interface FullProject extends Project {
   stack: string;
   licence: string;
   contributors: string;
-  media: { url: string; alt: string } | null;
 }
 
 const projects = (await site<FullProject[]>(PATHS.projects)) ?? [];

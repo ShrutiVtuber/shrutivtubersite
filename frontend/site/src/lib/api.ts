@@ -97,6 +97,11 @@ export interface Project {
   repoUrl: string;
   siteUrl: string;
   status: string;
+  /* The API has always sent this. It was missing here, so the landing page —
+     typed against this and not against the payload — had no screenshot to
+     pass and passed null instead. A project's picture then appeared on /work
+     and nowhere else. */
+  media: { url: string; alt: string } | null;
 }
 
 export interface LiveStatus {
