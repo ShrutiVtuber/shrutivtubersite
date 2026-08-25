@@ -64,7 +64,7 @@ extract structured data per page type, then render Astro components.
 - [x] Blog index (first / empty) — pagination waits for a second page of entries
 - [x] Category archive
 - [x] Article (cover / no cover) + TOC rail + static rail fallback
-- [ ] Sky-at-publication block, from the stored record
+- [x] Sky blocks — two moments, published and begun (see below)
 - [x] Docs index
 - [x] Docs page (TOC / no TOC) + sidebar + provenance
 - [x] Wiki index (A–Z) + wiki article — **no grade dots**: the designer's
@@ -140,3 +140,36 @@ hers to do: sign in, then walk
 What was verified from here: the containers are healthy, production carries the
 same nine synced pages the local run was checked against, and the font fix is
 live and public (0 malformed faces, woff2 served as `font/woff2`).
+
+
+## The two skies (2026-08-25)
+
+Both moments are live.
+
+**Published** captures itself. `_sky_reconciler` in the API lifespan walks the
+synced tree every fifteen minutes, reads `datePublished` out of the page's
+JSON-LD `@graph`, and captures the sky at that instant. Because the instant
+comes from the entry and never from the clock, a late pass records the same sky
+as a prompt one — which is the only reason it is allowed to run unattended. One
+Postgres advisory lock keeps the two uvicorn workers from both casting it.
+
+**Begun** cannot capture itself. BeeRanked records no creation time and exposes
+none through `list_content` or `get_content`, so `/admin/journal` is where she
+records it. Set once; there is no amend, by design.
+
+Documentation deliberately gets neither. The design gives it a provenance block
+— which ephemeris, which flags — because a page that is revised has no single
+instant. **That block is not built yet**; it is the obvious next piece for docs
+pages.
+
+### A daemon bug this turned up
+
+`shruti-astro` returns `planetaryHours.current: null` for a moment that falls in
+the night that began the *previous* UTC day. Probed across 2026-08-25:
+
+    02:30Z → null      05:00Z → Sun     12:00Z → Mars
+    20:00Z → Sun       22:30Z → Moon
+
+So an entry published between midnight and dawn loses its planetary hour — all
+four seeded entries did. The record block simply omits the line, which is
+honest, but the fix belongs in theourgia's ephemeris service, not here.

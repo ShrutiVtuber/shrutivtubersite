@@ -61,6 +61,14 @@ async def _sky_reconciler() -> None:
     """
     from shruti.api.routes.journal import reconcile_published
 
+    # The documented deploy is `up -d --build` and then `alembic upgrade head`,
+    # so on any deploy carrying a migration this task starts against a schema
+    # that is a minute behind the code. It recovers on its own — the failure is
+    # caught and the next pass is fine — but it recovers a quarter of an hour
+    # later and leaves a traceback that looks like something is wrong. Waiting
+    # out the window costs nothing: no entry needs its sky in the first minute.
+    await asyncio.sleep(int(os.environ.get("SHRUTI_SKY_FIRST_PASS_SECONDS", "90")))
+
     while True:
         try:
             async with SessionLocal() as session:
