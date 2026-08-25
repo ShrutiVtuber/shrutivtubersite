@@ -529,6 +529,199 @@ class Order(TimestampMixin, table=True):
     downloads: int = 0
 
 
+
+# ── classes and workshops ───────────────────────────────────────────────────
+
+class Course(TimestampMixin, table=True):
+    """
+    A class, or a workshop.
+
+    **One table for both**, because a workshop is a class that happened live
+    once: it has a date and a number of seats, and everything else about it —
+    modules, lessons, how it is sold, who may open it — is identical. The
+    edited recording sold afterwards is a *separate* course, which is what she
+    asked for and what keeps this from needing special cases.
+
+    Sold like a product and mirrored to Stripe the same way, or included with
+    one or more membership tiers, or both.
+    """
+
+    __tablename__ = "course"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    slug: str = Field(index=True, unique=True)
+    title: str
+    kind: str = Field(default="class", index=True)     # class | workshop
+
+    tagline: str = ""
+    body_md: str = ""
+    media_id: Optional[int] = Field(default=None, foreign_key="media.id")
+
+    price_cents: int = 0
+    currency: str = "eur"
+    tax_code: str = "txcd_10000000"
+    stripe_product_id: str = ""
+    stripe_price_id: str = ""
+
+    # Workshops only. A class has no date and no limit.
+    starts_at: Optional[datetime] = Field(default=None, sa_type=UTC_TS)
+    minutes: Optional[int] = None
+    seats: Optional[int] = None
+    room_name: str = ""              # the live room, once one exists
+
+    visible: bool = Field(default=False)
+    position: int = Field(default=0)
+
+
+class CourseTier(TimestampMixin, table=True):
+    """
+    A membership that includes a course.
+
+    A row rather than a column because a course can be included with several
+    tiers at once — she said so plainly — and a column would make that a
+    comma-separated string nobody can query.
+    """
+
+    __tablename__ = "course_tier"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    course_id: int = Field(foreign_key="course.id", index=True)
+    tier_key: str = Field(index=True)
+
+
+class Module(TimestampMixin, table=True):
+    """A part of a course. What the reference calls a section."""
+
+    __tablename__ = "course_module"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    course_id: int = Field(foreign_key="course.id", index=True)
+    title: str
+    position: int = Field(default=0)
+
+
+class Lesson(TimestampMixin, table=True):
+    """
+    One thing to watch, read, listen to, download or answer.
+
+    **The video provider is a field.** Courses start on Bunny because at
+    thirty euros Cloudflare would take a quarter of the sale, and move to
+    Cloudflare when they are worth a hundred and fifty. That is a planned
+    migration rather than a hypothetical one, so both can be live at once and a
+    course can move one lesson at a time.
+    """
+
+    __tablename__ = "lesson"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    module_id: int = Field(foreign_key="course_module.id", index=True)
+    title: str
+    kind: str = Field(default="video")      # video | text | audio | pdf | quiz
+    position: int = Field(default=0)
+
+    # Shown under a video, and the whole of a text lesson.
+    body_md: str = ""
+
+    video_provider: str = ""                # bunny | cloudflare
+    video_id: str = ""
+    # For the "VIDEO · 96 MIN" line. Stored rather than asked for on render.
+    duration_seconds: Optional[int] = None
+
+    # What an audio or pdf lesson hands over. Same store as a paid product
+    # file, and served the same guarded way.
+    file_id: Optional[int] = Field(default=None, foreign_key="product_file.id")
+
+    # Watchable before buying. One good lesson given away sells more than a
+    # locked door does.
+    free_preview: bool = Field(default=False)
+
+
+class QuizQuestion(TimestampMixin, table=True):
+    """
+    One question, for checking yourself.
+
+    **Not graded and not gateable.** Where she certifies, the examination is a
+    live reading watched by her or an assistant, or a written test sent to her,
+    and a written lesson explains it. So nothing here has to decide whether
+    somebody passed, which is what keeps it small — and means a quiz can never
+    make somebody feel they failed a class they paid for.
+    """
+
+    __tablename__ = "quiz_question"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    lesson_id: int = Field(foreign_key="lesson.id", index=True)
+    prompt: str
+    # One per line.
+    choices: str = ""
+    answer_index: int = 0
+    # Shown once they have answered, right or wrong. The point of a self-check
+    # is the explanation, not the mark.
+    explanation: str = ""
+    position: int = Field(default=0)
+
+
+class Entitlement(TimestampMixin, table=True):
+    """
+    Permission to open a course, and where it came from.
+
+    **Kept apart from progress on purpose.** Access bought with a membership
+    ends when the membership does; access bought outright never does; and
+    neither has anything to do with how far somebody got. Keeping them in one
+    record would make "they lose the materials but not their progress"
+    impossible to honour without special cases.
+
+    `source` matters as much as the fact of it — a purchase and a tier expire
+    differently, and one "has access" flag cannot say which one just ended.
+    """
+
+    __tablename__ = "entitlement"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="site_user.id", index=True)
+    course_id: int = Field(foreign_key="course.id", index=True)
+
+    source: str = Field(default="purchase", index=True)  # purchase | tier | ticket | gift
+    # Which membership granted it, so losing that one revokes only what it gave.
+    tier_key: str = ""
+
+    # Set rather than deleted, so why somebody lost access is still answerable
+    # six months later when they write and ask.
+    revoked_at: Optional[datetime] = Field(default=None, sa_type=UTC_TS)
+
+
+class Enrolment(TimestampMixin, table=True):
+    """
+    How far somebody got, and where to put them back.
+
+    Survives losing access. Somebody who resubscribes lands where they left
+    off rather than at the beginning, which is the difference between a
+    membership that is worth rejoining and one that punishes you for having
+    paused.
+    """
+
+    __tablename__ = "enrolment"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="site_user.id", index=True)
+    course_id: int = Field(foreign_key="course.id", index=True)
+    last_lesson_id: Optional[int] = Field(default=None, foreign_key="lesson.id")
+    completed_at: Optional[datetime] = Field(default=None, sa_type=UTC_TS)
+
+
+class LessonProgress(TimestampMixin, table=True):
+    """One tick in the sidebar."""
+
+    __tablename__ = "lesson_progress"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="site_user.id", index=True)
+    lesson_id: int = Field(foreign_key="lesson.id", index=True)
+    completed_at: Optional[datetime] = Field(default=None, sa_type=UTC_TS)
+    # Where to resume a video. Not a tick — somebody can be halfway.
+    seconds_watched: int = 0
+
+
 # Accounts and everything that hangs off them. Imported here so metadata
 # sees them and Alembic autogenerate does not miss the tables.
 from shruti.models.accounts import (  # noqa: E402,F401
