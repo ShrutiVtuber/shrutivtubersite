@@ -214,8 +214,8 @@ const here = (extra: Record<string, string> = {}) => {
         </label>
         <label class="field">
           <span class="adm-lbl">Its id</span>
-          <input class="adm-input" name="video_id" value={lesson.video_id} />
-          <p class="hint">The GUID Bunny shows on the video.</p>
+          <input class="adm-input" name="video_id" value={lesson.video_id} data-video-id />
+          <p class="hint">Filled in for you when you upload below.</p>
         </label>
       </div>
 
@@ -260,6 +260,29 @@ const here = (extra: Record<string, string> = {}) => {
         <a class="cancel" href={here()}>Done</a>
       </div>
     </form>
+  )}
+
+  {course && lesson && (
+    <section class="adm-card" data-upload data-lesson={lesson.id}>
+      <h2 class="h2">Upload the video</h2>
+      <p class="adm-note">
+        It goes straight to Bunny from this browser rather than through the
+        server, so a long lecture is not at the mercy of a request timing out.
+        Leave this page open until it finishes.
+      </p>
+      <label class="field">
+        <span class="adm-lbl">Choose a file</span>
+        <input class="adm-input" type="file" accept="video/*" data-file />
+      </label>
+      <p class="up-status" data-status role="status"></p>
+      <div class="up-bar" data-bar hidden><span data-fill></span></div>
+      <noscript>
+        <p class="hint">
+          Uploading needs JavaScript. Without it, upload in the Bunny dashboard
+          and paste the video's GUID into the id field above.
+        </p>
+      </noscript>
+    </section>
   )}
 
   {course && lesson && lesson.kind === "quiz" && (
@@ -438,6 +461,14 @@ const here = (extra: Record<string, string> = {}) => {
   .right { color: var(--accent); font-weight: 600; }
   .qadd { display: grid; gap: var(--space-3); margin-top: var(--space-4); }
 
+  .up-status { margin: 0; font: 400 var(--text-sm) var(--font-body); color: var(--ink-soft); min-height: 1.2em; }
+  .up-status[data-bad] { color: var(--live); }
+  .up-bar {
+    height: 6px; border-radius: 99px; background: var(--surface-veil);
+    overflow: hidden; margin-top: 6px;
+  }
+  .up-bar span { display: block; height: 100%; width: 0; background: var(--accent); transition: width .2s ease-out; }
+
   .inline { display: inline; }
   .row-actions { display: flex; gap: var(--space-3); align-items: center; }
   .danger {
@@ -449,6 +480,97 @@ const here = (extra: Record<string, string> = {}) => {
 </style>
 
 <script>
+  /* Uploading a lecture.
+   *
+   * The file goes from this browser straight to Bunny. It never touches the
+   * server, which only needs the id afterwards — thirty hours of video has no
+   * business travelling through a box that is going to forget it immediately,
+   * and an upload that dies to a request timeout is an hour of somebody's
+   * evening.
+   */
+  const panel = document.querySelector<HTMLElement>("[data-upload]");
+  if (panel) {
+    const lessonId = panel.dataset.lesson;
+    const file = panel.querySelector<HTMLInputElement>("[data-file]");
+    const status = panel.querySelector<HTMLElement>("[data-status]");
+    const bar = panel.querySelector<HTMLElement>("[data-bar]");
+    const fill = panel.querySelector<HTMLElement>("[data-fill]");
+    const idBox = document.querySelector<HTMLInputElement>("[data-video-id]");
+
+    const say = (text: string, bad = false) => {
+      if (!status) return;
+      status.textContent = text;
+      status.toggleAttribute("data-bad", bad);
+    };
+
+    file?.addEventListener("change", async () => {
+      const chosen = file.files?.[0];
+      if (!chosen) return;
+
+      say("Making a slot…");
+      let slot: any;
+      try {
+        const r = await fetch(`/api/classes/admin/lessons/${lessonId}/video`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ title: chosen.name }),
+        });
+        slot = await r.json();
+        if (!r.ok) { say(slot?.detail ?? "Bunny would not take it.", true); return; }
+      } catch {
+        say("Could not reach the server.", true);
+        return;
+      }
+
+      if (idBox) idBox.value = slot.videoId;
+      if (bar) bar.hidden = false;
+
+      /* XHR rather than fetch, only because it reports progress and fetch does
+         not. On an hour of video, a bar that moves is the difference between
+         waiting and giving up. */
+      const put = new XMLHttpRequest();
+      put.open("PUT", slot.uploadUrl, true);
+      put.setRequestHeader("AccessKey", slot.accessKey);
+
+      put.upload.addEventListener("progress", (event) => {
+        if (!event.lengthComputable) return;
+        const percent = Math.round((event.loaded / event.total) * 100);
+        if (fill) fill.style.width = `${percent}%`;
+        say(`Uploading — ${percent}%`);
+      });
+
+      put.addEventListener("load", () => {
+        if (put.status >= 300) { say(`Bunny refused it (${put.status}).`, true); return; }
+        say("Uploaded. Bunny is encoding it now — this can take a while on a long lecture.");
+        watch();
+      });
+      put.addEventListener("error", () => say("The upload failed partway.", true));
+      put.send(chosen);
+
+      /* Encoding outlasts the upload, and a lesson is not really ready until
+         it is done — so the page keeps asking rather than declaring victory
+         at the moment the bytes land. */
+      async function watch() {
+        for (let tries = 0; tries < 240; tries += 1) {
+          await new Promise((r) => setTimeout(r, 5000));
+          try {
+            const r = await fetch(`/api/classes/admin/lessons/${lessonId}/video`);
+            const state = await r.json();
+            if (state.ready) {
+              const mins = Math.round((state.seconds ?? 0) / 60);
+              say(`Ready — ${mins} minutes. Save the lesson to keep the length.`);
+              return;
+            }
+            if (state.progress) say(`Encoding — ${state.progress}%`);
+          } catch {
+            /* Keep waiting; a blip is not a failure. */
+          }
+        }
+        say("Still encoding. It will finish on its own — reload later to check.");
+      }
+    });
+  }
+
   /* People count from one; the database counts from zero. Translating here
      rather than asking her to think in offsets. */
   const human = document.querySelector<HTMLInputElement>("[data-answer]");

@@ -301,6 +301,124 @@ async def set_course_tiers(
     return {"ok": True, "includedWith": sorted(set(body.tier_keys))}
 
 
+# ── getting video in ────────────────────────────────────────────────────────
+
+class VideoIn(BaseModel):
+    title: str
+
+
+@router.post("/admin/lessons/{lesson_id}/video", dependencies=[Depends(require_admin)])
+async def prepare_video(
+    lesson_id: int, body: VideoIn, session: AsyncSession = Depends(get_session)
+) -> dict:
+    """
+    Make a slot at Bunny and hand back where to put the file.
+
+    **The file does not come through this server.** Thirty hours of lecture has
+    no business travelling through a box that only needs to know an id
+    afterwards, and an upload that dies because a request timed out is an hour
+    of somebody's evening. The browser sends it straight to Bunny.
+
+    The lesson is pointed at the new video immediately, so a half-finished
+    upload leaves a lesson that says it has a video and cannot play it —
+    visible in the outline as "no video yet" until the upload lands, which is
+    better than a lesson that looks complete and is not.
+    """
+    import httpx
+
+    from shruti.core.config import get_settings
+    from shruti.core.video import upload_target
+
+    lesson = await session.get(Lesson, lesson_id)
+    if lesson is None:
+        raise HTTPException(404, "no such lesson")
+
+    target = upload_target("bunny")
+    if not target["ready"]:
+        raise HTTPException(503, target["reason"])
+
+    s = get_settings()
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            made = await client.post(
+                target["endpoint"],
+                headers={"AccessKey": s.bunny_stream_api_key,
+                         "content-type": "application/json"},
+                json={"title": body.title or lesson.title},
+            )
+        made.raise_for_status()
+        video_id = made.json()["guid"]
+    except Exception as exc:                           # noqa: BLE001
+        log.exception("could not make a video slot for lesson %s", lesson_id)
+        raise HTTPException(502, f"Bunny would not take it: {exc}")
+
+    lesson.video_provider = "bunny"
+    lesson.video_id = video_id
+    await session.commit()
+
+    return {
+        "ok": True,
+        "videoId": video_id,
+        # Where the browser PUTs the file, and the key it needs to do it.
+        # A library key, not the account one: it can touch this library and
+        # nothing else, which is the most a browser should ever hold.
+        "uploadUrl": f"{target['endpoint']}/{video_id}",
+        "accessKey": s.bunny_stream_api_key,
+    }
+
+
+@router.get("/admin/lessons/{lesson_id}/video", dependencies=[Depends(require_admin)])
+async def video_state(
+    lesson_id: int, session: AsyncSession = Depends(get_session)
+) -> dict:
+    """
+    How the encoding is getting on.
+
+    Bunny takes a while over a long lecture, and a lesson is not really ready
+    until it is done. Asked of Bunny rather than tracked here, because they
+    know and this side would be guessing.
+    """
+    import httpx
+
+    from shruti.core.config import get_settings
+
+    lesson = await session.get(Lesson, lesson_id)
+    if lesson is None:
+        raise HTTPException(404, "no such lesson")
+    if not lesson.video_id or lesson.video_provider != "bunny":
+        return {"ready": False, "reason": "no Bunny video on this lesson"}
+
+    s = get_settings()
+    try:
+        async with httpx.AsyncClient(timeout=20.0) as client:
+            r = await client.get(
+                f"https://video.bunnycdn.com/library/{s.bunny_library_id}/videos/{lesson.video_id}",
+                headers={"AccessKey": s.bunny_stream_api_key, "accept": "application/json"},
+            )
+        r.raise_for_status()
+        got = r.json()
+    except Exception as exc:                           # noqa: BLE001
+        return {"ready": False, "reason": f"Bunny would not say: {exc}"}
+
+    # 4 is finished; anything below it is still being worked on.
+    status = got.get("status", 0)
+    seconds = got.get("length") or 0
+
+    # Recorded now so the outline can say "96 min" without asking Bunny again
+    # on every page load.
+    if seconds and lesson.duration_seconds != seconds:
+        lesson.duration_seconds = seconds
+        await session.commit()
+
+    return {
+        "ready": status >= 4,
+        "status": status,
+        "progress": got.get("encodeProgress", 0),
+        "seconds": seconds,
+        "reason": "" if status >= 4 else "still encoding",
+    }
+
+
 # ── workshops: the room, and the people in it ───────────────────────────────
 
 async def _ticket_holders(course_id: int, session: AsyncSession) -> list:
