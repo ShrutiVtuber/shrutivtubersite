@@ -45,7 +45,8 @@ What happens when you use them:
   over the GeoNames dataset.
 - **Times and charts are computed on the server** and returned to you. The
   parameters are in the URL so a reckoning can be shared or re-opened. Nothing
-  is stored.
+  is stored — unless you press **Keep this chart**, which is a decision you
+  make, needs its own consent, and has a section of its own below.
 - **Two instruments compute in your browser instead**: the isopsephy page and
   the sigil generator. What you type into those never reaches this server at
   all — no request is made — and the sigil's share link carries the reduced
@@ -142,6 +143,50 @@ one and no to another:
 For each, the exact wording you agreed to is stored with the record, along with
 the version, the time and where it was given. If the wording changes later, your
 record still says what you actually read.
+"""),
+    ("charts", "If you keep a chart", 45, """
+A chart you keep stores your **birth date, birth time and birth place**, and
+those are the reason this section exists rather than being a line in the one
+above. Birth data used to produce an astrological reading arguably reveals
+something about your philosophical beliefs, which makes it **special-category
+data** under Article 9. Its lawful basis here is your **explicit consent**, and
+that consent is stored word for word, under the version you were shown, next to
+the chart it justifies.
+
+**You do not need an account to keep one.** If you do not have one, the consent
+is recorded against the chart itself, because there is no account to record it
+against.
+
+**Two links, and they are not the same link.**
+
+- The one you land on when you keep a chart is **yours**. It is how you get
+  back to it. Nothing about it is guessable and it carries no birth data, so it
+  can sit in your browser history without your birth details sitting there too.
+- If you choose to share the chart, a **second** link is made. You can revoke
+  that one at any time, and revoking it does not disturb yours.
+
+**What somebody with a share link can see, and what they cannot.** The page
+they land on does not print your birth date, your birth time or your birth
+place. It shows the chart.
+
+A chart is your birth data, drawn. Anybody who can read a chart can get your
+birth time to within a few minutes from the ascendant, and the date from the
+positions of the planets. Keeping it out of the link and off the page is worth
+doing and it stops the ordinary case completely — but it does not, and cannot,
+hide it from an astrologer. You are told this at the moment you make the link,
+because a protection with a hard limit should be described with the limit.
+
+**How long it is kept.**
+
+- On an account: until you delete it, or delete your account.
+- Without an account: **one year**, and the year starts again every time you
+  open it. That is not tidying up. The consent behind it cannot be renewed by
+  asking, because there is nobody to ask, so it is not relied on indefinitely.
+
+**Deleting one takes one press**, on the chart's own page, with no email and no
+waiting. It deletes the birth data with it. If you later make an account, a
+chart you already kept can be moved onto it rather than cast again, and the
+expiry lifts.
 """),
     ("newsletter", "The monthly letter", 50, """
 Subscribing is **double opt-in**: an address that has not confirmed is never
