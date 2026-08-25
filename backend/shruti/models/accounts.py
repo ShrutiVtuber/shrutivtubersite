@@ -26,6 +26,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Optional
 
+from sqlalchemy import UniqueConstraint
 from sqlmodel import Field
 
 from shruti.models import UTC_TS, TimestampMixin
@@ -180,7 +181,7 @@ class Issue(TimestampMixin, table=True):
 
 class JournalSky(TimestampMixin, table=True):
     """
-    The sky at the moment a journal entry was published.
+    The sky at a moment in a journal entry's life.
 
     Theourgia stamps every record with what the world was doing when it was
     made, and a journal of practice deserves the same. The rules it follows,
@@ -199,15 +200,28 @@ class JournalSky(TimestampMixin, table=True):
     Stored rather than recomputed on read, which is the other half of the
     point: rendering a journal index should not cast twelve charts.
 
-    Keyed by the entry's slug, because the entries themselves live in
-    BeeRanked. This table holds only what BeeRanked cannot know.
+    Keyed by the entry's slug and the moment it describes, because the entries
+    themselves live in BeeRanked. This table holds only what BeeRanked cannot
+    know.
+
+    Two moments are kept, and they are different questions:
+
+      - ``published`` — when it went up. Discoverable: BeeRanked stamps it into
+        the synced page, so this one is captured without being asked.
+      - ``written`` — when she started writing it. **Not** discoverable:
+        BeeRanked records no creation time and exposes none, so this is hers to
+        record or it does not exist. The interesting sky for practice is often
+        this one — a piece begun under a Mars hour and published on a Thursday
+        was begun under a Mars hour.
     """
 
     __tablename__ = "journal_sky"
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    # The BeeRanked entry this describes, one to one.
-    slug: str = Field(index=True, unique=True)
+    # The BeeRanked entry this describes. One row per entry per moment.
+    slug: str = Field(index=True)
+    # Which moment: "published" or "written".
+    kind: str = Field(default="published", index=True)
 
     # The moment described. Not the moment of capture.
     at: datetime = Field(sa_type=UTC_TS)
@@ -224,6 +238,10 @@ class JournalSky(TimestampMixin, table=True):
 
     # Why `reading` is empty. Empty itself when the capture succeeded.
     failure_reason: str = ""
+
+    # One record per entry per moment — and never two of the same moment, so a
+    # duplicate webhook cannot quietly overwrite a capture with a later sky.
+    __table_args__ = (UniqueConstraint("slug", "kind", name="journal_sky_slug_kind_key"),)
 
 
 class Passkey(TimestampMixin, table=True):

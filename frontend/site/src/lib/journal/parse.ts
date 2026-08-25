@@ -17,6 +17,7 @@ import { readFile, readdir } from "node:fs/promises";
 import { join, resolve, sep } from "node:path";
 import { parse, type HTMLElement } from "node-html-parser";
 
+import { moments } from "./sky";
 import type {
   AzGroup, AzRow, ChangeGroup, Crumb, Entry, JournalPage, Kind, NavGroup,
   PageType, Release, TocItem,
@@ -406,7 +407,15 @@ export async function read(parts: string[]): Promise<JournalPage | null> {
     groups,
     releases: type === "changelog" ? releasesFrom(main) : [],
     release,
-    sky: null,
+    /* Only a written piece has a moment, and in the design only an article
+       shows one. Documentation carries a provenance block instead — which
+       ephemeris, which flags — because a page that is revised has no single
+       instant to record, and the wiki carries neither. An index has none
+       either, and asking would be a request per listing. */
+    sky:
+      type === "article"
+        ? await moments(parts[parts.length - 1] ?? "")
+        : { published: null, written: null },
   };
 }
 

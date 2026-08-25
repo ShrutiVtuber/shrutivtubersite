@@ -1,9 +1,15 @@
 ---
-/* The sky when an entry was published.
+/* The sky at one moment in an entry's life.
  *
- * Stored with the entry at publish time and never recomputed — so it still
- * says what the sky said, which is the entire point of recording it. It ends
- * the article and never sits above the prose: it is a record, not a header.
+ * Stored when captured and never recomputed — so it still says what the sky
+ * said, which is the entire point of recording it. It ends the article and
+ * never sits above the prose: it is a record, not a header.
+ *
+ * Two moments can be shown. **When it was published** is discoverable, so it
+ * is captured without being asked. **When she began writing** is not — nothing
+ * records it but her — and it is often the more interesting of the two, since
+ * a piece begun under a Mars hour was begun under a Mars hour whatever day it
+ * finally went up.
  *
  * Rendered only when there is a real record. An invented one would be worse
  * than none, because the whole claim of the block is that it is true.
@@ -11,8 +17,25 @@
 import Glyph from "./Glyph.astro";
 import type { SkyRecord } from "../../lib/journal/types";
 
-interface Props { sky: SkyRecord; when: string }
-const { sky, when } = Astro.props;
+interface Props {
+  sky: SkyRecord;
+  when: string;
+  /** Which moment this records. */
+  moment?: "published" | "written";
+  /** Where, when it was somewhere other than the usual desk. */
+  place?: string;
+}
+const { sky, when, moment = "published", place } = Astro.props;
+
+const HEADING =
+  moment === "written"
+    ? "The sky when this was begun"
+    : "The sky when this was published";
+
+const FOOT =
+  moment === "written"
+    ? "Recorded at the start of writing and never recomputed"
+    : "Recorded at publication and never recomputed";
 
 const rows: [string, string, boolean][] = [
   ["Sun · tropical", sky.sunTropical, true],
@@ -25,9 +48,9 @@ const rows: [string, string, boolean][] = [
   ["Thelemic", sky.thelemic, true],
 ];
 ---
-<section class="j-record" aria-label="The sky when this was published">
+<section class="j-record" aria-label={HEADING}>
   <div class="j-record-head">
-    <p class="j-eyebrow">The sky when this was published</p>
+    <p class="j-eyebrow">{HEADING}</p>
     <span class="j-glyph" aria-hidden="true">☉&#xFE0E; ☾&#xFE0E;</span>
   </div>
   <div class="j-leaders">
@@ -45,5 +68,7 @@ const rows: [string, string, boolean][] = [
       ))
     }
   </div>
-  <p class="j-record-foot">{sky.rule} Recorded at publication and never recomputed{when ? `, on ${when}` : ""}.</p>
+  <p class="j-record-foot">
+    {sky.rule} {FOOT}{when ? `, on ${when}` : ""}{place ? ` in ${place}` : ""}.
+  </p>
 </section>

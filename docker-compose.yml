@@ -104,9 +104,13 @@ services:
     environment:
       # Where to ask what the sky was doing, for journal entries.
       SHRUTI_ASTRO_INTERNAL: http://shruti-astro:8000
+      # The synced pages, read to find when each entry was published. Read-only
+      # — the backend is a reader here, the agent owns the volume.
+      SHRUTI_JOURNAL_DIR: /srv/journal
       SHRUTI_DATABASE_URL: postgresql+asyncpg://${SHRUTI_POSTGRES_USER:-shruti}:${SHRUTI_POSTGRES_PASSWORD}@postgres:5432/${SHRUTI_POSTGRES_DB:-shruti}
     volumes:
       - media:/app/media
+      - journal:/srv/journal:ro
     networks: [shruti, shruti-interop]
 
   postgres:

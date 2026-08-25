@@ -66,7 +66,23 @@ const hasToc = page.toc.length >= 3;
 
       <div class="j-prose" set:html={page.body} />
 
-      {page.sky && <SkyRecordBlock sky={page.sky} when={longDate(page.date)} />}
+      {/* Begun first, then published — the order they happened in. */}
+      {page.sky.written && (
+        <SkyRecordBlock
+          sky={page.sky.written.sky}
+          when={longDate(page.sky.written.at.slice(0, 10))}
+          place={page.sky.written.place}
+          moment="written"
+        />
+      )}
+      {page.sky.published && (
+        <SkyRecordBlock
+          sky={page.sky.published.sky}
+          when={longDate(page.sky.published.at.slice(0, 10))}
+          place={page.sky.published.place}
+          moment="published"
+        />
+      )}
 
       {
         related.length > 0 && (

@@ -109,7 +109,7 @@ export interface Release {
   groups: ChangeGroup[];
 }
 
-/** The sky when an entry was published — stored, never recomputed. */
+/** The sky at one moment in an entry's life — stored, never recomputed. */
 export interface SkyRecord {
   sunTropical: string;
   sunSidereal: string;
@@ -147,5 +147,5 @@ export interface JournalPage {
   groups: AzGroup[];
   releases: Release[];
   release: Release | null;
-  sky: SkyRecord | null;
+  sky: import("./sky").Moments;
 }

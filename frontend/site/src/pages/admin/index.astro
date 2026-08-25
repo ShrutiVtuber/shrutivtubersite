@@ -20,6 +20,9 @@ const msgCount = Array.isArray(messages.body) ? messages.body.length : 0;
 const qCount = Array.isArray(questions.body) ? questions.body.length : 0;
 const rows = Array.isArray(sections.body) ? sections.body : [];
 const hidden = rows.filter((s: any) => !s.visible).length;
+/* Only the count, for the tile. The page itself does the real listing. */
+const skyList = await asAdmin(Astro, "/api/journal/entries");
+const skyEntries: any[] = skyList.body?.entries ?? [];
 ---
 
 <AdminLayout title="Overview">
@@ -38,6 +41,14 @@ const hidden = rows.filter((s: any) => !s.visible).length;
       <span class="adm-lbl">Inbox</span>
       <span class="big">{msgCount + qCount}</span>
       <span class="sub">{msgCount} messages · {qCount} questions</span>
+    </a>
+
+    <a class="adm-card tile" href="/admin/journal">
+      <span class="adm-lbl">Journal skies</span>
+      <span class="big">{skyEntries.length}</span>
+      <span class="sub">
+        {skyEntries.filter((e: any) => e.written).length} with a writing sky
+      </span>
     </a>
 
     <a class="adm-card tile" href="/admin/blocks">

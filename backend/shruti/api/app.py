@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -13,9 +15,11 @@ from shruti.api.routes import (
     newsletter, passkeys, places, public, videos,
 )
 from shruti.core.config import get_settings
+from shruti.core.db import SessionLocal
 from shruti.core.logredact import install as install_log_redaction
 
 logging.basicConfig(level=logging.INFO)
+log = logging.getLogger(__name__)
 
 settings = get_settings()
 
@@ -29,7 +33,47 @@ async def lifespan(app: FastAPI):
 
     # Schema is owned by alembic, never by create_all — migrations are the
     # only thing allowed to touch production DDL.
-    yield
+
+    sky = asyncio.create_task(_sky_reconciler())
+    try:
+        yield
+    finally:
+        sky.cancel()
+
+
+# How often to look for entries published since the last pass. The work is
+# trivial when there is nothing to do — one query and a directory walk — so
+# this is about how soon a new entry gets its sky, not about load.
+SKY_INTERVAL_S = int(os.environ.get("SHRUTI_SKY_RECONCILE_SECONDS", "900"))
+
+
+async def _sky_reconciler() -> None:
+    """
+    Capture the publication sky for entries that do not have one yet.
+
+    It runs on a timer rather than on a webhook because BeeRanked's agent syncs
+    pages to a volume and tells us nothing when it does. A timer is late; a
+    webhook we do not receive is never.
+
+    Being late costs nothing here. The moment captured is the entry's own
+    published timestamp, read from the page, so a pass that runs an hour after
+    publication records the same sky as one that runs a second after it.
+    """
+    from shruti.api.routes.journal import reconcile_published
+
+    while True:
+        try:
+            async with SessionLocal() as session:
+                result = await reconcile_published(session)
+            if result.get("captured") or result.get("failed"):
+                log.info("[sky] %s", result)
+        except asyncio.CancelledError:
+            raise
+        except Exception:                              # noqa: BLE001
+            # A failed pass is not worth taking the API down for; the next one
+            # is fifteen minutes away and the work is idempotent.
+            log.exception("[sky] reconcile failed")
+        await asyncio.sleep(SKY_INTERVAL_S)
 
 
 app = FastAPI(

@@ -1,0 +1,174 @@
+---
+/* The journal's skies.
+ *
+ * There is exactly one thing to do here, and it exists because exactly one
+ * thing cannot be discovered: when a piece was begun. BeeRanked stamps the
+ * publication time into every page it syncs, so that sky is captured by a
+ * pass that runs on its own and needs nobody. Nothing anywhere records the
+ * moment writing started — so if it matters, and for a journal of practice it
+ * is often the moment that matters most, it has to be said here.
+ *
+ * Deliberately not editable afterwards. A record that can be adjusted is not a
+ * record; the capture route has no amend, and neither does this.
+ */
+import AdminLayout from "../../layouts/AdminLayout.astro";
+import CsrfField from "../../components/forms/CsrfField.astro";
+import { asAdmin } from "../../lib/admin";
+import { verifyCsrf } from "../../lib/csrf";
+
+export const prerender = false;
+
+let notice = "";
+let failed = "";
+
+if (Astro.request.method === "POST") {
+  const form = await Astro.request.formData();
+  if (!verifyCsrf(Astro.cookies, form)) {
+    failed = "That did not save. Reload the page and try again.";
+  } else {
+    const slug = String(form.get("slug") ?? "");
+    const local = String(form.get("at") ?? "");
+    const place = String(form.get("place") ?? "").trim();
+    if (!slug || !local) {
+      failed = "Pick an entry and a moment.";
+    } else {
+      /* A datetime-local field has no zone. Sent as written and read as UTC by
+         the backend would silently move the moment by three hours in summer,
+         so the offset is attached here, from the browser's own clock, in a
+         hidden field the form fills in. */
+      /* A literal "+" in form-urlencoded means a space. A browser encodes it
+         as %2B and this never bites — but anything hand-rolled posting to this
+         form would silently lose the sign and land the moment in the wrong
+         zone, so put it back rather than reject something that is obviously a
+         positive offset. */
+      const offset = String(form.get("offset") ?? "Z").replace(/^ /, "+");
+      const r = await asAdmin(Astro, "/api/journal/sky", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          slug,
+          kind: "written",
+          at: `${local}:00${offset}`,
+          ...(place ? { place_name: place } : {}),
+        }),
+      });
+      if (r.ok) {
+        notice = r.body?.failureReason
+          ? `Recorded, but the sky is empty: ${r.body.failureReason}`
+          : `Recorded — ${r.body?.summary || "the sky is stored"}.`;
+      } else {
+        failed =
+          r.status === 409 || r.body?.created === false
+            ? "That entry already has a writing sky, and these are not editable."
+            : (r.body?.detail ?? "That did not save.");
+      }
+    }
+  }
+}
+
+const list = await asAdmin(Astro, "/api/journal/entries");
+const entries: any[] = list.body?.entries ?? [];
+const when = (iso: string) => (iso ? iso.slice(0, 16).replace("T", " ") : "");
+---
+
+<AdminLayout title="Journal skies">
+  <h1 class="adm-h">Journal skies</h1>
+
+  {notice && <p class="adm-note ok">{notice}</p>}
+  {failed && <p class="adm-note bad">{failed}</p>}
+
+  <section class="adm-card">
+    <h2 class="h2">Record when a piece was begun</h2>
+    <p class="adm-note">
+      The publication sky is captured on its own, within about fifteen minutes
+      of an entry going up. This is for the other moment — the one nothing but
+      you can know. Once recorded it stays as recorded.
+    </p>
+
+    {
+      entries.length === 0 ? (
+        <p class="adm-note">No entries have synced yet.</p>
+      ) : (
+        <form method="POST" class="form">
+          <CsrfField />
+          <input type="hidden" name="offset" value="Z" data-offset />
+
+          <label class="field">
+            <span>Entry</span>
+            <select name="slug" required>
+              {entries.filter((e) => !e.written).map((e) => (
+                <option value={e.slug}>{e.slug}</option>
+              ))}
+            </select>
+          </label>
+
+          <label class="field">
+            <span>Started writing</span>
+            <input type="datetime-local" name="at" required />
+          </label>
+
+          <label class="field">
+            <span>Where <em>(blank means Athens)</em></span>
+            <input type="text" name="place" placeholder="Athens" />
+          </label>
+
+          <button class="btn" type="submit">Record it</button>
+        </form>
+      )
+    }
+  </section>
+
+  <section class="adm-card">
+    <h2 class="h2">What is recorded <span class="count">{entries.length}</span></h2>
+    {
+      entries.length === 0 ? (
+        <p class="adm-note">Nothing yet.</p>
+      ) : (
+        <ul class="items">
+          {entries.map((e) => (
+            <li>
+              <div class="meta">
+                <span class="who">{e.slug}</span>
+                <span class="when t-tabular">
+                  published {when(e.publishedAt) || "—"}
+                </span>
+              </div>
+              <p class="body">
+                <strong>Published sky:</strong>{" "}
+                {e.published
+                  ? e.published.summary || e.published.failureReason || "stored"
+                  : "not captured yet"}
+                <br />
+                <strong>Writing sky:</strong>{" "}
+                {e.written
+                  ? `${when(e.written.at)} — ${e.written.summary || e.written.failureReason || "stored"}`
+                  : "not recorded"}
+              </p>
+            </li>
+          ))}
+        </ul>
+      )
+    }
+  </section>
+</AdminLayout>
+
+<script>
+  /* The offset of the moment the reader is actually typing, not of now — they
+     are different across a DST boundary, and a piece begun in July recorded in
+     December would otherwise land an hour out. */
+  const form = document.querySelector("form.form");
+  const offset = form?.querySelector<HTMLInputElement>("[data-offset]");
+  const at = form?.querySelector<HTMLInputElement>('input[name="at"]');
+
+  function sync() {
+    if (!offset || !at?.value) return;
+    const mins = -new Date(at.value).getTimezoneOffset();
+    const sign = mins < 0 ? "-" : "+";
+    const abs = Math.abs(mins);
+    const pad = (n: number) => String(n).padStart(2, "0");
+    offset.value = `${sign}${pad(Math.floor(abs / 60))}:${pad(abs % 60)}`;
+  }
+
+  at?.addEventListener("change", sync);
+  form?.addEventListener("submit", sync);
+</script>
