@@ -584,6 +584,44 @@ async def list_items(
     return [r.model_dump() for r in rows]
 
 
+def _coerced(model: type, payload: dict) -> dict:
+    """
+    Values shaped the way their columns expect.
+
+    A SQLModel table class does not validate on construction, so a datetime
+    column handed the string a form posted takes it verbatim and asyncpg
+    refuses it at the very last moment — "expected a datetime, got 'str'" —
+    as a 500 with nothing useful said. The admin sends JSON, and JSON has no
+    datetime, so somebody has to do this and it is better done once here than
+    remembered at every call site.
+
+    Only what is actually understood is touched; anything else passes through
+    to be rejected by the database as before.
+    """
+    fields = getattr(model, "model_fields", {})
+    out: dict = {}
+    for key, value in payload.items():
+        field = fields.get(key)
+        annotation = getattr(field, "annotation", None) if field else None
+        wants_dt = annotation is datetime or (
+            # Optional[datetime] and friends
+            datetime in getattr(annotation, "__args__", ())
+        )
+        if wants_dt and isinstance(value, str):
+            if not value.strip():
+                out[key] = None
+                continue
+            try:
+                parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+            except ValueError:
+                raise HTTPException(422, f"{key} is not a date and time I can read")
+            # Naive means the sender did not say; the whole schema is UTC.
+            out[key] = parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+        else:
+            out[key] = value
+    return out
+
+
 @router.post("/{kind}", status_code=201)
 async def create_item(
     kind: str,
@@ -594,7 +632,7 @@ async def create_item(
     model = _model(kind)
     payload.pop("id", None)
     try:
-        row = model(**payload)
+        row = model(**_coerced(model, payload))
     except Exception as exc:                       # noqa: BLE001
         raise HTTPException(422, f"could not create: {exc}")
     session.add(row)
@@ -618,7 +656,7 @@ async def update_item(
 
     payload.pop("id", None)
     payload.pop("created_at", None)
-    for key, value in payload.items():
+    for key, value in _coerced(model, payload).items():
         if not hasattr(row, key):
             raise HTTPException(422, f"{kind} has no field {key!r}")
         setattr(row, key, value)

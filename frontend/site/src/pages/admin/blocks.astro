@@ -14,7 +14,7 @@ import MediaField from "../../components/forms/MediaField.astro";
 import Button from "../../components/forms/Button.astro";
 import Badge from "../../components/navigation/Badge.astro";
 import { asAdmin, KINDS } from "../../lib/admin";
-import { GROUP_ORDER, MEDIA_USE, specFor } from "../../lib/adminFields";
+import { GROUP_ORDER, MEDIA_USE, blankFor, specFor } from "../../lib/adminFields";
 import { verifyCsrf } from "../../lib/csrf";
 
 const kind = KINDS.some((k) => k.kind === Astro.url.searchParams.get("kind"))
@@ -85,7 +85,16 @@ if (Astro.request.method === "POST") {
 
 const list = await asAdmin(Astro, `/api/admin/${kind}`);
 const rows: any[] = Array.isArray(list.body) ? list.body : [];
-const row = editing ? rows.find((r) => String(r.id) === editing) : null;
+/* Creating and editing are the same form. A new one has no row to read its
+   columns off, so its shape comes from the field spec — which is also what
+   stops it being created with half its fields missing because the editor could
+   not guess they existed. */
+const creating = Astro.url.searchParams.get("new") === "1";
+const row = editing
+  ? rows.find((r) => String(r.id) === editing)
+  : creating
+    ? blankFor(kind)
+    : null;
 
 /* Fields grouped the way someone filling them in would expect, rather than in
    whatever order the table happens to return its columns. */
@@ -135,9 +144,11 @@ const label = (r: any) =>
     row ? (
       <form method="POST" class="adm-card editor">
         <CsrfField />
-        <input type="hidden" name="action" value="save" />
-        <input type="hidden" name="id" value={row.id} />
-        <h2 class="h2">Editing {label(row)}</h2>
+        <input type="hidden" name="action" value={creating ? "create" : "save"} />
+        {!creating && <input type="hidden" name="id" value={row.id} />}
+        <h2 class="h2">
+          {creating ? `New ${spec.singular}` : `Editing ${label(row)}`}
+        </h2>
         {
           grouped(row).map(([group, keys]) => (
             <section class="group">
@@ -191,15 +202,31 @@ const label = (r: any) =>
                                 ))}
                               </select>
                             )
-                            : (
-                              <input
-                                class="adm-input"
-                                type={spec.type === "url" ? "url" : spec.type === "number" ? "number" : "text"}
-                                name={k}
-                                value={value ?? ""}
-                                placeholder={spec.placeholder}
-                              />
-                            )
+                            : spec.type === "datetime"
+                              ? (
+                                /* Stored UTC, typed local. The visible box has
+                                   no name and never posts; a script keeps the
+                                   hidden one filled with a full ISO instant,
+                                   offset included, so a time typed here means
+                                   the same instant after a clock change. */
+                                <>
+                                  <input class="adm-input" type="datetime-local" data-dt-local />
+                                  <input type="hidden" name={k} value={value ?? ""} data-dt-value />
+                                  <noscript>
+                                    <input class="adm-input" name={k} value={value ?? ""}
+                                           placeholder="2026-09-01T19:00:00+03:00" />
+                                  </noscript>
+                                </>
+                              )
+                              : (
+                                <input
+                                  class="adm-input"
+                                  type={spec.type === "url" ? "url" : spec.type === "number" ? "number" : "text"}
+                                  name={k}
+                                  value={value ?? ""}
+                                  placeholder={spec.placeholder}
+                                />
+                              )
                       }
                       {spec.help && <p class="hint">{spec.help}</p>}
                     </label>
@@ -210,7 +237,7 @@ const label = (r: any) =>
           ))
         }
         <div class="row-actions">
-          <Button type="submit">Save</Button>
+          <Button type="submit">{creating ? `Add ${spec.singular}` : "Save"}</Button>
           <a class="cancel" href={`/admin/blocks?kind=${kind}`}>Cancel</a>
         </div>
       </form>
@@ -221,10 +248,16 @@ const label = (r: any) =>
           half-finished ships by accident — and a hidden row is dimmed here rather than tucked away.
         </p>
 
+        <div class="list-actions">
+          <Button href={`/admin/blocks?kind=${kind}&new=1`}>Add a {spec.singular}</Button>
+        </div>
+
         <div class="rows">
           {
             rows.length === 0 ? (
-              <p class="adm-note">No {spec.label.toLowerCase()} yet.</p>
+              <p class="adm-note">
+                No {spec.label.toLowerCase()} yet — “Add a {spec.singular}” above is where they start.
+              </p>
             ) : (
               rows.map((r) => (
                 <div class="row" data-hidden={!r.visible || undefined}>
@@ -255,6 +288,12 @@ const label = (r: any) =>
                       </Button>
                     </form>
                     <a class="edit" href={`/admin/blocks?kind=${kind}&edit=${r.id}`}>Edit</a>
+                    <form method="POST" class="inline" data-confirm={`Delete ${label(r)}? This cannot be undone.`}>
+                      <CsrfField />
+                      <input type="hidden" name="action" value="delete" />
+                      <input type="hidden" name="id" value={r.id} />
+                      <button type="submit" class="danger">Delete</button>
+                    </form>
                   </div>
                 </div>
               ))
@@ -294,6 +333,16 @@ const label = (r: any) =>
 
   .editor { gap: var(--space-4); max-width: 760px; }
   .h2 { font: 600 var(--text-h3) var(--font-display); color: var(--ink); margin: 0; }
+  .list-actions { margin-bottom: var(--space-4); }
+
+  /* Destructive, and dressed as it: not a primary button competing with Edit,
+     but not hidden either. */
+  .danger {
+    appearance: none; background: none; border: 0; padding: 0; cursor: pointer;
+    font: 500 var(--text-sm) var(--font-body); color: var(--live);
+  }
+  .danger:hover { text-decoration: underline; }
+
   .field { display: grid; gap: 4px; }
 
   /* Grouped, so a form of fourteen boxes reads as four short questions rather
@@ -329,3 +378,44 @@ const label = (r: any) =>
     max-width: 62ch;
   }
 </style>
+
+<script>
+  /* A time is typed in the local clock and stored as an instant.
+   *
+   * `datetime-local` has no zone, so posting its value raw would be read as UTC
+   * and land the stream three hours out in summer. The visible box is unnamed
+   * and never posts; this keeps the hidden field beside it holding a full ISO
+   * instant with the offset of the moment being typed — not of now, which is a
+   * different offset across a clock change.
+   */
+  document.querySelectorAll<HTMLInputElement>("[data-dt-local]").forEach((local) => {
+    const hidden = local.parentElement?.querySelector<HTMLInputElement>("[data-dt-value]");
+    if (!hidden) return;
+
+    if (hidden.value) {
+      const at = new Date(hidden.value);
+      if (!Number.isNaN(at.getTime())) {
+        const pad = (n: number) => String(n).padStart(2, "0");
+        local.value =
+          `${at.getFullYear()}-${pad(at.getMonth() + 1)}-${pad(at.getDate())}` +
+          `T${pad(at.getHours())}:${pad(at.getMinutes())}`;
+      }
+    }
+
+    const sync = () => {
+      if (!local.value) { hidden.value = ""; return; }
+      const at = new Date(local.value);
+      hidden.value = Number.isNaN(at.getTime()) ? "" : at.toISOString();
+    };
+    local.addEventListener("change", sync);
+    local.form?.addEventListener("submit", sync);
+  });
+
+  /* Deleting is one click and cannot be undone, so it asks first. The message
+     lives on the form, because only the form knows what it is about to remove. */
+  document.querySelectorAll<HTMLFormElement>("form[data-confirm]").forEach((form) => {
+    form.addEventListener("submit", (event) => {
+      if (!window.confirm(form.dataset.confirm ?? "Delete this?")) event.preventDefault();
+    });
+  });
+</script>

@@ -13,7 +13,8 @@
  */
 
 export type FieldType =
-  | "text" | "textarea" | "url" | "slug" | "select" | "checkbox" | "media" | "number";
+  | "text" | "textarea" | "url" | "slug" | "select" | "checkbox" | "media"
+  | "number" | "datetime";
 
 export interface FieldSpec {
   label: string;
@@ -151,10 +152,36 @@ export const FIELDS: Record<string, Record<string, FieldSpec>> = {
   },
 
   "fan-art": {
-    artist: { label: "Artist", group: "Content" },
+    artist: { label: "Artist", group: "Content", help: "Credit them by the name they use." },
     title: { label: "Title of the piece", group: "Content" },
     media_id: { label: "The artwork", type: "media", group: "Image" },
-    url: { label: "Where to find them", type: "url", group: "Links" },
+    artist_url: {
+      label: "Where to find them", type: "url", group: "Links",
+      help: "Their profile, so the credit is a link and not just a name.",
+    },
+    platform: { label: "Posted on", group: "Links", placeholder: "Bluesky" },
+  },
+
+  schedule: {
+    title: { label: "What is it", group: "Content", placeholder: "Building the ephemeris" },
+    starts_at: {
+      label: "Starts", type: "datetime", group: "When",
+      help: "Your local time. Stored as UTC, so it stays right across a clock change.",
+    },
+    duration_minutes: {
+      label: "How long, in minutes", type: "number", group: "When",
+      placeholder: "120",
+    },
+    platform: {
+      label: "Where", type: "select", group: "When",
+      options: [
+        { value: "twitch", label: "Twitch" },
+        { value: "youtube", label: "YouTube" },
+        { value: "other", label: "Somewhere else" },
+      ],
+    },
+    url: { label: "Link", type: "url", group: "When", help: "Optional — leave blank for the usual channel." },
+    notes_md: { label: "Notes", type: "textarea", group: "Content", help: "Markdown. Shown with the entry." },
   },
 
   links: {
@@ -177,7 +204,27 @@ export const FIELDS: Record<string, Record<string, FieldSpec>> = {
 };
 
 /** The order groups are shown in. Anything unlisted follows, in first-seen order. */
-export const GROUP_ORDER = ["Content", "Image", "Links", "Details", "Where", "Publishing"];
+export const GROUP_ORDER = [
+  "Content", "Image", "When", "Links", "Details", "Where", "Publishing",
+];
+
+/**
+ * The fields a blank one starts with.
+ *
+ * A form for something that does not exist yet cannot read its columns off a
+ * row, so the order comes from here. Anything described for a kind is
+ * offered — which is also what stops a new item being created with half its
+ * fields missing because the editor could not guess they existed.
+ */
+export function blankFor(kind: string): Record<string, unknown> {
+  const spec = FIELDS[kind];
+  if (!spec) return {};
+  const out: Record<string, unknown> = {};
+  for (const [key, field] of Object.entries(spec)) {
+    out[key] = field.type === "checkbox" ? false : field.type === "media" ? null : "";
+  }
+  return out;
+}
 
 /** A readable label for a column nothing describes yet. */
 export function humanLabel(key: string): string {
