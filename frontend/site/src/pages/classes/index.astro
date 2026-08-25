@@ -1,0 +1,140 @@
+---
+/* Everything on offer.
+ *
+ * Classes and workshops together, because from outside they are the same
+ * question — what can I learn here — and only differ in whether there is a
+ * date attached.
+ */
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import SectionHeader from "../../components/brand/SectionHeader.astro";
+import EmptyState from "../../components/feedback/EmptyState.astro";
+import { site } from "../../lib/api";
+
+export const prerender = false;
+
+interface CourseCard {
+  slug: string; title: string; kind: string; tagline: string;
+  priceCents: number; currency: string;
+  startsAt: string | null; minutes: number | null; seats: number | null;
+  media: { url: string; alt: string } | null;
+}
+
+const courses = (await site<CourseCard[]>("/api/classes")) ?? [];
+const classes = courses.filter((c) => c.kind === "class");
+const workshops = courses.filter((c) => c.kind === "workshop");
+
+const money = (c: CourseCard) =>
+  c.priceCents === 0
+    ? "free"
+    : new Intl.NumberFormat("en-IE", {
+        style: "currency", currency: c.currency || "EUR",
+        minimumFractionDigits: c.priceCents % 100 === 0 ? 0 : 2,
+      }).format(c.priceCents / 100);
+
+const when = (iso: string | null) =>
+  iso
+    ? new Date(iso).toLocaleString("en-GB", {
+        day: "numeric", month: "long", hour: "2-digit", minute: "2-digit",
+      })
+    : "";
+---
+
+<BaseLayout
+  title="Classes — Shruti"
+  description="Recorded classes and live workshops on astrology, theurgy and the software of practice."
+>
+  <div class="container">
+    <SectionHeader
+      as="h1" glyph="♄" eyebrow="Classes"
+      title="What there is to learn"
+      body="Recorded classes you take at your own pace, and workshops held live. Prices include tax."
+    />
+
+    {
+      courses.length === 0 ? (
+        <EmptyState
+          glyph="○"
+          title="Nothing open yet"
+          body="Classes are being written. The instruments are free in the meantime, and always will be."
+        />
+      ) : (
+        <>
+          {workshops.length > 0 && (
+            <section class="band">
+              <h2 class="band-head">Live</h2>
+              <div class="grid">
+                {workshops.map((c) => (
+                  <a class="card" href={`/classes/${c.slug}`}>
+                    <div class="shot" data-empty={!c.media}>
+                      {c.media && <img src={c.media.url} alt={c.media.alt || c.title} loading="lazy" />}
+                      {!c.media && <span class="plate">—</span>}
+                    </div>
+                    <div class="body">
+                      <span class="when">{when(c.startsAt) || "date to come"}</span>
+                      <span class="name">{c.title}</span>
+                      {c.tagline && <span class="dek">{c.tagline}</span>}
+                      <span class="price">
+                        {money(c)}
+                        {c.seats ? <span class="seats"> · {c.seats} places</span> : null}
+                      </span>
+                    </div>
+                  </a>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {classes.length > 0 && (
+            <section class="band">
+              <h2 class="band-head">At your own pace</h2>
+              <div class="grid">
+                {classes.map((c) => (
+                  <a class="card" href={`/classes/${c.slug}`}>
+                    <div class="shot" data-empty={!c.media}>
+                      {c.media && <img src={c.media.url} alt={c.media.alt || c.title} loading="lazy" />}
+                      {!c.media && <span class="plate">—</span>}
+                    </div>
+                    <div class="body">
+                      <span class="name">{c.title}</span>
+                      {c.tagline && <span class="dek">{c.tagline}</span>}
+                      <span class="price">{money(c)}</span>
+                    </div>
+                  </a>
+                ))}
+              </div>
+            </section>
+          )}
+        </>
+      )
+    }
+  </div>
+</BaseLayout>
+
+<style>
+  .band { margin-top: var(--space-6); }
+  .band-head {
+    margin: 0 0 var(--space-4);
+    font: 600 var(--text-xs) var(--font-mono);
+    letter-spacing: .08em; text-transform: uppercase; color: var(--accent);
+  }
+  .grid {
+    display: grid; gap: var(--space-5);
+    grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr));
+  }
+  .card {
+    display: grid; gap: var(--space-3); text-decoration: none; color: inherit;
+    border: var(--border-w) solid var(--line); border-radius: var(--radius-md);
+    overflow: hidden; background: var(--surface-card);
+    transition: border-color var(--dur-1) var(--ease-out);
+  }
+  .card:hover { border-color: var(--accent); }
+  .shot { aspect-ratio: 16 / 9; display: grid; place-items: center; background: var(--surface-veil); }
+  .shot img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .plate { font: 400 var(--text-sm) var(--font-mono); color: var(--ink-faint); }
+  .body { display: grid; gap: 4px; padding: 0 var(--space-4) var(--space-4); }
+  .when { font: 500 var(--text-xs) var(--font-mono); color: var(--accent); text-transform: uppercase; letter-spacing: .04em; }
+  .name { font: 500 var(--text-h4) var(--font-display); color: var(--ink); }
+  .dek { font: 400 var(--text-sm) var(--font-body); color: var(--ink-soft); }
+  .price { font: 500 var(--text-sm) var(--font-mono); color: var(--accent); }
+  .seats { color: var(--ink-faint); }
+</style>

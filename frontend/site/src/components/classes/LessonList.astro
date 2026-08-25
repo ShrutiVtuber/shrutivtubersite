@@ -1,0 +1,108 @@
+---
+/* The sidebar: parts, and the lessons in them.
+ *
+ * Every lesson is listed whether or not the reader may open it. That is the
+ * point — the list is what tells somebody what they are buying, and hiding it
+ * until they pay makes a worse sales page and a vaguer promise.
+ *
+ * A tick is a tick and a lock is a lock, and neither is a colour alone: the
+ * mark differs in shape as well, so it reads for somebody who cannot tell the
+ * rose from the grey.
+ */
+interface Lesson {
+  id: number; title: string; kind: string;
+  minutes: number | null; freePreview: boolean; done: boolean; open: boolean;
+}
+interface Module { id: number; title: string; lessons: Lesson[]; done: number; count: number }
+interface Props { slug: string; modules: Module[]; current?: number | null }
+const { slug, modules, current } = Astro.props;
+
+const MARK: Record<string, string> = {
+  video: "▶", text: "¶", audio: "♪", pdf: "⇩", quiz: "?",
+};
+const WORD: Record<string, string> = {
+  video: "video", text: "written", audio: "audio", pdf: "pdf", quiz: "questions",
+};
+---
+
+<nav class="ll" aria-label="Lessons">
+  {
+    modules.map((m) => (
+      <section class="ll-part">
+        <h2 class="ll-part-head">
+          <span class="ll-part-title">{m.title}</span>
+          <span class="ll-part-count" aria-label={`${m.done} of ${m.count} finished`}>
+            {m.done}/{m.count}
+          </span>
+        </h2>
+        <ol class="ll-items">
+          {m.lessons.map((l) => (
+            <li>
+              <a
+                class="ll-item"
+                href={l.open ? `/classes/${slug}/${l.id}` : undefined}
+                aria-current={l.id === current ? "page" : undefined}
+                data-locked={!l.open || undefined}
+                data-done={l.done || undefined}
+              >
+                <span class="ll-tick" aria-hidden="true">
+                  {l.done ? "✓" : l.open ? "○" : "·"}
+                </span>
+                <span class="ll-body">
+                  <span class="ll-title">{l.title}</span>
+                  <span class="ll-meta">
+                    <span class="ll-mark" aria-hidden="true">{MARK[l.kind] ?? "·"}</span>
+                    {WORD[l.kind] ?? l.kind}
+                    {l.minutes ? ` · ${l.minutes} min` : ""}
+                    {l.freePreview && !l.open ? " · free" : ""}
+                  </span>
+                </span>
+                {!l.open && <span class="ll-lock" aria-label="not yours yet">🔒&#xFE0E;</span>}
+              </a>
+            </li>
+          ))}
+        </ol>
+      </section>
+    ))
+  }
+</nav>
+
+<style>
+  .ll { display: grid; gap: var(--space-5); }
+  .ll-part { display: grid; gap: 6px; }
+  .ll-part-head {
+    display: flex; gap: var(--space-3); align-items: baseline;
+    justify-content: space-between; margin: 0;
+    padding-bottom: 6px; border-bottom: var(--border-w) solid var(--line);
+  }
+  .ll-part-title { font: 600 var(--text-sm) var(--font-display); color: var(--ink); }
+  .ll-part-count { font: 400 var(--text-xs) var(--font-mono); color: var(--ink-faint); }
+
+  .ll-items { list-style: none; margin: 0; padding: 0; display: grid; gap: 1px; }
+  .ll-item {
+    display: flex; gap: 10px; align-items: start; padding: 8px 10px;
+    border-radius: var(--radius-sm); text-decoration: none; color: inherit;
+  }
+  .ll-item:hover { background: var(--surface-veil); }
+  .ll-item[aria-current="page"] { background: var(--accent-wash); }
+  .ll-item[data-locked] { cursor: default; opacity: .62; }
+  .ll-item[data-locked]:hover { background: none; }
+
+  /* Shape as well as colour: a tick and a circle differ for somebody who
+     cannot tell the rose from the grey. */
+  .ll-tick {
+    flex: none; width: 1.1em; text-align: center;
+    font: 500 var(--text-sm) var(--font-mono); color: var(--ink-faint);
+  }
+  .ll-item[data-done] .ll-tick { color: var(--accent); }
+
+  .ll-body { display: grid; gap: 1px; min-width: 0; flex: 1; }
+  .ll-title { font: 400 var(--text-sm) / 1.35 var(--font-body); color: var(--ink); }
+  .ll-item[data-done] .ll-title { color: var(--ink-soft); }
+  .ll-meta {
+    font: 400 var(--text-xs) var(--font-mono); color: var(--ink-faint);
+    text-transform: uppercase; letter-spacing: .04em;
+  }
+  .ll-mark { margin-right: 4px; }
+  .ll-lock { flex: none; font-size: var(--text-xs); opacity: .8; }
+</style>

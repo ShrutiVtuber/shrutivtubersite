@@ -1,0 +1,91 @@
+---
+/* Self-check questions.
+ *
+ * Nothing is scored and nothing is gated. Choosing reveals the answer and the
+ * reason — the explanation is the whole point, and a mark would only turn a
+ * class somebody paid for into a thing they can fail.
+ *
+ * Answers are already in the page, which is deliberate: there is nothing to
+ * protect when nobody is being graded, and a round trip to be told something
+ * nobody is marking is a round trip for nothing.
+ */
+interface Question {
+  id: number; prompt: string; choices: string[];
+  answerIndex: number; explanation: string;
+}
+interface Props { questions: Question[] }
+const { questions } = Astro.props;
+---
+
+<div class="quiz" data-quiz>
+  {
+    questions.map((q, n) => (
+      <fieldset class="q" data-answer={q.answerIndex}>
+        <legend class="q-prompt"><span class="q-n">{n + 1}.</span> {q.prompt}</legend>
+        <div class="q-choices">
+          {q.choices.map((choice, i) => (
+            <label class="q-choice">
+              <input type="radio" name={`q-${q.id}`} value={i} />
+              <span>{choice}</span>
+            </label>
+          ))}
+        </div>
+        <p class="q-after" hidden>
+          <span class="q-verdict"></span>
+          {q.explanation && <span class="q-why">{q.explanation}</span>}
+        </p>
+      </fieldset>
+    ))
+  }
+</div>
+
+<style>
+  .quiz { display: grid; gap: var(--space-5); }
+  .q { border: 0; padding: 0; margin: 0; display: grid; gap: var(--space-3); }
+  .q-prompt {
+    padding: 0; font: 500 var(--text-body) var(--font-body); color: var(--ink);
+  }
+  .q-n { color: var(--ink-faint); font-family: var(--font-mono); margin-right: 4px; }
+  .q-choices { display: grid; gap: 6px; }
+  .q-choice {
+    display: flex; gap: 10px; align-items: baseline; cursor: pointer;
+    padding: 8px 10px; border-radius: var(--radius-sm);
+    border: var(--border-w) solid var(--line); background: var(--surface-card);
+  }
+  .q-choice:hover { border-color: color-mix(in srgb, var(--accent) 50%, transparent); }
+  .q-choice input { accent-color: var(--accent); }
+  .q-choice[data-right] { border-color: var(--accent); background: var(--accent-wash); }
+  .q-choice[data-chosen-wrong] { border-color: var(--live); }
+  .q-after {
+    margin: 0; display: grid; gap: 2px;
+    font: 400 var(--text-sm) / var(--leading-body) var(--font-body);
+    color: var(--ink-soft);
+  }
+  .q-verdict { font-weight: 600; color: var(--ink); }
+</style>
+
+<script>
+  /* Answering reveals. Nothing is sent anywhere, because nothing is being
+     marked — this is a reader checking themselves, not a test. */
+  document.querySelectorAll<HTMLElement>("[data-quiz] .q").forEach((q) => {
+    const right = Number(q.dataset.answer ?? 0);
+    const after = q.querySelector<HTMLElement>(".q-after");
+    const verdict = q.querySelector<HTMLElement>(".q-verdict");
+
+    q.querySelectorAll<HTMLInputElement>('input[type="radio"]').forEach((input) => {
+      input.addEventListener("change", () => {
+        const chosen = Number(input.value);
+        q.querySelectorAll<HTMLElement>(".q-choice").forEach((label, i) => {
+          label.toggleAttribute("data-right", i === right);
+          label.toggleAttribute("data-chosen-wrong", i === chosen && i !== right);
+        });
+        if (verdict) {
+          verdict.textContent = chosen === right
+            ? "That is it."
+            : "Not that one — the marked answer is the one.";
+        }
+        if (after) after.hidden = false;
+      });
+    });
+  });
+</script>

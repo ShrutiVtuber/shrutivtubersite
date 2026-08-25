@@ -1,0 +1,136 @@
+---
+/* A course, before you are in it.
+ *
+ * The whole outline is here whether or not they may open anything, because
+ * that list is what somebody is deciding about. What changes with access is
+ * the button at the top: start, resume, or buy.
+ */
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import Button from "../../components/forms/Button.astro";
+import Prose from "../../components/content/Prose.astro";
+import LessonList from "../../components/classes/LessonList.astro";
+import { SITE_API } from "../../lib/api";
+import { READER_COOKIE } from "../../lib/account";
+import { renderMarkdown } from "../../lib/markdown";
+
+export const prerender = false;
+
+const slug = Astro.params.slug ?? "";
+/* Fetched with the reader's cookie, so the page knows whether this person
+   already has the class — `site()` carries nothing and would show a buy button
+   to somebody who bought it last year. */
+const token = Astro.cookies.get(READER_COOKIE)?.value;
+const course = await fetch(`${SITE_API}/api/classes/${slug}`, {
+  headers: token ? { cookie: `${READER_COOKIE}=${token}` } : {},
+}).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+if (!course) return new Response(null, { status: 404, statusText: "Not found" });
+
+const html = await renderMarkdown(course.bodyMd ?? "");
+const money =
+  course.priceCents === 0
+    ? "Free"
+    : new Intl.NumberFormat("en-IE", {
+        style: "currency", currency: course.currency || "EUR",
+        minimumFractionDigits: course.priceCents % 100 === 0 ? 0 : 2,
+      }).format(course.priceCents / 100);
+
+const lessons = course.modules.flatMap((m: any) => m.lessons);
+const firstOpen = lessons.find((l: any) => l.open);
+const resumeId = course.progress.lastLessonId ?? firstOpen?.id ?? null;
+const started = course.progress.done > 0;
+
+const when = course.startsAt
+  ? new Date(course.startsAt).toLocaleString("en-GB", {
+      weekday: "long", day: "numeric", month: "long",
+      hour: "2-digit", minute: "2-digit",
+    })
+  : "";
+
+/* Why they have it, said plainly. Somebody who loses access later should
+   already know which door they came through. */
+const REASON: Record<string, string> = {
+  purchase: "Yours — you bought it.",
+  ticket: "Yours — you were there.",
+  gift: "Yours.",
+  free: "Free to anybody.",
+};
+const grantedBy = course.access.reason.startsWith("tier:")
+  ? `Included with your ${course.access.reason.slice(5)} membership. It stays yours while that does.`
+  : REASON[course.access.reason] ?? "";
+---
+
+<BaseLayout title={`${course.title} — Shruti`} description={course.tagline}>
+  <div class="container course">
+    <header class="head">
+      {course.kind === "workshop" && when && <p class="when">{when}</p>}
+      <h1>{course.title}</h1>
+      {course.tagline && <p class="dek">{course.tagline}</p>}
+
+      <div class="actions">
+        {
+          course.access.allowed && resumeId ? (
+            <Button size="lg" href={`/classes/${slug}/${resumeId}`}>
+              {started ? "Pick up where you left off" : "Start"}
+            </Button>
+          ) : (
+            <>
+              <Button size="lg" href={`/classes/${slug}/buy`}>
+                {course.priceCents === 0 ? "Sign up" : `Take this class · ${money}`}
+              </Button>
+              {firstOpen && (
+                <Button variant="secondary" size="lg" href={`/classes/${slug}/${firstOpen.id}`}>
+                  Watch a lesson first
+                </Button>
+              )}
+            </>
+          )
+        }
+      </div>
+
+      {grantedBy && <p class="granted">{grantedBy}</p>}
+      {
+        course.access.allowed && course.progress.total > 0 && (
+          <p class="progress">
+            {course.progress.done} of {course.progress.total} lessons finished
+          </p>
+        )
+      }
+    </header>
+
+    <div class="split">
+      <div class="about">
+        {html && <Prose html={html} />}
+      </div>
+      <aside class="outline">
+        <h2 class="outline-head">What is in it</h2>
+        <LessonList slug={slug} modules={course.modules} />
+      </aside>
+    </div>
+  </div>
+</BaseLayout>
+
+<style>
+  .course { margin-top: var(--space-6); }
+  .head { display: grid; gap: var(--space-3); max-width: 62ch; }
+  .when {
+    margin: 0; font: 500 var(--text-xs) var(--font-mono); color: var(--accent);
+    text-transform: uppercase; letter-spacing: .06em;
+  }
+  h1 { margin: 0; font: 600 var(--text-h1) var(--font-display); color: var(--ink); }
+  .dek { margin: 0; font: 400 var(--text-h4) var(--font-body); color: var(--ink-soft); }
+  .actions { display: flex; gap: var(--space-3); flex-wrap: wrap; margin-top: var(--space-3); }
+  .granted, .progress {
+    margin: 0; font: 400 var(--text-sm) var(--font-body); color: var(--ink-soft);
+  }
+
+  .split {
+    display: grid; gap: var(--space-6); margin-top: var(--space-6);
+    grid-template-columns: minmax(0, 1fr);
+  }
+  @media (min-width: 900px) { .split { grid-template-columns: 1fr 22rem; } }
+  .outline-head {
+    margin: 0 0 var(--space-4);
+    font: 600 var(--text-xs) var(--font-mono);
+    letter-spacing: .08em; text-transform: uppercase; color: var(--accent);
+  }
+</style>

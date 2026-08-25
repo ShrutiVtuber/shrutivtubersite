@@ -1,0 +1,257 @@
+---
+/* One lesson, with the course beside it.
+ *
+ * The shape from the reference: the outline down the left, the thing itself in
+ * the middle, complete-and-continue at the bottom — built in this site's own
+ * language rather than as a copy of it.
+ *
+ * Marking finished is a form post rather than a script, so it works before any
+ * JavaScript arrives and works if none ever does. The only thing script adds is
+ * refetching a playback token that went stale in a tab left open, which is a
+ * convenience rather than the mechanism.
+ */
+import BaseLayout from "../../../layouts/BaseLayout.astro";
+import Button from "../../../components/forms/Button.astro";
+import CsrfField from "../../../components/forms/CsrfField.astro";
+import Prose from "../../../components/content/Prose.astro";
+import LessonList from "../../../components/classes/LessonList.astro";
+import Quiz from "../../../components/classes/Quiz.astro";
+import { SITE_API } from "../../../lib/api";
+import { READER_COOKIE } from "../../../lib/account";
+import { renderMarkdown } from "../../../lib/markdown";
+import { verifyCsrf } from "../../../lib/csrf";
+
+export const prerender = false;
+
+const slug = Astro.params.slug ?? "";
+const lessonId = Astro.params.lesson ?? "";
+
+/* The reader's own cookie, forwarded deliberately — the site talks to the API
+   over the internal network and carries nothing it is not told to. The name
+   comes from lib/account rather than being written again here, because two
+   copies of a cookie name is one rename away from a silent sign-out. */
+function readerHeaders(): Record<string, string> {
+  const token = Astro.cookies.get(READER_COOKIE)?.value;
+  return token ? { cookie: `${READER_COOKIE}=${token}` } : {};
+}
+
+let failed = "";
+
+if (Astro.request.method === "POST") {
+  const form = await Astro.request.formData();
+  if (!verifyCsrf(Astro.cookies, form)) {
+    failed = "That did not save. Reload and try again.";
+  } else {
+    const r = await fetch(
+      `${SITE_API}/api/classes/${slug}/lessons/${lessonId}/progress`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json", ...readerHeaders() },
+        body: JSON.stringify({ done: String(form.get("done") ?? "1") === "1" }),
+      },
+    );
+    /* Straight on to the next lesson, which is what "complete and continue"
+       promises — and back to this one when there is no next, so finishing the
+       last lesson does not throw somebody somewhere they did not ask for. */
+    if (r.ok) {
+      return Astro.redirect(
+        String(form.get("next") ?? "") || `/classes/${slug}/${lessonId}`,
+        303,
+      );
+    }
+    const body = await r.json().catch(() => null);
+    failed = body?.detail ?? "That did not save.";
+  }
+}
+
+const [course, lesson] = await Promise.all([
+  fetch(`${SITE_API}/api/classes/${slug}`, { headers: readerHeaders() })
+    .then((r) => (r.ok ? r.json() : null)).catch(() => null),
+  fetch(`${SITE_API}/api/classes/${slug}/lessons/${lessonId}`, { headers: readerHeaders() })
+    .then(async (r) => ({ ok: r.ok, status: r.status, body: await r.json().catch(() => null) }))
+    .catch(() => ({ ok: false, status: 0, body: null })),
+]);
+
+if (!course) return new Response(null, { status: 404, statusText: "Not found" });
+
+const locked = !lesson.ok;
+const it = lesson.body ?? {};
+const html = locked ? "" : await renderMarkdown(it.bodyMd ?? "");
+
+const all = course.modules.flatMap((m: any) => m.lessons);
+const here = all.findIndex((l: any) => String(l.id) === String(lessonId));
+const next = all.slice(here + 1).find((l: any) => l.open) ?? null;
+const done = here >= 0 ? all[here].done : false;
+---
+
+<BaseLayout title={`${it.title ?? "Lesson"} — ${course.title}`} description={course.tagline}>
+  <div class="reader">
+    <aside class="rail">
+      <a class="back" href={`/classes/${slug}`}>← {course.title}</a>
+      <p class="tally">{course.progress.done} of {course.progress.total} finished</p>
+      <LessonList slug={slug} modules={course.modules} current={Number(lessonId)} />
+    </aside>
+
+    <main class="pane">
+      {failed && <p class="adm-bad" role="alert">{failed}</p>}
+
+      {locked && (
+        <div class="locked">
+          <span class="lock" aria-hidden="true">🔒&#xFE0E;</span>
+          <h1>{lesson.status === 401 ? "Sign in to open this" : "Not yours yet"}</h1>
+          <p>
+            {lesson.status === 401
+              ? "You may already have this class — signing in will show you."
+              : "This lesson is part of a class you do not have."}
+          </p>
+          <div class="acts">
+            {lesson.status === 401 && <Button href="/signin">Sign in</Button>}
+            <Button variant={lesson.status === 401 ? "secondary" : "primary"}
+                    href={`/classes/${slug}`}>About this class</Button>
+          </div>
+        </div>
+      )}
+
+      {!locked && (
+        <header class="lhead">
+          <h1>{it.title}</h1>
+          {it.minutes && <p class="lmeta">{it.minutes} minutes</p>}
+        </header>
+      )}
+
+      {!locked && it.kind === "video" && it.video?.ready && (
+        <div class="player" data-player data-refresh={`/api/classes/${slug}/lessons/${lessonId}`}>
+          <iframe
+            src={it.video.src}
+            title={it.title}
+            loading="lazy"
+            allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture; fullscreen"
+            allowfullscreen
+          ></iframe>
+        </div>
+      )}
+      {!locked && it.kind === "video" && !it.video?.ready && (
+        <p class="absent">{it.video?.reason ?? "No video on this lesson yet."}</p>
+      )}
+
+      {!locked && (it.kind === "pdf" || it.kind === "audio") && it.file && (
+        <p class="file">
+          <Button href={it.file.url}>
+            {it.kind === "pdf" ? "Download the PDF" : "Download the audio"}
+          </Button>
+        </p>
+      )}
+      {!locked && (it.kind === "pdf" || it.kind === "audio") && !it.file && (
+        <p class="absent">Nothing attached to this lesson yet.</p>
+      )}
+
+      {!locked && it.kind === "quiz" && it.questions?.length > 0 && (
+        <Quiz questions={it.questions} />
+      )}
+      {!locked && it.kind === "quiz" && !it.questions?.length && (
+        <p class="absent">No questions on this one yet.</p>
+      )}
+
+      {!locked && html && <Prose html={html} />}
+
+      {!locked && (
+        <form method="POST" class="finish">
+          <CsrfField />
+          <input type="hidden" name="done" value={done ? "0" : "1"} />
+          <input type="hidden" name="next" value={next ? `/classes/${slug}/${next.id}` : ""} />
+          {done && <span class="already">✓ Finished</span>}
+          {done && <Button type="submit" variant="ghost" size="sm">Mark unfinished</Button>}
+          {done && next && (
+            <Button href={`/classes/${slug}/${next.id}`} variant="secondary">Next lesson →</Button>
+          )}
+          {!done && (
+            <Button type="submit" size="lg">
+              {next ? "Complete and continue →" : "Mark finished"}
+            </Button>
+          )}
+        </form>
+      )}
+    </main>
+  </div>
+</BaseLayout>
+
+<style>
+  .reader {
+    display: grid; gap: var(--space-6);
+    grid-template-columns: minmax(0, 1fr);
+    padding: var(--space-5) var(--space-5) var(--space-7);
+    max-width: 84rem; margin: 0 auto;
+  }
+  @media (min-width: 940px) {
+    .reader { grid-template-columns: 20rem minmax(0, 1fr); gap: var(--space-7); }
+    .rail {
+      position: sticky; top: var(--space-5); align-self: start;
+      max-height: calc(100dvh - 4rem); overflow-y: auto;
+    }
+  }
+
+  .rail { display: grid; gap: var(--space-3); align-content: start; }
+  .back { font: 500 var(--text-sm) var(--font-body); color: var(--accent); text-decoration: none; }
+  .back:hover { text-decoration: underline; }
+  .tally { margin: 0; font: 400 var(--text-xs) var(--font-mono); color: var(--ink-faint); }
+
+  .pane { display: grid; gap: var(--space-5); align-content: start; min-width: 0; }
+  .lhead { display: grid; gap: 4px; }
+  h1 { margin: 0; font: 600 var(--text-h2) var(--font-display); color: var(--ink); }
+  .lmeta { margin: 0; font: 400 var(--text-xs) var(--font-mono); color: var(--ink-faint); }
+
+  .player {
+    position: relative; aspect-ratio: 16 / 9; background: var(--surface-inset);
+    border-radius: var(--radius-md); overflow: hidden;
+  }
+  .player iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+
+  .absent {
+    margin: 0; padding: var(--space-5); text-align: center;
+    border: var(--border-w) dashed var(--line); border-radius: var(--radius-md);
+    font: 400 var(--text-sm) var(--font-body); color: var(--ink-soft);
+  }
+  .file { margin: 0; }
+
+  .finish {
+    display: flex; gap: var(--space-4); align-items: center; flex-wrap: wrap;
+    padding-top: var(--space-5); border-top: var(--border-w) solid var(--line);
+  }
+  .already { font: 500 var(--text-sm) var(--font-body); color: var(--accent); }
+
+  .locked { display: grid; gap: var(--space-3); place-items: start; max-width: 46ch; }
+  .lock { font-size: var(--text-h2); }
+  .acts { display: flex; gap: var(--space-3); flex-wrap: wrap; }
+</style>
+
+<script>
+  /* A tab left open past the token's four hours would otherwise show a player
+   * that refuses to start, which reads as "her site is broken" rather than "my
+   * tab is old". So the page quietly asks for a fresh link when it comes back
+   * into view after long enough, and swaps it in.
+   *
+   * Nothing depends on this. The lesson works without it, and a reader who
+   * simply reloads gets the same result by the same route.
+   */
+  const player = document.querySelector<HTMLElement>("[data-player]");
+  const frame = player?.querySelector("iframe");
+  const from = player?.dataset.refresh;
+  if (player && frame && from) {
+    let leftAt = Date.now();
+    document.addEventListener("visibilitychange", async () => {
+      if (document.hidden) { leftAt = Date.now(); return; }
+      // Well inside the token's life, so a stale one is never reached.
+      if (Date.now() - leftAt < 3 * 60 * 60 * 1000) return;
+      try {
+        const r = await fetch(from, { headers: { accept: "application/json" } });
+        if (!r.ok) return;
+        const fresh = await r.json();
+        if (fresh?.video?.ready && fresh.video.src !== frame.getAttribute("src")) {
+          frame.setAttribute("src", fresh.video.src);
+        }
+      } catch {
+        /* Leave it alone; a reload does the same job. */
+      }
+    });
+  }
+</script>
