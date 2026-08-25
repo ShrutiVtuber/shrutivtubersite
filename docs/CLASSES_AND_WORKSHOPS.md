@@ -100,11 +100,61 @@ sell access to something.
 - **Mux** — best tooling, dearest, and aimed at people with more video than
   she has. <https://www.mux.com/pricing/video>
 
-**Recommendation: Cloudflare Stream**, on the grounds that it is one fewer
-account and one fewer bill and the signed-token model is exactly right for a
-paid course. **Bunny if the bill matters more than the tidiness**, which at
-launch it might. Either is a small integration and the choice is not
-irreversible — the player is behind one component and one field on a lesson.
+#### The numbers, on a real course
+
+Twenty videos of an hour and a half — **1,800 minutes, 30 hours**. Rates below
+are the published ones as understood here; **check the pricing pages before
+committing**, because they move and this is the one recurring bill this feature
+adds.
+
+The two bill on different axes, which is the whole story:
+
+- **Cloudflare charges per minute watched.** Quality is irrelevant to the bill.
+  $5 per 1,000 minutes stored per month, $1 per 1,000 delivered.
+- **Bunny charges per gigabyte.** So what somebody watches it at changes the
+  bill, and storage counts *every rendition* it transcodes, not just the master.
+
+|  | Cloudflare Stream | Bunny Stream |
+|---|---|---|
+| Storage | **$9.00 / month** | ~84 GB → **$0.84 / month** |
+| One full watch | **$1.80** | **$0.24** at 720p · **$0.34** at 1080p |
+| Four full watches | **$7.20** | **~$1.16** |
+
+First year of one course, storage included:
+
+| students | CF, watched once | CF, watched 4× | Bunny, once | Bunny, 4× |
+|---:|---:|---:|---:|---:|
+| 10 | $126 | $180 | $13 | $22 |
+| 100 | $288 | $828 | $39 | $126 |
+| 500 | $1,008 | $3,708 | $155 | $590 |
+
+**Whether that matters depends entirely on what a course costs.** Per student,
+worst case, the difference is about $6:
+
+| course price | Cloudflare takes | Bunny takes |
+|---|---|---|
+| €30 | **24%** | 3.9% |
+| €80 | 9.0% | 1.4% |
+| €150 | 4.8% | 0.8% |
+
+At €150 the difference is noise and the tidier bill wins. At €30 Cloudflare is
+eating a quarter of the sale.
+
+**Two honest caveats.** Bunny's bandwidth is cheapest in Europe and North
+America and dearer elsewhere — a mostly-Asian audience narrows the gap. And
+Cloudflare Stream has a monthly minimum, so the $9 above is a floor rather than
+a starting point.
+
+#### Switching later is a field, not a migration
+
+The lesson carries **which provider** and **which video id**, and the player
+switches on the first. So both can be live at once and a course can move one at
+a time, or never.
+
+What switching actually costs is **re-uploading 30 hours** from her own
+masters — time, not code, and she keeps those masters regardless. It is built
+provider-agnostic from the start whichever she picks, because that costs
+nothing now and buys the freedom later.
 
 ### 2. The live platform
 
