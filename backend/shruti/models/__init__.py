@@ -352,6 +352,54 @@ class Product(TimestampMixin, table=True):
     position: int = Field(default=0)
 
 
+class Tier(TimestampMixin, table=True):
+    """
+    A membership.
+
+    Was two names in a dict and two price IDs in the environment, which meant a
+    third tier needed a deploy and a fourth needed a developer. It is a table
+    now, for the same reason products are: what she sells is content, not
+    configuration.
+
+    The perks are one per line rather than a related table. They are a short
+    list of sentences shown in one place and never queried — a table for them
+    would be machinery earning nothing.
+
+    Mirrored to Stripe like a product, except the price recurs. Changing the
+    amount makes a new Stripe price and retires the old, so **anyone already
+    subscribed keeps paying what they agreed to** — which is not a nicety, it
+    is the only honest way to change a price under a standing arrangement.
+    """
+
+    __tablename__ = "tier"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    # Stable and machine-readable. Used in checkout, so changing it breaks a
+    # link somebody may have open.
+    key: str = Field(index=True, unique=True)
+    name: str
+    tagline: str = ""
+    # One perk per line.
+    perks: str = ""
+    cta: str = ""
+    # "Most common", or blank.
+    badge: str = ""
+    # The one drawn as the recommended column. At most one, and nothing breaks
+    # if none is.
+    featured: bool = Field(default=False)
+
+    price_cents: int = 0
+    currency: str = "eur"
+    interval: str = "month"      # month | year
+
+    tax_code: str = "txcd_10000000"
+    stripe_product_id: str = ""
+    stripe_price_id: str = ""
+
+    visible: bool = Field(default=False)
+    position: int = Field(default=0)
+
+
 class ProductPhoto(TimestampMixin, table=True):
     """
     One of a product's photographs.

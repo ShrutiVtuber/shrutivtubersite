@@ -62,7 +62,20 @@ if (Astro.request.method === "POST") {
   }
 }
 
-interface StripeTier { tier: string; amount: number | null; currency: string; interval: string }
+interface StripeTier {
+  tier: string;
+  amount: number | null;
+  currency: string;
+  interval: string;
+  /* The copy comes with the tier now, so adding one is adding a row rather
+     than editing this page and deploying it. */
+  name?: string;
+  tagline?: string;
+  perks?: string[];
+  cta?: string;
+  badge?: string;
+  featured?: boolean;
+}
 interface Billing {
   configured: boolean;
   tiers: StripeTier[];
@@ -94,29 +107,37 @@ const money = (cents: number | null | undefined, currency = "EUR") =>
         minimumFractionDigits: cents % 100 === 0 ? 0 : 2,
       }).format(cents / 100);
 
+/* The one-off is not a tier and never was — its amount is chosen by the giver,
+   not configured — so it is written here and the rest come from the database. */
+const ONE_OFF = {
+  key: "one-off",
+  name: "One-off",
+  price: money(oneOff?.default ?? 300),
+  note: "once, or any amount",
+  primary: false,
+  badge: "",
+  cta: "Give once",
+  items: ["A coffee for the bench", "Name read on stream if you leave one", "No account needed"],
+};
+
 const TIERS = [
-  {
-    key: "one-off", name: "One-off",
-    price: money(oneOff?.default ?? 300), note: "once, or any amount",
-    primary: false, badge: "", cta: "Give once",
-    items: ["A coffee for the bench", "Name read on stream if you leave one", "No account needed"],
-  },
-  {
-    key: "lamplighter", name: "Lamplighter",
-    price: money(priced.get("lamplighter")?.amount ?? null), note: "/ month",
-    primary: true, badge: "Most common", cta: "Become a Lamplighter",
-    items: ["Members channel on Discord", "Schedule a day early", "Name in the monthly credits roll"],
-  },
-  {
-    key: "almanac", name: "Almanac",
-    price: money(priced.get("almanac")?.amount ?? null), note: "/ month",
-    primary: false, badge: "", cta: "Become an Almanac",
-    items: ["Everything in Lamplighter", "Monthly practice notes, signed Soror Eu. A.", "A vote on the next instrument"],
-  },
+  ONE_OFF,
+  ...(billing?.tiers ?? []).map((t) => ({
+    key: t.tier,
+    name: t.name || t.tier,
+    price: money(t.amount ?? null, t.currency || "EUR"),
+    note: t.interval ? `/ ${t.interval}` : "",
+    primary: !!t.featured,
+    badge: t.badge ?? "",
+    cta: t.cta || `Become ${t.name || t.tier}`,
+    items: t.perks ?? [],
+  })),
 ];
 
 /* A tier is offerable when Stripe knows its price. The one-off always is —
    its amount is chosen here, not configured. */
+/* A tier is offerable when Stripe knows its price. The one-off always is —
+   its amount is chosen by the giver, not configured. */
 const offerable = (key: string) => open && (key === "one-off" || priced.has(key));
 
 /* Every block the admin has added to /support. */

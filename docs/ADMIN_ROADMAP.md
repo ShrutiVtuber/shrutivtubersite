@@ -12,7 +12,8 @@ Left, in the order agreed:
 
 1. ~~User management~~ — done
 2. ~~Merchandise~~ — infrastructure done — physical *and* digital
-3. **Discount codes** ← next — Stripe coupons and promotion codes
+3. **Discount codes** ← next
+4. ~~Memberships as data~~ — done, see below — Stripe coupons and promotion codes
 4. **Classes and workshops** — sold and hosted on the site, "like kotobaseed
    has". Explicitly **after the site itself is done**; not now.
 
@@ -219,3 +220,45 @@ complaints are one cause. Locally, where the test keys are set, the page shows
 €3 / €5 / €11 and the amount box.
 
 Setting them is hers — they are live keys. `scripts/set-secret.sh` is the way.
+
+
+## Memberships are rows now (2026-08-25)
+
+`/admin/memberships` adds, edits and takes them off offer. The name, the perks,
+the words on the button and the badge all come from the row, so a new tier is a
+row rather than a page edit and a deploy. Verified by adding a third (€33/month)
+and watching it appear on /support, priced, with its perks, and buyable.
+
+**Nobody's subscription moved.** The two original tiers adopted the price IDs
+that were already in the environment rather than being given fresh ones, so a
+subscription taken out before this goes on billing against exactly the price it
+was taken out against. Changing an amount makes a new Stripe price and retires
+the old — which is the only honest way to change a price under a standing
+arrangement.
+
+A tier nobody is on can be removed; one people are paying for can only be taken
+off offer, because their subscription lives at Stripe whether or not the row
+does.
+
+### The money rule got stronger, not weaker
+
+`_line_items` had to become async to look a tier up, which broke the tests
+guarding *"a subscription amount can never come from the client"*. Rather than
+loosen them, the builders were split: `_one_off_line_items(amount)` is the only
+one that takes an amount, and `_subscription_line_items(price_id, tier)` has
+nowhere to put one. The test is now a signature assertion — a future edit
+cannot re-introduce the bug by passing an amount through, because passing it is
+a TypeError.
+
+## Going live, when she is ready
+
+She writes the three values into a file and says where; they are installed from
+it without passing through a terminal or a chat, and the file is deleted.
+
+    SHRUTI_STRIPE_SECRET_KEY       sk_live_…
+    SHRUTI_STRIPE_PUBLISHABLE_KEY  pk_live_…
+    SHRUTI_STRIPE_WEBHOOK_SECRET   from a live webhook endpoint
+
+Once the live secret key is in, the live webhook endpoint and the live tier
+prices are API-creatable from here. Only the account keys have to come from her
+hands — Stripe shows a secret key once and never again.

@@ -26,13 +26,14 @@ from typing import Any
 from urllib.parse import urlparse
 
 import stripe
-from fastapi import APIRouter, Depends, Header, HTTPException, Request
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
 from shruti.core import emails
 from shruti.core.config import get_settings
+from shruti.api.deps import require_admin
 from shruti.core.db import get_session
 from shruti.core.mail import send
 from shruti.core.origins import resolve as resolve_origin
@@ -44,7 +45,10 @@ router = APIRouter(prefix="/api/billing", tags=["billing"])
 
 # The tiers the site offers, mapped to the settings that name their Stripe
 # price. Adding a tier means adding a price ID, not editing a template.
-TIERS = {
+# The two that predate the tier table. Their price IDs live in the environment
+# and are adopted on first read, so a subscription taken out before this keeps
+# billing against exactly the price it was taken out against.
+LEGACY_PRICE_FIELDS = {
     "lamplighter": "stripe_price_lamplighter",
     "almanac": "stripe_price_almanac",
 }
@@ -65,15 +69,53 @@ def _client() -> Any:
     return stripe
 
 
-def _price_id(tier: str) -> str:
-    s = get_settings()
-    field = TIERS.get(tier)
-    if not field:
+async def _tier_row(key: str, session: AsyncSession):
+    from shruti.models import Tier
+
+    return (
+        await session.execute(select(Tier).where(Tier.key == key, Tier.visible.is_(True)))
+    ).scalar_one_or_none()
+
+
+async def _price_id(tier: str, session: AsyncSession) -> str:
+    row = await _tier_row(tier, session)
+    if row is None:
         raise HTTPException(404, "no such tier")
-    price = getattr(s, field, "")
-    if not price:
+    price_id = await _ensure_price(row, session)
+    if not price_id:
         raise HTTPException(503, "that tier is not set up yet")
-    return price
+    return price_id
+
+
+async def _ensure_price(row, session: AsyncSession) -> str:
+    """
+    The Stripe price for a tier, making one if it has none.
+
+    The two original tiers keep the price they already had — taken from the
+    environment where they still live — because a subscription is a standing
+    arrangement and moving one to a freshly created price would change what
+    somebody agreed to pay without asking them.
+    """
+    if row.stripe_price_id:
+        return row.stripe_price_id
+
+    field = LEGACY_PRICE_FIELDS.get(row.key)
+    inherited = getattr(get_settings(), field, "") if field else ""
+    if inherited:
+        row.stripe_price_id = inherited
+        await session.commit()
+        return inherited
+
+    from shruti.core import shop as stripe_shop
+
+    try:
+        product_id, price_id = stripe_shop.sync(row, interval=row.interval)
+    except Exception as exc:                           # noqa: BLE001
+        log.warning("tier %s could not be synced: %s", row.key, type(exc).__name__)
+        return ""
+    row.stripe_product_id, row.stripe_price_id = product_id, price_id
+    await session.commit()
+    return price_id
 
 
 def _site_url(request: Request | None = None) -> str:
@@ -107,44 +149,60 @@ def _site_url(request: Request | None = None) -> str:
 # ── what the page shows ─────────────────────────────────────────────────────
 
 @router.get("/tiers")
-async def tiers() -> dict:
+async def tiers(session: AsyncSession = Depends(get_session)) -> dict:
     """
-    The tiers, priced by Stripe.
+    The tiers, as she has them, priced by Stripe.
 
     Returns `configured: false` rather than an error when Stripe is not set up:
     the support page has a designed state for that, and a 503 would make the
     whole page look broken when only the buttons are missing.
+
+    The copy comes from here too — name, perks, the words on the button — so
+    adding a tier is adding a row rather than editing a page and deploying it.
     """
+    from shruti.models import Tier
+
     s = get_settings()
+    rows = (
+        await session.execute(
+            select(Tier).where(Tier.visible.is_(True)).order_by(Tier.position, Tier.id)
+        )
+    ).scalars().all()
+
+    listed = [
+        {
+            "tier": t.key,
+            "name": t.name,
+            "tagline": t.tagline,
+            "perks": [line for line in (t.perks or "").splitlines() if line.strip()],
+            "cta": t.cta or f"Become {t.name}",
+            "badge": t.badge,
+            "featured": t.featured,
+            "amount": t.price_cents,
+            "currency": (t.currency or "eur").upper(),
+            "interval": t.interval,
+        }
+        for t in rows
+    ]
+
     if not s.stripe_secret_key:
-        return {"configured": False, "tiers": [], "oneOff": None,
+        # The tiers still describe themselves — the page can show what is on
+        # offer and say the buttons are not live, which reads better than an
+        # empty page that looks broken.
+        return {"configured": False, "tiers": listed, "oneOff": None,
                 "testMode": s.stripe_is_test}
 
-    client = _client()
-    out = []
-    for name, field in TIERS.items():
-        price_id = getattr(s, field, "")
-        if not price_id:
-            continue
-        try:
-            price = client.Price.retrieve(price_id)
-        except Exception as exc:                   # noqa: BLE001
-            # One misconfigured price must not take the other tier with it.
-            log.warning("stripe price %s could not be read: %s", name, type(exc).__name__)
-            continue
-        out.append({
-            "tier": name,
-            "amount": price.get("unit_amount"),
-            "currency": (price.get("currency") or "eur").upper(),
-            "interval": (price.get("recurring") or {}).get("interval", ""),
-        })
+    # A tier with no Stripe price yet gets one now, so the first person to look
+    # at the page is not the one who discovers it was never finished.
+    for row in rows:
+        await _ensure_price(row, session)
 
     return {
         # Said on every money screen, because a site taking test cards looks
         # exactly like one that works.
         "testMode": s.stripe_is_test,
         "configured": True,
-        "tiers": out,
+        "tiers": listed,
         "oneOff": {"min": ONE_OFF_MIN, "max": ONE_OFF_MAX, "default": ONE_OFF_DEFAULT,
                    "currency": "EUR"},
     }
@@ -152,61 +210,205 @@ async def tiers() -> dict:
 
 # ── starting a checkout ─────────────────────────────────────────────────────
 
-def _line_items(tier: str, amount: int | None) -> dict[str, Any]:
+def _one_off_line_items(amount: int | None) -> dict[str, Any]:
     """
-    What is actually being bought, and for how much.
+    A gift, for the amount the giver chose.
 
-    Extracted from the route so the rule it enforces can be tested rather than
-    read: **`amount` is reachable only on the one-off path.** A subscription's
-    price comes from `_price_id` and from nowhere else, so no edit to the form,
-    the client, or this signature can make a subscriber pay what their browser
-    said they should.
+    This is the ONLY builder that takes an amount, which is the whole of the
+    rule: a subscription cannot be given one because the function that builds
+    one has nowhere to put it.
     """
-    if tier == "one-off":
-        cents = amount or ONE_OFF_DEFAULT
-        if not ONE_OFF_MIN <= cents <= ONE_OFF_MAX:
-            raise HTTPException(
-                422,
-                f"a one-off gift has to be between "
-                f"€{ONE_OFF_MIN / 100:.2f} and €{ONE_OFF_MAX / 100:.0f}",
-            )
-        return {
-            "mode": "payment",
-            "line_items": [{
-                "quantity": 1,
-                "price_data": {
-                    "currency": "eur",
-                    "unit_amount": cents,
-                    # VAT is INSIDE this number, not added to it.
-                    #
-                    # EU consumer law wants a price shown to a consumer to be
-                    # the price they pay, and Managed Payments will otherwise
-                    # add tax on top — a €4 tier quoted on the page and
-                    # charged at €4.84 on Stripe's, which is both unlawful for
-                    # B2C and the exact moment somebody abandons a checkout.
-                    #
-                    # The subscription prices carry the same behaviour, set on
-                    # the price itself in Stripe. It cannot be changed on an
-                    # existing price, so switching means creating a new one.
-                    "tax_behavior": "inclusive",
-                    "product_data": {
-                    "name": "A one-off gift",
-                    # Required by Managed Payments, same as the subscription
-                    # products. A gift that promises a name read on stream is
-                    # not a no-consideration donation, so it is declared
-                    # taxable rather than assumed out of scope.
-                    "tax_code": get_settings().stripe_tax_code,
-                },
-                },
-            }],
-        }
+    cents = amount or ONE_OFF_DEFAULT
+    if not ONE_OFF_MIN <= cents <= ONE_OFF_MAX:
+        raise HTTPException(
+            422,
+            f"a one-off gift has to be between "
+            f"€{ONE_OFF_MIN / 100:.2f} and €{ONE_OFF_MAX / 100:.0f}",
+        )
+    return {
+        "mode": "payment",
+        "line_items": [{
+            "quantity": 1,
+            "price_data": {
+                "currency": "eur",
+                "unit_amount": cents,
+                # VAT is INSIDE this number, not added to it.
+                #
+                # EU consumer law wants a price shown to a consumer to be
+                # the price they pay, and Managed Payments will otherwise
+                # add tax on top — a €4 tier quoted on the page and
+                # charged at €4.84 on Stripe's, which is both unlawful for
+                # B2C and the exact moment somebody abandons a checkout.
+                #
+                # The subscription prices carry the same behaviour, set on
+                # the price itself in Stripe. It cannot be changed on an
+                # existing price, so switching means creating a new one.
+                "tax_behavior": "inclusive",
+                "product_data": {
+                "name": "A one-off gift",
+                # Required by Managed Payments, same as the subscription
+                # products. A gift that promises a name read on stream is
+                # not a no-consideration donation, so it is declared
+                # taxable rather than assumed out of scope.
+                "tax_code": get_settings().stripe_tax_code,
+            },
+            },
+        }],
+    }
 
-    # `amount` is deliberately not consulted here, whatever it holds.
+
+def _subscription_line_items(price_id: str, tier: str) -> dict[str, Any]:
+    """
+    A membership, at a price Stripe holds.
+
+    **Takes no amount, and cannot be given one.** That is not a check that
+    could be edited away — there is no parameter to pass. A subscriber pays
+    what Stripe has recorded for the tier, whatever the browser said.
+    """
     return {
         "mode": "subscription",
-        "line_items": [{"price": _price_id(tier), "quantity": 1}],
+        "line_items": [{"price": price_id, "quantity": 1}],
         "subscription_data": {"metadata": {"tier": tier}},
     }
+
+
+async def _line_items(tier: str, amount: int | None,
+                      session: AsyncSession) -> dict[str, Any]:
+    """
+    What is being bought, and for how much.
+
+    Dispatch only. The amount goes to the one-off builder or nowhere, and the
+    tier's price is looked up rather than accepted.
+    """
+    if tier == "one-off":
+        return _one_off_line_items(amount)
+    return _subscription_line_items(await _price_id(tier, session), tier)
+
+
+# ── tiers, as she manages them ──────────────────────────────────────────────
+
+class TierIn(BaseModel):
+    key: str
+    name: str
+    tagline: str = ""
+    perks: str = ""
+    cta: str = ""
+    badge: str = ""
+    featured: bool = False
+    price_cents: int = 0
+    currency: str = "eur"
+    interval: str = "month"
+    tax_code: str = "txcd_10000000"
+    visible: bool = False
+    position: int = 0
+
+
+def _tier_payload(t) -> dict:
+    return {
+        "id": t.id, "key": t.key, "name": t.name, "tagline": t.tagline,
+        "perks": t.perks, "cta": t.cta, "badge": t.badge, "featured": t.featured,
+        "price_cents": t.price_cents, "currency": t.currency,
+        "interval": t.interval, "tax_code": t.tax_code,
+        "visible": t.visible, "position": t.position,
+        "stripePriceId": t.stripe_price_id,
+        "sellable": bool(t.stripe_price_id),
+    }
+
+
+@router.get("/admin/tiers", dependencies=[Depends(require_admin)])
+async def admin_tiers(session: AsyncSession = Depends(get_session)) -> list[dict]:
+    from shruti.models import Tier
+
+    rows = (
+        await session.execute(select(Tier).order_by(Tier.position, Tier.id))
+    ).scalars().all()
+    return [_tier_payload(t) for t in rows]
+
+
+@router.post("/admin/tiers", status_code=201, dependencies=[Depends(require_admin)])
+async def create_tier(
+    body: TierIn, session: AsyncSession = Depends(get_session)
+) -> dict:
+    from shruti.models import Tier
+
+    if body.interval not in {"month", "year"}:
+        raise HTTPException(422, "interval must be month or year")
+    row = Tier(**body.model_dump())
+    session.add(row)
+    await session.commit()
+    await session.refresh(row)
+    return await _sync_tier(row, session)
+
+
+@router.patch("/admin/tiers/{tier_id}", dependencies=[Depends(require_admin)])
+async def update_tier(
+    tier_id: int, body: dict, session: AsyncSession = Depends(get_session)
+) -> dict:
+    from shruti.models import Tier
+
+    row = await session.get(Tier, tier_id)
+    if row is None:
+        raise HTTPException(404, "no such tier")
+    if body.get("interval") and body["interval"] not in {"month", "year"}:
+        raise HTTPException(422, "interval must be month or year")
+
+    for key, value in body.items():
+        if key in {"id", "created_at", "stripe_product_id", "stripe_price_id"}:
+            continue
+        if hasattr(row, key):
+            setattr(row, key, value)
+    await session.commit()
+    await session.refresh(row)
+    return await _sync_tier(row, session)
+
+
+async def _sync_tier(row, session: AsyncSession) -> dict:
+    from shruti.core import shop as stripe_shop
+
+    try:
+        product_id, price_id = stripe_shop.sync(row, interval=row.interval)
+    except Exception as exc:                           # noqa: BLE001
+        log.warning("tier %s could not be synced: %s", row.key, type(exc).__name__)
+        return _tier_payload(row) | {"stripeError": f"{type(exc).__name__}: {exc}"}
+    row.stripe_product_id, row.stripe_price_id = product_id, price_id
+    await session.commit()
+    await session.refresh(row)
+    return _tier_payload(row)
+
+
+@router.delete("/admin/tiers/{tier_id}", status_code=204,
+               dependencies=[Depends(require_admin)])
+async def delete_tier(tier_id: int, session: AsyncSession = Depends(get_session)):
+    """
+    Remove a tier nobody is on.
+
+    **Refused while anyone is subscribed to it.** Their subscription lives at
+    Stripe and would go on billing whether or not this row exists — deleting it
+    here would only mean the site could no longer say what they are paying for.
+    Hide it instead: nobody new can join, and everybody on it keeps what they
+    have.
+    """
+    from shruti.models import Supporter, Tier
+
+    row = await session.get(Tier, tier_id)
+    if row is None:
+        raise HTTPException(404, "no such tier")
+
+    on_it = (
+        await session.execute(select(Supporter).where(Supporter.tier == row.key))
+    ).scalars().first()
+    if on_it is not None:
+        raise HTTPException(
+            409,
+            "somebody is subscribed to this, and their subscription lives at "
+            "Stripe whether or not this row does. Untick \u201con offer\u201d "
+            "instead — nobody new can join and everybody on it keeps what they "
+            "have.",
+        )
+
+    await session.delete(row)
+    await session.commit()
+    return Response(status_code=204)
 
 
 class CheckoutIn(BaseModel):
@@ -244,7 +446,7 @@ async def checkout(
         # account without trusting anything the browser sends back.
         common["client_reference_id"] = str(user.id)
 
-    params = {**common, **_line_items(body.tier, body.amount)}
+    params = {**common, **await _line_items(body.tier, body.amount, session)}
 
     try:
         checkout_session = client.checkout.Session.create(**params)

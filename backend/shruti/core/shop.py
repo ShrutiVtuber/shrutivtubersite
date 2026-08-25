@@ -48,12 +48,17 @@ def tax_behavior() -> str:
     return get_settings().stripe_tax_behavior or "inclusive"
 
 
-def sync(product: Any) -> tuple[str, str]:
+def sync(product: Any, *, interval: str = "") -> tuple[str, str]:
     """
     Create or update this product in Stripe. Returns (product_id, price_id).
 
     Safe to call on every save: if nothing that Stripe cares about changed, it
     updates the name and description and hands the same price back.
+
+    `interval` makes it a subscription price — "month" or "year". A membership
+    and a jumper are the same arrangement with Stripe as far as this is
+    concerned, differing only in whether the price repeats, so they share this
+    rather than having two of it that drift.
     """
     stripe = _client()
 
@@ -61,10 +66,16 @@ def sync(product: Any) -> tuple[str, str]:
         "name": product.name,
         "description": product.tagline or None,
         "tax_code": product.tax_code or None,
-        "metadata": {"slug": product.slug, "kind": product.kind},
+        # A product calls its identifier `slug` and a tier calls it `key`.
+        # They are the same thing to Stripe, so this asks for whichever the
+        # thing being synced has rather than knowing which it is.
+        "metadata": {
+            "slug": getattr(product, "slug", "") or getattr(product, "key", ""),
+            "kind": getattr(product, "kind", "membership"),
+        },
         # Stripe needs to know whether an address is required, and it is the
         # kind of thing that must not be decided in two places.
-        "shippable": product.kind == "physical",
+        "shippable": getattr(product, "kind", "") == "physical",
     }
 
     if product.stripe_product_id:
@@ -83,19 +94,26 @@ def sync(product: Any) -> tuple[str, str]:
             and existing.get("unit_amount") == product.price_cents
             and existing.get("currency") == product.currency
             and existing.get("tax_behavior") == tax_behavior()
+            and (existing.get("recurring") or {}).get("interval", "") == interval
         )
         if matches:
             return stripe_product["id"], price_id
 
-    price = stripe.Price.create(
-        product=stripe_product["id"],
-        unit_amount=product.price_cents,
-        currency=product.currency,
-        tax_behavior=tax_behavior(),
-    )
+    price_args = {
+        "product": stripe_product["id"],
+        "unit_amount": product.price_cents,
+        "currency": product.currency,
+        "tax_behavior": tax_behavior(),
+    }
+    if interval:
+        price_args["recurring"] = {"interval": interval}
+    price = stripe.Price.create(**price_args)
 
-    # The old one is archived rather than deleted: an order that was placed at
-    # it must keep resolving, and Stripe does not allow deleting a used price.
+    # The old one is archived rather than deleted: an order placed at it must
+    # keep resolving, Stripe does not allow deleting a used price, and — for a
+    # membership — **anyone already subscribed goes on paying the old one**.
+    # That is the point, not a side effect: a price cannot change under a
+    # standing arrangement without changing what was agreed.
     if price_id:
         try:
             stripe.Price.modify(price_id, active=False)

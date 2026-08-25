@@ -21,6 +21,9 @@ const qCount = Array.isArray(questions.body) ? questions.body.length : 0;
 const rows = Array.isArray(sections.body) ? sections.body : [];
 const hidden = rows.filter((s: any) => !s.visible).length;
 /* Only the count, for the tile. The page itself does the real listing. */
+const membershipList = await asAdmin(Astro, "/api/billing/admin/tiers");
+const memberships: any[] = Array.isArray(membershipList.body) ? membershipList.body : [];
+
 const [shopList, shopOrders] = await Promise.all([
   asAdmin(Astro, "/api/shop/admin/products"),
   asAdmin(Astro, "/api/shop/admin/orders"),
@@ -51,6 +54,12 @@ const skyEntries: any[] = skyList.body?.entries ?? [];
       <span class="adm-lbl">Inbox</span>
       <span class="big">{msgCount + qCount}</span>
       <span class="sub">{msgCount} messages · {qCount} questions</span>
+    </a>
+
+    <a class="adm-card tile" href="/admin/memberships">
+      <span class="adm-lbl">Memberships</span>
+      <span class="big">{memberships.length}</span>
+      <span class="sub">on offer on /support</span>
     </a>
 
     <a class="adm-card tile" href="/admin/shop">

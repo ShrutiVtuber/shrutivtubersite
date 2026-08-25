@@ -1,0 +1,257 @@
+---
+/* Memberships.
+ *
+ * Separate from the shop because a membership is a standing arrangement and a
+ * jumper is not: the rules that matter here are about what happens to people
+ * already paying, which is not a question a product ever raises.
+ *
+ * The two that shipped were a dict in the code and two price IDs in the
+ * environment, so a third needed a deploy. They are rows now.
+ */
+import AdminLayout from "../../layouts/AdminLayout.astro";
+import CsrfField from "../../components/forms/CsrfField.astro";
+import Button from "../../components/forms/Button.astro";
+import Badge from "../../components/navigation/Badge.astro";
+import { asAdmin } from "../../lib/admin";
+import { verifyCsrf } from "../../lib/csrf";
+
+export const prerender = false;
+
+let notice = "";
+let failed = "";
+
+if (Astro.request.method === "POST") {
+  const form = await Astro.request.formData();
+  if (!verifyCsrf(Astro.cookies, form)) {
+    failed = "That did not save. Reload the page and try again.";
+  } else {
+    const action = String(form.get("action") ?? "");
+    const id = String(form.get("id") ?? "");
+
+    if (action === "save" || action === "create") {
+      const euros = String(form.get("price") ?? "0").replace(",", ".");
+      const payload: Record<string, unknown> = {
+        key: String(form.get("key") ?? ""),
+        name: String(form.get("name") ?? ""),
+        tagline: String(form.get("tagline") ?? ""),
+        perks: String(form.get("perks") ?? ""),
+        cta: String(form.get("cta") ?? ""),
+        badge: String(form.get("badge") ?? ""),
+        featured: String(form.get("featured") ?? "off") === "on",
+        price_cents: Math.round(Number(euros || 0) * 100),
+        interval: String(form.get("interval") ?? "month"),
+        visible: String(form.get("visible") ?? "off") === "on",
+        position: Number(form.get("position") ?? 0),
+      };
+      const r = action === "create"
+        ? await asAdmin(Astro, "/api/billing/admin/tiers", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify(payload),
+          })
+        : await asAdmin(Astro, `/api/billing/admin/tiers/${id}`, {
+            method: "PATCH",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+
+      if (!r.ok) failed = r.body?.detail ?? "That did not save.";
+      else if (r.body?.stripeError)
+        failed = `Saved, but Stripe did not take it: ${r.body.stripeError}`;
+      else notice = "Saved, and in step with Stripe.";
+    }
+
+    if (action === "delete" && id) {
+      const r = await asAdmin(Astro, `/api/billing/admin/tiers/${id}`, { method: "DELETE" });
+      notice = r.ok ? "Removed." : "";
+      failed = r.ok ? "" : (r.body?.detail ?? "That could not be removed.");
+    }
+  }
+}
+
+const editing = Astro.url.searchParams.get("edit") ?? "";
+const creating = Astro.url.searchParams.get("new") === "1";
+
+const list = await asAdmin(Astro, "/api/billing/admin/tiers");
+const tiers: any[] = Array.isArray(list.body) ? list.body : [];
+
+const BLANK = {
+  id: "", key: "", name: "", tagline: "", perks: "", cta: "", badge: "",
+  featured: false, price_cents: 0, interval: "month", visible: false, position: 0,
+};
+const row = creating ? BLANK : tiers.find((t) => String(t.id) === editing) ?? null;
+const money = (cents: number) => `${(cents / 100).toFixed(2)} EUR`;
+---
+
+<AdminLayout title="Memberships">
+  <h1 class="adm-h">Memberships</h1>
+
+  {notice && <p class="adm-ok" role="status">{notice}</p>}
+  {failed && <p class="adm-bad" role="alert">{failed}</p>}
+
+  {
+    row ? (
+      <form method="POST" class="adm-card editor">
+        <CsrfField />
+        <input type="hidden" name="action" value={creating ? "create" : "save"} />
+        {!creating && <input type="hidden" name="id" value={row.id} />}
+        <h2 class="h2">{creating ? "New membership" : `Editing ${row.name}`}</h2>
+
+        <label class="field">
+          <span class="adm-lbl">Name</span>
+          <input class="adm-input" name="name" value={row.name} required />
+        </label>
+        <label class="field">
+          <span class="adm-lbl">Key</span>
+          <input class="adm-input" name="key" value={row.key} required placeholder="ephemeris" />
+          <p class="hint">
+            Used in checkout. Changing it on a membership people are already on
+            will break the link between them and it — leave it alone once it is
+            live.
+          </p>
+        </label>
+        <label class="field">
+          <span class="adm-lbl">Tagline</span>
+          <input class="adm-input" name="tagline" value={row.tagline} />
+        </label>
+        <label class="field">
+          <span class="adm-lbl">What they get</span>
+          <textarea class="adm-area" name="perks" rows="5">{row.perks}</textarea>
+          <p class="hint">One per line. Shown as the list under the price.</p>
+        </label>
+        <label class="field">
+          <span class="adm-lbl">Words on the button</span>
+          <input class="adm-input" name="cta" value={row.cta} placeholder="Become an Ephemeris" />
+        </label>
+        <label class="field">
+          <span class="adm-lbl">Badge</span>
+          <input class="adm-input" name="badge" value={row.badge} placeholder="Most common" />
+          <p class="hint">Blank for none.</p>
+        </label>
+
+        <label class="field">
+          <span class="adm-lbl">Price, in euros</span>
+          <input class="adm-input" name="price" value={(row.price_cents / 100).toFixed(2)}
+                 inputmode="decimal" required />
+          <p class="hint">
+            Tax included. Changing it makes a new Stripe price — <strong>anyone
+            already subscribed goes on paying what they agreed to</strong>, which
+            is the only honest way to change a price under a standing arrangement.
+          </p>
+        </label>
+        <label class="field">
+          <span class="adm-lbl">How often</span>
+          <select class="adm-input" name="interval">
+            <option value="month" selected={row.interval === "month"}>Every month</option>
+            <option value="year" selected={row.interval === "year"}>Every year</option>
+          </select>
+        </label>
+
+        <div class="field field--check">
+          <input type="hidden" name="featured" value="off" />
+          <label class="check">
+            <input type="checkbox" name="featured" checked={row.featured} />
+            <span>Draw it as the recommended one</span>
+          </label>
+        </div>
+        <div class="field field--check">
+          <input type="hidden" name="visible" value="off" />
+          <label class="check">
+            <input type="checkbox" name="visible" checked={row.visible} />
+            <span>On offer</span>
+          </label>
+        </div>
+        <label class="field">
+          <span class="adm-lbl">Order</span>
+          <input class="adm-input" name="position" value={row.position} inputmode="numeric" />
+        </label>
+
+        <div class="row-actions">
+          <Button type="submit">{creating ? "Add it" : "Save"}</Button>
+          <a class="cancel" href="/admin/memberships">Cancel</a>
+        </div>
+      </form>
+    ) : (
+      <>
+        <p class="adm-note">
+          What is on offer on /support. A membership nobody is on can be removed;
+          one people are paying for can only be taken off offer, because their
+          subscription lives at Stripe whether or not the row here does.
+        </p>
+
+        <div class="list-actions">
+          <Button href="/admin/memberships?new=1">Add a membership</Button>
+        </div>
+
+        <div class="rows">
+          {
+            tiers.length === 0 ? (
+              <p class="adm-note">None yet.</p>
+            ) : (
+              tiers.map((t) => (
+                <div class="row" data-hidden={!t.visible || undefined}>
+                  <div class="row-main">
+                    <span class="row-label">{t.name}</span>
+                    <span class="row-sub">{money(t.price_cents)} / {t.interval} · {t.key}</span>
+                  </div>
+                  {t.featured && <Badge tone="rose">recommended</Badge>}
+                  {!t.sellable && <Badge tone="faint">no Stripe price</Badge>}
+                  <Badge tone={t.visible ? "accent" : "faint"}>
+                    {t.visible ? "on offer" : "off offer"}
+                  </Badge>
+                  <div class="row-actions">
+                    <a class="edit" href={`/admin/memberships?edit=${t.id}`}>Edit</a>
+                    <form method="POST" class="inline" data-confirm={`Remove ${t.name}?`}>
+                      <CsrfField />
+                      <input type="hidden" name="action" value="delete" />
+                      <input type="hidden" name="id" value={t.id} />
+                      <button type="submit" class="danger">Remove</button>
+                    </form>
+                  </div>
+                </div>
+              ))
+            )
+          }
+        </div>
+      </>
+    )
+  }
+</AdminLayout>
+
+<style>
+  .editor { display: grid; gap: var(--space-4); max-width: 680px; }
+  .field { display: grid; gap: 4px; }
+  .field--check { gap: 6px; }
+  .check { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+  .check input { width: 18px; height: 18px; accent-color: var(--accent); }
+  .hint { margin: 0; font: 400 var(--text-xs) var(--font-body); color: var(--ink-soft); max-width: 62ch; }
+  .list-actions { margin: var(--space-4) 0; }
+  .rows { display: grid; gap: 6px; }
+  .row {
+    display: flex; gap: var(--space-3); align-items: center; flex-wrap: wrap;
+    padding: var(--space-3); border: var(--border-w) solid var(--line);
+    border-radius: var(--radius-sm); background: var(--surface-card);
+  }
+  .row[data-hidden] { opacity: .6; border-style: dashed; }
+  .row-main { display: grid; gap: 2px; min-width: 0; flex: 1; }
+  .row-label { font: 500 var(--text-body) var(--font-body); color: var(--ink); }
+  .row-sub { font: 400 var(--text-xs) var(--font-mono); color: var(--ink-faint); }
+  .row-actions { display: flex; gap: var(--space-3); align-items: center; }
+  .inline { display: inline; }
+  .h2 { font: 600 var(--text-h3) var(--font-display); color: var(--ink); margin: 0; }
+  .edit, .cancel { font: 500 var(--text-sm) var(--font-body); color: var(--accent); text-decoration: none; }
+  .edit:hover, .cancel:hover { text-decoration: underline; }
+  .danger {
+    appearance: none; background: none; border: 0; padding: 0; cursor: pointer;
+    font: 500 var(--text-sm) var(--font-body); color: var(--live);
+  }
+  .danger:hover { text-decoration: underline; }
+</style>
+
+<script>
+  document.querySelectorAll<HTMLFormElement>("form[data-confirm]").forEach((form) => {
+    form.addEventListener("submit", (event) => {
+      if (!window.confirm(form.dataset.confirm ?? "Remove this?")) event.preventDefault();
+    });
+  });
+</script>

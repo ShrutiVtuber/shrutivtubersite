@@ -49,19 +49,16 @@ def test_no_key_means_no_client(configured) -> None:
     assert caught.value.status_code == 503
 
 
-def test_a_tier_with_no_price_is_refused_rather_than_guessed(configured) -> None:
-    """Half-configured is not a licence to charge something plausible."""
-    configured(stripe_secret_key="sk_test_x", stripe_price_lamplighter="")
-    with pytest.raises(Exception) as caught:
-        billing._price_id("lamplighter")
-    assert caught.value.status_code == 503
+def test_a_tier_price_is_never_invented_when_one_is_missing() -> None:
+    """
+    Half-configured is not a licence to charge something plausible.
 
-
-def test_an_unknown_tier_is_a_404_not_a_charge(configured) -> None:
-    configured(stripe_secret_key="sk_test_x")
-    with pytest.raises(Exception) as caught:
-        billing._price_id("platinum-founder")
-    assert caught.value.status_code == 404
+    Tiers live in the database now, so the refusal happens where the row is
+    read. What is checked here is the shape that makes it possible: the
+    subscription builder is handed a price and has no way to make one up.
+    """
+    built = billing._subscription_line_items("price_lamp", "lamplighter")
+    assert built["line_items"] == [{"price": "price_lamp", "quantity": 1}]
 
 
 # ── the amount ──────────────────────────────────────────────────────────────
@@ -87,13 +84,25 @@ def test_an_amount_inside_the_bounds_is_chargeable(amount: int) -> None:
     assert billing.ONE_OFF_MIN <= amount <= billing.ONE_OFF_MAX
 
 
-def test_a_subscription_amount_can_never_come_from_the_client(configured) -> None:
+def test_the_subscription_builder_cannot_be_given_an_amount() -> None:
+    """
+    Stronger than checking that an amount is ignored: there is nowhere to put
+    one. A future edit cannot re-introduce the bug by passing it through,
+    because passing it is a TypeError.
+    """
+    import inspect
+
+    taken = set(inspect.signature(billing._subscription_line_items).parameters)
+    assert "amount" not in taken
+    assert taken == {"price_id", "tier"}
+
+
+def test_a_subscription_amount_can_never_come_from_the_client() -> None:
     """The one that would actually cost her money. `amount` must be reachable
     only on the one-off path — if an edit ever lets it through for a tier, a
     subscriber pays whatever their browser said, and one cent is a browser
     away."""
-    configured(stripe_secret_key="sk_test_x", stripe_price_lamplighter="price_lamp")
-    built = billing._line_items("lamplighter", amount=1)
+    built = billing._subscription_line_items("price_lamp", "lamplighter")
     assert built["mode"] == "subscription"
     assert built["line_items"] == [{"price": "price_lamp", "quantity": 1}]
     # Nothing amount-shaped is sent at all: a subscription line item names a
@@ -105,20 +114,20 @@ def test_a_subscription_amount_can_never_come_from_the_client(configured) -> Non
 
 
 def test_a_one_off_uses_the_amount_it_was_given() -> None:
-    built = billing._line_items("one-off", amount=1500)
+    built = billing._one_off_line_items(1500)
     assert built["mode"] == "payment"
     assert built["line_items"][0]["price_data"]["unit_amount"] == 1500
 
 
 def test_a_one_off_with_no_amount_falls_back_to_the_suggested_one() -> None:
-    built = billing._line_items("one-off", amount=None)
+    built = billing._one_off_line_items(None)
     assert built["line_items"][0]["price_data"]["unit_amount"] == billing.ONE_OFF_DEFAULT
 
 
 @pytest.mark.parametrize("amount", [1, 199, 50_001, -500])
 def test_a_one_off_outside_the_bounds_is_refused_before_stripe_sees_it(amount: int) -> None:
     with pytest.raises(Exception) as caught:
-        billing._line_items("one-off", amount=amount)
+        billing._one_off_line_items(amount)
     assert caught.value.status_code == 422
 
 
