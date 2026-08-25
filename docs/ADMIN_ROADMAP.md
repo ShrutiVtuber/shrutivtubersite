@@ -12,9 +12,9 @@ Left, in the order agreed:
 
 1. ~~User management~~ — done
 2. ~~Merchandise~~ — infrastructure done — physical *and* digital
-3. **Discount codes** ← next
+3. ~~Discount codes~~ — done
 4. ~~Memberships as data~~ — done, see below — Stripe coupons and promotion codes
-4. **Classes and workshops** — sold and hosted on the site, "like kotobaseed
+4. **Classes and workshops** ← next to discuss — sold and hosted on the site, "like kotobaseed
    has". Explicitly **after the site itself is done**; not now.
 
 ## Her decisions, recorded
@@ -262,3 +262,39 @@ it without passing through a terminal or a chat, and the file is deleted.
 Once the live secret key is in, the live webhook endpoint and the live tier
 prices are API-creatable from here. Only the account keys have to come from her
 hands — Stripe shows a secret key once and never again.
+
+
+## Discount codes — done (2026-08-25)
+
+`/admin/discounts`. A percentage or an amount, good for everything / the shop
+only / memberships only, lasting one month, a few, or as long as they stay.
+Optional cap on uses and an expiry.
+
+**A code's terms cannot be edited, only turned on and off.** Stripe's rule, and
+the right one: people who already hold a code were promised what it said when
+they got it. Offering something different means a different code.
+
+Redemption counts are asked of Stripe rather than kept here, because Stripe is
+where redeeming happens — a local tally drifts the first time a webhook is
+missed.
+
+Codes are accepted at checkout for **memberships and the shop, not one-off
+gifts**. Discounting a donation is a strange thing to do to somebody being
+generous.
+
+### Two things this turned up
+
+- **`applies_to` on a coupon is an expandable field.** A plain retrieve returns
+  `null` and the restriction looks lost. It was not — checked with
+  `expand=['applies_to']`, and the coupons were correctly confined all along.
+  Worth knowing before anybody "fixes" a bug that is not there.
+- **A tier that adopted its price from the environment knew its price and not
+  its product.** Invisible until a discount restricted to memberships silently
+  covered only the tiers that happened to have one — which it did: a code made
+  before the fix covers Lamplighter and not Almanac. Missing product ids are
+  backfilled from the price now.
+
+### Also worth knowing
+
+This API version wants `PromotionCode.create(promotion={"type": "coupon",
+"coupon": id})`. Passing `coupon=` is refused outright as an unknown parameter.

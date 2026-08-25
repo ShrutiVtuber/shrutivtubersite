@@ -157,6 +157,10 @@ async def checkout(
         # code that says what this is lives on the product.
         "automatic_tax": {"enabled": True},
         "metadata": {"product_slug": product.slug, "kind": product.kind},
+        # A box to type a code into. Stripe checks it — whether it exists, has
+        # expired, has run out, or applies to this at all — which is a great
+        # deal of rule-following not worth reimplementing here.
+        "allow_promotion_codes": True,
     }
 
     if product.kind == "physical":
@@ -181,6 +185,166 @@ async def checkout(
 
     checkout_session = stripe.checkout.Session.create(**session_args)
     return {"url": checkout_session["url"]}
+
+
+# ── discount codes ──────────────────────────────────────────────────────────
+
+class DiscountIn(BaseModel):
+    code: str = Field(min_length=2, max_length=60)
+    note: str = ""
+    percent_off: float | None = None
+    amount_off_cents: int | None = None
+    currency: str = "eur"
+    applies_to: str = "everything"
+    duration: str = "once"
+    duration_months: int | None = None
+    max_redemptions: int | None = None
+    expires_at: str | None = None
+    active: bool = True
+
+
+def _discount_payload(d, used: int | None = None) -> dict:
+    return {
+        "id": d.id,
+        "code": d.code,
+        "note": d.note,
+        "percentOff": d.percent_off,
+        "amountOffCents": d.amount_off_cents,
+        "currency": d.currency,
+        "appliesTo": d.applies_to,
+        "duration": d.duration,
+        "durationMonths": d.duration_months,
+        "maxRedemptions": d.max_redemptions,
+        "expiresAt": d.expires_at.isoformat() if d.expires_at else None,
+        "active": d.active,
+        "live": bool(d.stripe_promotion_code_id),
+        "timesRedeemed": used,
+    }
+
+
+@router.get("/admin/discounts", dependencies=[Depends(require_admin)])
+async def list_discounts(session: AsyncSession = Depends(get_session)) -> list[dict]:
+    from shruti.core import discounts as codes
+    from shruti.models import Discount
+
+    rows = (
+        await session.execute(select(Discount).order_by(Discount.id.desc()))
+    ).scalars().all()
+    return [_discount_payload(d, codes.redemptions(d)) for d in rows]
+
+
+@router.post("/admin/discounts", status_code=201, dependencies=[Depends(require_admin)])
+async def create_discount(
+    body: DiscountIn, session: AsyncSession = Depends(get_session)
+) -> dict:
+    """
+    Make a code.
+
+    Refuses the combinations that would be meaningless rather than passing them
+    to Stripe to refuse less clearly — a discount of nothing, or one that is
+    both a percentage and an amount, is a mistake worth catching in the form.
+    """
+    from datetime import datetime
+
+    from shruti.core import discounts as codes
+    from shruti.models import Discount
+
+    has_percent = body.percent_off is not None
+    has_amount = body.amount_off_cents is not None
+    if has_percent == has_amount:
+        raise HTTPException(422, "give either a percentage off or an amount off, not both")
+    if has_percent and not (0 < body.percent_off <= 100):
+        raise HTTPException(422, "a percentage off has to be between 0 and 100")
+    if has_amount and body.amount_off_cents <= 0:
+        raise HTTPException(422, "an amount off has to be more than nothing")
+    if body.duration not in {"once", "repeating", "forever"}:
+        raise HTTPException(422, "duration must be once, repeating or forever")
+    if body.applies_to not in {"everything", "shop", "memberships"}:
+        raise HTTPException(422, "unknown applies-to")
+
+    expires = None
+    if body.expires_at:
+        try:
+            expires = datetime.fromisoformat(body.expires_at.replace("Z", "+00:00"))
+        except ValueError:
+            raise HTTPException(422, "that expiry is not a date and time I can read")
+
+    row = Discount(
+        **body.model_dump(exclude={"expires_at"}),
+        expires_at=expires,
+    )
+    row.code = row.code.strip()
+    session.add(row)
+    await session.commit()
+    await session.refresh(row)
+
+    try:
+        product_ids = await codes.product_ids_for(row.applies_to, session)
+        coupon_id, promo_id = codes.create(row, product_ids)
+    except Exception as exc:                           # noqa: BLE001
+        # The row is kept so she can see what failed and why rather than the
+        # code vanishing, but it is plainly not live.
+        log.exception("discount %s could not be created at Stripe", row.code)
+        return _discount_payload(row) | {"stripeError": f"{type(exc).__name__}: {exc}"}
+
+    row.stripe_coupon_id, row.stripe_promotion_code_id = coupon_id, promo_id
+    await session.commit()
+    await session.refresh(row)
+    return _discount_payload(row, 0)
+
+
+@router.post("/admin/discounts/{discount_id}/active",
+             dependencies=[Depends(require_admin)])
+async def set_discount_active(
+    discount_id: int, active: bool, session: AsyncSession = Depends(get_session)
+) -> dict:
+    """
+    Turn a code on or off.
+
+    The only thing about a live discount that can change. Its terms are fixed
+    at Stripe by design, and changing what a code is worth after people have it
+    would change what they were promised.
+    """
+    from shruti.core import discounts as codes
+    from shruti.models import Discount
+
+    row = await session.get(Discount, discount_id)
+    if row is None:
+        raise HTTPException(404, "no such code")
+    try:
+        codes.set_active(row, active)
+    except Exception as exc:                           # noqa: BLE001
+        raise HTTPException(502, f"Stripe would not change it: {exc}")
+    row.active = active
+    await session.commit()
+    return {"ok": True, "active": row.active}
+
+
+@router.delete("/admin/discounts/{discount_id}", status_code=204,
+               dependencies=[Depends(require_admin)])
+async def delete_discount(
+    discount_id: int, session: AsyncSession = Depends(get_session)
+):
+    """
+    Remove a code.
+
+    The coupon behind it is deleted where Stripe allows it — one that has been
+    redeemed cannot be, and should not be: it is part of the record of what
+    somebody actually paid.
+    """
+    from shruti.core import discounts as codes
+    from shruti.models import Discount
+
+    row = await session.get(Discount, discount_id)
+    if row is None:
+        raise HTTPException(404, "no such code")
+    try:
+        codes.archive(row)
+    except codes.StripeUnavailable:
+        pass
+    await session.delete(row)
+    await session.commit()
+    return Response(status_code=204)
 
 
 # ── the admin's half ────────────────────────────────────────────────────────

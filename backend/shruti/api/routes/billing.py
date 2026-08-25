@@ -97,6 +97,20 @@ async def _ensure_price(row, session: AsyncSession) -> str:
     somebody agreed to pay without asking them.
     """
     if row.stripe_price_id:
+        # A tier that adopted its price from the environment knows the price
+        # and not the product it belongs to. That gap is invisible until
+        # something needs the product — a discount restricted to memberships
+        # silently covers only the tiers that happen to have one — so it is
+        # closed the first time anybody asks.
+        if not row.stripe_product_id:
+            try:
+                import stripe
+
+                stripe.api_key = get_settings().stripe_secret_key
+                row.stripe_product_id = stripe.Price.retrieve(row.stripe_price_id)["product"]
+                await session.commit()
+            except Exception:                          # noqa: BLE001
+                log.info("tier %s: its product could not be resolved yet", row.key)
         return row.stripe_price_id
 
     field = LEGACY_PRICE_FIELDS.get(row.key)
@@ -269,6 +283,10 @@ def _subscription_line_items(price_id: str, tier: str) -> dict[str, Any]:
         "mode": "subscription",
         "line_items": [{"price": price_id, "quantity": 1}],
         "subscription_data": {"metadata": {"tier": tier}},
+        # A box to type a code into. Stripe does the checking — exists, not
+        # expired, not exhausted, applies to this — which is a great deal of
+        # rule-following not worth reimplementing.
+        "allow_promotion_codes": True,
     }
 
 
@@ -437,6 +455,9 @@ async def checkout(
         # Stripe collects the address it needs for tax; asking for more than
         # that on a gift is how a gift stops being given.
         "billing_address_collection": "auto",
+        # Off for a gift. A one-off is whatever the giver chose to give, and
+        # offering to take some of it off is a strange thing to do to somebody
+        # being generous. The subscription builder turns it on for itself.
         "allow_promotion_codes": False,
     }
     if email:

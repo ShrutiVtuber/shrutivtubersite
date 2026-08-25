@@ -352,6 +352,52 @@ class Product(TimestampMixin, table=True):
     position: int = Field(default=0)
 
 
+class Discount(TimestampMixin, table=True):
+    """
+    A code somebody types at checkout.
+
+    **The terms cannot be changed once it exists.** That is Stripe's rule, not
+    a shortcut taken here: a coupon's percentage, amount and duration are fixed
+    at creation, because a discount that could be altered afterwards would
+    change what somebody was already promised. So this table follows the same
+    rule — a code is created, and then it is either on or off. Changing the
+    offer means making another one.
+
+    Two things at Stripe stand behind one row: a coupon, which is the discount,
+    and a promotion code, which is the word people type. Keeping them together
+    here means she thinks about one thing rather than two.
+    """
+
+    __tablename__ = "discount"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    # What they type. Stored as given; Stripe matches case-insensitively.
+    code: str = Field(index=True, unique=True)
+    # For her own list — never shown to a buyer.
+    note: str = ""
+
+    # One or the other, never both.
+    percent_off: Optional[float] = None
+    amount_off_cents: Optional[int] = None
+    currency: str = "eur"
+
+    # everything | shop | memberships
+    applies_to: str = "everything"
+
+    # How long it lasts on a subscription. A one-off purchase ignores this
+    # entirely — there is no second month to discount.
+    duration: str = "once"           # once | repeating | forever
+    duration_months: Optional[int] = None
+
+    max_redemptions: Optional[int] = None
+    expires_at: Optional[datetime] = Field(default=None, sa_type=UTC_TS)
+
+    active: bool = Field(default=True)
+
+    stripe_coupon_id: str = ""
+    stripe_promotion_code_id: str = ""
+
+
 class Tier(TimestampMixin, table=True):
     """
     A membership.

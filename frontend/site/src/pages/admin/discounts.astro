@@ -1,0 +1,263 @@
+---
+/* Discount codes.
+ *
+ * A code is made and then it is either on or off. Its terms cannot be edited,
+ * and that is Stripe's rule rather than a corner cut here: a discount that
+ * could be altered after people have it would change what they were already
+ * promised. Offering something different means making a different code.
+ *
+ * How many times one has been used is asked of Stripe rather than counted
+ * here, because Stripe is where redemption happens — a number kept on this
+ * side would drift the first time a webhook went missing.
+ */
+import AdminLayout from "../../layouts/AdminLayout.astro";
+import CsrfField from "../../components/forms/CsrfField.astro";
+import Button from "../../components/forms/Button.astro";
+import Badge from "../../components/navigation/Badge.astro";
+import { asAdmin } from "../../lib/admin";
+import { verifyCsrf } from "../../lib/csrf";
+
+export const prerender = false;
+
+let notice = "";
+let failed = "";
+
+if (Astro.request.method === "POST") {
+  const form = await Astro.request.formData();
+  if (!verifyCsrf(Astro.cookies, form)) {
+    failed = "That did not save. Reload the page and try again.";
+  } else {
+    const action = String(form.get("action") ?? "");
+    const id = String(form.get("id") ?? "");
+
+    if (action === "create") {
+      const kind = String(form.get("kind") ?? "percent");
+      const off = String(form.get("off") ?? "").replace(",", ".");
+      const payload: Record<string, unknown> = {
+        code: String(form.get("code") ?? "").trim(),
+        note: String(form.get("note") ?? ""),
+        applies_to: String(form.get("applies_to") ?? "everything"),
+        duration: String(form.get("duration") ?? "once"),
+        active: true,
+      };
+      if (kind === "percent") payload.percent_off = Number(off || 0);
+      else payload.amount_off_cents = Math.round(Number(off || 0) * 100);
+
+      const months = String(form.get("duration_months") ?? "").trim();
+      if (payload.duration === "repeating") payload.duration_months = Number(months || 1);
+      const max = String(form.get("max_redemptions") ?? "").trim();
+      if (max) payload.max_redemptions = Number(max);
+      const until = String(form.get("expires_at") ?? "").trim();
+      if (until) payload.expires_at = `${until}T23:59:59Z`;
+
+      const r = await asAdmin(Astro, "/api/shop/admin/discounts", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!r.ok) failed = r.body?.detail ?? "That code was not made.";
+      else if (r.body?.stripeError)
+        failed = `Saved here, but Stripe did not take it: ${r.body.stripeError}`;
+      else notice = `${r.body?.code} is live.`;
+    }
+
+    if (action === "toggle" && id) {
+      const on = String(form.get("active") ?? "1") === "1";
+      const r = await asAdmin(Astro, `/api/shop/admin/discounts/${id}/active?active=${on}`,
+                              { method: "POST" });
+      notice = r.ok ? (on ? "Turned on." : "Turned off.") : "";
+      failed = r.ok ? "" : (r.body?.detail ?? "That did not change.");
+    }
+
+    if (action === "delete" && id) {
+      const r = await asAdmin(Astro, `/api/shop/admin/discounts/${id}`, { method: "DELETE" });
+      notice = r.ok ? "Removed." : "";
+      failed = r.ok ? "" : (r.body?.detail ?? "That could not be removed.");
+    }
+  }
+}
+
+const list = await asAdmin(Astro, "/api/shop/admin/discounts");
+const codes: any[] = Array.isArray(list.body) ? list.body : [];
+
+const worth = (d: any) =>
+  d.percentOff != null
+    ? `${d.percentOff}% off`
+    : `${((d.amountOffCents ?? 0) / 100).toFixed(2)} ${String(d.currency).toUpperCase()} off`;
+
+const lasts = (d: any) =>
+  d.duration === "forever"
+    ? "every month, for as long as they stay"
+    : d.duration === "repeating"
+      ? `the first ${d.durationMonths ?? 1} months`
+      : "once";
+
+const scope = (d: any) =>
+  d.appliesTo === "shop" ? "the shop"
+  : d.appliesTo === "memberships" ? "memberships"
+  : "everything";
+---
+
+<AdminLayout title="Discount codes">
+  <h1 class="adm-h">Discount codes</h1>
+
+  {notice && <p class="adm-ok" role="status">{notice}</p>}
+  {failed && <p class="adm-bad" role="alert">{failed}</p>}
+
+  <form method="POST" class="adm-card maker">
+    <CsrfField />
+    <input type="hidden" name="action" value="create" />
+    <h2 class="h2">Make a code</h2>
+    <p class="adm-note">
+      Once it exists its terms cannot be changed — only turned on and off. That
+      is Stripe's rule and the right one: people who already have a code were
+      promised what it said when they got it. To offer something different,
+      make a different code.
+    </p>
+
+    <div class="two">
+      <label class="field">
+        <span class="adm-lbl">The code</span>
+        <input class="adm-input" name="code" required placeholder="SWARA20"
+               autocapitalize="characters" />
+        <p class="hint">What people type. Case does not matter to Stripe.</p>
+      </label>
+      <label class="field">
+        <span class="adm-lbl">Note to yourself</span>
+        <input class="adm-input" name="note" placeholder="Launch week" />
+        <p class="hint">Never shown to anyone buying.</p>
+      </label>
+    </div>
+
+    <div class="two">
+      <label class="field">
+        <span class="adm-lbl">Take off</span>
+        <input class="adm-input" name="off" required inputmode="decimal" placeholder="20" />
+      </label>
+      <label class="field">
+        <span class="adm-lbl">As</span>
+        <select class="adm-input" name="kind">
+          <option value="percent">a percentage</option>
+          <option value="amount">euros</option>
+        </select>
+      </label>
+    </div>
+
+    <div class="two">
+      <label class="field">
+        <span class="adm-lbl">Good for</span>
+        <select class="adm-input" name="applies_to">
+          <option value="everything">Everything</option>
+          <option value="shop">The shop only</option>
+          <option value="memberships">Memberships only</option>
+        </select>
+      </label>
+      <label class="field">
+        <span class="adm-lbl">On a membership, lasts</span>
+        <select class="adm-input" name="duration">
+          <option value="once">the first month</option>
+          <option value="repeating">a few months</option>
+          <option value="forever">for as long as they stay</option>
+        </select>
+        <p class="hint">A one-off purchase ignores this — there is no second month.</p>
+      </label>
+    </div>
+
+    <div class="two">
+      <label class="field">
+        <span class="adm-lbl">How many months, if a few</span>
+        <input class="adm-input" name="duration_months" inputmode="numeric" placeholder="3" />
+      </label>
+      <label class="field">
+        <span class="adm-lbl">Most times it can be used</span>
+        <input class="adm-input" name="max_redemptions" inputmode="numeric"
+               placeholder="leave blank for no limit" />
+      </label>
+    </div>
+
+    <label class="field">
+      <span class="adm-lbl">Stops working after</span>
+      <input class="adm-input" type="date" name="expires_at" />
+      <p class="hint">Blank means it never expires.</p>
+    </label>
+
+    <div><Button type="submit">Make it</Button></div>
+  </form>
+
+  <section class="adm-card">
+    <h2 class="h2">Codes <span class="count">{codes.length}</span></h2>
+    {
+      codes.length === 0 ? (
+        <p class="adm-note">None yet.</p>
+      ) : (
+        <ul class="items">
+          {codes.map((d) => (
+            <li>
+              <div class="meta">
+                <span class="who">{d.code}</span>
+                <span class="when">{worth(d)} on {scope(d)}, {lasts(d)}</span>
+                {!d.live && <Badge tone="faint">not at Stripe</Badge>}
+                <Badge tone={d.active ? "accent" : "faint"}>
+                  {d.active ? "on" : "off"}
+                </Badge>
+              </div>
+              <p class="body">
+                {d.note && <>{d.note} · </>}
+                used {d.timesRedeemed ?? 0}
+                {d.maxRedemptions ? ` of ${d.maxRedemptions}` : " times"}
+                {d.expiresAt && <> · until {String(d.expiresAt).slice(0, 10)}</>}
+              </p>
+              <div class="acts">
+                <form method="POST" class="inline">
+                  <CsrfField />
+                  <input type="hidden" name="action" value="toggle" />
+                  <input type="hidden" name="id" value={d.id} />
+                  <input type="hidden" name="active" value={d.active ? "0" : "1"} />
+                  <Button type="submit" variant="ghost" size="sm">
+                    {d.active ? "Turn off" : "Turn on"}
+                  </Button>
+                </form>
+                <form method="POST" class="inline" data-confirm={`Remove ${d.code}?`}>
+                  <CsrfField />
+                  <input type="hidden" name="action" value="delete" />
+                  <input type="hidden" name="id" value={d.id} />
+                  <button type="submit" class="danger">Remove</button>
+                </form>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )
+    }
+  </section>
+</AdminLayout>
+
+<style>
+  .maker { display: grid; gap: var(--space-4); max-width: 720px; }
+  .two { display: grid; gap: var(--space-3); grid-template-columns: 1fr 1fr; }
+  @media (max-width: 620px) { .two { grid-template-columns: 1fr; } }
+  .field { display: grid; gap: 4px; }
+  .hint { margin: 0; font: 400 var(--text-xs) var(--font-body); color: var(--ink-soft); }
+  .h2 { font: 600 var(--text-h3) var(--font-display); color: var(--ink); margin: 0; }
+  .items { list-style: none; margin: var(--space-3) 0 0; padding: 0; display: grid; gap: var(--space-4); }
+  .meta { display: flex; gap: var(--space-3); align-items: baseline; flex-wrap: wrap; }
+  .who { font: 600 var(--text-body) var(--font-mono); color: var(--ink); letter-spacing: .04em; }
+  .when { font: 400 var(--text-sm) var(--font-body); color: var(--ink-soft); }
+  .body { margin: 2px 0 0; font: 400 var(--text-xs) var(--font-body); color: var(--ink-faint); }
+  .acts { display: flex; gap: var(--space-3); align-items: center; margin-top: 4px; }
+  .inline { display: inline; }
+  .danger {
+    appearance: none; background: none; border: 0; padding: 0; cursor: pointer;
+    font: 500 var(--text-sm) var(--font-body); color: var(--live);
+  }
+  .danger:hover { text-decoration: underline; }
+  .count { font: 400 var(--text-xs) var(--font-mono); color: var(--ink-faint); }
+</style>
+
+<script>
+  document.querySelectorAll<HTMLFormElement>("form[data-confirm]").forEach((form) => {
+    form.addEventListener("submit", (event) => {
+      if (!window.confirm(form.dataset.confirm ?? "Remove this?")) event.preventDefault();
+    });
+  });
+</script>
