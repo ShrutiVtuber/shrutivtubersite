@@ -90,6 +90,13 @@ class Settings(BaseSettings):
     bunny_token_auth_key: str = ""
     cloudflare_stream_domain: str = ""
 
+    # ── the live room, for workshops ────────────────────────────────────
+    # The subdomain only, not the whole host: the API wants the name and the
+    # embed wants the host, and normalising once here beats remembering which
+    # is which at every call site.
+    daily_domain: str = ""
+    daily_api_key: str = ""
+
     stripe_secret_key: str = ""
     # Whether a listed price already contains the tax. Inclusive is what the
     # memberships use and what a European shopper expects — the number on the
