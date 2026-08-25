@@ -19,9 +19,9 @@ from __future__ import annotations
 from shruti.api.routes.admin import router
 
 
-def _routes():
+def _routes(which=router):
     out = []
-    for route in router.routes:
+    for route in which.routes:
         for method in sorted(getattr(route, "methods", []) or []):
             if method in {"HEAD", "OPTIONS"}:
                 continue
@@ -73,4 +73,57 @@ def test_the_routes_that_have_actually_been_shadowed_are_reachable() -> None:
     specific = [i for i, (_m, p) in enumerate(routes) if "{kind}" not in p]
     assert min(generic) > max(specific), (
         "a specific route is declared after a /{kind} catch-all and is unreachable"
+    )
+
+
+def test_no_router_anywhere_shadows_one_of_its_own_routes():
+    """
+    The same rule, applied to every router rather than only to the admin one.
+
+    It has bitten three times in this file's history and each time the fix was
+    local. `/api/classes` was where it would have bitten next: a reader route
+    of `/{slug}/lessons/{id}` matches `/admin/lessons/{id}` exactly, and only
+    the accident that one was GET and the other PATCH kept them apart. The
+    reader routes are declared last there now, so it does not depend on that.
+    """
+    from shruti.api.routes import (
+        accounts, admin, billing, classes, content, media, shop,
+    )
+
+    def segments(path: str) -> list[str]:
+        return [p for p in path.strip("/").split("/") if p]
+
+    def shadows(earlier: str, later: str) -> bool:
+        a, b = segments(earlier), segments(later)
+        if len(a) != len(b):
+            return False
+        return all(x.startswith("{") or x == y for x, y in zip(a, b))
+
+    for module in (accounts, admin, billing, classes, content, media, shop):
+        routes = _routes(module.router)
+        for i, (method, path) in enumerate(routes):
+            for earlier_method, earlier_path in routes[:i]:
+                if earlier_method != method or earlier_path == path:
+                    continue
+                assert not shadows(earlier_path, path), (
+                    f"in {module.__name__}: {method} {path} is unreachable — "
+                    f"{earlier_method} {earlier_path} is declared first and "
+                    f"matches it."
+                )
+
+
+def test_the_class_admin_is_declared_before_the_slug_that_would_eat_it():
+    """
+    Named separately from the general rule, because the general rule only
+    catches it once somebody adds the method that collides — by which point
+    the endpoint is written and appears to do nothing.
+    """
+    from shruti.api.routes import classes
+
+    paths = [route.path for route in classes.router.routes if getattr(route, "methods", None)]
+    last_admin = max(i for i, p in enumerate(paths) if "/admin/" in p)
+    first_slug = min(i for i, p in enumerate(paths) if "{slug}" in p)
+    assert last_admin < first_slug, (
+        "a /{slug} route is declared before the admin routes, so "
+        "/api/classes/admin/... will be read as a course called 'admin'"
     )

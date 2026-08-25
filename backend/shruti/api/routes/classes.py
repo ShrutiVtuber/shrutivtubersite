@@ -14,11 +14,12 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
+from shruti.api.deps import require_admin
 from shruti.core.access import may_open
 from shruti.core.db import get_session
 from shruti.models import (
@@ -61,6 +62,508 @@ async def list_courses(session: AsyncSession = Depends(get_session)) -> list[dic
     ).all()
     return [_course_card(c, m) for c, m in rows]
 
+
+# ── building one ────────────────────────────────────────────────────────────
+#
+# Declared after the reader's routes but before nothing — this router has no
+# catch-alls, so `/admin/...` cannot be swallowed by `/{slug}`: they differ in
+# their first segment, and `admin` is a literal.
+
+class CourseIn(BaseModel):
+    slug: str
+    title: str
+    kind: str = "class"
+    tagline: str = ""
+    body_md: str = ""
+    media_id: int | None = None
+    price_cents: int = 0
+    currency: str = "eur"
+    tax_code: str = "txcd_10000000"
+    starts_at: str | None = None
+    minutes: int | None = None
+    seats: int | None = None
+    visible: bool = False
+    position: int = 0
+
+
+def _admin_course(c: Course, tiers: list[str], counts: tuple[int, int]) -> dict:
+    modules, lessons = counts
+    return {
+        "id": c.id, "slug": c.slug, "title": c.title, "kind": c.kind,
+        "tagline": c.tagline, "body_md": c.body_md, "media_id": c.media_id,
+        "price_cents": c.price_cents, "currency": c.currency,
+        "tax_code": c.tax_code,
+        "starts_at": c.starts_at.isoformat() if c.starts_at else None,
+        "minutes": c.minutes, "seats": c.seats, "room_name": c.room_name,
+        "visible": c.visible, "position": c.position,
+        "includedWith": tiers,
+        "modules": modules, "lessons": lessons,
+        "stripePriceId": c.stripe_price_id,
+        # Free courses need no Stripe price; paid ones cannot be bought
+        # without one, and saying so beats a buy button that 503s.
+        "sellable": c.price_cents == 0 or bool(c.stripe_price_id),
+    }
+
+
+@router.get("/admin/courses", dependencies=[Depends(require_admin)])
+async def admin_courses(session: AsyncSession = Depends(get_session)) -> list[dict]:
+    from shruti.models import CourseTier
+
+    rows = (
+        await session.execute(select(Course).order_by(Course.position, Course.id))
+    ).scalars().all()
+    tiers: dict[int, list[str]] = {}
+    for link in (await session.execute(select(CourseTier))).scalars().all():
+        tiers.setdefault(link.course_id, []).append(link.tier_key)
+
+    modules = (await session.execute(select(Module))).scalars().all()
+    by_course: dict[int, list[int]] = {}
+    for m in modules:
+        by_course.setdefault(m.course_id, []).append(m.id)
+    lessons = (await session.execute(select(Lesson))).scalars().all()
+    per_module: dict[int, int] = {}
+    for l in lessons:
+        per_module[l.module_id] = per_module.get(l.module_id, 0) + 1
+
+    return [
+        _admin_course(
+            c, sorted(tiers.get(c.id, [])),
+            (len(by_course.get(c.id, [])),
+             sum(per_module.get(mid, 0) for mid in by_course.get(c.id, []))),
+        )
+        for c in rows
+    ]
+
+
+async def _sync_course(row: Course, session: AsyncSession) -> dict:
+    """
+    Keep a paid course in step with Stripe. A free one needs nothing there.
+    """
+    from shruti.core import shop as stripe_shop
+    from shruti.models import CourseTier
+
+    tiers = sorted(
+        link.tier_key
+        for link in (
+            await session.execute(
+                select(CourseTier).where(CourseTier.course_id == row.id)
+            )
+        ).scalars().all()
+    )
+    counts = (0, 0)
+
+    if row.price_cents <= 0:
+        return _admin_course(row, tiers, counts)
+
+    try:
+        product_id, price_id = stripe_shop.sync(row)
+    except Exception as exc:                           # noqa: BLE001
+        log.warning("course %s could not be synced: %s", row.slug, type(exc).__name__)
+        return _admin_course(row, tiers, counts) | {
+            "stripeError": f"{type(exc).__name__}: {exc}"
+        }
+    row.stripe_product_id, row.stripe_price_id = product_id, price_id
+    await session.commit()
+    await session.refresh(row)
+    return _admin_course(row, tiers, counts)
+
+
+@router.post("/admin/courses", status_code=201, dependencies=[Depends(require_admin)])
+async def create_course(
+    body: CourseIn, session: AsyncSession = Depends(get_session)
+) -> dict:
+    from datetime import datetime
+
+    if body.kind not in {"class", "workshop"}:
+        raise HTTPException(422, "a course is a class or a workshop")
+
+    starts = None
+    if body.starts_at:
+        try:
+            starts = datetime.fromisoformat(body.starts_at.replace("Z", "+00:00"))
+        except ValueError:
+            raise HTTPException(422, "that start time is not one I can read")
+
+    row = Course(**body.model_dump(exclude={"starts_at"}), starts_at=starts)
+    session.add(row)
+    await session.commit()
+    await session.refresh(row)
+    return await _sync_course(row, session)
+
+
+@router.patch("/admin/courses/{course_id}", dependencies=[Depends(require_admin)])
+async def update_course(
+    course_id: int, body: dict, session: AsyncSession = Depends(get_session)
+) -> dict:
+    from datetime import datetime
+
+    row = await session.get(Course, course_id)
+    if row is None:
+        raise HTTPException(404, "no such course")
+
+    for key, value in body.items():
+        if key in {"id", "created_at", "stripe_product_id", "stripe_price_id"}:
+            continue
+        if key == "starts_at":
+            if value:
+                try:
+                    value = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+                except ValueError:
+                    raise HTTPException(422, "that start time is not one I can read")
+            else:
+                value = None
+        if hasattr(row, key):
+            setattr(row, key, value)
+    await session.commit()
+    await session.refresh(row)
+    return await _sync_course(row, session)
+
+
+@router.delete("/admin/courses/{course_id}", status_code=204,
+               dependencies=[Depends(require_admin)])
+async def delete_course(course_id: int, session: AsyncSession = Depends(get_session)):
+    """
+    Remove a course nobody holds.
+
+    **Refused once anybody has it.** Their entitlement points here, and so does
+    every tick of their progress — deleting it would take away something
+    somebody paid for and lose the record that they ever had it. Hide it
+    instead: nobody new can find it, everybody who has it keeps it.
+    """
+    from shruti.models import Entitlement
+
+    row = await session.get(Course, course_id)
+    if row is None:
+        raise HTTPException(404, "no such course")
+
+    held = (
+        await session.execute(
+            select(Entitlement).where(Entitlement.course_id == course_id)
+        )
+    ).scalars().first()
+    if held is not None:
+        raise HTTPException(
+            409,
+            "somebody has this, so it cannot be deleted \u2014 their access and "
+            "everything they have worked through points at it. Untick "
+            "\u201cpublished\u201d instead: nobody new can find it and everybody "
+            "who has it keeps it.",
+        )
+
+    for module in (
+        await session.execute(select(Module).where(Module.course_id == course_id))
+    ).scalars().all():
+        for lesson in (
+            await session.execute(select(Lesson).where(Lesson.module_id == module.id))
+        ).scalars().all():
+            await session.execute(
+                QuizQuestion.__table__.delete().where(
+                    QuizQuestion.lesson_id == lesson.id
+                )
+            )
+            await session.delete(lesson)
+        await session.delete(module)
+    await session.delete(row)
+    await session.commit()
+    return Response(status_code=204)
+
+
+class TiersIn(BaseModel):
+    """Which memberships include this. Sent whole, not one at a time."""
+
+    tier_keys: list[str]
+
+
+@router.put("/admin/courses/{course_id}/tiers", dependencies=[Depends(require_admin)])
+async def set_course_tiers(
+    course_id: int, body: TiersIn, session: AsyncSession = Depends(get_session)
+) -> dict:
+    """
+    Say which memberships include this course.
+
+    **Changing it does not reach into anybody's access here.** Entitlements are
+    brought in line when a subscription is next looked at, which keeps one
+    place responsible for granting and revoking rather than two that can
+    disagree.
+    """
+    from shruti.models import CourseTier
+
+    course = await session.get(Course, course_id)
+    if course is None:
+        raise HTTPException(404, "no such course")
+
+    await session.execute(
+        CourseTier.__table__.delete().where(CourseTier.course_id == course_id)
+    )
+    for key in {k.strip() for k in body.tier_keys if k.strip()}:
+        session.add(CourseTier(course_id=course_id, tier_key=key))
+    await session.commit()
+    return {"ok": True, "includedWith": sorted(set(body.tier_keys))}
+
+
+# ── modules and lessons ─────────────────────────────────────────────────────
+
+class ModuleIn(BaseModel):
+    title: str
+    position: int = 0
+
+
+@router.get("/admin/courses/{course_id}/outline", dependencies=[Depends(require_admin)])
+async def admin_outline(
+    course_id: int, session: AsyncSession = Depends(get_session)
+) -> list[dict]:
+    modules = (
+        await session.execute(
+            select(Module).where(Module.course_id == course_id)
+            .order_by(Module.position, Module.id)
+        )
+    ).scalars().all()
+    lessons = (
+        await session.execute(
+            select(Lesson).where(Lesson.module_id.in_([m.id for m in modules] or [0]))
+            .order_by(Lesson.position, Lesson.id)
+        )
+    ).scalars().all()
+
+    counts = {
+        q.lesson_id: 0 for q in (
+            await session.execute(select(QuizQuestion))
+        ).scalars().all()
+    }
+    for q in (await session.execute(select(QuizQuestion))).scalars().all():
+        counts[q.lesson_id] = counts.get(q.lesson_id, 0) + 1
+
+    by_module: dict[int, list[dict]] = {}
+    for l in lessons:
+        by_module.setdefault(l.module_id, []).append({
+            "id": l.id, "title": l.title, "kind": l.kind, "position": l.position,
+            "body_md": l.body_md,
+            "video_provider": l.video_provider, "video_id": l.video_id,
+            "duration_seconds": l.duration_seconds,
+            "file_id": l.file_id, "free_preview": l.free_preview,
+            "questions": counts.get(l.id, 0),
+            # A video lesson with no video is the commonest half-finished
+            # state, and the one that looks fine in a list.
+            "incomplete": l.kind == "video" and not l.video_id,
+        })
+
+    return [
+        {"id": m.id, "title": m.title, "position": m.position,
+         "lessons": by_module.get(m.id, [])}
+        for m in modules
+    ]
+
+
+@router.post("/admin/courses/{course_id}/modules", status_code=201,
+             dependencies=[Depends(require_admin)])
+async def create_module(
+    course_id: int, body: ModuleIn, session: AsyncSession = Depends(get_session)
+) -> dict:
+    if await session.get(Course, course_id) is None:
+        raise HTTPException(404, "no such course")
+    existing = (
+        await session.execute(select(Module).where(Module.course_id == course_id))
+    ).scalars().all()
+    row = Module(course_id=course_id, title=body.title,
+                 position=body.position or (max((m.position for m in existing), default=0) + 10))
+    session.add(row)
+    await session.commit()
+    await session.refresh(row)
+    return {"id": row.id, "title": row.title, "position": row.position}
+
+
+@router.patch("/admin/modules/{module_id}", dependencies=[Depends(require_admin)])
+async def update_module(
+    module_id: int, body: dict, session: AsyncSession = Depends(get_session)
+) -> dict:
+    row = await session.get(Module, module_id)
+    if row is None:
+        raise HTTPException(404, "no such module")
+    for key, value in body.items():
+        if key in {"id", "course_id", "created_at"}:
+            continue
+        if hasattr(row, key):
+            setattr(row, key, value)
+    await session.commit()
+    return {"ok": True}
+
+
+@router.delete("/admin/modules/{module_id}", status_code=204,
+               dependencies=[Depends(require_admin)])
+async def delete_module(module_id: int, session: AsyncSession = Depends(get_session)):
+    """Removes its lessons with it — an orphan lesson belongs nowhere."""
+    row = await session.get(Module, module_id)
+    if row is None:
+        raise HTTPException(404, "no such module")
+    for lesson in (
+        await session.execute(select(Lesson).where(Lesson.module_id == module_id))
+    ).scalars().all():
+        await session.execute(
+            QuizQuestion.__table__.delete().where(QuizQuestion.lesson_id == lesson.id)
+        )
+        await session.delete(lesson)
+    await session.delete(row)
+    await session.commit()
+    return Response(status_code=204)
+
+
+class LessonIn(BaseModel):
+    title: str
+    kind: str = "video"
+    position: int = 0
+    body_md: str = ""
+    video_provider: str = ""
+    video_id: str = ""
+    duration_seconds: int | None = None
+    file_id: int | None = None
+    free_preview: bool = False
+
+
+LESSON_KINDS = {"video", "text", "audio", "pdf", "quiz"}
+
+
+@router.post("/admin/modules/{module_id}/lessons", status_code=201,
+             dependencies=[Depends(require_admin)])
+async def create_lesson(
+    module_id: int, body: LessonIn, session: AsyncSession = Depends(get_session)
+) -> dict:
+    if body.kind not in LESSON_KINDS:
+        raise HTTPException(422, f"a lesson is one of {sorted(LESSON_KINDS)}")
+    if await session.get(Module, module_id) is None:
+        raise HTTPException(404, "no such module")
+    existing = (
+        await session.execute(select(Lesson).where(Lesson.module_id == module_id))
+    ).scalars().all()
+    row = Lesson(
+        module_id=module_id,
+        **body.model_dump(exclude={"position"}),
+        position=body.position or (max((l.position for l in existing), default=0) + 10),
+    )
+    session.add(row)
+    await session.commit()
+    await session.refresh(row)
+    return {"id": row.id, "title": row.title, "kind": row.kind}
+
+
+@router.patch("/admin/lessons/{lesson_id}", dependencies=[Depends(require_admin)])
+async def update_lesson(
+    lesson_id: int, body: dict, session: AsyncSession = Depends(get_session)
+) -> dict:
+    row = await session.get(Lesson, lesson_id)
+    if row is None:
+        raise HTTPException(404, "no such lesson")
+    if body.get("kind") and body["kind"] not in LESSON_KINDS:
+        raise HTTPException(422, f"a lesson is one of {sorted(LESSON_KINDS)}")
+    for key, value in body.items():
+        if key in {"id", "module_id", "created_at"}:
+            continue
+        if hasattr(row, key):
+            setattr(row, key, value)
+    await session.commit()
+    return {"ok": True}
+
+
+@router.delete("/admin/lessons/{lesson_id}", status_code=204,
+               dependencies=[Depends(require_admin)])
+async def delete_lesson(lesson_id: int, session: AsyncSession = Depends(get_session)):
+    """
+    Remove a lesson, and the ticks against it.
+
+    Progress is kept everywhere else in this system on purpose; here it cannot
+    be, because a tick against a lesson that no longer exists is not a record
+    of anything. The video at the provider is untouched — deleting a lesson
+    should not delete a master.
+    """
+    row = await session.get(Lesson, lesson_id)
+    if row is None:
+        raise HTTPException(404, "no such lesson")
+    await session.execute(
+        QuizQuestion.__table__.delete().where(QuizQuestion.lesson_id == lesson_id)
+    )
+    await session.execute(
+        LessonProgress.__table__.delete().where(LessonProgress.lesson_id == lesson_id)
+    )
+    await session.delete(row)
+    await session.commit()
+    return Response(status_code=204)
+
+
+class QuestionIn(BaseModel):
+    prompt: str
+    choices: str = ""
+    answer_index: int = 0
+    explanation: str = ""
+    position: int = 0
+
+
+@router.get("/admin/lessons/{lesson_id}/questions", dependencies=[Depends(require_admin)])
+async def admin_questions(
+    lesson_id: int, session: AsyncSession = Depends(get_session)
+) -> list[dict]:
+    rows = (
+        await session.execute(
+            select(QuizQuestion).where(QuizQuestion.lesson_id == lesson_id)
+            .order_by(QuizQuestion.position, QuizQuestion.id)
+        )
+    ).scalars().all()
+    return [
+        {"id": q.id, "prompt": q.prompt, "choices": q.choices,
+         "answer_index": q.answer_index, "explanation": q.explanation,
+         "position": q.position}
+        for q in rows
+    ]
+
+
+@router.post("/admin/lessons/{lesson_id}/questions", status_code=201,
+             dependencies=[Depends(require_admin)])
+async def create_question(
+    lesson_id: int, body: QuestionIn, session: AsyncSession = Depends(get_session)
+) -> dict:
+    lesson = await session.get(Lesson, lesson_id)
+    if lesson is None:
+        raise HTTPException(404, "no such lesson")
+    choices = [c for c in body.choices.splitlines() if c.strip()]
+    if len(choices) < 2:
+        raise HTTPException(422, "a question needs at least two answers to choose between")
+    if not 0 <= body.answer_index < len(choices):
+        raise HTTPException(422, "the right answer is not one of the choices")
+
+    existing = (
+        await session.execute(
+            select(QuizQuestion).where(QuizQuestion.lesson_id == lesson_id)
+        )
+    ).scalars().all()
+    row = QuizQuestion(
+        lesson_id=lesson_id,
+        **body.model_dump(exclude={"position"}),
+        position=body.position or (max((q.position for q in existing), default=0) + 10),
+    )
+    session.add(row)
+    await session.commit()
+    await session.refresh(row)
+    return {"id": row.id}
+
+
+@router.delete("/admin/questions/{question_id}", status_code=204,
+               dependencies=[Depends(require_admin)])
+async def delete_question(
+    question_id: int, session: AsyncSession = Depends(get_session)
+):
+    row = await session.get(QuizQuestion, question_id)
+    if row is None:
+        raise HTTPException(404, "no such question")
+    await session.delete(row)
+    await session.commit()
+    return Response(status_code=204)
+
+
+# ── what a reader sees ──────────────────────────────────────────────────────
+#
+# Declared AFTER the admin routes, and that is not stylistic. `/{slug}` sits in
+# the same position as `admin`, so a parameter here eats the literal there —
+# `/api/classes/admin/lessons/5` would be read as the lesson 5 of a course
+# called "admin". Today only the accident that one is GET and the other PATCH
+# keeps them apart; declaring these last means it does not depend on that.
 
 @router.get("/{slug}")
 async def read_course(
