@@ -72,6 +72,17 @@ if (Astro.request.method === "POST") {
       failed = r.body?.detail ?? "That could not be opened. Try again in a moment.";
     }
 
+    if (action === "signout") {
+      /* Told to the backend as well as done here. Clearing the cookie is what
+         actually ends the session in this browser — the backend's own
+         Set-Cookie would be on a response nobody sees — but the call is still
+         made, so a future server-side session store gets the event rather than
+         needing this to be remembered then. */
+      await asReader(Astro, "/api/account/signout", { method: "POST" });
+      Astro.cookies.delete("shruti_reader", { path: "/" });
+      return Astro.redirect("/", 303);
+    }
+
     if (action === "delete") {
       const r = await asReader(Astro, "/api/account/", { method: "DELETE" });
       if (r.ok) {
@@ -296,6 +307,19 @@ const TRADITIONS = [
         there never will be: the convenience of one, without the third party.
       </p>
       <PasskeyList passkeys={passkeys} />
+    </section>
+
+    <section class="card">
+      <h2>Signing out</h2>
+      <p class="quiet">
+        Ends this session in this browser. Your account and everything in it stay exactly as they
+        are — this is not deleting anything.
+      </p>
+      <form method="POST">
+        <CsrfField />
+        <input type="hidden" name="action" value="signout" />
+        <div><Button variant="secondary" type="submit">Sign out</Button></div>
+      </form>
     </section>
 
     <section class="card">

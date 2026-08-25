@@ -132,3 +132,99 @@ def test_expiry_limits_the_link_and_never_the_person(monkeypatch):
     assert second["expiresAt"] > first["expiresAt"]
     assert first["ready"] and second["ready"]
     get_settings.cache_clear()
+
+
+# ── an unconfigured provider must refuse, not improvise ─────────────────────
+
+def test_cloudflare_refuses_without_a_domain(monkeypatch):
+    """
+    It used to answer with "customer-placeholder.cloudflarestream.com".
+
+    That is a real-looking URL resolving to nothing, returned with
+    `ready: True`. A paid lesson would have shown an empty player and said
+    nothing, and from the admin it looked identical to a video still encoding.
+    The module's own docstring already promised the opposite: "an unknown or
+    unconfigured provider returns ready: false with a reason rather than a
+    broken URL".
+    """
+    from shruti.core import video
+
+    class Fake:
+        cloudflare_stream_domain = ""
+        bunny_library_id = ""
+        bunny_stream_api_key = ""
+        bunny_token_auth_key = ""
+        bunny_cdn_hostname = ""
+
+    monkeypatch.setattr(video, "get_settings", lambda: Fake())
+    answer = video.playback("cloudflare", "abc123")
+    assert answer["ready"] is False
+    assert "not set up" in answer["reason"]
+    assert "placeholder" not in str(answer)
+
+
+def test_no_provider_is_offered_that_is_not_configured(monkeypatch):
+    """
+    The admin dropdown reads this. An option that exists but cannot work looks
+    exactly as real as one that can.
+    """
+    from shruti.core import video
+
+    class Nothing:
+        bunny_library_id = ""
+        bunny_stream_api_key = ""
+        bunny_token_auth_key = ""
+        cloudflare_stream_domain = ""
+
+    monkeypatch.setattr(video, "get_settings", lambda: Nothing())
+    assert video.providers() == []
+
+    class BunnyOnly(Nothing):
+        bunny_library_id = "12345"
+        bunny_stream_api_key = "key"
+        bunny_token_auth_key = "signing"
+
+    monkeypatch.setattr(video, "get_settings", lambda: BunnyOnly())
+    got = video.providers()
+    assert [p["key"] for p in got] == ["bunny"]
+    assert got[0]["protected"] is True
+
+
+def test_a_provider_that_cannot_sign_says_so(monkeypatch):
+    """
+    A course sold for money that plays from an unsigned URL is a course anybody
+    can hotlink. She should see which is which before choosing, not after.
+    """
+    from shruti.core import video
+
+    class Unsigned:
+        bunny_library_id = "12345"
+        bunny_stream_api_key = "key"
+        bunny_token_auth_key = ""            # no signing key
+        cloudflare_stream_domain = "example.cloudflarestream.com"
+
+    monkeypatch.setattr(video, "get_settings", lambda: Unsigned())
+    by_key = {p["key"]: p for p in video.providers()}
+    assert by_key["bunny"]["protected"] is False
+    assert by_key["cloudflare"]["protected"] is False
+
+
+def test_the_provider_route_is_not_shadowed_by_a_catch_all():
+    """
+    FastAPI matches in declaration order, so a `/admin/{something}` declared
+    earlier would swallow `/admin/video-providers` and the dropdown would go
+    silently empty — which reads exactly like "no providers are configured".
+
+    That has bitten this codebase four times, every time as silence rather than
+    an error.
+    """
+    from shruti.api.routes.classes import router
+
+    paths = [r.path for r in router.routes]
+    here = paths.index("/api/classes/admin/video-providers")
+    prefix = "/api/classes/admin/"
+    for i, other in enumerate(paths):
+        rest = other[len(prefix):] if other.startswith(prefix) else ""
+        # A catch-all directly at the admin root is the one that would shadow.
+        if rest.startswith("{") and rest.count("/") == 0:
+            assert i > here, f"{other} is declared before video-providers and shadows it"

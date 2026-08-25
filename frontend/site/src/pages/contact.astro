@@ -27,7 +27,50 @@ let failed = "";
 const errors: Record<string, string> = {};
 const values = { topic: "", name: "", email: "", msg: "" };
 
-if (Astro.request.method === "POST") {
+/* The question box is a different thing from the contact form and lives on the
+   same page. Contact goes to an inbox and gets a private reply; a question may
+   be answered in public, and only ever after she has approved it. Keeping them
+   apart on the page matters because the second one has a consequence the first
+   does not. */
+let asked = false;
+let askFailed = "";
+const askErrors: Record<string, string> = {};
+const askValues = { body: "", askedBy: "" };
+
+if (Astro.request.method === "POST" && String((await Astro.request.clone().formData()).get("form") ?? "") === "question") {
+  const form = await Astro.request.formData();
+  if (!verifyCsrf(Astro.cookies, form)) {
+    askFailed = "That did not send. Reload the page and try again.";
+  }
+  askValues.body = String(form.get("body") ?? "");
+  askValues.askedBy = String(form.get("asked_by") ?? "");
+  const honeypot = String(form.get("website") ?? "");
+
+  if (!askFailed && askValues.body.trim().length < 3) {
+    askErrors.body = "A question needs a few words at least.";
+  }
+  if (!askFailed && askValues.body.trim().length > 1000) {
+    askErrors.body = "That is longer than the box takes — a thousand characters.";
+  }
+
+  if (!askFailed && Object.keys(askErrors).length === 0) {
+    try {
+      const response = await fetch(`${SITE_API}/api/questions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          body: askValues.body,
+          asked_by: askValues.askedBy,
+          website: honeypot,
+        }),
+      });
+      if (response.ok) asked = true;
+      else askFailed = "That did not send. Try the address above instead.";
+    } catch {
+      askFailed = "That did not send. Try the address above instead.";
+    }
+  }
+} else if (Astro.request.method === "POST") {
   const form = await Astro.request.formData();
 
   /* Rejected before anything is read out of the form. A submission without a
@@ -69,6 +112,16 @@ if (Astro.request.method === "POST") {
       failed = "That did not send. The address above works, and always will.";
     }
   }
+}
+
+/* Only ever questions she has approved AND answered — the endpoint enforces
+   that, and nothing else is ever public. */
+let answered: { body: string; askedBy: string; answeredMd: string; answeredAt: string | null }[] = [];
+try {
+  const r = await fetch(`${SITE_API}/api/questions`);
+  if (r.ok) answered = await r.json();
+} catch {
+  /* A question list that cannot be fetched is not worth failing the page for. */
 }
 
 /* Every block the admin has added to /contact. */
@@ -132,6 +185,65 @@ const extra = sections.filter((s) => s.key !== "intro");
     }
   </div>
 
+    <section class="ask">
+      <h2>Ask something</h2>
+      <p class="ask-why">
+        Different from the form above. That one reaches an inbox and gets a reply to you; this
+        one may be answered here, in public, where the next person with the same question can
+        read it. <strong>Nothing appears until she has approved it</strong>, and you can leave
+        the name blank.
+      </p>
+
+      {asked ? (
+        <p class="ask-ok">
+          Asked. It goes nowhere public until she has read it and answered it — and she may not
+          answer every one.
+        </p>
+      ) : (
+        <form method="POST" class="ask-form">
+          <CsrfField />
+          <input type="hidden" name="form" value="question" />
+          <TextArea
+            name="body"
+            label="Your question"
+            rows={4}
+            value={askValues.body}
+            error={askErrors.body}
+            required
+          />
+          <TextField
+            name="asked_by"
+            label="A name to put on it, if you want one"
+            value={askValues.askedBy}
+            placeholder="Leave blank to stay anonymous"
+          />
+          {/* Left empty by people, filled in by robots. */}
+          <div class="hp" aria-hidden="true">
+            <label>Website<input type="text" name="website" tabindex="-1" autocomplete="off" /></label>
+          </div>
+          {askFailed && <p class="ask-bad">{askFailed}</p>}
+          <div><Button type="submit" data-track="question:asked">Ask it</Button></div>
+        </form>
+      )}
+
+      {
+        answered.length > 0 && (
+          <div class="answers">
+            <h3>Answered</h3>
+            <ul>
+              {answered.map((q) => (
+                <li>
+                  <p class="a-q">{q.body}</p>
+                  <p class="a-by">{q.askedBy || "Anonymous"}</p>
+                  <Prose html={q.answeredMd} />
+                </li>
+              ))}
+            </ul>
+          </div>
+        )
+      }
+    </section>
+
     {/* Anything else the admin has put on this page. Only `intro` used to
         render, so a block added in the admin simply did not appear — which
         makes the editor feel broken rather than the page feel empty. */}
@@ -154,6 +266,29 @@ const extra = sections.filter((s) => s.key !== "intro");
 </BaseLayout>
 
 <style>
+  .ask {
+    margin-top: var(--space-7); display: grid; gap: var(--space-4);
+    padding: var(--space-6);
+    background: var(--surface-card);
+    border: var(--border-w) solid var(--line);
+    border-radius: var(--radius-md);
+  }
+  .ask h2 { font: 600 var(--text-h3) var(--font-display); color: var(--ink); margin: 0; }
+  .ask h3 { font: 600 var(--text-h4) var(--font-display); color: var(--ink); margin: 0 0 var(--space-3); }
+  .ask-why { font: 400 var(--text-body) / var(--leading-body) var(--font-body); color: var(--ink-soft); margin: 0; max-width: 62ch; }
+  .ask-ok { font: 400 var(--text-body) var(--font-body); color: var(--accent); margin: 0; max-width: 62ch; }
+  .ask-bad { font: 400 var(--text-sm) var(--font-body); color: var(--live); margin: 0; }
+  .ask-form { display: grid; gap: var(--space-4); max-width: 56ch; }
+  /* Off-screen rather than display:none — a hidden field some robots skip is a
+     honeypot that catches nothing. */
+  .hp { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+  .answers ul { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-5); }
+  .answers li { border-top: var(--border-w) solid var(--line); padding-top: var(--space-4); }
+  .a-q { font: 500 var(--text-body) / var(--leading-body) var(--font-body); color: var(--ink); margin: 0 0 4px; }
+  .a-by {
+    font: 600 var(--text-micro) var(--font-body); letter-spacing: var(--tracking-eyebrow);
+    text-transform: uppercase; color: var(--ink-faint); margin: 0 0 var(--space-3);
+  }
   .contact-cards { margin-top: var(--space-6); }
   .contact-card {
     background: var(--surface-card);

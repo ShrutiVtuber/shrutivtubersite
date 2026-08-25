@@ -96,16 +96,26 @@ def _cloudflare(video_id: str, life_seconds: int) -> dict:
     """
     Cloudflare Stream, for when courses are worth enough to move.
 
-    Their signed playback needs a signing key created through the API, which
-    is a thing to set up on the day rather than a thing to half-build now. The
+    Their signed playback needs a signing key created through the API, which is
+    a thing to set up on the day rather than a thing to half-build now. The
     unsigned embed works and says that it is unsigned.
+
+    **With no domain configured this refuses**, rather than pointing a player at
+    a made-up host. It used to fall back to "customer-placeholder…", which is a
+    real-looking URL that resolves to nothing: a paid lesson would have shown an
+    empty player with no explanation, and the admin had no way to tell that from
+    a video still encoding.
     """
     s = get_settings()
-    domain = s.cloudflare_stream_domain or "customer-placeholder.cloudflarestream.com"
+    if not s.cloudflare_stream_domain:
+        return {
+            "ready": False,
+            "reason": "Cloudflare Stream is not set up — no stream domain is configured",
+        }
     return {
         "ready": True,
         "kind": "iframe",
-        "src": f"https://{domain}/{video_id}/iframe",
+        "src": f"https://{s.cloudflare_stream_domain}/{video_id}/iframe",
         "expiresAt": None,
         "unprotected": True,
     }
@@ -129,3 +139,36 @@ def upload_target(provider: str) -> dict:
             "endpoint": f"https://video.bunnycdn.com/library/{s.bunny_library_id}/videos",
         }
     return {"ready": False, "reason": f"cannot upload to {provider!r} yet"}
+
+
+def providers() -> list[dict]:
+    """
+    The video providers that are actually set up, for the admin to choose from.
+
+    Offering an unconfigured provider in a dropdown is how somebody picks it,
+    saves a lesson, and finds out weeks later that the player has been empty —
+    the option looked exactly as real as the working one.
+
+    `protected` is not decoration: a course sold for money that plays without a
+    signed URL is a course anybody can hotlink, and she should see which is
+    which before choosing.
+    """
+    s = get_settings()
+    out: list[dict] = []
+    if s.bunny_library_id and s.bunny_stream_api_key:
+        out.append({
+            "key": "bunny",
+            "label": "Bunny Stream",
+            "protected": bool(s.bunny_token_auth_key),
+            "uploads": True,
+        })
+    if s.cloudflare_stream_domain:
+        out.append({
+            "key": "cloudflare",
+            "label": "Cloudflare Stream",
+            # Signed playback is not built; the embed is open by design and
+            # says so rather than implying protection it does not have.
+            "protected": False,
+            "uploads": False,
+        })
+    return out

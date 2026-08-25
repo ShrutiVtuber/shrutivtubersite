@@ -105,6 +105,23 @@ def _admin_course(c: Course, tiers: list[str], counts: tuple[int, int]) -> dict:
     }
 
 
+@router.get("/admin/video-providers", dependencies=[Depends(require_admin)])
+async def video_providers() -> list[dict]:
+    """
+    Which video providers are actually set up.
+
+    Declared BEFORE /admin/courses and well before any /admin/{something}
+    catch-all: FastAPI matches in declaration order, and this codebase has been
+    bitten four times by a literal path arriving after one that swallows it.
+
+    The admin form reads this so it can stop offering a provider that would
+    quietly produce an empty player.
+    """
+    from shruti.core.video import providers
+
+    return providers()
+
+
 @router.get("/admin/courses", dependencies=[Depends(require_admin)])
 async def admin_courses(session: AsyncSession = Depends(get_session)) -> list[dict]:
     from shruti.models import CourseTier

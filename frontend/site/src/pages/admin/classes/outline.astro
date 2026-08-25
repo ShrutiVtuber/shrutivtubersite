@@ -127,11 +127,17 @@ if (Astro.request.method === "POST") {
 const courseId = Astro.url.searchParams.get("course") ?? "";
 const openLesson = Astro.url.searchParams.get("lesson") ?? "";
 
-const [list, outlineCall, fileCall] = await Promise.all([
+const [list, outlineCall, fileCall, providerCall] = await Promise.all([
   asAdmin(Astro, "/api/classes/admin/courses"),
   courseId ? asAdmin(Astro, `/api/classes/admin/courses/${courseId}/outline`) : Promise.resolve({ body: [] }),
   asAdmin(Astro, "/api/shop/admin/files"),
+  /* Which video providers are actually configured. Asked of the server rather
+     than written into the markup: the providers that EXIST and the providers
+     that WORK are different lists, and only the server knows the second. */
+  asAdmin(Astro, "/api/classes/admin/video-providers"),
 ]);
+const videoProviders: { key: string; label: string; protected: boolean; uploads: boolean }[] =
+  Array.isArray(providerCall.body) ? providerCall.body : [];
 const courses: any[] = Array.isArray(list.body) ? list.body : [];
 const outline: any[] = Array.isArray(outlineCall.body) ? outlineCall.body : [];
 const files: any[] = Array.isArray(fileCall.body) ? fileCall.body : [];
@@ -208,8 +214,26 @@ const here = (extra: Record<string, string> = {}) => {
           <span class="adm-lbl">Video, from</span>
           <select class="adm-input" name="video_provider">
             <option value="" selected={!lesson.video_provider}>— none —</option>
-            <option value="bunny" selected={lesson.video_provider === "bunny"}>Bunny</option>
-            <option value="cloudflare" selected={lesson.video_provider === "cloudflare"}>Cloudflare</option>
+            {
+              /* Only what is actually set up. An unconfigured provider in this
+                 list looks exactly as real as the working one, and choosing it
+                 produces an empty player nobody notices for weeks. */
+              videoProviders.map((v) => (
+                <option value={v.key} selected={lesson.video_provider === v.key}>
+                  {v.label}{v.protected ? "" : " — plays unprotected"}
+                </option>
+              ))
+            }
+            {
+              /* One already saved but no longer configured stays selectable, so
+                 saving this form cannot silently change it behind her. */
+              lesson.video_provider &&
+                !videoProviders.some((v) => v.key === lesson.video_provider) && (
+                  <option value={lesson.video_provider} selected>
+                    {lesson.video_provider} — NOT SET UP, this lesson will not play
+                  </option>
+                )
+            }
           </select>
         </label>
         <label class="field">
