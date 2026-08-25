@@ -18,14 +18,59 @@ import { site, PATHS, type LiveStatus } from "../lib/api";
 import { badgeFrom } from "../lib/live";
 
 interface Video {
-  title: string; platform: "twitch" | "youtube"; duration?: string;
+  id: string; title: string; platform: "twitch" | "youtube"; duration?: string;
   date?: string; href: string; thumb?: string | null;
 }
+interface Feed { videos: Video[]; counts: { youtube: number; twitch: number } }
 
-/* No videos endpoint exists yet: it needs the platform API keys, which are
-   what the live badge is also waiting on. Until then this is honestly empty. */
-const videos: Video[] = [];
-const live = badgeFrom(await site<LiveStatus>(PATHS.live));
+const [feed, liveStatus] = await Promise.all([
+  site<Feed>("/api/videos"),
+  site<LiveStatus>(PATHS.live),
+]);
+const videos = feed?.videos ?? [];
+const live = badgeFrom(liveStatus);
+const siteUrl = import.meta.env.SHRUTI_SITE_URL ?? "https://shrutivtuber.com";
+
+/* VideoObject, one per video.
+ *
+ * THIS is what puts a video in search results — a browser fetching a
+ * thumbnail from Google's own CDN sends Search nothing and earns no ranking.
+ * Structured data is the part Google actually reads, and it is what makes a
+ * video eligible for the rich result with a still and a duration.
+ *
+ * `contentUrl` points at the platform because that is where the video is; the
+ * page is named as `url` so a click from search lands here. Nothing is
+ * asserted that is not known: a video with no duration simply omits it rather
+ * than claiming PT0S. */
+const ISO_DURATION = (d?: string) => {
+  if (!d) return undefined;
+  const m = /^(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s)?$/.exec(d.trim());
+  if (!m) return undefined;
+  const [, h, mi, sec] = m;
+  if (!h && !mi && !sec) return undefined;
+  return `PT${h ? h + "H" : ""}${mi ? mi + "M" : ""}${sec ? sec + "S" : ""}`;
+};
+
+const jsonLd = videos.length > 0
+  ? {
+      "@context": "https://schema.org",
+      "@type": "ItemList",
+      itemListElement: videos.map((v, i) => ({
+        "@type": "ListItem",
+        position: i + 1,
+        item: {
+          "@type": "VideoObject",
+          name: v.title,
+          uploadDate: v.date || undefined,
+          thumbnailUrl: v.thumb ? new URL(v.thumb, siteUrl).href : undefined,
+          contentUrl: v.href,
+          url: new URL("/videos", siteUrl).href,
+          duration: ISO_DURATION(v.duration),
+          publisher: { "@type": "Person", name: "Shruti" },
+        },
+      })),
+    }
+  : null;
 ---
 
 <BaseLayout title="Videos — Shruti" description="Streams and VODs from Twitch and YouTube.">
@@ -35,6 +80,15 @@ const live = badgeFrom(await site<LiveStatus>(PATHS.live));
         as="h1" glyph="▶" eyebrow="Videos" title="Streams & VODs"
         body="Auto-pulled from Twitch and YouTube."
       />
+      {
+        feed && (feed.counts.youtube > 0 || feed.counts.twitch > 0) && (
+          <p class="video-counts t-tabular">
+            {feed.counts.youtube > 0 && <>{feed.counts.youtube} on YouTube</>}
+            {feed.counts.youtube > 0 && feed.counts.twitch > 0 && <> · </>}
+            {feed.counts.twitch > 0 && <>{feed.counts.twitch} VODs on Twitch</>}
+          </p>
+        )
+      }
     </div>
 
     {
@@ -67,9 +121,18 @@ const live = badgeFrom(await site<LiveStatus>(PATHS.live));
       )
     }
   </div>
+  {
+    /* Rendered last so it never delays the page, and only when there is
+       something true to say. */
+    jsonLd && (
+      <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
+    )
+  }
 </BaseLayout>
 
 <style>
+  .video-counts { font: 400 var(--text-xs) var(--font-mono); color: var(--ink-faint); margin: 6px 0 0; }
+
   .video-grid { margin-top: var(--space-6); }
   .video-actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
 </style>

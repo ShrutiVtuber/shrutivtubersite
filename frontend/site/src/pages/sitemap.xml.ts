@@ -27,7 +27,7 @@ const STATIC: [path: string, priority: string, changefreq: string][] = [
   ["/about", "0.7", "monthly"],
   ["/work", "0.7", "monthly"],
   ["/schedule", "0.7", "weekly"],
-  ["/videos", "0.6", "weekly"],
+  ["/videos", "0.7", "weekly"],
   ["/journal", "0.8", "weekly"],
   ["/horoscopes", "0.8", "weekly"],
   ["/horoscopes/archive", "0.6", "weekly"],

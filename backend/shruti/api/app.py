@@ -10,9 +10,10 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from shruti.api.routes import (
     accounts, admin, billing, content, horoscopes, journal, live, media,
-    newsletter, passkeys, places, public,
+    newsletter, passkeys, places, public, videos,
 )
 from shruti.core.config import get_settings
+from shruti.core.logredact import install as install_log_redaction
 
 logging.basicConfig(level=logging.INFO)
 
@@ -21,6 +22,11 @@ settings = get_settings()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Attached here rather than at import, because uvicorn installs its own
+    # handlers on the root logger while starting up — a filter added before
+    # that is added to handlers that get replaced.
+    install_log_redaction()
+
     # Schema is owned by alembic, never by create_all — migrations are the
     # only thing allowed to touch production DDL.
     yield
@@ -61,4 +67,5 @@ app.include_router(journal.router)
 app.include_router(passkeys.router)
 app.include_router(billing.router)
 app.include_router(media.router)
+app.include_router(videos.router)
 app.include_router(admin.router)
