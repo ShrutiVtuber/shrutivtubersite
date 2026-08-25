@@ -86,11 +86,6 @@ const done = here >= 0 ? all[here].done : false;
 
 <BaseLayout title={`${it.title ?? "Lesson"} — ${course.title}`} description={course.tagline}>
   <div class="reader">
-    <aside class="rail">
-      <a class="back" href={`/classes/${slug}`}>← {course.title}</a>
-      <p class="tally">{course.progress.done} of {course.progress.total} finished</p>
-      <LessonList slug={slug} modules={course.modules} current={Number(lessonId)} />
-    </aside>
 
     <main class="pane">
       {failed && <p class="adm-bad" role="alert">{failed}</p>}
@@ -172,6 +167,13 @@ const done = here >= 0 ? all[here].done : false;
         </form>
       )}
     </main>
+    <aside class="rail">
+      {/* Kept above the outline rather than in it: stacked on a phone this is
+          the way back out, and burying it under forty lessons hides the exit. */}
+      <a class="back" href={`/classes/${slug}`}>← {course.title}</a>
+      <p class="tally">{course.progress.done} of {course.progress.total} finished</p>
+      <LessonList slug={slug} modules={course.modules} current={Number(lessonId)} />
+    </aside>
   </div>
 </BaseLayout>
 
@@ -186,12 +188,28 @@ const done = here >= 0 ? all[here].done : false;
     max-width: 1440px; margin: 0 auto;
     padding: 0 var(--page-pad) var(--space-7);
   }
-  @media (min-width: 940px) {
+  /* The lesson comes FIRST IN THE MARKUP and the outline follows it.
+   *
+   * Stacked on a phone that is the right order — a forty-lesson course above
+   * the video means scrolling past the whole curriculum to reach the thing you
+   * opened, and the outline answers "what is next", which is a question you
+   * have after watching rather than before.
+   *
+   * Done in the markup rather than with `order`, for two reasons. A screen
+   * reader follows the markup whatever CSS says, so the lesson should come
+   * first there too. And `order` did not survive the build at all — every
+   * declaration was stripped from the output, which is a silent way to lose a
+   * layout. Explicit placement cannot be dropped without the columns visibly
+   * collapsing. */
+  @media (min-width: 960px) {
     .reader { grid-template-columns: 20rem minmax(0, 1fr); gap: var(--space-7); }
+    /* Side by side, the outline goes back to the left where it belongs. */
     .rail {
+      grid-column: 1; grid-row: 1;
       position: sticky; top: var(--space-5); align-self: start;
       max-height: calc(100dvh - 4rem); overflow-y: auto;
     }
+    .pane { grid-column: 2; grid-row: 1; }
   }
 
   .rail { display: grid; gap: var(--space-3); align-content: start; }

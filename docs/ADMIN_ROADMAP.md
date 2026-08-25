@@ -332,10 +332,39 @@ exactly how the nav wrap survived.
 Every public page, the class reader, and every admin screen: **nothing
 overflows at any of the fourteen widths.**
 
-### Still worth doing, but not breakage
+### Breakpoints, consolidated
 
-- The site uses fifteen distinct breakpoints where about four would do. Nothing
-  is broken by that; it is just harder to reason about than it needs to be.
-- The reader's outline stacks above the video on a phone, so a forty-lesson
-  course means scrolling past all of it. It does not overflow — it is simply
-  not the nicest way round.
+Eleven of the site's own became four: **560 · 720 · 960 · 1160**.
+
+Every move rounded **up**, which is the safe direction in both senses — a
+max-width rule applies over a wider range so the narrow layout starts sooner,
+and a min-width rule holds off so the wide layout starts later. More room
+either way, which is what she asked for.
+
+`journal.css` keeps its own 639 / 1023 / 1440. That is the designer's file,
+copied verbatim so it can be re-delivered, and editing it for tidiness would
+cost more than it saves.
+
+### The reader stacks lesson-first
+
+On a phone the lesson comes first and the outline follows it. A forty-lesson
+course above the video means scrolling past the whole curriculum to reach the
+thing you opened, and the outline answers "what is next" — a question you have
+after watching rather than before.
+
+Done by **moving the markup**, not with `order`, for two reasons. A screen
+reader follows the markup whatever the CSS says, so the lesson should come
+first there too. And `order` did not survive the build: every declaration was
+stripped from the output. Explicit grid placement cannot be dropped without the
+columns visibly collapsing.
+
+### The build was failing silently
+
+While doing the above, a stray `}` in `site.css` broke the stylesheet — and
+several changes appeared to deploy and did not, because the check being used
+was `docker compose build | grep -c error`, which reports **zero on a failed
+build** whose message does not happen to match.
+
+`./scripts/build-site.sh` now reads the exit code, which is the truth, and
+prints the failure. Proved in both directions: it passes a cached build and
+fails a deliberately broken one.
