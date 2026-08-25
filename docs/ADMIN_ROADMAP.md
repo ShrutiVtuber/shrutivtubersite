@@ -299,28 +299,43 @@ generous.
 This API version wants `PromotionCode.create(promotion={"type": "coupon",
 "coupon": id})`. Passing `coupon=` is refused outright as an unknown parameter.
 
-## A full pass over tablet and phone — after the current features
+## The pass over tablet and phone — done (2026-08-25)
 
-Her ask, and a real one: **the site should be in its tablet layout well before
-anything would break, with room to spare**, so nobody ever meets a broken
-state at some exact pixel.
+Her ask: **the site should be in its tablet layout well before anything would
+break, with room to spare**, so nobody meets a broken state at some exact
+pixel.
 
-What prompted it: at 1089px the header nav wrapped "Journal" onto a second
-line. That one was caused by adding Classes and Shop to the nav — nine items
-where seven fitted — and the drawer only took over at 960px. The breakpoint is
-1160px now, which has room, and the rule is written above it in the stylesheet:
-**adding a nav item means checking that number again.**
+### Measured rather than eyeballed
 
-That is the cause fixed, not the pass. The pass is still to do:
+`./scripts/check-widths.sh` walks the site in a real browser at fourteen widths
+— 1440, 1280, 1160, 1100, 1024, 900, 834, 768, 700, 640, 560, 480, 390, 360 —
+and reports anything wider than the window, naming the element.
 
-- [ ] Every page walked at 1440 / 1180 / 1024 / 834 / 768 / 430 / 375
-- [ ] The breakpoints are a set, not a scatter — the site currently uses 560,
-      620, 640, 720, 860, 880, 900, 940, 960, which is nine numbers doing the
-      work of about four
-- [ ] Nothing switches layout at the pixel it would otherwise break; every
-      switch has buffer
-- [ ] The reader's sidebar on a phone — it stacks today, but stacking a
-      forty-lesson outline above the video means scrolling past all of it
-- [ ] Tables and wide blocks scroll inside themselves rather than the page
-- [ ] Admin screens too, which are currently built for a desktop and used from
-      one — worth checking rather than assuming
+This is not a thing a build, a typecheck or a unit test can see: it needs a
+viewport. And it is not a thing anybody spots by resizing, because a layout can
+be right at the two widths you happen to try and wrong between them. That is
+exactly how the nav wrap survived.
+
+### What it found
+
+- **The nav wrapped between 960 and about 1120.** Caused by adding Classes and
+  Shop — nine items where seven fitted — while the drawer only took over at
+  960. It takes over at 1160 now, with room rather than at the pixel it fails.
+- **The header pushed every page 29px sideways at 360.** The brand, the live
+  badge, a sign-in link and a menu button do not fit across a narrow phone.
+  Below 440 the badge goes — it says the same thing on the home page and on
+  /videos, both a tap away — the gaps close, the menu button becomes its glyph
+  alone, and the brand comes down four points.
+
+### Where it stands
+
+Every public page, the class reader, and every admin screen: **nothing
+overflows at any of the fourteen widths.**
+
+### Still worth doing, but not breakage
+
+- The site uses fifteen distinct breakpoints where about four would do. Nothing
+  is broken by that; it is just harder to reason about than it needs to be.
+- The reader's outline stacks above the video on a phone, so a forty-lesson
+  course means scrolling past all of it. It does not overflow — it is simply
+  not the nicest way round.

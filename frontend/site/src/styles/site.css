@@ -98,6 +98,24 @@
    ADDING A NAV ITEM MEANS CHECKING THIS NUMBER AGAIN. It went wrong the moment
    Classes and Shop arrived. */
 @media (max-width: 1160px) { .site-nav { display: none; } .nav-toggle { display: inline-flex; } }
+
+/* On a narrow phone the bar runs out of room: the brand, the live badge, a
+   sign-in link and a menu button do not fit across 360px, and the header
+   pushed the whole page 29px sideways.
+   The badge is the one to lose — it says the same thing on the home page and
+   on /videos, both of which are one tap away — and the gaps close up before
+   anything is dropped. */
+@media (max-width: 440px) {
+  .site-header .bar { gap: var(--space-3); }
+  .header-side { gap: 8px; min-width: 0; }
+  .header-side .sh-badge { display: none; }
+  /* The word beside the glyph goes too. `≡` is the whole of what that button
+     means, and the accessible name is on the button rather than in the text,
+     so nothing is lost by a reader who cannot see it. */
+  .nav-toggle { font-size: 0; gap: 0; padding: 8px 10px; }
+  .nav-toggle span { font-size: 17px; }
+  .brand .brand-word { font-size: 22px; }
+}
 .nav-toggle:hover { border-color: var(--accent); color: var(--accent); }
 .acct-link {
   font: 600 var(--text-xs)/1 var(--font-body);
