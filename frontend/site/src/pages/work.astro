@@ -47,7 +47,7 @@ const INSTRUMENTS: [string, string, string, string][] = [
   title="Work — Shruti"
   description="A portfolio of instruments: working software for magickal and astrological practice."
 >
-  <div class="page">
+  <div class="page work-page">
     <SectionHeader
       as="h1"
       glyph="✶"
@@ -138,7 +138,18 @@ const INSTRUMENTS: [string, string, string, string][] = [
 </BaseLayout>
 
 <style>
-  .work-grid { margin-top: var(--space-6); }
+  /* `.page` is only a measure and a gutter — it sets no rhythm — so every
+   * block here stacked flush against the one before it unless it happened to
+   * carry a margin of its own. Two did and two did not, which is why the
+   * instruments ran straight into the projects above them and into "What
+   * follows" below.
+   *
+   * One gap on the container, rather than four margins that have to be kept
+   * in agreement. */
+  .work-page { display: grid; gap: var(--space-8); }
+  /* A grid and its heading are one block, so they close up. */
+  .work-grid { margin-top: calc(-1 * var(--space-4)); }
+
   .work-entry { display: grid; gap: var(--space-5); align-content: start; }
   .work-credits-head {
     font: 600 var(--text-micro) var(--font-body);
@@ -161,7 +172,8 @@ const INSTRUMENTS: [string, string, string, string][] = [
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
     gap: 12px;
-    margin-top: var(--space-5);
+    /* Tight to its own heading; the container spaces the sections. */
+    margin-top: calc(-1 * var(--space-4));
   }
   .instrument {
     display: block;

@@ -11,6 +11,19 @@
   html {
     background: var(--surface-page);
     color-scheme: light dark;
+
+    /* No sideways scroll, on any page.
+     *
+     * The full-bleed hero breaks out of the page column with `width: 100vw`,
+     * and 100vw INCLUDES the vertical scrollbar — so on every page that
+     * scrolls, which is every page, the hero is about fifteen pixels wider
+     * than the visible area and the whole document drifts left and right.
+     * There is no vw-based breakout that avoids this; the unit is defined to
+     * include the scrollbar.
+     *
+     * `clip`, not `hidden`: hidden makes this a scroll container, which
+     * silently breaks `position: sticky` on the header. clip does not. */
+    overflow-x: clip;
   }
   body {
     background: var(--surface-page);

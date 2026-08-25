@@ -16,6 +16,13 @@
   padding-top: var(--space-6);
   padding-bottom: var(--space-9);
 }
+/* A full-bleed hero owns the top of the page, so nothing may sit above it.
+ *
+ * The top padding is right for a page that opens with a heading — it gives the
+ * text air under the sticky header. Under a hero whose whole point is to reach
+ * the edges, it leaves a band of page background between the header and the
+ * sky, which reads as a gap nobody meant. */
+.site-main:has(> .sh-hero[data-bleed]:first-child) { padding-top: 0; }
 .section { display: grid; gap: var(--space-5); }
 .section-head {
   display: flex;

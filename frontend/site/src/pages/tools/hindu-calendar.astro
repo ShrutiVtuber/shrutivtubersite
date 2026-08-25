@@ -199,7 +199,8 @@ const RULE_NAME: Record<string, string> = {
 
         <section class="months">
           <h2>Months</h2>
-          <table>
+          <div class="table-scroll">
+            <table>
             <thead>
               <tr><th scope="col">Month</th><th scope="col">From</th><th scope="col">To</th><th scope="col">Festivals</th></tr>
             </thead>
@@ -228,6 +229,7 @@ const RULE_NAME: Record<string, string> = {
               }
             </tbody>
           </table>
+          </div>
 
           {
             corpusData && (
@@ -258,6 +260,16 @@ const RULE_NAME: Record<string, string> = {
 </ToolLayout>
 
 <style>
+  /* Wide content scrolls inside its own box, never by moving the page.
+   *
+   * This matters more since `overflow-x: clip` went on <html>: without a
+   * scroll container of its own, a table wider than a phone is now CLIPPED
+   * rather than reachable — the columns past the edge simply cannot be read.
+   * Clipping the page's accidental overflow is right; clipping a table is
+   * not, and the difference is this rule. */
+  .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .table-scroll table { min-width: 34rem; }
+
   .fest-provenance {
     font: 400 var(--text-xs) / 1.7 var(--font-body); color: var(--ink-faint);
     margin: var(--space-3) 0 0; max-width: 78ch;
