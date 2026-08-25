@@ -21,6 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import SQLModel, select
 
 from shruti.api.deps import require_admin
+from shruti.core.operator import session_stamp
 from shruti.core.auth import authenticate, issue_token
 from shruti.core.config import get_settings
 from shruti.core.db import get_session
@@ -69,7 +70,7 @@ async def login(
         # "wrong password" tells an attacker which half to work on.
         raise HTTPException(401, "email or password is wrong")
 
-    token = issue_token(payload.email)
+    token = issue_token(payload.email, await session_stamp(session))
     response.set_cookie(
         "shruti_session", token,
         httponly=True, samesite="lax",
@@ -250,7 +251,7 @@ async def claim_site(
         # race. Distinguishing them tells an attacker which half to work on.
         raise HTTPException(400, "that setup token is not valid, or the site is already claimed")
 
-    token = issue_token(body.email)
+    token = issue_token(body.email, await session_stamp(session))
     response.set_cookie(
         "shruti_session", token, httponly=True, samesite="lax",
         secure=get_settings().is_production, max_age=12 * 3600, path="/",
@@ -313,7 +314,7 @@ async def do_reset(
         raise HTTPException(400, "that link has expired or has already been used")
 
     await set_password(session, body.password)
-    token = issue_token(email)
+    token = issue_token(email, await session_stamp(session))
     response.set_cookie(
         "shruti_session", token, httponly=True, samesite="lax",
         secure=get_settings().is_production, max_age=12 * 3600, path="/",

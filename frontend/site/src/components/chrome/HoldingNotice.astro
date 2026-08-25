@@ -1,0 +1,45 @@
+---
+/* Shown only to the operator, and only while the holding page is up.
+ *
+ * The site header reflects a READER session, so an admin cookie leaves no
+ * mark on the page at all. Without this bar the operator loads the site,
+ * sees a normal site, and concludes the holding page is broken — which is
+ * exactly what happened, and cost an evening.
+ *
+ * It says who sees what, and gives the two controls worth having within
+ * reach: the switch, and a way to look at what everyone else is looking at.
+ */
+---
+
+<div class="holding-notice" role="status">
+  <span class="hn-dot" aria-hidden="true"></span>
+  <p>
+    <strong>Only you can see this.</strong> Visitors get the holding page —
+    you are signed in as the site owner.
+  </p>
+  <span class="hn-links">
+    <a href="/coming-soon">See what they see</a>
+    <a href="/admin/settings">Take it live</a>
+    <a href="/admin/signout">Sign out</a>
+  </span>
+</div>
+
+<style>
+  .holding-notice {
+    display: flex; align-items: center; gap: 10px 16px; flex-wrap: wrap;
+    padding: 8px clamp(12px, 4vw, 28px);
+    background: var(--accent-wash);
+    border-bottom: var(--border-w) solid var(--line);
+    font: 400 var(--text-xs) var(--font-body); color: var(--ink-soft);
+    /* Above the sticky header, and never over the content. */
+    position: relative; z-index: 50;
+  }
+  .holding-notice p { margin: 0; }
+  .holding-notice strong { color: var(--ink); font-weight: 600; }
+  .hn-dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--accent); flex: none;
+  }
+  .hn-links { display: flex; gap: 14px; margin-left: auto; flex-wrap: wrap; }
+  .hn-links a { color: var(--accent); text-underline-offset: 2px; }
+</style>

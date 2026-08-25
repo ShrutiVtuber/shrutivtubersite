@@ -124,6 +124,11 @@ export const onRequest = defineMiddleware(async (context, next) => {
          * launch. */
         return context.rewrite("/coming-soon");
       }
+      /* She is through the gate. The site has to SAY so — the header only
+       * reflects a reader session, so an admin cookie is invisible, and
+       * without a marker the honest reading of a normal-looking site is that
+       * the holding page is broken. */
+      context.locals.bypassingHolding = true;
     }
   }
 

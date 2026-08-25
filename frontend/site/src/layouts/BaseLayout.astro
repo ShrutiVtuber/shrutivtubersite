@@ -10,6 +10,7 @@ import "../styles/site.css";
 import SiteHeader from "../components/chrome/SiteHeader.astro";
 import SiteFooter from "../components/chrome/SiteFooter.astro";
 import CookieNotice from "../components/brand/CookieNotice.astro";
+import HoldingNotice from "../components/chrome/HoldingNotice.astro";
 import { site, type LiveStatus, type LinkGroups, PATHS } from "../lib/api";
 import { badgeFrom } from "../lib/live";
 import type { SocialLink } from "../components/brand/SocialLinkRow.astro";
@@ -80,6 +81,8 @@ const socials: SocialLink[] = Object.values(links?.groups ?? {})
   </head>
   <body>
     <a href="#main" class="skip-link">Skip to content</a>
+    {/* Only when the operator is past the gate — see the component. */}
+    {Astro.locals.bypassingHolding && <HoldingNotice />}
     <SiteHeader live={badge} />
     {bare ? <slot /> : <main id="main" class="site-main"><slot /></main>}
     <SiteFooter socials={socials} />

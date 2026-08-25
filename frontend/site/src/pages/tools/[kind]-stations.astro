@@ -37,7 +37,14 @@ const ATHENS = { lat: 37.9838, lon: 23.7275, label: "Athens, Greece" };
 const lat = Number(q.get("lat") ?? ATHENS.lat);
 const lon = Number(q.get("lon") ?? ATHENS.lon);
 const place = q.get("place") ?? (q.has("lat") ? "" : ATHENS.label);
-const preset = PRESETS.some((p) => p.value === q.get("preset")) ? q.get("preset")! : "hellenic";
+/* Times only, until a visitor asks for otherwise.
+ *
+ * The dedications are a real person's devotional practice, not decoration for
+ * a public page, and defaulting to them both exposes hers and assumes the
+ * reader's. The preset stays a first-class choice — the design brief is
+ * emphatic that the tool computes times and the naming is the visitor's — but
+ * the choice now starts unmade. */
+const preset = PRESETS.some((p) => p.value === q.get("preset")) ? q.get("preset")! : "none";
 const start = q.get("start") ?? "";
 
 /* THE CAP IS REFUSED, NOT TRIMMED. Asking for 60 days gets a stated refusal

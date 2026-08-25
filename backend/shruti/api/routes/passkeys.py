@@ -47,7 +47,7 @@ from webauthn.helpers.structs import (
 from shruti.core.auth import SESSION_HOURS as ADMIN_SESSION_HOURS, issue_token
 from shruti.core.config import get_settings
 from shruti.core.db import get_session
-from shruti.core.operator import operator_email
+from shruti.core.operator import operator_email, session_stamp
 from shruti.core.origins import relying_party
 from shruti.core.sessions import SESSION_COOKIE, SESSION_DAYS, issue_session
 from shruti.api.deps import require_admin
@@ -469,7 +469,7 @@ async def admin_signin(
 
     email = await operator_email(session) or ""
     response.set_cookie(
-        "shruti_session", issue_token(email),
+        "shruti_session", issue_token(email, await session_stamp(session)),
         httponly=True, samesite="lax", secure=get_settings().is_production,
         max_age=ADMIN_SESSION_HOURS * 3600, path="/",
     )

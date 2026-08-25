@@ -57,30 +57,57 @@ if (Astro.request.method === "POST") {
   }
 }
 
-interface Station { name: string; at: string; occurred: boolean; dedication: string }
-interface Stations { table: { date: string; stations: Station[] }[] }
-interface Today { reckonings: Record<string, any> }
+interface Luminary {
+  tropical: { sign: string; degree: number };
+  sidereal: { rashi: string; degree: number; nakshatra: string };
+  speedPerDay: number;
+}
+interface Today {
+  at: string;
+  reckonings: Record<string, any>;
+  sun: Luminary;
+  moon: Luminary;
+}
 
-const [stationsAnswer, todayAnswer, live, links] = await Promise.all([
-  askAstro<Stations>(`/stations?lat=${ATHENS.lat}&lon=${ATHENS.lon}&days=2&body=sun&preset=hellenic`),
+const [todayAnswer, live, links] = await Promise.all([
   askAstro<Today>(`/today?lat=${ATHENS.lat}&lon=${ATHENS.lon}`),
   site<LiveStatus>(PATHS.live),
   site<LinkGroups>(PATHS.links),
 ]);
 
-/* ── job 1: real station times, in place of the placeholder S array ──────── */
-const GLYPH: Record<string, string> = {
-  sunrise: "☉︎", noon: "☉︎", sunset: "☉︎", midnight: "☾︎",
-};
-const stations = (stationsAnswer.data?.table ?? [])
-  .flatMap((d) => d.stations)
-  .filter((s) => s.at)
-  .map((s) => ({
-    at: s.at,
-    name: s.name.charAt(0).toUpperCase() + s.name.slice(1),
-    glyph: GLYPH[s.name] ?? "☉︎",
-    who: s.dedication || "",
-  }));
+/* ── job 1, as she redirected it: the Sun and the Moon, not the stations ───
+ *
+ * The design put a station countdown here, labelled with the Hellenic
+ * dedications — Hekate Phosphoros at dawn, Apollo at noon. Those are her
+ * devotional practice and do not belong on a page the whole internet meets
+ * first, so the centrepiece is now where the two luminaries actually are.
+ *
+ * Both zodiacs, unranked, exactly as the rest of the site does it: neither is
+ * a correction of the other, and showing one alone would be picking a side the
+ * site does not pick. */
+const DEG = (n: number) => `${Math.floor(n)}°${String(Math.round((n % 1) * 60)).padStart(2, "0")}′`;
+
+const sky = todayAnswer.data
+  ? {
+      at: todayAnswer.data.at,
+      sun: {
+        sign: todayAnswer.data.sun.tropical.sign,
+        degree: DEG(todayAnswer.data.sun.tropical.degree),
+        rashi: todayAnswer.data.sun.sidereal.rashi,
+        nakshatra: todayAnswer.data.sun.sidereal.nakshatra,
+      },
+      moon: {
+        sign: todayAnswer.data.moon.tropical.sign,
+        degree: DEG(todayAnswer.data.moon.tropical.degree),
+        rashi: todayAnswer.data.moon.sidereal.rashi,
+        nakshatra: todayAnswer.data.moon.sidereal.nakshatra,
+        /* The Moon moves about half a degree an hour, which is the one thing
+           on this page that visibly changes while you watch it. */
+        through: (todayAnswer.data.moon.tropical.degree / 30) * 100,
+        perDay: todayAnswer.data.moon.speedPerDay,
+      },
+    }
+  : null;
 
 /* ── job 4: the reckonings, from /today rather than hardcoded ────────────── */
 const r = todayAnswer.data?.reckonings ?? {};
@@ -175,22 +202,45 @@ const consentSent =
 </div>
 <div class="card">
 <div style="display:flex;align-items:baseline;gap:8px 12px;flex-wrap:wrap">
-<p class="eyebrow">Next station · {ATHENS.label}</p>
+<p class="eyebrow">The sky over {ATHENS.label}</p>
 <span class="tab" id="clock" style="margin-left:auto;font-family:var(--font-mono);font-size:var(--text-xs);color:var(--ink-faint)">—</span>
 </div>
-<div class="next">
-<span class="g glyph" id="sglyph" aria-hidden="true">☉︎</span>
-<div style="display:grid;gap:2px;min-width:0"><h2 id="sname">—</h2><span class="who" id="swho"></span></div>
-<div class="count"><b class="tab" id="scount">—</b><span class="tab" id="sat">—</span></div>
-</div>
-<div class="bar" aria-hidden="true"><div id="sbar"></div></div>
+{
+  sky ? (
+    <>
+      <div class="lum">
+        <span class="g glyph" aria-hidden="true">☉</span>
+        <div style="display:grid;gap:2px;min-width:0">
+          <h2>{sky.sun.degree} {sky.sun.sign}</h2>
+          <span class="who">{sky.sun.rashi} · {sky.sun.nakshatra}</span>
+        </div>
+      </div>
+      <div class="lum">
+        <span class="g glyph" aria-hidden="true">☾</span>
+        <div style="display:grid;gap:2px;min-width:0">
+          <h2>{sky.moon.degree} {sky.moon.sign}</h2>
+          <span class="who">{sky.moon.rashi} · {sky.moon.nakshatra}</span>
+        </div>
+        <div class="count">
+          <b class="tab">{sky.moon.perDay.toFixed(2)}°</b>
+          <span class="tab">per day</span>
+        </div>
+      </div>
+      {/* The Moon through its current sign — the one thing here that moves
+          while you are looking at it. */}
+      <div class="bar" aria-hidden="true"><div id="sbar" style={`width:${sky.moon.through.toFixed(1)}%`}></div></div>
+    </>
+  ) : (
+    <p class="fine">The ephemeris could not be reached just now. It is usually a moment.</p>
+  )
+}
 <div class="reck">
 <p class="eyebrow" style="margin-bottom:3px">Today, in every reckoning kept here</p>
 <div class="r"><span>Gregorian</span><i></i><b class="tab" id="greg">—</b></div>
 <div class="r"><span>Attic</span><i></i><b>{reck.attic}</b></div>
 <div class="r"><span>Hindu · amānta</span><i></i><b>{reck.hindu}</b></div>
 <div class="r"><span>Thelemic</span><i></i><b>{reck.thelemic}</b></div>
-<p class="fine">Swiss Ephemeris · amānta reckoning · sunrise taken as the upper limb clearing the horizon. The finished instruments let you change every one of those.</p>
+<p class="fine">Swiss Ephemeris · tropical above, sidereal below, neither a correction of the other · amānta reckoning. The finished instruments let you change every one of those.</p>
 </div>
 </div>
 <div style="display:grid;gap:12px">
@@ -225,40 +275,19 @@ const consentSent =
 </footer>
 </div>
 
-{/* The stations, handed to the script as data rather than through
-    `define:vars`.
-   
-    Explicit on purpose: the value is visible in view-source, it survives
-    whatever Astro decides to do with a script tag, and the designer's script
-    stays the file they wrote rather than one Astro has rewritten.
-   
-    `is:inline` is required here. Without it Astro treats any <script> as
-    JavaScript to process and bundle, and a block of JSON does not survive
-    that. */}
-<script is:inline type="application/json" id="stations" set:html={JSON.stringify(stations)}></script>
-
-{/* The designer's countdown, unchanged except that S is now real. The maths
-    was already correct; it needed correct inputs, not new logic. */}
+{/* Only the clock and today's date move without the server. The positions
+    are a snapshot, and the page says when it was taken rather than pretending
+    to a precision it does not have. */}
 <script is:inline>
-var S = JSON.parse(document.getElementById('stations').textContent || '[]');
 function pad(n){return String(n).padStart(2,'0')}
 function tick(){
-  if(!S.length) return;
   var now=new Date();
-  var next=null,prev=null;
-  for(var i=0;i<S.length;i++){ var t=new Date(S[i].at); if(t>now){ next=S[i]; prev=S[i-1]||null; break; } }
-  if(!next){ next=S[S.length-1]; prev=S[S.length-2]||null; }
-  var nt=new Date(next.at), pt=prev?new Date(prev.at):new Date(nt.getTime()-6*3600*1000);
-  var left=Math.max(0,(nt-now)/1000), span=Math.max(1,(nt-pt)/1000);
-  var h=Math.floor(left/3600), m=Math.floor(left%3600/60), s=Math.floor(left%60);
-  document.getElementById('clock').textContent=pad(now.getHours())+':'+pad(now.getMinutes())+':'+pad(now.getSeconds());
-  document.getElementById('sglyph').textContent=next.glyph;
-  document.getElementById('sname').textContent=next.name;
-  document.getElementById('swho').textContent=next.who;
-  document.getElementById('scount').textContent='in '+(h>0?h+'h '+pad(m)+'m':m+'m '+pad(s)+'s');
-  document.getElementById('sat').textContent='at '+pad(nt.getHours())+':'+pad(nt.getMinutes())+' local';
-  document.getElementById('sbar').style.width=Math.max(0,Math.min(100,(span-left)/span*100)).toFixed(1)+'%';
-  document.getElementById('greg').textContent=now.toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short',year:'numeric'});
+  var c=document.getElementById('clock');
+  if(c) c.textContent=pad(now.getHours())+':'+pad(now.getMinutes())+':'+pad(now.getSeconds());
+  var g=document.getElementById('greg');
+  if(g) g.textContent=now.toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short',year:'numeric'});
+  var y=document.getElementById('yr');
+  if(y) y.textContent=now.getFullYear();
 }
 tick();setInterval(tick,1000);
 </script>

@@ -65,15 +65,36 @@ def authenticate(email: str, password: str) -> bool:
     return bool(s.admin_email and s.admin_password_hash and email_ok and password_ok)
 
 
-def issue_token(email: str) -> str:
+def issue_token(email: str, stamp: str = "") -> str:
+    """
+    An admin session.
+
+    `stamp` fingerprints the operator's current credentials — see
+    `operator.session_stamp`. It is what makes changing the password end every
+    other session instead of leaving them live until their own expiry.
+    """
     s = get_settings()
     now = datetime.now(timezone.utc)
     return jwt.encode(
         {"sub": email, "iat": now, "exp": now + timedelta(hours=SESSION_HOURS),
-         "scope": "admin"},
+         "scope": "admin", "stm": stamp},
         s.secret_key,
         algorithm="HS256",
     )
+
+
+def read_claims(token: str) -> dict | None:
+    """Every claim, if the token is valid and unexpired."""
+    s = get_settings()
+    if not s.secret_key:
+        return None
+    try:
+        claims = jwt.decode(token, s.secret_key, algorithms=["HS256"])
+    except jwt.PyJWTError:
+        return None
+    if claims.get("scope") != "admin":
+        return None
+    return claims
 
 
 def read_token(token: str) -> str | None:

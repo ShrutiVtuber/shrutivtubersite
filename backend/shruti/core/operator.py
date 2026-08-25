@@ -18,6 +18,7 @@ Once claimed, the token is spent and the route is closed for good.
 from __future__ import annotations
 
 import logging
+import hashlib
 import secrets
 
 from argon2 import PasswordHasher
@@ -136,3 +137,35 @@ async def set_password(session: AsyncSession, password: str) -> None:
 
 async def operator_email(session: AsyncSession) -> str:
     return await _get(session, KEY_EMAIL)
+
+
+async def session_stamp(session: AsyncSession) -> str:
+    """
+    A short fingerprint of the operator as they are RIGHT NOW.
+
+    Carried in every admin token and checked on every admin request, so a
+    token stops working the moment the thing it was issued against changes.
+
+    Without it a signed token was accepted forever until its own expiry, no
+    matter what happened to the account: changing the password after a
+    compromise left the attacker's session live for another twelve hours,
+    unclaiming the site left every old session working, and a token naming an
+    address that had never been the operator passed too, because nothing ever
+    compared it to anything.
+
+    Derived rather than stored: the password hash already changes on every
+    password change, and the email changes on a re-claim, so hashing the pair
+    gives revocation for free with no new column and no session table.
+    """
+    values = await _get_many_raw(session)
+    material = f"{values.get(KEY_EMAIL, '')}|{values.get(KEY_HASH, '')}"
+    return hashlib.sha256(material.encode()).hexdigest()[:16]
+
+
+async def _get_many_raw(session: AsyncSession) -> dict[str, str]:
+    rows = (
+        await session.execute(
+            select(SiteSetting).where(SiteSetting.key.in_([KEY_EMAIL, KEY_HASH]))
+        )
+    ).scalars().all()
+    return {r.key: r.value for r in rows}
