@@ -294,6 +294,125 @@ __all__ = [
 ]
 
 
+
+class Product(TimestampMixin, table=True):
+    """
+    Something for sale: a physical thing, or a file.
+
+    **One table for both kinds.** They differ in two ways — a physical thing
+    needs an address and has a finite number of it, a file needs delivering and
+    does not — and are identical in every other way a screen cares about.
+    Splitting them would mean writing the shop, the admin and the checkout
+    twice to say the same thing.
+
+    **Mirrored to Stripe, not owned by it.** The row here is what the shop
+    renders from, so a page load is not a network call; the Stripe product and
+    price are what actually take the money. They are kept in step on save.
+
+    **Tax is per product.** Digital goods and physical goods are taxed
+    differently, and a jumper is taxed differently from a book — so the code
+    lives on the row rather than being a constant somebody has to remember to
+    change.
+    """
+
+    __tablename__ = "product"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    slug: str = Field(index=True, unique=True)
+    name: str
+    kind: str = Field(default="digital", index=True)      # physical | digital
+
+    tagline: str = ""
+    body_md: str = ""
+
+    # Minor units, as Stripe counts them: 1100 is €11.00. Never a float —
+    # money in a float is how a cent goes missing.
+    price_cents: int = 0
+    currency: str = "eur"
+
+    # The picture in the shop.
+    media_id: Optional[int] = Field(default=None, foreign_key="media.id")
+
+    # What a buyer of a digital product receives. Not servable from the public
+    # media path: a paid file behind a guessable URL is not a paid file.
+    file_id: Optional[int] = Field(default=None, foreign_key="product_file.id")
+
+    # How many are left. None means "as many as you like", which is what every
+    # digital product is and some physical ones are.
+    stock: Optional[int] = None
+
+    # Stripe's own tax code. `txcd_10000000` is general digital goods, which is
+    # what the memberships already use; physical things want their own.
+    tax_code: str = "txcd_10000000"
+
+    stripe_product_id: str = ""
+    stripe_price_id: str = ""
+
+    visible: bool = Field(default=False)
+    position: int = Field(default=0)
+
+
+class ProductFile(TimestampMixin, table=True):
+    """
+    The file a digital product delivers.
+
+    Deliberately not a `Media` row. Media is images, served straight off a
+    public path by Caddy — exactly what a paid file must not be. These live
+    apart, are fetched only through a route that checks the buyer first, and
+    keep the original filename because a download called
+    `9f2c…d1.zip` is not something anyone can use.
+    """
+
+    __tablename__ = "product_file"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    # Content-hashed on disk or in the bucket, like media.
+    stored_name: str = Field(index=True, unique=True)
+    # What it is called when it lands in someone's downloads.
+    original_name: str
+    mime_type: str = ""
+    size_bytes: int = 0
+    storage_backend: str = "local"
+
+
+class Order(TimestampMixin, table=True):
+    """
+    One completed purchase.
+
+    Written from the webhook, never from the browser coming back — a buyer who
+    closes the tab has still bought the thing, and a buyer who reloads the
+    thank-you page has not bought it twice.
+
+    Holds what is needed to honour the sale and to answer "what did I buy?"
+    six months later. The address is here because a physical order cannot be
+    posted without one; it is not here for anything else.
+    """
+
+    __tablename__ = "product_order"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    # Stripe's session id, and the thing that makes a repeated webhook a no-op.
+    checkout_session_id: str = Field(index=True, unique=True)
+    payment_intent_id: str = ""
+
+    email: str = Field(index=True)
+    product_id: Optional[int] = Field(default=None, foreign_key="product.id")
+    product_name: str = ""          # kept flat: the product may be renamed later
+    quantity: int = 1
+
+    amount_total_cents: int = 0
+    currency: str = "eur"
+
+    # Posted, packed, still to do. Physical only; a digital order is done the
+    # moment it is paid for.
+    fulfilment: str = Field(default="none", index=True)   # none | to_send | sent
+    shipping_json: str = ""         # the address as Stripe gave it
+
+    # How a buyer gets back to their file, without an account.
+    download_token: str = Field(default="", index=True)
+    downloads: int = 0
+
+
 # Accounts and everything that hangs off them. Imported here so metadata
 # sees them and Alembic autogenerate does not miss the tables.
 from shruti.models.accounts import (  # noqa: E402,F401

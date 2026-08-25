@@ -141,3 +141,27 @@ Media uploads are **images only** (`ALLOWED_IMAGE`). A digital product is a PDF
 or a zip or audio, so product files need their own allow-list and must not be
 servable from the public media path — a paid file behind a guessable URL is not
 a paid file.
+
+
+### Managed Payments — the thing that actually decides the tax answer
+
+Her account has **Managed Payments** on, which was switched on for the
+memberships. It makes Stripe the merchant of record: Stripe owes the VAT, files
+it, and is the name on the buyer's statement. That is why the memberships need
+no registration of her own — a better answer than the one first given here.
+
+**It does not support shipping.** A checkout session with
+`shipping_address_collection` is refused outright while it is on.
+
+So the shop splits along a line that is real rather than convenient:
+
+| | Digital | Physical |
+|---|---|---|
+| Managed Payments | on | **off**, per session |
+| Merchant of record | Stripe | **her** |
+| VAT registration | Stripe's problem | **hers** |
+| Shipping address | not collected | collected |
+
+Physical sales pass `managed_payments: {enabled: false}`, because they cannot
+work otherwise. That is the piece worth an accountant's attention **before the
+first physical thing sells** — not the digital pricing, which is handled.

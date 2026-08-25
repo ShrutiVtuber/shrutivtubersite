@@ -79,6 +79,15 @@ class Settings(BaseSettings):
     # hosted Customer Portal. That is not laziness — it keeps the site outside
     # PCI scope entirely, and the Portal IS the one-click cancellation.
     stripe_secret_key: str = ""
+    # Whether a listed price already contains the tax. Inclusive is what the
+    # memberships use and what a European shopper expects — the number on the
+    # page is the number they pay. A setting rather than a constant because
+    # physical goods sold elsewhere often are not priced that way, and finding
+    # that out should not need a migration.
+    stripe_tax_behavior: str = "inclusive"
+    # Where physical things can be posted. Narrow to begin with on purpose —
+    # a country on this list is a promise to actually post there.
+    shop_ship_to: list[str] = ["GR"]
     stripe_publishable_key: str = ""
     # Signs the webhook. Without it every webhook is refused, because an
     # unverified webhook is an open endpoint for inventing subscriptions.
