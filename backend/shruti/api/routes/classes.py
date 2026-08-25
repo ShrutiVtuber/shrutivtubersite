@@ -747,6 +747,66 @@ async def read_lesson(
     return body
 
 
+@router.get("/{slug}/lessons/{lesson_id}/file")
+async def lesson_file(
+    slug: str, lesson_id: int, request: Request,
+    session: AsyncSession = Depends(get_session),
+):
+    """
+    The PDF or the audio a lesson hands over.
+
+    Guarded by the same check as the lesson itself, and served from the same
+    store a bought product file uses — a course file is no more reachable than
+    a purchased one, and neither is reachable by guessing a name.
+    """
+    from shruti.api.routes.accounts import current_user
+    from shruti.models import ProductFile
+
+    course = (
+        await session.execute(select(Course).where(Course.slug == slug))
+    ).scalar_one_or_none()
+    lesson = await session.get(Lesson, lesson_id)
+    if course is None or lesson is None:
+        raise HTTPException(404, "no such lesson")
+
+    module = await session.get(Module, lesson.module_id)
+    if module is None or module.course_id != course.id:
+        raise HTTPException(404, "no such lesson")
+
+    user = await current_user(request, session)
+    allowed, _reason = await may_open(user, course, session)
+    if not (allowed or lesson.free_preview):
+        raise HTTPException(
+            403,
+            "this is part of a class you do not have yet"
+            if user else "sign in to open this",
+        )
+
+    if not lesson.file_id:
+        raise HTTPException(404, "there is no file on this lesson")
+    row = await session.get(ProductFile, lesson.file_id)
+    if row is None:
+        raise HTTPException(410, "the file is missing; please write and it will be sorted out")
+
+    from shruti.core.storage import fetch
+
+    found = await fetch(row.stored_name)
+    if found is None:
+        raise HTTPException(410, "the file is missing; please write and it will be sorted out")
+
+    data, content_type = found
+    return Response(
+        content=data,
+        media_type=content_type or row.mime_type or "application/octet-stream",
+        headers={
+            # The name she uploaded, not the hash it is stored under.
+            "Content-Disposition": f'attachment; filename="{row.original_name}"',
+            # One person's course material. Nothing in between should keep it.
+            "Cache-Control": "private, no-store",
+        },
+    )
+
+
 class ProgressIn(BaseModel):
     seconds: int | None = None
     done: bool | None = None

@@ -21,6 +21,9 @@ const qCount = Array.isArray(questions.body) ? questions.body.length : 0;
 const rows = Array.isArray(sections.body) ? sections.body : [];
 const hidden = rows.filter((s: any) => !s.visible).length;
 /* Only the count, for the tile. The page itself does the real listing. */
+const classCall = await asAdmin(Astro, "/api/classes/admin/courses");
+const classList: any[] = Array.isArray(classCall.body) ? classCall.body : [];
+
 const discountList = await asAdmin(Astro, "/api/shop/admin/discounts");
 const discountCodes: any[] = Array.isArray(discountList.body) ? discountList.body : [];
 
@@ -57,6 +60,14 @@ const skyEntries: any[] = skyList.body?.entries ?? [];
       <span class="adm-lbl">Inbox</span>
       <span class="big">{msgCount + qCount}</span>
       <span class="sub">{msgCount} messages · {qCount} questions</span>
+    </a>
+
+    <a class="adm-card tile" href="/admin/classes">
+      <span class="adm-lbl">Classes</span>
+      <span class="big">{classList.length}</span>
+      <span class="sub">
+        {classList.filter((c: any) => c.kind === "workshop").length} workshops
+      </span>
     </a>
 
     <a class="adm-card tile" href="/admin/discounts">

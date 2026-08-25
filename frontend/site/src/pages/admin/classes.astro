@@ -1,0 +1,380 @@
+---
+/* Classes and workshops.
+ *
+ * The list and the course form. The outline — modules and lessons — lives on
+ * its own screen, because a course with forty lessons in the same form as its
+ * price and its description is a form nobody can find anything in.
+ */
+import AdminLayout from "../../layouts/AdminLayout.astro";
+import CsrfField from "../../components/forms/CsrfField.astro";
+import Button from "../../components/forms/Button.astro";
+import Badge from "../../components/navigation/Badge.astro";
+import MediaField from "../../components/forms/MediaField.astro";
+import { asAdmin } from "../../lib/admin";
+import { verifyCsrf } from "../../lib/csrf";
+
+export const prerender = false;
+
+let notice = "";
+let failed = "";
+
+const num = (form: FormData, key: string): number | null => {
+  const raw = String(form.get(key) ?? "").trim();
+  return raw === "" ? null : Number(raw);
+};
+
+if (Astro.request.method === "POST") {
+  const form = await Astro.request.formData();
+  if (!verifyCsrf(Astro.cookies, form)) {
+    failed = "That did not save. Reload the page and try again.";
+  } else {
+    const action = String(form.get("action") ?? "");
+    const id = String(form.get("id") ?? "");
+
+    if (action === "save" || action === "create") {
+      const euros = String(form.get("price") ?? "0").replace(",", ".");
+      const local = String(form.get("starts_at") ?? "").trim();
+      const payload: Record<string, unknown> = {
+        slug: String(form.get("slug") ?? "").trim(),
+        title: String(form.get("title") ?? ""),
+        kind: String(form.get("kind") ?? "class"),
+        tagline: String(form.get("tagline") ?? ""),
+        body_md: String(form.get("body_md") ?? ""),
+        media_id: num(form, "media_id"),
+        price_cents: Math.round(Number(euros || 0) * 100),
+        tax_code: String(form.get("tax_code") ?? "txcd_10000000"),
+        minutes: num(form, "minutes"),
+        seats: num(form, "seats"),
+        visible: String(form.get("visible") ?? "off") === "on",
+        position: Number(form.get("position") ?? 0),
+        starts_at: local ? String(form.get("starts_at_iso") ?? local) : null,
+      };
+      const r = action === "create"
+        ? await asAdmin(Astro, "/api/classes/admin/courses", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify(payload),
+          })
+        : await asAdmin(Astro, `/api/classes/admin/courses/${id}`, {
+            method: "PATCH",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+
+      if (!r.ok) failed = r.body?.detail ?? "That did not save.";
+      else if (r.body?.stripeError)
+        failed = `Saved, but Stripe did not take it: ${r.body.stripeError}`;
+      else notice = "Saved.";
+    }
+
+    if (action === "tiers" && id) {
+      const keys = form.getAll("tier_keys").map(String).filter(Boolean);
+      const r = await asAdmin(Astro, `/api/classes/admin/courses/${id}/tiers`, {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ tier_keys: keys }),
+      });
+      notice = r.ok
+        ? (keys.length
+            ? `Included with ${keys.join(", ")}. Access follows when a subscription is next looked at.`
+            : "No longer included with any membership.")
+        : "";
+      failed = r.ok ? "" : (r.body?.detail ?? "That did not save.");
+    }
+
+    if (action === "delete" && id) {
+      const r = await asAdmin(Astro, `/api/classes/admin/courses/${id}`, { method: "DELETE" });
+      notice = r.ok ? "Deleted." : "";
+      failed = r.ok ? "" : (r.body?.detail ?? "That could not be deleted.");
+    }
+  }
+}
+
+const editing = Astro.url.searchParams.get("edit") ?? "";
+const creating = Astro.url.searchParams.get("new") === "1";
+
+const [list, tierList] = await Promise.all([
+  asAdmin(Astro, "/api/classes/admin/courses"),
+  asAdmin(Astro, "/api/billing/admin/tiers"),
+]);
+const courses: any[] = Array.isArray(list.body) ? list.body : [];
+const tiers: any[] = Array.isArray(tierList.body) ? tierList.body : [];
+
+const BLANK = {
+  id: "", slug: "", title: "", kind: "class", tagline: "", body_md: "",
+  media_id: null, price_cents: 0, tax_code: "txcd_10000000", starts_at: null,
+  minutes: null, seats: null, visible: false, position: 0, includedWith: [],
+};
+const row = creating ? BLANK : courses.find((c) => String(c.id) === editing) ?? null;
+const money = (cents: number) => `${(cents / 100).toFixed(2)} EUR`;
+---
+
+<AdminLayout title="Classes">
+  <h1 class="adm-h">Classes and workshops</h1>
+
+  {notice && <p class="adm-ok" role="status">{notice}</p>}
+  {failed && <p class="adm-bad" role="alert">{failed}</p>}
+
+  {
+    row ? (
+      <>
+      <form method="POST" class="adm-card editor">
+        <CsrfField />
+        <input type="hidden" name="action" value={creating ? "create" : "save"} />
+        {!creating && <input type="hidden" name="id" value={row.id} />}
+        <h2 class="h2">{creating ? "New" : `Editing ${row.title}`}</h2>
+
+        <section class="group">
+          <h3 class="group-head">What it is</h3>
+          <label class="field">
+            <span class="adm-lbl">Kind</span>
+            <select class="adm-input" name="kind" data-kind>
+              <option value="class" selected={row.kind === "class"}>
+                Class — recorded, taken whenever they like
+              </option>
+              <option value="workshop" selected={row.kind === "workshop"}>
+                Workshop — live, on a date, with a number of seats
+              </option>
+            </select>
+          </label>
+          <label class="field">
+            <span class="adm-lbl">Title</span>
+            <input class="adm-input" name="title" value={row.title} required />
+          </label>
+          <label class="field">
+            <span class="adm-lbl">Address on the site</span>
+            <input class="adm-input" name="slug" value={row.slug} required
+                   placeholder="casting-a-chart" />
+            <p class="hint">It lives at /classes/&lt;this&gt;. Changing it breaks any link already shared.</p>
+          </label>
+          <label class="field">
+            <span class="adm-lbl">Tagline</span>
+            <input class="adm-input" name="tagline" value={row.tagline} />
+          </label>
+          <label class="field">
+            <span class="adm-lbl">Description</span>
+            <textarea class="adm-area" name="body_md" rows="8">{row.body_md}</textarea>
+            <p class="hint">Markdown. The sales page.</p>
+          </label>
+        </section>
+
+        <section class="group">
+          <h3 class="group-head">Picture</h3>
+          <MediaField name="media_id" value={row.media_id} label="Cover" />
+        </section>
+
+        <section class="group" data-live hidden={row.kind !== "workshop"}>
+          <h3 class="group-head">When it happens</h3>
+          <label class="field">
+            <span class="adm-lbl">Starts</span>
+            <input class="adm-input" type="datetime-local" data-dt-local />
+            <input type="hidden" name="starts_at_iso" value={row.starts_at ?? ""} data-dt-value />
+            <input type="hidden" name="starts_at" value={row.starts_at ?? ""} />
+            <p class="hint">Your local time, stored as an instant so it survives a clock change.</p>
+          </label>
+          <label class="field">
+            <span class="adm-lbl">How long, in minutes</span>
+            <input class="adm-input" name="minutes" value={row.minutes ?? ""} inputmode="numeric" />
+          </label>
+          <label class="field">
+            <span class="adm-lbl">Seats</span>
+            <input class="adm-input" name="seats" value={row.seats ?? ""} inputmode="numeric"
+                   placeholder="leave blank for no limit" />
+            <p class="hint">
+              A free workshop with seats still takes an RSVP, so you know how
+              many are coming.
+            </p>
+          </label>
+        </section>
+
+        <section class="group">
+          <h3 class="group-head">Money</h3>
+          <label class="field">
+            <span class="adm-lbl">Price, in euros</span>
+            <input class="adm-input" name="price" value={(row.price_cents / 100).toFixed(2)}
+                   inputmode="decimal" required />
+            <p class="hint">
+              Zero and no seats means it is simply free to anybody. Zero with
+              seats means free but by RSVP.
+            </p>
+          </label>
+          <label class="field">
+            <span class="adm-lbl">Stripe tax code</span>
+            <input class="adm-input" name="tax_code" value={row.tax_code} />
+            <p class="hint">
+              <code>txcd_10000000</code> covers a recorded course. Live teaching
+              may be treated differently — worth an accountant before the first
+              workshop sells.
+            </p>
+          </label>
+        </section>
+
+        <section class="group">
+          <h3 class="group-head">Publishing</h3>
+          <div class="field field--check">
+            <input type="hidden" name="visible" value="off" />
+            <label class="check">
+              <input type="checkbox" name="visible" checked={row.visible} />
+              <span>Published</span>
+            </label>
+          </div>
+          <label class="field">
+            <span class="adm-lbl">Order</span>
+            <input class="adm-input" name="position" value={row.position} inputmode="numeric" />
+          </label>
+        </section>
+
+        <div class="row-actions">
+          <Button type="submit">{creating ? "Add it" : "Save"}</Button>
+          <a class="cancel" href="/admin/classes">Cancel</a>
+        </div>
+      </form>
+
+      {!creating && (
+        <section class="adm-card">
+          <h2 class="h2">Included with</h2>
+          <p class="adm-note">
+            Anybody on a ticked membership can open this while they are on it.
+            Cancelling takes the materials and leaves every tick of their
+            progress, so coming back is coming back rather than starting again.
+          </p>
+          <form method="POST">
+            <CsrfField />
+            <input type="hidden" name="action" value="tiers" />
+            <input type="hidden" name="id" value={row.id} />
+            {tiers.length === 0 && <p class="adm-note">No memberships exist yet.</p>}
+            {tiers.map((t) => (
+              <div class="field field--check">
+                <label class="check">
+                  <input type="checkbox" name="tier_keys" value={t.key}
+                         checked={(row.includedWith ?? []).includes(t.key)} />
+                  <span>{t.name}</span>
+                </label>
+              </div>
+            ))}
+            <div><Button type="submit" variant="secondary">Save who gets it</Button></div>
+          </form>
+        </section>
+      )}
+      </>
+    ) : (
+      <>
+        <div class="list-actions">
+          <Button href="/admin/classes?new=1">Add a class or workshop</Button>
+        </div>
+
+        <div class="rows">
+          {
+            courses.length === 0 ? (
+              <p class="adm-note">Nothing yet — “Add a class or workshop” is where it starts.</p>
+            ) : (
+              courses.map((c) => (
+                <div class="row" data-hidden={!c.visible || undefined}>
+                  <div class="row-main">
+                    <span class="row-label">{c.title}</span>
+                    <span class="row-sub">
+                      {c.kind} · {c.price_cents === 0 ? "free" : money(c.price_cents)}
+                      {" · "}{c.modules} parts, {c.lessons} lessons
+                      {c.seats ? ` · ${c.seats} seats` : ""}
+                    </span>
+                    {c.includedWith.length > 0 && (
+                      <span class="row-sub">with {c.includedWith.join(", ")}</span>
+                    )}
+                  </div>
+                  {!c.sellable && <Badge tone="faint">no Stripe price</Badge>}
+                  <Badge tone={c.visible ? "accent" : "faint"}>
+                    {c.visible ? "published" : "draft"}
+                  </Badge>
+                  <div class="row-actions">
+                    <a class="edit" href={`/admin/classes/outline?course=${c.id}`}>Lessons</a>
+                    <a class="edit" href={`/admin/classes?edit=${c.id}`}>Edit</a>
+                    <form method="POST" class="inline" data-confirm={`Delete ${c.title}?`}>
+                      <CsrfField />
+                      <input type="hidden" name="action" value="delete" />
+                      <input type="hidden" name="id" value={c.id} />
+                      <button type="submit" class="danger">Delete</button>
+                    </form>
+                  </div>
+                </div>
+              ))
+            )
+          }
+        </div>
+      </>
+    )
+  }
+</AdminLayout>
+
+<style>
+  .editor { display: grid; gap: var(--space-5); max-width: 760px; }
+  .group { display: grid; gap: var(--space-3); }
+  .group[hidden] { display: none; }
+  .group-head {
+    margin: 0; font: 600 var(--text-xs) var(--font-mono); letter-spacing: .08em;
+    text-transform: uppercase; color: var(--accent); padding-bottom: 4px;
+    border-bottom: var(--border-w) solid var(--accent-wash);
+  }
+  .field { display: grid; gap: 4px; }
+  .field--check { gap: 6px; }
+  .check { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+  .check input { width: 18px; height: 18px; accent-color: var(--accent); }
+  .hint { margin: 0; font: 400 var(--text-xs) var(--font-body); color: var(--ink-soft); max-width: 62ch; }
+  .list-actions { margin-bottom: var(--space-4); }
+  .rows { display: grid; gap: 6px; }
+  .row {
+    display: flex; gap: var(--space-3); align-items: center; flex-wrap: wrap;
+    padding: var(--space-3); border: var(--border-w) solid var(--line);
+    border-radius: var(--radius-sm); background: var(--surface-card);
+  }
+  .row[data-hidden] { opacity: .6; border-style: dashed; }
+  .row-main { display: grid; gap: 2px; min-width: 0; flex: 1; }
+  .row-label { font: 500 var(--text-body) var(--font-body); color: var(--ink); }
+  .row-sub { font: 400 var(--text-xs) var(--font-mono); color: var(--ink-faint); }
+  .row-actions { display: flex; gap: var(--space-3); align-items: center; }
+  .inline { display: inline; }
+  .h2 { font: 600 var(--text-h3) var(--font-display); color: var(--ink); margin: 0; }
+  .edit, .cancel { font: 500 var(--text-sm) var(--font-body); color: var(--accent); text-decoration: none; }
+  .edit:hover, .cancel:hover { text-decoration: underline; }
+  .danger {
+    appearance: none; background: none; border: 0; padding: 0; cursor: pointer;
+    font: 500 var(--text-sm) var(--font-body); color: var(--live);
+  }
+  .danger:hover { text-decoration: underline; }
+</style>
+
+<script>
+  /* The live fields belong to a workshop and to nothing else, so they appear
+     with the choice rather than sitting there confusing a class. */
+  const kind = document.querySelector<HTMLSelectElement>("[data-kind]");
+  const live = document.querySelector<HTMLElement>("[data-live]");
+  const show = () => { if (live && kind) live.hidden = kind.value !== "workshop"; };
+  kind?.addEventListener("change", show);
+  show();
+
+  /* A time is typed in the local clock and stored as an instant. */
+  const local = document.querySelector<HTMLInputElement>("[data-dt-local]");
+  const hidden = document.querySelector<HTMLInputElement>("[data-dt-value]");
+  if (local && hidden) {
+    if (hidden.value) {
+      const at = new Date(hidden.value);
+      if (!Number.isNaN(at.getTime())) {
+        const pad = (n: number) => String(n).padStart(2, "0");
+        local.value = `${at.getFullYear()}-${pad(at.getMonth() + 1)}-${pad(at.getDate())}`
+          + `T${pad(at.getHours())}:${pad(at.getMinutes())}`;
+      }
+    }
+    const sync = () => {
+      if (!local.value) { hidden.value = ""; return; }
+      const at = new Date(local.value);
+      hidden.value = Number.isNaN(at.getTime()) ? "" : at.toISOString();
+    };
+    local.addEventListener("change", sync);
+    local.form?.addEventListener("submit", sync);
+  }
+
+  document.querySelectorAll<HTMLFormElement>("form[data-confirm]").forEach((form) => {
+    form.addEventListener("submit", (event) => {
+      if (!window.confirm(form.dataset.confirm ?? "Delete this?")) event.preventDefault();
+    });
+  });
+</script>

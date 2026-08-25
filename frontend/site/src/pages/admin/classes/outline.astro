@@ -1,0 +1,468 @@
+---
+/* The outline: parts, and the lessons in them.
+ *
+ * Its own screen because a course with forty lessons does not belong in the
+ * same form as its price. This is the screen she will spend the most time in,
+ * so it stays flat — everything visible, nothing behind a click that does not
+ * need to be.
+ */
+import AdminLayout from "../../../layouts/AdminLayout.astro";
+import CsrfField from "../../../components/forms/CsrfField.astro";
+import Button from "../../../components/forms/Button.astro";
+import Badge from "../../../components/navigation/Badge.astro";
+import { asAdmin } from "../../../lib/admin";
+import { verifyCsrf } from "../../../lib/csrf";
+
+export const prerender = false;
+
+let notice = "";
+let failed = "";
+
+const num = (form: FormData, key: string): number | null => {
+  const raw = String(form.get(key) ?? "").trim();
+  return raw === "" ? null : Number(raw);
+};
+
+if (Astro.request.method === "POST") {
+  const form = await Astro.request.formData();
+  if (!verifyCsrf(Astro.cookies, form)) {
+    failed = "That did not save. Reload the page and try again.";
+  } else {
+    const action = String(form.get("action") ?? "");
+    const id = String(form.get("id") ?? "");
+    const course = String(form.get("course") ?? "");
+
+    if (action === "add-module") {
+      const r = await asAdmin(Astro, `/api/classes/admin/courses/${course}/modules`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ title: String(form.get("title") ?? "") }),
+      });
+      notice = r.ok ? "Part added." : "";
+      failed = r.ok ? "" : (r.body?.detail ?? "That did not save.");
+    }
+
+    if (action === "rename-module" && id) {
+      const r = await asAdmin(Astro, `/api/classes/admin/modules/${id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          title: String(form.get("title") ?? ""),
+          position: Number(form.get("position") ?? 0),
+        }),
+      });
+      notice = r.ok ? "Saved." : "";
+      failed = r.ok ? "" : (r.body?.detail ?? "That did not save.");
+    }
+
+    if (action === "delete-module" && id) {
+      const r = await asAdmin(Astro, `/api/classes/admin/modules/${id}`, { method: "DELETE" });
+      notice = r.ok ? "Part removed, with its lessons." : "";
+      failed = r.ok ? "" : (r.body?.detail ?? "That did not delete.");
+    }
+
+    if (action === "add-lesson" && id) {
+      const r = await asAdmin(Astro, `/api/classes/admin/modules/${id}/lessons`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          title: String(form.get("title") ?? ""),
+          kind: String(form.get("kind") ?? "video"),
+        }),
+      });
+      notice = r.ok ? "Lesson added — open it to put something in it." : "";
+      failed = r.ok ? "" : (r.body?.detail ?? "That did not save.");
+    }
+
+    if (action === "save-lesson" && id) {
+      const r = await asAdmin(Astro, `/api/classes/admin/lessons/${id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          title: String(form.get("title") ?? ""),
+          kind: String(form.get("kind") ?? "video"),
+          position: Number(form.get("position") ?? 0),
+          body_md: String(form.get("body_md") ?? ""),
+          video_provider: String(form.get("video_provider") ?? ""),
+          video_id: String(form.get("video_id") ?? "").trim(),
+          duration_seconds: num(form, "duration_minutes") === null
+            ? null : Math.round(Number(form.get("duration_minutes")) * 60),
+          file_id: num(form, "file_id"),
+          free_preview: String(form.get("free_preview") ?? "off") === "on",
+        }),
+      });
+      notice = r.ok ? "Saved." : "";
+      failed = r.ok ? "" : (r.body?.detail ?? "That did not save.");
+    }
+
+    if (action === "delete-lesson" && id) {
+      const r = await asAdmin(Astro, `/api/classes/admin/lessons/${id}`, { method: "DELETE" });
+      notice = r.ok ? "Lesson removed." : "";
+      failed = r.ok ? "" : (r.body?.detail ?? "That did not delete.");
+    }
+
+    if (action === "add-question" && id) {
+      const r = await asAdmin(Astro, `/api/classes/admin/lessons/${id}/questions`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          prompt: String(form.get("prompt") ?? ""),
+          choices: String(form.get("choices") ?? ""),
+          answer_index: Number(form.get("answer_index") ?? 0),
+          explanation: String(form.get("explanation") ?? ""),
+        }),
+      });
+      notice = r.ok ? "Question added." : "";
+      failed = r.ok ? "" : (r.body?.detail ?? "That question was not added.");
+    }
+
+    if (action === "delete-question" && id) {
+      const r = await asAdmin(Astro, `/api/classes/admin/questions/${id}`, { method: "DELETE" });
+      notice = r.ok ? "Question removed." : "";
+      failed = r.ok ? "" : (r.body?.detail ?? "That did not delete.");
+    }
+  }
+}
+
+const courseId = Astro.url.searchParams.get("course") ?? "";
+const openLesson = Astro.url.searchParams.get("lesson") ?? "";
+
+const [list, outlineCall, fileCall] = await Promise.all([
+  asAdmin(Astro, "/api/classes/admin/courses"),
+  courseId ? asAdmin(Astro, `/api/classes/admin/courses/${courseId}/outline`) : Promise.resolve({ body: [] }),
+  asAdmin(Astro, "/api/shop/admin/files"),
+]);
+const courses: any[] = Array.isArray(list.body) ? list.body : [];
+const outline: any[] = Array.isArray(outlineCall.body) ? outlineCall.body : [];
+const files: any[] = Array.isArray(fileCall.body) ? fileCall.body : [];
+const course = courses.find((c) => String(c.id) === courseId) ?? null;
+
+const lesson = outline.flatMap((m) => m.lessons).find((l: any) => String(l.id) === openLesson) ?? null;
+const questions: any[] = lesson && lesson.kind === "quiz"
+  ? (await asAdmin(Astro, `/api/classes/admin/lessons/${lesson.id}/questions`)).body ?? []
+  : [];
+
+const KINDS = [
+  ["video", "Video"], ["text", "Written lesson"], ["pdf", "A PDF to download"],
+  ["audio", "Audio"], ["quiz", "Self-check questions"],
+];
+const here = (extra: Record<string, string> = {}) => {
+  const u = new URLSearchParams({ course: courseId });
+  for (const [k, v] of Object.entries(extra)) v ? u.set(k, v) : u.delete(k);
+  return `/admin/classes/outline?${u}`;
+};
+---
+
+<AdminLayout title="Course outline">
+  <div class="head">
+    <h1 class="adm-h">{course ? course.title : "Course outline"}</h1>
+    {course && <a class="cancel" href="/admin/classes">All classes</a>}
+  </div>
+
+  {notice && <p class="adm-ok" role="status">{notice}</p>}
+  {failed && <p class="adm-bad" role="alert">{failed}</p>}
+
+  {!course && (
+    <section class="adm-card">
+      <h2 class="h2">Which one</h2>
+      {courses.length === 0 && <p class="adm-note">No classes yet.</p>}
+      <ul class="plain">
+        {courses.map((c) => (
+          <li><a href={`/admin/classes/outline?course=${c.id}`}>{c.title}</a></li>
+        ))}
+      </ul>
+    </section>
+  )}
+
+  {course && lesson && (
+    <form method="POST" class="adm-card editor">
+      <CsrfField />
+      <input type="hidden" name="action" value="save-lesson" />
+      <input type="hidden" name="id" value={lesson.id} />
+      <input type="hidden" name="course" value={courseId} />
+      <h2 class="h2">{lesson.title}</h2>
+
+      <label class="field">
+        <span class="adm-lbl">Title</span>
+        <input class="adm-input" name="title" value={lesson.title} required />
+      </label>
+      <label class="field">
+        <span class="adm-lbl">What it is</span>
+        <select class="adm-input" name="kind">
+          {KINDS.map(([v, label]) => (
+            <option value={v} selected={lesson.kind === v}>{label}</option>
+          ))}
+        </select>
+      </label>
+
+      <label class="field">
+        <span class="adm-lbl">Words</span>
+        <textarea class="adm-area" name="body_md" rows="8">{lesson.body_md}</textarea>
+        <p class="hint">
+          Markdown. The whole of a written lesson, or the notes under a video.
+        </p>
+      </label>
+
+      <div class="two">
+        <label class="field">
+          <span class="adm-lbl">Video, from</span>
+          <select class="adm-input" name="video_provider">
+            <option value="" selected={!lesson.video_provider}>— none —</option>
+            <option value="bunny" selected={lesson.video_provider === "bunny"}>Bunny</option>
+            <option value="cloudflare" selected={lesson.video_provider === "cloudflare"}>Cloudflare</option>
+          </select>
+        </label>
+        <label class="field">
+          <span class="adm-lbl">Its id</span>
+          <input class="adm-input" name="video_id" value={lesson.video_id} />
+          <p class="hint">The GUID Bunny shows on the video.</p>
+        </label>
+      </div>
+
+      <div class="two">
+        <label class="field">
+          <span class="adm-lbl">How long, in minutes</span>
+          <input class="adm-input" name="duration_minutes" inputmode="numeric"
+                 value={lesson.duration_seconds ? Math.round(lesson.duration_seconds / 60) : ""} />
+          <p class="hint">Shown in the list, so somebody can plan an evening.</p>
+        </label>
+        <label class="field">
+          <span class="adm-lbl">File to hand over</span>
+          <select class="adm-input" name="file_id">
+            <option value="">— none —</option>
+            {files.map((f) => (
+              <option value={f.id} selected={String(lesson.file_id) === String(f.id)}>
+                {f.name}
+              </option>
+            ))}
+          </select>
+          <p class="hint">Uploaded on the Shop screen. The same guarded store.</p>
+        </label>
+      </div>
+
+      <div class="two">
+        <div class="field field--check">
+          <input type="hidden" name="free_preview" value="off" />
+          <label class="check">
+            <input type="checkbox" name="free_preview" checked={lesson.free_preview} />
+            <span>Anybody can watch this one</span>
+          </label>
+          <p class="hint">One good lesson given away sells more than a locked door does.</p>
+        </div>
+        <label class="field">
+          <span class="adm-lbl">Order</span>
+          <input class="adm-input" name="position" value={lesson.position} inputmode="numeric" />
+        </label>
+      </div>
+
+      <div class="row-actions">
+        <Button type="submit">Save</Button>
+        <a class="cancel" href={here()}>Done</a>
+      </div>
+    </form>
+  )}
+
+  {course && lesson && lesson.kind === "quiz" && (
+    <section class="adm-card">
+      <h2 class="h2">Questions <span class="count">{questions.length}</span></h2>
+      <p class="adm-note">
+        Self-check. Nothing is scored and nothing is gated — the answer and the
+        reason are shown once they have chosen, because the explanation is the
+        point rather than the mark.
+      </p>
+      {questions.map((q) => (
+        <div class="qrow">
+          <div>
+            <p class="qprompt">{q.prompt}</p>
+            <p class="hint">
+              {q.choices.split("\n").filter(Boolean).map((c: string, i: number) => (
+                <span class={i === q.answer_index ? "right" : ""}>{c}{" · "}</span>
+              ))}
+            </p>
+          </div>
+          <form method="POST" class="inline">
+            <CsrfField />
+            <input type="hidden" name="action" value="delete-question" />
+            <input type="hidden" name="id" value={q.id} />
+            <input type="hidden" name="course" value={courseId} />
+            <button type="submit" class="danger">Remove</button>
+          </form>
+        </div>
+      ))}
+      <form method="POST" class="qadd">
+        <CsrfField />
+        <input type="hidden" name="action" value="add-question" />
+        <input type="hidden" name="id" value={lesson.id} />
+        <input type="hidden" name="course" value={courseId} />
+        <label class="field">
+          <span class="adm-lbl">Question</span>
+          <input class="adm-input" name="prompt" required />
+        </label>
+        <label class="field">
+          <span class="adm-lbl">Answers, one per line</span>
+          <textarea class="adm-area" name="choices" rows="4" required></textarea>
+        </label>
+        <div class="two">
+          <label class="field">
+            <span class="adm-lbl">Which is right (1, 2, 3…)</span>
+            <input class="adm-input" name="answer_index_human" inputmode="numeric" value="1" data-answer />
+            <input type="hidden" name="answer_index" value="0" data-answer-zero />
+          </label>
+          <label class="field">
+            <span class="adm-lbl">Why</span>
+            <input class="adm-input" name="explanation" />
+          </label>
+        </div>
+        <div><Button type="submit" variant="secondary">Add the question</Button></div>
+      </form>
+    </section>
+  )}
+
+  {course && !lesson && (
+    <>
+      {outline.map((m) => (
+        <section class="adm-card part">
+          <div class="part-head">
+            <form method="POST" class="rename">
+              <CsrfField />
+              <input type="hidden" name="action" value="rename-module" />
+              <input type="hidden" name="id" value={m.id} />
+              <input type="hidden" name="course" value={courseId} />
+              <input class="adm-input title" name="title" value={m.title} />
+              <input class="adm-input pos" name="position" value={m.position} inputmode="numeric" />
+              <Button type="submit" variant="ghost" size="sm">Save</Button>
+            </form>
+            <form method="POST" class="inline" data-confirm={`Delete “${m.title}” and its lessons?`}>
+              <CsrfField />
+              <input type="hidden" name="action" value="delete-module" />
+              <input type="hidden" name="id" value={m.id} />
+              <input type="hidden" name="course" value={courseId} />
+              <button type="submit" class="danger">Remove part</button>
+            </form>
+          </div>
+
+          <ol class="lessons">
+            {m.lessons.length === 0 && <p class="adm-note">Nothing in this part yet.</p>}
+            {m.lessons.map((l: any) => (
+              <li>
+                <a class="lesson" href={here({ lesson: String(l.id) })}>
+                  <span class="lname">{l.title}</span>
+                  <span class="lmeta">
+                    {l.kind}
+                    {l.duration_seconds ? ` · ${Math.round(l.duration_seconds / 60)} min` : ""}
+                    {l.questions ? ` · ${l.questions} questions` : ""}
+                  </span>
+                </a>
+                {l.free_preview && <Badge tone="accent">free</Badge>}
+                {l.incomplete && <Badge tone="faint">no video yet</Badge>}
+                <form method="POST" class="inline" data-confirm={`Delete “${l.title}”?`}>
+                  <CsrfField />
+                  <input type="hidden" name="action" value="delete-lesson" />
+                  <input type="hidden" name="id" value={l.id} />
+                  <input type="hidden" name="course" value={courseId} />
+                  <button type="submit" class="danger">Remove</button>
+                </form>
+              </li>
+            ))}
+          </ol>
+
+          <form method="POST" class="addlesson">
+            <CsrfField />
+            <input type="hidden" name="action" value="add-lesson" />
+            <input type="hidden" name="id" value={m.id} />
+            <input type="hidden" name="course" value={courseId} />
+            <input class="adm-input" name="title" placeholder="A new lesson" required />
+            <select class="adm-input kind" name="kind">
+              {KINDS.map(([v, label]) => <option value={v}>{label}</option>)}
+            </select>
+            <Button type="submit" variant="ghost" size="sm">Add</Button>
+          </form>
+        </section>
+      ))}
+
+      <form method="POST" class="adm-card">
+        <CsrfField />
+        <input type="hidden" name="action" value="add-module" />
+        <input type="hidden" name="course" value={courseId} />
+        <h2 class="h2">Add a part</h2>
+        <div class="addpart">
+          <input class="adm-input" name="title" placeholder="Part 2: The ephemeris" required />
+          <Button type="submit">Add</Button>
+        </div>
+      </form>
+    </>
+  )}
+</AdminLayout>
+
+<style>
+  .head { display: flex; gap: var(--space-4); align-items: baseline; flex-wrap: wrap; }
+  .editor { display: grid; gap: var(--space-4); max-width: 760px; }
+  .two { display: grid; gap: var(--space-3); grid-template-columns: 1fr 1fr; }
+  @media (max-width: 620px) { .two { grid-template-columns: 1fr; } }
+  .field { display: grid; gap: 4px; }
+  .field--check { gap: 6px; }
+  .check { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+  .check input { width: 18px; height: 18px; accent-color: var(--accent); }
+  .hint { margin: 0; font: 400 var(--text-xs) var(--font-body); color: var(--ink-soft); }
+  .h2 { font: 600 var(--text-h3) var(--font-display); color: var(--ink); margin: 0; }
+  .plain { list-style: none; margin: var(--space-3) 0 0; padding: 0; display: grid; gap: 6px; }
+  .plain a, .cancel, .edit { color: var(--accent); text-decoration: none; font: 500 var(--text-sm) var(--font-body); }
+  .plain a:hover, .cancel:hover { text-decoration: underline; }
+
+  .part { display: grid; gap: var(--space-3); }
+  .part-head { display: flex; gap: var(--space-3); align-items: center; flex-wrap: wrap; }
+  .rename { display: flex; gap: var(--space-3); align-items: center; flex: 1; flex-wrap: wrap; }
+  .rename .title { flex: 1 1 220px; font-weight: 500; }
+  .rename .pos { width: 80px; }
+
+  .lessons { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+  .lessons li {
+    display: flex; gap: var(--space-3); align-items: center; flex-wrap: wrap;
+    padding: 8px 10px; border: var(--border-w) solid var(--line);
+    border-radius: var(--radius-sm); background: var(--surface-page);
+  }
+  .lesson { flex: 1; display: grid; gap: 1px; text-decoration: none; min-width: 0; }
+  .lname { font: 500 var(--text-sm) var(--font-body); color: var(--ink); }
+  .lmeta { font: 400 var(--text-xs) var(--font-mono); color: var(--ink-faint); }
+  .lesson:hover .lname { color: var(--accent); }
+
+  .addlesson, .addpart { display: flex; gap: var(--space-3); align-items: center; flex-wrap: wrap; }
+  .addlesson input, .addpart input { flex: 1 1 200px; }
+  .addlesson .kind { flex: 0 1 190px; }
+
+  .qrow {
+    display: flex; gap: var(--space-3); align-items: start; justify-content: space-between;
+    padding: var(--space-3) 0; border-bottom: var(--border-w) solid var(--line);
+  }
+  .qprompt { margin: 0; font: 500 var(--text-sm) var(--font-body); color: var(--ink); }
+  .right { color: var(--accent); font-weight: 600; }
+  .qadd { display: grid; gap: var(--space-3); margin-top: var(--space-4); }
+
+  .inline { display: inline; }
+  .row-actions { display: flex; gap: var(--space-3); align-items: center; }
+  .danger {
+    appearance: none; background: none; border: 0; padding: 0; cursor: pointer;
+    font: 500 var(--text-xs) var(--font-body); color: var(--live);
+  }
+  .danger:hover { text-decoration: underline; }
+  .count { font: 400 var(--text-xs) var(--font-mono); color: var(--ink-faint); }
+</style>
+
+<script>
+  /* People count from one; the database counts from zero. Translating here
+     rather than asking her to think in offsets. */
+  const human = document.querySelector<HTMLInputElement>("[data-answer]");
+  const zero = document.querySelector<HTMLInputElement>("[data-answer-zero]");
+  const sync = () => {
+    if (human && zero) zero.value = String(Math.max(0, Number(human.value || 1) - 1));
+  };
+  human?.addEventListener("input", sync);
+  human?.form?.addEventListener("submit", sync);
+  sync();
+
+  document.querySelectorAll<HTMLFormElement>("form[data-confirm]").forEach((form) => {
+    form.addEventListener("submit", (event) => {
+      if (!window.confirm(form.dataset.confirm ?? "Delete this?")) event.preventDefault();
+    });
+  });
+</script>
