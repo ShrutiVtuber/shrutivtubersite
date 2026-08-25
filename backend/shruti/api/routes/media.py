@@ -35,7 +35,10 @@ router = APIRouter(prefix="/api/media", tags=["media"])
 SAFE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,180}$")
 
 
-@router.get("/{filename}")
+# GET and HEAD both. A HEAD that 405s where the GET succeeds confuses caches
+# and link checkers, and Cloudflare sits in front of this. Starlette drops the
+# body for HEAD itself, so one handler answers both correctly.
+@router.api_route("/{filename}", methods=["GET", "HEAD"])
 async def serve(filename: str) -> Response:
     if not SAFE.match(filename) or ".." in filename:
         raise HTTPException(404, "no such file")

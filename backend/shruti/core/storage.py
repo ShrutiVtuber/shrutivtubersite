@@ -167,9 +167,18 @@ async def _put_r2(filename: str, data: bytes, content_type: str) -> Stored:
     return Stored(key=filename, url=public_url(filename), backend="r2")
 
 
-def public_url(filename: str) -> str:
+def public_url(filename: str, backend: str = "r2") -> str:
     """
-    Where a stored file is read from, without needing the row's backend.
+    Where a stored file is read from.
+
+    **`backend` is the row's, not the current configuration's.** A file
+    uploaded before R2 was switched on is still on disk, and answering for it
+    from the current settings would send the browser to /api/media/, which
+    reads the bucket, where that file has never been. Every media row records
+    its backend precisely so switching R2 on does not 404 what came before —
+    and that promise is only kept if this function is told.
+
+    The rule used to live in the two call sites instead, written out twice.
 
     Three cases, and the middle one is the one that used to be wrong:
 
@@ -178,12 +187,17 @@ def public_url(filename: str) -> str:
         `/media/` is Caddy reading local disk and the file is not there;
       - no R2 at all, so `/media/` is right and Caddy has the file.
     """
+    if backend != "r2":
+        return f"/media/{filename}"
     s = get_settings()
     base = (getattr(s, "r2_public_base", "") or "").rstrip("/")
     if base and r2_configured():
         return f"{base}/{filename}"
     if r2_configured():
         return f"/api/media/{filename}"
+    # An R2 row with R2 switched off: the bucket still holds it, but nothing
+    # here can reach it. /media/ at least tries disk rather than a path that
+    # is guaranteed to fail.
     return f"/media/{filename}"
 
 

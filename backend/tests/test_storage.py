@@ -88,7 +88,10 @@ def test_r2_with_no_public_base_serves_through_the_site(monkeypatch) -> None:
         monkeypatch.setenv(f"SHRUTI_{key}", value)
     get_settings.cache_clear()
     try:
-        assert public_url("x.png") == "/api/media/x.png"
+        assert public_url("x.png", "r2") == "/api/media/x.png"
+        # The promise the storage_backend column exists to keep: a file
+        # uploaded before R2 was switched on is still on disk.
+        assert public_url("old.png", "local") == "/media/old.png"
     finally:
         get_settings.cache_clear()
 
@@ -105,7 +108,8 @@ def test_a_public_base_is_used_when_there_is_one(monkeypatch) -> None:
         monkeypatch.setenv(f"SHRUTI_{key}", value)
     get_settings.cache_clear()
     try:
-        assert public_url("x.png") == "https://media.example.com/x.png"
+        assert public_url("x.png", "r2") == "https://media.example.com/x.png"
+        assert public_url("old.png", "local") == "/media/old.png"
     finally:
         get_settings.cache_clear()
 
@@ -118,7 +122,8 @@ def test_without_r2_the_disk_path_is_still_right(monkeypatch) -> None:
     monkeypatch.setenv("SHRUTI_R2_BUCKET", "")
     get_settings.cache_clear()
     try:
-        assert public_url("x.png") == "/media/x.png"
+        assert public_url("x.png", "r2") == "/media/x.png"
+        assert public_url("x.png", "local") == "/media/x.png"
     finally:
         get_settings.cache_clear()
 

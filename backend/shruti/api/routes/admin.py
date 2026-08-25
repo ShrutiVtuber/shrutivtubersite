@@ -320,6 +320,88 @@ async def do_reset(
     )
     return {"ok": True}
 
+@router.get("/media")
+async def list_media(
+    session: AsyncSession = Depends(get_session),
+    _: str = Depends(require_admin),
+) -> list[dict]:
+    """Everything uploaded, newest first, with where it actually lives."""
+    from shruti.core.storage import public_url
+
+    rows = (
+        await session.execute(select(Media).order_by(Media.id.desc()))
+    ).scalars().all()
+    return [
+        {
+            "id": m.id,
+            "filename": m.filename,
+            "url": public_url(m.filename, m.storage_backend),
+            "mimeType": m.mime_type,
+            "width": m.width,
+            "height": m.height,
+            "sizeBytes": m.size_bytes,
+            "altText": m.alt_text,
+            "credit": m.credit,
+            "storage": m.storage_backend,
+            "createdAt": m.created_at.isoformat() if m.created_at else None,
+        }
+        for m in rows
+    ]
+
+
+# ── site settings ───────────────────────────────────────────────────────────
+
+class SettingsIn(BaseModel):
+    """Arbitrary key/value, validated by the caller knowing the keys."""
+
+    values: dict[str, str]
+
+
+@router.get("/settings")
+async def read_settings(
+    prefix: str = "",
+    session: AsyncSession = Depends(get_session),
+    _: str = Depends(require_admin),
+) -> dict:
+    from shruti.core.settings_store import get_all
+
+    return {"settings": await get_all(session, prefix)}
+
+
+@router.put("/settings")
+async def write_settings(
+    body: SettingsIn,
+    session: AsyncSession = Depends(get_session),
+    _: str = Depends(require_admin),
+) -> dict:
+    from shruti.core.settings_store import get_all, put_many
+
+    # Keys are namespaced and short; nothing here is a path or a template.
+    clean = {
+        k: v for k, v in body.values.items()
+        if k and len(k) <= 64 and len(v) <= 500
+    }
+    await put_many(session, clean)
+    return {"ok": True, "settings": await get_all(session)}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# THE GENERIC COLLECTION ROUTES. THEY MUST STAY LAST IN THIS FILE.
+#
+# FastAPI matches in declaration order, so `/{kind}` swallows every specific
+# path declared after it. This has now bitten three times: POST /media, then
+# GET /claim, then — found by actually clicking through the admin — GET /media
+# and GET /settings, both of which had been 404ing since the day they were
+# written. Neither looked broken: the media library rendered as empty, and the
+# imprint form rendered as blank fields, which is exactly what an unused
+# feature looks like.
+#
+# Twice the fix was "move this one route up", and twice it worked and left the
+# trap armed. So the rule is structural now: every specific route goes ABOVE
+# this banner, the catch-alls stay below it, and a test asserts the ordering
+# rather than trusting the next person to read a comment.
+# ─────────────────────────────────────────────────────────────────────────────
+
 @router.get("/{kind}")
 async def list_items(
     kind: str,
@@ -437,68 +519,3 @@ async def delete_item(
     await session.delete(row)
     await session.commit()
     return Response(status_code=204)
-
-
-@router.get("/media")
-async def list_media(
-    session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
-) -> list[dict]:
-    """Everything uploaded, newest first, with where it actually lives."""
-    from shruti.core.storage import public_url
-
-    rows = (
-        await session.execute(select(Media).order_by(Media.id.desc()))
-    ).scalars().all()
-    return [
-        {
-            "id": m.id,
-            "filename": m.filename,
-            "url": public_url(m.filename) if m.storage_backend == "r2" else f"/media/{m.filename}",
-            "mimeType": m.mime_type,
-            "width": m.width,
-            "height": m.height,
-            "sizeBytes": m.size_bytes,
-            "altText": m.alt_text,
-            "credit": m.credit,
-            "storage": m.storage_backend,
-            "createdAt": m.created_at.isoformat() if m.created_at else None,
-        }
-        for m in rows
-    ]
-
-
-# ── site settings ───────────────────────────────────────────────────────────
-
-class SettingsIn(BaseModel):
-    """Arbitrary key/value, validated by the caller knowing the keys."""
-
-    values: dict[str, str]
-
-
-@router.get("/settings")
-async def read_settings(
-    prefix: str = "",
-    session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
-) -> dict:
-    from shruti.core.settings_store import get_all
-
-    return {"settings": await get_all(session, prefix)}
-
-
-@router.put("/settings")
-async def write_settings(
-    body: SettingsIn,
-    session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
-) -> dict:
-    from shruti.core.settings_store import get_all, put_many
-
-    # Keys are namespaced and short; nothing here is a path or a template.
-    clean = {
-        k: v for k, v in body.values.items()
-        if k and len(k) <= 64 and len(v) <= 500
-    }
-    await put_many(session, clean)
-    return {"ok": True, "settings": await get_all(session)}

@@ -26,7 +26,7 @@ def _media_payload(m: Media | None) -> dict | None:
     return {
         # Resolved per row: a file stored locally before R2 was configured must
         # keep pointing at /media/*, not at a bucket it was never put in.
-        "url": public_url(m.filename) if m.storage_backend == "r2" else f"/media/{m.filename}",
+        "url": public_url(m.filename, m.storage_backend),
         "alt": m.alt_text,
         "width": m.width,
         "height": m.height,
