@@ -48,8 +48,34 @@ started.** Nothing has been built.
 > nice like that but will blend with our theme, and a link to the changelogs
 > etc on the side or somewhere that looks nice.
 
-So: **posts and changelog entries, both as posts, in one blog at /journal**,
-wearing Shruti's theme, with the changelog reachable from somewhere tasteful.
+And, added just after:
+
+> we'll also need documentation when we have it for our products etc as well
+> from beeranked so we should be able to display nicely all the stuff — we
+> should make a few to act as placeholders so we can see how it will display
+> with various types of content.
+
+So the section handles **at least four content types**: blog posts, changelog
+entries, documentation for her products (Theourgia, shruti-astro, the mobile
+app), and whatever reference/wiki pages follow. All from BeeRanked, all wearing
+Shruti's theme.
+
+**Build placeholder content of each type via the MCP first**, before styling
+anything. She asked for this explicitly and she is right: a stylesheet written
+against one sample post is a stylesheet that breaks on the first doc page with
+a code block, a table and four heading levels. Make one of each — a post with
+a cover, a post without, a changelog entry, a doc page with headings and code,
+a reference page — then design against the real spread.
+
+### An open question, for her, not for code
+
+Blog and changelog read chronologically. **Documentation does not** — it reads
+by structure, and wants a sidebar, a version, and a stable URL per topic.
+Putting product docs under `/journal` may be wrong: `/journal` for the writing
+and the changelog, `/docs` for the manuals, both from BeeRanked, is the obvious
+alternative and probably the better one.
+
+Ask her. Do not resolve it in code.
 
 ### The MCP
 
