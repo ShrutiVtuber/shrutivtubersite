@@ -69,8 +69,11 @@ interface Today {
   moon: Luminary;
 }
 
-const [todayAnswer, live, links] = await Promise.all([
+interface Version { licence: string; sha: string; sourceUrl: string; version: string }
+
+const [todayAnswer, versionAnswer, live, links] = await Promise.all([
   askAstro<Today>(`/today?lat=${ATHENS.lat}&lon=${ATHENS.lon}`),
+  askAstro<Version>("/version"),
   site<LiveStatus>(PATHS.live),
   site<LinkGroups>(PATHS.links),
 ]);
@@ -101,9 +104,6 @@ const sky = todayAnswer.data
         degree: DEG(todayAnswer.data.moon.tropical.degree),
         rashi: todayAnswer.data.moon.sidereal.rashi,
         nakshatra: todayAnswer.data.moon.sidereal.nakshatra,
-        /* The Moon moves about half a degree an hour, which is the one thing
-           on this page that visibly changes while you watch it. */
-        through: (todayAnswer.data.moon.tropical.degree / 30) * 100,
         perDay: todayAnswer.data.moon.speedPerDay,
       },
     }
@@ -154,6 +154,18 @@ const imprintHtml = imprint?.visible && imprint.entity
   : "business@shrutivtuber.com";
 const holder = imprint?.visible && imprint.entity ? imprint.entity : "Shruti";
 
+/* The AGPL source offer, on the one page that is currently the whole site.
+ *
+ * These numbers come from Swiss Ephemeris running in the astrology daemon, and
+ * that daemon is AGPL-3.0. Section 13 is not satisfied by a licence file in a
+ * repository somewhere: a user who interacts with the program over a network
+ * is owed an offer of the source for the build they actually talked to. The
+ * tool pages carry this in their provenance card; while the holding page is
+ * the only page anyone can reach, it has to carry it too.
+ *
+ * The link points at the running commit rather than the repository root, for
+ * the same reason — "the source" means the source of what answered you. */
+const source = versionAnswer.data;
 const badge = live?.anyLive ? "live" : "offline";
 const year = new Date().getUTCFullYear();
 const csrf = Astro.locals.csrf;
@@ -226,9 +238,6 @@ const consentSent =
           <span class="tab">per day</span>
         </div>
       </div>
-      {/* The Moon through its current sign — the one thing here that moves
-          while you are looking at it. */}
-      <div class="bar" aria-hidden="true"><div id="sbar" style={`width:${sky.moon.through.toFixed(1)}%`}></div></div>
     </>
   ) : (
     <p class="fine">The ephemeris could not be reached just now. It is usually a moment.</p>
@@ -240,7 +249,19 @@ const consentSent =
 <div class="r"><span>Attic</span><i></i><b>{reck.attic}</b></div>
 <div class="r"><span>Hindu · amānta</span><i></i><b>{reck.hindu}</b></div>
 <div class="r"><span>Thelemic</span><i></i><b>{reck.thelemic}</b></div>
-<p class="fine">Swiss Ephemeris · tropical above, sidereal below, neither a correction of the other · amānta reckoning. The finished instruments let you change every one of those.</p>
+<p class="fine">
+  <a href="https://www.astro.com/swisseph/" rel="noopener">Swiss Ephemeris</a> · tropical above,
+  sidereal below, neither a correction of the other · amānta reckoning. The finished instruments
+  let you change every one of those.
+</p>
+<p class="fine">
+  Computed on the server by
+  <a href={source?.sourceUrl ?? "https://github.com/ShrutiVtuber/shruti-astro"} rel="noopener">shruti-astro</a>,
+  {source?.version && <> version {source.version}{source.sha && source.sha !== "dev" ? ` · ${source.sha.slice(0, 7)}` : ""},</>}
+  free software under <a href="https://www.gnu.org/licenses/agpl-3.0.html" rel="noopener">AGPL-3.0</a>.
+  The source of the build that answered you is at that link — that is what the licence asks for,
+  and it is a better answer than a badge.
+</p>
 </div>
 </div>
 <div style="display:grid;gap:12px">
