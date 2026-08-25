@@ -271,6 +271,70 @@ async def audience(session: AsyncSession = Depends(get_session)) -> dict:
     }
 
 
+@router.get("/admin/subscribers", dependencies=[Depends(require_admin)])
+async def list_subscribers(session: AsyncSession = Depends(get_session)) -> list[dict]:
+    """
+    The list itself, not just a count of it.
+
+    She is the controller. When somebody emails asking to be removed — which
+    they may, instead of using the link — she has to be able to act on it
+    without asking anybody to run a query for her. Without this the only
+    honest answer to an erasure request is "wait until a developer is free",
+    and that is not an answer the law accepts.
+    """
+    today = datetime.now(timezone.utc).date().isoformat()
+    rows = (
+        await session.execute(select(Subscriber).order_by(Subscriber.id.desc()))
+    ).scalars().all()
+
+    def state(r: Subscriber) -> str:
+        if r.unsubscribed_at:
+            return "unsubscribed"
+        if not r.confirmed_at:
+            return "never confirmed"
+        if r.cadence == "paused" or (r.paused_until and r.paused_until > today):
+            return "paused"
+        return "on the list"
+
+    return [
+        {
+            "id": r.id,
+            "email": r.email,
+            "state": state(r),
+            "confirmedAt": r.confirmed_at.isoformat() if r.confirmed_at else None,
+            "pausedUntil": r.paused_until,
+        }
+        for r in rows
+    ]
+
+
+@router.delete("/admin/subscribers/{subscriber_id}", status_code=204,
+               dependencies=[Depends(require_admin)])
+async def forget_subscriber(
+    subscriber_id: int, session: AsyncSession = Depends(get_session)
+) -> Response:
+    """
+    Erase an address, properly.
+
+    **Deletes rather than marking unsubscribed**, because this is the answer to
+    "delete my data" and not to "stop sending". Unsubscribing keeps the row —
+    which is right for a person who used the link, since it is what stops a
+    re-subscribe from being silently ignored — and wrong for a person who asked
+    to be forgotten.
+
+    The consent records are left. They carry the email but they are the
+    evidence of what was agreed and when, which is the one thing an erasure
+    cannot take with it: deleting them would leave her unable to show consent
+    for mail already sent.
+    """
+    row = await session.get(Subscriber, subscriber_id)
+    if row is None:
+        raise HTTPException(404, "no such subscriber")
+    await session.delete(row)
+    await session.commit()
+    return Response(status_code=204)
+
+
 @router.post("/admin/issues", status_code=201, dependencies=[Depends(require_admin)])
 async def create_issue(
     body: IssueIn, session: AsyncSession = Depends(get_session)

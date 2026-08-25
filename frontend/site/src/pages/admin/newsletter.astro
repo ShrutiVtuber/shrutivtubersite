@@ -70,6 +70,10 @@ if (Astro.request.method === "POST") {
         ? "Test sent to your own address. Read it before sending the real one."
         : "";
       if (!notice) failed = r.body?.error ?? r.body?.detail ?? "The test did not send.";
+    } else if (action === "forget") {
+      const r = await asAdmin(Astro, `/api/newsletter/admin/subscribers/${id}`, { method: "DELETE" });
+      notice = r.ok ? "That address has been erased." : "";
+      if (!r.ok) failed = r.body?.detail ?? "That could not be erased.";
     } else if (action === "send") {
       const r = await asAdmin(Astro, `/api/newsletter/admin/issues/${id}/send`, { method: "POST" });
       if (r.ok) {
@@ -82,12 +86,14 @@ if (Astro.request.method === "POST") {
   }
 }
 
-const [issueCall, audienceCall] = await Promise.all([
+const [issueCall, audienceCall, peopleCall] = await Promise.all([
   asAdmin(Astro, "/api/newsletter/admin/issues"),
   asAdmin(Astro, "/api/newsletter/admin/audience"),
+  asAdmin(Astro, "/api/newsletter/admin/subscribers"),
 ]);
 const issues: any[] = Array.isArray(issueCall.body) ? issueCall.body : [];
 const reach = audienceCall.body ?? {};
+const people: any[] = Array.isArray(peopleCall.body) ? peopleCall.body : [];
 
 const openId = Astro.url.searchParams.get("open") ?? "";
 const open = issues.find((i) => String(i.id) === openId) ?? null;
@@ -133,6 +139,37 @@ const readable = (iso: string | null) =>
                 {i.sentAt ? `sent ${readable(i.sentAt)}` : "draft"}
               </Badge>
               {i.sentAt && !i.visible && <span class="hidden-mark">hidden from the archive</span>}
+            </li>
+          ))}
+        </ul>
+      )
+    }
+  </section>
+
+  <section class="adm-card">
+    <h2 class="adm-lbl">The list</h2>
+    <p class="adm-note">
+      Here because you are the controller. If somebody emails asking to be
+      removed rather than using the link, you can act on it — erasing takes the
+      row away rather than marking it unsubscribed, because those are answers to
+      two different requests. The consent records stay: they are the evidence of
+      what was agreed, which is the one thing an erasure cannot take with it.
+    </p>
+    {
+      people.length === 0 ? (
+        <p class="adm-note">Nobody yet.</p>
+      ) : (
+        <ul class="people">
+          {people.map((s) => (
+            <li>
+              <span class="addr">{s.email}</span>
+              <Badge tone={s.state === "on the list" ? "accent" : "faint"}>{s.state}</Badge>
+              <form method="POST" onsubmit={`return confirm('Erase ${s.email}? This cannot be undone.')`}>
+                <CsrfField />
+                <input type="hidden" name="action" value="forget" />
+                <input type="hidden" name="id" value={s.id} />
+                <button type="submit" class="erase">Erase</button>
+              </form>
             </li>
           ))}
         </ul>
@@ -256,6 +293,15 @@ const readable = (iso: string | null) =>
     font: 600 var(--text-micro) var(--font-body); letter-spacing: var(--tracking-eyebrow);
     text-transform: uppercase; color: var(--ink-faint);
   }
+
+  .people { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+  .people li { display: flex; gap: var(--space-3); align-items: center; flex-wrap: wrap; }
+  .addr { font: 400 var(--text-sm) var(--font-body); color: var(--ink); }
+  .erase {
+    font: 500 var(--text-xs) var(--font-body); color: var(--live);
+    background: none; border: 0; cursor: pointer; padding: 6px 4px;
+  }
+  .erase:hover { text-decoration: underline; }
 
   .write { display: grid; gap: var(--space-4); max-width: 70ch; }
   .write label { display: grid; gap: 6px; }
