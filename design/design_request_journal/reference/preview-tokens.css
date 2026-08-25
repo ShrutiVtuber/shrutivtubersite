@@ -1,0 +1,152 @@
+/* Preview tokens — the site's real design system, flattened.
+ *
+ * Link this from a reference HTML file and it renders exactly as it will
+ * inside the site. Do not edit these values: they are the live tokens,
+ * copied verbatim, and a value changed here is a design that will not
+ * match once implemented.
+ *
+ * Dawn is canonical; Dusk follows the visitor's OS. Both are here, so a
+ * reference file checks both by changing the OS setting and nothing else.
+ */
+
+@import url('./preview-fonts.css');
+
+/* Shruti — element defaults. */
+:root{background:var(--surface-page)}
+body{margin:0;background:var(--surface-page);color:var(--ink);font-family:var(--font-body);font-size:var(--text-body);line-height:var(--leading-body);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+a{color:var(--accent);text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:.18em;text-decoration-color:color-mix(in srgb,var(--accent) 45%,transparent);transition:color var(--dur-1) var(--ease-out),text-decoration-color var(--dur-1) var(--ease-out)}
+a:hover{color:var(--accent-hover);text-decoration-color:var(--accent-hover)}
+hr{border:0;border-top:var(--border-w) solid var(--line);margin:var(--space-5) 0}
+::selection{background:color-mix(in srgb,var(--accent) 24%,transparent)}
+img{max-width:100%;height:auto}
+/* Shruti — colour system. One sky, two hours: Dawn (light) and Dusk (dark).
+   Base ramps live on :root so no colour exists only inside a media query.
+   Semantic tokens alias a ramp; dark scopes re-point them. */
+:root{
+  /* Dawn ramp (light) */
+  --dawn-page:#F8F6F3; --dawn-card:#FFFFFF; --dawn-veil:#F1ECEF; --dawn-inset:#ECE7EB;
+  --dawn-ink:#26304A; --dawn-ink-soft:#4A5470; --dawn-ink-faint:#6E7890;
+  --dawn-line:#DCD6DC; --dawn-line-strong:#B9B3BE;
+  --dawn-accent:#33639C; --dawn-accent-hover:#2A527F; --dawn-accent-wash:#E3EDF7;
+  --dawn-rose:#A85A76; --dawn-rose-hover:#914862; --dawn-rose-wash:#F6E7ED;
+  --dawn-live:#A62639; --dawn-live-wash:#F9E9EB;
+  --dawn-sky-zenith:#A9CDEC; --dawn-sky-mid:#D9D3E8; --dawn-sky-horizon:#F2DCD9; --dawn-horizon-line:#C9A9B4;
+  /* Dusk ramp (dark) */
+  --dusk-page:#121829; --dusk-card:#1A2138; --dusk-veil:#232C48; --dusk-inset:#0D1220;
+  --dusk-ink:#E9E6F0; --dusk-ink-soft:#B3B9D2; --dusk-ink-faint:#8B93AF;
+  --dusk-line:#2E3752; --dusk-line-strong:#485272;
+  --dusk-accent:#8FBEE8; --dusk-accent-hover:#A9CDEF; --dusk-accent-wash:#1D2A45;
+  --dusk-rose:#E0A4BC; --dusk-rose-hover:#EBB9CD; --dusk-rose-wash:#2C2338;
+  --dusk-live:#F07A8C; --dusk-live-wash:#33202B;
+  --dusk-sky-zenith:#0B1322; --dusk-sky-mid:#23325A; --dusk-sky-horizon:#6E5470; --dusk-horizon-line:#8A6880;
+  /* Semantic aliases — Dawn by default */
+  --surface-page:var(--dawn-page); --surface-card:var(--dawn-card); --surface-veil:var(--dawn-veil); --surface-inset:var(--dawn-inset);
+  --ink:var(--dawn-ink); --ink-soft:var(--dawn-ink-soft); --ink-faint:var(--dawn-ink-faint);
+  --line:var(--dawn-line); --line-strong:var(--dawn-line-strong);
+  --accent:var(--dawn-accent); --accent-hover:var(--dawn-accent-hover); --accent-wash:var(--dawn-accent-wash); --on-accent:#FFFFFF;
+  --rose:var(--dawn-rose); --rose-hover:var(--dawn-rose-hover); --rose-wash:var(--dawn-rose-wash);
+  --live:var(--dawn-live); --live-wash:var(--dawn-live-wash);
+  --sky-zenith:var(--dawn-sky-zenith); --sky-mid:var(--dawn-sky-mid); --sky-horizon:var(--dawn-sky-horizon); --horizon-line:var(--dawn-horizon-line);
+  --sky:linear-gradient(180deg,var(--sky-zenith) 0%,var(--sky-mid) 58%,var(--sky-horizon) 100%);
+  --focus-ring:var(--accent);
+  color-scheme:light dark;
+}
+/* System preference — un-stamped documents follow the OS */
+@media (prefers-color-scheme:dark){
+  :root{
+    --surface-page:var(--dusk-page); --surface-card:var(--dusk-card); --surface-veil:var(--dusk-veil); --surface-inset:var(--dusk-inset);
+    --ink:var(--dusk-ink); --ink-soft:var(--dusk-ink-soft); --ink-faint:var(--dusk-ink-faint);
+    --line:var(--dusk-line); --line-strong:var(--dusk-line-strong);
+    --accent:var(--dusk-accent); --accent-hover:var(--dusk-accent-hover); --accent-wash:var(--dusk-accent-wash); --on-accent:#10182B;
+    --rose:var(--dusk-rose); --rose-hover:var(--dusk-rose-hover); --rose-wash:var(--dusk-rose-wash);
+    --live:var(--dusk-live); --live-wash:var(--dusk-live-wash);
+    --sky-zenith:var(--dusk-sky-zenith); --sky-mid:var(--dusk-sky-mid); --sky-horizon:var(--dusk-sky-horizon); --horizon-line:var(--dusk-horizon-line);
+  }
+}
+/* Explicit stamp — wins over the media query */
+[data-theme="dark"]{
+  --surface-page:var(--dusk-page); --surface-card:var(--dusk-card); --surface-veil:var(--dusk-veil); --surface-inset:var(--dusk-inset);
+  --ink:var(--dusk-ink); --ink-soft:var(--dusk-ink-soft); --ink-faint:var(--dusk-ink-faint);
+  --line:var(--dusk-line); --line-strong:var(--dusk-line-strong);
+  --accent:var(--dusk-accent); --accent-hover:var(--dusk-accent-hover); --accent-wash:var(--dusk-accent-wash); --on-accent:#10182B;
+  --rose:var(--dusk-rose); --rose-hover:var(--dusk-rose-hover); --rose-wash:var(--dusk-rose-wash);
+  --live:var(--dusk-live); --live-wash:var(--dusk-live-wash);
+  --sky-zenith:var(--dusk-sky-zenith); --sky-mid:var(--dusk-sky-mid); --sky-horizon:var(--dusk-sky-horizon); --horizon-line:var(--dusk-horizon-line);
+}
+/* Explicit light stamp — restores Dawn inside any scope (incl. under system-dark) */
+[data-theme="light"]{
+  --surface-page:var(--dawn-page); --surface-card:var(--dawn-card); --surface-veil:var(--dawn-veil); --surface-inset:var(--dawn-inset);
+  --ink:var(--dawn-ink); --ink-soft:var(--dawn-ink-soft); --ink-faint:var(--dawn-ink-faint);
+  --line:var(--dawn-line); --line-strong:var(--dawn-line-strong);
+  --accent:var(--dawn-accent); --accent-hover:var(--dawn-accent-hover); --accent-wash:var(--dawn-accent-wash); --on-accent:#FFFFFF;
+  --rose:var(--dawn-rose); --rose-hover:var(--dawn-rose-hover); --rose-wash:var(--dawn-rose-wash);
+  --live:var(--dawn-live); --live-wash:var(--dawn-live-wash);
+  --sky-zenith:var(--dawn-sky-zenith); --sky-mid:var(--dawn-sky-mid); --sky-horizon:var(--dawn-sky-horizon); --horizon-line:var(--dawn-horizon-line);
+  color-scheme:light;
+}
+[data-theme="dark"]{ color-scheme:dark }
+/* Shruti — type system. Display/prose: EB Garamond. UI: Commissioner. Data/code: JetBrains Mono.
+   Devanagari fallbacks: Noto Serif Devanagari (serif), Mukta (sans). */
+:root{
+  --font-display:"EB Garamond","Noto Serif Devanagari",Georgia,"Times New Roman",serif;
+  --font-body:"Commissioner","Mukta",-apple-system,"Segoe UI",system-ui,sans-serif;
+  --font-mono:"JetBrains Mono","Noto Sans Devanagari",ui-monospace,"SF Mono",Menlo,monospace;
+  /* Scale */
+  --text-hero:clamp(2.5rem,6vw,3.75rem); /* @kind spacing */
+  --text-h1:2.25rem; --text-h2:1.75rem; --text-h3:1.375rem; --text-h4:1.125rem;
+  --text-prose:1.1875rem; --text-body:1rem; --text-sm:.875rem; --text-xs:.8125rem; --text-micro:.75rem;
+  /* Leading */
+  --leading-display:1.08; --leading-heading:1.2; --leading-prose:1.72; --leading-body:1.55; --leading-tight:1.3;
+  /* Weights */
+  --weight-display:500; --weight-heading:600; --weight-body:400; --weight-medium:500; --weight-strong:600;
+  /* Tracking */
+  --tracking-display:-0.01em; --tracking-eyebrow:.14em; --tracking-caps:.08em;
+}
+/* Role helpers */
+.t-hero{font-family:var(--font-display);font-size:var(--text-hero);line-height:var(--leading-display);font-weight:var(--weight-display);letter-spacing:var(--tracking-display);color:var(--ink)}
+.t-h1{font-family:var(--font-display);font-size:var(--text-h1);line-height:var(--leading-heading);font-weight:var(--weight-heading);letter-spacing:var(--tracking-display);color:var(--ink)}
+.t-h2{font-family:var(--font-display);font-size:var(--text-h2);line-height:var(--leading-heading);font-weight:var(--weight-heading);color:var(--ink)}
+.t-h3{font-family:var(--font-display);font-size:var(--text-h3);line-height:var(--leading-heading);font-weight:var(--weight-heading);color:var(--ink)}
+.t-eyebrow{font-family:var(--font-body);font-size:var(--text-micro);line-height:1;font-weight:var(--weight-strong);letter-spacing:var(--tracking-eyebrow);text-transform:uppercase;color:var(--ink-faint)}
+.t-prose{font-family:var(--font-display);font-size:var(--text-prose);line-height:var(--leading-prose);font-weight:var(--weight-body);color:var(--ink)}
+.t-body{font-family:var(--font-body);font-size:var(--text-body);line-height:var(--leading-body);color:var(--ink)}
+.t-sm{font-family:var(--font-body);font-size:var(--text-sm);line-height:var(--leading-body);color:var(--ink-soft)}
+.t-mono{font-family:var(--font-mono);font-size:var(--text-sm);font-variant-numeric:tabular-nums;color:var(--ink)}
+.t-tabular{font-variant-numeric:tabular-nums lining-nums}
+/* Astronomical and zodiac glyphs are TYPE, never emoji. U+2648–2653 and U+FE0F-adjacent
+   characters default to a colour-emoji font in most browsers, which ignores `color` and breaks
+   the brand rule. Always set this on a glyph span, and pair it with U+FE0E in the data. */
+.t-glyph{font-family:var(--font-display);font-variant-emoji:text;font-feature-settings:normal}
+/* Shruti — space, radius, border width. 4px base. */
+:root{
+  --space-1:4px; --space-2:8px; --space-3:12px; --space-4:16px; --space-5:24px; --space-6:32px; --space-7:48px; --space-8:64px; --space-9:96px;
+  --radius-sm:4px;   /* controls: buttons, inputs, tags */
+  --radius-md:10px;  /* cards */
+  --radius-lg:16px;  /* modals, hero panels */
+  --radius-full:999px; /* pills, seals */
+  --border-w:1px; --border-w-strong:1.5px;
+  --measure-prose:66ch; --measure-ui:56ch;
+  --page-max:1120px; --page-pad:clamp(16px,4vw,40px);
+}
+/* Shruti — elevation, motion, focus. Hairlines do the work; shadow is reserved for floating layers.
+   Order matters: the system media block precedes the explicit [data-theme] stamps so stamps win. */
+:root{
+  --shadow-1:0 1px 2px rgba(18,24,41,.06);
+  --shadow-2:0 2px 8px -2px rgba(18,24,41,.12);
+  --shadow-3:0 12px 32px -8px rgba(18,24,41,.26),0 2px 8px rgba(18,24,41,.10);
+  --blur-veil:blur(10px); /* @kind other */
+  --ease-out:cubic-bezier(.2,.7,.3,1); /* @kind other */
+  --ease-in-out:cubic-bezier(.45,0,.25,1); /* @kind other */
+  --dur-1:120ms; /* @kind other */
+  --dur-2:240ms; /* @kind other */
+  --dur-3:600ms; /* @kind other */
+}
+@media (prefers-color-scheme:dark){
+  :root{ --shadow-1:0 1px 2px rgba(0,0,0,.3); --shadow-2:0 2px 10px -2px rgba(0,0,0,.45); --shadow-3:0 14px 36px -8px rgba(0,0,0,.6),0 2px 8px rgba(0,0,0,.35) }
+}
+[data-theme="light"]{ --shadow-1:0 1px 2px rgba(18,24,41,.06); --shadow-2:0 2px 8px -2px rgba(18,24,41,.12); --shadow-3:0 12px 32px -8px rgba(18,24,41,.26),0 2px 8px rgba(18,24,41,.10) }
+[data-theme="dark"]{ --shadow-1:0 1px 2px rgba(0,0,0,.3); --shadow-2:0 2px 10px -2px rgba(0,0,0,.45); --shadow-3:0 14px 36px -8px rgba(0,0,0,.6),0 2px 8px rgba(0,0,0,.35) }
+:where(a,button,input,select,textarea,summary,[tabindex]):focus-visible{outline:2px solid var(--focus-ring);outline-offset:2px;border-radius:var(--radius-sm)}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:1ms!important;animation-iteration-count:1!important;transition-duration:1ms!important;scroll-behavior:auto!important}
+}
