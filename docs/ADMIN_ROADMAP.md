@@ -10,8 +10,8 @@ and in-place media upload where a template actually draws the picture.
 
 Left, in the order agreed:
 
-1. **User management** ← in progress
-2. **Merchandise** — physical *and* digital
+1. ~~User management~~ — done
+2. **Merchandise** ← next — physical *and* digital
 3. **Discount codes** — Stripe coupons and promotion codes
 4. **Classes and workshops** — sold and hosted on the site, "like kotobaseed
    has". Explicitly **after the site itself is done**; not now.
@@ -56,15 +56,15 @@ is her note and not their data.
 
 ## Checklist
 
-- [ ] `BannedEmail` model + migration
-- [ ] Signup and sign-in refuse a banned address
-- [ ] `GET /api/admin/users` — list and search
-- [ ] `POST /api/admin/users/{id}/signin-link` — help someone back in
-- [ ] `POST /api/admin/users/{id}/ban` — export, email, delete, record
-- [ ] `GET/DELETE /api/admin/bans` — review and lift
-- [ ] `/admin/users` page
-- [ ] Tests
-- [ ] Deployed
+- [x] `BannedEmail` model + migration
+- [x] Signup and sign-in refuse a banned address
+- [x] `GET /api/admin/users` — list and search
+- [x] `POST /api/admin/users/{id}/signin-link` — help someone back in
+- [x] `POST /api/admin/users/{id}/ban` — export, email, delete, record
+- [x] `GET/DELETE /api/admin/bans` — review and lift
+- [x] `/admin/users` page
+- [x] Tests
+- [x] Deployed
 
 ## Gotchas this codebase has already paid for
 
@@ -78,3 +78,19 @@ is her note and not their data.
   given.
 - **Checkboxes post nothing when unticked** — they need a hidden partner.
 - **Match on content, not on indentation** copied out of a terminal dump.
+
+
+## User management — done (2026-08-25)
+
+`/admin/users`: search, a sign-in link you can send someone who cannot get in,
+and closing an account. Barred addresses are listed and liftable underneath.
+
+The ban does its four steps in order and **refuses if the mail does not go** —
+nothing is deleted unless their copy was actually sent. Verified end to end:
+the account went, the address could not register again (and the signup form
+said nothing different to it than to anyone else), and lifting the ban with a
+differently-cased version of the address worked, because the hash is of the
+normalised form.
+
+There is no password to read and none to set on their behalf. That is the
+design, not a gap: the only door is a link to their own address.

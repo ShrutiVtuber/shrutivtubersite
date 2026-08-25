@@ -1,0 +1,238 @@
+---
+/* People with accounts.
+ *
+ * Deliberately thin. This screen exists to help someone who cannot get in, and
+ * to close an account when it has to be closed. It is not for reading what
+ * people have told the site about themselves — birth data is not in the
+ * payload this page fetches and should never be added to it.
+ *
+ * There is no password to read and none to set on their behalf. The only door
+ * is a link to their own address, which is the same door they would have used,
+ * and that is the design working rather than a gap in it.
+ */
+import AdminLayout from "../../layouts/AdminLayout.astro";
+import CsrfField from "../../components/forms/CsrfField.astro";
+import Button from "../../components/forms/Button.astro";
+import Badge from "../../components/navigation/Badge.astro";
+import { asAdmin } from "../../lib/admin";
+import { verifyCsrf } from "../../lib/csrf";
+
+export const prerender = false;
+
+let notice = "";
+let failed = "";
+
+if (Astro.request.method === "POST") {
+  const form = await Astro.request.formData();
+  if (!verifyCsrf(Astro.cookies, form)) {
+    failed = "That did not go through. Reload the page and try again.";
+  } else {
+    const action = String(form.get("action") ?? "");
+    const id = String(form.get("id") ?? "");
+
+    if (action === "signin-link" && id) {
+      const r = await asAdmin(Astro, `/api/admin/users/${id}/signin-link`, { method: "POST" });
+      notice = r.ok ? `Sign-in link sent to ${r.body?.sentTo ?? "them"}.` : "";
+      failed = r.ok ? "" : (r.body?.detail ?? "That link did not send.");
+    }
+
+    if (action === "ban" && id) {
+      const r = await asAdmin(Astro, `/api/admin/users/${id}/ban`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ reason: String(form.get("reason") ?? "") }),
+      });
+      notice = r.ok
+        ? `Closed ${r.body?.closed ?? "the account"}. Their copy was sent before anything was deleted.`
+        : "";
+      failed = r.ok ? "" : (r.body?.detail ?? "That account was not closed.");
+    }
+
+    if (action === "lift") {
+      const r = await asAdmin(Astro, "/api/admin/bans/lift", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email: String(form.get("email") ?? "") }),
+      });
+      notice = r.ok ? "That address can register again." : "";
+      failed = r.ok
+        ? ""
+        : r.status === 404
+          ? "That address is not on the list."
+          : (r.body?.detail ?? "That did not lift.");
+    }
+  }
+}
+
+const q = Astro.url.searchParams.get("q") ?? "";
+const banning = Astro.url.searchParams.get("ban") ?? "";
+
+const [people, bans] = await Promise.all([
+  asAdmin(Astro, `/api/admin/users${q ? `?q=${encodeURIComponent(q)}` : ""}`),
+  asAdmin(Astro, "/api/admin/bans"),
+]);
+const users: any[] = Array.isArray(people.body) ? people.body : [];
+const banned: any[] = Array.isArray(bans.body) ? bans.body : [];
+const closing = banning ? users.find((u) => String(u.id) === banning) : null;
+const when = (iso: string | null) => (iso ? iso.slice(0, 10) : "—");
+---
+
+<AdminLayout title="People">
+  <div class="head">
+    <h1 class="adm-h">People</h1>
+    <Badge tone={users.length > 0 ? "accent" : "faint"}>
+      {users.length === 1 ? "1 account" : `${users.length} accounts`}
+    </Badge>
+  </div>
+
+  {notice && <p class="adm-ok" role="status">{notice}</p>}
+  {failed && <p class="adm-bad" role="alert">{failed}</p>}
+
+  <form method="GET" class="adm-card finder">
+    <label class="field grow">
+      <span class="adm-lbl">Search</span>
+      <input class="adm-input" type="search" name="q" value={q} placeholder="Email or name" />
+    </label>
+    <div><Button type="submit">Find</Button></div>
+    {q && <a class="cancel" href="/admin/users">Clear</a>}
+  </form>
+
+  {
+    closing && (
+      <form method="POST" class="adm-card closing">
+        <CsrfField />
+        <input type="hidden" name="action" value="ban" />
+        <input type="hidden" name="id" value={closing.id} />
+        <h2 class="h2">Close {closing.email}</h2>
+        <p class="adm-note">
+          This deletes the account and bars the address for good. Before anything
+          is deleted they are emailed a copy of everything held about them, and
+          told the account is being closed. If that email cannot be sent, nothing
+          is deleted — losing someone's data while failing to give them a copy is
+          not something to do quietly.
+        </p>
+        <p class="adm-note">
+          What survives: a dated record that consent was given and withdrawn,
+          carrying no birth data and no longer carrying their address. That
+          record is what shows the deletion itself was lawful.
+        </p>
+        <label class="field">
+          <span class="adm-lbl">Reason, for your own record</span>
+          <input class="adm-input" type="text" name="reason" placeholder="Why this account is being closed" />
+        </label>
+        <div class="row-actions">
+          <Button type="submit">Close the account and bar the address</Button>
+          <a class="cancel" href="/admin/users">Cancel</a>
+        </div>
+      </form>
+    )
+  }
+
+  <div class="rows">
+    {
+      users.length === 0 ? (
+        <p class="adm-note">
+          {q ? "Nobody matches that." : "Nobody has an account yet."}
+        </p>
+      ) : (
+        users.map((u) => (
+          <div class="row">
+            <div class="row-main">
+              <span class="row-label">{u.displayName || u.email}</span>
+              <span class="row-sub">{u.email}</span>
+              <span class="row-sub">
+                joined {when(u.createdAt)} · last seen {when(u.lastSeenAt)}
+              </span>
+            </div>
+            {u.supporter && <Badge tone="rose">supporter</Badge>}
+            <Badge tone={u.verified ? "accent" : "faint"}>
+              {u.verified ? "verified" : "unverified"}
+            </Badge>
+            <div class="row-actions">
+              <form method="POST" class="inline">
+                <CsrfField />
+                <input type="hidden" name="action" value="signin-link" />
+                <input type="hidden" name="id" value={u.id} />
+                <Button type="submit" variant="ghost" size="sm">Send a sign-in link</Button>
+              </form>
+              <a class="danger" href={`/admin/users?ban=${u.id}${q ? `&q=${encodeURIComponent(q)}` : ""}`}>
+                Close account
+              </a>
+            </div>
+          </div>
+        ))
+      )
+    }
+  </div>
+
+  <section class="adm-card">
+    <h2 class="h2">Barred addresses <span class="count">{banned.length}</span></h2>
+    <p class="adm-note">
+      The list holds a fingerprint, not the address — a ban follows a deletion,
+      and keeping the addresses readable would rebuild the thing the deletion
+      was for. Enough of each is shown to recognise it.
+    </p>
+    {
+      banned.length === 0 ? (
+        <p class="adm-note">Nobody is barred.</p>
+      ) : (
+        <ul class="items">
+          {banned.map((b) => (
+            <li>
+              <div class="meta">
+                <span class="who">{b.hint}</span>
+                <span class="when t-tabular">{when(b.createdAt)}</span>
+              </div>
+              {b.reason && <p class="body">{b.reason}</p>}
+            </li>
+          ))}
+        </ul>
+      )
+    }
+
+    <form method="POST" class="lift">
+      <CsrfField />
+      <input type="hidden" name="action" value="lift" />
+      <label class="field grow">
+        <span class="adm-lbl">Let an address register again</span>
+        <input class="adm-input" type="email" name="email" placeholder="their@address" required />
+      </label>
+      <div><Button type="submit" variant="secondary">Lift the ban</Button></div>
+      <p class="adm-note">
+        Typing the address is the only way, because the list cannot tell you
+        whose a row is. That is deliberate: lifting a ban should be a decision
+        about a person you can name.
+      </p>
+    </form>
+  </section>
+</AdminLayout>
+
+<style>
+  .head { display: flex; gap: var(--space-4); align-items: baseline; flex-wrap: wrap; }
+  .finder, .lift { display: flex; gap: var(--space-3); align-items: end; flex-wrap: wrap; }
+  .field { display: grid; gap: 4px; }
+  .grow { flex: 1 1 260px; }
+  .rows { display: grid; gap: 6px; margin: var(--space-4) 0; }
+  .row {
+    display: flex; gap: var(--space-3); align-items: center; flex-wrap: wrap;
+    padding: var(--space-3); border: var(--border-w) solid var(--line);
+    border-radius: var(--radius-sm); background: var(--surface-card);
+  }
+  .row-main { display: grid; gap: 2px; min-width: 0; flex: 1; }
+  .row-label { font: 500 var(--text-body) var(--font-body); color: var(--ink); }
+  .row-sub { font: 400 var(--text-xs) var(--font-mono); color: var(--ink-faint); }
+  .row-actions { display: flex; gap: var(--space-3); align-items: center; }
+  .inline { display: inline; }
+  .h2 { font: 600 var(--text-h3) var(--font-display); color: var(--ink); margin: 0; }
+  .cancel { font: 500 var(--text-sm) var(--font-body); color: var(--accent); text-decoration: none; }
+  .cancel:hover { text-decoration: underline; }
+  .danger { font: 500 var(--text-sm) var(--font-body); color: var(--live); text-decoration: none; }
+  .danger:hover { text-decoration: underline; }
+  .closing { border-color: color-mix(in srgb, var(--live) 45%, transparent); }
+  .items { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-3); }
+  .meta { display: flex; gap: var(--space-3); align-items: baseline; flex-wrap: wrap; }
+  .who { font: 500 var(--text-sm) var(--font-mono); color: var(--ink); }
+  .when { font: 400 var(--text-xs) var(--font-mono); color: var(--ink-faint); }
+  .body { margin: 2px 0 0; font: 400 var(--text-sm) var(--font-body); color: var(--ink-soft); }
+  .count { font: 400 var(--text-xs) var(--font-mono); color: var(--ink-faint); }
+</style>

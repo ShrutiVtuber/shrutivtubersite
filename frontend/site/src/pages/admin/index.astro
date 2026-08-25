@@ -21,6 +21,8 @@ const qCount = Array.isArray(questions.body) ? questions.body.length : 0;
 const rows = Array.isArray(sections.body) ? sections.body : [];
 const hidden = rows.filter((s: any) => !s.visible).length;
 /* Only the count, for the tile. The page itself does the real listing. */
+const peopleList = await asAdmin(Astro, "/api/admin/users");
+const people: any[] = Array.isArray(peopleList.body) ? peopleList.body : [];
 const skyList = await asAdmin(Astro, "/api/journal/entries");
 const skyEntries: any[] = skyList.body?.entries ?? [];
 ---
@@ -41,6 +43,14 @@ const skyEntries: any[] = skyList.body?.entries ?? [];
       <span class="adm-lbl">Inbox</span>
       <span class="big">{msgCount + qCount}</span>
       <span class="sub">{msgCount} messages · {qCount} questions</span>
+    </a>
+
+    <a class="adm-card tile" href="/admin/users">
+      <span class="adm-lbl">People</span>
+      <span class="big">{people.length}</span>
+      <span class="sub">
+        {people.filter((u: any) => u.supporter).length} supporting
+      </span>
     </a>
 
     <a class="adm-card tile" href="/admin/journal">

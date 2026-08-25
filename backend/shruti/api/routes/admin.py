@@ -11,6 +11,7 @@ Both are one request.
 from __future__ import annotations
 
 import hashlib
+import json
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
@@ -28,7 +29,8 @@ from shruti.core.operator import session_stamp
 from shruti.core.auth import authenticate, issue_token
 from shruti.core.config import get_settings
 from shruti.core.db import get_session
-from shruti.models import (FanArt, 
+from shruti.models.accounts import User
+from shruti.models import (BannedEmail, FanArt, 
     ContactMessage, Credit, Media, ProfileField, Project, Question,
     ScheduleEntry, Section, SocialLink, Tool,
 )
@@ -517,6 +519,199 @@ async def delete_media(
     await session.delete(row)
     await session.commit()
     return Response(status_code=204)
+
+
+# ── people ──────────────────────────────────────────────────────────────────
+
+@router.get("/users")
+async def list_users(
+    q: str = "",
+    session: AsyncSession = Depends(get_session),
+    _: str = Depends(require_admin),
+) -> list[dict]:
+    """
+    Everyone with an account, newest first.
+
+    Deliberately thin. This screen exists to help someone who cannot get in and
+    to close an account when it has to be closed — not to browse what people
+    have told the site about themselves. Birth data is never in this payload.
+    """
+    from shruti.models import Supporter
+
+    stmt = select(User).order_by(User.id.desc())
+    if q.strip():
+        like = f"%{q.strip()}%"
+        stmt = stmt.where(User.email.ilike(like) | User.display_name.ilike(like))
+    users = (await session.execute(stmt.limit(500))).scalars().all()
+
+    supporters = {
+        s.email: s
+        for s in (await session.execute(select(Supporter))).scalars().all()
+        if s.email
+    }
+
+    return [
+        {
+            "id": u.id,
+            "email": u.email,
+            "displayName": u.display_name,
+            "verified": u.email_verified_at is not None,
+            "hasPassword": bool(u.password_hash),
+            "supporter": u.email in supporters,
+            "lastSeenAt": u.last_seen_at.isoformat() if u.last_seen_at else None,
+            "createdAt": u.created_at.isoformat() if u.created_at else None,
+        }
+        for u in users
+    ]
+
+
+@router.post("/users/{user_id}/signin-link", status_code=202)
+async def resend_signin_link(
+    user_id: int,
+    session: AsyncSession = Depends(get_session),
+    _: str = Depends(require_admin),
+) -> dict:
+    """
+    Send someone the link that gets them in.
+
+    The whole of "help them fix it": there is no password to read and none to
+    set on their behalf, which is the point of the design. A link to their own
+    address is the only door, and it is the same door they would have used.
+    """
+    from shruti.api.routes.accounts import _send_magic_link
+
+    user = await session.get(User, user_id)
+    if user is None:
+        raise HTTPException(404, "no such account")
+    await _send_magic_link(user.email)
+    return {"ok": True, "sentTo": user.email}
+
+
+class BanIn(BaseModel):
+    reason: str = ""
+
+
+@router.post("/users/{user_id}/ban")
+async def ban_user(
+    user_id: int,
+    body: BanIn,
+    session: AsyncSession = Depends(get_session),
+    _: str = Depends(require_admin),
+) -> dict:
+    """
+    Close an account for good, and bar the address.
+
+    The order is the whole of it:
+
+      1. Build their export — the same one they could have downloaded.
+      2. **Send it, and say what is happening, before anything is deleted.**
+         Afterwards there is no address left to send to, and a deletion nobody
+         was told about is the version of this that gets complained about.
+      3. Delete, by the same path self-service deletion takes, so it reaches
+         the newsletter and keeps the anonymised consent trail that proves the
+         deletion was lawful.
+      4. Record the ban as a hash, so the address cannot register again and
+         cannot be read back out of the list either.
+
+    If the mail does not go, nothing is deleted. Losing someone's data while
+    failing to give them a copy is the one outcome worth refusing outright.
+    """
+    from shruti.api.routes.accounts import erase, export_for
+    from shruti.core import mail
+    from shruti.core.bans import fingerprint, hint
+
+    user = await session.get(User, user_id)
+    if user is None:
+        raise HTTPException(404, "no such account")
+
+    email = user.email
+    payload = await export_for(user, session)
+
+    sent = await mail.send(
+        subject="Your account on shrutivtuber.com has been closed",
+        to=email,
+        body=(
+            "Your account has been closed and will not be reopened, and this "
+            "address cannot be used to register again.\n\n"
+            "Everything the site held about you is below, as a copy for your "
+            "records. It has now been deleted, apart from a dated record that "
+            "consent was given and withdrawn, which carries no birth data and "
+            "no longer carries your address — that record is what shows the "
+            "deletion itself was lawful.\n\n"
+            "If you believe this is a mistake, reply to this message.\n\n"
+            + json.dumps(payload, ensure_ascii=False, indent=2)
+        ),
+    )
+    if not sent.sent:
+        raise HTTPException(
+            502,
+            "nothing was deleted: their copy could not be sent "
+            f"({sent.error or 'the mail did not go'}). "
+            "Fix the mail and try again — deleting someone's data without "
+            "giving them a copy is not something to do quietly.",
+        )
+
+    await erase(user, session)
+
+    session.add(
+        BannedEmail(email_hash=fingerprint(email), reason=body.reason.strip(),
+                    hint=hint(email))
+    )
+    await session.commit()
+    return {"ok": True, "closed": hint(email), "exportSentTo": hint(email)}
+
+
+@router.get("/bans")
+async def list_bans(
+    session: AsyncSession = Depends(get_session),
+    _: str = Depends(require_admin),
+) -> list[dict]:
+    rows = (
+        await session.execute(select(BannedEmail).order_by(BannedEmail.id.desc()))
+    ).scalars().all()
+    return [
+        {
+            "id": b.id,
+            "hint": b.hint,
+            "reason": b.reason,
+            "createdAt": b.created_at.isoformat() if b.created_at else None,
+        }
+        for b in rows
+    ]
+
+
+class UnbanIn(BaseModel):
+    """Lifting a ban needs the address, because the list only holds a hash."""
+
+    email: str
+
+
+@router.post("/bans/lift")
+async def lift_ban(
+    body: UnbanIn,
+    session: AsyncSession = Depends(get_session),
+    _: str = Depends(require_admin),
+) -> dict:
+    """
+    Let an address register again.
+
+    It takes the address rather than a row id on purpose: the list cannot tell
+    her which address a row is, so lifting one means knowing whose it is. That
+    is a feature — an unban should be a decision about a person, not a click on
+    a row whose owner nobody can name.
+    """
+    from shruti.core.bans import fingerprint
+
+    row = (
+        await session.execute(
+            select(BannedEmail).where(BannedEmail.email_hash == fingerprint(body.email))
+        )
+    ).scalar_one_or_none()
+    if row is None:
+        raise HTTPException(404, "that address is not banned")
+    await session.delete(row)
+    await session.commit()
+    return {"ok": True}
 
 
 # ── site settings ───────────────────────────────────────────────────────────

@@ -316,3 +316,30 @@ class Supporter(TimestampMixin, table=True):
     # rather than stopping mid-month, and the account page has to say so.
     cancel_at_period_end: bool = False
     current_period_end: Optional[datetime] = Field(default=None, sa_type=UTC_TS)
+
+
+class BannedEmail(TimestampMixin, table=True):
+    """
+    An address that may not register again.
+
+    **A hash, not the address.** A ban follows a deletion, and the deletion was
+    the point — keeping a readable list of the addresses just deleted would
+    quietly rebuild the thing that was meant to go. A SHA-256 of the normalised
+    address answers the only question ever asked of it, "is this one banned?",
+    and cannot be read back into a mailing list.
+
+    Still liftable: she types the address to unban it and the hash matches.
+
+    The reason is kept in the clear because it is her note about a decision she
+    made, not data about them — and a ban with no reason recorded is one nobody
+    can review later, including her.
+    """
+
+    __tablename__ = "banned_email"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    email_hash: str = Field(index=True, unique=True)
+    reason: str = ""
+    # Kept so the list can be read at all: "s…a@gmail.com" is enough to
+    # recognise one you are looking for without being an address.
+    hint: str = ""

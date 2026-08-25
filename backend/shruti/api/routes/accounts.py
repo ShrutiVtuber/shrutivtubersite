@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import delete, select
 
 from shruti.core.consents import BY_KIND, CONSENT_VERSION
+from shruti.core.bans import is_banned
 from shruti.core.db import get_session
 from shruti.core.mail import send as send_mail
 from shruti.core.sessions import (
@@ -104,6 +105,12 @@ async def sign_up(
     # consent that blocked a submit would not be freely given.
     if not given.get("account"):
         raise HTTPException(422, "the account agreement is required to create an account")
+
+    # A banned address is turned away, and told nothing more than anyone else
+    # is told — the same answer as an address that already has an account, for
+    # the same reason: a form does not get to be an oracle about who is here.
+    if await is_banned(email, session):
+        return {"ok": True, "checkEmail": True}
 
     existing = (
         await session.execute(select(User).where(User.email == email))
@@ -486,6 +493,17 @@ async def export_everything(
     No email round-trip and no "we will get back to you within thirty days" —
     the design promises a file in the page, so it is a file in the page.
     """
+    return await export_for(user, session)
+
+
+async def export_for(user: User, session: AsyncSession) -> dict:
+    """
+    The export itself.
+
+    Shared with the admin, which has to send someone their data before closing
+    their account. One definition of "everything held about you" — two would
+    drift, and the one that drifted would be the one nobody was looking at.
+    """
     nativity = (
         await session.execute(select(Nativity).where(Nativity.user_id == user.id))
     ).scalars().first()
@@ -549,6 +567,19 @@ async def delete_account(
     about a living person we can identify — the email is replaced by the
     account id.
     """
+    result = await erase(user, session)
+    response.delete_cookie(SESSION_COOKIE, path="/")
+    return result
+
+
+async def erase(user: User, session: AsyncSession) -> dict:
+    """
+    The deletion itself, shared with the admin's ban.
+
+    A banned account is a deleted account — the same deletion, reaching the
+    same places, keeping the same anonymised consent trail. Writing it twice
+    would mean one of them forgetting the newsletter.
+    """
     email = user.email
     uid = user.id
 
@@ -568,7 +599,6 @@ async def delete_account(
     await session.execute(delete(User).where(User.id == uid))
     await session.commit()
 
-    response.delete_cookie(SESSION_COOKIE, path="/")
     return {
         "ok": True,
         "deleted": ["account", "email address", "preferences", "nativity", "newsletter subscription"],
