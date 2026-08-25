@@ -1,0 +1,32 @@
+/* Shruti — print. The station tables and the natal chart get printed and pinned up, so print is a
+   designed medium here, not an afterthought. Rules: ink on paper, hairlines survive, sky panels and
+   chrome go, nothing is a colour block that eats a toner cartridge. */
+@media print{
+  :root{
+    /* Force Dawn on paper whatever the screen theme is. */
+    --surface-page:#FFFFFF; --surface-card:#FFFFFF; --surface-veil:#FFFFFF; --surface-inset:#FFFFFF;
+    --ink:#000000; --ink-soft:#2A2A2A; --ink-faint:#555555;
+    --line:#B8B8B8; --line-strong:#6E6E6E;
+    --accent:#000000; --accent-hover:#000000; --accent-wash:transparent; --on-accent:#FFFFFF;
+    --rose:#3A3A3A; --rose-hover:#3A3A3A; --rose-wash:transparent;
+    --live:#000000; --live-wash:transparent;
+    --shadow-1:none; --shadow-2:none; --shadow-3:none;
+  }
+  *,*::before,*::after{background-image:none!important;box-shadow:none!important;text-shadow:none!important}
+  body{background:#FFFFFF}
+  /* Chrome, controls and anything interactive earn no paper. */
+  .site-header,.site-footer,.demo-bar,.no-print,button,select,input,textarea,
+  .sky-stars,.export-block,.nav-toggle,.site-menu{display:none!important}
+  /* A sky panel prints as a ruled block, not a grey wash. */
+  .sky{background:none!important;border:1px solid var(--line-strong)!important;border-radius:0!important;padding:12pt!important}
+  .sky-veil{background:none!important;backdrop-filter:none!important;border:0!important;padding:0!important}
+  .sky-horizon{background:var(--line-strong)!important}
+  a{color:#000;text-decoration:none}
+  /* Print the destination of real links once, small, after the text. */
+  .prose a[href^="http"]::after{content:" (" attr(href) ")";font-family:var(--font-mono);font-size:8pt;color:#555}
+  h1,h2,h3{break-after:avoid-page}
+  table,.station-table{break-inside:auto}
+  thead{display:table-header-group}
+  tr,.station-row{break-inside:avoid}
+  @page{margin:14mm}
+}

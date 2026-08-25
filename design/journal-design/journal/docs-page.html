@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Casting a chart — /journal reference</title>
+<link rel="stylesheet" href="fonts.css">
+<link rel="stylesheet" href="../_ds/shruti-design-system-cb687f1a-c730-4155-891e-19f81b273619/tokens/colors.css">
+<link rel="stylesheet" href="../_ds/shruti-design-system-cb687f1a-c730-4155-891e-19f81b273619/tokens/typography.css">
+<link rel="stylesheet" href="../_ds/shruti-design-system-cb687f1a-c730-4155-891e-19f81b273619/tokens/spacing.css">
+<link rel="stylesheet" href="../_ds/shruti-design-system-cb687f1a-c730-4155-891e-19f81b273619/tokens/effects.css">
+<link rel="stylesheet" href="../_ds/shruti-design-system-cb687f1a-c730-4155-891e-19f81b273619/tokens/print.css">
+<link rel="stylesheet" href="../_ds/shruti-design-system-cb687f1a-c730-4155-891e-19f81b273619/tokens/base.css">
+<link rel="stylesheet" href="../_ds/shruti-design-system-cb687f1a-c730-4155-891e-19f81b273619/assets/sky.css">
+<link rel="stylesheet" href="../_ds/shruti-design-system-cb687f1a-c730-4155-891e-19f81b273619/assets/seal.css">
+<link rel="stylesheet" href="journal.css">
+</head>
+<body>
+<div data-journal>
+<p class="j-chrome-note"><span class="j-eyebrow">SiteHeader · real component · out of scope · documentation page, sidebar + TOC</span></p>
+<main class="j-page j-page--docs">
+<div class="j-shell j-shell--docs">
+<nav class="j-nav-rail" aria-label="Documentation">
+<a class="j-nav-home" href="/journal/docs/">Documentation</a>
+<div class="j-nav-group">
+<p class="j-eyebrow">The ephemeris API</p>
+<a class="j-nav-link" href="/journal/docs/casting-a-chart/" aria-current="page">Casting a chart</a>
+<div class="j-nav-sub"><a href="#what-you-need">What you need</a><a href="#what-comes-back">What comes back</a><a href="#when-it-refuses">When it refuses</a></div>
+<a class="j-nav-link" href="#">Positions and speeds</a>
+<a class="j-nav-link" href="#">Ayanāṁśa selection</a>
+<a class="j-nav-link" href="#">Refusals and error codes</a>
+<a class="j-nav-link" href="#">Rate limits and caching</a>
+</div>
+<div class="j-nav-group">
+<p class="j-eyebrow">The four calendars</p>
+<a class="j-nav-link" href="#">The four reckonings</a><a class="j-nav-link" href="#">Observed crescent vs conjunction</a><a class="j-nav-link" href="#">Amānta and pūrṇimānta naming</a><a class="j-nav-link" href="#">Sunrise definitions</a>
+</div>
+<div class="j-nav-group">
+<p class="j-eyebrow">The mobile app</p>
+<a class="j-nav-link" href="#">Installing and pairing</a><a class="j-nav-link" href="#">Entries, seals and export</a><a class="j-nav-link" href="#">Building from source</a>
+</div>
+</nav>
+<article class="j-col--narrow">
+<nav class="j-bc" aria-label="Breadcrumb"><a href="/journal/docs/">Docs</a><span class="j-bc-sep" aria-hidden="true">›</span><a href="#">The ephemeris API</a><span class="j-bc-sep" aria-hidden="true">›</span><span aria-current="page">Casting a chart</span></nav>
+<h1 class="j-h1 j-h1--doc">Casting a chart</h1>
+<div class="j-meta j-meta--doc">
+<time datetime="2026-08-25">updated 2026-08-25</time><span class="j-bc-sep" aria-hidden="true">·</span><span style="font-size:var(--text-xs);color:var(--ink-soft)">by Shruti</span>
+<a class="j-more j-meta-end" href="https://github.com/theourgia/docs">edit this page →</a>
+</div>
+<div class="j-prose">
+<p>The ephemeris is a small HTTP service. Every instrument on this site is a page over it, and it answers the same questions for anyone who asks.</p>
+<h2 id="what-you-need">What you need</h2>
+<p>A moment and a place. The moment is a date and a time; the place is a latitude and a longitude. Nothing else is required, and nothing else is stored.</p>
+<pre><code>GET /chart?date=1990-05-04&amp;time=14:20&amp;lat=37.9838&amp;lon=23.7275
+     &amp;zodiac=both&amp;ayanamsa=lahiri&amp;houses=whole-sign</code></pre>
+<p>Omit <code>time</code> and the service does not guess noon. It answers with the day's positions, marks the houses <code>null</code>, and says why — an unknown birth time is a real condition, not a validation error.</p>
+<h2 id="what-comes-back">What comes back</h2>
+<p>Both traditions, side by side and unranked. The tropical zodiac and the sidereal one are not two attempts at the same answer; they are two different questions, and the response gives you both rather than choosing.</p>
+<div class="j-scroll">
+<table class="j-table" style="min-width:560px">
+<thead><tr><th scope="col">Field</th><th scope="col">Tropical</th><th scope="col">Sidereal · Lahiri</th><th scope="col">Note</th></tr></thead>
+<tbody>
+<tr><td><code>sun</code></td><td class="j-mono j-glyph">14°02′ ♉&#xFE0E;</td><td class="j-mono j-glyph">20°11′ ♈&#xFE0E;</td><td>Ayanāṁśa 23°51′</td></tr>
+<tr><td><code>moon</code></td><td class="j-mono j-glyph">02°47′ ♑&#xFE0E;</td><td class="j-mono j-glyph">08°56′ ♐&#xFE0E;</td><td><span lang="sa">उत्तराषाढा</span> · Uttarāṣāḍhā</td></tr>
+<tr><td><code>moon.speed</code></td><td class="j-mono">13.42°/day</td><td class="j-mono">13.42°/day</td><td>Present only with the speed flag</td></tr>
+<tr><td><code>asc</code></td><td class="j-mono j-glyph">28°19′ ♌&#xFE0E;</td><td class="j-mono j-glyph">04°28′ ♌&#xFE0E;</td><td>Whole-sign houses follow the sign</td></tr>
+<tr><td><code>attic</code></td><td colspan="2" lang="grc" style="font-family:var(--font-display);font-size:1.05em">ἑβδόμη Μουνιχιῶνος</td><td>Observed crescent, Athens</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="both-traditions-unranked">Why nothing is marked correct</h3>
+<p>Ranking them would be a claim about which sky is real. The instrument's job is to reckon under a stated rule and name the rule; the practitioner's job is to know which rule they are working in.</p>
+<h2 id="when-it-refuses">When it refuses</h2>
+<p>A refusal is a first-class response with its own shape. It carries the condition, the rule that produced it, and the alternatives that would answer — never a fabricated number.</p>
+<pre><code>{
+  "error": "unreckonable",
+  "condition": "no_sunrise",
+  "rule": "sunrise = upper limb clears the horizon",
+  "detail": "The sun does not rise at 78.22°N on 2026-12-21.",
+  "alternatives": ["civil_twilight", "solar_midnight", "previous_sunrise"]
+}</code></pre>
+<p>The instruments render this state rather than an empty table; on a tool page it is the cannot-compute panel, and here it is documented as a normal outcome. A day with no sunrise is not a bug in the calendar. It is a fact about latitude.</p>
+</div>
+<section class="j-record j-record--prov" aria-label="Provenance">
+<p class="j-eyebrow">Provenance</p>
+<div class="j-leaders" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr))">
+<div class="j-leader"><span class="j-leader-k">Engine</span><span class="j-leader-fill"></span><span class="j-leader-v">Swiss Ephemeris 2.10.03</span></div>
+<div class="j-leader"><span class="j-leader-k">Rule in force</span><span class="j-leader-fill"></span><span class="j-leader-v">Lahiri · whole-sign</span></div>
+<div class="j-leader"><span class="j-leader-k">Licence</span><span class="j-leader-fill"></span><span class="j-leader-v">AGPL-3.0</span></div>
+<div class="j-leader"><span class="j-leader-k">Running build</span><span class="j-leader-fill"></span><span class="j-leader-v">0.9.4 · 4f1c9ae</span></div>
+</div>
+<p class="j-record-foot">A number without its rule is not an answer. Source for the running build is offered on request and in the repository.</p>
+</section>
+<div class="j-next"><div class="j-next-grid">
+<a class="j-next-card" href="#"><span class="j-eyebrow">Previous</span><span class="j-next-title">Ayanāṁśa selection</span></a>
+<a class="j-next-card j-next-card--end" href="#"><span class="j-eyebrow">Next</span><span class="j-next-title">Positions and speeds</span></a>
+</div></div>
+</article>
+<aside class="j-rail j-rail--toc" aria-label="On this page">
+<div class="j-rail-group">
+<p class="j-eyebrow">On this page</p>
+<a class="j-toc-link is-current" href="#what-you-need">What you need</a>
+<a class="j-toc-link" href="#what-comes-back">What comes back</a>
+<a class="j-toc-link j-toc-link--sub" href="#both-traditions-unranked">Why nothing is marked correct</a>
+<a class="j-toc-link" href="#when-it-refuses">When it refuses</a>
+</div>
+<div class="j-rail-group"><p class="j-eyebrow">Applies to</p><span class="j-rail-mono">theourgia-ephemeris ≥ 0.9.0</span></div>
+</aside>
+</div>
+</main>
+<p class="j-chrome-note j-chrome-note--foot"><span class="j-eyebrow">SiteFooter · real component · legal imprint</span></p>
+</div>
+</body>
+</html>

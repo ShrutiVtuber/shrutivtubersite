@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rate limits and caching — /journal reference</title>
+<link rel="stylesheet" href="fonts.css">
+<link rel="stylesheet" href="../_ds/shruti-design-system-cb687f1a-c730-4155-891e-19f81b273619/tokens/colors.css">
+<link rel="stylesheet" href="../_ds/shruti-design-system-cb687f1a-c730-4155-891e-19f81b273619/tokens/typography.css">
+<link rel="stylesheet" href="../_ds/shruti-design-system-cb687f1a-c730-4155-891e-19f81b273619/tokens/spacing.css">
+<link rel="stylesheet" href="../_ds/shruti-design-system-cb687f1a-c730-4155-891e-19f81b273619/tokens/effects.css">
+<link rel="stylesheet" href="../_ds/shruti-design-system-cb687f1a-c730-4155-891e-19f81b273619/tokens/print.css">
+<link rel="stylesheet" href="../_ds/shruti-design-system-cb687f1a-c730-4155-891e-19f81b273619/tokens/base.css">
+<link rel="stylesheet" href="../_ds/shruti-design-system-cb687f1a-c730-4155-891e-19f81b273619/assets/sky.css">
+<link rel="stylesheet" href="../_ds/shruti-design-system-cb687f1a-c730-4155-891e-19f81b273619/assets/seal.css">
+<link rel="stylesheet" href="journal.css">
+</head>
+<body>
+<div data-journal>
+<p class="j-chrome-note"><span class="j-eyebrow">SiteHeader · real component · out of scope · documentation page, no TOC — under three headings the rail carries small print</span></p>
+<main class="j-page j-page--docs">
+<div class="j-shell j-shell--docs">
+<nav class="j-nav-rail" aria-label="Documentation">
+<a class="j-nav-home" href="/journal/docs/">Documentation</a>
+<div class="j-nav-group">
+<p class="j-eyebrow">The ephemeris API</p>
+<a class="j-nav-link" href="/journal/docs/casting-a-chart/">Casting a chart</a>
+
+<a class="j-nav-link" href="#">Positions and speeds</a>
+<a class="j-nav-link" href="#">Ayanāṁśa selection</a>
+<a class="j-nav-link" href="#">Refusals and error codes</a>
+<a class="j-nav-link" href="/journal/docs/rate-limits/" aria-current="page">Rate limits and caching</a>
+</div>
+<div class="j-nav-group">
+<p class="j-eyebrow">The four calendars</p>
+<a class="j-nav-link" href="#">The four reckonings</a><a class="j-nav-link" href="#">Observed crescent vs conjunction</a><a class="j-nav-link" href="#">Amānta and pūrṇimānta naming</a><a class="j-nav-link" href="#">Sunrise definitions</a>
+</div>
+<div class="j-nav-group">
+<p class="j-eyebrow">The mobile app</p>
+<a class="j-nav-link" href="#">Installing and pairing</a><a class="j-nav-link" href="#">Entries, seals and export</a><a class="j-nav-link" href="#">Building from source</a>
+</div>
+</nav>
+<article class="j-col--narrow">
+<nav class="j-bc" aria-label="Breadcrumb"><a href="/journal/docs/">Docs</a><span class="j-bc-sep" aria-hidden="true">›</span><a href="#">The ephemeris API</a><span class="j-bc-sep" aria-hidden="true">›</span><span aria-current="page">Rate limits and caching</span></nav>
+<h1 class="j-h1 j-h1--doc">Rate limits and caching</h1>
+<div class="j-meta j-meta--doc">
+<time datetime="2026-08-25">updated 2026-08-25</time><span class="j-bc-sep" aria-hidden="true">·</span><span style="font-size:var(--text-xs);color:var(--ink-soft)">by Shruti</span>
+<a class="j-more j-meta-end" href="https://github.com/theourgia/docs">edit this page →</a>
+</div>
+<div class="j-prose">
+<p>Sixty requests a minute per address, and a day of cache on anything older than yesterday. Neither number is interesting; both are stated because an instrument that fails quietly under load is worse than one that says no.</p>
+<h2 id="the-limits">The limits</h2>
+<p>Exceed them and you get <code>429</code> with a <code>Retry-After</code> in seconds — a refusal with a number in it, like every other refusal in the service.</p>
+<pre><code>HTTP/1.1 429 Too Many Requests
+Retry-After: 24
+X-Reckoned-By: theourgia-ephemeris 0.9.4</code></pre>
+
+<p>Nothing here needs a table of contents, which is the point of the state: a page with fewer than three headings gets small print in the rail instead, and the body column stays exactly where it is on every other page.</p>
+</div>
+<section class="j-record j-record--prov" aria-label="Provenance">
+<p class="j-eyebrow">Provenance</p>
+<div class="j-leaders" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr))">
+<div class="j-leader"><span class="j-leader-k">Engine</span><span class="j-leader-fill"></span><span class="j-leader-v">Swiss Ephemeris 2.10.03</span></div>
+<div class="j-leader"><span class="j-leader-k">Rule in force</span><span class="j-leader-fill"></span><span class="j-leader-v">Lahiri · whole-sign</span></div>
+<div class="j-leader"><span class="j-leader-k">Licence</span><span class="j-leader-fill"></span><span class="j-leader-v">AGPL-3.0</span></div>
+<div class="j-leader"><span class="j-leader-k">Running build</span><span class="j-leader-fill"></span><span class="j-leader-v">0.9.4 · 4f1c9ae</span></div>
+</div>
+<p class="j-record-foot">A number without its rule is not an answer. Source for the running build is offered on request and in the repository.</p>
+</section>
+<div class="j-next"><div class="j-next-grid">
+<a class="j-next-card" href="#"><span class="j-eyebrow">Previous</span><span class="j-next-title">Refusals and error codes</span></a>
+<a class="j-next-card j-next-card--end" href="#"><span class="j-eyebrow">Next</span><span class="j-next-title">The four reckonings</span></a>
+</div></div>
+</article>
+<aside class="j-rail j-rail--toc j-rail--static" aria-label="About this page">
+<div class="j-rail-group"><p class="j-eyebrow">Applies to</p><span class="j-rail-mono">theourgia-ephemeris ≥ 0.9.0</span></div>
+<div class="j-rail-group"><p class="j-eyebrow">Last reviewed</p><span class="j-rail-mono">2026-08-25</span></div>
+<div class="j-rail-group"><p class="j-eyebrow">Source</p><span class="j-rail-small">This page is written beside the code. Corrections by pull request are quicker than by email.</span><a class="j-more" href="https://github.com/theourgia/docs">theourgia/docs →</a></div>
+</aside>
+</div>
+</main>
+<p class="j-chrome-note j-chrome-note--foot"><span class="j-eyebrow">SiteFooter · real component · legal imprint</span></p>
+</div>
+</body>
+</html>

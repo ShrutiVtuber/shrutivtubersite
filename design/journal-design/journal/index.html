@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>/journal — reference pages</title>
+<link rel="stylesheet" href="fonts.css">
+<link rel="stylesheet" href="../_ds/shruti-design-system-cb687f1a-c730-4155-891e-19f81b273619/tokens/colors.css">
+<link rel="stylesheet" href="../_ds/shruti-design-system-cb687f1a-c730-4155-891e-19f81b273619/tokens/typography.css">
+<link rel="stylesheet" href="../_ds/shruti-design-system-cb687f1a-c730-4155-891e-19f81b273619/tokens/spacing.css">
+<link rel="stylesheet" href="../_ds/shruti-design-system-cb687f1a-c730-4155-891e-19f81b273619/tokens/effects.css">
+<link rel="stylesheet" href="../_ds/shruti-design-system-cb687f1a-c730-4155-891e-19f81b273619/tokens/base.css">
+<link rel="stylesheet" href="../_ds/shruti-design-system-cb687f1a-c730-4155-891e-19f81b273619/assets/sky.css">
+<link rel="stylesheet" href="journal.css">
+</head>
+<body>
+<div data-journal>
+<div class="sky" style="position:relative">
+  <div class="sky-stars"></div>
+  <div class="j-page" style="padding-top:56px;padding-bottom:56px">
+    <div class="j-veil" style="max-width:64ch;text-align:left;justify-items:start;padding:28px 30px">
+      <p class="j-eyebrow j-eyebrow--rose">shrutivtuber.com · section handoff</p>
+      <h1 class="j-h1">/journal — reference pages</h1>
+      <p class="j-lede" style="max-width:58ch">Nineteen pages and states, one stylesheet, no implementer glue. Open any page:
+      it renders against the design system's tokens exactly as the section should ship. Dusk follows
+      your OS — there is no switch here, as there is none on the site.</p>
+    </div>
+  </div>
+  <div class="sky-horizon"></div>
+</div>
+
+<main class="j-page">
+  <div class="j-section-head" style="margin-top:0"><h2>Start here</h2></div>
+  <div class="j-grid" style="grid-template-columns:repeat(auto-fill,minmax(min(300px,100%),1fr))">
+    <a class="j-next-card" href="IMPLEMENTATION.md"><span class="j-eyebrow j-eyebrow--rose">Read first</span><span class="j-next-title">Implementation guide</span><span class="j-card-dek">Widths, the one column rule, a markup skeleton per page, the constraint checks, the OG spec.</span></a>
+    <a class="j-next-card" href="SAMPLE-DATA.md"><span class="j-eyebrow j-eyebrow--rose">Before publishing</span><span class="j-next-title">Sample data</span><span class="j-card-dek">Every invented figure and the file it lives in. The corpus grades must come from the real corpus.</span></a>
+    <a class="j-next-card" href="_audit.html"><span class="j-eyebrow j-eyebrow--rose">Tool, not shipped</span><span class="j-next-title">Tier &amp; contrast audit</span><span class="j-card-dek">All 19 pages at five widths and both themes. Re-run after any grid or colour change.</span></a>
+  </div>
+
+  <div class="j-section-head"><h2>Listings</h2><span class="j-pag-note" style="margin-left:auto">card grid · hub, indexes, archives</span></div>
+  <div class="j-list" style="border-top:0;padding-top:16px">
+    <a class="j-row" href="hub.html"><span class="j-row-name">Hub — populated</span><span class="j-leader-fill"></span><span class="j-row-date">/journal/</span></a>
+    <a class="j-row" href="hub-empty.html"><span class="j-row-name">Hub — nothing published</span><span class="j-leader-fill"></span><span class="j-row-date">empty</span></a>
+    <a class="j-row" href="hub-single.html"><span class="j-row-name">Hub — a single item</span><span class="j-leader-fill"></span><span class="j-row-date">single</span></a>
+    <a class="j-row" href="all-content.html"><span class="j-row-name">All content — grouped by month</span><span class="j-leader-fill"></span><span class="j-row-date">/journal/all/</span></a>
+    <a class="j-row" href="blog-index-first.html"><span class="j-row-name">Blog index — first page</span><span class="j-leader-fill"></span><span class="j-row-date">/journal/blog/</span></a>
+    <a class="j-row" href="blog-index.html"><span class="j-row-name">Blog index — page N, pagination</span><span class="j-leader-fill"></span><span class="j-row-date">page/2/</span></a>
+    <a class="j-row" href="blog-index-empty.html"><span class="j-row-name">Index — empty</span><span class="j-leader-fill"></span><span class="j-row-date">empty</span></a>
+    <a class="j-row" href="category.html"><span class="j-row-name">Category archive</span><span class="j-leader-fill"></span><span class="j-row-date">category/&lt;slug&gt;/</span></a>
+  </div>
+
+  <div class="j-section-head"><h2>Reading</h2><span class="j-pag-note" style="margin-left:auto">one column, one rail — the rail never disappears</span></div>
+  <div class="j-list" style="border-top:0;padding-top:16px">
+    <a class="j-row" href="article.html"><span class="j-row-name">Article — no cover, long, TOC rail</span><span class="j-leader-fill"></span><span class="j-row-date">the common case</span></a>
+    <a class="j-row" href="article-cover.html"><span class="j-row-name">Article — cover art, short, small-print rail</span><span class="j-leader-fill"></span><span class="j-row-date">blog/&lt;slug&gt;/</span></a>
+    <a class="j-row" href="docs-index.html"><span class="j-row-name">Documentation index — grouped by section</span><span class="j-leader-fill"></span><span class="j-row-date">/journal/docs/</span></a>
+    <a class="j-row" href="docs-page.html"><span class="j-row-name">Documentation page — sidebar, TOC, provenance</span><span class="j-leader-fill"></span><span class="j-row-date">two rails</span></a>
+    <a class="j-row" href="docs-page-no-toc.html"><span class="j-row-name">Documentation page — under three headings, no TOC</span><span class="j-leader-fill"></span><span class="j-row-date">two rails</span></a>
+    <a class="j-row" href="wiki-index.html"><span class="j-row-name">Wiki index — A–Z, graded</span><span class="j-leader-fill"></span><span class="j-row-date">/journal/wiki/</span></a>
+    <a class="j-row" href="wiki-article.html"><span class="j-row-name">Wiki article — graded corpus table</span><span class="j-leader-fill"></span><span class="j-row-date">wiki/&lt;slug&gt;/</span></a>
+  </div>
+
+  <div class="j-section-head"><h2>Releases and edges</h2></div>
+  <div class="j-list" style="border-top:0;padding-top:16px">
+    <a class="j-row" href="changelog.html"><span class="j-row-name">Changelog — version list</span><span class="j-leader-fill"></span><span class="j-row-date">/journal/changelog/</span></a>
+    <a class="j-row" href="changelog-entry.html"><span class="j-row-name">Changelog — one release, six groups</span><span class="j-leader-fill"></span><span class="j-row-date">0.9.4</span></a>
+    <a class="j-row" href="sitemap.html"><span class="j-row-name">Sitemap</span><span class="j-leader-fill"></span><span class="j-row-date">/journal/sitemap/</span></a>
+    <a class="j-row" href="404.html"><span class="j-row-name">Not found — inside the section</span><span class="j-leader-fill"></span><span class="j-row-date">404</span></a>
+  </div>
+
+  <section class="j-record" aria-label="What the implementer must know">
+    <div class="j-record-head"><p class="j-eyebrow">Three things before you build</p></div>
+    <div class="j-leaders j-leaders--single">
+      <div class="j-leader"><span class="j-leader-k">Fonts</span><span class="j-leader-fill"></span><span class="j-leader-v">drop the binaries into fonts/ — see fonts/README.md</span></div>
+      <div class="j-leader"><span class="j-leader-k">Chrome</span><span class="j-leader-fill"></span><span class="j-leader-v">the dashed strips are notes; use the real SiteHeader/SiteFooter</span></div>
+      <div class="j-leader"><span class="j-leader-k">Content</span><span class="j-leader-fill"></span><span class="j-leader-v">every figure is sample data — see SAMPLE-DATA.md</span></div>
+    </div>
+    <p class="j-record-foot">Section-internal links are <span class="j-mono">/journal/…</span>; links out to the site are fully qualified, or the rewrite sends them into the section and they 404. The reference pages use those forms already.</p>
+  </section>
+</main>
+</div>
+</body>
+</html>

@@ -1,0 +1,91 @@
+/* ============================================================================
+   /journal — self-hosted faces. No external request, by design.
+   Drop the .woff2 files listed in fonts/README.md into ./fonts/ and this file
+   needs no further edit. Until they are present the stacks in the design
+   system's tokens/typography.css fall back to Georgia / system-ui, which is
+   why the reference pages must be judged with the binaries in place.
+
+   Ranges: Latin, Latin-ext, Greek and Greek-ext ship in one file per face —
+   polytonic Greek runs inline in this section constantly and must never
+   trigger a second download mid-sentence. Devanagari is a separate face and
+   is range-limited so it can never win a Latin codepoint.
+   ========================================================================= */
+
+/* --- EB Garamond — display and prose (Latin + polytonic Greek) ---------- */
+@font-face{
+  font-family:"EB Garamond";
+  src:url("fonts/eb-garamond-400.woff2") format("woff2");
+  font-weight:400;font-style:normal;font-display:swap;
+}
+@font-face{
+  font-family:"EB Garamond";
+  src:url("fonts/eb-garamond-400-italic.woff2") format("woff2");
+  font-weight:400;font-style:italic;font-display:swap;
+}
+@font-face{
+  font-family:"EB Garamond";
+  src:url("fonts/eb-garamond-500.woff2") format("woff2");
+  font-weight:500;font-style:normal;font-display:swap;
+}
+@font-face{
+  font-family:"EB Garamond";
+  src:url("fonts/eb-garamond-600.woff2") format("woff2");
+  font-weight:600;font-style:normal;font-display:swap;
+}
+
+/* --- Commissioner — UI (Latin + Greek) ---------------------------------- */
+@font-face{
+  font-family:"Commissioner";
+  src:url("fonts/commissioner-400.woff2") format("woff2");
+  font-weight:400;font-style:normal;font-display:swap;
+}
+@font-face{
+  font-family:"Commissioner";
+  src:url("fonts/commissioner-500.woff2") format("woff2");
+  font-weight:500;font-style:normal;font-display:swap;
+}
+@font-face{
+  font-family:"Commissioner";
+  src:url("fonts/commissioner-600.woff2") format("woff2");
+  font-weight:600;font-style:normal;font-display:swap;
+}
+
+/* --- JetBrains Mono — data, times, code (Latin + Greek) ----------------- */
+@font-face{
+  font-family:"JetBrains Mono";
+  src:url("fonts/jetbrains-mono-400.woff2") format("woff2");
+  font-weight:400;font-style:normal;font-display:swap;
+}
+@font-face{
+  font-family:"JetBrains Mono";
+  src:url("fonts/jetbrains-mono-500.woff2") format("woff2");
+  font-weight:500;font-style:normal;font-display:swap;
+}
+
+/* --- Devanagari fallbacks — range-limited ------------------------------- */
+/* U+0900–097F Devanagari · U+A8E0–A8FF extended · U+1CD0–1CFA Vedic marks ·
+   U+200C/200D ZWNJ/ZWJ, which conjunct forms need. */
+@font-face{
+  font-family:"Noto Serif Devanagari";
+  src:url("fonts/noto-serif-devanagari-400.woff2") format("woff2");
+  font-weight:400;font-style:normal;font-display:swap;
+  unicode-range:U+0900-097F,U+1CD0-1CFA,U+200C-200D,U+20A8,U+25CC,U+A830-A839,U+A8E0-A8FF;
+}
+@font-face{
+  font-family:"Noto Serif Devanagari";
+  src:url("fonts/noto-serif-devanagari-600.woff2") format("woff2");
+  font-weight:600;font-style:normal;font-display:swap;
+  unicode-range:U+0900-097F,U+1CD0-1CFA,U+200C-200D,U+20A8,U+25CC,U+A830-A839,U+A8E0-A8FF;
+}
+@font-face{
+  font-family:"Mukta";
+  src:url("fonts/mukta-400.woff2") format("woff2");
+  font-weight:400;font-style:normal;font-display:swap;
+  unicode-range:U+0900-097F,U+1CD0-1CFA,U+200C-200D,U+20A8,U+25CC,U+A830-A839,U+A8E0-A8FF;
+}
+@font-face{
+  font-family:"Mukta";
+  src:url("fonts/mukta-600.woff2") format("woff2");
+  font-weight:600;font-style:normal;font-display:swap;
+  unicode-range:U+0900-097F,U+1CD0-1CFA,U+200C-200D,U+20A8,U+25CC,U+A830-A839,U+A8E0-A8FF;
+}

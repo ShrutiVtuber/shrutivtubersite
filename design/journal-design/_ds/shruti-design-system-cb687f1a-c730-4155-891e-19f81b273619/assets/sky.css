@@ -1,0 +1,13 @@
+/* The sky panel — the one atmosphere idea. Pure CSS, art-absent by default.
+   Usage: <div class="sky"> … <div class="sky-horizon"></div></div>
+   Optional art: <img class="sky-clouds" src="…"> layered inside. */
+.sky{position:relative;background:linear-gradient(180deg,var(--sky-zenith) 0%,var(--sky-mid) 58%,var(--sky-horizon) 100%);color:var(--ink);overflow:hidden;transition:background var(--dur-3) var(--ease-in-out)}
+.sky-horizon{position:absolute;left:0;right:0;bottom:0;height:1px;background:var(--horizon-line)}
+.sky-clouds{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.28;mix-blend-mode:luminosity;pointer-events:none}
+[data-theme="dark"] .sky-clouds{opacity:.22}
+/* Stars appear only at dusk — tiny, static, CSS-only */
+.sky-stars{position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity var(--dur-3) var(--ease-in-out);background-image:radial-gradient(1px 1px at 12% 22%,rgba(233,230,240,.9) 50%,transparent 51%),radial-gradient(1px 1px at 28% 8%,rgba(233,230,240,.7) 50%,transparent 51%),radial-gradient(1.5px 1.5px at 44% 30%,rgba(233,230,240,.8) 50%,transparent 51%),radial-gradient(1px 1px at 61% 12%,rgba(233,230,240,.6) 50%,transparent 51%),radial-gradient(1px 1px at 73% 26%,rgba(233,230,240,.85) 50%,transparent 51%),radial-gradient(1.5px 1.5px at 86% 9%,rgba(233,230,240,.7) 50%,transparent 51%),radial-gradient(1px 1px at 93% 33%,rgba(233,230,240,.6) 50%,transparent 51%),radial-gradient(1px 1px at 7% 45%,rgba(233,230,240,.5) 50%,transparent 51%),radial-gradient(1px 1px at 52% 48%,rgba(233,230,240,.45) 50%,transparent 51%)}
+[data-theme="dark"] .sky-stars{opacity:1}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .sky-stars{opacity:1}}
+/* Text protection over sky: a veil capsule, not a scrim */
+.sky-veil{background:color-mix(in srgb,var(--surface-page) 62%,transparent);backdrop-filter:var(--blur-veil);-webkit-backdrop-filter:var(--blur-veil);border:var(--border-w) solid color-mix(in srgb,var(--line) 60%,transparent);border-radius:var(--radius-lg)}

@@ -1,0 +1,86 @@
+# /journal implementation — working notes
+
+**Live progress tracker. Update the checklist as work lands.**
+Companion to `docs/DESIGN_REQUEST_JOURNAL.md` (the brief we sent) and
+`design/journal-design/journal/` (the designer's answer).
+
+---
+
+## The job in one paragraph
+
+BeeRanked's agent syncs published pages to `/srv/journal` as static HTML. An
+Astro route reads them and renders inside the site's own `BaseLayout`, so the
+section gets the REAL `SiteHeader`/`SiteFooter`. The designer has replaced the
+content markup entirely: their skeleton is `.j-page` / `.j-shell` / `.j-col` /
+`.j-rail` with `.j-*` classes throughout. So the implementer must **extract the
+DATA from BeeRanked's HTML and re-emit it in the designer's skeleton** — not
+pass their markup through. That is what rebetichord's injector does and what we
+promised the designer in the brief.
+
+## Where things live
+
+| | |
+|---|---|
+| Designer package | `design/journal-design/journal/` |
+| Their guide | `design/journal-design/journal/IMPLEMENTATION.md` — read §1 and §2 first |
+| Their stylesheet | `design/journal-design/journal/journal.css` (31KB, zero colour literals) |
+| Their references | 19 HTML files in that folder; `index.html` is the front door |
+| Their audit tool | `_audit.html` — tier sweep + contrast. A TOOL, not shipped |
+| Synced source | `/srv/journal` in the `site` container (volume `journal`) |
+| Our route | `frontend/site/src/pages/journal/[...slug].astro` |
+| Our reader | `frontend/site/src/lib/journal.ts` |
+
+## Decisions already made (do not relitigate)
+
+- **Their `fonts.css` is NOT used.** We self-host the same faces already, split
+  by `unicode-range`, so a Latin reader never downloads Devanagari. Verified
+  our EB Garamond includes `greek-ext` (U+1F00–1FFF) so polytonic renders.
+  Their eleven-file scheme would be a regression.
+- **`.j-*` namespacing accepted** over the `[data-journal]` scoping the brief
+  asked for. Checked: zero unprefixed selectors, so nothing can leak.
+- **Their sample data is invented and disclosed** in `SAMPLE-DATA.md`. One
+  value is impossible: `Anno IVxxxiv` — cycles are 22 years so year 34 cannot
+  exist. Real value today is `Vxii`. Use the engine, never their figures.
+- The sky-at-publication block is stored per entry (`/api/journal/sky`,
+  migration `c9a04e1b78f2`) and never recomputed.
+- Links out of the section must be absolute; root-relative gets rewritten into
+  the section and 404s.
+
+## Parsing approach
+
+Regex over HTML is what produced the "rendered my own CSS comment as the
+article" bug. Use a real parser (`node-html-parser`, small, no jsdom) and
+extract structured data per page type, then render Astro components.
+
+## Checklist
+
+- [ ] `node-html-parser` added to the site package
+- [ ] `journal.css` copied into the site and imported by the route
+- [ ] Type detection: which page type is this path?
+- [ ] Shared: `.j-page` / `.j-shell` / `.j-col` / `.j-rail` layout components
+- [ ] Card + row components (`.j-card`, `.j-row`, `.j-feature`)
+- [ ] Hub (populated / empty / single)
+- [ ] All content
+- [ ] Blog index (first / page N / empty) + pagination
+- [ ] Category archive
+- [ ] Article (cover / no cover) + TOC rail + static rail fallback
+- [ ] Sky-at-publication block, from the stored record
+- [ ] Docs index
+- [ ] Docs page (TOC / no TOC) + sidebar + provenance
+- [ ] Wiki index (A–Z) + wiki article (graded table)
+- [ ] Changelog list + entry (six groups, fixed order)
+- [ ] Sitemap
+- [ ] 404 inside the section
+- [ ] Type marks carry `&#xFE0E;` or zodiac glyphs go colour-emoji
+- [ ] No horizontal scroll at 320 (their audit method)
+- [ ] Deployed and checked live
+
+## Gotchas already paid for
+
+- Caddy's `/journal/*` also matches bare `/journal`; `handle_path` then strips
+  everything and `file_server` answers 200 with an empty body. Fixed with a
+  `redir` — do not turn it back into a `handle` block.
+- `upsert_plugin` REPLACES rather than patches; send css + slots + flags
+  together or the omitted ones are cleared.
+- Never put angle-bracket tag syntax in the BeeRanked plugin CSS — it is
+  injected into the page and the extractor used to match it.

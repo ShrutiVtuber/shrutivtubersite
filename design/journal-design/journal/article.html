@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nothing was ever retrograde — /journal reference</title>
+<link rel="stylesheet" href="fonts.css">
+<link rel="stylesheet" href="../_ds/shruti-design-system-cb687f1a-c730-4155-891e-19f81b273619/tokens/colors.css">
+<link rel="stylesheet" href="../_ds/shruti-design-system-cb687f1a-c730-4155-891e-19f81b273619/tokens/typography.css">
+<link rel="stylesheet" href="../_ds/shruti-design-system-cb687f1a-c730-4155-891e-19f81b273619/tokens/spacing.css">
+<link rel="stylesheet" href="../_ds/shruti-design-system-cb687f1a-c730-4155-891e-19f81b273619/tokens/effects.css">
+<link rel="stylesheet" href="../_ds/shruti-design-system-cb687f1a-c730-4155-891e-19f81b273619/tokens/print.css">
+<link rel="stylesheet" href="../_ds/shruti-design-system-cb687f1a-c730-4155-891e-19f81b273619/tokens/base.css">
+<link rel="stylesheet" href="../_ds/shruti-design-system-cb687f1a-c730-4155-891e-19f81b273619/assets/sky.css">
+<link rel="stylesheet" href="../_ds/shruti-design-system-cb687f1a-c730-4155-891e-19f81b273619/assets/seal.css">
+<link rel="stylesheet" href="journal.css">
+</head>
+<body>
+<div data-journal>
+<p class="j-chrome-note"><span class="j-eyebrow">SiteHeader · real component · out of scope · article, no cover image</span></p>
+<main class="j-page">
+<div class="j-shell">
+<article class="j-col">
+<nav class="j-bc" aria-label="Breadcrumb"><a href="/journal/">Journal</a><span class="j-bc-sep" aria-hidden="true">›</span><a href="/journal/blog/">Writing</a><span class="j-bc-sep" aria-hidden="true">›</span><span aria-current="page">Nothing was ever retrograde</span></nav>
+<div class="j-plate j-plate--entry" role="img" aria-label="Sky plate — this entry has no cover art">
+<span class="j-plate-glyph j-glyph" aria-hidden="true">☾&#xFE0E;</span>
+<span class="j-plate-note">writing · no cover art</span>
+<span class="j-plate-note">25.08.2026</span>
+</div>
+<h1 class="j-h1 j-h1--entry">Nothing was ever retrograde</h1>
+<p class="j-deck">A chart correct in every particular except one, and a zero that looked exactly like an answer.</p>
+<div class="j-meta">
+<span>By <a href="https://shrutivtuber.com" rel="author">Shruti</a></span>
+<span class="j-bc-sep" aria-hidden="true">·</span>
+<time datetime="2026-08-25">25 August 2026</time>
+<span class="j-tags j-meta-end"><a class="j-tag" href="/journal/blog/category/ephemeris/">Ephemeris</a><a class="j-tag" href="/journal/blog/category/bugs/">Bugs</a></span>
+</div>
+<div class="j-prose">
+<p>A chart was coming out right in every particular except one. Every planet was direct — all of them, at every date I tried, in every house system. A birth chart with no retrogrades is not wrong the way a crash is wrong. It is wrong the way a stopped clock is wrong: it reads plausibly, twice a day.</p>
+<h2 id="the-shape-of-the-bug">The shape of the bug</h2>
+<p>Swiss Ephemeris fills the speed slot <strong>only when it is asked to</strong>. Ask for a position without <code>FLG_SPEED</code> and you get a position, correct to the arcsecond, along with a zero where the daily motion should be.</p>
+<pre><code>xx, ret = swe.calc_ut(jd, swe.MOON, swe.FLG_SWIEPH)
+speed    = xx[3]        # 0.0 — never computed
+retrograde = speed &lt; 0.0</code></pre>
+<p>Zero is not less than zero. So nothing was ever retrograde — not because the arithmetic was wrong, but because the input was a plausible-looking zero rather than a missing value.</p>
+<blockquote>A number that was never computed should not be able to reach a comparison. If it can, the comparison is not the bug.<cite>— from the commit message</cite></blockquote>
+<h2 id="why-it-survived">Why it survived</h2>
+<p>Nothing threw. No test failed, because the tests asserted positions and the positions were right. The Moon's daily motion read <code>0.00°/day</code>, which looks like a formatting problem rather than an absence, and I read it as one for two days.<sup><a href="#note-2" id="ref-2">2</a></sup></p>
+<h3 id="what-the-flags-return">What the flags actually return</h3>
+<div class="j-scroll">
+<table class="j-table">
+<thead><tr><th scope="col">Flag combination</th><th scope="col">Longitude</th><th scope="col">Daily motion</th><th scope="col">Relative cost</th></tr></thead>
+<tbody>
+<tr><td><code>FLG_SWIEPH</code></td><td>exact</td><td class="j-mono">0.00°/day</td><td class="j-mono">1.0×</td></tr>
+<tr><td><code>FLG_SWIEPH | FLG_SPEED</code></td><td>exact</td><td class="j-mono">computed</td><td class="j-mono">1.4×</td></tr>
+<tr><td><code>FLG_MOSEPH | FLG_SPEED</code></td><td>±1″</td><td class="j-mono">computed</td><td class="j-mono">0.6×</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="the-test-that-would-have-caught-it">The test that would have caught it</h3>
+<p>One assertion over a date I already knew by heart: Mercury stations retrograde on 9 August 2026, and any build that says otherwise is not asking for speed. It is now the first test in the suite, and the only one whose failure I have already seen.</p>
+<h2 id="the-fix-and-the-rule">The fix, and the rule</h2>
+<pre><code>- xx, ret = swe.calc_ut(jd, body, FLG_SWIEPH)
++ xx, ret = swe.calc_ut(jd, body, FLG_SWIEPH | FLG_SPEED)
++ if not flags &amp; FLG_SPEED:
++     raise Unreckonable("speed was not requested")</code></pre>
+<p>The one-line change is the flag. The change that matters is the second one: the ephemeris layer now refuses to hand back a field it never computed. <code>Unreckonable</code> is the same exception the calendars raise at the pole on a day the sun does not rise — the instruments would rather say <em lang="grc">οὐ λογίζεται</em>, it is not reckoned, than return a number nobody derived.<sup><a href="#note-1" id="ref-1">1</a></sup></p>
+<h4 id="a-note-on-daily-motion">A note on daily motion</h4>
+<p>The Moon's motion runs from roughly 11°/day to 15°/day and never rests. Sanskrit astronomy names the retrograde condition <span lang="sa">वक्री</span> (<em>vakrī</em>, crooked) — a description of apparent motion, not a verdict on it. Zero was never a plausible value for either tradition to report.</p>
+<h2 id="what-changed-in-the-instrument">What changed in the instrument</h2>
+<p>The chart page now prints ℞ beside a retrograde body, states the flag it ran under in its provenance card, and shows an em dash with a footnote where the speed field is absent. A chart that cannot know is more useful than a chart that guesses.</p>
+</div>
+<aside class="j-instrument">
+<p class="j-eyebrow">Try it against your own chart</p>
+<span class="j-instrument-name">Natal chart</span>
+<p>Tropical whole-sign and sidereal Lahiri side by side, unranked, with the flag and the ephemeris build named under the figure.</p>
+<a href="https://shrutivtuber.com/tools/natal-chart">shrutivtuber.com/tools/natal-chart →</a>
+</aside>
+<section class="j-notes" aria-label="Notes">
+<p class="j-eyebrow">Notes</p>
+<div class="j-note" id="note-1"><span class="j-note-n">1</span><p>Swiss Ephemeris 2.10.03, AGPL. Every instrument names the build it is running; this one is stated on the chart page's provenance card.</p></div>
+<div class="j-note" id="note-2"><span class="j-note-n">2</span><p>Stations are computed, not tabulated. The 9 August figure comes from the same call, asked properly.</p></div>
+</section>
+<section class="j-record" aria-label="The sky when this was published">
+<div class="j-record-head"><p class="j-eyebrow">The sky when this was published</p><span class="j-glyph" aria-hidden="true">☉&#xFE0E; ☾&#xFE0E;</span></div>
+<div class="j-leaders">
+<div class="j-leader"><span class="j-leader-k">Sun · tropical</span><span class="j-leader-fill"></span><span class="j-leader-v j-glyph">2°14′ ♍&#xFE0E;</span></div>
+<div class="j-leader"><span class="j-leader-k">Sun · sidereal, Lahiri</span><span class="j-leader-fill"></span><span class="j-leader-v j-glyph">8°23′ ♌&#xFE0E;</span></div>
+<div class="j-leader"><span class="j-leader-k">Moon · tropical</span><span class="j-leader-fill"></span><span class="j-leader-v j-glyph">19°41′ ♓&#xFE0E;</span></div>
+<div class="j-leader"><span class="j-leader-k">Moon · sidereal, Lahiri</span><span class="j-leader-fill"></span><span class="j-leader-v j-glyph">25°50′ ♒&#xFE0E;</span></div>
+<div class="j-leader"><span class="j-leader-k">Tithi</span><span class="j-leader-fill"></span><span class="j-leader-v">Kṛṣṇa Ekādaśī · ends 03:41</span></div>
+<div class="j-leader"><span class="j-leader-k">Nakṣatra</span><span class="j-leader-fill"></span><span class="j-leader-v">Mṛgaśīrṣa · ends 21:07</span></div>
+<div class="j-leader"><span class="j-leader-k">Attic</span><span class="j-leader-fill"></span><span class="j-leader-v j-leader-v--greek" lang="grc">δωδεκάτη Μεταγειτνιῶνος</span></div>
+<div class="j-leader"><span class="j-leader-k">Thelemic</span><span class="j-leader-fill"></span><span class="j-leader-v j-glyph">Anno IVxxxiv ☉&#xFE0E; in ♍&#xFE0E;</span></div>
+</div>
+<p class="j-record-foot">Recorded for Athens (GMT+3) at the moment of publication and stored with the entry. Swiss Ephemeris 2.10.03 · Lahiri ayanāṁśa · amānta month naming · Attic date by observed crescent. Never recomputed, so it still says what the sky said.</p>
+</section>
+<section class="j-next">
+<p class="j-eyebrow">Continue reading</p>
+<div class="j-next-grid">
+<a class="j-next-card" href="/journal/blog/the-month-that-would-not-open/"><span class="j-eyebrow j-eyebrow--rose"><span class="j-glyph" aria-hidden="true">☾&#xFE0E;</span> Writing</span><span class="j-next-title">The month that would not open</span><span class="j-card-date">25.08.2026</span></a>
+<a class="j-next-card" href="/journal/docs/casting-a-chart/"><span class="j-eyebrow j-eyebrow--rose"><span class="j-glyph" aria-hidden="true">♄&#xFE0E;</span> Documentation</span><span class="j-next-title">Casting a chart</span><span class="j-card-date">updated 25.08.2026</span></a>
+</div>
+</section>
+</article>
+<aside class="j-rail" aria-label="On this page">
+<div class="j-rail-group">
+<p class="j-eyebrow">On this page</p>
+<a class="j-toc-link is-current" href="#the-shape-of-the-bug">The shape of the bug</a>
+<a class="j-toc-link" href="#why-it-survived">Why it survived</a>
+<a class="j-toc-link j-toc-link--sub" href="#what-the-flags-return">What the flags return</a>
+<a class="j-toc-link j-toc-link--sub" href="#the-test-that-would-have-caught-it">The test that would have caught it</a>
+<a class="j-toc-link" href="#the-fix-and-the-rule">The fix, and the rule</a>
+<a class="j-toc-link j-toc-link--sub" href="#a-note-on-daily-motion">A note on daily motion</a>
+<a class="j-toc-link" href="#what-changed-in-the-instrument">What changed in the instrument</a>
+</div>
+</aside>
+</div>
+</main>
+<p class="j-chrome-note j-chrome-note--foot"><span class="j-eyebrow">SiteFooter · real component · legal imprint</span></p>
+</div>
+</body>
+</html>

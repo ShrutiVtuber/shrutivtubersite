@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>0.9.4 — /journal reference</title>
+<link rel="stylesheet" href="fonts.css">
+<link rel="stylesheet" href="../_ds/shruti-design-system-cb687f1a-c730-4155-891e-19f81b273619/tokens/colors.css">
+<link rel="stylesheet" href="../_ds/shruti-design-system-cb687f1a-c730-4155-891e-19f81b273619/tokens/typography.css">
+<link rel="stylesheet" href="../_ds/shruti-design-system-cb687f1a-c730-4155-891e-19f81b273619/tokens/spacing.css">
+<link rel="stylesheet" href="../_ds/shruti-design-system-cb687f1a-c730-4155-891e-19f81b273619/tokens/effects.css">
+<link rel="stylesheet" href="../_ds/shruti-design-system-cb687f1a-c730-4155-891e-19f81b273619/tokens/print.css">
+<link rel="stylesheet" href="../_ds/shruti-design-system-cb687f1a-c730-4155-891e-19f81b273619/tokens/base.css">
+<link rel="stylesheet" href="../_ds/shruti-design-system-cb687f1a-c730-4155-891e-19f81b273619/assets/sky.css">
+<link rel="stylesheet" href="../_ds/shruti-design-system-cb687f1a-c730-4155-891e-19f81b273619/assets/seal.css">
+<link rel="stylesheet" href="journal.css">
+</head>
+<body>
+<div data-journal>
+<p class="j-chrome-note"><span class="j-eyebrow">SiteHeader · real component · out of scope · changelog, single release</span></p>
+<main class="j-page">
+<div class="j-shell">
+<article class="j-col">
+<nav class="j-bc" aria-label="Breadcrumb"><a href="/journal/">Journal</a><span class="j-bc-sep" aria-hidden="true">›</span><a href="/journal/changelog/">Changelog</a><span class="j-bc-sep" aria-hidden="true">›</span><span aria-current="page" class="j-mono">0.9.4</span></nav>
+<div style="display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;margin-bottom:10px">
+<h1 class="j-h1 j-h1--version">0.9.4</h1>
+<span class="j-mono" style="font-size:var(--text-sm);color:var(--ink-soft)">theourgia-ephemeris</span>
+</div>
+<div class="j-meta">
+<time datetime="2026-08-24">released 2026-08-24</time><span class="j-bc-sep" aria-hidden="true">·</span><span class="j-mono" style="font-size:var(--text-xs);color:var(--ink-soft)">tag v0.9.4 · 4f1c9ae</span>
+<a class="j-more j-meta-end" href="https://github.com/theourgia/ephemeris/releases/tag/v0.9.4">on GitHub →</a>
+</div>
+<p class="j-lede" style="margin-bottom:36px">Speed is no longer optional inside the service. A field that was not computed cannot reach a comparison — the retrograde bug is fixed at the layer that allowed it, not at the call site.</p>
+<div class="j-groups">
+<div class="j-group"><p class="j-eyebrow">Added</p><ul><li><code>Unreckonable</code> exception carrying condition, rule and alternatives</li><li>Regression test: Mercury station retrograde, 2026-08-09</li></ul></div>
+<div class="j-group"><p class="j-eyebrow">Changed</p><ul><li><code>FLG_SPEED</code> set on every planetary call</li><li>Provenance block names the flag set in force</li><li>Chart response marks retrograde bodies with ℞</li></ul></div>
+<div class="j-group"><p class="j-eyebrow">Fixed</p><ul><li>Retrograde never reported; speed slot read as 0.0 when unrequested</li><li>Daily motion formatted as <code>0.00°/day</code> instead of absent</li><li>Ayanāṁśa name dropped from cached responses</li><li>Sidereal ascendant off by one sign at 29°+ boundaries</li></ul></div>
+<div class="j-group"><p class="j-eyebrow">Deprecated</p><ul><li><code>?fast=1</code> — removal in 0.11</li></ul></div>
+<div class="j-group"><p class="j-eyebrow">Removed</p><ul><li>Undocumented <code>/chart/quick</code> endpoint</li></ul></div>
+<div class="j-group j-group--security"><p class="j-eyebrow">Security</p><ul><li>Coordinates no longer written to the request log</li></ul></div>
+</div>
+<div class="j-next"><div class="j-next-grid">
+<a class="j-next-card" href="#"><span class="j-eyebrow">Previous release</span><span class="j-next-title j-mono">0.9.3</span></a>
+<a class="j-next-card j-next-card--end" href="/journal/blog/nothing-was-ever-retrograde/"><span class="j-eyebrow">The writing behind this one</span><span class="j-next-title">Nothing was ever retrograde</span></a>
+</div></div>
+</article>
+<aside class="j-rail j-rail--static" aria-label="Release notes">
+<div class="j-rail-group"><p class="j-eyebrow">Upgrade note</p><span class="j-rail-small">Callers that read <span class="j-mono">speed</span> without asking for it will now receive a refusal instead of a zero. That is the point.</span></div>
+<div class="j-rail-group"><p class="j-eyebrow">Runs on</p><span class="j-rail-mono">Swiss Ephemeris 2.10.03<br>AGPL-3.0</span></div>
+</aside>
+</div>
+</main>
+<p class="j-chrome-note j-chrome-note--foot"><span class="j-eyebrow">SiteFooter · real component · legal imprint</span></p>
+</div>
+</body>
+</html>

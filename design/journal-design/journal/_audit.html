@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>/journal — tier and theme audit</title>
+<link rel="stylesheet" href="fonts.css">
+<link rel="stylesheet" href="../_ds/shruti-design-system-cb687f1a-c730-4155-891e-19f81b273619/tokens/colors.css">
+<link rel="stylesheet" href="../_ds/shruti-design-system-cb687f1a-c730-4155-891e-19f81b273619/tokens/typography.css">
+<link rel="stylesheet" href="../_ds/shruti-design-system-cb687f1a-c730-4155-891e-19f81b273619/tokens/spacing.css">
+<link rel="stylesheet" href="../_ds/shruti-design-system-cb687f1a-c730-4155-891e-19f81b273619/tokens/effects.css">
+<link rel="stylesheet" href="../_ds/shruti-design-system-cb687f1a-c730-4155-891e-19f81b273619/tokens/base.css">
+<style>
+  body{margin:0;background:var(--surface-page);color:var(--ink);font-family:var(--font-body);padding:32px}
+  h1{font-family:var(--font-display);font-size:2rem;font-weight:500;letter-spacing:-.015em;margin:0 0 8px}
+  p.lede{margin:0 0 24px;color:var(--ink-soft);font-size:.875rem;max-width:70ch;line-height:1.6}
+  table{border-collapse:collapse;font-size:.8125rem;font-variant-numeric:tabular-nums}
+  th,td{text-align:left;padding:7px 14px 7px 0;border-bottom:1px solid var(--line);white-space:nowrap}
+  th{font-size:.75rem;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-faint);font-weight:600}
+  td.page{font-family:var(--font-mono);color:var(--ink)}
+  .ok{color:var(--ink-faint)}
+  .bad{color:var(--live);font-weight:600;font-family:var(--font-mono)}
+  .run{display:flex;gap:12px;align-items:center;margin-bottom:20px;flex-wrap:wrap}
+  button{font:inherit;font-size:.875rem;padding:9px 16px;min-height:44px;border-radius:4px;
+    border:1px solid var(--accent);background:var(--accent);color:var(--on-accent);cursor:pointer}
+  button.quiet{background:transparent;color:var(--accent);border-color:var(--line-strong)}
+  #status{font-family:var(--font-mono);font-size:.8125rem;color:var(--ink-soft)}
+  #stage{position:fixed;left:-20000px;top:0}
+  iframe{border:0}
+  #shots{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:20px;margin-top:32px}
+  .shot{border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--surface-card)}
+  .shot h3{margin:0;padding:10px 14px;font-family:var(--font-mono);font-size:.75rem;font-weight:400;
+    color:var(--ink-faint);border-bottom:1px solid var(--line)}
+  .shot .frame{height:260px;overflow:hidden;position:relative}
+  .shot iframe{position:absolute;top:0;left:0;width:1440px;height:1040px;transform:scale(.26);transform-origin:0 0}
+</style>
+</head>
+<body>
+<h1>/journal — tier and theme audit</h1>
+<p class="lede">Loads every reference page at 320 · 375 · 640 · 1024 · 1440 in a real iframe, so the
+media queries fire against a real viewport, and reports any page whose document scrolls sideways —
+naming the widest offender. Elements inside a <code>.j-scroll</code> box are expected to overflow
+<em>their box</em> and are not counted; only the page scrolling is a failure. Then renders every page
+in both themes for the visual pass.</p>
+<div class="run">
+  <button id="go">Run the sweep</button>
+  <button id="contrast">Run the contrast audit</button>
+  <button class="quiet" id="theme">Thumbnails: dusk</button>
+  <span id="status">idle</span>
+</div>
+<table id="out"><thead><tr><th>Page</th><th>320</th><th>375</th><th>640</th><th>1024</th><th>1440</th></tr></thead><tbody></tbody></table>
+<table id="cout" style="margin-top:32px"><thead><tr><th>Page</th><th>Dawn</th><th>Dusk</th></tr></thead><tbody></tbody></table>
+<div id="shots"></div>
+<div id="stage"></div>
+<script>
+const PAGES = ['hub.html','hub-empty.html','hub-single.html','all-content.html','blog-index-first.html',
+ 'blog-index.html','blog-index-empty.html','category.html','article.html','article-cover.html',
+ 'docs-index.html','docs-page.html','docs-page-no-toc.html','wiki-index.html','wiki-article.html',
+ 'changelog.html','changelog-entry.html','sitemap.html','404.html'];
+const TIERS = [320,375,640,1024,1440];
+const stage = document.getElementById('stage');
+const tbody = document.querySelector('#out tbody');
+const status = document.getElementById('status');
+let theme = 'light';
+
+function measure(doc, width){
+  const de = doc.documentElement;
+  const over = de.scrollWidth - width;
+  if (over <= 1) return null;
+  let worst = null;
+  const all = doc.querySelectorAll('[data-journal] *');
+  for (const el of all){
+    if (el.closest('.j-scroll')) continue;
+    const r = el.getBoundingClientRect();
+    const spill = Math.round(r.right - width);
+    if (spill > 1 && (!worst || spill > worst.spill)){
+      worst = {spill, tag: el.tagName.toLowerCase(), cls: (el.className||'').toString().slice(0,42)};
+    }
+  }
+  return {over: Math.round(over), worst};
+}
+
+function load(src, width){
+  return new Promise(res => {
+    const f = document.createElement('iframe');
+    f.style.width = width + 'px';
+    f.style.height = '1200px';
+    f.src = src;
+    f.onload = () => {
+      setTimeout(() => {
+        let out = null;
+        try { out = measure(f.contentDocument, width); } catch(e){ out = {over:-1, worst:{tag:'x-origin',cls:'',spill:0}}; }
+        f.remove();
+        res(out);
+      }, 80);
+    };
+    setTimeout(() => { if (document.body.contains(f)) { let out=null; try{ out=measure(f.contentDocument,width);}catch(e){} f.remove(); res(out); } }, 4000);
+    stage.appendChild(f);
+  });
+}
+
+document.getElementById('go').onclick = async () => {
+  tbody.innerHTML = ''; window.__audit = {};
+  for (const p of PAGES){
+    const tr = document.createElement('tr');
+    tr.innerHTML = '<td class="page">' + p + '</td>' + TIERS.map(() => '<td class="ok">…</td>').join('');
+    tbody.appendChild(tr);
+    window.__audit[p] = {};
+    for (let i = 0; i < TIERS.length; i++){
+      status.textContent = p + ' @ ' + TIERS[i];
+      const r = await load(p, TIERS[i]);
+      const cell = tr.children[i+1];
+      if (!r){ cell.className = 'ok'; cell.textContent = '✓'; window.__audit[p][TIERS[i]] = 'ok'; }
+      else {
+        cell.className = 'bad';
+        cell.textContent = '+' + r.over + (r.worst ? ' ' + r.worst.tag + '.' + r.worst.cls.split(' ')[0] : '');
+        window.__audit[p][TIERS[i]] = cell.textContent;
+      }
+    }
+  }
+  status.textContent = 'done · results in window.__audit';
+  const shots = document.getElementById('shots');
+  shots.innerHTML = PAGES.map(p => '<div class="shot"><h3>' + p + '</h3><div class="frame"><iframe data-shot src="' + p + '"></iframe></div></div>').join('');
+};
+
+/* ---- WCAG AA contrast, both themes -------------------------------------
+   Text over the sky panel is checked against all three gradient stops, and
+   translucent veils are composited, so the veil-over-sky case is real. */
+function parseRGB(s){
+  const m = (s||'').match(/rgba?\(([^)]+)\)/); if (!m) return null;
+  const p = m[1].split(/[,\s\/]+/).filter(Boolean).map(Number);
+  return {r:p[0], g:p[1], b:p[2], a:p.length>3?p[3]:1};
+}
+function hexRGB(h){
+  h = (h||'').trim(); const m = h.match(/^#([0-9a-f]{6})$/i);
+  if (!m) return parseRGB(h);
+  const n = parseInt(m[1],16); return {r:n>>16&255, g:n>>8&255, b:n&255, a:1};
+}
+const over = (fg, bg) => ({r: fg.r*fg.a + bg.r*(1-fg.a), g: fg.g*fg.a + bg.g*(1-fg.a), b: fg.b*fg.a + bg.b*(1-fg.a), a:1});
+function lum(c){
+  const f = v => { v/=255; return v<=.03928 ? v/12.92 : Math.pow((v+.055)/1.055, 2.4); };
+  return .2126*f(c.r) + .7152*f(c.g) + .0722*f(c.b);
+}
+const ratio = (a,b) => { const l1=lum(a), l2=lum(b); return (Math.max(l1,l2)+.05)/(Math.min(l1,l2)+.05); };
+
+function backdrops(el, win, doc){
+  const cs = win.getComputedStyle(doc.documentElement);
+  const sky = ['--sky-zenith','--sky-mid','--sky-horizon'].map(v => hexRGB(cs.getPropertyValue(v))).filter(Boolean);
+  const page = parseRGB(win.getComputedStyle(doc.body).backgroundColor) || {r:255,g:255,b:255,a:1};
+  const layers = [];
+  let node = el, hitSky = false;
+  while (node && node.nodeType === 1){
+    const s = win.getComputedStyle(node);
+    if ((s.backgroundImage||'').includes('gradient')) hitSky = true;
+    const bg = parseRGB(s.backgroundColor);
+    if (bg && bg.a > 0) { layers.push(bg); if (bg.a === 1) break; }
+    node = node.parentElement;
+  }
+  const bases = hitSky && sky.length ? sky : [page];
+  return bases.map(base => layers.reduceRight((acc, l) => over(l, acc), base));
+}
+
+function auditContrast(win, doc){
+  const fails = [];
+  const nodes = doc.querySelectorAll('[data-journal] *');
+  for (const el of nodes){
+    const direct = [...el.childNodes].some(n => n.nodeType === 3 && n.textContent.trim().length > 1);
+    if (!direct) continue;
+    const s = win.getComputedStyle(el);
+    if (s.visibility === 'hidden' || s.display === 'none' || parseFloat(s.opacity) < .1) continue;
+    if (el.closest('.j-sr')) continue;
+    if (el.closest('[aria-hidden="true"]')) continue;  /* ornaments carry no information */
+    const fg = parseRGB(s.color); if (!fg) continue;
+    const size = parseFloat(s.fontSize), weight = parseInt(s.fontWeight, 10) || 400;
+    const large = size >= 24 || (size >= 18.66 && weight >= 700);
+    const need = large ? 3 : 4.5;
+    let worst = 99, worstBg = null;
+    for (const bg of backdrops(el, win, doc)){
+      const r = ratio(over(fg, bg), bg);
+      if (r < worst) { worst = r; worstBg = bg; }
+    }
+    if (worst < need - 0.02){
+      fails.push({ sel: el.tagName.toLowerCase() + '.' + (el.className||'').toString().split(' ')[0],
+        text: el.textContent.trim().slice(0, 28), got: worst.toFixed(2), need, px: Math.round(size) });
+    }
+  }
+  return fails;
+}
+
+function loadFor(src, theme){
+  return new Promise(res => {
+    const f = document.createElement('iframe');
+    f.style.width = '1200px'; f.style.height = '1400px'; f.src = src;
+    const done = () => {
+      let out = [];
+      try {
+        const st = f.contentDocument.createElement('style');
+        st.textContent = '*,*::before,*::after{transition:none!important;animation:none!important}';
+        f.contentDocument.head.appendChild(st);
+        f.contentDocument.documentElement.setAttribute('data-theme', theme);
+        setTimeout(() => {
+          try { out = auditContrast(f.contentWindow, f.contentDocument); } catch(e){}
+          f.remove(); res(out);
+        }, 120);
+      } catch(e){ f.remove(); res([]); }
+    };
+    f.onload = () => setTimeout(done, 60);
+    setTimeout(() => { if (document.body.contains(f)) { f.remove(); res([]); } }, 6000);
+    stage.appendChild(f);
+  });
+}
+
+document.getElementById('contrast').onclick = async () => {
+  const body = document.querySelector('#cout tbody');
+  body.innerHTML = ''; window.__contrast = {};
+  for (const p of PAGES){
+    const tr = document.createElement('tr');
+    tr.innerHTML = '<td class="page">' + p + '</td><td class="ok">…</td><td class="ok">…</td>';
+    body.appendChild(tr);
+    for (const [i, th] of [['light',0],['dark',1]].entries()){
+      status.textContent = 'contrast · ' + p + ' · ' + th[0];
+      const fails = await loadFor(p, th[0]);
+      const cell = tr.children[th[1] + 1];
+      if (!fails.length){ cell.className = 'ok'; cell.textContent = '✓'; }
+      else {
+        cell.className = 'bad';
+        cell.textContent = fails.length + '× worst ' + fails.map(f=>+f.got).sort((a,b)=>a-b)[0];
+        (window.__contrast[p] = window.__contrast[p] || {})[th[0]] = fails;
+      }
+    }
+  }
+  status.textContent = 'contrast done · window.__contrast';
+};
+
+document.getElementById('theme').onclick = (e) => {
+  theme = theme === 'light' ? 'dark' : 'light';
+  e.target.textContent = 'Thumbnails: ' + (theme === 'light' ? 'dusk' : 'dawn');
+  document.documentElement.setAttribute('data-theme', theme);
+  for (const f of document.querySelectorAll('iframe[data-shot]')){
+    try { f.contentDocument.documentElement.setAttribute('data-theme', theme); } catch(err){}
+  }
+};
+</script>
+</body>
+</html>

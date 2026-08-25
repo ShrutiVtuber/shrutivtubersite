@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<!-- @template name="Coming soon" description="The holding page. Full-bleed sky, a live station countdown so the page is an instrument rather than a placard, one honest paragraph, double-opt-in subscribe, and where to find her in the meantime." -->
+<helmet><script src="./ds-base.js"></script></helmet>
+<div class="sky" style="min-height:100vh;display:flex;flex-direction:column;font-family:var(--font-body);color:var(--ink);border-radius:0">
+<div class="sky-stars"></div>
+<header style="position:relative;display:flex;align-items:center;gap:10px 20px;flex-wrap:wrap;padding:clamp(16px,3vw,26px) clamp(16px,5vw,44px)">
+<span style="font-family:var(--font-display);font-size:clamp(22px,3vw,28px);font-weight:500;letter-spacing:-.01em;color:var(--ink)">Shruti</span>
+<span style="display:inline-flex;align-items:center;gap:7px;padding:4px 10px;border:1px solid var(--line);border-radius:999px;font-family:var(--font-mono);font-size:var(--text-xs);color:var(--ink-soft)"><span aria-hidden="true" style="width:6px;height:6px;border-radius:50%;background:var(--ink-faint)"></span>{{ liveLabel }}</span>
+<div style="margin-left:auto;display:flex;gap:10px;font-family:var(--font-mono);font-size:var(--text-xs)">
+<a href="#" style="color:var(--ink);text-decoration:none;font-weight:600">EN</a>
+<a href="#" lang="el" style="color:var(--ink-faint);text-decoration:none" style-hover="color:var(--ink)">ΕΛ</a>
+<a href="#" lang="hi" style="color:var(--ink-faint);text-decoration:none" style-hover="color:var(--ink)">हि</a>
+<a href="#" lang="fr" style="color:var(--ink-faint);text-decoration:none" style-hover="color:var(--ink)">FR</a>
+</div>
+</header>
+<main style="position:relative;flex:1;display:flex;align-items:center;justify-content:center;padding:clamp(16px,4vw,40px) clamp(16px,5vw,44px) clamp(32px,6vw,64px)">
+<div class="sky-veil" style="width:100%;max-width:680px;padding:clamp(24px,5vw,44px);display:grid;gap:clamp(22px,3vw,30px)">
+<div style="display:grid;gap:12px">
+<p class="t-eyebrow" style="margin:0">shrutivtuber.com · in construction</p>
+<h1 style="font-family:var(--font-display);font-size:clamp(2rem,6vw,3.25rem);line-height:1.08;font-weight:500;letter-spacing:-.015em;margin:0;color:var(--ink);text-wrap:pretty">The site is being built.<br>The sky is not waiting.</h1>
+<p style="margin:0;font-family:var(--font-display);font-size:var(--text-prose);line-height:1.6;color:var(--ink-soft);max-width:52ch;text-wrap:pretty">Instruments for magick — an ephemeris, four calendars, planetary hours, letter-reckoning — built in the open and given away. The pages are still going up. Below is the sky over Athens as of this moment, which is the only part that was never going to wait for a launch date.</p>
+</div>
+<div style="display:grid;gap:14px;padding:18px 20px;background:var(--surface-card);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow-1)">
+<div style="display:flex;align-items:baseline;gap:8px 12px;flex-wrap:wrap">
+<p class="t-eyebrow" style="margin:0">Next station · Athens</p>
+<span class="t-tabular" style="margin-left:auto;font-family:var(--font-mono);font-size:var(--text-xs);color:var(--ink-faint)">{{ clock }} EEST</span>
+</div>
+<div style="display:flex;align-items:baseline;gap:14px;flex-wrap:wrap">
+<span aria-hidden="true" class="t-glyph" style="font-family:var(--font-display);font-size:2.25rem;line-height:1;color:var(--rose)">{{ stationGlyph }}</span>
+<div style="display:grid;gap:2px;min-width:0">
+<span style="font-family:var(--font-display);font-size:var(--text-h3);font-weight:600;color:var(--ink)">{{ stationName }}</span>
+<span style="font-family:var(--font-body);font-size:var(--text-xs);color:var(--rose)">{{ stationAttribution }}</span>
+</div>
+<div style="margin-left:auto;text-align:right;display:grid;gap:2px">
+<span class="t-tabular" style="font-family:var(--font-mono);font-size:clamp(1.5rem,5vw,2.25rem);line-height:1;font-weight:500;color:var(--ink)">in {{ countdown }}</span>
+<span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--ink-soft)">at {{ stationAt }} local</span>
+</div>
+</div>
+<div aria-hidden="true" style="height:2px;background:var(--line);border-radius:2px;overflow:hidden"><div ref="{{ barRef }}" style="height:100%;background:var(--rose);width:0%"></div></div>
+<div style="display:grid;gap:5px;padding-top:12px;border-top:1px solid var(--line)">
+<p class="t-eyebrow" style="margin:0 0 3px">Today, in every reckoning kept here</p>
+<sc-for list="{{ reckonings }}" as="r" hint-placeholder-count="4">
+<div style="display:flex;align-items:baseline;gap:10px">
+<span style="font-size:var(--text-sm);color:var(--ink-soft);white-space:nowrap">{{ r.name }}</span>
+<span style="flex:1;border-bottom:1px dotted var(--line-strong);transform:translateY(-3px);min-width:12px"></span>
+<span class="t-tabular" style="font-family:var(--font-mono);font-variant-emoji:text;font-size:var(--text-sm);color:var(--ink);text-align:right">{{ r.value }}</span>
+</div>
+</sc-for>
+<p style="margin:6px 0 0;font-family:var(--font-mono);font-size:var(--text-xs);line-height:1.6;color:var(--ink-faint)">Swiss Ephemeris · amānta reckoning · sunrise taken as the upper limb clearing the horizon. The finished instruments let you change every one of those.</p>
+</div>
+</div>
+<div style="display:grid;gap:12px">
+<div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap">
+<h2 style="margin:0;font-family:var(--font-display);font-size:var(--text-h4);font-weight:600;color:var(--ink)">Hear when it opens</h2>
+<span style="font-family:var(--font-mono);font-size:.625rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--rose)">one letter a month</span>
+</div>
+<form onSubmit="{{ submit }}" style="display:flex;gap:10px;flex-wrap:wrap">
+<label style="flex:1 1 240px;display:grid;gap:5px;min-width:0">
+<span style="font-size:var(--text-xs);font-weight:600;color:var(--ink-soft)">Email address</span>
+<input type="email" required="{{ true }}" placeholder="you@example.com" style="font-family:var(--font-body);font-size:var(--text-sm);color:var(--ink);background:var(--surface-page);border:1px solid var(--line-strong);border-radius:4px;padding:11px 12px;width:100%;box-sizing:border-box" style-focus="border-color:var(--accent);outline:none">
+</label>
+<button type="submit" style="align-self:flex-end;font-family:var(--font-body);font-size:var(--text-sm);font-weight:600;color:var(--on-accent);background:var(--accent);border:1px solid var(--accent);border-radius:4px;padding:0 18px;min-height:44px;cursor:pointer" style-hover="background:var(--accent-hover);border-color:var(--accent-hover)">{{ submitLabel }}</button>
+</form>
+<p style="margin:0;font-size:var(--text-xs);line-height:1.6;color:var(--ink-soft);max-width:60ch">{{ consentLine }}</p>
+</div>
+<div style="display:grid;gap:10px;padding-top:20px;border-top:1px solid var(--line)">
+<p class="t-eyebrow" style="margin:0">Until then, she is here</p>
+<div style="display:flex;gap:8px;flex-wrap:wrap">
+<a href="#" style="display:inline-flex;align-items:center;min-height:38px;padding:0 14px;font-size:var(--text-sm);font-weight:500;color:var(--accent);text-decoration:none;border:1px solid var(--line-strong);border-radius:999px" style-hover="border-color:var(--accent)">Twitch</a>
+<a href="#" style="display:inline-flex;align-items:center;min-height:38px;padding:0 14px;font-size:var(--text-sm);font-weight:500;color:var(--accent);text-decoration:none;border:1px solid var(--line-strong);border-radius:999px" style-hover="border-color:var(--accent)">YouTube</a>
+<a href="#" style="display:inline-flex;align-items:center;min-height:38px;padding:0 14px;font-size:var(--text-sm);font-weight:500;color:var(--accent);text-decoration:none;border:1px solid var(--line-strong);border-radius:999px" style-hover="border-color:var(--accent)">Bluesky</a>
+<a href="#" style="display:inline-flex;align-items:center;min-height:38px;padding:0 14px;font-size:var(--text-sm);font-weight:500;color:var(--accent);text-decoration:none;border:1px solid var(--line-strong);border-radius:999px" style-hover="border-color:var(--accent)">Discord</a>
+<a href="https://github.com" style="display:inline-flex;align-items:center;min-height:38px;padding:0 14px;font-size:var(--text-sm);font-weight:500;color:var(--accent);text-decoration:none;border:1px solid var(--line-strong);border-radius:999px" style-hover="border-color:var(--accent)">The code</a>
+</div>
+<p style="margin:0;font-size:var(--text-xs);line-height:1.6;color:var(--ink-faint)">Streams run most weeks from Athens. The repositories are public already — the instruments exist before the pages that will explain them.</p>
+</div>
+</div>
+</main>
+<div class="sky-horizon"></div>
+<footer style="position:relative;background:var(--surface-page);border-top:1px solid var(--line)">
+<div style="max-width:1120px;margin:0 auto;padding:22px clamp(16px,5vw,44px);display:flex;align-items:flex-start;gap:16px 32px;flex-wrap:wrap">
+<p style="margin:0;font-family:var(--font-mono);font-size:var(--text-xs);line-height:1.9;color:var(--ink-faint)">ShrutiVTuber, LLC<br>Registered office (virtual): [street, no.] · [postcode] Athens, GR<br>business@shrutivtuber.com<br>GEMI [000000000000] · VAT EL[000000000]</p>
+<p style="margin:0;font-size:var(--text-xs);line-height:1.9;color:var(--ink-faint)">© ShrutiVTuber, LLC · <a href="#" style="color:inherit">Privacy</a> · <a href="#" style="color:inherit">Terms</a></p>
+<span class="seal seal-ring" title="Soror Eu. A." style="margin-left:auto">S∴E.A.</span>
+</div>
+</footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;system&quot;,&quot;dawn&quot;,&quot;dusk&quot;],&quot;default&quot;:&quot;system&quot;,&quot;tsType&quot;:&quot;\&quot;system\&quot;|\&quot;dawn\&quot;|\&quot;dusk\&quot;&quot;,&quot;section&quot;:&quot;Theme&quot;},&quot;phase&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;building&quot;,&quot;opening&quot;],&quot;default&quot;:&quot;building&quot;,&quot;tsType&quot;:&quot;\&quot;building\&quot;|\&quot;opening\&quot;&quot;,&quot;section&quot;:&quot;Page&quot;},&quot;preset&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;hellenic&quot;,&quot;none&quot;],&quot;default&quot;:&quot;hellenic&quot;,&quot;tsType&quot;:&quot;\&quot;hellenic\&quot;|\&quot;none\&quot;&quot;,&quot;section&quot;:&quot;Page&quot;}}">
+class Component extends DCLogic {
+  state = { now: new Date(), sent: false };
+  applyTheme() {
+    const t = this.props.theme ?? 'system';
+    const el = document.documentElement;
+    if (t === 'dawn') el.setAttribute('data-theme', 'light');
+    else if (t === 'dusk') el.setAttribute('data-theme', 'dark');
+    else el.removeAttribute('data-theme');
+  }
+  bar = React.createRef();
+  componentDidMount() {
+    this.applyTheme();
+    this.paintBar();
+    // A real clock: the countdown is the one thing on this page that must not be a mock.
+    this.t = setInterval(() => this.setState({ now: new Date() }), 1000);
+  }
+  componentDidUpdate() { this.applyTheme(); this.paintBar() }
+  // The bar moves every second, so its width is set here rather than held in the template —
+  // the markup keeps a literal 0% and paints instantly.
+  paintBar() { if (this.bar.current) this.bar.current.style.width = this.pct }
+  componentWillUnmount() { clearInterval(this.t) }
+  renderVals() {
+    const now = this.state.now;
+    const pad = n => String(n).padStart(2, '0');
+    // The four solar stations for Athens, early September. The developer swaps these for /stations.
+    const S = [
+      { h: 6, m: 52, name: 'Sunrise', glyph: '☉', who: 'Hekate Phosphoros' },
+      { h: 13, m: 29, name: 'Noon', glyph: '☉', who: 'Apollo' },
+      { h: 20, m: 5, name: 'Sunset', glyph: '☉', who: 'Hekate Enodia' },
+      { h: 24, m: 29, name: 'Midnight', glyph: '☾', who: 'Persephone' }
+    ];
+    const mins = now.getHours() * 60 + now.getMinutes() + now.getSeconds() / 60;
+    let idx = S.findIndex(s => s.h * 60 + s.m > mins);
+    if (idx === -1) idx = 0;
+    const next = S[idx];
+    const prev = S[(idx - 1 + S.length) % S.length];
+    const nextMins = next.h * 60 + next.m;
+    let left = nextMins - mins;
+    if (left < 0) left += 1440;
+    const h = Math.floor(left / 60), m = Math.floor(left % 60), s = Math.floor((left * 60) % 60);
+    let prevMins = prev.h * 60 + prev.m;
+    if (prevMins > nextMins) prevMins -= 1440;
+    const span = nextMins - prevMins;
+    const showAttribution = (this.props.preset ?? 'hellenic') !== 'none';
+    const phase = this.props.phase ?? 'building';
+    this.pct = Math.max(0, Math.min(100, ((span - left) / span) * 100)).toFixed(1) + '%';
+    return {
+      clock: pad(now.getHours()) + ':' + pad(now.getMinutes()) + ':' + pad(now.getSeconds()),
+      countdown: h > 0 ? h + 'h ' + pad(m) + 'm' : m + 'm ' + pad(s) + 's',
+      stationName: next.name,
+      stationGlyph: next.glyph + '\uFE0E',
+      stationAttribution: showAttribution ? next.who : '',
+      stationAt: pad(next.h % 24) + ':' + pad(next.m),
+      barRef: this.bar,
+      liveLabel: phase === 'opening' ? 'opening this autumn' : 'offline · building',
+      reckonings: [
+        { name: 'Gregorian', value: now.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }) },
+        { name: 'Attic', value: 'δωδεκάτη Μεταγειτνιῶνος' },
+        { name: 'Hindu · amānta', value: 'Bhādrapada kṛṣṇa 11 · Vikrama 2083' },
+        { name: 'Thelemic', value: 'Anno IVxxxiv \u2609\uFE0E in \u264D\uFE0E' }
+      ],
+      submitLabel: this.state.sent ? 'Check your email' : 'Send me the letter',
+      consentLine: this.state.sent
+        ? 'A confirmation link is on its way. The subscription only begins once you click it — nothing is added to a list before then.'
+        : 'One letter a month: what shipped, what the sky is doing, and the occasional paid thing. You will get a confirmation email first and are not subscribed until you click it. Leave in one click, any time.',
+      submit: e => { e.preventDefault(); this.setState({ sent: true }) }
+    };
+  }
+}
+</script>
+</body>
+</html>

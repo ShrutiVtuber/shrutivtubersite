@@ -1,0 +1,22 @@
+/* Shruti — elevation, motion, focus. Hairlines do the work; shadow is reserved for floating layers.
+   Order matters: the system media block precedes the explicit [data-theme] stamps so stamps win. */
+:root{
+  --shadow-1:0 1px 2px rgba(18,24,41,.06);
+  --shadow-2:0 2px 8px -2px rgba(18,24,41,.12);
+  --shadow-3:0 12px 32px -8px rgba(18,24,41,.26),0 2px 8px rgba(18,24,41,.10);
+  --blur-veil:blur(10px); /* @kind other */
+  --ease-out:cubic-bezier(.2,.7,.3,1); /* @kind other */
+  --ease-in-out:cubic-bezier(.45,0,.25,1); /* @kind other */
+  --dur-1:120ms; /* @kind other */
+  --dur-2:240ms; /* @kind other */
+  --dur-3:600ms; /* @kind other */
+}
+@media (prefers-color-scheme:dark){
+  :root{ --shadow-1:0 1px 2px rgba(0,0,0,.3); --shadow-2:0 2px 10px -2px rgba(0,0,0,.45); --shadow-3:0 14px 36px -8px rgba(0,0,0,.6),0 2px 8px rgba(0,0,0,.35) }
+}
+[data-theme="light"]{ --shadow-1:0 1px 2px rgba(18,24,41,.06); --shadow-2:0 2px 8px -2px rgba(18,24,41,.12); --shadow-3:0 12px 32px -8px rgba(18,24,41,.26),0 2px 8px rgba(18,24,41,.10) }
+[data-theme="dark"]{ --shadow-1:0 1px 2px rgba(0,0,0,.3); --shadow-2:0 2px 10px -2px rgba(0,0,0,.45); --shadow-3:0 14px 36px -8px rgba(0,0,0,.6),0 2px 8px rgba(0,0,0,.35) }
+:where(a,button,input,select,textarea,summary,[tabindex]):focus-visible{outline:2px solid var(--focus-ring);outline-offset:2px;border-radius:var(--radius-sm)}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:1ms!important;animation-iteration-count:1!important;transition-duration:1ms!important;scroll-behavior:auto!important}
+}

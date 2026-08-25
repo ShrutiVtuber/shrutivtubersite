@@ -1,0 +1,4 @@
+/* Webfonts — served from Google Fonts (no font binaries were provided; see readme.md caveats).
+   Coverage: EB Garamond (Latin+Greek incl. polytonic), Commissioner (Latin+Greek),
+   JetBrains Mono (Latin+Greek), Noto Serif Devanagari + Mukta (Devanagari). */
+@import url('https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400..800;1,400..800&family=Commissioner:wght@300..900&family=JetBrains+Mono:ital,wght@0,400..700;1,400&family=Noto+Serif+Devanagari:wght@400..700&family=Mukta:wght@400;500;600;700&display=swap');

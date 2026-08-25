@@ -1,0 +1,1529 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<script src="./ds-base.js"></script>
+<script src="./image-slot.js"></script>
+<style>body{margin:0;background:var(--surface-inset)}a{color:var(--accent)}a:hover{color:var(--accent-hover)}</style>
+</helmet>
+<section id="system" style="max-width:var(--j-frame,1440px);margin:0 auto;padding:48px 24px 0;font-family:var(--font-body)">
+<div style="display:flex;align-items:baseline;gap:12px 20px;flex-wrap:wrap;margin-bottom:18px">
+<span class="t-eyebrow" style="color:var(--rose-hover)">Page designs · 2026-08-25</span>
+<span style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--ink-soft)">every width, edge and gap decided here</span>
+<span style="margin-left:auto;font-family:var(--font-mono);font-size:var(--text-xs);color:var(--ink-soft)">handoff · <a href="journal/IMPLEMENTATION.md" style="color:var(--accent);text-decoration:none">journal/</a> · journal.css + 17 reference pages + guide</span>
+</div>
+<h1 style="margin:0 0 14px;font-family:var(--font-display);font-size:clamp(2rem,4vw,2.75rem);line-height:1.1;font-weight:500;letter-spacing:-.015em;color:var(--ink)">shrutivtuber.com /journal</h1>
+<p style="margin:0 0 28px;font-family:var(--font-display);font-size:var(--text-prose);line-height:1.65;color:var(--ink-soft);max-width:62ch;text-wrap:pretty">Pages, not components. Header and footer are the site's real components and are drawn here only as dashed strips, so the edges they hand over can be judged. One column governs each page: nothing sits at a width that was not chosen.</p>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(232px,100%),1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:10px;overflow:hidden;margin-bottom:32px">
+<div style="background:var(--surface-card);padding:16px 18px;display:grid;gap:6px">
+<span class="t-eyebrow">Page</span>
+<span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-sm);color:var(--ink)">1120px · pad clamp(16,4vw,40)</span>
+<span style="font-size:var(--text-xs);color:var(--ink-soft);line-height:1.5">Outer bound for every page type, listings included.</span>
+</div>
+<div style="background:var(--surface-card);padding:16px 18px;display:grid;gap:6px">
+<span class="t-eyebrow">Reading column</span>
+<span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-sm);color:var(--ink)">68ch · 56px gutter</span>
+<span style="font-size:var(--text-xs);color:var(--ink-soft);line-height:1.5">Header, plate, prose, colophon, footnotes and next-links are siblings in it. One left edge.</span>
+</div>
+<div style="background:var(--surface-card);padding:16px 18px;display:grid;gap:6px">
+<span class="t-eyebrow">Rails</span>
+<span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-sm);color:var(--ink)">208px toc · 232px docs nav</span>
+<span style="font-size:var(--text-xs);color:var(--ink-soft);line-height:1.5">Wrap below the column when the frame cannot hold them. No media query needed.</span>
+</div>
+<div style="background:var(--surface-card);padding:16px 18px;display:grid;gap:6px">
+<span class="t-eyebrow">Rhythm</span>
+<span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-sm);color:var(--ink)">64 / 48 / 24 / 12</span>
+<span style="font-size:var(--text-xs);color:var(--ink-soft);line-height:1.5">Page top · between blocks · inside blocks · label to content. Hairline closes each section.</span>
+</div>
+</div>
+<div style="display:flex;gap:8px;flex-wrap:wrap;padding-bottom:20px;border-bottom:1px solid var(--line)">
+<a href="#article-plain" style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--accent);text-decoration:none;border:1px solid var(--line-strong);border-radius:999px;padding:6px 12px" style-hover="border-color:var(--accent)">01 article · no cover</a>
+<a href="#article-cover" style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--accent);text-decoration:none;border:1px solid var(--line-strong);border-radius:999px;padding:6px 12px" style-hover="border-color:var(--accent)">02 article · cover</a>
+<a href="#hub" style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--accent);text-decoration:none;border:1px solid var(--line-strong);border-radius:999px;padding:6px 12px" style-hover="border-color:var(--accent)">03 hub</a>
+<a href="#blog-index" style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--accent);text-decoration:none;border:1px solid var(--line-strong);border-radius:999px;padding:6px 12px" style-hover="border-color:var(--accent)">04 blog index</a>
+<a href="#all-content" style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--accent);text-decoration:none;border:1px solid var(--line-strong);border-radius:999px;padding:6px 12px" style-hover="border-color:var(--accent)">05 all content</a>
+<a href="#category" style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--accent);text-decoration:none;border:1px solid var(--line-strong);border-radius:999px;padding:6px 12px" style-hover="border-color:var(--accent)">06 category</a>
+<a href="#docs-index" style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--accent);text-decoration:none;border:1px solid var(--line-strong);border-radius:999px;padding:6px 12px" style-hover="border-color:var(--accent)">07 docs index</a>
+<a href="#docs-page" style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--accent);text-decoration:none;border:1px solid var(--line-strong);border-radius:999px;padding:6px 12px" style-hover="border-color:var(--accent)">08 docs page</a>
+<a href="#wiki-index" style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--accent);text-decoration:none;border:1px solid var(--line-strong);border-radius:999px;padding:6px 12px" style-hover="border-color:var(--accent)">09 wiki index</a>
+<a href="#wiki-article" style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--accent);text-decoration:none;border:1px solid var(--line-strong);border-radius:999px;padding:6px 12px" style-hover="border-color:var(--accent)">10 wiki article</a>
+<a href="#changelog-list" style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--accent);text-decoration:none;border:1px solid var(--line-strong);border-radius:999px;padding:6px 12px" style-hover="border-color:var(--accent)">11 changelog</a>
+<a href="#changelog-entry" style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--accent);text-decoration:none;border:1px solid var(--line-strong);border-radius:999px;padding:6px 12px" style-hover="border-color:var(--accent)">12 release</a>
+<a href="#sitemap" style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--accent);text-decoration:none;border:1px solid var(--line-strong);border-radius:999px;padding:6px 12px" style-hover="border-color:var(--accent)">13 sitemap · 404</a>
+<a href="#empty-states" style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--accent);text-decoration:none;border:1px solid var(--line-strong);border-radius:999px;padding:6px 12px" style-hover="border-color:var(--accent)">14 empty states</a>
+<a href="#og" style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--accent);text-decoration:none;border:1px solid var(--line-strong);border-radius:999px;padding:6px 12px" style-hover="border-color:var(--accent)">15 og card</a>
+</div>
+<div style="margin-top:20px;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(260px,100%),1fr));gap:16px 32px">
+<div style="display:grid;gap:6px">
+<span class="t-eyebrow" style="color:var(--rose-hover)">Type marks</span>
+<span style="font-size:var(--text-xs);line-height:1.6;color:var(--ink-soft)"><span class="t-glyph" style="color:var(--ink)">☾&#xFE0E;</span> writing · <span class="t-glyph" style="color:var(--ink)">♄&#xFE0E;</span> documentation · <span class="t-glyph" style="color:var(--ink)">☿&#xFE0E;</span> wiki · <span class="t-glyph" style="color:var(--ink)">♃&#xFE0E;</span> changelog. Set in EB Garamond as type, never as an icon.</span>
+</div>
+<div style="display:grid;gap:6px">
+<span class="t-eyebrow" style="color:var(--rose-hover)">Grades</span>
+<span style="font-size:var(--text-xs);line-height:1.6;color:var(--ink-soft)"><span class="t-glyph" style="color:var(--ink)">●</span> attested · <span class="t-glyph" style="color:var(--ink-soft)">◐</span> reconstructed · <span class="t-glyph" style="color:var(--rose-hover)">○</span> disputed · — not dated by us. The site's disclosure glyphs, reused with a legend.</span>
+</div>
+<div style="display:grid;gap:6px">
+<span class="t-eyebrow" style="color:var(--rose-hover)">Art-absent</span>
+<span style="font-size:var(--text-xs);line-height:1.6;color:var(--ink-soft)">Every media slot falls back to a sky plate closed by the horizon line — a designed state, not a gap. Most entries will never have art.</span>
+</div>
+<div style="display:grid;gap:6px">
+<span class="t-eyebrow" style="color:var(--rose-hover)">Wide content</span>
+<span style="font-size:var(--text-xs);line-height:1.6;color:var(--ink-soft)">Tables and code scroll inside their own box. The page never scrolls sideways, down to 320px.</span>
+</div>
+</div>
+</section>
+<section id="article-plain" data-screen-label="Article — no cover" style="max-width:var(--j-frame,1440px);margin:0 auto;padding:56px 24px 0;font-family:var(--font-body)">
+<div style="display:flex;align-items:baseline;gap:10px 18px;flex-wrap:wrap;margin-bottom:12px">
+<span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-sm);color:var(--ink)">/journal/blog/&lt;slug&gt;/</span>
+<span class="t-eyebrow">Article · no cover image · the common case</span>
+<span class="t-eyebrow" style="margin-left:auto;color:var(--rose-hover)">01</span>
+</div>
+<div style="background:var(--surface-page);border:1px solid var(--line);border-radius:16px;overflow:hidden;box-shadow:var(--shadow-1)">
+<div style="display:var(--j-chrome,flex);align-items:center;gap:12px;flex-wrap:wrap;padding:11px clamp(16px,4vw,40px);border-bottom:1px dashed var(--line-strong);background:var(--surface-veil)">
+<span class="t-eyebrow">SiteHeader · real component · out of scope</span>
+<span style="margin-left:auto;font-family:var(--font-mono);font-size:var(--text-micro);color:var(--ink-soft)">journal pages begin below this line</span>
+</div>
+<div style="max-width:1120px;margin:0 auto;padding:64px clamp(16px,4vw,40px) 80px">
+<div style="display:flex;gap:56px;align-items:flex-start;flex-wrap:wrap">
+<div style="flex:1 1 460px;min-width:0;max-width:68ch">
+<nav aria-label="Breadcrumb" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:var(--text-xs);margin-bottom:24px">
+<a href="#" style="color:var(--ink-soft);text-decoration:none" style-hover="color:var(--accent-hover);text-decoration:underline">Journal</a>
+<span aria-hidden="true" style="color:var(--ink-soft)">›</span>
+<a href="#" style="color:var(--ink-soft);text-decoration:none" style-hover="color:var(--accent-hover);text-decoration:underline">Writing</a>
+<span aria-hidden="true" style="color:var(--ink-soft)">›</span>
+<span aria-current="page" style="color:var(--ink-soft);font-weight:500">Nothing was ever retrograde</span>
+</nav>
+<div class="sky" style="position:relative;height:128px;border:1px solid var(--line);border-radius:10px;display:flex;align-items:flex-end;justify-content:space-between;gap:12px;padding:14px 18px;margin-bottom:28px">
+<div class="sky-stars"></div>
+<span aria-hidden="true" class="t-glyph" style="position:absolute;top:12px;left:18px;font-size:2rem;line-height:1;color:var(--horizon-line)">☾&#xFE0E;</span>
+<span class="t-tabular" style="position:relative;font-family:var(--font-mono);font-size:var(--text-micro);letter-spacing:.05em;color:var(--ink-soft)">writing · no cover art</span>
+<span class="t-tabular" style="position:relative;font-family:var(--font-mono);font-size:var(--text-micro);color:var(--ink-soft)">25.08.2026</span>
+<div class="sky-horizon"></div>
+</div>
+<h1 style="margin:0 0 14px;font-family:var(--font-display);font-size:clamp(2.125rem,4vw,2.75rem);line-height:1.12;font-weight:500;letter-spacing:-.015em;color:var(--ink);text-wrap:pretty">Nothing was ever retrograde</h1>
+<p style="margin:0 0 24px;font-family:var(--font-display);font-size:1.3125rem;line-height:1.55;color:var(--ink-soft);max-width:52ch;text-wrap:pretty">A chart correct in every particular except one, and a zero that looked exactly like an answer.</p>
+<div style="display:flex;align-items:center;gap:10px 16px;flex-wrap:wrap;padding-bottom:14px;border-bottom:1px solid var(--line);margin-bottom:40px">
+<span style="font-size:var(--text-sm);color:var(--ink-soft)">By <a href="https://shrutivtuber.com" rel="author" style="color:var(--ink);text-decoration-color:color-mix(in srgb,var(--accent) 45%,transparent)">Shruti</a></span>
+<span aria-hidden="true" style="color:var(--ink-soft)">·</span>
+<span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--ink-soft)">25 August 2026</span>
+<div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap">
+<a href="#" style="font-size:var(--text-xs);font-weight:500;color:var(--ink-soft);background:var(--surface-veil);border:1px solid transparent;border-radius:999px;padding:5px 12px;text-decoration:none;line-height:1" style-hover="color:var(--accent-hover);border-color:color-mix(in srgb,var(--accent) 40%,transparent)">Ephemeris</a>
+<a href="#" style="font-size:var(--text-xs);font-weight:500;color:var(--ink-soft);background:var(--surface-veil);border:1px solid transparent;border-radius:999px;padding:5px 12px;text-decoration:none;line-height:1" style-hover="color:var(--accent-hover);border-color:color-mix(in srgb,var(--accent) 40%,transparent)">Bugs</a>
+</div>
+</div>
+<x-import component-from-global-scope="ShrutiDesignSystem_cb687f.Prose" hint-size="100%,900px">
+<p>A chart was coming out right in every particular except one. Every planet was direct — all of them, at every date I tried, in every house system. A birth chart with no retrogrades is not wrong the way a crash is wrong. It is wrong the way a stopped clock is wrong: it reads plausibly, twice a day.</p>
+<h2 id="the-shape-of-the-bug">The shape of the bug</h2>
+<p>Swiss Ephemeris fills the speed slot <strong>only when it is asked to</strong>. Ask for a position without <code>FLG_SPEED</code> and you get a position, correct to the arcsecond, along with a zero where the daily motion should be.</p>
+<pre><code>xx, ret = swe.calc_ut(jd, swe.MOON, swe.FLG_SWIEPH)
+speed    = xx[3]        # 0.0 — never computed
+retrograde = speed &lt; 0.0</code></pre>
+<p>Zero is not less than zero. So nothing was ever retrograde — not because the arithmetic was wrong, but because the input was a plausible-looking zero rather than a missing value.</p>
+<blockquote>A number that was never computed should not be able to reach a comparison. If it can, the comparison is not the bug.</blockquote>
+<h2 id="why-it-survived">Why it survived</h2>
+<p>Nothing threw. No test failed, because the tests asserted positions and the positions were right. The Moon's daily motion read <code>0.00°/day</code>, which looks like a formatting problem rather than an absence, and I read it as one for two days.</p>
+<h3 id="what-the-flags-return">What the flags actually return</h3>
+<div style="overflow-x:auto;margin:1.4em 0">
+<table style="min-width:480px">
+<thead><tr><th>Flag combination</th><th>Longitude</th><th>Daily motion</th><th>Relative cost</th></tr></thead>
+<tbody>
+<tr><td><code>FLG_SWIEPH</code></td><td>exact</td><td class="t-tabular" style="font-family:var(--font-mono)">0.00°/day</td><td class="t-tabular" style="font-family:var(--font-mono)">1.0×</td></tr>
+<tr><td><code>FLG_SWIEPH | FLG_SPEED</code></td><td>exact</td><td class="t-tabular" style="font-family:var(--font-mono)">computed</td><td class="t-tabular" style="font-family:var(--font-mono)">1.4×</td></tr>
+<tr><td><code>FLG_MOSEPH | FLG_SPEED</code></td><td>±1″</td><td class="t-tabular" style="font-family:var(--font-mono)">computed</td><td class="t-tabular" style="font-family:var(--font-mono)">0.6×</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="the-test-that-would-have-caught-it">The test that would have caught it</h3>
+<p>One assertion over a date I already knew by heart: Mercury stations retrograde on 9 August 2026, and any build that says otherwise is not asking for speed. It is now the first test in the suite, and the only one whose failure I have already seen.</p>
+<h2 id="the-fix-and-the-rule">The fix, and the rule</h2>
+<pre><code>- xx, ret = swe.calc_ut(jd, body, FLG_SWIEPH)
++ xx, ret = swe.calc_ut(jd, body, FLG_SWIEPH | FLG_SPEED)
++ if not flags &amp; FLG_SPEED:
++     raise Unreckonable("speed was not requested")</code></pre>
+<p>The one-line change is the flag. The change that matters is the second one: the ephemeris layer now refuses to hand back a field it never computed. <code>Unreckonable</code> is the same exception the calendars raise at the pole on a day the sun does not rise — the instruments would rather say <em lang="grc">οὐ λογίζεται</em>, it is not reckoned, than return a number nobody derived.</p>
+<h4 id="a-note-on-daily-motion">A note on daily motion</h4>
+<p>The Moon's motion runs from roughly 11°/day to 15°/day and never rests. Sanskrit astronomy names the retrograde condition <span lang="sa">वक्री</span> (<em>vakrī</em>, crooked) — a description of apparent motion, not a verdict on it. Zero was never a plausible value for either tradition to report.</p>
+<h2 id="what-changed-in-the-instrument">What changed in the instrument</h2>
+<p>The chart page now prints ℞ beside a retrograde body, states the flag it ran under in its provenance card, and shows an em dash with a footnote where the speed field is absent. A chart that cannot know is more useful than a chart that guesses.</p>
+</x-import>
+<aside style="margin:36px 0 0;padding:18px 20px;background:var(--surface-card);border:1px solid var(--line);border-radius:10px;display:grid;gap:8px" style-hover="border-color:var(--line-strong);box-shadow:var(--shadow-2)">
+<span class="t-eyebrow">Try it against your own chart</span>
+<span style="font-family:var(--font-display);font-size:var(--text-h3);font-weight:600;color:var(--ink)">Natal chart</span>
+<span style="font-size:var(--text-sm);line-height:1.55;color:var(--ink-soft);max-width:52ch">Tropical whole-sign and sidereal Lahiri side by side, unranked, with the flag and the ephemeris build named under the figure.</span>
+<a href="https://shrutivtuber.com/tools/natal-chart" style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--accent);text-decoration:none;justify-self:start" style-hover="text-decoration:underline">shrutivtuber.com/tools/natal-chart →</a>
+</aside>
+<div style="margin-top:44px;padding-top:20px;border-top:1px solid var(--line);display:grid;gap:12px">
+<span class="t-eyebrow">Notes</span>
+<div style="display:flex;gap:12px;align-items:baseline"><span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--rose-hover);min-width:14px">1</span><span style="font-family:var(--font-display);font-size:var(--text-body);line-height:1.65;color:var(--ink-soft)">Swiss Ephemeris 2.10.03, AGPL. Every instrument names the build it is running; this one is stated on the chart page's provenance card.</span></div>
+<div style="display:flex;gap:12px;align-items:baseline"><span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--rose-hover);min-width:14px">2</span><span style="font-family:var(--font-display);font-size:var(--text-body);line-height:1.65;color:var(--ink-soft)">Stations are computed, not tabulated. The 9 August figure comes from the same call, asked properly.</span></div>
+</div>
+<div style="margin-top:44px;padding:20px 22px;background:var(--surface-veil);border:1px solid var(--line);border-top:1.5px solid var(--rose);border-radius:10px;display:grid;gap:14px">
+<div style="display:flex;align-items:baseline;gap:10px 14px;flex-wrap:wrap">
+<span class="t-eyebrow">The sky when this was published</span>
+<span aria-hidden="true" class="t-glyph" style="margin-left:auto;font-size:var(--text-sm);color:var(--rose-hover)">☉&#xFE0E; ☾&#xFE0E;</span>
+</div>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(248px,100%),1fr));gap:2px 32px">
+<div style="display:flex;align-items:baseline;gap:8px"><span style="font-size:var(--text-sm);color:var(--ink-soft);white-space:nowrap">Sun · tropical</span><span style="flex:1;border-bottom:1px dotted var(--line-strong);transform:translateY(-3px);min-width:10px"></span><span class="t-tabular t-glyph" style="font-family:var(--font-mono);font-size:var(--text-sm);color:var(--ink)">2°14′ ♍&#xFE0E;</span></div>
+<div style="display:flex;align-items:baseline;gap:8px"><span style="font-size:var(--text-sm);color:var(--ink-soft);white-space:nowrap">Sun · sidereal, Lahiri</span><span style="flex:1;border-bottom:1px dotted var(--line-strong);transform:translateY(-3px);min-width:10px"></span><span class="t-tabular t-glyph" style="font-family:var(--font-mono);font-size:var(--text-sm);color:var(--ink)">8°23′ ♌&#xFE0E;</span></div>
+<div style="display:flex;align-items:baseline;gap:8px"><span style="font-size:var(--text-sm);color:var(--ink-soft);white-space:nowrap">Moon · tropical</span><span style="flex:1;border-bottom:1px dotted var(--line-strong);transform:translateY(-3px);min-width:10px"></span><span class="t-tabular t-glyph" style="font-family:var(--font-mono);font-size:var(--text-sm);color:var(--ink)">19°41′ ♓&#xFE0E;</span></div>
+<div style="display:flex;align-items:baseline;gap:8px"><span style="font-size:var(--text-sm);color:var(--ink-soft);white-space:nowrap">Moon · sidereal, Lahiri</span><span style="flex:1;border-bottom:1px dotted var(--line-strong);transform:translateY(-3px);min-width:10px"></span><span class="t-tabular t-glyph" style="font-family:var(--font-mono);font-size:var(--text-sm);color:var(--ink)">25°50′ ♒&#xFE0E;</span></div>
+<div style="display:flex;align-items:baseline;gap:8px"><span style="font-size:var(--text-sm);color:var(--ink-soft);white-space:nowrap">Tithi</span><span style="flex:1;border-bottom:1px dotted var(--line-strong);transform:translateY(-3px);min-width:10px"></span><span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-sm);color:var(--ink)">Kṛṣṇa Ekādaśī · ends 03:41</span></div>
+<div style="display:flex;align-items:baseline;gap:8px"><span style="font-size:var(--text-sm);color:var(--ink-soft);white-space:nowrap">Nakṣatra</span><span style="flex:1;border-bottom:1px dotted var(--line-strong);transform:translateY(-3px);min-width:10px"></span><span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-sm);color:var(--ink)">Mṛgaśīrṣa · ends 21:07</span></div>
+<div style="display:flex;align-items:baseline;gap:8px"><span style="font-size:var(--text-sm);color:var(--ink-soft);white-space:nowrap">Attic</span><span style="flex:1;border-bottom:1px dotted var(--line-strong);transform:translateY(-3px);min-width:10px"></span><span lang="grc" style="font-family:var(--font-display);font-size:var(--text-body);color:var(--ink)">δωδεκάτη Μεταγειτνιῶνος</span></div>
+<div style="display:flex;align-items:baseline;gap:8px"><span style="font-size:var(--text-sm);color:var(--ink-soft);white-space:nowrap">Thelemic</span><span style="flex:1;border-bottom:1px dotted var(--line-strong);transform:translateY(-3px);min-width:10px"></span><span class="t-tabular t-glyph" style="font-family:var(--font-mono);font-size:var(--text-sm);color:var(--ink)">Anno IVxxxiv ☉&#xFE0E; in ♍&#xFE0E;</span></div>
+</div>
+<p style="margin:0;font-family:var(--font-mono);font-size:var(--text-micro);line-height:1.7;color:var(--ink-soft)">Recorded for Athens (GMT+3) at the moment of publication and stored with the entry. Swiss Ephemeris 2.10.03 · Lahiri ayanāṁśa · amānta month naming · Attic date by observed crescent. Never recomputed, so it still says what the sky said.</p>
+</div>
+<div style="margin-top:48px;padding-top:20px;border-top:1px solid var(--line)">
+<span class="t-eyebrow" style="display:block;margin-bottom:16px">Continue reading</span>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(220px,100%),1fr));gap:16px">
+<a href="#" style="display:grid;gap:6px;padding:16px 18px;background:var(--surface-card);border:1px solid var(--line);border-radius:10px;text-decoration:none;box-shadow:var(--shadow-1)" style-hover="border-color:var(--line-strong);box-shadow:var(--shadow-2)">
+<span class="t-eyebrow" style="color:var(--rose-hover)">☾&#xFE0E; Writing</span>
+<span style="font-family:var(--font-display);font-size:var(--text-h4);font-weight:600;line-height:1.3;color:var(--ink)">The month that would not open</span>
+<span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-micro);color:var(--ink-soft)">25.08.2026</span>
+</a>
+<a href="#" style="display:grid;gap:6px;padding:16px 18px;background:var(--surface-card);border:1px solid var(--line);border-radius:10px;text-decoration:none;box-shadow:var(--shadow-1)" style-hover="border-color:var(--line-strong);box-shadow:var(--shadow-2)">
+<span class="t-eyebrow" style="color:var(--rose-hover)">♄&#xFE0E; Documentation</span>
+<span style="font-family:var(--font-display);font-size:var(--text-h4);font-weight:600;line-height:1.3;color:var(--ink)">Casting a chart</span>
+<span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-micro);color:var(--ink-soft)">updated 25.08.2026</span>
+</a>
+</div>
+</div>
+</div>
+<aside style="flex:0 1 208px;min-width:0;position:sticky;top:24px;align-self:flex-start;padding-left:20px;border-left:1px solid var(--line);display:grid;gap:10px">
+<span class="t-eyebrow">On this page</span>
+<a href="#the-shape-of-the-bug" style="font-size:var(--text-xs);line-height:1.45;color:var(--ink);text-decoration:none;font-weight:500;border-left:2px solid var(--rose);margin-left:-22px;padding-left:20px">The shape of the bug</a>
+<a href="#why-it-survived" style="font-size:var(--text-xs);line-height:1.45;color:var(--ink-soft);text-decoration:none" style-hover="color:var(--accent-hover)">Why it survived</a>
+<a href="#what-the-flags-return" style="font-size:var(--text-xs);line-height:1.45;color:var(--ink-soft);text-decoration:none;padding-left:12px" style-hover="color:var(--accent-hover)">What the flags return</a>
+<a href="#the-test-that-would-have-caught-it" style="font-size:var(--text-xs);line-height:1.45;color:var(--ink-soft);text-decoration:none;padding-left:12px" style-hover="color:var(--accent-hover)">The test that would have caught it</a>
+<a href="#the-fix-and-the-rule" style="font-size:var(--text-xs);line-height:1.45;color:var(--ink-soft);text-decoration:none" style-hover="color:var(--accent-hover)">The fix, and the rule</a>
+<a href="#a-note-on-daily-motion" style="font-size:var(--text-xs);line-height:1.45;color:var(--ink-soft);text-decoration:none;padding-left:12px" style-hover="color:var(--accent-hover)">A note on daily motion</a>
+<a href="#what-changed-in-the-instrument" style="font-size:var(--text-xs);line-height:1.45;color:var(--ink-soft);text-decoration:none" style-hover="color:var(--accent-hover)">What changed in the instrument</a>
+</aside>
+</div>
+</div>
+<div style="display:var(--j-chrome,flex);align-items:center;gap:12px;flex-wrap:wrap;padding:11px clamp(16px,4vw,40px);border-top:1px dashed var(--line-strong);background:var(--surface-veil)">
+<span class="t-eyebrow">SiteFooter · real component · legal imprint</span>
+</div>
+</div>
+</section>
+
+
+<section id="article-cover" data-screen-label="Article — with cover" style="max-width:var(--j-frame,1440px);margin:0 auto;padding:56px 24px 0;font-family:var(--font-body)">
+<div style="display:flex;align-items:baseline;gap:10px 18px;flex-wrap:wrap;margin-bottom:12px">
+<span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-sm);color:var(--ink)">/journal/blog/&lt;slug&gt;/</span>
+<span class="t-eyebrow">Article · cover art · short entry · rail carries small print instead of a TOC</span>
+<span class="t-eyebrow" style="margin-left:auto;color:var(--rose-hover)">02</span>
+</div>
+<div style="background:var(--surface-page);border:1px solid var(--line);border-radius:16px;overflow:hidden;box-shadow:var(--shadow-1)">
+<div style="display:var(--j-chrome,flex);align-items:center;gap:12px;flex-wrap:wrap;padding:11px clamp(16px,4vw,40px);border-bottom:1px dashed var(--line-strong);background:var(--surface-veil)">
+<span class="t-eyebrow">SiteHeader · real component · out of scope</span>
+</div>
+<div style="max-width:1120px;margin:0 auto;padding:64px clamp(16px,4vw,40px) 80px">
+<div style="display:flex;gap:56px;align-items:flex-start;flex-wrap:wrap">
+<div style="flex:1 1 460px;min-width:0;max-width:68ch">
+<nav aria-label="Breadcrumb" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:var(--text-xs);margin-bottom:24px">
+<a href="#" style="color:var(--ink-soft);text-decoration:none" style-hover="color:var(--accent-hover);text-decoration:underline">Journal</a>
+<span aria-hidden="true" style="color:var(--ink-soft)">›</span>
+<a href="#" style="color:var(--ink-soft);text-decoration:none" style-hover="color:var(--accent-hover);text-decoration:underline">Writing</a>
+<span aria-hidden="true" style="color:var(--ink-soft)">›</span>
+<span aria-current="page" style="color:var(--ink-soft);font-weight:500">The month that would not open</span>
+</nav>
+<figure style="margin:0 0 28px">
+<div style="position:relative;aspect-ratio:16/9;border:1px solid var(--line);border-radius:10px;overflow:hidden">
+<image-slot id="journal-cover-metageitnion" shape="rect" placeholder="Cover art — 1600×900, twilight-hued brand art"></image-slot>
+</div>
+<figcaption style="margin-top:10px;display:flex;gap:10px 16px;flex-wrap:wrap;font-size:var(--text-xs);line-height:1.5;color:var(--ink-soft)">
+<span style="flex:1 1 320px;min-width:0">The western horizon from Lykavittós at the hour the new crescent was due, and did not appear.</span>
+<span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-micro)">Art · commissioned · © the artist</span>
+</figcaption>
+</figure>
+<h1 style="margin:0 0 14px;font-family:var(--font-display);font-size:clamp(2.125rem,4vw,2.75rem);line-height:1.12;font-weight:500;letter-spacing:-.015em;color:var(--ink);text-wrap:pretty">The month that would not open</h1>
+<p style="margin:0 0 24px;font-family:var(--font-display);font-size:1.3125rem;line-height:1.55;color:var(--ink-soft);max-width:52ch;text-wrap:pretty">Two reckonings, two first days, and an instrument that had to learn to say both.</p>
+<div style="display:flex;align-items:center;gap:10px 16px;flex-wrap:wrap;padding-bottom:14px;border-bottom:1px solid var(--line);margin-bottom:40px">
+<span style="font-size:var(--text-sm);color:var(--ink-soft)">By <a href="https://shrutivtuber.com" rel="author" style="color:var(--ink);text-decoration-color:color-mix(in srgb,var(--accent) 45%,transparent)">Shruti</a></span>
+<span aria-hidden="true" style="color:var(--ink-soft)">·</span>
+<span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--ink-soft)">25 August 2026</span>
+<div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap">
+<a href="#" style="font-size:var(--text-xs);font-weight:500;color:var(--ink-soft);background:var(--surface-veil);border:1px solid transparent;border-radius:999px;padding:5px 12px;text-decoration:none;line-height:1" style-hover="color:var(--accent-hover);border-color:color-mix(in srgb,var(--accent) 40%,transparent)">Calendars</a>
+</div>
+</div>
+<x-import component-from-global-scope="ShrutiDesignSystem_cb687f.Prose" hint-size="100%,520px">
+<p>The conjunction fell at 21:07 on a Sunday. The crescent that should have opened <span lang="grc">Μεταγειτνιών</span> was, that evening, four degrees above a horizon the sun had only just left — technically present, practically invisible, and by the rule the corpus actually uses, not yet a month.</p>
+<h2 id="two-rules-one-sky">Two rules, one sky</h2>
+<p>Conjunction reckoning starts the month at a computed instant. Observed-crescent reckoning starts it at the first evening the new moon can be seen from a named place. They agree most months and part company two or three times a year, and when they part company they do not disagree slightly: they disagree by a whole day, and every festival in the month moves with them.</p>
+<blockquote>The Athenians did not know the instant of conjunction. They knew whether someone had seen it.</blockquote>
+<h3 id="what-the-page-does-now">What the page does now</h3>
+<p>It shows both, marks which one it is counting by, and refuses to pick. Where the two rules give different dates the header carries them side by side rather than resolving to the one I happen to prefer.</p>
+<figure>
+<div style="position:relative;aspect-ratio:16/10;border:1px solid var(--line);border-radius:10px;overflow:hidden">
+<image-slot id="journal-figure-attic-disagreement" shape="rect" placeholder="Screenshot — Attic calendar, two-authorities state"></image-slot>
+</div>
+<figcaption>The two-authorities state on <span style="font-family:var(--font-mono);font-size:.9em">/tools/attic-calendar</span>. Neither column is styled as the correct one.</figcaption>
+</figure>
+<h2 id="the-stream-where-it-broke">The stream where it broke</h2>
+<p>I found this live, on a Thursday, with about forty people watching me insist the calendar was wrong for eleven minutes before reading my own rule text.</p>
+</x-import>
+<div style="margin-top:8px;display:grid;gap:10px">
+<div style="position:relative;aspect-ratio:16/9;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--surface-inset);display:grid;place-items:center">
+<div class="sky" style="position:absolute;inset:0;border-radius:0"><div class="sky-stars"></div><div class="sky-horizon"></div></div>
+<button type="button" aria-label="Play — Attic calendar, the two-authorities case" style="position:relative;width:60px;height:60px;border-radius:999px;border:1px solid var(--line-strong);background:color-mix(in srgb,var(--surface-page) 72%,transparent);backdrop-filter:var(--blur-veil);display:grid;place-items:center;cursor:pointer;padding:0" style-hover="border-color:var(--accent)">
+<span aria-hidden="true" style="width:0;height:0;border-style:solid;border-width:9px 0 9px 14px;border-color:transparent transparent transparent var(--ink);margin-left:3px"></span>
+</button>
+</div>
+<p style="margin:0;display:flex;gap:10px 16px;flex-wrap:wrap;font-size:var(--text-xs);line-height:1.5;color:var(--ink-soft)"><span style="flex:1 1 300px;min-width:0">Clip · the eleven minutes, cut down to two.</span><span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-micro)">Thumbnail proxied · player loads on click only</span></p>
+</div>
+<aside style="margin:36px 0 0;padding:18px 20px;background:var(--surface-card);border:1px solid var(--line);border-radius:10px;display:grid;gap:8px" style-hover="border-color:var(--line-strong);box-shadow:var(--shadow-2)">
+<span class="t-eyebrow">Try it against tonight</span>
+<span style="font-family:var(--font-display);font-size:var(--text-h3);font-weight:600;color:var(--ink)">Attic calendar</span>
+<span style="font-size:var(--text-sm);line-height:1.55;color:var(--ink-soft);max-width:52ch">Observed crescent or conjunction, four city calendars, and the festival column with its grades intact.</span>
+<a href="https://shrutivtuber.com/tools/attic-calendar" style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--accent);text-decoration:none;justify-self:start" style-hover="text-decoration:underline">shrutivtuber.com/tools/attic-calendar →</a>
+</aside>
+<div style="margin-top:44px;padding:20px 22px;background:var(--surface-veil);border:1px solid var(--line);border-top:1.5px solid var(--rose);border-radius:10px;display:grid;gap:14px">
+<div style="display:flex;align-items:baseline;gap:10px 14px;flex-wrap:wrap">
+<span class="t-eyebrow">The sky when this was published</span>
+<span aria-hidden="true" class="t-glyph" style="margin-left:auto;font-size:var(--text-sm);color:var(--rose-hover)">☉&#xFE0E; ☾&#xFE0E;</span>
+</div>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(248px,100%),1fr));gap:2px 32px">
+<div style="display:flex;align-items:baseline;gap:8px"><span style="font-size:var(--text-sm);color:var(--ink-soft);white-space:nowrap">Sun · tropical</span><span style="flex:1;border-bottom:1px dotted var(--line-strong);transform:translateY(-3px);min-width:10px"></span><span class="t-tabular t-glyph" style="font-family:var(--font-mono);font-size:var(--text-sm);color:var(--ink)">2°14′ ♍&#xFE0E;</span></div>
+<div style="display:flex;align-items:baseline;gap:8px"><span style="font-size:var(--text-sm);color:var(--ink-soft);white-space:nowrap">Sun · sidereal, Lahiri</span><span style="flex:1;border-bottom:1px dotted var(--line-strong);transform:translateY(-3px);min-width:10px"></span><span class="t-tabular t-glyph" style="font-family:var(--font-mono);font-size:var(--text-sm);color:var(--ink)">8°23′ ♌&#xFE0E;</span></div>
+<div style="display:flex;align-items:baseline;gap:8px"><span style="font-size:var(--text-sm);color:var(--ink-soft);white-space:nowrap">Moon · tropical</span><span style="flex:1;border-bottom:1px dotted var(--line-strong);transform:translateY(-3px);min-width:10px"></span><span class="t-tabular t-glyph" style="font-family:var(--font-mono);font-size:var(--text-sm);color:var(--ink)">19°41′ ♓&#xFE0E;</span></div>
+<div style="display:flex;align-items:baseline;gap:8px"><span style="font-size:var(--text-sm);color:var(--ink-soft);white-space:nowrap">Moon · sidereal, Lahiri</span><span style="flex:1;border-bottom:1px dotted var(--line-strong);transform:translateY(-3px);min-width:10px"></span><span class="t-tabular t-glyph" style="font-family:var(--font-mono);font-size:var(--text-sm);color:var(--ink)">25°50′ ♒&#xFE0E;</span></div>
+<div style="display:flex;align-items:baseline;gap:8px"><span style="font-size:var(--text-sm);color:var(--ink-soft);white-space:nowrap">Tithi</span><span style="flex:1;border-bottom:1px dotted var(--line-strong);transform:translateY(-3px);min-width:10px"></span><span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-sm);color:var(--ink)">Kṛṣṇa Ekādaśī · ends 03:41</span></div>
+<div style="display:flex;align-items:baseline;gap:8px"><span style="font-size:var(--text-sm);color:var(--ink-soft);white-space:nowrap">Nakṣatra</span><span style="flex:1;border-bottom:1px dotted var(--line-strong);transform:translateY(-3px);min-width:10px"></span><span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-sm);color:var(--ink)">Mṛgaśīrṣa · ends 21:07</span></div>
+<div style="display:flex;align-items:baseline;gap:8px"><span style="font-size:var(--text-sm);color:var(--ink-soft);white-space:nowrap">Attic · observed</span><span style="flex:1;border-bottom:1px dotted var(--line-strong);transform:translateY(-3px);min-width:10px"></span><span lang="grc" style="font-family:var(--font-display);font-size:var(--text-body);color:var(--ink)">δωδεκάτη Μεταγειτνιῶνος</span></div>
+<div style="display:flex;align-items:baseline;gap:8px"><span style="font-size:var(--text-sm);color:var(--ink-soft);white-space:nowrap">Thelemic</span><span style="flex:1;border-bottom:1px dotted var(--line-strong);transform:translateY(-3px);min-width:10px"></span><span class="t-tabular t-glyph" style="font-family:var(--font-mono);font-size:var(--text-sm);color:var(--ink)">Anno IVxxxiv ☉&#xFE0E; in ♍&#xFE0E;</span></div>
+</div>
+<p style="margin:0;font-family:var(--font-mono);font-size:var(--text-micro);line-height:1.7;color:var(--ink-soft)">Recorded for Athens (GMT+3) at the moment of publication and stored with the entry. Swiss Ephemeris 2.10.03 · Lahiri ayanāṁśa · amānta month naming · Attic date by observed crescent. Never recomputed, so it still says what the sky said.</p>
+</div>
+<div style="margin-top:48px;padding-top:20px;border-top:1px solid var(--line)">
+<span class="t-eyebrow" style="display:block;margin-bottom:16px">Continue reading</span>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(220px,100%),1fr));gap:16px">
+<a href="#" style="display:grid;gap:6px;padding:16px 18px;background:var(--surface-card);border:1px solid var(--line);border-radius:10px;text-decoration:none;box-shadow:var(--shadow-1)" style-hover="border-color:var(--line-strong);box-shadow:var(--shadow-2)">
+<span class="t-eyebrow" style="color:var(--rose-hover)">☾&#xFE0E; Writing</span>
+<span style="font-family:var(--font-display);font-size:var(--text-h4);font-weight:600;line-height:1.3;color:var(--ink)">Nothing was ever retrograde</span>
+<span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-micro);color:var(--ink-soft)">25.08.2026</span>
+</a>
+<a href="#" style="display:grid;gap:6px;padding:16px 18px;background:var(--surface-card);border:1px solid var(--line);border-radius:10px;text-decoration:none;box-shadow:var(--shadow-1)" style-hover="border-color:var(--line-strong);box-shadow:var(--shadow-2)">
+<span class="t-eyebrow" style="color:var(--rose-hover)">☿&#xFE0E; Wiki</span>
+<span style="font-family:var(--font-display);font-size:var(--text-h4);font-weight:600;line-height:1.3;color:var(--ink)">The Attic festival corpus</span>
+<span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-micro);color:var(--ink-soft)">updated 24.08.2026</span>
+</a>
+</div>
+</div>
+</div>
+<aside style="flex:0 1 208px;min-width:0;align-self:flex-start;padding-left:20px;border-left:1px solid var(--line);display:grid;gap:14px">
+<div style="display:grid;gap:5px">
+<span class="t-eyebrow">Filed under</span>
+<a href="#" style="font-size:var(--text-xs);color:var(--accent);text-decoration:none" style-hover="text-decoration:underline">Calendars</a>
+</div>
+<div style="display:grid;gap:5px">
+<span class="t-eyebrow">Published</span>
+<span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--ink-soft)">2026-08-25 · 19:40 EEST</span>
+</div>
+<div style="display:grid;gap:5px">
+<span class="t-eyebrow">Permalink</span>
+<span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-micro);line-height:1.5;color:var(--ink-soft);word-break:break-all">/journal/blog/the-month-that-would-not-open</span>
+</div>
+<div style="display:grid;gap:5px;padding-top:12px;border-top:1px solid var(--line)">
+<span class="t-eyebrow">Too short for a table of contents</span>
+<span style="font-size:var(--text-micro);line-height:1.55;color:var(--ink-soft)">Under three headings the rail carries the entry's small print instead, so the reading column never moves between articles.</span>
+</div>
+</aside>
+</div>
+</div>
+<div style="display:var(--j-chrome,flex);align-items:center;gap:12px;flex-wrap:wrap;padding:11px clamp(16px,4vw,40px);border-top:1px dashed var(--line-strong);background:var(--surface-veil)">
+<span class="t-eyebrow">SiteFooter · real component · legal imprint</span>
+</div>
+</div>
+</section>
+
+<section id="hub" data-screen-label="Hub" style="max-width:var(--j-frame,1440px);margin:0 auto;padding:56px 24px 0;font-family:var(--font-body)">
+<div style="display:flex;align-items:baseline;gap:10px 18px;flex-wrap:wrap;margin-bottom:12px">
+<span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-sm);color:var(--ink)">/journal/</span>
+<span class="t-eyebrow">Hub · populated · featured entry then the card grid</span>
+<span class="t-eyebrow" style="margin-left:auto;color:var(--rose-hover)">03</span>
+</div>
+<div style="background:var(--surface-page);border:1px solid var(--line);border-radius:16px;overflow:hidden;box-shadow:var(--shadow-1)">
+<div style="display:var(--j-chrome,flex);align-items:center;gap:12px;flex-wrap:wrap;padding:11px clamp(16px,4vw,40px);border-bottom:1px dashed var(--line-strong);background:var(--surface-veil)">
+<span class="t-eyebrow">SiteHeader · real component · out of scope</span>
+</div>
+<div style="max-width:1120px;margin:0 auto;padding:64px clamp(16px,4vw,40px) 80px">
+<div style="display:flex;align-items:flex-end;gap:16px 40px;flex-wrap:wrap;padding-bottom:20px;border-bottom:1px solid var(--line)">
+<div style="flex:1 1 420px;min-width:0;display:grid;gap:10px">
+<span class="t-eyebrow" style="color:var(--rose-hover)">Journal</span>
+<h1 style="margin:0;font-family:var(--font-display);font-size:clamp(2rem,3.6vw,2.5rem);line-height:1.12;font-weight:500;letter-spacing:-.015em;color:var(--ink)">Notes, documentation, and what changed</h1>
+<p style="margin:0;font-family:var(--font-display);font-size:var(--text-prose);line-height:1.6;color:var(--ink-soft);max-width:56ch;text-wrap:pretty">Practice, and software written as practice. The instruments are documented here, and every version they have ever shipped is listed.</p>
+</div>
+<div style="display:flex;gap:8px;flex-wrap:wrap">
+<a href="#" aria-current="page" style="font-size:var(--text-xs);font-weight:600;color:var(--accent);background:var(--accent-wash);border:1px solid color-mix(in srgb,var(--accent) 50%,transparent);border-radius:999px;padding:7px 13px;text-decoration:none;line-height:1;display:inline-flex;gap:6px;align-items:center">Everything<span class="t-tabular" style="font-family:var(--font-mono);font-size:10px;color:var(--ink-soft)">48</span></a>
+<a href="#" style="font-size:var(--text-xs);font-weight:500;color:var(--ink-soft);background:var(--surface-veil);border:1px solid transparent;border-radius:999px;padding:7px 13px;text-decoration:none;line-height:1;display:inline-flex;gap:6px;align-items:center" style-hover="color:var(--accent-hover);border-color:color-mix(in srgb,var(--accent) 40%,transparent)">Writing<span class="t-tabular" style="font-family:var(--font-mono);font-size:10px;color:var(--ink-soft)">21</span></a>
+<a href="#" style="font-size:var(--text-xs);font-weight:500;color:var(--ink-soft);background:var(--surface-veil);border:1px solid transparent;border-radius:999px;padding:7px 13px;text-decoration:none;line-height:1;display:inline-flex;gap:6px;align-items:center" style-hover="color:var(--accent-hover);border-color:color-mix(in srgb,var(--accent) 40%,transparent)">Documentation<span class="t-tabular" style="font-family:var(--font-mono);font-size:10px;color:var(--ink-soft)">14</span></a>
+<a href="#" style="font-size:var(--text-xs);font-weight:500;color:var(--ink-soft);background:var(--surface-veil);border:1px solid transparent;border-radius:999px;padding:7px 13px;text-decoration:none;line-height:1;display:inline-flex;gap:6px;align-items:center" style-hover="color:var(--accent-hover);border-color:color-mix(in srgb,var(--accent) 40%,transparent)">Wiki<span class="t-tabular" style="font-family:var(--font-mono);font-size:10px;color:var(--ink-soft)">9</span></a>
+<a href="#" style="font-size:var(--text-xs);font-weight:500;color:var(--ink-soft);background:var(--surface-veil);border:1px solid transparent;border-radius:999px;padding:7px 13px;text-decoration:none;line-height:1;display:inline-flex;gap:6px;align-items:center" style-hover="color:var(--accent-hover);border-color:color-mix(in srgb,var(--accent) 40%,transparent)">Changelog<span class="t-tabular" style="font-family:var(--font-mono);font-size:10px;color:var(--ink-soft)">4</span></a>
+</div>
+</div>
+<a href="#" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(300px,100%),1fr));gap:0;margin-top:40px;background:var(--surface-card);border:1px solid var(--line);border-radius:10px;overflow:hidden;text-decoration:none;box-shadow:var(--shadow-1)" style-hover="border-color:var(--line-strong);box-shadow:var(--shadow-2)">
+<div class="sky" style="position:relative;min-height:260px;border-radius:0">
+<div class="sky-stars"></div>
+<span aria-hidden="true" class="t-glyph" style="position:absolute;top:18px;left:20px;font-size:2.25rem;line-height:1;color:var(--horizon-line)">☾&#xFE0E;</span>
+<span class="t-tabular" style="position:absolute;bottom:16px;left:20px;font-family:var(--font-mono);font-size:var(--text-micro);letter-spacing:.05em;color:var(--ink-soft)">no cover art</span>
+<div class="sky-horizon"></div>
+</div>
+<div style="padding:28px 30px;display:grid;gap:10px;align-content:center">
+<span class="t-eyebrow" style="color:var(--rose-hover)">Latest · Writing</span>
+<span style="font-family:var(--font-display);font-size:var(--text-h2);font-weight:600;line-height:1.2;color:var(--ink);text-wrap:pretty">The month that would not open</span>
+<span style="font-family:var(--font-display);font-size:var(--text-body);line-height:1.6;color:var(--ink-soft);max-width:44ch">Two reckonings, two first days, and an instrument that had to learn to say both.</span>
+<span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-micro);color:var(--ink-soft)">25.08.2026</span>
+</div>
+</a>
+<div style="margin-top:48px;display:flex;align-items:baseline;gap:12px 20px;flex-wrap:wrap;padding-bottom:14px;border-bottom:1px solid var(--line)">
+<h2 style="margin:0;font-family:var(--font-display);font-size:var(--text-h3);font-weight:600;color:var(--ink)">Recently</h2>
+<a href="#" style="margin-left:auto;font-family:var(--font-mono);font-size:var(--text-xs);color:var(--accent);text-decoration:none" style-hover="text-decoration:underline">All content →</a>
+</div>
+<div style="margin-top:24px;display:grid;grid-template-columns:repeat(auto-fill,minmax(min(300px,100%),1fr));gap:20px">
+<a href="#" style="display:grid;grid-template-rows:auto 1fr;background:var(--surface-card);border:1px solid var(--line);border-radius:10px;overflow:hidden;text-decoration:none;box-shadow:var(--shadow-1)" style-hover="border-color:var(--line-strong);box-shadow:var(--shadow-2)">
+<div class="sky" style="position:relative;aspect-ratio:16/9;border-radius:0"><div class="sky-stars"></div><span aria-hidden="true" class="t-glyph" style="position:absolute;top:12px;left:14px;font-size:1.5rem;line-height:1;color:var(--horizon-line)">☾&#xFE0E;</span><div class="sky-horizon"></div></div>
+<div style="padding:16px 18px 18px;display:grid;gap:7px;align-content:start">
+<span class="t-eyebrow" style="color:var(--rose-hover)">Writing</span>
+<span style="font-family:var(--font-display);font-size:var(--text-h4);font-weight:600;line-height:1.3;color:var(--ink);text-wrap:pretty">Nothing was ever retrograde</span>
+<span style="font-size:var(--text-xs);line-height:1.55;color:var(--ink-soft)">A chart correct in every particular except one.</span>
+<span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-micro);color:var(--ink-soft)">25.08.2026</span>
+</div>
+</a>
+<a href="#" style="display:grid;grid-template-rows:auto 1fr;background:var(--surface-card);border:1px solid var(--line);border-radius:10px;overflow:hidden;text-decoration:none;box-shadow:var(--shadow-1)" style-hover="border-color:var(--line-strong);box-shadow:var(--shadow-2)">
+<div class="sky" style="position:relative;aspect-ratio:16/9;border-radius:0"><div class="sky-stars"></div><span aria-hidden="true" class="t-glyph" style="position:absolute;top:12px;left:14px;font-size:1.5rem;line-height:1;color:var(--horizon-line)">♄&#xFE0E;</span><div class="sky-horizon"></div></div>
+<div style="padding:16px 18px 18px;display:grid;gap:7px;align-content:start">
+<span class="t-eyebrow" style="color:var(--rose-hover)">Documentation</span>
+<span style="font-family:var(--font-display);font-size:var(--text-h4);font-weight:600;line-height:1.3;color:var(--ink);text-wrap:pretty">The four reckonings</span>
+<span style="font-size:var(--text-xs);line-height:1.55;color:var(--ink-soft)">Which calendar answers which question, and where they refuse.</span>
+<span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-micro);color:var(--ink-soft)">updated 25.08.2026</span>
+</div>
+</a>
+<a href="#" style="display:grid;grid-template-rows:auto 1fr;background:var(--surface-card);border:1px solid var(--line);border-radius:10px;overflow:hidden;text-decoration:none;box-shadow:var(--shadow-1)" style-hover="border-color:var(--line-strong);box-shadow:var(--shadow-2)">
+<div class="sky" style="position:relative;aspect-ratio:16/9;border-radius:0"><div class="sky-stars"></div><span aria-hidden="true" class="t-glyph" style="position:absolute;top:12px;left:14px;font-size:1.5rem;line-height:1;color:var(--horizon-line)">♄&#xFE0E;</span><div class="sky-horizon"></div></div>
+<div style="padding:16px 18px 18px;display:grid;gap:7px;align-content:start">
+<span class="t-eyebrow" style="color:var(--rose-hover)">Documentation</span>
+<span style="font-family:var(--font-display);font-size:var(--text-h4);font-weight:600;line-height:1.3;color:var(--ink);text-wrap:pretty">Casting a chart</span>
+<span style="font-size:var(--text-xs);line-height:1.55;color:var(--ink-soft)">The ephemeris endpoint, and what it will not answer.</span>
+<span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-micro);color:var(--ink-soft)">updated 25.08.2026</span>
+</div>
+</a>
+<a href="#" style="display:grid;grid-template-rows:auto 1fr;background:var(--surface-card);border:1px solid var(--line);border-radius:10px;overflow:hidden;text-decoration:none;box-shadow:var(--shadow-1)" style-hover="border-color:var(--line-strong);box-shadow:var(--shadow-2)">
+<div class="sky" style="position:relative;aspect-ratio:16/9;border-radius:0"><div class="sky-stars"></div><span aria-hidden="true" class="t-glyph" style="position:absolute;top:12px;left:14px;font-size:1.5rem;line-height:1;color:var(--horizon-line)">☿&#xFE0E;</span><div class="sky-horizon"></div></div>
+<div style="padding:16px 18px 18px;display:grid;gap:7px;align-content:start">
+<span class="t-eyebrow" style="color:var(--rose-hover)">Wiki</span>
+<span style="font-family:var(--font-display);font-size:var(--text-h4);font-weight:600;line-height:1.3;color:var(--ink);text-wrap:pretty">The Attic festival corpus</span>
+<span style="font-size:var(--text-xs);line-height:1.55;color:var(--ink-soft)">Attested, reconstructed, disputed — and the days left undated.</span>
+<span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-micro);color:var(--ink-soft)">updated 24.08.2026</span>
+</div>
+</a>
+<a href="#" style="display:grid;grid-template-rows:auto 1fr;background:var(--surface-card);border:1px solid var(--line);border-radius:10px;overflow:hidden;text-decoration:none;box-shadow:var(--shadow-1)" style-hover="border-color:var(--line-strong);box-shadow:var(--shadow-2)">
+<div class="sky" style="position:relative;aspect-ratio:16/9;border-radius:0"><div class="sky-stars"></div><span aria-hidden="true" class="t-glyph" style="position:absolute;top:12px;left:14px;font-size:1.5rem;line-height:1;color:var(--horizon-line)">♃&#xFE0E;</span><div class="sky-horizon"></div></div>
+<div style="padding:16px 18px 18px;display:grid;gap:7px;align-content:start">
+<span class="t-eyebrow" style="color:var(--rose-hover)">Changelog</span>
+<span style="font-family:var(--font-display);font-size:var(--text-h4);font-weight:600;line-height:1.3;color:var(--ink);text-wrap:pretty">theourgia-ephemeris 0.9.4</span>
+<span style="font-size:var(--text-xs);line-height:1.55;color:var(--ink-soft)">Speed flags required; Unreckonable raised instead of a zero.</span>
+<span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-micro);color:var(--ink-soft)">24.08.2026</span>
+</div>
+</a>
+<a href="#" style="display:grid;grid-template-rows:auto 1fr;background:var(--surface-card);border:1px solid var(--line);border-radius:10px;overflow:hidden;text-decoration:none;box-shadow:var(--shadow-1)" style-hover="border-color:var(--line-strong);box-shadow:var(--shadow-2)">
+<div class="sky" style="position:relative;aspect-ratio:16/9;border-radius:0"><div class="sky-stars"></div><span aria-hidden="true" class="t-glyph" style="position:absolute;top:12px;left:14px;font-size:1.5rem;line-height:1;color:var(--horizon-line)">☾&#xFE0E;</span><div class="sky-horizon"></div></div>
+<div style="padding:16px 18px 18px;display:grid;gap:7px;align-content:start">
+<span class="t-eyebrow" style="color:var(--rose-hover)">Writing</span>
+<span style="font-family:var(--font-display);font-size:var(--text-h4);font-weight:600;line-height:1.3;color:var(--ink);text-wrap:pretty">Offerings, and what a ledger is for</span>
+<span style="font-size:var(--text-xs);line-height:1.55;color:var(--ink-soft)">Recording a rite without turning it into telemetry.</span>
+<span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-micro);color:var(--ink-soft)">18.08.2026</span>
+</div>
+</a>
+</div>
+<div style="margin-top:48px;padding-top:24px;border-top:1px solid var(--line);display:grid;grid-template-columns:repeat(auto-fit,minmax(min(240px,100%),1fr));gap:20px">
+<a href="#" style="display:grid;gap:6px;text-decoration:none">
+<span class="t-eyebrow" style="color:var(--rose-hover)">♄&#xFE0E; Documentation</span>
+<span style="font-family:var(--font-display);font-size:var(--text-h4);font-weight:600;color:var(--ink)">Every instrument, documented</span>
+<span style="font-size:var(--text-xs);line-height:1.55;color:var(--ink-soft)">Endpoints, rules in force, and the licence each one runs under.</span>
+</a>
+<a href="#" style="display:grid;gap:6px;text-decoration:none">
+<span class="t-eyebrow" style="color:var(--rose-hover)">☿&#xFE0E; Wiki</span>
+<span style="font-family:var(--font-display);font-size:var(--text-h4);font-weight:600;color:var(--ink)">The corpora, with their grades</span>
+<span style="font-size:var(--text-xs);line-height:1.55;color:var(--ink-soft)">Festivals, epithets and sources — marked attested, reconstructed or disputed.</span>
+</a>
+<a href="#" style="display:grid;gap:6px;text-decoration:none">
+<span class="t-eyebrow" style="color:var(--rose-hover)">♃&#xFE0E; Changelog</span>
+<span style="font-family:var(--font-display);font-size:var(--text-h4);font-weight:600;color:var(--ink)">What shipped, in order</span>
+<span style="font-size:var(--text-xs);line-height:1.55;color:var(--ink-soft)">Pulled from the repositories, so the terse entries stay terse.</span>
+</a>
+</div>
+</div>
+<div style="display:var(--j-chrome,flex);align-items:center;gap:12px;flex-wrap:wrap;padding:11px clamp(16px,4vw,40px);border-top:1px dashed var(--line-strong);background:var(--surface-veil)">
+<span class="t-eyebrow">SiteFooter · real component · legal imprint</span>
+</div>
+</div>
+</section>
+
+<section id="blog-index" data-screen-label="Blog index — page N" style="max-width:var(--j-frame,1440px);margin:0 auto;padding:56px 24px 0;font-family:var(--font-body)">
+<div style="display:flex;align-items:baseline;gap:10px 18px;flex-wrap:wrap;margin-bottom:12px">
+<span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-sm);color:var(--ink)">/journal/blog/page/2/</span>
+<span class="t-eyebrow">Blog index · page N · first page is identical without the “page 2 of 4” line</span>
+<span class="t-eyebrow" style="margin-left:auto;color:var(--rose-hover)">04</span>
+</div>
+<div style="background:var(--surface-page);border:1px solid var(--line);border-radius:16px;overflow:hidden;box-shadow:var(--shadow-1)">
+<div style="display:var(--j-chrome,flex);align-items:center;gap:12px;flex-wrap:wrap;padding:11px clamp(16px,4vw,40px);border-bottom:1px dashed var(--line-strong);background:var(--surface-veil)">
+<span class="t-eyebrow">SiteHeader · real component · out of scope</span>
+</div>
+<div style="max-width:1120px;margin:0 auto;padding:64px clamp(16px,4vw,40px) 80px">
+<nav aria-label="Breadcrumb" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:var(--text-xs);margin-bottom:24px">
+<a href="#" style="color:var(--ink-soft);text-decoration:none" style-hover="color:var(--accent-hover);text-decoration:underline">Journal</a>
+<span aria-hidden="true" style="color:var(--ink-soft)">›</span>
+<span aria-current="page" style="color:var(--ink-soft);font-weight:500">Writing</span>
+</nav>
+<div style="display:flex;align-items:flex-end;gap:16px 40px;flex-wrap:wrap;padding-bottom:20px;border-bottom:1px solid var(--line)">
+<div style="flex:1 1 420px;min-width:0;display:grid;gap:10px">
+<span class="t-eyebrow" style="color:var(--rose-hover)">☾&#xFE0E; Writing</span>
+<h1 style="margin:0;font-family:var(--font-display);font-size:clamp(2rem,3.6vw,2.5rem);line-height:1.12;font-weight:500;letter-spacing:-.015em;color:var(--ink)">Writing</h1>
+<p style="margin:0;font-family:var(--font-display);font-size:var(--text-prose);line-height:1.6;color:var(--ink-soft);max-width:56ch;text-wrap:pretty">Notes on practice, and on software written as practice. Most of them begin with something that did not work.</p>
+</div>
+<div style="display:grid;gap:4px;text-align:right">
+<span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-h3);color:var(--ink)">21</span>
+<span class="t-eyebrow">entries</span>
+</div>
+</div>
+<div style="margin-top:20px;display:flex;align-items:baseline;gap:10px 16px;flex-wrap:wrap">
+<span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--ink-soft)">page 2 of 4 · entries 7–12</span>
+<div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap">
+<a href="#" style="font-size:var(--text-xs);font-weight:500;color:var(--ink-soft);background:var(--surface-veil);border:1px solid transparent;border-radius:999px;padding:6px 12px;text-decoration:none;line-height:1" style-hover="color:var(--accent-hover);border-color:color-mix(in srgb,var(--accent) 40%,transparent)">Calendars</a>
+<a href="#" style="font-size:var(--text-xs);font-weight:500;color:var(--ink-soft);background:var(--surface-veil);border:1px solid transparent;border-radius:999px;padding:6px 12px;text-decoration:none;line-height:1" style-hover="color:var(--accent-hover);border-color:color-mix(in srgb,var(--accent) 40%,transparent)">Ephemeris</a>
+<a href="#" style="font-size:var(--text-xs);font-weight:500;color:var(--ink-soft);background:var(--surface-veil);border:1px solid transparent;border-radius:999px;padding:6px 12px;text-decoration:none;line-height:1" style-hover="color:var(--accent-hover);border-color:color-mix(in srgb,var(--accent) 40%,transparent)">Practice</a>
+<a href="#" style="font-size:var(--text-xs);font-weight:500;color:var(--ink-soft);background:var(--surface-veil);border:1px solid transparent;border-radius:999px;padding:6px 12px;text-decoration:none;line-height:1" style-hover="color:var(--accent-hover);border-color:color-mix(in srgb,var(--accent) 40%,transparent)">Streams</a>
+</div>
+</div>
+<div style="margin-top:24px;display:grid;grid-template-columns:repeat(auto-fill,minmax(min(300px,100%),1fr));gap:20px">
+<a href="#" style="display:grid;grid-template-rows:auto 1fr;background:var(--surface-card);border:1px solid var(--line);border-radius:10px;overflow:hidden;text-decoration:none;box-shadow:var(--shadow-1)" style-hover="border-color:var(--line-strong);box-shadow:var(--shadow-2)">
+<div class="sky" style="position:relative;aspect-ratio:16/9;border-radius:0"><div class="sky-stars"></div><span aria-hidden="true" class="t-glyph" style="position:absolute;top:12px;left:14px;font-size:1.5rem;line-height:1;color:var(--horizon-line)">☾&#xFE0E;</span><div class="sky-horizon"></div></div>
+<div style="padding:16px 18px 18px;display:grid;gap:7px;align-content:start">
+<span class="t-eyebrow" style="color:var(--rose-hover)">Practice</span>
+<span style="font-family:var(--font-display);font-size:var(--text-h4);font-weight:600;line-height:1.3;color:var(--ink);text-wrap:pretty">Offerings, and what a ledger is for</span>
+<span style="font-size:var(--text-xs);line-height:1.55;color:var(--ink-soft)">Recording a rite without turning it into telemetry.</span>
+<span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-micro);color:var(--ink-soft)">18.08.2026</span>
+</div>
+</a>
+<a href="#" style="display:grid;grid-template-rows:auto 1fr;background:var(--surface-card);border:1px solid var(--line);border-radius:10px;overflow:hidden;text-decoration:none;box-shadow:var(--shadow-1)" style-hover="border-color:var(--line-strong);box-shadow:var(--shadow-2)">
+<div style="position:relative;aspect-ratio:16/9;border-bottom:1px solid var(--line);overflow:hidden">
+<image-slot id="journal-blog-card-cover" shape="rect" placeholder="Cover — 1600×900"></image-slot>
+</div>
+<div style="padding:16px 18px 18px;display:grid;gap:7px;align-content:start">
+<span class="t-eyebrow" style="color:var(--rose-hover)">Streams</span>
+<span style="font-family:var(--font-display);font-size:var(--text-h4);font-weight:600;line-height:1.3;color:var(--ink);text-wrap:pretty">Eleven minutes of being wrong on camera</span>
+<span style="font-size:var(--text-xs);line-height:1.55;color:var(--ink-soft)">An entry with cover art sits in the same grid, cropped 16:9.</span>
+<span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-micro);color:var(--ink-soft)">14.08.2026</span>
+</div>
+</a>
+<a href="#" style="display:grid;grid-template-rows:auto 1fr;background:var(--surface-card);border:1px solid var(--line);border-radius:10px;overflow:hidden;text-decoration:none;box-shadow:var(--shadow-1)" style-hover="border-color:var(--line-strong);box-shadow:var(--shadow-2)">
+<div class="sky" style="position:relative;aspect-ratio:16/9;border-radius:0"><div class="sky-stars"></div><span aria-hidden="true" class="t-glyph" style="position:absolute;top:12px;left:14px;font-size:1.5rem;line-height:1;color:var(--horizon-line)">☾&#xFE0E;</span><div class="sky-horizon"></div></div>
+<div style="padding:16px 18px 18px;display:grid;gap:7px;align-content:start">
+<span class="t-eyebrow" style="color:var(--rose-hover)">Calendars</span>
+<span style="font-family:var(--font-display);font-size:var(--text-h4);font-weight:600;line-height:1.3;color:var(--ink);text-wrap:pretty">Ἑκατομβαιών, and the year that starts late</span>
+<span style="font-size:var(--text-xs);line-height:1.55;color:var(--ink-soft)">A Greek month name in a card title, at the same optical size.</span>
+<span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-micro);color:var(--ink-soft)">09.08.2026</span>
+</div>
+</a>
+<a href="#" style="display:grid;grid-template-rows:auto 1fr;background:var(--surface-card);border:1px solid var(--line);border-radius:10px;overflow:hidden;text-decoration:none;box-shadow:var(--shadow-1)" style-hover="border-color:var(--line-strong);box-shadow:var(--shadow-2)">
+<div class="sky" style="position:relative;aspect-ratio:16/9;border-radius:0"><div class="sky-stars"></div><span aria-hidden="true" class="t-glyph" style="position:absolute;top:12px;left:14px;font-size:1.5rem;line-height:1;color:var(--horizon-line)">☾&#xFE0E;</span><div class="sky-horizon"></div></div>
+<div style="padding:16px 18px 18px;display:grid;gap:7px;align-content:start">
+<span class="t-eyebrow" style="color:var(--rose-hover)">Ephemeris</span>
+<span style="font-family:var(--font-display);font-size:var(--text-h4);font-weight:600;line-height:1.3;color:var(--ink);text-wrap:pretty">Six ayanāṁśas walk into a function signature</span>
+<span style="font-size:var(--text-xs);line-height:1.55;color:var(--ink-soft)">Diacritics in a title, set in the display face without a wobble.</span>
+<span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-micro);color:var(--ink-soft)">02.08.2026</span>
+</div>
+</a>
+<a href="#" style="display:grid;grid-template-rows:auto 1fr;background:var(--surface-card);border:1px solid var(--line);border-radius:10px;overflow:hidden;text-decoration:none;box-shadow:var(--shadow-1)" style-hover="border-color:var(--line-strong);box-shadow:var(--shadow-2)">
+<div class="sky" style="position:relative;aspect-ratio:16/9;border-radius:0"><div class="sky-stars"></div><span aria-hidden="true" class="t-glyph" style="position:absolute;top:12px;left:14px;font-size:1.5rem;line-height:1;color:var(--horizon-line)">☾&#xFE0E;</span><div class="sky-horizon"></div></div>
+<div style="padding:16px 18px 18px;display:grid;gap:7px;align-content:start">
+<span class="t-eyebrow" style="color:var(--rose-hover)">Practice</span>
+<span style="font-family:var(--font-display);font-size:var(--text-h4);font-weight:600;line-height:1.3;color:var(--ink);text-wrap:pretty">A shrine is a data model</span>
+<span style="font-size:var(--text-xs);line-height:1.55;color:var(--ink-soft)">What the offerings ledger stores, and what it refuses to.</span>
+<span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-micro);color:var(--ink-soft)">28.07.2026</span>
+</div>
+</a>
+<a href="#" style="display:grid;grid-template-rows:auto 1fr;background:var(--surface-card);border:1px solid var(--line);border-radius:10px;overflow:hidden;text-decoration:none;box-shadow:var(--shadow-1)" style-hover="border-color:var(--line-strong);box-shadow:var(--shadow-2)">
+<div class="sky" style="position:relative;aspect-ratio:16/9;border-radius:0"><div class="sky-stars"></div><span aria-hidden="true" class="t-glyph" style="position:absolute;top:12px;left:14px;font-size:1.5rem;line-height:1;color:var(--horizon-line)">☾&#xFE0E;</span><div class="sky-horizon"></div></div>
+<div style="padding:16px 18px 18px;display:grid;gap:7px;align-content:start">
+<span class="t-eyebrow" style="color:var(--rose-hover)">Streams</span>
+<span style="font-family:var(--font-display);font-size:var(--text-h4);font-weight:600;line-height:1.3;color:var(--ink);text-wrap:pretty">Building the sigil generator on stream</span>
+<span style="font-size:var(--text-xs);line-height:1.55;color:var(--ink-soft)">Three reduction methods, and why none of them is the real one.</span>
+<span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-micro);color:var(--ink-soft)">21.07.2026</span>
+</div>
+</a>
+</div>
+<div style="margin-top:40px;padding-top:24px;border-top:1px solid var(--line);display:flex;align-items:center;gap:16px 24px;flex-wrap:wrap">
+<nav aria-label="Pagination" style="display:flex;align-items:center;gap:4px">
+<a href="#" aria-label="Previous page" style="min-width:40px;height:40px;display:inline-grid;place-items:center;border:1px solid transparent;border-radius:4px;font-size:var(--text-sm);color:var(--ink-soft);text-decoration:none" style-hover="color:var(--ink);border-color:var(--line-strong)">←</a>
+<a href="#" style="min-width:40px;height:40px;display:inline-grid;place-items:center;border:1px solid transparent;border-radius:4px;font-size:var(--text-sm);color:var(--ink-soft);text-decoration:none;font-variant-numeric:tabular-nums" style-hover="color:var(--ink);border-color:var(--line-strong)">1</a>
+<a href="#" aria-current="page" style="min-width:40px;height:40px;display:inline-grid;place-items:center;border:1px solid color-mix(in srgb,var(--accent) 50%,transparent);border-radius:4px;font-size:var(--text-sm);font-weight:600;color:var(--accent);background:var(--accent-wash);text-decoration:none;font-variant-numeric:tabular-nums">2</a>
+<a href="#" style="min-width:40px;height:40px;display:inline-grid;place-items:center;border:1px solid transparent;border-radius:4px;font-size:var(--text-sm);color:var(--ink-soft);text-decoration:none;font-variant-numeric:tabular-nums" style-hover="color:var(--ink);border-color:var(--line-strong)">3</a>
+<a href="#" style="min-width:40px;height:40px;display:inline-grid;place-items:center;border:1px solid transparent;border-radius:4px;font-size:var(--text-sm);color:var(--ink-soft);text-decoration:none;font-variant-numeric:tabular-nums" style-hover="color:var(--ink);border-color:var(--line-strong)">4</a>
+<a href="#" aria-label="Next page" style="min-width:40px;height:40px;display:inline-grid;place-items:center;border:1px solid transparent;border-radius:4px;font-size:var(--text-sm);color:var(--ink-soft);text-decoration:none" style-hover="color:var(--ink);border-color:var(--line-strong)">→</a>
+</nav>
+<span class="t-tabular" style="margin-left:auto;font-family:var(--font-mono);font-size:var(--text-micro);color:var(--ink-soft)">6 per page · newest first</span>
+</div>
+</div>
+<div style="display:var(--j-chrome,flex);align-items:center;gap:12px;flex-wrap:wrap;padding:11px clamp(16px,4vw,40px);border-top:1px dashed var(--line-strong);background:var(--surface-veil)">
+<span class="t-eyebrow">SiteFooter · real component · legal imprint</span>
+</div>
+</div>
+</section>
+
+<section id="all-content" data-screen-label="All content" style="max-width:var(--j-frame,1440px);margin:0 auto;padding:56px 24px 0;font-family:var(--font-body)">
+<div style="display:flex;align-items:baseline;gap:10px 18px;flex-wrap:wrap;margin-bottom:12px">
+<span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-sm);color:var(--ink)">/journal/all/</span>
+<span class="t-eyebrow">All content · every type, chronological, grouped by month</span>
+<span class="t-eyebrow" style="margin-left:auto;color:var(--rose-hover)">05</span>
+</div>
+<div style="background:var(--surface-page);border:1px solid var(--line);border-radius:16px;overflow:hidden;box-shadow:var(--shadow-1)">
+<div style="display:var(--j-chrome,flex);align-items:center;gap:12px;flex-wrap:wrap;padding:11px clamp(16px,4vw,40px);border-bottom:1px dashed var(--line-strong);background:var(--surface-veil)">
+<span class="t-eyebrow">SiteHeader · real component · out of scope</span>
+</div>
+<div style="max-width:1120px;margin:0 auto;padding:64px clamp(16px,4vw,40px) 80px">
+<div style="display:flex;align-items:flex-end;gap:16px 40px;flex-wrap:wrap;padding-bottom:20px;border-bottom:1px solid var(--line)">
+<div style="flex:1 1 420px;min-width:0;display:grid;gap:10px">
+<span class="t-eyebrow" style="color:var(--rose-hover)">Journal · everything</span>
+<h1 style="margin:0;font-family:var(--font-display);font-size:clamp(2rem,3.6vw,2.5rem);line-height:1.12;font-weight:500;letter-spacing:-.015em;color:var(--ink)">All content</h1>
+<p style="margin:0;font-family:var(--font-display);font-size:var(--text-prose);line-height:1.6;color:var(--ink-soft);max-width:56ch;text-wrap:pretty">Writing, documentation, wiki articles and releases in one sequence. The glyph and the label say which is which.</p>
+</div>
+<div style="display:grid;gap:4px;text-align:right">
+<span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-h3);color:var(--ink)">48</span>
+<span class="t-eyebrow">entries</span>
+</div>
+</div>
+<div style="margin-top:36px;display:flex;align-items:baseline;gap:12px;flex-wrap:wrap">
+<h2 class="t-tabular" style="margin:0;font-family:var(--font-mono);font-size:var(--text-sm);font-weight:500;letter-spacing:.04em;color:var(--ink-soft)">2026 · AUGUST</h2>
+<span style="flex:1;border-bottom:1px solid var(--line);transform:translateY(-4px);min-width:20px"></span>
+<span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-micro);color:var(--ink-soft)">6</span>
+</div>
+<div style="margin-top:20px;display:grid;grid-template-columns:repeat(auto-fill,minmax(min(300px,100%),1fr));gap:20px">
+<a href="#" style="display:grid;grid-template-rows:auto 1fr;background:var(--surface-card);border:1px solid var(--line);border-radius:10px;overflow:hidden;text-decoration:none;box-shadow:var(--shadow-1)" style-hover="border-color:var(--line-strong);box-shadow:var(--shadow-2)">
+<div class="sky" style="position:relative;aspect-ratio:16/9;border-radius:0"><div class="sky-stars"></div><span aria-hidden="true" class="t-glyph" style="position:absolute;top:12px;left:14px;font-size:1.5rem;line-height:1;color:var(--horizon-line)">☾&#xFE0E;</span><div class="sky-horizon"></div></div>
+<div style="padding:16px 18px 18px;display:grid;gap:7px;align-content:start">
+<span class="t-eyebrow" style="color:var(--rose-hover)">☾&#xFE0E; Writing</span>
+<span style="font-family:var(--font-display);font-size:var(--text-h4);font-weight:600;line-height:1.3;color:var(--ink);text-wrap:pretty">The month that would not open</span>
+<span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-micro);color:var(--ink-soft)">25.08.2026</span>
+</div>
+</a>
+<a href="#" style="display:grid;grid-template-rows:auto 1fr;background:var(--surface-card);border:1px solid var(--line);border-radius:10px;overflow:hidden;text-decoration:none;box-shadow:var(--shadow-1)" style-hover="border-color:var(--line-strong);box-shadow:var(--shadow-2)">
+<div class="sky" style="position:relative;aspect-ratio:16/9;border-radius:0"><div class="sky-stars"></div><span aria-hidden="true" class="t-glyph" style="position:absolute;top:12px;left:14px;font-size:1.5rem;line-height:1;color:var(--horizon-line)">☾&#xFE0E;</span><div class="sky-horizon"></div></div>
+<div style="padding:16px 18px 18px;display:grid;gap:7px;align-content:start">
+<span class="t-eyebrow" style="color:var(--rose-hover)">☾&#xFE0E; Writing</span>
+<span style="font-family:var(--font-display);font-size:var(--text-h4);font-weight:600;line-height:1.3;color:var(--ink);text-wrap:pretty">Nothing was ever retrograde</span>
+<span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-micro);color:var(--ink-soft)">25.08.2026</span>
+</div>
+</a>
+<a href="#" style="display:grid;grid-template-rows:auto 1fr;background:var(--surface-card);border:1px solid var(--line);border-radius:10px;overflow:hidden;text-decoration:none;box-shadow:var(--shadow-1)" style-hover="border-color:var(--line-strong);box-shadow:var(--shadow-2)">
+<div class="sky" style="position:relative;aspect-ratio:16/9;border-radius:0"><div class="sky-stars"></div><span aria-hidden="true" class="t-glyph" style="position:absolute;top:12px;left:14px;font-size:1.5rem;line-height:1;color:var(--horizon-line)">♄&#xFE0E;</span><div class="sky-horizon"></div></div>
+<div style="padding:16px 18px 18px;display:grid;gap:7px;align-content:start">
+<span class="t-eyebrow" style="color:var(--rose-hover)">♄&#xFE0E; Documentation</span>
+<span style="font-family:var(--font-display);font-size:var(--text-h4);font-weight:600;line-height:1.3;color:var(--ink);text-wrap:pretty">Casting a chart</span>
+<span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-micro);color:var(--ink-soft)">updated 25.08.2026</span>
+</div>
+</a>
+<a href="#" style="display:grid;grid-template-rows:auto 1fr;background:var(--surface-card);border:1px solid var(--line);border-radius:10px;overflow:hidden;text-decoration:none;box-shadow:var(--shadow-1)" style-hover="border-color:var(--line-strong);box-shadow:var(--shadow-2)">
+<div class="sky" style="position:relative;aspect-ratio:16/9;border-radius:0"><div class="sky-stars"></div><span aria-hidden="true" class="t-glyph" style="position:absolute;top:12px;left:14px;font-size:1.5rem;line-height:1;color:var(--horizon-line)">♃&#xFE0E;</span><div class="sky-horizon"></div></div>
+<div style="padding:16px 18px 18px;display:grid;gap:7px;align-content:start">
+<span class="t-eyebrow" style="color:var(--rose-hover)">♃&#xFE0E; Changelog</span>
+<span style="font-family:var(--font-display);font-size:var(--text-h4);font-weight:600;line-height:1.3;color:var(--ink);text-wrap:pretty">theourgia-ephemeris 0.9.4</span>
+<span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-micro);color:var(--ink-soft)">24.08.2026</span>
+</div>
+</a>
+<a href="#" style="display:grid;grid-template-rows:auto 1fr;background:var(--surface-card);border:1px solid var(--line);border-radius:10px;overflow:hidden;text-decoration:none;box-shadow:var(--shadow-1)" style-hover="border-color:var(--line-strong);box-shadow:var(--shadow-2)">
+<div class="sky" style="position:relative;aspect-ratio:16/9;border-radius:0"><div class="sky-stars"></div><span aria-hidden="true" class="t-glyph" style="position:absolute;top:12px;left:14px;font-size:1.5rem;line-height:1;color:var(--horizon-line)">☿&#xFE0E;</span><div class="sky-horizon"></div></div>
+<div style="padding:16px 18px 18px;display:grid;gap:7px;align-content:start">
+<span class="t-eyebrow" style="color:var(--rose-hover)">☿&#xFE0E; Wiki</span>
+<span style="font-family:var(--font-display);font-size:var(--text-h4);font-weight:600;line-height:1.3;color:var(--ink);text-wrap:pretty">The Attic festival corpus</span>
+<span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-micro);color:var(--ink-soft)">updated 24.08.2026</span>
+</div>
+</a>
+<a href="#" style="display:grid;grid-template-rows:auto 1fr;background:var(--surface-card);border:1px solid var(--line);border-radius:10px;overflow:hidden;text-decoration:none;box-shadow:var(--shadow-1)" style-hover="border-color:var(--line-strong);box-shadow:var(--shadow-2)">
+<div class="sky" style="position:relative;aspect-ratio:16/9;border-radius:0"><div class="sky-stars"></div><span aria-hidden="true" class="t-glyph" style="position:absolute;top:12px;left:14px;font-size:1.5rem;line-height:1;color:var(--horizon-line)">♄&#xFE0E;</span><div class="sky-horizon"></div></div>
+<div style="padding:16px 18px 18px;display:grid;gap:7px;align-content:start">
+<span class="t-eyebrow" style="color:var(--rose-hover)">♄&#xFE0E; Documentation</span>
+<span style="font-family:var(--font-display);font-size:var(--text-h4);font-weight:600;line-height:1.3;color:var(--ink);text-wrap:pretty">The four reckonings</span>
+<span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-micro);color:var(--ink-soft)">updated 25.08.2026</span>
+</div>
+</a>
+</div>
+<div style="margin-top:44px;display:flex;align-items:baseline;gap:12px;flex-wrap:wrap">
+<h2 class="t-tabular" style="margin:0;font-family:var(--font-mono);font-size:var(--text-sm);font-weight:500;letter-spacing:.04em;color:var(--ink-soft)">2026 · JULY</h2>
+<span style="flex:1;border-bottom:1px solid var(--line);transform:translateY(-4px);min-width:20px"></span>
+<span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-micro);color:var(--ink-soft)">2</span>
+</div>
+<div style="margin-top:20px;display:grid;grid-template-columns:repeat(auto-fill,minmax(min(300px,100%),1fr));gap:20px">
+<a href="#" style="display:grid;grid-template-rows:auto 1fr;background:var(--surface-card);border:1px solid var(--line);border-radius:10px;overflow:hidden;text-decoration:none;box-shadow:var(--shadow-1)" style-hover="border-color:var(--line-strong);box-shadow:var(--shadow-2)">
+<div class="sky" style="position:relative;aspect-ratio:16/9;border-radius:0"><div class="sky-stars"></div><span aria-hidden="true" class="t-glyph" style="position:absolute;top:12px;left:14px;font-size:1.5rem;line-height:1;color:var(--horizon-line)">☾&#xFE0E;</span><div class="sky-horizon"></div></div>
+<div style="padding:16px 18px 18px;display:grid;gap:7px;align-content:start">
+<span class="t-eyebrow" style="color:var(--rose-hover)">☾&#xFE0E; Writing</span>
+<span style="font-family:var(--font-display);font-size:var(--text-h4);font-weight:600;line-height:1.3;color:var(--ink);text-wrap:pretty">A shrine is a data model</span>
+<span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-micro);color:var(--ink-soft)">28.07.2026</span>
+</div>
+</a>
+<a href="#" style="display:grid;grid-template-rows:auto 1fr;background:var(--surface-card);border:1px solid var(--line);border-radius:10px;overflow:hidden;text-decoration:none;box-shadow:var(--shadow-1)" style-hover="border-color:var(--line-strong);box-shadow:var(--shadow-2)">
+<div class="sky" style="position:relative;aspect-ratio:16/9;border-radius:0"><div class="sky-stars"></div><span aria-hidden="true" class="t-glyph" style="position:absolute;top:12px;left:14px;font-size:1.5rem;line-height:1;color:var(--horizon-line)">♃&#xFE0E;</span><div class="sky-horizon"></div></div>
+<div style="padding:16px 18px 18px;display:grid;gap:7px;align-content:start">
+<span class="t-eyebrow" style="color:var(--rose-hover)">♃&#xFE0E; Changelog</span>
+<span style="font-family:var(--font-display);font-size:var(--text-h4);font-weight:600;line-height:1.3;color:var(--ink);text-wrap:pretty">theourgia-attic 0.4.0</span>
+<span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-micro);color:var(--ink-soft)">19.07.2026</span>
+</div>
+</a>
+</div>
+</div>
+<div style="display:var(--j-chrome,flex);align-items:center;gap:12px;flex-wrap:wrap;padding:11px clamp(16px,4vw,40px);border-top:1px dashed var(--line-strong);background:var(--surface-veil)">
+<span class="t-eyebrow">SiteFooter · real component · legal imprint</span>
+</div>
+</div>
+</section>
+<section id="category" data-screen-label="Category archive" style="max-width:var(--j-frame,1440px);margin:0 auto;padding:56px 24px 0;font-family:var(--font-body)">
+<div style="display:flex;align-items:baseline;gap:10px 18px;flex-wrap:wrap;margin-bottom:12px">
+<span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-sm);color:var(--ink)">/journal/blog/category/&lt;slug&gt;/</span>
+<span class="t-eyebrow">Category archive · name, description, count, siblings</span>
+<span class="t-eyebrow" style="margin-left:auto;color:var(--rose-hover)">06</span>
+</div>
+<div style="background:var(--surface-page);border:1px solid var(--line);border-radius:16px;overflow:hidden;box-shadow:var(--shadow-1)">
+<div style="display:var(--j-chrome,flex);align-items:center;gap:12px;flex-wrap:wrap;padding:11px clamp(16px,4vw,40px);border-bottom:1px dashed var(--line-strong);background:var(--surface-veil)">
+<span class="t-eyebrow">SiteHeader · real component · out of scope</span>
+</div>
+<div style="max-width:1120px;margin:0 auto;padding:64px clamp(16px,4vw,40px) 80px">
+<nav aria-label="Breadcrumb" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:var(--text-xs);margin-bottom:24px">
+<a href="#" style="color:var(--ink-soft);text-decoration:none" style-hover="color:var(--accent-hover);text-decoration:underline">Journal</a>
+<span aria-hidden="true" style="color:var(--ink-soft)">›</span>
+<a href="#" style="color:var(--ink-soft);text-decoration:none" style-hover="color:var(--accent-hover);text-decoration:underline">Writing</a>
+<span aria-hidden="true" style="color:var(--ink-soft)">›</span>
+<span aria-current="page" style="color:var(--ink-soft);font-weight:500">Calendars</span>
+</nav>
+<div style="display:flex;align-items:flex-end;gap:16px 40px;flex-wrap:wrap;padding-bottom:20px;border-bottom:1px solid var(--line)">
+<div style="flex:1 1 420px;min-width:0;display:grid;gap:10px">
+<span class="t-eyebrow" style="color:var(--rose-hover)">Category</span>
+<h1 style="margin:0;font-family:var(--font-display);font-size:clamp(2rem,3.6vw,2.5rem);line-height:1.12;font-weight:500;letter-spacing:-.015em;color:var(--ink)">Calendars</h1>
+<p style="margin:0;font-family:var(--font-display);font-size:var(--text-prose);line-height:1.6;color:var(--ink-soft);max-width:56ch;text-wrap:pretty">Attic, Hindu lunisolar, Thelemic and Gregorian — four ways of saying which day it is, and the arguments between them.</p>
+</div>
+<div style="display:grid;gap:4px;text-align:right">
+<span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-h3);color:var(--ink)">7</span>
+<span class="t-eyebrow">entries</span>
+</div>
+</div>
+<div style="margin-top:20px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+<span class="t-eyebrow" style="margin-right:4px">Also filed</span>
+<a href="#" style="font-size:var(--text-xs);font-weight:500;color:var(--ink-soft);background:var(--surface-veil);border:1px solid transparent;border-radius:999px;padding:6px 12px;text-decoration:none;line-height:1;display:inline-flex;gap:6px;align-items:center" style-hover="color:var(--accent-hover);border-color:color-mix(in srgb,var(--accent) 40%,transparent)">Ephemeris<span class="t-tabular" style="font-family:var(--font-mono);font-size:10px;color:var(--ink-soft)">5</span></a>
+<a href="#" style="font-size:var(--text-xs);font-weight:500;color:var(--ink-soft);background:var(--surface-veil);border:1px solid transparent;border-radius:999px;padding:6px 12px;text-decoration:none;line-height:1;display:inline-flex;gap:6px;align-items:center" style-hover="color:var(--accent-hover);border-color:color-mix(in srgb,var(--accent) 40%,transparent)">Practice<span class="t-tabular" style="font-family:var(--font-mono);font-size:10px;color:var(--ink-soft)">6</span></a>
+<a href="#" style="font-size:var(--text-xs);font-weight:500;color:var(--ink-soft);background:var(--surface-veil);border:1px solid transparent;border-radius:999px;padding:6px 12px;text-decoration:none;line-height:1;display:inline-flex;gap:6px;align-items:center" style-hover="color:var(--accent-hover);border-color:color-mix(in srgb,var(--accent) 40%,transparent)">Streams<span class="t-tabular" style="font-family:var(--font-mono);font-size:10px;color:var(--ink-soft)">3</span></a>
+</div>
+<div style="margin-top:28px;display:grid;grid-template-columns:repeat(auto-fill,minmax(min(300px,100%),1fr));gap:20px">
+<a href="#" style="display:grid;grid-template-rows:auto 1fr;background:var(--surface-card);border:1px solid var(--line);border-radius:10px;overflow:hidden;text-decoration:none;box-shadow:var(--shadow-1)" style-hover="border-color:var(--line-strong);box-shadow:var(--shadow-2)">
+<div class="sky" style="position:relative;aspect-ratio:16/9;border-radius:0"><div class="sky-stars"></div><span aria-hidden="true" class="t-glyph" style="position:absolute;top:12px;left:14px;font-size:1.5rem;line-height:1;color:var(--horizon-line)">☾&#xFE0E;</span><div class="sky-horizon"></div></div>
+<div style="padding:16px 18px 18px;display:grid;gap:7px;align-content:start">
+<span class="t-eyebrow" style="color:var(--rose-hover)">Writing</span>
+<span style="font-family:var(--font-display);font-size:var(--text-h4);font-weight:600;line-height:1.3;color:var(--ink);text-wrap:pretty">The month that would not open</span>
+<span style="font-size:var(--text-xs);line-height:1.55;color:var(--ink-soft)">Two reckonings, two first days.</span>
+<span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-micro);color:var(--ink-soft)">25.08.2026</span>
+</div>
+</a>
+<a href="#" style="display:grid;grid-template-rows:auto 1fr;background:var(--surface-card);border:1px solid var(--line);border-radius:10px;overflow:hidden;text-decoration:none;box-shadow:var(--shadow-1)" style-hover="border-color:var(--line-strong);box-shadow:var(--shadow-2)">
+<div class="sky" style="position:relative;aspect-ratio:16/9;border-radius:0"><div class="sky-stars"></div><span aria-hidden="true" class="t-glyph" style="position:absolute;top:12px;left:14px;font-size:1.5rem;line-height:1;color:var(--horizon-line)">☾&#xFE0E;</span><div class="sky-horizon"></div></div>
+<div style="padding:16px 18px 18px;display:grid;gap:7px;align-content:start">
+<span class="t-eyebrow" style="color:var(--rose-hover)">Writing</span>
+<span style="font-family:var(--font-display);font-size:var(--text-h4);font-weight:600;line-height:1.3;color:var(--ink);text-wrap:pretty">Ἑκατομβαιών, and the year that starts late</span>
+<span style="font-size:var(--text-xs);line-height:1.55;color:var(--ink-soft)">Where the Attic year begins, and why nobody agrees.</span>
+<span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-micro);color:var(--ink-soft)">09.08.2026</span>
+</div>
+</a>
+<a href="#" style="display:grid;grid-template-rows:auto 1fr;background:var(--surface-card);border:1px solid var(--line);border-radius:10px;overflow:hidden;text-decoration:none;box-shadow:var(--shadow-1)" style-hover="border-color:var(--line-strong);box-shadow:var(--shadow-2)">
+<div class="sky" style="position:relative;aspect-ratio:16/9;border-radius:0"><div class="sky-stars"></div><span aria-hidden="true" class="t-glyph" style="position:absolute;top:12px;left:14px;font-size:1.5rem;line-height:1;color:var(--horizon-line)">♄&#xFE0E;</span><div class="sky-horizon"></div></div>
+<div style="padding:16px 18px 18px;display:grid;gap:7px;align-content:start">
+<span class="t-eyebrow" style="color:var(--rose-hover)">Documentation</span>
+<span style="font-family:var(--font-display);font-size:var(--text-h4);font-weight:600;line-height:1.3;color:var(--ink);text-wrap:pretty">The four reckonings</span>
+<span style="font-size:var(--text-xs);line-height:1.55;color:var(--ink-soft)">Adhika-māsa, intercalation, and the day with no beginning.</span>
+<span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-micro);color:var(--ink-soft)">updated 25.08.2026</span>
+</div>
+</a>
+</div>
+</div>
+<div style="display:var(--j-chrome,flex);align-items:center;gap:12px;flex-wrap:wrap;padding:11px clamp(16px,4vw,40px);border-top:1px dashed var(--line-strong);background:var(--surface-veil)">
+<span class="t-eyebrow">SiteFooter · real component · legal imprint</span>
+</div>
+</div>
+</section>
+
+<section id="docs-index" data-screen-label="Documentation index" style="max-width:var(--j-frame,1440px);margin:0 auto;padding:56px 24px 0;font-family:var(--font-body)">
+<div style="display:flex;align-items:baseline;gap:10px 18px;flex-wrap:wrap;margin-bottom:12px">
+<span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-sm);color:var(--ink)">/journal/docs/</span>
+<span class="t-eyebrow">Documentation index · grouped by section · almanac lists inside cards</span>
+<span class="t-eyebrow" style="margin-left:auto;color:var(--rose-hover)">07</span>
+</div>
+<div style="background:var(--surface-page);border:1px solid var(--line);border-radius:16px;overflow:hidden;box-shadow:var(--shadow-1)">
+<div style="display:var(--j-chrome,flex);align-items:center;gap:12px;flex-wrap:wrap;padding:11px clamp(16px,4vw,40px);border-bottom:1px dashed var(--line-strong);background:var(--surface-veil)">
+<span class="t-eyebrow">SiteHeader · real component · out of scope</span>
+</div>
+<div style="max-width:1120px;margin:0 auto;padding:64px clamp(16px,4vw,40px) 80px">
+<div style="display:flex;align-items:flex-end;gap:16px 40px;flex-wrap:wrap;padding-bottom:20px;border-bottom:1px solid var(--line)">
+<div style="flex:1 1 420px;min-width:0;display:grid;gap:10px">
+<span class="t-eyebrow" style="color:var(--rose-hover)">♄&#xFE0E; Documentation</span>
+<h1 style="margin:0;font-family:var(--font-display);font-size:clamp(2rem,3.6vw,2.5rem);line-height:1.12;font-weight:500;letter-spacing:-.015em;color:var(--ink)">Documentation</h1>
+<p style="margin:0;font-family:var(--font-display);font-size:var(--text-prose);line-height:1.6;color:var(--ink-soft);max-width:56ch;text-wrap:pretty">How the instruments reckon, stated plainly enough to disagree with. Every page names the rule in force, the engine and the licence.</p>
+</div>
+<div style="display:grid;gap:4px;text-align:right">
+<span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-h3);color:var(--ink)">14</span>
+<span class="t-eyebrow">pages · 3 sections</span>
+</div>
+</div>
+<div style="margin-top:32px;display:grid;grid-template-columns:repeat(auto-fill,minmax(min(320px,100%),1fr));gap:20px">
+<div style="background:var(--surface-card);border:1px solid var(--line);border-radius:10px;padding:20px 22px;display:grid;gap:14px;box-shadow:var(--shadow-1)">
+<div style="display:grid;gap:6px">
+<span class="t-eyebrow" style="color:var(--rose-hover)">Section 01</span>
+<h2 style="margin:0;font-family:var(--font-display);font-size:var(--text-h3);font-weight:600;color:var(--ink)">The ephemeris API</h2>
+<p style="margin:0;font-size:var(--text-xs);line-height:1.55;color:var(--ink-soft)">One small HTTP service under every instrument on the site.</p>
+</div>
+<div style="display:grid;gap:7px;padding-top:12px;border-top:1px solid var(--line)">
+<a href="#" style="display:flex;align-items:baseline;gap:8px;text-decoration:none"><span style="font-size:var(--text-sm);color:var(--accent)">Casting a chart</span><span style="flex:1;border-bottom:1px dotted var(--line-strong);transform:translateY(-3px);min-width:10px"></span><span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-micro);color:var(--ink-soft)">25.08</span></a>
+<a href="#" style="display:flex;align-items:baseline;gap:8px;text-decoration:none"><span style="font-size:var(--text-sm);color:var(--accent)">Positions and speeds</span><span style="flex:1;border-bottom:1px dotted var(--line-strong);transform:translateY(-3px);min-width:10px"></span><span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-micro);color:var(--ink-soft)">24.08</span></a>
+<a href="#" style="display:flex;align-items:baseline;gap:8px;text-decoration:none"><span style="font-size:var(--text-sm);color:var(--accent)">Ayanāṁśa selection</span><span style="flex:1;border-bottom:1px dotted var(--line-strong);transform:translateY(-3px);min-width:10px"></span><span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-micro);color:var(--ink-soft)">21.08</span></a>
+<a href="#" style="display:flex;align-items:baseline;gap:8px;text-decoration:none"><span style="font-size:var(--text-sm);color:var(--accent)">Refusals and error codes</span><span style="flex:1;border-bottom:1px dotted var(--line-strong);transform:translateY(-3px);min-width:10px"></span><span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-micro);color:var(--ink-soft)">21.08</span></a>
+<a href="#" style="display:flex;align-items:baseline;gap:8px;text-decoration:none"><span style="font-size:var(--text-sm);color:var(--accent)">Rate limits and caching</span><span style="flex:1;border-bottom:1px dotted var(--line-strong);transform:translateY(-3px);min-width:10px"></span><span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-micro);color:var(--ink-soft)">12.08</span></a>
+</div>
+</div>
+<div style="background:var(--surface-card);border:1px solid var(--line);border-radius:10px;padding:20px 22px;display:grid;gap:14px;box-shadow:var(--shadow-1)">
+<div style="display:grid;gap:6px">
+<span class="t-eyebrow" style="color:var(--rose-hover)">Section 02</span>
+<h2 style="margin:0;font-family:var(--font-display);font-size:var(--text-h3);font-weight:600;color:var(--ink)">The four calendars</h2>
+<p style="margin:0;font-size:var(--text-xs);line-height:1.55;color:var(--ink-soft)">Attic, Hindu lunisolar, Thelemic, Gregorian — and where each one refuses.</p>
+</div>
+<div style="display:grid;gap:7px;padding-top:12px;border-top:1px solid var(--line)">
+<a href="#" style="display:flex;align-items:baseline;gap:8px;text-decoration:none"><span style="font-size:var(--text-sm);color:var(--accent)">The four reckonings</span><span style="flex:1;border-bottom:1px dotted var(--line-strong);transform:translateY(-3px);min-width:10px"></span><span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-micro);color:var(--ink-soft)">25.08</span></a>
+<a href="#" style="display:flex;align-items:baseline;gap:8px;text-decoration:none"><span style="font-size:var(--text-sm);color:var(--accent)">Observed crescent vs conjunction</span><span style="flex:1;border-bottom:1px dotted var(--line-strong);transform:translateY(-3px);min-width:10px"></span><span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-micro);color:var(--ink-soft)">23.08</span></a>
+<a href="#" style="display:flex;align-items:baseline;gap:8px;text-decoration:none"><span style="font-size:var(--text-sm);color:var(--accent)">Amānta and pūrṇimānta naming</span><span style="flex:1;border-bottom:1px dotted var(--line-strong);transform:translateY(-3px);min-width:10px"></span><span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-micro);color:var(--ink-soft)">20.08</span></a>
+<a href="#" style="display:flex;align-items:baseline;gap:8px;text-decoration:none"><span style="font-size:var(--text-sm);color:var(--accent)">Adhika-māsa, and what it displaces</span><span style="flex:1;border-bottom:1px dotted var(--line-strong);transform:translateY(-3px);min-width:10px"></span><span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-micro);color:var(--ink-soft)">15.08</span></a>
+<a href="#" style="display:flex;align-items:baseline;gap:8px;text-decoration:none"><span style="font-size:var(--text-sm);color:var(--accent)">Sunrise definitions</span><span style="flex:1;border-bottom:1px dotted var(--line-strong);transform:translateY(-3px);min-width:10px"></span><span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-micro);color:var(--ink-soft)">11.08</span></a>
+</div>
+</div>
+<div style="background:var(--surface-card);border:1px solid var(--line);border-radius:10px;padding:20px 22px;display:grid;gap:14px;box-shadow:var(--shadow-1)">
+<div style="display:grid;gap:6px">
+<span class="t-eyebrow" style="color:var(--rose-hover)">Section 03</span>
+<h2 style="margin:0;font-family:var(--font-display);font-size:var(--text-h3);font-weight:600;color:var(--ink)">The mobile app</h2>
+<p style="margin:0;font-size:var(--text-xs);line-height:1.55;color:var(--ink-soft)">Offline journalling, and what leaves the device (nothing, by default).</p>
+</div>
+<div style="display:grid;gap:7px;padding-top:12px;border-top:1px solid var(--line)">
+<a href="#" style="display:flex;align-items:baseline;gap:8px;text-decoration:none"><span style="font-size:var(--text-sm);color:var(--accent)">Installing and pairing</span><span style="flex:1;border-bottom:1px dotted var(--line-strong);transform:translateY(-3px);min-width:10px"></span><span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-micro);color:var(--ink-soft)">22.08</span></a>
+<a href="#" style="display:flex;align-items:baseline;gap:8px;text-decoration:none"><span style="font-size:var(--text-sm);color:var(--accent)">Entries, seals and export</span><span style="flex:1;border-bottom:1px dotted var(--line-strong);transform:translateY(-3px);min-width:10px"></span><span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-micro);color:var(--ink-soft)">22.08</span></a>
+<a href="#" style="display:flex;align-items:baseline;gap:8px;text-decoration:none"><span style="font-size:var(--text-sm);color:var(--accent)">Federation, if you want it</span><span style="flex:1;border-bottom:1px dotted var(--line-strong);transform:translateY(-3px);min-width:10px"></span><span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-micro);color:var(--ink-soft)">08.08</span></a>
+<a href="#" style="display:flex;align-items:baseline;gap:8px;text-decoration:none"><span style="font-size:var(--text-sm);color:var(--accent)">Building from source</span><span style="flex:1;border-bottom:1px dotted var(--line-strong);transform:translateY(-3px);min-width:10px"></span><span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-micro);color:var(--ink-soft)">04.08</span></a>
+</div>
+</div>
+</div>
+<div style="margin-top:32px;padding:18px 20px;background:var(--surface-veil);border:1px solid var(--line);border-radius:10px;display:flex;gap:12px 28px;flex-wrap:wrap;align-items:baseline">
+<span class="t-eyebrow">Reading order</span>
+<p style="margin:0;flex:1 1 320px;min-width:0;font-size:var(--text-sm);line-height:1.6;color:var(--ink-soft)">Nothing here assumes the page before it. Start where the instrument you are using lives; the cross-links go sideways, not forward.</p>
+<a href="https://shrutivtuber.com/tools" style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--accent);text-decoration:none" style-hover="text-decoration:underline">the instruments themselves →</a>
+</div>
+</div>
+<div style="display:var(--j-chrome,flex);align-items:center;gap:12px;flex-wrap:wrap;padding:11px clamp(16px,4vw,40px);border-top:1px dashed var(--line-strong);background:var(--surface-veil)">
+<span class="t-eyebrow">SiteFooter · real component · legal imprint</span>
+</div>
+</div>
+</section>
+
+<section id="docs-page" data-screen-label="Documentation page" style="max-width:var(--j-frame,1440px);margin:0 auto;padding:56px 24px 0;font-family:var(--font-body)">
+<div style="display:flex;align-items:baseline;gap:10px 18px;flex-wrap:wrap;margin-bottom:12px">
+<span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-sm);color:var(--ink)">/journal/docs/&lt;slug&gt;/</span>
+<span class="t-eyebrow">Documentation page · two rails ⇒ 40px gutters, 62ch column · both rails wrap below the body under 1024</span>
+<span class="t-eyebrow" style="margin-left:auto;color:var(--rose-hover)">08</span>
+</div>
+<div style="background:var(--surface-page);border:1px solid var(--line);border-radius:16px;overflow:hidden;box-shadow:var(--shadow-1)">
+<div style="display:var(--j-chrome,flex);align-items:center;gap:12px;flex-wrap:wrap;padding:11px clamp(16px,4vw,40px);border-bottom:1px dashed var(--line-strong);background:var(--surface-veil)">
+<span class="t-eyebrow">SiteHeader · real component · out of scope</span>
+</div>
+<div style="max-width:1120px;margin:0 auto;padding:48px clamp(16px,4vw,40px) 80px">
+<div style="display:flex;gap:40px;align-items:flex-start;flex-wrap:wrap">
+<nav aria-label="Documentation" style="flex:0 1 208px;min-width:0;position:sticky;top:24px;align-self:flex-start;display:grid;gap:20px;padding-right:20px;border-right:1px solid var(--line)">
+<a href="#" style="font-family:var(--font-display);font-size:var(--text-h4);font-weight:600;color:var(--ink);text-decoration:none">Documentation</a>
+<div style="display:grid;gap:8px">
+<span class="t-eyebrow">The ephemeris API</span>
+<a href="#" style="font-size:var(--text-xs);line-height:1.45;color:var(--ink);text-decoration:none;font-weight:600;border-left:2px solid var(--rose);margin-left:-22px;padding-left:20px" aria-current="page">Casting a chart</a>
+<div style="display:grid;gap:6px;padding-left:12px;border-left:1px solid var(--line);margin-left:2px">
+<a href="#what-you-need" style="font-size:var(--text-micro);line-height:1.4;color:var(--ink-soft);text-decoration:none" style-hover="color:var(--accent-hover)">What you need</a>
+<a href="#what-comes-back" style="font-size:var(--text-micro);line-height:1.4;color:var(--ink-soft);text-decoration:none" style-hover="color:var(--accent-hover)">What comes back</a>
+<a href="#when-it-refuses" style="font-size:var(--text-micro);line-height:1.4;color:var(--ink-soft);text-decoration:none" style-hover="color:var(--accent-hover)">When it refuses</a>
+</div>
+<a href="#" style="font-size:var(--text-xs);line-height:1.45;color:var(--ink-soft);text-decoration:none" style-hover="color:var(--accent-hover)">Positions and speeds</a>
+<a href="#" style="font-size:var(--text-xs);line-height:1.45;color:var(--ink-soft);text-decoration:none" style-hover="color:var(--accent-hover)">Ayanāṁśa selection</a>
+<a href="#" style="font-size:var(--text-xs);line-height:1.45;color:var(--ink-soft);text-decoration:none" style-hover="color:var(--accent-hover)">Refusals and error codes</a>
+<a href="#" style="font-size:var(--text-xs);line-height:1.45;color:var(--ink-soft);text-decoration:none" style-hover="color:var(--accent-hover)">Rate limits and caching</a>
+</div>
+<div style="display:grid;gap:8px">
+<span class="t-eyebrow">The four calendars</span>
+<a href="#" style="font-size:var(--text-xs);line-height:1.45;color:var(--ink-soft);text-decoration:none" style-hover="color:var(--accent-hover)">The four reckonings</a>
+<a href="#" style="font-size:var(--text-xs);line-height:1.45;color:var(--ink-soft);text-decoration:none" style-hover="color:var(--accent-hover)">Observed crescent vs conjunction</a>
+<a href="#" style="font-size:var(--text-xs);line-height:1.45;color:var(--ink-soft);text-decoration:none" style-hover="color:var(--accent-hover)">Amānta and pūrṇimānta naming</a>
+<a href="#" style="font-size:var(--text-xs);line-height:1.45;color:var(--ink-soft);text-decoration:none" style-hover="color:var(--accent-hover)">Sunrise definitions</a>
+</div>
+<div style="display:grid;gap:8px">
+<span class="t-eyebrow">The mobile app</span>
+<a href="#" style="font-size:var(--text-xs);line-height:1.45;color:var(--ink-soft);text-decoration:none" style-hover="color:var(--accent-hover)">Installing and pairing</a>
+<a href="#" style="font-size:var(--text-xs);line-height:1.45;color:var(--ink-soft);text-decoration:none" style-hover="color:var(--accent-hover)">Entries, seals and export</a>
+<a href="#" style="font-size:var(--text-xs);line-height:1.45;color:var(--ink-soft);text-decoration:none" style-hover="color:var(--accent-hover)">Building from source</a>
+</div>
+</nav>
+<article style="flex:1 1 360px;min-width:0;max-width:62ch">
+<nav aria-label="Breadcrumb" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:var(--text-xs);margin-bottom:20px">
+<a href="#" style="color:var(--ink-soft);text-decoration:none" style-hover="color:var(--accent-hover);text-decoration:underline">Docs</a>
+<span aria-hidden="true" style="color:var(--ink-soft)">›</span>
+<a href="#" style="color:var(--ink-soft);text-decoration:none" style-hover="color:var(--accent-hover);text-decoration:underline">The ephemeris API</a>
+<span aria-hidden="true" style="color:var(--ink-soft)">›</span>
+<span aria-current="page" style="color:var(--ink-soft);font-weight:500">Casting a chart</span>
+</nav>
+<h1 style="margin:0 0 12px;font-family:var(--font-display);font-size:clamp(1.875rem,3.4vw,2.375rem);line-height:1.14;font-weight:500;letter-spacing:-.015em;color:var(--ink);text-wrap:pretty">Casting a chart</h1>
+<div style="display:flex;align-items:center;gap:10px 16px;flex-wrap:wrap;padding-bottom:14px;border-bottom:1px solid var(--line);margin-bottom:32px">
+<span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--ink-soft)">updated 2026-08-25</span>
+<span aria-hidden="true" style="color:var(--ink-soft)">·</span>
+<span style="font-size:var(--text-xs);color:var(--ink-soft)">by Shruti</span>
+<a href="https://github.com/theourgia/docs" style="margin-left:auto;font-family:var(--font-mono);font-size:var(--text-micro);color:var(--accent);text-decoration:none" style-hover="text-decoration:underline">edit this page →</a>
+</div>
+<x-import component-from-global-scope="ShrutiDesignSystem_cb687f.Prose" hint-size="100%,900px">
+<p>The ephemeris is a small HTTP service. Every instrument on this site is a page over it, and it answers the same questions for anyone who asks.</p>
+<h2 id="what-you-need">What you need</h2>
+<p>A moment and a place. The moment is a date and a time; the place is a latitude and a longitude. Nothing else is required, and nothing else is stored.</p>
+<pre><code>GET /chart?date=1990-05-04&amp;time=14:20&amp;lat=37.9838&amp;lon=23.7275
+     &amp;zodiac=both&amp;ayanamsa=lahiri&amp;houses=whole-sign</code></pre>
+<p>Omit <code>time</code> and the service does not guess noon. It answers with the day's positions, marks the houses <code>null</code>, and says why — an unknown birth time is a real condition, not a validation error.</p>
+<h2 id="what-comes-back">What comes back</h2>
+<p>Both traditions, side by side and unranked. The tropical zodiac and the sidereal one are not two attempts at the same answer; they are two different questions, and the response gives you both rather than choosing.</p>
+<div style="overflow-x:auto;margin:1.4em 0">
+<table style="min-width:560px">
+<thead><tr><th>Field</th><th>Tropical</th><th>Sidereal · Lahiri</th><th>Note</th></tr></thead>
+<tbody>
+<tr><td><code>sun</code></td><td class="t-tabular t-glyph" style="font-family:var(--font-mono)">14°02′ ♉&#xFE0E;</td><td class="t-tabular t-glyph" style="font-family:var(--font-mono)">20°11′ ♈&#xFE0E;</td><td>Ayanāṁśa 23°51′</td></tr>
+<tr><td><code>moon</code></td><td class="t-tabular t-glyph" style="font-family:var(--font-mono)">02°47′ ♑&#xFE0E;</td><td class="t-tabular t-glyph" style="font-family:var(--font-mono)">08°56′ ♐&#xFE0E;</td><td><span lang="sa">उत्तराषाढा</span> · Uttarāṣāḍhā</td></tr>
+<tr><td><code>moon.speed</code></td><td class="t-tabular" style="font-family:var(--font-mono)">13.42°/day</td><td class="t-tabular" style="font-family:var(--font-mono)">13.42°/day</td><td>Present only with the speed flag</td></tr>
+<tr><td><code>asc</code></td><td class="t-tabular t-glyph" style="font-family:var(--font-mono)">28°19′ ♌&#xFE0E;</td><td class="t-tabular t-glyph" style="font-family:var(--font-mono)">04°28′ ♌&#xFE0E;</td><td>Whole-sign houses follow the sign</td></tr>
+<tr><td><code>attic</code></td><td colspan="2" lang="grc" style="font-family:var(--font-display);font-size:1.05em">ἑβδόμη Μουνιχιῶνος</td><td>Observed crescent, Athens</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="both-traditions-unranked">Why nothing is marked correct</h3>
+<p>Ranking them would be a claim about which sky is real. The instrument's job is to reckon under a stated rule and name the rule; the practitioner's job is to know which rule they are working in.</p>
+<h2 id="when-it-refuses">When it refuses</h2>
+<p>A refusal is a first-class response with its own shape. It carries the condition, the rule that produced it, and the alternatives that would answer — never a fabricated number.</p>
+<pre><code>{
+  "error": "unreckonable",
+  "condition": "no_sunrise",
+  "rule": "sunrise = upper limb clears the horizon",
+  "detail": "The sun does not rise at 78.22°N on 2026-12-21.",
+  "alternatives": ["civil_twilight", "solar_midnight", "previous_sunrise"]
+}</code></pre>
+<p>The instruments render this state rather than an empty table; on a tool page it is the cannot-compute panel, and here it is documented as a normal outcome. A day with no sunrise is not a bug in the calendar. It is a fact about latitude.</p>
+</x-import>
+<div style="margin-top:36px;padding:18px 20px;background:var(--surface-veil);border:1px solid var(--line);border-top:1.5px solid var(--rose);border-radius:10px;display:grid;gap:12px">
+<span class="t-eyebrow">Provenance</span>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(220px,100%),1fr));gap:2px 28px">
+<div style="display:flex;align-items:baseline;gap:8px"><span style="font-size:var(--text-sm);color:var(--ink-soft);white-space:nowrap">Engine</span><span style="flex:1;border-bottom:1px dotted var(--line-strong);transform:translateY(-3px);min-width:10px"></span><span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-sm);color:var(--ink)">Swiss Ephemeris 2.10.03</span></div>
+<div style="display:flex;align-items:baseline;gap:8px"><span style="font-size:var(--text-sm);color:var(--ink-soft);white-space:nowrap">Rule in force</span><span style="flex:1;border-bottom:1px dotted var(--line-strong);transform:translateY(-3px);min-width:10px"></span><span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-sm);color:var(--ink)">Lahiri · whole-sign</span></div>
+<div style="display:flex;align-items:baseline;gap:8px"><span style="font-size:var(--text-sm);color:var(--ink-soft);white-space:nowrap">Licence</span><span style="flex:1;border-bottom:1px dotted var(--line-strong);transform:translateY(-3px);min-width:10px"></span><span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-sm);color:var(--ink)">AGPL-3.0</span></div>
+<div style="display:flex;align-items:baseline;gap:8px"><span style="font-size:var(--text-sm);color:var(--ink-soft);white-space:nowrap">Running build</span><span style="flex:1;border-bottom:1px dotted var(--line-strong);transform:translateY(-3px);min-width:10px"></span><span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-sm);color:var(--ink)">0.9.4 · 4f1c9ae</span></div>
+</div>
+<p style="margin:0;font-family:var(--font-mono);font-size:var(--text-micro);line-height:1.7;color:var(--ink-soft)">A number without its rule is not an answer. Source for the running build is offered on request and in the repository.</p>
+</div>
+<div style="margin-top:36px;padding-top:20px;border-top:1px solid var(--line);display:grid;grid-template-columns:repeat(auto-fit,minmax(min(240px,100%),1fr));gap:16px">
+<a href="#" style="display:grid;gap:5px;padding:14px 16px;border:1px solid var(--line);border-radius:10px;text-decoration:none;background:var(--surface-card)" style-hover="border-color:var(--line-strong)">
+<span class="t-eyebrow">Previous</span>
+<span style="font-family:var(--font-display);font-size:var(--text-body);font-weight:600;color:var(--ink)">Ayanāṁśa selection</span>
+</a>
+<a href="#" style="display:grid;gap:5px;padding:14px 16px;border:1px solid var(--line);border-radius:10px;text-decoration:none;background:var(--surface-card);text-align:right" style-hover="border-color:var(--line-strong)">
+<span class="t-eyebrow">Next</span>
+<span style="font-family:var(--font-display);font-size:var(--text-body);font-weight:600;color:var(--ink)">Positions and speeds</span>
+</a>
+</div>
+</article>
+<aside style="flex:0 1 176px;min-width:0;position:sticky;top:24px;align-self:flex-start;padding-left:20px;border-left:1px solid var(--line);display:grid;gap:10px">
+<span class="t-eyebrow">On this page</span>
+<a href="#what-you-need" style="font-size:var(--text-micro);line-height:1.45;color:var(--ink);text-decoration:none;font-weight:600;border-left:2px solid var(--rose);margin-left:-22px;padding-left:20px">What you need</a>
+<a href="#what-comes-back" style="font-size:var(--text-micro);line-height:1.45;color:var(--ink-soft);text-decoration:none" style-hover="color:var(--accent-hover)">What comes back</a>
+<a href="#both-traditions-unranked" style="font-size:var(--text-micro);line-height:1.45;color:var(--ink-soft);text-decoration:none;padding-left:12px" style-hover="color:var(--accent-hover)">Why nothing is marked correct</a>
+<a href="#when-it-refuses" style="font-size:var(--text-micro);line-height:1.45;color:var(--ink-soft);text-decoration:none" style-hover="color:var(--accent-hover)">When it refuses</a>
+<div style="margin-top:6px;padding-top:12px;border-top:1px solid var(--line);display:grid;gap:6px">
+<span class="t-eyebrow">Applies to</span>
+<span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-micro);line-height:1.5;color:var(--ink-soft)">theourgia-ephemeris ≥ 0.9.0</span>
+</div>
+</aside>
+</div>
+</div>
+<div style="display:var(--j-chrome,flex);align-items:center;gap:12px;flex-wrap:wrap;padding:11px clamp(16px,4vw,40px);border-top:1px dashed var(--line-strong);background:var(--surface-veil)">
+<span class="t-eyebrow">SiteFooter · real component · legal imprint</span>
+</div>
+</div>
+</section>
+
+<section id="wiki-index" data-screen-label="Wiki index" style="max-width:var(--j-frame,1440px);margin:0 auto;padding:56px 24px 0;font-family:var(--font-body)">
+<div style="display:flex;align-items:baseline;gap:10px 18px;flex-wrap:wrap;margin-bottom:12px">
+<span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-sm);color:var(--ink)">/journal/wiki/</span>
+<span class="t-eyebrow">Wiki index · same prose engine, encyclopedic navigation: A–Z, not cards</span>
+<span class="t-eyebrow" style="margin-left:auto;color:var(--rose-hover)">09</span>
+</div>
+<div style="background:var(--surface-page);border:1px solid var(--line);border-radius:16px;overflow:hidden;box-shadow:var(--shadow-1)">
+<div style="display:var(--j-chrome,flex);align-items:center;gap:12px;flex-wrap:wrap;padding:11px clamp(16px,4vw,40px);border-bottom:1px dashed var(--line-strong);background:var(--surface-veil)">
+<span class="t-eyebrow">SiteHeader · real component · out of scope</span>
+</div>
+<div style="max-width:1120px;margin:0 auto;padding:64px clamp(16px,4vw,40px) 80px">
+<div style="display:flex;align-items:flex-end;gap:16px 40px;flex-wrap:wrap;padding-bottom:20px;border-bottom:1px solid var(--line)">
+<div style="flex:1 1 420px;min-width:0;display:grid;gap:10px">
+<span class="t-eyebrow" style="color:var(--rose-hover)">☿&#xFE0E; Wiki</span>
+<h1 style="margin:0;font-family:var(--font-display);font-size:clamp(2rem,3.6vw,2.5rem);line-height:1.12;font-weight:500;letter-spacing:-.015em;color:var(--ink)">The wiki</h1>
+<p style="margin:0;font-family:var(--font-display);font-size:var(--text-prose);line-height:1.6;color:var(--ink-soft);max-width:56ch;text-wrap:pretty">Corpora, epithets, sources and terms — the reference layer the instruments read from. Entries are graded, and some are deliberately left undated.</p>
+</div>
+<div style="display:grid;gap:4px;text-align:right">
+<span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-h3);color:var(--ink)">9</span>
+<span class="t-eyebrow">articles</span>
+</div>
+</div>
+<div style="margin-top:24px;display:flex;gap:12px 28px;flex-wrap:wrap;align-items:baseline;padding:14px 18px;background:var(--surface-veil);border:1px solid var(--line);border-radius:10px">
+<span class="t-eyebrow">Grades used here</span>
+<span style="display:inline-flex;align-items:baseline;gap:7px;font-size:var(--text-xs);color:var(--ink-soft)"><span aria-hidden="true" class="t-glyph" style="color:var(--ink)">●</span>attested</span>
+<span style="display:inline-flex;align-items:baseline;gap:7px;font-size:var(--text-xs);color:var(--ink-soft)"><span aria-hidden="true" class="t-glyph" style="color:var(--ink-soft)">◐</span>reconstructed</span>
+<span style="display:inline-flex;align-items:baseline;gap:7px;font-size:var(--text-xs);color:var(--ink-soft)"><span aria-hidden="true" class="t-glyph" style="color:var(--rose-hover)">○</span>disputed</span>
+<span style="display:inline-flex;align-items:baseline;gap:7px;font-size:var(--text-xs);color:var(--ink-soft)"><span aria-hidden="true" class="t-tabular" style="font-family:var(--font-mono)">—</span>not dated by us</span>
+</div>
+<div style="margin-top:36px;display:grid;grid-template-columns:repeat(auto-fill,minmax(min(320px,100%),1fr));gap:8px 48px">
+<div style="display:grid;gap:12px">
+<div style="display:flex;align-items:baseline;gap:12px"><h2 class="t-tabular" style="margin:0;font-family:var(--font-mono);font-size:var(--text-sm);color:var(--rose-hover)">A</h2><span style="flex:1;border-bottom:1px solid var(--line);transform:translateY(-4px)"></span></div>
+<a href="#" style="display:flex;align-items:baseline;gap:8px;text-decoration:none"><span aria-hidden="true" class="t-glyph" style="color:var(--ink);width:12px">●</span><span style="font-size:var(--text-sm);color:var(--accent)">Attic festival corpus</span><span style="flex:1;border-bottom:1px dotted var(--line-strong);transform:translateY(-3px);min-width:10px"></span><span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-micro);color:var(--ink-soft)">24.08</span></a>
+<a href="#" style="display:flex;align-items:baseline;gap:8px;text-decoration:none"><span aria-hidden="true" class="t-glyph" style="color:var(--ink-soft);width:12px">◐</span><span style="font-size:var(--text-sm);color:var(--accent)">Ayanāṁśa, the six in use</span><span style="flex:1;border-bottom:1px dotted var(--line-strong);transform:translateY(-3px);min-width:10px"></span><span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-micro);color:var(--ink-soft)">20.08</span></a>
+<div style="display:flex;align-items:baseline;gap:12px;margin-top:12px"><h2 class="t-tabular" style="margin:0;font-family:var(--font-mono);font-size:var(--text-sm);color:var(--rose-hover)">E</h2><span style="flex:1;border-bottom:1px solid var(--line);transform:translateY(-4px)"></span></div>
+<a href="#" style="display:flex;align-items:baseline;gap:8px;text-decoration:none"><span aria-hidden="true" class="t-glyph" style="color:var(--ink);width:12px">●</span><span style="font-size:var(--text-sm);color:var(--accent)">Epithets of Hekate</span><span style="flex:1;border-bottom:1px dotted var(--line-strong);transform:translateY(-3px);min-width:10px"></span><span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-micro);color:var(--ink-soft)">18.08</span></a>
+<a href="#" style="display:flex;align-items:baseline;gap:8px;text-decoration:none"><span aria-hidden="true" class="t-glyph" style="color:var(--rose-hover);width:12px">○</span><span style="font-size:var(--text-sm);color:var(--accent)">Eleusinian dating problems</span><span style="flex:1;border-bottom:1px dotted var(--line-strong);transform:translateY(-3px);min-width:10px"></span><span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-micro);color:var(--ink-soft)">11.08</span></a>
+<div style="display:flex;align-items:baseline;gap:12px;margin-top:12px"><h2 class="t-tabular" style="margin:0;font-family:var(--font-mono);font-size:var(--text-sm);color:var(--rose-hover)">I</h2><span style="flex:1;border-bottom:1px solid var(--line);transform:translateY(-4px)"></span></div>
+<a href="#" style="display:flex;align-items:baseline;gap:8px;text-decoration:none"><span aria-hidden="true" class="t-glyph" style="color:var(--ink);width:12px">●</span><span style="font-size:var(--text-sm);color:var(--accent)">Isopsephy, the six scripts</span><span style="flex:1;border-bottom:1px dotted var(--line-strong);transform:translateY(-3px);min-width:10px"></span><span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-micro);color:var(--ink-soft)">09.08</span></a>
+</div>
+<div style="display:grid;gap:12px">
+<div style="display:flex;align-items:baseline;gap:12px"><h2 class="t-tabular" style="margin:0;font-family:var(--font-mono);font-size:var(--text-sm);color:var(--rose-hover)">K</h2><span style="flex:1;border-bottom:1px solid var(--line);transform:translateY(-4px)"></span></div>
+<a href="#" style="display:flex;align-items:baseline;gap:8px;text-decoration:none"><span aria-hidden="true" class="t-glyph" style="color:var(--ink-soft);width:12px">◐</span><span style="font-size:var(--text-sm);color:var(--accent)">Kaṭapayādi, and why it has no sum</span><span style="flex:1;border-bottom:1px dotted var(--line-strong);transform:translateY(-3px);min-width:10px"></span><span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-micro);color:var(--ink-soft)">07.08</span></a>
+<div style="display:flex;align-items:baseline;gap:12px;margin-top:12px"><h2 class="t-tabular" style="margin:0;font-family:var(--font-mono);font-size:var(--text-sm);color:var(--rose-hover)">M</h2><span style="flex:1;border-bottom:1px solid var(--line);transform:translateY(-4px)"></span></div>
+<a href="#" style="display:flex;align-items:baseline;gap:8px;text-decoration:none"><span aria-hidden="true" class="t-glyph" style="color:var(--ink);width:12px">●</span><span style="font-size:var(--text-sm);color:var(--accent)">Mahāvidyā, the ten</span><span style="flex:1;border-bottom:1px dotted var(--line-strong);transform:translateY(-3px);min-width:10px"></span><span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-micro);color:var(--ink-soft)">02.08</span></a>
+<a href="#" style="display:flex;align-items:baseline;gap:8px;text-decoration:none"><span aria-hidden="true" class="t-glyph" style="color:var(--ink-soft);width:12px">◐</span><span style="font-size:var(--text-sm);color:var(--accent)">Metageitnion</span><span style="flex:1;border-bottom:1px dotted var(--line-strong);transform:translateY(-3px);min-width:10px"></span><span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-micro);color:var(--ink-soft)">25.08</span></a>
+<div style="display:flex;align-items:baseline;gap:12px;margin-top:12px"><h2 class="t-tabular" style="margin:0;font-family:var(--font-mono);font-size:var(--text-sm);color:var(--rose-hover)">S</h2><span style="flex:1;border-bottom:1px solid var(--line);transform:translateY(-4px)"></span></div>
+<a href="#" style="display:flex;align-items:baseline;gap:8px;text-decoration:none"><span aria-hidden="true" class="t-glyph" style="color:var(--ink);width:12px">●</span><span style="font-size:var(--text-sm);color:var(--accent)">Sandhyā, the twilight junctures</span><span style="flex:1;border-bottom:1px dotted var(--line-strong);transform:translateY(-3px);min-width:10px"></span><span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-micro);color:var(--ink-soft)">28.07</span></a>
+</div>
+</div>
+</div>
+<div style="display:var(--j-chrome,flex);align-items:center;gap:12px;flex-wrap:wrap;padding:11px clamp(16px,4vw,40px);border-top:1px dashed var(--line-strong);background:var(--surface-veil)">
+<span class="t-eyebrow">SiteFooter · real component · legal imprint</span>
+</div>
+</div>
+</section>
+<section id="wiki-article" data-screen-label="Wiki article" style="max-width:var(--j-frame,1440px);margin:0 auto;padding:56px 24px 0;font-family:var(--font-body)">
+<div style="display:flex;align-items:baseline;gap:10px 18px;flex-wrap:wrap;margin-bottom:12px">
+<span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-sm);color:var(--ink)">/journal/wiki/&lt;slug&gt;/</span>
+<span class="t-eyebrow">Wiki article · graded corpus table · wide table scrolls in its own box</span>
+<span class="t-eyebrow" style="margin-left:auto;color:var(--rose-hover)">10</span>
+</div>
+<div style="background:var(--surface-page);border:1px solid var(--line);border-radius:16px;overflow:hidden;box-shadow:var(--shadow-1)">
+<div style="display:var(--j-chrome,flex);align-items:center;gap:12px;flex-wrap:wrap;padding:11px clamp(16px,4vw,40px);border-bottom:1px dashed var(--line-strong);background:var(--surface-veil)">
+<span class="t-eyebrow">SiteHeader · real component · out of scope</span>
+</div>
+<div style="max-width:1120px;margin:0 auto;padding:56px clamp(16px,4vw,40px) 80px">
+<div style="display:flex;gap:40px;align-items:flex-start;flex-wrap:wrap">
+<article style="flex:1 1 400px;min-width:0;max-width:64ch">
+<nav aria-label="Breadcrumb" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:var(--text-xs);margin-bottom:20px">
+<a href="#" style="color:var(--ink-soft);text-decoration:none" style-hover="color:var(--accent-hover);text-decoration:underline">Journal</a>
+<span aria-hidden="true" style="color:var(--ink-soft)">›</span>
+<a href="#" style="color:var(--ink-soft);text-decoration:none" style-hover="color:var(--accent-hover);text-decoration:underline">Wiki</a>
+<span aria-hidden="true" style="color:var(--ink-soft)">›</span>
+<span aria-current="page" style="color:var(--ink-soft);font-weight:500">Attic festival corpus</span>
+</nav>
+<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+<span aria-hidden="true" class="t-glyph" style="font-size:var(--text-h4);color:var(--ink)">●</span>
+<span class="t-eyebrow">Attested · commentary public</span>
+</div>
+<h1 style="margin:0 0 12px;font-family:var(--font-display);font-size:clamp(1.875rem,3.4vw,2.375rem);line-height:1.14;font-weight:500;letter-spacing:-.015em;color:var(--ink);text-wrap:pretty">The Attic festival corpus</h1>
+<div style="display:flex;align-items:center;gap:10px 16px;flex-wrap:wrap;padding-bottom:14px;border-bottom:1px solid var(--line);margin-bottom:32px">
+<span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--ink-soft)">revised 2026-08-24</span>
+<span aria-hidden="true" style="color:var(--ink-soft)">·</span>
+<span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--ink-soft)">14 sources</span>
+<span aria-hidden="true" style="color:var(--ink-soft)">·</span>
+<span style="font-size:var(--text-xs);color:var(--ink-soft)">signed <span class="seal seal-line">Soror Eu. A.</span></span>
+</div>
+<x-import component-from-global-scope="ShrutiDesignSystem_cb687f.Prose" hint-size="100%,760px">
+<p>The corpus is the table the Attic calendar reads from: which festivals fall on which day of which month, and how firmly each of those claims can be made. It is scholarship with a schema, and the schema has to carry doubt without hiding it.</p>
+<h2 id="how-days-are-graded">How days are graded</h2>
+<p>Three grades and one refusal. A grade describes the strength of the evidence for the <em>date</em>, not the importance of the festival — the Mysteries are the best-attested rite in the corpus and their opening day is still argued about.</p>
+</x-import>
+<div style="margin-top:24px;display:flex;gap:12px 24px;flex-wrap:wrap;align-items:baseline;padding:12px 16px;background:var(--surface-veil);border:1px solid var(--line);border-radius:10px">
+<span class="t-eyebrow">Legend</span>
+<span style="display:inline-flex;align-items:baseline;gap:7px;font-size:var(--text-xs);color:var(--ink-soft)"><span aria-hidden="true" class="t-glyph" style="color:var(--ink)">●</span>attested — dated by a primary source</span>
+<span style="display:inline-flex;align-items:baseline;gap:7px;font-size:var(--text-xs);color:var(--ink-soft)"><span aria-hidden="true" class="t-glyph" style="color:var(--ink-soft)">◐</span>reconstructed — inferred from a cycle</span>
+<span style="display:inline-flex;align-items:baseline;gap:7px;font-size:var(--text-xs);color:var(--ink-soft)"><span aria-hidden="true" class="t-glyph" style="color:var(--rose-hover)">○</span>disputed — sources conflict</span>
+</div>
+<div style="margin-top:20px;overflow-x:auto;border:1px solid var(--line);border-radius:10px">
+<table style="min-width:620px;width:100%;border-collapse:collapse;font-family:var(--font-body);font-size:var(--text-sm)">
+<thead>
+<tr style="background:var(--surface-veil)">
+<th style="text-align:left;padding:10px 14px;font-family:var(--font-body);font-size:var(--text-micro);letter-spacing:.14em;text-transform:uppercase;color:var(--ink-soft);font-weight:600;border-bottom:1px solid var(--line-strong)">Grade</th>
+<th style="text-align:left;padding:10px 14px;font-family:var(--font-body);font-size:var(--text-micro);letter-spacing:.14em;text-transform:uppercase;color:var(--ink-soft);font-weight:600;border-bottom:1px solid var(--line-strong)">Festival</th>
+<th style="text-align:left;padding:10px 14px;font-family:var(--font-body);font-size:var(--text-micro);letter-spacing:.14em;text-transform:uppercase;color:var(--ink-soft);font-weight:600;border-bottom:1px solid var(--line-strong)">Month</th>
+<th style="text-align:left;padding:10px 14px;font-family:var(--font-body);font-size:var(--text-micro);letter-spacing:.14em;text-transform:uppercase;color:var(--ink-soft);font-weight:600;border-bottom:1px solid var(--line-strong)">Day</th>
+<th style="text-align:left;padding:10px 14px;font-family:var(--font-body);font-size:var(--text-micro);letter-spacing:.14em;text-transform:uppercase;color:var(--ink-soft);font-weight:600;border-bottom:1px solid var(--line-strong)">Source</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="padding:11px 14px;border-bottom:1px solid var(--line)"><span aria-hidden="true" class="t-glyph" style="color:var(--ink)">●</span><span style="position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)">attested</span></td>
+<td style="padding:11px 14px;border-bottom:1px solid var(--line);color:var(--ink)">Noumenia</td>
+<td style="padding:11px 14px;border-bottom:1px solid var(--line)" lang="grc"><span style="font-family:var(--font-display);font-size:1.05em;color:var(--ink)">ἑκάστου μηνός</span></td>
+<td class="t-tabular" style="padding:11px 14px;border-bottom:1px solid var(--line);font-family:var(--font-mono);color:var(--ink)">01</td>
+<td class="t-tabular" style="padding:11px 14px;border-bottom:1px solid var(--line);font-family:var(--font-mono);font-size:var(--text-micro);color:var(--ink-soft)">Plut. <i>Mor.</i> 828a</td>
+</tr>
+<tr>
+<td style="padding:11px 14px;border-bottom:1px solid var(--line)"><span aria-hidden="true" class="t-glyph" style="color:var(--ink)">●</span></td>
+<td style="padding:11px 14px;border-bottom:1px solid var(--line);color:var(--ink)">Deipnon of Hekate</td>
+<td style="padding:11px 14px;border-bottom:1px solid var(--line)" lang="grc"><span style="font-family:var(--font-display);font-size:1.05em;color:var(--ink)">ἑκάστου μηνός</span></td>
+<td class="t-tabular" style="padding:11px 14px;border-bottom:1px solid var(--line);font-family:var(--font-mono);color:var(--ink)">30 · ἕνη καὶ νέα</td>
+<td class="t-tabular" style="padding:11px 14px;border-bottom:1px solid var(--line);font-family:var(--font-mono);font-size:var(--text-micro);color:var(--ink-soft)">Ar. <i>Plut.</i> 594</td>
+</tr>
+<tr>
+<td style="padding:11px 14px;border-bottom:1px solid var(--line)"><span aria-hidden="true" class="t-glyph" style="color:var(--ink-soft)">◐</span></td>
+<td style="padding:11px 14px;border-bottom:1px solid var(--line);color:var(--ink)">Metageitnia</td>
+<td style="padding:11px 14px;border-bottom:1px solid var(--line)" lang="grc"><span style="font-family:var(--font-display);font-size:1.05em;color:var(--ink)">Μεταγειτνιών</span></td>
+<td class="t-tabular" style="padding:11px 14px;border-bottom:1px solid var(--line);font-family:var(--font-mono);color:var(--ink-soft)">c. 07–12</td>
+<td class="t-tabular" style="padding:11px 14px;border-bottom:1px solid var(--line);font-family:var(--font-mono);font-size:var(--text-micro);color:var(--ink-soft)">inferred · cycle</td>
+</tr>
+<tr>
+<td style="padding:11px 14px;border-bottom:1px solid var(--line)"><span aria-hidden="true" class="t-glyph" style="color:var(--rose-hover)">○</span></td>
+<td style="padding:11px 14px;border-bottom:1px solid var(--line);color:var(--ink)">Greater Mysteries, opening</td>
+<td style="padding:11px 14px;border-bottom:1px solid var(--line)" lang="grc"><span style="font-family:var(--font-display);font-size:1.05em;color:var(--ink)">Βοηδρομιών</span></td>
+<td class="t-tabular" style="padding:11px 14px;border-bottom:1px solid var(--line);font-family:var(--font-mono);color:var(--rose-hover)">14 or 15</td>
+<td class="t-tabular" style="padding:11px 14px;border-bottom:1px solid var(--line);font-family:var(--font-mono);font-size:var(--text-micro);color:var(--ink-soft)">two authorities</td>
+</tr>
+<tr>
+<td style="padding:11px 14px"><span aria-hidden="true" class="t-tabular" style="font-family:var(--font-mono);color:var(--ink-soft)">—</span></td>
+<td style="padding:11px 14px;color:var(--ink-soft)">Skira</td>
+<td style="padding:11px 14px" lang="grc"><span style="font-family:var(--font-display);font-size:1.05em;color:var(--ink-soft)">Σκιροφοριών</span></td>
+<td class="t-tabular" style="padding:11px 14px;font-family:var(--font-mono);color:var(--ink-soft)">not dated by us</td>
+<td class="t-tabular" style="padding:11px 14px;font-family:var(--font-mono);font-size:var(--text-micro);color:var(--ink-soft)">see note 3</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p style="margin:14px 0 0;font-size:var(--text-xs);line-height:1.65;color:var(--ink-soft);max-width:60ch">Five of the fifty-one entries carry no day. Where the corpus will not date something the instrument shows the month and stops; it does not offer a likeliest guess, and the calendar page marks the day as unassigned rather than empty.</p>
+<x-import component-from-global-scope="ShrutiDesignSystem_cb687f.Prose" hint-size="100%,300px">
+<h2 id="what-the-instrument-does-with-a-grade">What the instrument does with a grade</h2>
+<p>The festival column on the calendar page shows the same three glyphs, in the same order of certainty, with the same legend. A reader who learns them here can read them there — and a disputed date renders as both candidates, not as the one I find more convincing.</p>
+</x-import>
+<aside style="margin:32px 0 0;padding:18px 20px;background:var(--surface-card);border:1px solid var(--line);border-radius:10px;display:grid;gap:8px" style-hover="border-color:var(--line-strong);box-shadow:var(--shadow-2)">
+<span class="t-eyebrow">See it in the festival column</span>
+<span style="font-family:var(--font-display);font-size:var(--text-h3);font-weight:600;color:var(--ink)">Attic calendar</span>
+<span style="font-size:var(--text-sm);line-height:1.55;color:var(--ink-soft);max-width:52ch">Today in the Attic month, with the grades carried through from this corpus.</span>
+<a href="https://shrutivtuber.com/tools/attic-calendar" style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--accent);text-decoration:none;justify-self:start" style-hover="text-decoration:underline">shrutivtuber.com/tools/attic-calendar →</a>
+</aside>
+<div style="margin-top:36px;padding-top:20px;border-top:1px solid var(--line);display:grid;gap:12px">
+<span class="t-eyebrow">Notes</span>
+<div style="display:flex;gap:12px;align-items:baseline"><span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--rose-hover);min-width:14px">3</span><span style="font-family:var(--font-display);font-size:var(--text-body);line-height:1.65;color:var(--ink-soft)">The Skira are securely attested and insecurely dated. Rather than pick a day I have left the entry monthly, which the calendar renders as an unassigned festival at the head of Σκιροφοριών.</span></div>
+</div>
+</article>
+<aside style="flex:0 1 200px;min-width:0;position:sticky;top:24px;align-self:flex-start;padding-left:20px;border-left:1px solid var(--line);display:grid;gap:14px">
+<div style="display:grid;gap:9px">
+<span class="t-eyebrow">On this page</span>
+<a href="#how-days-are-graded" style="font-size:var(--text-micro);line-height:1.45;color:var(--ink);text-decoration:none;font-weight:600;border-left:2px solid var(--rose);margin-left:-22px;padding-left:20px">How days are graded</a>
+<a href="#what-the-instrument-does-with-a-grade" style="font-size:var(--text-micro);line-height:1.45;color:var(--ink-soft);text-decoration:none" style-hover="color:var(--accent-hover)">What the instrument does with a grade</a>
+</div>
+<div style="display:grid;gap:6px;padding-top:12px;border-top:1px solid var(--line)">
+<span class="t-eyebrow">Corpus</span>
+<div style="display:flex;align-items:baseline;gap:8px"><span style="font-size:var(--text-micro);color:var(--ink-soft)">entries</span><span style="flex:1;border-bottom:1px dotted var(--line-strong);transform:translateY(-3px)"></span><span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-micro);color:var(--ink)">51</span></div>
+<div style="display:flex;align-items:baseline;gap:8px"><span style="font-size:var(--text-micro);color:var(--ink-soft)">attested</span><span style="flex:1;border-bottom:1px dotted var(--line-strong);transform:translateY(-3px)"></span><span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-micro);color:var(--ink)">33</span></div>
+<div style="display:flex;align-items:baseline;gap:8px"><span style="font-size:var(--text-micro);color:var(--ink-soft)">reconstructed</span><span style="flex:1;border-bottom:1px dotted var(--line-strong);transform:translateY(-3px)"></span><span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-micro);color:var(--ink)">9</span></div>
+<div style="display:flex;align-items:baseline;gap:8px"><span style="font-size:var(--text-micro);color:var(--ink-soft)">disputed</span><span style="flex:1;border-bottom:1px dotted var(--line-strong);transform:translateY(-3px)"></span><span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-micro);color:var(--rose-hover)">4</span></div>
+<div style="display:flex;align-items:baseline;gap:8px"><span style="font-size:var(--text-micro);color:var(--ink-soft)">undated</span><span style="flex:1;border-bottom:1px dotted var(--line-strong);transform:translateY(-3px)"></span><span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-micro);color:var(--ink)">5</span></div>
+</div>
+</aside>
+</div>
+</div>
+<div style="display:var(--j-chrome,flex);align-items:center;gap:12px;flex-wrap:wrap;padding:11px clamp(16px,4vw,40px);border-top:1px dashed var(--line-strong);background:var(--surface-veil)">
+<span class="t-eyebrow">SiteFooter · real component · legal imprint</span>
+</div>
+</div>
+</section>
+
+<section id="changelog-list" data-screen-label="Changelog list" style="max-width:var(--j-frame,1440px);margin:0 auto;padding:56px 24px 0;font-family:var(--font-body)">
+<div style="display:flex;align-items:baseline;gap:10px 18px;flex-wrap:wrap;margin-bottom:12px">
+<span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-sm);color:var(--ink)">/journal/changelog/</span>
+<span class="t-eyebrow">Changelog · many terse entries ⇒ hairline rows, not cards</span>
+<span class="t-eyebrow" style="margin-left:auto;color:var(--rose-hover)">11</span>
+</div>
+<div style="background:var(--surface-page);border:1px solid var(--line);border-radius:16px;overflow:hidden;box-shadow:var(--shadow-1)">
+<div style="display:var(--j-chrome,flex);align-items:center;gap:12px;flex-wrap:wrap;padding:11px clamp(16px,4vw,40px);border-bottom:1px dashed var(--line-strong);background:var(--surface-veil)">
+<span class="t-eyebrow">SiteHeader · real component · out of scope</span>
+</div>
+<div style="max-width:1120px;margin:0 auto;padding:64px clamp(16px,4vw,40px) 80px">
+<div style="display:flex;align-items:flex-end;gap:16px 40px;flex-wrap:wrap;padding-bottom:20px;border-bottom:1px solid var(--line)">
+<div style="flex:1 1 420px;min-width:0;display:grid;gap:10px">
+<span class="t-eyebrow" style="color:var(--rose-hover)">♃&#xFE0E; Changelog</span>
+<h1 style="margin:0;font-family:var(--font-display);font-size:clamp(2rem,3.6vw,2.5rem);line-height:1.12;font-weight:500;letter-spacing:-.015em;color:var(--ink)">What shipped</h1>
+<p style="margin:0;font-family:var(--font-display);font-size:var(--text-prose);line-height:1.6;color:var(--ink-soft);max-width:56ch;text-wrap:pretty">Pulled from the repositories at release, unedited. Terse on purpose — the writing about a change lives in the journal, not here.</p>
+</div>
+<div style="display:flex;gap:8px;flex-wrap:wrap">
+<a href="#" aria-current="page" style="font-family:var(--font-mono);font-size:var(--text-xs);font-weight:600;color:var(--accent);background:var(--accent-wash);border:1px solid color-mix(in srgb,var(--accent) 50%,transparent);border-radius:999px;padding:7px 13px;text-decoration:none;line-height:1">theourgia-ephemeris</a>
+<a href="#" style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--ink-soft);background:var(--surface-veil);border:1px solid transparent;border-radius:999px;padding:7px 13px;text-decoration:none;line-height:1" style-hover="color:var(--accent-hover);border-color:color-mix(in srgb,var(--accent) 40%,transparent)">theourgia-attic</a>
+<a href="#" style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--ink-soft);background:var(--surface-veil);border:1px solid transparent;border-radius:999px;padding:7px 13px;text-decoration:none;line-height:1" style-hover="color:var(--accent-hover);border-color:color-mix(in srgb,var(--accent) 40%,transparent)">theourgia-cms</a>
+</div>
+</div>
+<div style="margin-top:8px">
+<a href="#" style="display:flex;gap:12px 28px;flex-wrap:wrap;align-items:baseline;padding:20px 0;border-bottom:1px solid var(--line);text-decoration:none" style-hover="background:var(--surface-veil)">
+<span class="t-tabular" style="flex:0 0 108px;font-family:var(--font-mono);font-size:var(--text-h4);font-weight:500;color:var(--ink)">0.9.4</span>
+<span style="flex:1 1 300px;min-width:0;display:grid;gap:6px">
+<span style="font-family:var(--font-display);font-size:var(--text-body);line-height:1.5;color:var(--ink)">Speed flags are now required; the ephemeris raises rather than returning a zero it never computed.</span>
+<span style="display:flex;gap:8px 14px;flex-wrap:wrap;font-family:var(--font-mono);font-size:var(--text-micro);color:var(--ink-soft)"><span>added 2</span><span>changed 3</span><span>fixed 4</span><span style="color:var(--rose-hover)">security 1</span></span>
+</span>
+<span class="t-tabular" style="flex:0 0 84px;text-align:right;font-family:var(--font-mono);font-size:var(--text-xs);color:var(--ink-soft)">24.08.2026</span>
+</a>
+<a href="#" style="display:flex;gap:12px 28px;flex-wrap:wrap;align-items:baseline;padding:20px 0;border-bottom:1px solid var(--line);text-decoration:none" style-hover="background:var(--surface-veil)">
+<span class="t-tabular" style="flex:0 0 108px;font-family:var(--font-mono);font-size:var(--text-h4);font-weight:500;color:var(--ink)">0.9.3</span>
+<span style="flex:1 1 300px;min-width:0;display:grid;gap:6px">
+<span style="font-family:var(--font-display);font-size:var(--text-body);line-height:1.5;color:var(--ink)">Six ayanāṁśas selectable per request; Lahiri remains the default and is now named in every response.</span>
+<span style="display:flex;gap:8px 14px;flex-wrap:wrap;font-family:var(--font-mono);font-size:var(--text-micro);color:var(--ink-soft)"><span>added 4</span><span>changed 1</span><span>fixed 2</span></span>
+</span>
+<span class="t-tabular" style="flex:0 0 84px;text-align:right;font-family:var(--font-mono);font-size:var(--text-xs);color:var(--ink-soft)">17.08.2026</span>
+</a>
+<a href="#" style="display:flex;gap:12px 28px;flex-wrap:wrap;align-items:baseline;padding:20px 0;border-bottom:1px solid var(--line);text-decoration:none" style-hover="background:var(--surface-veil)">
+<span class="t-tabular" style="flex:0 0 108px;font-family:var(--font-mono);font-size:var(--text-h4);font-weight:500;color:var(--ink)">0.9.2</span>
+<span style="flex:1 1 300px;min-width:0;display:grid;gap:6px">
+<span style="font-family:var(--font-display);font-size:var(--text-body);line-height:1.5;color:var(--ink)">Refusals carry alternatives. <code style="font-family:var(--font-mono);font-size:.85em;background:var(--surface-veil);border:1px solid var(--line);border-radius:4px;padding:1px 5px">no_sunrise</code> now suggests civil twilight and solar midnight.</span>
+<span style="display:flex;gap:8px 14px;flex-wrap:wrap;font-family:var(--font-mono);font-size:var(--text-micro);color:var(--ink-soft)"><span>added 1</span><span>changed 2</span><span>deprecated 1</span></span>
+</span>
+<span class="t-tabular" style="flex:0 0 84px;text-align:right;font-family:var(--font-mono);font-size:var(--text-xs);color:var(--ink-soft)">09.08.2026</span>
+</a>
+<a href="#" style="display:flex;gap:12px 28px;flex-wrap:wrap;align-items:baseline;padding:20px 0;border-bottom:1px solid var(--line);text-decoration:none" style-hover="background:var(--surface-veil)">
+<span class="t-tabular" style="flex:0 0 108px;font-family:var(--font-mono);font-size:var(--text-h4);font-weight:500;color:var(--ink)">0.9.1</span>
+<span style="flex:1 1 300px;min-width:0;display:grid;gap:6px">
+<span style="font-family:var(--font-display);font-size:var(--text-body);line-height:1.5;color:var(--ink)">Whole-sign houses; unknown birth time returns positions with null houses instead of a validation error.</span>
+<span style="display:flex;gap:8px 14px;flex-wrap:wrap;font-family:var(--font-mono);font-size:var(--text-micro);color:var(--ink-soft)"><span>added 3</span><span>fixed 1</span><span>removed 1</span></span>
+</span>
+<span class="t-tabular" style="flex:0 0 84px;text-align:right;font-family:var(--font-mono);font-size:var(--text-xs);color:var(--ink-soft)">02.08.2026</span>
+</a>
+</div>
+<div style="margin-top:28px;display:flex;align-items:baseline;gap:12px 20px;flex-wrap:wrap">
+<span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-micro);color:var(--ink-soft)">4 of 31 releases · synced from the repository at tag time</span>
+<a href="https://github.com/theourgia/ephemeris/releases" style="margin-left:auto;font-family:var(--font-mono);font-size:var(--text-xs);color:var(--accent);text-decoration:none" style-hover="text-decoration:underline">every release on GitHub →</a>
+</div>
+</div>
+<div style="display:var(--j-chrome,flex);align-items:center;gap:12px;flex-wrap:wrap;padding:11px clamp(16px,4vw,40px);border-top:1px dashed var(--line-strong);background:var(--surface-veil)">
+<span class="t-eyebrow">SiteFooter · real component · legal imprint</span>
+</div>
+</div>
+</section>
+<section id="changelog-entry" data-screen-label="Changelog entry" style="max-width:var(--j-frame,1440px);margin:0 auto;padding:56px 24px 0;font-family:var(--font-body)">
+<div style="display:flex;align-items:baseline;gap:10px 18px;flex-wrap:wrap;margin-bottom:12px">
+<span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-sm);color:var(--ink)">/journal/changelog/&lt;version&gt;/</span>
+<span class="t-eyebrow">Changelog entry · six groups, label column at a fixed 132px</span>
+<span class="t-eyebrow" style="margin-left:auto;color:var(--rose-hover)">12</span>
+</div>
+<div style="background:var(--surface-page);border:1px solid var(--line);border-radius:16px;overflow:hidden;box-shadow:var(--shadow-1)">
+<div style="display:var(--j-chrome,flex);align-items:center;gap:12px;flex-wrap:wrap;padding:11px clamp(16px,4vw,40px);border-bottom:1px dashed var(--line-strong);background:var(--surface-veil)">
+<span class="t-eyebrow">SiteHeader · real component · out of scope</span>
+</div>
+<div style="max-width:1120px;margin:0 auto;padding:56px clamp(16px,4vw,40px) 80px">
+<div style="display:flex;gap:56px;align-items:flex-start;flex-wrap:wrap">
+<article style="flex:1 1 460px;min-width:0;max-width:68ch">
+<nav aria-label="Breadcrumb" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:var(--text-xs);margin-bottom:20px">
+<a href="#" style="color:var(--ink-soft);text-decoration:none" style-hover="color:var(--accent-hover);text-decoration:underline">Journal</a>
+<span aria-hidden="true" style="color:var(--ink-soft)">›</span>
+<a href="#" style="color:var(--ink-soft);text-decoration:none" style-hover="color:var(--accent-hover);text-decoration:underline">Changelog</a>
+<span aria-hidden="true" style="color:var(--ink-soft)">›</span>
+<span aria-current="page" class="t-tabular" style="color:var(--ink-soft);font-weight:500;font-family:var(--font-mono)">0.9.4</span>
+</nav>
+<div style="display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;margin-bottom:10px">
+<h1 class="t-tabular" style="margin:0;font-family:var(--font-mono);font-size:clamp(2rem,3.6vw,2.5rem);line-height:1.1;font-weight:500;letter-spacing:-.01em;color:var(--ink)">0.9.4</h1>
+<span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-sm);color:var(--ink-soft)">theourgia-ephemeris</span>
+</div>
+<div style="display:flex;align-items:center;gap:10px 16px;flex-wrap:wrap;padding-bottom:14px;border-bottom:1px solid var(--line);margin-bottom:32px">
+<span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--ink-soft)">released 2026-08-24</span>
+<span aria-hidden="true" style="color:var(--ink-soft)">·</span>
+<span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--ink-soft)">tag v0.9.4 · 4f1c9ae</span>
+<a href="https://github.com/theourgia/ephemeris/releases/tag/v0.9.4" style="margin-left:auto;font-family:var(--font-mono);font-size:var(--text-micro);color:var(--accent);text-decoration:none" style-hover="text-decoration:underline">on GitHub →</a>
+</div>
+<p style="margin:0 0 36px;font-family:var(--font-display);font-size:var(--text-prose);line-height:1.6;color:var(--ink-soft);max-width:56ch;text-wrap:pretty">Speed is no longer optional inside the service. A field that was not computed cannot reach a comparison — the retrograde bug is fixed at the layer that allowed it, not at the call site.</p>
+<div style="display:grid;gap:0">
+<div style="display:flex;gap:16px 24px;flex-wrap:wrap;padding:16px 0;border-top:1px solid var(--line)">
+<span class="t-eyebrow" style="flex:0 0 132px;padding-top:3px">Added</span>
+<ul style="flex:1 1 300px;min-width:0;margin:0;padding-left:1.1em;display:grid;gap:7px">
+<li style="font-size:var(--text-sm);line-height:1.6;color:var(--ink)"><code style="font-family:var(--font-mono);font-size:.9em;background:var(--surface-veil);border:1px solid var(--line);border-radius:4px;padding:1px 5px">Unreckonable</code> exception carrying condition, rule and alternatives</li>
+<li style="font-size:var(--text-sm);line-height:1.6;color:var(--ink)">Regression test: Mercury station retrograde, 2026-08-09</li>
+</ul>
+</div>
+<div style="display:flex;gap:16px 24px;flex-wrap:wrap;padding:16px 0;border-top:1px solid var(--line)">
+<span class="t-eyebrow" style="flex:0 0 132px;padding-top:3px">Changed</span>
+<ul style="flex:1 1 300px;min-width:0;margin:0;padding-left:1.1em;display:grid;gap:7px">
+<li style="font-size:var(--text-sm);line-height:1.6;color:var(--ink)"><code style="font-family:var(--font-mono);font-size:.9em;background:var(--surface-veil);border:1px solid var(--line);border-radius:4px;padding:1px 5px">FLG_SPEED</code> set on every planetary call</li>
+<li style="font-size:var(--text-sm);line-height:1.6;color:var(--ink)">Provenance block names the flag set in force</li>
+<li style="font-size:var(--text-sm);line-height:1.6;color:var(--ink)">Chart response marks retrograde bodies with ℞</li>
+</ul>
+</div>
+<div style="display:flex;gap:16px 24px;flex-wrap:wrap;padding:16px 0;border-top:1px solid var(--line)">
+<span class="t-eyebrow" style="flex:0 0 132px;padding-top:3px">Fixed</span>
+<ul style="flex:1 1 300px;min-width:0;margin:0;padding-left:1.1em;display:grid;gap:7px">
+<li style="font-size:var(--text-sm);line-height:1.6;color:var(--ink)">Retrograde never reported; speed slot read as 0.0 when unrequested</li>
+<li style="font-size:var(--text-sm);line-height:1.6;color:var(--ink)">Daily motion formatted as <code style="font-family:var(--font-mono);font-size:.9em;background:var(--surface-veil);border:1px solid var(--line);border-radius:4px;padding:1px 5px">0.00°/day</code> instead of absent</li>
+<li style="font-size:var(--text-sm);line-height:1.6;color:var(--ink)">Ayanāṁśa name dropped from cached responses</li>
+<li style="font-size:var(--text-sm);line-height:1.6;color:var(--ink)">Sidereal ascendant off by one sign at 29°+ boundaries</li>
+</ul>
+</div>
+<div style="display:flex;gap:16px 24px;flex-wrap:wrap;padding:16px 0;border-top:1px solid var(--line)">
+<span class="t-eyebrow" style="flex:0 0 132px;padding-top:3px">Deprecated</span>
+<ul style="flex:1 1 300px;min-width:0;margin:0;padding-left:1.1em;display:grid;gap:7px">
+<li style="font-size:var(--text-sm);line-height:1.6;color:var(--ink)"><code style="font-family:var(--font-mono);font-size:.9em;background:var(--surface-veil);border:1px solid var(--line);border-radius:4px;padding:1px 5px">?fast=1</code> — removal in 0.11</li>
+</ul>
+</div>
+<div style="display:flex;gap:16px 24px;flex-wrap:wrap;padding:16px 0;border-top:1px solid var(--line)">
+<span class="t-eyebrow" style="flex:0 0 132px;padding-top:3px">Removed</span>
+<ul style="flex:1 1 300px;min-width:0;margin:0;padding-left:1.1em;display:grid;gap:7px">
+<li style="font-size:var(--text-sm);line-height:1.6;color:var(--ink)">Undocumented <code style="font-family:var(--font-mono);font-size:.9em;background:var(--surface-veil);border:1px solid var(--line);border-radius:4px;padding:1px 5px">/chart/quick</code> endpoint</li>
+</ul>
+</div>
+<div style="display:flex;gap:16px 24px;flex-wrap:wrap;padding:16px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)">
+<span class="t-eyebrow" style="flex:0 0 132px;padding-top:3px;color:var(--rose-hover)">Security</span>
+<ul style="flex:1 1 300px;min-width:0;margin:0;padding-left:1.1em;display:grid;gap:7px">
+<li style="font-size:var(--text-sm);line-height:1.6;color:var(--ink)">Coordinates no longer written to the request log</li>
+</ul>
+</div>
+</div>
+<div style="margin-top:36px;padding-top:20px;border-top:1px solid var(--line);display:grid;grid-template-columns:repeat(auto-fit,minmax(min(240px,100%),1fr));gap:16px">
+<a href="#" style="display:grid;gap:5px;padding:14px 16px;border:1px solid var(--line);border-radius:10px;text-decoration:none;background:var(--surface-card)" style-hover="border-color:var(--line-strong)">
+<span class="t-eyebrow">Previous release</span>
+<span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-body);font-weight:500;color:var(--ink)">0.9.3</span>
+</a>
+<a href="#" style="display:grid;gap:5px;padding:14px 16px;border:1px solid var(--line);border-radius:10px;text-decoration:none;background:var(--surface-card);text-align:right" style-hover="border-color:var(--line-strong)">
+<span class="t-eyebrow">The writing behind this one</span>
+<span style="font-family:var(--font-display);font-size:var(--text-body);font-weight:600;color:var(--ink)">Nothing was ever retrograde</span>
+</a>
+</div>
+</article>
+<aside style="flex:0 1 208px;min-width:0;align-self:flex-start;padding-left:20px;border-left:1px solid var(--line);display:grid;gap:14px">
+<div style="display:grid;gap:6px">
+<span class="t-eyebrow">Upgrade note</span>
+<span style="font-size:var(--text-micro);line-height:1.6;color:var(--ink-soft)">Callers that read <span class="t-tabular" style="font-family:var(--font-mono)">speed</span> without asking for it will now receive a refusal instead of a zero. That is the point.</span>
+</div>
+<div style="display:grid;gap:6px;padding-top:12px;border-top:1px solid var(--line)">
+<span class="t-eyebrow">Runs on</span>
+<span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-micro);line-height:1.6;color:var(--ink-soft)">Swiss Ephemeris 2.10.03<br>AGPL-3.0</span>
+</div>
+</aside>
+</div>
+</div>
+<div style="display:var(--j-chrome,flex);align-items:center;gap:12px;flex-wrap:wrap;padding:11px clamp(16px,4vw,40px);border-top:1px dashed var(--line-strong);background:var(--surface-veil)">
+<span class="t-eyebrow">SiteFooter · real component · legal imprint</span>
+</div>
+</div>
+</section>
+
+<section id="sitemap" data-screen-label="Sitemap and not found" style="max-width:var(--j-frame,1440px);margin:0 auto;padding:56px 24px 0;font-family:var(--font-body)">
+<div style="display:flex;align-items:baseline;gap:10px 18px;flex-wrap:wrap;margin-bottom:12px">
+<span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-sm);color:var(--ink)">/journal/sitemap/ · /journal/404</span>
+<span class="t-eyebrow">Sitemap and the section's not-found page</span>
+<span class="t-eyebrow" style="margin-left:auto;color:var(--rose-hover)">13</span>
+</div>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(420px,100%),1fr));gap:24px">
+<div style="background:var(--surface-page);border:1px solid var(--line);border-radius:16px;overflow:hidden;box-shadow:var(--shadow-1)">
+<div style="display:var(--j-chrome,flex);align-items:center;gap:12px;flex-wrap:wrap;padding:11px 28px;border-bottom:1px dashed var(--line-strong);background:var(--surface-veil)">
+<span class="t-eyebrow">SiteHeader</span>
+</div>
+<div style="padding:48px 32px 56px">
+<div style="display:grid;gap:10px;padding-bottom:18px;border-bottom:1px solid var(--line)">
+<span class="t-eyebrow" style="color:var(--rose-hover)">Journal</span>
+<h1 style="margin:0;font-family:var(--font-display);font-size:var(--text-h2);font-weight:500;letter-spacing:-.015em;color:var(--ink)">Sitemap</h1>
+<p style="margin:0;font-size:var(--text-sm);line-height:1.6;color:var(--ink-soft);max-width:52ch">Every page in the section, as the engine knows it. The machine-readable one is at <span class="t-tabular" style="font-family:var(--font-mono);font-size:.95em">/journal/sitemap.xml</span>.</p>
+</div>
+<div style="margin-top:24px;display:grid;gap:22px">
+<div style="display:grid;gap:9px">
+<span class="t-eyebrow">☾&#xFE0E; Writing · 21</span>
+<a href="#" style="display:flex;align-items:baseline;gap:8px;text-decoration:none"><span style="font-size:var(--text-sm);color:var(--accent)">The month that would not open</span><span style="flex:1;border-bottom:1px dotted var(--line-strong);transform:translateY(-3px);min-width:10px"></span><span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-micro);color:var(--ink-soft)">25.08</span></a>
+<a href="#" style="display:flex;align-items:baseline;gap:8px;text-decoration:none"><span style="font-size:var(--text-sm);color:var(--accent)">Nothing was ever retrograde</span><span style="flex:1;border-bottom:1px dotted var(--line-strong);transform:translateY(-3px);min-width:10px"></span><span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-micro);color:var(--ink-soft)">25.08</span></a>
+<a href="#" style="display:flex;align-items:baseline;gap:8px;text-decoration:none"><span style="font-size:var(--text-sm);color:var(--accent)">Offerings, and what a ledger is for</span><span style="flex:1;border-bottom:1px dotted var(--line-strong);transform:translateY(-3px);min-width:10px"></span><span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-micro);color:var(--ink-soft)">18.08</span></a>
+<a href="#" style="font-family:var(--font-mono);font-size:var(--text-micro);color:var(--ink-soft);text-decoration:none" style-hover="color:var(--accent-hover)">+ 18 more →</a>
+</div>
+<div style="display:grid;gap:9px">
+<span class="t-eyebrow">♄&#xFE0E; Documentation · 14</span>
+<a href="#" style="display:flex;align-items:baseline;gap:8px;text-decoration:none"><span style="font-size:var(--text-sm);color:var(--accent)">Casting a chart</span><span style="flex:1;border-bottom:1px dotted var(--line-strong);transform:translateY(-3px);min-width:10px"></span><span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-micro);color:var(--ink-soft)">25.08</span></a>
+<a href="#" style="display:flex;align-items:baseline;gap:8px;text-decoration:none"><span style="font-size:var(--text-sm);color:var(--accent)">The four reckonings</span><span style="flex:1;border-bottom:1px dotted var(--line-strong);transform:translateY(-3px);min-width:10px"></span><span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-micro);color:var(--ink-soft)">25.08</span></a>
+<a href="#" style="font-family:var(--font-mono);font-size:var(--text-micro);color:var(--ink-soft);text-decoration:none" style-hover="color:var(--accent-hover)">+ 12 more →</a>
+</div>
+<div style="display:grid;gap:9px">
+<span class="t-eyebrow">☿&#xFE0E; Wiki · 9 &nbsp;·&nbsp; ♃&#xFE0E; Changelog · 4</span>
+<a href="#" style="display:flex;align-items:baseline;gap:8px;text-decoration:none"><span style="font-size:var(--text-sm);color:var(--accent)">The Attic festival corpus</span><span style="flex:1;border-bottom:1px dotted var(--line-strong);transform:translateY(-3px);min-width:10px"></span><span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-micro);color:var(--ink-soft)">24.08</span></a>
+<a href="#" style="display:flex;align-items:baseline;gap:8px;text-decoration:none"><span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-sm);color:var(--accent)">theourgia-ephemeris 0.9.4</span><span style="flex:1;border-bottom:1px dotted var(--line-strong);transform:translateY(-3px);min-width:10px"></span><span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-micro);color:var(--ink-soft)">24.08</span></a>
+</div>
+</div>
+</div>
+<div style="display:var(--j-chrome,flex);align-items:center;gap:12px;padding:11px 28px;border-top:1px dashed var(--line-strong);background:var(--surface-veil)">
+<span class="t-eyebrow">SiteFooter</span>
+</div>
+</div>
+<div style="background:var(--surface-page);border:1px solid var(--line);border-radius:16px;overflow:hidden;box-shadow:var(--shadow-1);display:flex;flex-direction:column">
+<div style="display:var(--j-chrome,flex);align-items:center;gap:12px;flex-wrap:wrap;padding:11px 28px;border-bottom:1px dashed var(--line-strong);background:var(--surface-veil)">
+<span class="t-eyebrow">SiteHeader</span>
+</div>
+<div class="sky" style="position:relative;flex:1;display:flex;align-items:center;justify-content:center;padding:64px 32px;border-radius:0;min-height:420px">
+<div class="sky-stars"></div>
+<div class="sky-veil" style="position:relative;max-width:44ch;padding:32px 34px;display:grid;gap:14px;text-align:center;justify-items:center">
+<span aria-hidden="true" class="t-glyph" style="font-size:2rem;line-height:1;color:var(--rose-hover)">○</span>
+<span class="t-eyebrow">404 · inside the journal</span>
+<h1 style="margin:0;font-family:var(--font-display);font-size:var(--text-h2);font-weight:500;letter-spacing:-.015em;color:var(--ink);text-wrap:pretty">Nothing is filed here</h1>
+<p style="margin:0;font-family:var(--font-display);font-size:var(--text-body);line-height:1.65;color:var(--ink-soft)">The address is well formed and the entry is not. It may have been renamed, or it may never have existed — I would rather say so than show you a search page dressed as an answer.</p>
+<div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:4px">
+<a href="#" style="display:inline-flex;align-items:center;min-height:44px;padding:0 18px;font-size:var(--text-sm);font-weight:600;color:var(--on-accent);background:var(--accent);border:1px solid var(--accent);border-radius:4px;text-decoration:none" style-hover="background:var(--accent-hover);border-color:var(--accent-hover)">All content</a>
+<a href="#" style="display:inline-flex;align-items:center;min-height:44px;padding:0 18px;font-size:var(--text-sm);font-weight:500;color:var(--accent);border:1px solid var(--line-strong);border-radius:4px;text-decoration:none;background:transparent" style-hover="border-color:var(--accent)">Sitemap</a>
+</div>
+</div>
+<div class="sky-horizon"></div>
+</div>
+<div style="display:var(--j-chrome,flex);align-items:center;gap:12px;padding:11px 28px;border-top:1px dashed var(--line-strong);background:var(--surface-veil)">
+<span class="t-eyebrow">SiteFooter</span>
+</div>
+</div>
+</div>
+</section>
+<section id="empty-states" data-screen-label="Empty states" style="max-width:var(--j-frame,1440px);margin:0 auto;padding:56px 24px 0;font-family:var(--font-body)">
+<div style="display:flex;align-items:baseline;gap:10px 18px;flex-wrap:wrap;margin-bottom:12px">
+<span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-sm);color:var(--ink)">empty · single item</span>
+<span class="t-eyebrow">Authored states — never a bare grid, never fake liveness</span>
+<span class="t-eyebrow" style="margin-left:auto;color:var(--rose-hover)">14</span>
+</div>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(340px,100%),1fr));gap:24px">
+<div style="background:var(--surface-page);border:1px solid var(--line);border-radius:16px;padding:40px 32px;box-shadow:var(--shadow-1);display:grid;gap:22px;align-content:start">
+<span class="t-eyebrow" style="color:var(--rose-hover)">Hub · nothing published yet</span>
+<div style="display:grid;gap:10px;padding-bottom:18px;border-bottom:1px solid var(--line)">
+<h2 style="margin:0;font-family:var(--font-display);font-size:var(--text-h2);font-weight:500;letter-spacing:-.015em;color:var(--ink)">Notes, documentation, and what changed</h2>
+</div>
+<div class="sky" style="position:relative;border-radius:10px;border:1px solid var(--line);padding:44px 28px;display:grid;justify-items:center;text-align:center;gap:12px">
+<div class="sky-stars"></div>
+<span aria-hidden="true" class="t-glyph" style="position:relative;font-size:1.75rem;line-height:1;color:var(--ink-soft)">☾&#xFE0E;</span>
+<h3 style="position:relative;margin:0;font-family:var(--font-display);font-size:var(--text-h3);font-weight:600;color:var(--ink)">Nothing is written down yet</h3>
+<p style="position:relative;margin:0;font-size:var(--text-sm);line-height:1.6;color:var(--ink-soft);max-width:40ch">The instruments came first and the writing about them is still in a notebook. New entries are announced on Discord before they appear here.</p>
+<a href="https://shrutivtuber.com/tools" style="position:relative;font-family:var(--font-mono);font-size:var(--text-xs);color:var(--accent);text-decoration:none;margin-top:2px" style-hover="text-decoration:underline">the instruments, meanwhile →</a>
+<div class="sky-horizon"></div>
+</div>
+</div>
+<div style="background:var(--surface-page);border:1px solid var(--line);border-radius:16px;padding:40px 32px;box-shadow:var(--shadow-1);display:grid;gap:22px;align-content:start">
+<span class="t-eyebrow" style="color:var(--rose-hover)">Index · empty category</span>
+<div style="display:grid;gap:8px;padding-bottom:18px;border-bottom:1px solid var(--line)">
+<span class="t-eyebrow">Category</span>
+<h2 style="margin:0;font-family:var(--font-display);font-size:var(--text-h2);font-weight:500;letter-spacing:-.015em;color:var(--ink)">Divination</h2>
+<p style="margin:0;font-size:var(--text-sm);line-height:1.6;color:var(--ink-soft);max-width:48ch">Six systems are implemented; none of them has been written about yet.</p>
+</div>
+<div style="display:grid;justify-items:center;text-align:center;gap:10px;padding:36px 20px;border:1px dashed var(--line-strong);border-radius:10px;background:color-mix(in srgb,var(--surface-veil) 40%,transparent)">
+<span aria-hidden="true" class="t-glyph" style="font-size:1.75rem;line-height:1;color:var(--ink-soft)">○</span>
+<h3 style="margin:0;font-family:var(--font-display);font-size:var(--text-h3);font-weight:600;color:var(--ink)">This shelf is empty</h3>
+<p style="margin:0;font-size:var(--text-sm);line-height:1.6;color:var(--ink-soft);max-width:40ch">The category exists because the code does. When there is something honest to say about it, it will be here.</p>
+<a href="#" style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--accent);text-decoration:none" style-hover="text-decoration:underline">all writing →</a>
+</div>
+</div>
+<div style="background:var(--surface-page);border:1px solid var(--line);border-radius:16px;padding:40px 32px;box-shadow:var(--shadow-1);display:grid;gap:22px;align-content:start">
+<span class="t-eyebrow" style="color:var(--rose-hover)">Hub · a single item</span>
+<div style="display:grid;gap:10px;padding-bottom:18px;border-bottom:1px solid var(--line)">
+<h2 style="margin:0;font-family:var(--font-display);font-size:var(--text-h2);font-weight:500;letter-spacing:-.015em;color:var(--ink)">Notes, documentation, and what changed</h2>
+<p style="margin:0;font-size:var(--text-sm);line-height:1.6;color:var(--ink-soft);max-width:48ch">One entry, so it gets the whole width. No grid of one, and no “recently” heading over a single row.</p>
+</div>
+<a href="#" style="display:grid;background:var(--surface-card);border:1px solid var(--line);border-radius:10px;overflow:hidden;text-decoration:none;box-shadow:var(--shadow-1)" style-hover="border-color:var(--line-strong);box-shadow:var(--shadow-2)">
+<div class="sky" style="position:relative;aspect-ratio:21/9;border-radius:0"><div class="sky-stars"></div><span aria-hidden="true" class="t-glyph" style="position:absolute;top:14px;left:16px;font-size:1.75rem;line-height:1;color:var(--horizon-line)">☾&#xFE0E;</span><div class="sky-horizon"></div></div>
+<div style="padding:20px 22px;display:grid;gap:8px">
+<span class="t-eyebrow" style="color:var(--rose-hover)">Writing · the only entry</span>
+<span style="font-family:var(--font-display);font-size:var(--text-h3);font-weight:600;line-height:1.25;color:var(--ink)">Nothing was ever retrograde</span>
+<span style="font-size:var(--text-sm);line-height:1.55;color:var(--ink-soft)">A chart correct in every particular except one, and a zero that looked exactly like an answer.</span>
+<span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-micro);color:var(--ink-soft)">25.08.2026</span>
+</div>
+</a>
+</div>
+</div>
+</section>
+
+<section id="og" data-screen-label="OG image template" style="max-width:var(--j-frame,1440px);margin:0 auto;padding:56px 24px 96px;font-family:var(--font-body)">
+<div style="display:flex;align-items:baseline;gap:10px 18px;flex-wrap:wrap;margin-bottom:12px">
+<span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-sm);color:var(--ink)">og:image · 1200×630</span>
+<span class="t-eyebrow">Social card template · rendered from the entry, shown 1:1</span>
+<span class="t-eyebrow" style="margin-left:auto;color:var(--rose-hover)">15</span>
+</div>
+<div style="display:flex;gap:24px;flex-wrap:wrap">
+<div style="display:grid;gap:10px">
+<span class="t-eyebrow">A · no cover art (the default)</span>
+<div class="sky" style="position:relative;width:1200px;max-width:100%;aspect-ratio:1200/630;border:1px solid var(--line);border-radius:10px;display:grid;align-content:space-between;padding:56px 64px">
+<div class="sky-stars"></div>
+<div style="position:relative;display:flex;align-items:baseline;gap:16px">
+<span aria-hidden="true" class="t-glyph" style="font-size:44px;line-height:1;color:var(--rose-hover)">☾&#xFE0E;</span>
+<span style="font-family:var(--font-body);font-size:22px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-soft)">Writing</span>
+<span class="t-tabular" style="margin-left:auto;font-family:var(--font-mono);font-size:22px;color:var(--ink-soft)">25.08.2026</span>
+</div>
+<div class="sky-veil" style="position:relative;padding:36px 40px;display:grid;gap:18px;max-width:940px">
+<span style="font-family:var(--font-display);font-size:64px;line-height:1.1;font-weight:500;letter-spacing:-.015em;color:var(--ink);text-wrap:pretty">Nothing was ever retrograde</span>
+<span style="font-family:var(--font-display);font-size:28px;line-height:1.4;color:var(--ink-soft)">A chart correct in every particular except one.</span>
+</div>
+<div style="position:relative;display:flex;align-items:baseline;gap:16px">
+<span style="font-family:var(--font-display);font-size:28px;font-weight:500;color:var(--ink)">Shruti</span>
+<span class="t-tabular" style="font-family:var(--font-mono);font-size:20px;color:var(--ink-soft)">shrutivtuber.com/journal</span>
+<span class="seal seal-ring" style="margin-left:auto">S∴E.A.</span>
+</div>
+<div class="sky-horizon"></div>
+</div>
+</div>
+<div style="display:grid;gap:10px">
+<span class="t-eyebrow">B · cover art present</span>
+<div style="position:relative;width:1200px;max-width:100%;aspect-ratio:1200/630;border:1px solid var(--line);border-radius:10px;overflow:hidden;display:grid;grid-template-columns:1fr 440px">
+<div class="sky" style="position:relative;border-radius:0;display:grid;align-content:space-between;padding:56px 48px 56px 64px">
+<div class="sky-stars"></div>
+<div style="position:relative;display:flex;align-items:baseline;gap:16px">
+<span aria-hidden="true" class="t-glyph" style="font-size:40px;line-height:1;color:var(--rose-hover)">♄&#xFE0E;</span>
+<span style="font-family:var(--font-body);font-size:20px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-soft)">Documentation</span>
+</div>
+<div style="position:relative;display:grid;gap:16px">
+<span style="font-family:var(--font-display);font-size:56px;line-height:1.1;font-weight:500;letter-spacing:-.015em;color:var(--ink);text-wrap:pretty">Casting a chart</span>
+<span style="font-family:var(--font-display);font-size:26px;line-height:1.4;color:var(--ink-soft);max-width:26ch">Both zodiacs, unranked, and what the service will not answer.</span>
+</div>
+<div style="position:relative;display:flex;align-items:baseline;gap:16px">
+<span style="font-family:var(--font-display);font-size:26px;font-weight:500;color:var(--ink)">Shruti</span>
+<span class="t-tabular" style="font-family:var(--font-mono);font-size:19px;color:var(--ink-soft)">/journal/docs</span>
+</div>
+<div class="sky-horizon"></div>
+</div>
+<div style="position:relative;border-left:1px solid var(--horizon-line)">
+<image-slot id="journal-og-art" shape="rect" placeholder="Cover art, right 440px"></image-slot>
+</div>
+</div>
+</div>
+</div>
+<div style="margin-top:24px;max-width:760px;padding:20px 22px;background:var(--surface-veil);border:1px solid var(--line);border-top:1.5px solid var(--rose);border-radius:10px;display:grid;gap:8px">
+<span class="t-eyebrow">Rules for the renderer</span>
+<div style="display:flex;align-items:baseline;gap:8px"><span style="font-size:var(--text-sm);color:var(--ink-soft)">Canvas · safe area</span><span style="flex:1;border-bottom:1px dotted var(--line-strong);transform:translateY(-3px)"></span><span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-sm);color:var(--ink)">1200×630 · 56px top/bottom, 64px sides</span></div>
+<div style="display:flex;align-items:baseline;gap:8px"><span style="font-size:var(--text-sm);color:var(--ink-soft)">Title</span><span style="flex:1;border-bottom:1px dotted var(--line-strong);transform:translateY(-3px)"></span><span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-sm);color:var(--ink)">64px → 48px past 46 chars · max 3 lines</span></div>
+<div style="display:flex;align-items:baseline;gap:8px"><span style="font-size:var(--text-sm);color:var(--ink-soft)">Deck</span><span style="flex:1;border-bottom:1px dotted var(--line-strong);transform:translateY(-3px)"></span><span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-sm);color:var(--ink)">28px · 1 line · dropped if the title takes 3</span></div>
+<div style="display:flex;align-items:baseline;gap:8px"><span style="font-size:var(--text-sm);color:var(--ink-soft)">Theme</span><span style="flex:1;border-bottom:1px dotted var(--line-strong);transform:translateY(-3px)"></span><span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-sm);color:var(--ink)">Dawn always — cards are viewed on other people's surfaces</span></div>
+<div style="display:flex;align-items:baseline;gap:8px"><span style="font-size:var(--text-sm);color:var(--ink-soft)">Seal</span><span style="flex:1;border-bottom:1px dotted var(--line-strong);transform:translateY(-3px)"></span><span class="t-tabular" style="font-family:var(--font-mono);font-size:var(--text-sm);color:var(--ink)">Only on magickal writing · never on docs or changelog</span></div>
+<p style="margin:4px 0 0;font-family:var(--font-mono);font-size:var(--text-micro);line-height:1.7;color:var(--ink-soft)">Rendered at publish time and stored beside the entry — the same discipline as the sky block. Nothing is generated on request, and no third party sees who asked for the card.</p>
+</div>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;system&quot;,&quot;dawn&quot;,&quot;dusk&quot;],&quot;default&quot;:&quot;system&quot;,&quot;tsType&quot;:&quot;\&quot;system\&quot;|\&quot;dawn\&quot;|\&quot;dusk\&quot;&quot;,&quot;section&quot;:&quot;Review&quot;},&quot;tier&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;1440 · desktop&quot;,&quot;1024 · laptop&quot;,&quot;800 · tablet&quot;,&quot;375 · phone&quot;],&quot;default&quot;:&quot;1440 · desktop&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Review&quot;},&quot;chrome&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Review&quot;}}">
+class Component extends DCLogic {
+  apply() {
+    const el = document.documentElement;
+    const t = this.props.theme ?? 'system';
+    if (t === 'dawn') el.setAttribute('data-theme', 'light');
+    else if (t === 'dusk') el.setAttribute('data-theme', 'dark');
+    else el.removeAttribute('data-theme');
+    const tier = this.props.tier ?? '1440 · desktop';
+    el.style.setProperty('--j-frame', (tier.match(/\d+/) || ['1440'])[0] + 'px');
+    el.style.setProperty('--j-chrome', (this.props.chrome ?? true) ? 'flex' : 'none');
+  }
+  componentDidMount() { this.apply() }
+  componentDidUpdate() { this.apply() }
+  renderVals() { return {} }
+}
+
+</script>
+</body>
+</html>
