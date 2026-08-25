@@ -10,7 +10,6 @@ import SectionFigure from "../components/blocks/SectionFigure.astro";
 import SectionHeader from "../components/brand/SectionHeader.astro";
 import Button from "../components/forms/Button.astro";
 import Badge from "../components/navigation/Badge.astro";
-import EmptyState from "../components/feedback/EmptyState.astro";
 import CsrfField from "../components/forms/CsrfField.astro";
 import { pageSections } from "../lib/content";
 import { site, SITE_API } from "../lib/api";
@@ -234,12 +233,6 @@ const offerable = (key: string) => open && (key === "one-off" || priced.has(key)
       }
     </p>
 
-    <SectionHeader as="h2" title="Merch" />
-    <EmptyState
-      glyph="◐"
-      title="No merch yet"
-      body="Designs are commissioned before anything is printed — nothing exists that I wouldn't wear. Discord hears first when that changes."
-    />
   </div>
 
     {/* Anything else the admin has put on this page. Only `intro` used to

@@ -33,6 +33,8 @@ const STATUS_WORD: Record<string, string> = {
 
 const INSTRUMENTS: [string, string, string, string][] = [
   ["☉", "Planetary hours", "The day divided by its own light.", "/tools/planetary-hours"],
+  ["◉", "Solar stations", "Sunrise, culmination, sunset and nadir — the adoration hours.", "/tools/solar-stations"],
+  ["☾", "Lunar stations", "Moonrise, culmination, moonset and nadir, with the phase.", "/tools/lunar-stations"],
   ["☽", "Attic calendar", "The lunisolar month, kept current.", "/tools/attic-calendar"],
   ["◐", "Pañcāṅga", "The five limbs of the day.", "/tools/pancanga"],
   ["☾", "Hindu calendar", "The lunisolar year and its festivals.", "/tools/hindu-calendar"],
@@ -148,6 +150,17 @@ const INSTRUMENTS: [string, string, string, string][] = [
   .work-page { display: grid; gap: var(--space-8); }
   /* A grid and its heading are one block, so they close up. */
   .work-grid { margin-top: calc(-1 * var(--space-4)); }
+
+  /* One column from 960 down, rather than the shared .grid-2's 560.
+   *
+   * These cards are not the short paired cards that rule was written for: each
+   * carries a screenshot, a tagline and a paragraph of real prose. Two-up at
+   * 858px gives each about 330px — roughly 38 characters a line once the
+   * padding is off — and a paragraph set that narrow reads as a ladder of
+   * fragments. The cards look fine; the reading does not. */
+  @media (max-width: 960px) {
+    .work-grid { grid-template-columns: 1fr; }
+  }
 
   .work-entry { display: grid; gap: var(--space-5); align-content: start; }
   .work-credits-head {

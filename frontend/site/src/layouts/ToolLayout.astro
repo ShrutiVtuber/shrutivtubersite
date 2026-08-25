@@ -32,8 +32,17 @@ const {
   place, date, disclosure = "○", reckoned, where = "server", noJs,
 } = Astro.props;
 
+/* The solar and lunar trackers were missing from here, so the only way to
+   reach them was a link on the Today page — an instrument you can only find by
+   already being somewhere else is one most people never find. They give the
+   adoration hours: sunrise, culmination, sunset and nadir, and the same four
+   for the Moon.
+   Named "stations" here because that is what the pages they open are headed,
+   and a link that disagrees with its destination is a papercut. */
 const INSTRUMENTS: [string, string, string][] = [
   ["☉", "Planetary hours", "/tools/planetary-hours"],
+  ["◉", "Solar stations", "/tools/solar-stations"],
+  ["☾", "Lunar stations", "/tools/lunar-stations"],
   ["◐", "Pañcāṅga", "/tools/pancanga"],
   ["☾", "Hindu calendar", "/tools/hindu-calendar"],
   ["☽", "Attic calendar", "/tools/attic-calendar"],
