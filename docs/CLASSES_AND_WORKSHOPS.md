@@ -297,20 +297,21 @@ and its id, and both can be live at once.
 
 **Selling it**
 
-- [ ] Stripe checkout for a course, and the webhook that grants entitlement
-- [ ] Call `sync_tier_entitlements` when a subscription starts, changes or ends
-      — the rule is written and nothing calls it yet
-- [ ] The email somebody gets when they buy a class
+- [x] Stripe checkout for a course, and the webhook that grants entitlement
+- [x] Call `sync_tier_entitlements` when a subscription starts, changes or ends
+      — wired into `_upsert`, the one function all three paths already go
+      through
+- [x] The email somebody gets when they buy a class
 
 **Workshops**
 
-- [ ] Seats, and a ticket that counts against them
-- [ ] **RSVP for free workshops** — no charge, still a ticket, so she knows
+- [x] Seats, and a ticket that counts against them
+- [x] **RSVP for free workshops** — no charge, still a ticket, so she knows
       how many are coming
-- [ ] **Launch the room** — one button, creates the Daily room
-- [ ] **Invite everyone holding a ticket** — one action, one email each,
+- [x] **Launch the room** — one button, creates the Daily room
+- [x] **Invite everyone holding a ticket** — one action, one email each,
       whether they paid or RSVPed
-- [ ] Recording delivered as one package after the whole workshop, not per day
+- [x] Recording delivered as one package after the whole workshop, not per day
 
 ## Gotchas this codebase has already paid for
 

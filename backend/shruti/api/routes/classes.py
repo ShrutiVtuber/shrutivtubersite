@@ -301,6 +301,243 @@ async def set_course_tiers(
     return {"ok": True, "includedWith": sorted(set(body.tier_keys))}
 
 
+# ── workshops: the room, and the people in it ───────────────────────────────
+
+async def _ticket_holders(course_id: int, session: AsyncSession) -> list:
+    """
+    Everybody with a place, however they came by it.
+
+    Paid and RSVPed alike — from the room's point of view they are the same
+    person, and she asked for one action that reaches all of them.
+    """
+    from shruti.models import Entitlement
+    from shruti.models.accounts import User
+
+    rows = (
+        await session.execute(
+            select(Entitlement, User)
+            .join(User, User.id == Entitlement.user_id)
+            .where(
+                Entitlement.course_id == course_id,
+                Entitlement.revoked_at.is_(None),
+            )
+        )
+    ).all()
+    return [user for _entitlement, user in rows]
+
+
+@router.get("/admin/courses/{course_id}/room", dependencies=[Depends(require_admin)])
+async def room_state(
+    course_id: int, session: AsyncSession = Depends(get_session)
+) -> dict:
+    """Whether there is a room, who is coming, and what was recorded."""
+    from shruti.core import room as live
+
+    course = await session.get(Course, course_id)
+    if course is None:
+        raise HTTPException(404, "no such course")
+
+    people = await _ticket_holders(course_id, session)
+    made = []
+    if course.room_name:
+        try:
+            made = await live.recordings(course.room_name)
+        except Exception:                              # noqa: BLE001
+            made = []
+
+    return {
+        "roomName": course.room_name,
+        "url": live.url(course.room_name) if course.room_name else "",
+        "seats": course.seats,
+        "taken": len(people),
+        "holders": [
+            {"id": u.id, "email": u.email, "name": u.display_name} for u in people
+        ],
+        "recordings": [
+            {"id": r.get("id"), "startedAt": r.get("start_ts"),
+             "seconds": r.get("duration"), "status": r.get("status")}
+            for r in made
+        ],
+    }
+
+
+@router.post("/admin/courses/{course_id}/room", dependencies=[Depends(require_admin)])
+async def launch_room(
+    course_id: int, session: AsyncSession = Depends(get_session)
+) -> dict:
+    """
+    Open the classroom.
+
+    One button. Makes the room if there is not one, and hands back her own way
+    in — an owner's link, which is the one that can start the recording.
+
+    Launching twice is not an error: the room that exists is the room she
+    wanted, and pressing a button again because nothing obviously happened is
+    what people do.
+    """
+    from shruti.core import room as live
+
+    course = await session.get(Course, course_id)
+    if course is None:
+        raise HTTPException(404, "no such course")
+    if course.kind != "workshop":
+        raise HTTPException(422, "only a workshop has a room")
+
+    name = course.room_name or f"shruti-{course.slug}"[:40]
+    try:
+        await live.create(name, course.starts_at, course.minutes)
+        mine = await live.token(name, owner=True, name="Shruti")
+    except live.RoomUnavailable as exc:
+        raise HTTPException(503, str(exc))
+    except Exception as exc:                           # noqa: BLE001
+        log.exception("could not open the room for %s", course.slug)
+        raise HTTPException(502, f"the room service refused: {exc}")
+
+    course.room_name = name
+    await session.commit()
+
+    return {"ok": True, "roomName": name, "joinUrl": live.url(name, mine)}
+
+
+@router.post("/admin/courses/{course_id}/invite", dependencies=[Depends(require_admin)])
+async def invite_everybody(
+    course_id: int, session: AsyncSession = Depends(get_session)
+) -> dict:
+    """
+    Send everybody holding a place their own way in.
+
+    **A link each, not one link.** The room is private and a token belongs to a
+    person, so a forwarded email does not become a spare seat.
+
+    Sending is reported rather than assumed: an invitation that silently failed
+    is somebody sitting outside a workshop they paid for, and she needs to know
+    before it starts rather than during.
+    """
+    from shruti.api.routes.billing import _site_url
+    from shruti.core import mail
+    from shruti.core import room as live
+
+    course = await session.get(Course, course_id)
+    if course is None:
+        raise HTTPException(404, "no such course")
+    if not course.room_name:
+        raise HTTPException(409, "open the room first — there is nothing to invite them to")
+
+    people = await _ticket_holders(course_id, session)
+    if not people:
+        return {"ok": True, "sent": 0, "failed": [], "note": "nobody has a place yet"}
+
+    when = (
+        course.starts_at.strftime("%A %-d %B at %H:%M UTC")
+        if course.starts_at else "shortly"
+    )
+    sent, failed = 0, []
+
+    for person in people:
+        if not person.email:
+            continue
+        try:
+            key = await live.token(course.room_name, owner=False,
+                                   name=person.display_name or "")
+        except Exception:                              # noqa: BLE001
+            failed.append(person.email)
+            continue
+
+        result = await mail.send(
+            subject=f"Joining {course.title}",
+            to=person.email,
+            body=(
+                f"{course.title} begins {when}.\n\n"
+                f"Your way in:\n{live.url(course.room_name, key)}\n\n"
+                "This link is yours — it will not work for anybody else, so "
+                "there is no need to guard it, and no use in passing it on.\n\n"
+                "Your camera and microphone start off. There is a chat, and a "
+                "way to raise your hand.\n\n"
+                "A recording of the whole workshop comes to you afterwards, to "
+                "keep.\n\n"
+                f"{_site_url(None)}/classes/{course.slug}\n"
+            ),
+        )
+        if result.sent:
+            sent += 1
+        else:
+            failed.append(person.email)
+
+    return {"ok": True, "sent": sent, "failed": failed, "of": len(people)}
+
+
+@router.post("/admin/courses/{course_id}/send-recording",
+             dependencies=[Depends(require_admin)])
+async def send_recording(
+    course_id: int, session: AsyncSession = Depends(get_session)
+) -> dict:
+    """
+    Send everybody the recording, once the workshop is over.
+
+    **One message with everything in it**, not one per day — she asked for that
+    plainly, and somebody who attended three evenings should have one thing to
+    keep rather than three to keep track of.
+
+    The links come from Daily and are not copied here: the files are large,
+    they already live somewhere durable, and holding them twice means paying
+    twice for the same hours.
+    """
+    from shruti.core import mail
+    from shruti.core import room as live
+
+    course = await session.get(Course, course_id)
+    if course is None:
+        raise HTTPException(404, "no such course")
+    if not course.room_name:
+        raise HTTPException(409, "nothing was recorded — there was no room")
+
+    try:
+        made = await live.recordings(course.room_name)
+    except live.RoomUnavailable as exc:
+        raise HTTPException(503, str(exc))
+
+    ready = [r for r in made if r.get("status") == "finished"]
+    if not ready:
+        raise HTTPException(
+            409,
+            "no finished recording yet — they take a while to process after a "
+            "workshop ends, so try again in a little while.",
+        )
+
+    links = []
+    for item in ready:
+        link = await live.download_link(item["id"])
+        if link:
+            minutes = round((item.get("duration") or 0) / 60)
+            links.append(f"  {minutes} minutes:\n  {link}")
+    if not links:
+        raise HTTPException(502, "the recordings exist but would not give up their links")
+
+    people = await _ticket_holders(course_id, session)
+    sent, failed = 0, []
+    for person in people:
+        if not person.email:
+            continue
+        result = await mail.send(
+            subject=f"Your recording — {course.title}",
+            to=person.email,
+            body=(
+                f"Thank you for coming to {course.title}.\n\n"
+                "Here is the recording, yours to download and keep:\n\n"
+                + "\n\n".join(links)
+                + "\n\nThese links expire after a while, so do save the files "
+                "rather than the message. If you miss the window, write to me "
+                "and I will send fresh ones.\n"
+            ),
+        )
+        if result.sent:
+            sent += 1
+        else:
+            failed.append(person.email)
+
+    return {"ok": True, "sent": sent, "failed": failed, "recordings": len(links)}
+
+
 # ── modules and lessons ─────────────────────────────────────────────────────
 
 class ModuleIn(BaseModel):
@@ -674,11 +911,58 @@ async def record_enrolment(event_object: dict, session: AsyncSession):
     if course is None:
         return None
 
-    return await grant(
+    entitlement = await grant(
         int(reference), course.id,
         "ticket" if course.kind == "workshop" else "purchase",
         session,
     )
+    await _welcome(int(reference), course, session)
+    return entitlement
+
+
+async def _welcome(user_id: int, course: Course, session: AsyncSession) -> None:
+    """
+    Tell them it worked and where to go.
+
+    Sent after the entitlement exists, never before — an email promising access
+    that has not been granted yet is worse than no email, because they act on
+    it and find a locked door.
+    """
+    from shruti.api.routes.billing import _site_url
+    from shruti.core import mail
+    from shruti.models.accounts import User
+
+    user = await session.get(User, user_id)
+    if user is None or not user.email:
+        return
+
+    site = _site_url(None)
+    where = f"{site}/classes/{course.slug}"
+
+    if course.kind == "workshop" and course.starts_at:
+        when = course.starts_at.strftime("%A %-d %B at %H:%M UTC")
+        body = (
+            f"Your place at {course.title} is booked.\n\n"
+            f"It begins {when}. You will get the joining link by email shortly "
+            "before it starts, and a recording of the whole thing afterwards "
+            "to keep.\n\n"
+            f"Everything about it is here:\n{where}\n"
+        )
+    elif course.kind == "workshop":
+        body = (
+            f"Your place at {course.title} is booked.\n\n"
+            "The date is still to be set — you will hear from me as soon as it "
+            f"is.\n\n{where}\n"
+        )
+    else:
+        body = (
+            f"{course.title} is yours.\n\n"
+            "It stays yours: come back to it whenever you like, for as long as "
+            "you like, and it will remember where you got to.\n\n"
+            f"Start here:\n{where}\n"
+        )
+
+    await mail.send(subject=f"{course.title}", to=user.email, body=body)
 
 
 # ── what a reader sees ──────────────────────────────────────────────────────

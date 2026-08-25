@@ -82,6 +82,29 @@ if (Astro.request.method === "POST") {
       failed = r.ok ? "" : (r.body?.detail ?? "That did not save.");
     }
 
+    if (action === "launch" && id) {
+      const r = await asAdmin(Astro, `/api/classes/admin/courses/${id}/room`, { method: "POST" });
+      notice = r.ok ? "The room is open." : "";
+      failed = r.ok ? "" : (r.body?.detail ?? "The room did not open.");
+    }
+
+    if (action === "invite" && id) {
+      const r = await asAdmin(Astro, `/api/classes/admin/courses/${id}/invite`, { method: "POST" });
+      if (!r.ok) failed = r.body?.detail ?? "Nothing was sent.";
+      else if (r.body?.failed?.length)
+        failed = `Sent to ${r.body.sent} of ${r.body.of}. These did not go: ${r.body.failed.join(", ")}`;
+      else notice = r.body?.note ?? `Sent to all ${r.body.sent}.`;
+    }
+
+    if (action === "send-recording" && id) {
+      const r = await asAdmin(Astro, `/api/classes/admin/courses/${id}/send-recording`,
+                              { method: "POST" });
+      if (!r.ok) failed = r.body?.detail ?? "Nothing was sent.";
+      else if (r.body?.failed?.length)
+        failed = `Sent to ${r.body.sent}. These did not go: ${r.body.failed.join(", ")}`;
+      else notice = `The recording went to ${r.body.sent} people.`;
+    }
+
     if (action === "delete" && id) {
       const r = await asAdmin(Astro, `/api/classes/admin/courses/${id}`, { method: "DELETE" });
       notice = r.ok ? "Deleted." : "";
@@ -106,6 +129,12 @@ const BLANK = {
   minutes: null, seats: null, visible: false, position: 0, includedWith: [],
 };
 const row = creating ? BLANK : courses.find((c) => String(c.id) === editing) ?? null;
+
+/* The room, only for a workshop being edited. A class has none and asking
+   would be a request per page load for an answer that is always no. */
+const room: any = row && !creating && row.kind === "workshop"
+  ? (await asAdmin(Astro, `/api/classes/admin/courses/${row.id}/room`)).body ?? null
+  : null;
 const money = (cents: number) => `${(cents / 100).toFixed(2)} EUR`;
 ---
 
@@ -230,6 +259,65 @@ const money = (cents: number) => `${(cents / 100).toFixed(2)} EUR`;
         </div>
       </form>
 
+      {room && (
+        <section class="adm-card">
+          <h2 class="h2">The live room</h2>
+          <p class="adm-note">
+            {room.taken} {room.taken === 1 ? "person has" : "people have"} a place
+            {room.seats ? ` of ${room.seats}` : ""}. Everybody gets their own way
+            in, so a forwarded email does not become a spare seat.
+          </p>
+
+          <div class="roomacts">
+            <form method="POST" class="inline">
+              <CsrfField />
+              <input type="hidden" name="action" value="launch" />
+              <input type="hidden" name="id" value={row.id} />
+              <Button type="submit">{room.roomName ? "Open it again" : "Open the classroom"}</Button>
+            </form>
+
+            {room.roomName && (
+              <form method="POST" class="inline">
+                <CsrfField />
+                <input type="hidden" name="action" value="invite" />
+                <input type="hidden" name="id" value={row.id} />
+                <Button type="submit" variant="secondary">
+                  Send everybody their link
+                </Button>
+              </form>
+            )}
+
+            {room.recordings?.length > 0 && (
+              <form method="POST" class="inline">
+                <CsrfField />
+                <input type="hidden" name="action" value="send-recording" />
+                <input type="hidden" name="id" value={row.id} />
+                <Button type="submit" variant="secondary">
+                  Send the recording to everybody
+                </Button>
+              </form>
+            )}
+          </div>
+
+          {room.recordings?.length > 0 && (
+            <p class="adm-note">
+              {room.recordings.length} recording{room.recordings.length === 1 ? "" : "s"}:
+              {" "}{room.recordings.map((r: any) =>
+                `${Math.round((r.seconds ?? 0) / 60)} min (${r.status})`).join(", ")}.
+              One message with all of it, sent when you are ready.
+            </p>
+          )}
+
+          {room.holders?.length > 0 && (
+            <ul class="holders">
+              {room.holders.map((h: any) => (
+                <li>{h.name || h.email} <span class="dim">{h.email}</span></li>
+              ))}
+            </ul>
+          )}
+        </section>
+      )}
+
       {!creating && (
         <section class="adm-card">
           <h2 class="h2">Included with</h2>
@@ -319,6 +407,13 @@ const money = (cents: number) => `${(cents / 100).toFixed(2)} EUR`;
   .check { display: flex; align-items: center; gap: 8px; cursor: pointer; }
   .check input { width: 18px; height: 18px; accent-color: var(--accent); }
   .hint { margin: 0; font: 400 var(--text-xs) var(--font-body); color: var(--ink-soft); max-width: 62ch; }
+  .roomacts { display: flex; gap: var(--space-3); flex-wrap: wrap; margin: var(--space-3) 0; }
+  .holders {
+    list-style: none; margin: var(--space-3) 0 0; padding: 0; display: grid; gap: 4px;
+    font: 400 var(--text-sm) var(--font-body); color: var(--ink);
+  }
+  .dim { color: var(--ink-faint); font-family: var(--font-mono); font-size: var(--text-xs); }
+
   .list-actions { margin-bottom: var(--space-4); }
   .rows { display: grid; gap: 6px; }
   .row {
