@@ -27,6 +27,10 @@ import { verifyCsrf } from "../lib/csrf";
    request. It is a single screen that should be up before a spinner would
    have appeared. */
 import CSS from "../styles/coming-soon.css?raw";
+/* The faces, inlined with the rest. The holding page is one request by design,
+   and it was the last page still fetching type from Google — which on the one
+   page the whole internet meets first is the worst place to leave that. */
+import FACES from "@shruti/shared/tokens/fonts-local.css?raw";
 
 const ATHENS = { lat: 37.9838, lon: 23.7275, label: "Athens" };
 
@@ -192,9 +196,7 @@ const consentSent =
 <meta property="og:type" content="website" />
 <link rel="icon" href="/favicon.ico" sizes="any" />
 <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-<link rel="preconnect" href="https://fonts.googleapis.com" />
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400..700;1,400&family=Commissioner:wght@300..700&family=JetBrains+Mono:wght@400;600&family=Noto+Serif+Devanagari:wght@400..600&family=Mukta:wght@400;600&display=swap" />
+<style is:global set:html={FACES}></style>
 <style is:global set:html={CSS}></style>
 </head>
 <body>

@@ -35,6 +35,33 @@
 		}
 	}
 
+	# ── /journal — the BeeRanked content section ─────────────────────────────
+	#
+	# Static files written by the beeranked agent, served straight from disk.
+	# No per-request dependency on their service: if the agent stops, the last
+	# sync keeps serving.
+	#
+	# **This is deliberately declared AFTER the site handler is decided but
+	# routed BEFORE it**, so understand the consequence: these files never pass
+	# through Astro, which means the holding-page gate in the site middleware
+	# does NOT apply to them. That is the right trade for a content section
+	# whose whole purpose is to be crawled and read — but it means /journal is
+	# public the moment this route exists, holding page or not.
+	#
+	# Until she has walked it, the agent is not installed on production and
+	# this handler finds an empty directory and 404s, which is the honest
+	# state for a section with nothing in it yet.
+	handle_path /journal/* {
+		root * /srv/journal
+		file_server
+		header {
+			Cache-Control "public, max-age=300"
+		}
+	}
+	handle /journal {
+		redir /journal/ 301
+	}
+
 	# ── Uploaded art / media ─────────────────────────────────────────────────
 	handle /media/* {
 		root * /srv

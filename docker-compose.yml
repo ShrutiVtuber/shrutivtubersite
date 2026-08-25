@@ -31,6 +31,7 @@ services:
     volumes:
       - ./Caddyfile.internal:/etc/caddy/Caddyfile:ro
       - media:/srv/media:ro
+      - journal:/srv/journal:ro
       - caddy_data:/data
       - caddy_config:/config
     networks: [shruti, shruti-interop]
@@ -58,6 +59,26 @@ services:
       PORT: 4321
     networks: [shruti, shruti-interop]
 
+
+  # ── BeeRanked content agent ────────────────────────────────────────────────
+  #
+  # Outbound-only. It polls BeeRanked for published content and writes it as
+  # ready-to-serve static files into a volume; nothing reaches in, and there is
+  # no per-request dependency on their service — if it stops, /journal keeps
+  # serving the last sync.
+  #
+  # Behind the `web` profile because it is part of the public site, not the API.
+  beeranked:
+    profiles: ["web"]
+    image: beeranked/agent
+    restart: unless-stopped
+    environment:
+      BEERANKED_KEY: ${SHRUTI_BEERANKED_KEY:?the connector key from setup_self_host_install}
+      BEERANKED_ENDPOINT: ${SHRUTI_BEERANKED_ENDPOINT:-https://studio.beeranked.online/api/agent}
+      BEERANKED_PATH: /journal
+    volumes:
+      - journal:/out
+    networks: [shruti]
 
   # There is no `admin` service. The admin was specified as a separate React
   # SPA built into a volume that caddy served at /admin, and it was never
@@ -99,6 +120,8 @@ services:
     networks: [shruti]
 
 volumes:
+  # Written by the beeranked agent, read by caddy. One direction only.
+  journal:
   postgres_data:
   media:
   caddy_data:

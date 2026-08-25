@@ -1,4 +1,14 @@
-/* Webfonts — served from Google Fonts (no font binaries were provided; see readme.md caveats).
-   Coverage: EB Garamond (Latin+Greek incl. polytonic), Commissioner (Latin+Greek),
-   JetBrains Mono (Latin+Greek), Noto Serif Devanagari + Mukta (Devanagari). */
-@import url('https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400..800;1,400..800&family=Commissioner:wght@300..900&family=JetBrains+Mono:ital,wght@0,400..700;1,400&family=Noto+Serif+Devanagari:wght@400..700&family=Mukta:wght@400;500;600;700&display=swap');
+/* Webfonts — SELF-HOSTED, not from Google.
+ *
+ * The design bundle shipped no binaries and the tokens pointed at
+ * fonts.googleapis.com, which meant every visitor to every page announced
+ * themselves to Google before a word was rendered. That is the same leak this
+ * site already closed for video thumbnails and refuses in its email, and it was
+ * happening site-wide.
+ *
+ * Coverage is unchanged: EB Garamond (Latin + Greek incl. polytonic),
+ * Commissioner (Latin + Greek), JetBrains Mono (Latin + Greek), Noto Serif
+ * Devanagari + Mukta (Devanagari). The unicode-range blocks come from Google's
+ * own CSS, which is why a Latin reader never downloads the Devanagari subsets.
+ */
+@import url('./fonts-local.css');
