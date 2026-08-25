@@ -101,3 +101,34 @@ def test_the_lesson_only_ever_knows_a_provider_and_an_id():
     fields = set(Lesson.model_fields)
     assert {"video_provider", "video_id"} <= fields
     assert not {"video_url", "library_id", "bunny_id", "embed"} & fields
+
+
+def test_a_token_lasts_hours_not_minutes_or_days():
+    """
+    Four hours. Not a rule so much as a balance, but a wrong edit here is the
+    kind that is only noticed by a student mid-lecture, so it is pinned.
+    """
+    assert video.TOKEN_LIFE_SECONDS == 4 * 60 * 60
+
+
+def test_expiry_limits_the_link_and_never_the_person(monkeypatch):
+    """
+    The thing she actually asked about.
+
+    Access lives in the entitlement and the token is only the door opening, so
+    opening the same lesson twice gives two different working links. A student
+    who bought a class keeps it for good; only the plastic keycard expires.
+    """
+    from shruti.core.config import get_settings
+
+    monkeypatch.setenv("SHRUTI_BUNNY_LIBRARY_ID", "123456")
+    monkeypatch.setenv("SHRUTI_BUNNY_TOKEN_AUTH_KEY", "test-key")
+    get_settings.cache_clear()
+
+    first = video.playback("bunny", "lecture-01", life_seconds=60)
+    second = video.playback("bunny", "lecture-01", life_seconds=120)
+
+    assert first["src"] != second["src"]          # a fresh one each time
+    assert second["expiresAt"] > first["expiresAt"]
+    assert first["ready"] and second["ready"]
+    get_settings.cache_clear()

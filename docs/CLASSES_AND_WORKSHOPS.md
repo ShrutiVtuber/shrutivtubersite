@@ -270,18 +270,48 @@ and its id, and both can be live at once.
 
 ## Implementation checklist
 
-- [ ] Models: Course, Module, Lesson, QuizQuestion, Entitlement, Enrolment,
-      LessonProgress, CourseTier
-- [ ] Migration
-- [ ] Admin: courses, modules, lessons, reordering
-- [ ] Admin: which tiers include which course
-- [ ] The reader — sidebar, typed lessons, ticks, complete & continue
-- [ ] Entitlement checks: purchased, or a live tier, or free preview
-- [ ] Selling a course — Stripe product, checkout, webhook grant
-- [ ] Revoking on cancellation, keeping progress
-- [ ] Bunny player + signed playback tokens
-- [ ] Quizzes, self-check
-- [ ] Workshops: seats, tickets, Daily room, recording delivery
+### Done
+
+- [x] Models: Course, CourseTier, Module, Lesson, QuizQuestion, Entitlement,
+      Enrolment, LessonProgress — migrated
+- [x] The access rule: bought outright is permanent, a tier lasts as long as
+      the tier does, revoking keeps every tick of progress
+- [x] Reader API: the outline is public, the content is not, one door
+- [x] Progress: recorded for anybody who may open a lesson, never removed
+- [x] Video: provider and id on the lesson, Bunny signed, four-hour tokens
+- [x] Admin API: courses, modules, lessons, questions, tier inclusion
+- [x] Bunny and Daily configured and answering
+
+### Left
+
+**The LMS proper**
+
+- [ ] Admin screens — building a course is API-only today
+- [ ] Uploading video from the admin, straight to Bunny rather than through us
+- [ ] The reader — sidebar, ticks, complete & continue, the player
+- [ ] Re-fetch a stale playback token instead of showing an error
+- [ ] `/lessons/{id}/file` — **referenced by the reader API and not yet
+      written**, so an audio or PDF lesson currently promises a download that
+      404s
+- [ ] Quiz UI — answer, reveal, explain
+- [ ] `/classes` catalogue and a sales page per course
+
+**Selling it**
+
+- [ ] Stripe checkout for a course, and the webhook that grants entitlement
+- [ ] Call `sync_tier_entitlements` when a subscription starts, changes or ends
+      — the rule is written and nothing calls it yet
+- [ ] The email somebody gets when they buy a class
+
+**Workshops**
+
+- [ ] Seats, and a ticket that counts against them
+- [ ] **RSVP for free workshops** — no charge, still a ticket, so she knows
+      how many are coming
+- [ ] **Launch the room** — one button, creates the Daily room
+- [ ] **Invite everyone holding a ticket** — one action, one email each,
+      whether they paid or RSVPed
+- [ ] Recording delivered as one package after the whole workshop, not per day
 
 ## Gotchas this codebase has already paid for
 

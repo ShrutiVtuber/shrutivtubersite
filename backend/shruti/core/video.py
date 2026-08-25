@@ -25,10 +25,18 @@ from shruti.core.config import get_settings
 
 log = logging.getLogger(__name__)
 
-# How long a playback URL stays good. Long enough to watch a lecture twice
-# without it dying mid-sentence; short enough that a shared link is useless by
-# the time it has been shared.
-TOKEN_LIFE_SECONDS = 6 * 60 * 60
+# How long a playback URL stays good.
+#
+# Four hours: long enough to watch a ninety-minute lecture twice with breaks,
+# short enough that a link somebody passes on is dead before it has travelled
+# far. It is not what limits anybody's access — a fresh one is minted every
+# time a lesson is opened, so a student who bought a class in 2026 gets a
+# working video in 2030 by the same route they always did.
+#
+# The one cost of a short life is a tab left open past it, where the token is
+# stale by the time somebody presses play. The reader re-fetches on a playback
+# failure rather than showing an error, so that is invisible.
+TOKEN_LIFE_SECONDS = 4 * 60 * 60
 
 
 def playback(provider: str, video_id: str, life_seconds: int = TOKEN_LIFE_SECONDS) -> dict:
