@@ -51,15 +51,25 @@
 	# Until she has walked it, the agent is not installed on production and
 	# this handler finds an empty directory and 404s, which is the honest
 	# state for a section with nothing in it yet.
+	# `redir`, not a `handle` block, and that matters.
+	#
+	# Caddy's `/journal/*` matcher ALSO matches the bare `/journal`, and
+	# `handle_path` then strips the whole thing — leaving file_server an empty
+	# path, which it answers with 200 and zero bytes. A blank page rather than
+	# a 404, so nothing in the logs looks wrong and the browser is handed
+	# `<html><head></head><body></body></html>`.
+	#
+	# Putting a `handle` block above it does not help: Caddy sorts directives
+	# by its own order, not by where they appear in the file, and `handle_path`
+	# is evaluated first either way. `redir` sorts ahead of both.
+	redir /journal /journal/ 301
+
 	handle_path /journal/* {
 		root * /srv/journal
 		file_server
 		header {
 			Cache-Control "public, max-age=300"
 		}
-	}
-	handle /journal {
-		redir /journal/ 301
 	}
 
 	# ── Uploaded art / media ─────────────────────────────────────────────────
