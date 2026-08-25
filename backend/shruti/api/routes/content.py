@@ -143,6 +143,7 @@ async def get_projects(session: AsyncSession = Depends(get_session)) -> list[dic
             "stack": p.stack,
             "licence": p.licence,
             "contributors": p.contributors,
+            "featured": p.featured,
             "media": _media_payload(m),
         }
         for p, m in rows

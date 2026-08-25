@@ -41,6 +41,19 @@ const [live, links, projects, schedule, horoscopes] = await Promise.all([
   site<HoroscopeIndex>("/api/horoscopes?period=monthly"),
 ]);
 
+/* The two projects that lead the page.
+ *
+ * Chosen in the admin rather than taken from the top of the portfolio, because
+ * "what should a stranger meet first" and "what order does the portfolio run
+ * in" are different questions — and tying them together meant reordering all
+ * of /work to change the front door.
+ *
+ * With nothing chosen it behaves as it always did and shows the first two, so
+ * the section is never empty just because nobody has ticked anything yet.
+ */
+const featured = (projects ?? []).filter((p) => p.featured);
+const leading = (featured.length > 0 ? featured : (projects ?? [])).slice(0, 2);
+
 /* The SIGN PICKER waits for something to read — twelve links to twelve empty
    pages is worse than no picker. The SECTION does not: hiding it entirely
    meant that on the day the site went public, with nothing written yet, the
@@ -306,9 +319,9 @@ const INSTRUMENTS = [
       <Button variant="ghost" href="/work">About the work →</Button>
     </div>
     {
-      projects && projects.length > 0 ? (
+      leading.length > 0 ? (
         <div class="grid-2">
-          {projects.slice(0, 2).map((p) => (
+          {leading.map((p) => (
             <ProjectCard
               name={p.name}
               tagline={p.tagline}

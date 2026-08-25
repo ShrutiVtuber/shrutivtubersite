@@ -174,6 +174,12 @@ class Project(TimestampMixin, table=True):
     licence: str = ""        # "AGPL-3.0", "Proprietary"
     contributors: str = ""   # the mono footnote under the table
 
+    # Which two lead the landing page. Separate from `position`, which orders
+    # the full portfolio on /work — the newest thing is not always the one you
+    # want a stranger to meet first, and tying the two together would mean
+    # reordering the portfolio to change the front door.
+    featured: bool = Field(default=False, index=True)
+
     position: int = Field(default=0)
     visible: bool = Field(default=True)
     media_id: Optional[int] = Field(default=None, foreign_key="media.id")

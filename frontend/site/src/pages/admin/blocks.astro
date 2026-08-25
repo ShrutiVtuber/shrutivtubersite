@@ -56,6 +56,7 @@ if (Astro.request.method === "POST") {
         payload[key] =
           s === "" && key.endsWith("_id") ? null
           : s === "on" ? true
+          : s === "off" ? false
           : /^-?\d+$/.test(s) && key !== "body_md" ? Number(s)
           : s;
       }
@@ -165,6 +166,11 @@ const label = (r: any) =>
                     )
                   ) : spec.type === "checkbox" || typeof value === "boolean" ? (
                     <div class="field field--check">
+                      {/* An unchecked box sends nothing at all, so unticking
+                          one would leave the field out of the payload and the
+                          patch would not unset it. The hidden partner is always
+                          sent; the checkbox overrides it when ticked. */}
+                      <input type="hidden" name={k} value="off" />
                       <label class="check">
                         <input type="checkbox" name={k} checked={!!value} />
                         <span>{spec.label}</span>
@@ -227,6 +233,16 @@ const label = (r: any) =>
                     {r.page && <span class="row-sub">on /{r.page}</span>}
                     {r.eyebrow && <span class="row-sub">{r.eyebrow}</span>}
                   </div>
+                  {/* Which two lead the home page, visible from the list —
+                      otherwise you have to open each one to find out. */}
+                  {/* Featured but hidden shows nowhere at all — the home page
+                      draws from what is public. Silently doing nothing is the
+                      trap; saying so is the fix. */}
+                  {r.featured && (
+                    <Badge tone={r.visible ? "rose" : "faint"}>
+                      {r.visible ? "on the home page" : "featured, but hidden"}
+                    </Badge>
+                  )}
                   <Badge tone={r.visible ? "accent" : "faint"}>{r.visible ? "visible" : "hidden"}</Badge>
                   <div class="row-actions">
                     <form method="POST" class="inline">

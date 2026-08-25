@@ -97,6 +97,8 @@ export interface Project {
   repoUrl: string;
   siteUrl: string;
   status: string;
+  /** Chosen to lead the landing page. */
+  featured: boolean;
   /* The API has always sent this. It was missing here, so the landing page —
      typed against this and not against the payload — had no screenshot to
      pass and passed null instead. A project's picture then appeared on /work

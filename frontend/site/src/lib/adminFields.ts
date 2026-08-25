@@ -98,6 +98,12 @@ export const FIELDS: Record<string, Record<string, FieldSpec>> = {
       placeholder: "https://…",
       help: "Shown as the “visit” link.",
     },
+    featured: {
+      label: "Lead the home page with this",
+      type: "checkbox",
+      group: "Publishing",
+      help: "The home page shows two projects. Tick the two you want a stranger to meet first — tick more and the first two in portfolio order win. With none ticked it falls back to the first two, so the section is never empty. A hidden project is never shown, featured or not.",
+    },
     status: { label: "Status", type: "select", options: STATUS, group: "Details" },
     role: {
       label: "Your role", group: "Details",
