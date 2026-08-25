@@ -15,8 +15,11 @@ import logging
 from datetime import datetime, timezone
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile
+from fastapi import (
+    APIRouter, Depends, File, Form, HTTPException, Response, UploadFile,
+)
 from pydantic import BaseModel, EmailStr, Field
+from sqlalchemy import func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import SQLModel, select
 
@@ -98,9 +101,56 @@ async def me(subject: str = Depends(require_admin)) -> dict:
 
 # ── media ───────────────────────────────────────────────────────────────────
 
+def _media_payload(m: Media) -> dict:
+    """
+    One shape for an image, wherever it is returned from.
+
+    Upload, patch and the listing all answered differently before — tags as a
+    string from one and a list from another — which makes a caller's handling
+    depend on which call it happened to come from.
+    """
+    from shruti.core.storage import public_url
+
+    return {
+        "id": m.id,
+        "filename": m.filename,
+        "url": public_url(m.filename, m.storage_backend),
+        "mimeType": m.mime_type,
+        "width": m.width,
+        "height": m.height,
+        "sizeBytes": m.size_bytes,
+        "title": m.title,
+        "tags": [t for t in m.tags.split(",") if t],
+        "altText": m.alt_text,
+        "credit": m.credit,
+        "creditUrl": m.credit_url,
+        "storage": m.storage_backend,
+        "createdAt": m.created_at.isoformat() if m.created_at else None,
+    }
+
+
+def _clean_tags(raw: str) -> str:
+    """
+    Comma-separated, trimmed, de-duplicated, order kept.
+
+    Order is kept because she typed it in an order; sorting would be tidier and
+    would also quietly rearrange what she wrote every time she saved.
+    """
+    out: list[str] = []
+    for tag in (raw or "").split(","):
+        tag = " ".join(tag.split())
+        if tag and tag.lower() not in {t.lower() for t in out}:
+            out.append(tag)
+    return ",".join(out)
+
+
+
 @router.post("/media", status_code=201)
 async def upload_media(
     file: UploadFile = File(...),
+    title: str = Form(""),
+    tags: str = Form(""),
+    alt_text: str = Form(""),
     session: AsyncSession = Depends(get_session),
     _: str = Depends(require_admin),
 ) -> dict:
@@ -110,6 +160,10 @@ async def upload_media(
     Named by content hash, so the same file uploaded twice is stored once and
     the URL is stable. The declared content type is checked against an
     allow-list rather than trusted — a browser will send whatever it is told.
+
+    A title and tags may be given at the same time, because the moment of
+    uploading is the moment you know what the thing is. They are stored beside
+    the hash, never in place of it.
     """
     s = get_settings()
     if file.content_type not in ALLOWED_IMAGE:
@@ -132,7 +186,18 @@ async def upload_media(
         select(Media).where(Media.filename == filename)
     )).scalars().first()
     if existing:
-        return existing.model_dump()
+        # The same bytes, so the same file — but this upload may carry a name
+        # the first one did not, and dropping it would be silently ignoring
+        # what was just typed. Only fills gaps; never overwrites.
+        changed = False
+        for field, value in (("title", title), ("tags", tags), ("alt_text", alt_text)):
+            if value.strip() and not getattr(existing, field):
+                setattr(existing, field, value.strip())
+                changed = True
+        if changed:
+            await session.commit()
+            await session.refresh(existing)
+        return _media_payload(existing) | {"deduped": True}
 
     width = height = None
     try:
@@ -154,11 +219,13 @@ async def upload_media(
 
     row = Media(filename=filename, mime_type=file.content_type,
                 width=width, height=height, size_bytes=len(data),
-                storage_backend=stored.backend)
+                storage_backend=stored.backend,
+                title=title.strip(), tags=_clean_tags(tags),
+                alt_text=alt_text.strip())
     session.add(row)
     await session.commit()
     await session.refresh(row)
-    return row.model_dump()
+    return _media_payload(row)
 
 
 # ── inbox ───────────────────────────────────────────────────────────────────
@@ -323,31 +390,133 @@ async def do_reset(
 
 @router.get("/media")
 async def list_media(
+    q: str = "",
+    tag: str = "",
     session: AsyncSession = Depends(get_session),
     _: str = Depends(require_admin),
 ) -> list[dict]:
-    """Everything uploaded, newest first, with where it actually lives."""
-    from shruti.core.storage import public_url
+    """
+    Everything uploaded, newest first, with where it actually lives.
 
-    rows = (
-        await session.execute(select(Media).order_by(Media.id.desc()))
-    ).scalars().all()
-    return [
-        {
-            "id": m.id,
-            "filename": m.filename,
-            "url": public_url(m.filename, m.storage_backend),
-            "mimeType": m.mime_type,
-            "width": m.width,
-            "height": m.height,
-            "sizeBytes": m.size_bytes,
-            "altText": m.alt_text,
-            "credit": m.credit,
-            "storage": m.storage_backend,
-            "createdAt": m.created_at.isoformat() if m.created_at else None,
-        }
-        for m in rows
-    ]
+    `q` searches the name, the tags and the alt text — the three things she
+    wrote — and the filename, which is only useful when someone already has a
+    URL in hand and wants to know what it is.
+    """
+
+    stmt = select(Media).order_by(Media.id.desc())
+    if q.strip():
+        like = f"%{q.strip()}%"
+        stmt = stmt.where(
+            Media.title.ilike(like)
+            | Media.tags.ilike(like)
+            | Media.alt_text.ilike(like)
+            | Media.filename.ilike(like)
+        )
+    if tag.strip():
+        # Padded on both sides so "art" cannot match "fan-art": tags are stored
+        # comma-separated and matching the bare word would match inside one.
+        stmt = stmt.where(
+            func.concat(",", Media.tags, ",").ilike(f"%,{tag.strip()},%")
+        )
+
+    rows = (await session.execute(stmt)).scalars().all()
+    return [_media_payload(m) for m in rows]
+
+
+class MediaPatch(BaseModel):
+    """
+    Everything about an image except the image.
+
+    All optional, and only what is sent is applied: a patch that renames a file
+    must not blank its alt text just by not mentioning it. That mistake has
+    been made in this codebase before, with an upsert that replaced instead of
+    patching and wiped the fields it was not given.
+    """
+
+    title: str | None = None
+    tags: str | None = None
+    alt_text: str | None = None
+    credit: str | None = None
+    credit_url: str | None = None
+
+
+@router.patch("/media/{media_id}")
+async def update_media(
+    media_id: int,
+    body: MediaPatch,
+    session: AsyncSession = Depends(get_session),
+    _: str = Depends(require_admin),
+) -> dict:
+    """Rename, retag or re-describe. Never touches the file or the URL."""
+    row = await session.get(Media, media_id)
+    if row is None:
+        raise HTTPException(404, "no such media")
+
+    for field, value in body.model_dump(exclude_unset=True).items():
+        if value is None:
+            continue
+        setattr(row, field, _clean_tags(value) if field == "tags" else value.strip())
+
+    await session.commit()
+    await session.refresh(row)
+    return _media_payload(row)
+
+
+# Everything that can point at an image, and what to call it when it does.
+MEDIA_USERS: tuple[tuple[type, str], ...] = (
+    (Section, "page block"),
+    (Project, "project"),
+    (Tool, "tool"),
+    (FanArt, "fan work"),
+)
+
+
+@router.delete("/media/{media_id}", status_code=204)
+async def delete_media(
+    media_id: int,
+    session: AsyncSession = Depends(get_session),
+    _: str = Depends(require_admin),
+) -> Response:
+    """
+    Remove an image, file and row together.
+
+    **Refused while anything still uses it**, and the refusal says what. The
+    alternative is to null the references, which silently blanks a picture on a
+    live page: the deletion succeeds and the damage turns up later, somewhere
+    else, looking like a different bug.
+    """
+    row = await session.get(Media, media_id)
+    if row is None:
+        raise HTTPException(404, "no such media")
+
+    used: list[str] = []
+    for model, noun in MEDIA_USERS:
+        rows = (
+            await session.execute(select(model).where(model.media_id == media_id))
+        ).scalars().all()
+        for r in rows:
+            label = (
+                getattr(r, "title", None) or getattr(r, "name", None)
+                or getattr(r, "key", None) or f"#{r.id}"
+            )
+            used.append(f"{noun} \u201c{label}\u201d")
+
+    if used:
+        raise HTTPException(
+            409,
+            "still in use by " + ", ".join(used)
+            + ". Point those at something else first, and then this can go.",
+        )
+
+    # The file first. A row removed while its file survives leaves an orphan
+    # nothing can find or delete; a file removed while its row survives shows
+    # as a broken image, which at least says out loud that something is wrong.
+    from shruti.core.storage import delete as delete_stored
+
+    await delete_stored(row.filename, row.storage_backend)
+    await session.delete(row)
+    await session.commit()
+    return Response(status_code=204)
 
 
 # ── site settings ───────────────────────────────────────────────────────────

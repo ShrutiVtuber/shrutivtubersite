@@ -1,0 +1,142 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+"""
+Managing media: naming, tagging, and getting rid of things.
+
+The filename is a content hash and stays one — that is what dedupes an image
+uploaded twice and what keeps a URL stable forever. Everything here is about
+the human half that sits beside it.
+"""
+from __future__ import annotations
+
+import asyncio
+import tempfile
+from pathlib import Path
+
+import pytest
+
+from shruti.api.routes import admin
+
+
+# ── tags ────────────────────────────────────────────────────────────────────
+
+def test_tags_are_trimmed_and_deduplicated():
+    assert admin._clean_tags("overlay, stream,  overlay ,twitch") == "overlay,stream,twitch"
+
+
+def test_tag_order_is_the_order_they_were_typed():
+    """
+    Not sorted.
+
+    Sorting would be tidier and would also quietly rearrange what she wrote
+    every time she saved, which reads as the field having a mind of its own.
+    """
+    assert admin._clean_tags("zeta, alpha, mu") == "zeta,alpha,mu"
+
+
+def test_duplicate_tags_differing_only_in_case_are_one_tag():
+    assert admin._clean_tags("Overlay, overlay, OVERLAY") == "Overlay"
+
+
+def test_empty_and_whitespace_tags_disappear():
+    assert admin._clean_tags("") == ""
+    assert admin._clean_tags("  ,  , ") == ""
+    assert admin._clean_tags("a,,b") == "a,b"
+
+
+def test_inner_whitespace_is_collapsed_not_stripped():
+    """A tag may be two words; it may not be two words and four spaces."""
+    assert admin._clean_tags("  stream   overlay  ") == "stream overlay"
+
+
+# ── deletion checks every table that can point at an image ──────────────────
+
+def test_every_model_with_a_media_id_is_checked_before_deleting():
+    """
+    The guard is a hand-written list, so this is the thing that rots.
+
+    Adding a fifth table with a `media_id` and forgetting to add it here would
+    not fail loudly — deletion would simply stop noticing that table, and the
+    first sign would be a blank picture on a live page.
+    """
+    from shruti import models
+
+    with_media = {
+        model.__name__
+        for model in vars(models).values()
+        if isinstance(model, type)
+        and getattr(model, "__tablename__", None)
+        and "media_id" in getattr(model, "model_fields", {})
+    }
+    checked = {model.__name__ for model, _noun in admin.MEDIA_USERS}
+
+    assert with_media, "no model has a media_id — this test is looking in the wrong place"
+    assert with_media == checked, (
+        f"not checked before deleting media: {sorted(with_media - checked)}; "
+        f"checked but no longer has a media_id: {sorted(checked - with_media)}"
+    )
+
+
+# ── removing the file itself ────────────────────────────────────────────────
+
+def test_deleting_a_local_file_removes_it():
+    from shruti.core import storage
+    from shruti.core.config import get_settings
+
+    with tempfile.TemporaryDirectory() as root:
+        settings = get_settings()
+        original = settings.media_root
+        try:
+            settings.media_root = root
+            target = Path(root) / "abc123.png"
+            target.write_bytes(b"not really a png")
+            asyncio.run(storage.delete("abc123.png", "local"))
+            assert not target.exists()
+        finally:
+            settings.media_root = original
+
+
+def test_deleting_a_file_that_is_already_gone_is_not_an_error():
+    """
+    The caller's intent is that it should not exist, and it does not.
+
+    Raising would leave a row that cannot be deleted because somebody tidied
+    its file up by hand — the database would be stuck holding a reference to
+    nothing, which is the state this whole feature exists to get out of.
+    """
+    from shruti.core import storage
+    from shruti.core.config import get_settings
+
+    with tempfile.TemporaryDirectory() as root:
+        settings = get_settings()
+        original = settings.media_root
+        try:
+            settings.media_root = root
+            asyncio.run(storage.delete("never-existed.png", "local"))
+        finally:
+            settings.media_root = original
+
+
+# ── the payload one shape ───────────────────────────────────────────────────
+
+def test_media_payload_gives_tags_as_a_list():
+    """
+    Upload, patch and the listing all answer with this, so a caller's handling
+    cannot depend on which one it happened to come from. Before, one returned a
+    comma-separated string and another a list.
+    """
+    from shruti.models import Media
+
+    row = Media(id=1, filename="x.png", mime_type="image/png",
+                tags="overlay,twitch", title="Corner frame")
+    payload = admin._media_payload(row)
+
+    assert payload["tags"] == ["overlay", "twitch"]
+    assert payload["title"] == "Corner frame"
+    assert "url" in payload
+
+
+def test_media_payload_of_an_untagged_row_is_an_empty_list_not_one_empty_string():
+    from shruti.models import Media
+
+    row = Media(id=1, filename="x.png", mime_type="image/png", tags="")
+    assert admin._media_payload(row)["tags"] == []

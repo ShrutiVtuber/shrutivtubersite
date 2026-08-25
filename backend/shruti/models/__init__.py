@@ -59,6 +59,17 @@ class Media(TimestampMixin, table=True):
     # a bucket that does not contain them.
     storage_backend: str = "local"      # local | r2
 
+    # What she calls it. The filename is a content hash and always will be —
+    # that is what makes the URL stable and the same image upload once — so the
+    # human name is kept beside it and renaming never touches the file.
+    title: str = ""
+
+    # Free tags, comma-separated, for finding things again. A join table is the
+    # more correct shape; at a few hundred images a string and an ILIKE is less
+    # machinery for the same result. Revisit if tags ever need renaming or
+    # merging rather than just matching.
+    tags: str = ""
+
     alt_text: str = ""
     credit: str = ""          # illustrator/rigger attribution, shown where used
     credit_url: str = ""

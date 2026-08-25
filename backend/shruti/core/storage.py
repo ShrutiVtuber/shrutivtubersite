@@ -167,6 +167,54 @@ async def _put_r2(filename: str, data: bytes, content_type: str) -> Stored:
     return Stored(key=filename, url=public_url(filename), backend="r2")
 
 
+async def delete(filename: str, backend: str) -> None:
+    """
+    Remove one stored file.
+
+    **The row's backend decides where to look**, not the current
+    configuration — a file uploaded before R2 was switched on is on disk, and
+    asking the bucket to delete it would report success having done nothing.
+
+    A file that is already gone is not an error. The caller's intent is that it
+    should not exist, and it does not; raising here would leave a database row
+    that cannot be removed because its file was tidied up by hand.
+    """
+    if backend == "r2":
+        await _delete_r2(filename)
+        return
+
+    path = Path(get_settings().media_root) / filename
+    try:
+        path.unlink()
+    except FileNotFoundError:
+        log.info("media %s was already gone from disk", filename)
+
+
+async def _delete_r2(filename: str) -> None:
+    s = get_settings()
+    host = f"{s.r2_account_id}.r2.cloudflarestorage.com"
+    path = f"/{s.r2_bucket}/{filename}"
+    amz_date = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+
+    headers = authorization_header(
+        method="DELETE", host=host, path=path, payload=b"",
+        access_key=s.r2_access_key_id, secret_key=s.r2_secret_access_key,
+        region="auto", service="s3",
+        amz_date=amz_date,
+        # The signer always signs content-type, so it has to be a value that
+        # actually goes out on the wire: an empty one risks httpx dropping the
+        # header and the signature then covering something that was not sent,
+        # which is the usual reason SigV4 is rejected with nothing useful said.
+        content_type="application/octet-stream",
+    )
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        r = await client.delete(f"https://{host}{path}", headers=headers)
+    # S3 answers 204 for a delete and, by design, also for a key that was never
+    # there. 404 is treated the same way for the same reason as on disk.
+    if r.status_code not in (200, 204, 404):
+        raise RuntimeError(f"R2 returned {r.status_code} deleting {filename}")
+
+
 def public_url(filename: str, backend: str = "r2") -> str:
     """
     Where a stored file is read from.

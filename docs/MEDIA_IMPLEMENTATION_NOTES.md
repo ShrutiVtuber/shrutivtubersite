@@ -45,16 +45,16 @@ site and launch. Her words, condensed:
 
 ## Checklist
 
-- [ ] Migration: `media.title`, `media.tags`
-- [ ] Upload accepts title + tags
-- [ ] `PATCH /api/admin/media/{id}` — rename, retag, alt text, credit
-- [ ] `DELETE /api/admin/media/{id}` — refuses when referenced, says by what
-- [ ] `storage.delete()` for disk and R2
-- [ ] `GET /api/admin/media?q=&tag=` — search and filter
-- [ ] `MediaField.astro` — in-place upload, used wherever `media_id` is edited
-- [ ] `blocks.astro` renders `media_id` with it, for all four kinds
-- [ ] Media page: search, tag filter, rename/retag/delete per item
-- [ ] Tests
+- [x] Migration: `media.title`, `media.tags`
+- [x] Upload accepts title + tags
+- [x] `PATCH /api/admin/media/{id}` — rename, retag, alt text, credit
+- [x] `DELETE /api/admin/media/{id}` — refuses when referenced, says by what
+- [x] `storage.delete()` for disk and R2
+- [x] `GET /api/admin/media?q=&tag=` — search and filter
+- [x] `MediaField.astro` — in-place upload, used wherever `media_id` is edited
+- [x] `blocks.astro` renders `media_id` with it, for all four kinds
+- [x] Media page: search, tag filter, rename/retag/delete per item
+- [x] Tests
 - [ ] Deployed and checked
 
 ## Gotchas already paid for on this codebase
@@ -66,3 +66,35 @@ site and launch. Her words, condensed:
   one field and wiped the rest.
 - **Indentation when scripting edits.** Matching a line copied out of a
   prefixed terminal dump silently matches nothing. Match on content.
+
+
+## Where it got to (2026-08-25)
+
+All five asks are done and verified against the running stack, not only by
+reading the code:
+
+- Upload in place on projects, tools, page blocks and fan works — one field,
+  `MediaField.astro`, wherever `media_id` is edited. It posts to the same
+  endpoint the media page uses, which is why item 3 needed no work of its own.
+- The library picker sits beside it, with its own search, so reusing an
+  existing image is also not an id-paste.
+- Delete works, file and row together. **Refused while something still points
+  at it**, naming what: *"still in use by project “Theourgia”"*. Verified for
+  both storage backends — the R2 object is genuinely gone from the bucket,
+  checked by fetching it afterwards, not just absent from the database.
+- Name and tags at upload, and editable afterwards without touching the file.
+- Search over name, tags and alt text; a tag row that filters. Tag matching is
+  padded (`,tag,`) so "art" cannot match "fan-art".
+
+112 backend tests pass, 10 of them new. Typecheck is back to its pre-existing
+60 errors — none in any of this.
+
+### Two things worth knowing
+
+- The **filename is still the content hash** and always will be. Renaming
+  changes a column, never a file or a URL, so nothing that already points at an
+  image can break by renaming it.
+- Uploading a file that is **already in the library** returns the existing row
+  and fills in a name or tags if it had none — it never overwrites what is
+  there. So re-uploading to "rename" quietly does nothing, which is why rename
+  is its own control.

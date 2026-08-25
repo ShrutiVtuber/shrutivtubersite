@@ -10,6 +10,7 @@
  */
 import AdminLayout from "../../layouts/AdminLayout.astro";
 import CsrfField from "../../components/forms/CsrfField.astro";
+import MediaField from "../../components/forms/MediaField.astro";
 import Button from "../../components/forms/Button.astro";
 import Badge from "../../components/navigation/Badge.astro";
 import { asAdmin, KINDS } from "../../lib/admin";
@@ -49,7 +50,13 @@ if (Astro.request.method === "POST") {
       for (const [key, value] of form.entries()) {
         if (["action", "id", "_csrf", "kind"].includes(key)) continue;
         const s = String(value);
-        payload[key] = s === "on" ? true : /^-?\d+$/.test(s) && key !== "body_md" ? Number(s) : s;
+        /* An id field left empty means "nothing", not the empty string —
+           which a nullable integer column rejects. */
+        payload[key] =
+          s === "" && key.endsWith("_id") ? null
+          : s === "on" ? true
+          : /^-?\d+$/.test(s) && key !== "body_md" ? Number(s)
+          : s;
       }
       const r = action === "create"
         ? await asAdmin(Astro, `/api/admin/${kind}`, {
@@ -80,6 +87,8 @@ const row = editing ? rows.find((r) => String(r.id) === editing) : null;
 
 /* Which fields to show, per table. Long text gets a textarea. */
 const LONG = new Set(["body_md", "bodyMd", "notes_md", "notesMd", "wording"]);
+/* Rendered as a picture with an upload on it, not as a number to look up. */
+const MEDIA = new Set(["media_id", "mediaId"]);
 const SKIP = new Set(["id", "created_at", "updated_at", "createdAt", "updatedAt", "media", "visible", "position"]);
 const fieldsOf = (r: any) => Object.keys(r).filter((k) => !SKIP.has(k));
 const label = (r: any) =>
@@ -115,11 +124,13 @@ const label = (r: any) =>
             <label class="field">
               <span class="adm-lbl">{k.replace(/_/g, " ").replace(/([A-Z])/g, " $1")}</span>
               {
-                LONG.has(k)
-                  ? <textarea class="adm-area" name={k} rows="10">{row[k] ?? ""}</textarea>
-                  : typeof row[k] === "boolean"
-                    ? <input type="checkbox" name={k} checked={row[k]} />
-                    : <input class="adm-input" name={k} value={row[k] ?? ""} />
+                MEDIA.has(k)
+                  ? <MediaField name={k} value={row[k] ?? null} label="Image" />
+                  : LONG.has(k)
+                    ? <textarea class="adm-area" name={k} rows="10">{row[k] ?? ""}</textarea>
+                    : typeof row[k] === "boolean"
+                      ? <input type="checkbox" name={k} checked={row[k]} />
+                      : <input class="adm-input" name={k} value={row[k] ?? ""} />
               }
             </label>
           ))

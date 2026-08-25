@@ -18,35 +18,93 @@ import { verifyCsrf } from "../../lib/csrf";
 let notice = "";
 let failed = "";
 
+function auth(): Record<string, string> {
+  const token = Astro.cookies.get(ADMIN_COOKIE)?.value;
+  return token ? { cookie: `${ADMIN_COOKIE}=${token}` } : {};
+}
+
 if (Astro.request.method === "POST") {
   const form = await Astro.request.formData();
   if (!verifyCsrf(Astro.cookies, form)) {
-    failed = "That did not upload. Reload the page and try again.";
+    failed = "That did not work. Reload the page and try again.";
   } else {
-    const file = form.get("file");
-    if (!(file instanceof File) || file.size === 0) {
-      failed = "Choose a file first.";
-    } else {
-      /* Forwarded as multipart to the backend, which is where the type
-         allow-list and the size limit are enforced — not here, because a
-         check in the browser or in a proxy is a courtesy, not a control. */
-      const out = new FormData();
-      out.append("file", file, file.name);
-      const token = Astro.cookies.get(ADMIN_COOKIE)?.value;
-      const r = await fetch(`${SITE_API}/api/admin/media`, {
-        method: "POST",
-        headers: token ? { cookie: `${ADMIN_COOKIE}=${token}` } : {},
-        body: out,
+    const action = String(form.get("action") ?? "upload");
+    const id = String(form.get("id") ?? "");
+
+    if (action === "upload") {
+      const file = form.get("file");
+      if (!(file instanceof File) || file.size === 0) {
+        failed = "Choose a file first.";
+      } else {
+        /* Forwarded as multipart to the backend, which is where the type
+           allow-list and the size limit are enforced — not here, because a
+           check in the browser or in a proxy is a courtesy, not a control. */
+        const out = new FormData();
+        out.append("file", file, file.name);
+        out.append("title", String(form.get("title") ?? ""));
+        out.append("tags", String(form.get("tags") ?? ""));
+        out.append("alt_text", String(form.get("alt_text") ?? ""));
+        const r = await fetch(`${SITE_API}/api/admin/media`, {
+          method: "POST", headers: auth(), body: out,
+        });
+        const body = await r.json().catch(() => null);
+        if (!r.ok) failed = body?.detail ?? "That did not upload.";
+        else if (body?.deduped)
+          notice = "That image was already here — the same bytes, so the same file.";
+        else notice = `Uploaded — stored on ${body?.storage ?? "disk"}.`;
+      }
+    }
+
+    if (action === "rename" && id) {
+      const r = await asAdmin(Astro, `/api/admin/media/${id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          title: String(form.get("title") ?? ""),
+          tags: String(form.get("tags") ?? ""),
+          alt_text: String(form.get("alt_text") ?? ""),
+        }),
       });
-      const body = await r.json().catch(() => null);
-      notice = r.ok ? `Uploaded — stored on ${body?.storage_backend ?? "disk"}.` : "";
-      failed = r.ok ? "" : (body?.detail ?? "That did not upload.");
+      notice = r.ok ? "Saved." : "";
+      failed = r.ok ? "" : (r.body?.detail ?? "That did not save.");
+    }
+
+    if (action === "delete" && id) {
+      const r = await asAdmin(Astro, `/api/admin/media/${id}`, { method: "DELETE" });
+      /* A refusal here is the useful kind: it names what still points at the
+         image, so the next step is obvious rather than a guess. */
+      notice = r.ok ? "Deleted — the file and the record together." : "";
+      failed = r.ok ? "" : (r.body?.detail ?? "That could not be deleted.");
     }
   }
 }
 
-const list = await asAdmin(Astro, "/api/admin/media");
+const q = Astro.url.searchParams.get("q") ?? "";
+const tag = Astro.url.searchParams.get("tag") ?? "";
+const editing = Astro.url.searchParams.get("edit") ?? "";
+
+const query = new URLSearchParams();
+if (q) query.set("q", q);
+if (tag) query.set("tag", tag);
+const list = await asAdmin(Astro, `/api/admin/media${query.size ? `?${query}` : ""}`);
 const items: any[] = Array.isArray(list.body) ? list.body : [];
+
+/* Every tag in use, for the filter row. Taken from the unfiltered library —
+   a tag list that shrinks as you filter by it cannot be used to change
+   filter. */
+const all = q || tag ? await asAdmin(Astro, "/api/admin/media") : list;
+const allTags = [
+  ...new Set((Array.isArray(all.body) ? all.body : []).flatMap((m: any) => m.tags ?? [])),
+].sort((a, b) => String(a).localeCompare(String(b)));
+
+const here = (extra: Record<string, string> = {}) => {
+  const u = new URLSearchParams();
+  if (q) u.set("q", q);
+  if (tag) u.set("tag", tag);
+  for (const [k, v] of Object.entries(extra)) v ? u.set(k, v) : u.delete(k);
+  return `/admin/media${u.size ? `?${u}` : ""}`;
+};
+
 const onR2 = items.filter((m) => m.storage === "r2").length;
 const kb = (n: number) => `${Math.round(n / 1024)} KB`;
 ---
@@ -64,36 +122,111 @@ const kb = (n: number) => `${Math.round(n / 1024)} KB`;
 
   <form method="POST" enctype="multipart/form-data" class="adm-card upload">
     <CsrfField />
+    <input type="hidden" name="action" value="upload" />
     <label class="field">
       <span class="adm-lbl">Image</span>
       <input class="adm-input" type="file" name="file" accept="image/png,image/jpeg,image/webp,image/avif,image/svg+xml" required />
     </label>
+    <div class="naming">
+      <label class="field">
+        <span class="adm-lbl">Name it</span>
+        <input class="adm-input" type="text" name="title" placeholder="Stream overlay, corner frame" />
+      </label>
+      <label class="field">
+        <span class="adm-lbl">Tags</span>
+        <input class="adm-input" type="text" name="tags" placeholder="overlay, twitch" />
+      </label>
+    </div>
+    <label class="field">
+      <span class="adm-lbl">Alt text</span>
+      <input class="adm-input" type="text" name="alt_text" placeholder="What someone who cannot see it would need told" />
+    </label>
     <div><Button type="submit">Upload</Button></div>
     <p class="adm-note">
       PNG, JPEG, WebP, AVIF or SVG. Files are named by their own SHA-256, so the same image
-      uploaded twice is stored once and its URL never changes.
+      uploaded twice is stored once and its URL never changes — the name you give is yours,
+      kept beside it, and can be changed whenever without moving anything.
     </p>
+  </form>
+
+  <form method="GET" class="adm-card finder">
+    <label class="field grow">
+      <span class="adm-lbl">Search</span>
+      <input class="adm-input" type="search" name="q" value={q}
+             placeholder="Name, tag or alt text" />
+    </label>
+    {tag && <input type="hidden" name="tag" value={tag} />}
+    <div><Button type="submit">Find</Button></div>
+    {
+      (q || tag) && <a class="clear" href="/admin/media">Clear</a>
+    }
+    {
+      allTags.length > 0 && (
+        <nav class="tags" aria-label="Tags">
+          {allTags.map((t: any) => (
+            <a class="tag" href={here({ tag: tag === t ? "" : String(t), edit: "" })}
+               aria-current={tag === t ? "page" : undefined}>{t}</a>
+          ))}
+        </nav>
+      )
+    }
   </form>
 
   {
     items.length === 0 ? (
-      <p class="adm-note">Nothing uploaded yet. Every art slot on the site has a designed
-      absent state, so there is no hurry.</p>
+      <p class="adm-note">
+        {q || tag
+          ? "Nothing matches that."
+          : "Nothing uploaded yet. Every art slot on the site has a designed absent state, so there is no hurry."}
+      </p>
     ) : (
       <div class="grid">
         {
           items.map((m) => (
-            <figure class="item">
+            <figure class="item" data-editing={String(m.id) === editing || undefined}>
               <a href={m.url} class="thumb">
-                <img src={m.url} alt={m.altText || m.filename} loading="lazy" />
+                <img src={m.url} alt={m.altText || m.title || m.filename} loading="lazy" />
               </a>
-              <figcaption>
-                <span class="t-tabular name">{m.filename.slice(0, 14)}…</span>
-                <span class="meta">
-                  {m.width && m.height ? `${m.width}×${m.height} · ` : ""}{kb(m.sizeBytes)}
-                </span>
-                <span class="store" data-r2={m.storage === "r2" || undefined}>{m.storage}</span>
-              </figcaption>
+              {
+                String(m.id) === editing ? (
+                  <form method="POST" class="editor">
+                    <CsrfField />
+                    <input type="hidden" name="action" value="rename" />
+                    <input type="hidden" name="id" value={m.id} />
+                    <input class="adm-input" type="text" name="title" value={m.title} placeholder="Name" />
+                    <input class="adm-input" type="text" name="tags" value={(m.tags ?? []).join(", ")} placeholder="Tags" />
+                    <input class="adm-input" type="text" name="alt_text" value={m.altText} placeholder="Alt text" />
+                    <div class="editor-actions">
+                      <Button type="submit">Save</Button>
+                      <a class="cancel" href={here({ edit: "" })}>Cancel</a>
+                    </div>
+                  </form>
+                ) : (
+                  <figcaption>
+                    <span class="name">{m.title || `${m.filename.slice(0, 14)}…`}</span>
+                    <span class="meta">
+                      {m.width && m.height ? `${m.width}×${m.height} · ` : ""}{kb(m.sizeBytes)}
+                    </span>
+                    {
+                      (m.tags ?? []).length > 0 && (
+                        <span class="itemtags">
+                          {m.tags.map((t: string) => <a class="tag" href={here({ tag: t, edit: "" })}>{t}</a>)}
+                        </span>
+                      )
+                    }
+                    <span class="store" data-r2={m.storage === "r2" || undefined}>{m.storage}</span>
+                    <span class="actions">
+                      <a href={here({ edit: String(m.id) })}>Rename</a>
+                      <form method="POST" class="del">
+                        <CsrfField />
+                        <input type="hidden" name="action" value="delete" />
+                        <input type="hidden" name="id" value={m.id} />
+                        <button type="submit" class="danger">Delete</button>
+                      </form>
+                    </span>
+                  </figcaption>
+                )
+              }
             </figure>
           ))
         }

@@ -1,0 +1,265 @@
+---
+/* An image field you can actually fill in.
+ *
+ * The old way was: leave the page, go to Media, upload, copy the id, come
+ * back, paste the number. Five steps and a number to remember, for the single
+ * most common thing there is to do on a page — put a picture on it.
+ *
+ * So this uploads in place. The file goes to the same endpoint the media page
+ * uses, which is why anything uploaded here appears in the library like
+ * anything else: there is one upload path, not two. A name and tags can be
+ * given at the same moment, because that is the moment you know what the
+ * picture is; typed later, it never happens.
+ *
+ * Picking something already uploaded is the other half of not-pasting-ids, so
+ * the library is here too.
+ *
+ * Needs JavaScript, and says so when it does not have it — an upload that
+ * cannot leave the page has to be a page load, and the id box is the honest
+ * fallback rather than a control that silently does nothing.
+ */
+interface Props {
+  /** The form field that carries the id. */
+  name: string;
+  value: number | string | null;
+  label?: string;
+}
+const { name, value, label = "Image" } = Astro.props;
+const current = value === null || value === "" ? "" : String(value);
+---
+
+<div class="mediafield" data-mediafield>
+  <span class="adm-lbl">{label}</span>
+  <input type="hidden" name={name} value={current} data-mf-value />
+
+  <div class="mf-row">
+    <figure class="mf-preview" data-mf-preview data-empty={current ? undefined : "true"}>
+      <img data-mf-img alt="" hidden />
+      <figcaption data-mf-caption>Nothing chosen</figcaption>
+    </figure>
+
+    <div class="mf-controls">
+      <div class="mf-actions">
+        <label class="mf-btn">
+          <span>Upload a file</span>
+          <input type="file" data-mf-file
+                 accept="image/png,image/jpeg,image/webp,image/avif,image/svg+xml" />
+        </label>
+        <button type="button" class="mf-btn mf-btn--quiet" data-mf-browse>
+          Choose existing
+        </button>
+        <button type="button" class="mf-btn mf-btn--quiet" data-mf-clear hidden>
+          Remove
+        </button>
+      </div>
+
+      <div class="mf-naming">
+        <input class="adm-input" type="text" data-mf-title
+               placeholder="Name it — “Stream overlay, corner frame”" />
+        <input class="adm-input" type="text" data-mf-tags
+               placeholder="Tags, comma separated" />
+      </div>
+
+      <p class="mf-status" data-mf-status role="status"></p>
+    </div>
+  </div>
+
+  <div class="mf-library" data-mf-library hidden>
+    <input class="adm-input mf-search" type="search" data-mf-search
+           placeholder="Search the library…" />
+    <div class="mf-grid" data-mf-grid></div>
+  </div>
+
+  <noscript>
+    <p class="adm-note">
+      Uploading in place needs JavaScript. Without it, upload on the Media page
+      and put the id here:
+    </p>
+    <input class="adm-input" type="text" name={name} value={current} />
+  </noscript>
+</div>
+
+<style>
+  .mediafield { display: grid; gap: 8px; }
+  .mf-row { display: flex; gap: 14px; align-items: flex-start; flex-wrap: wrap; }
+
+  .mf-preview {
+    margin: 0; width: 128px; min-height: 96px; display: grid; gap: 4px;
+    place-content: center; text-align: center;
+    border: 1px dashed var(--line, #d8d2cc); border-radius: 8px; padding: 8px;
+    background: var(--surface-2, #faf7f4); overflow: hidden;
+  }
+  .mf-preview img { max-width: 100%; max-height: 120px; border-radius: 4px; display: block; }
+  .mf-preview figcaption { font-size: 11px; opacity: .7; word-break: break-word; }
+  .mf-preview:not([data-empty]) { border-style: solid; }
+
+  .mf-controls { flex: 1 1 260px; display: grid; gap: 8px; min-width: 0; }
+  .mf-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+  .mf-btn {
+    display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
+    padding: 6px 12px; border-radius: 6px; font-size: 13px;
+    border: 1px solid var(--line, #d8d2cc); background: var(--surface, #fff);
+  }
+  .mf-btn:hover { border-color: var(--accent, #a8577a); }
+  .mf-btn input[type="file"] { display: none; }
+  .mf-btn--quiet { opacity: .85; }
+
+  .mf-naming { display: grid; gap: 6px; grid-template-columns: 1fr 1fr; }
+  @media (max-width: 560px) { .mf-naming { grid-template-columns: 1fr; } }
+
+  .mf-status { margin: 0; font-size: 12px; min-height: 1em; opacity: .8; }
+  .mf-status[data-bad] { color: var(--bad, #a33); opacity: 1; }
+
+  .mf-library { display: grid; gap: 8px; }
+  .mf-grid {
+    display: grid; gap: 8px; max-height: 260px; overflow-y: auto; padding: 4px;
+    grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+  }
+  .mf-pick {
+    padding: 0; border: 2px solid transparent; border-radius: 6px;
+    background: none; cursor: pointer; line-height: 0;
+  }
+  .mf-pick img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 4px; }
+  .mf-pick:hover, .mf-pick:focus-visible { border-color: var(--accent, #a8577a); }
+  .mf-pick span {
+    display: block; font-size: 10px; line-height: 1.3; padding-top: 2px;
+    opacity: .75; word-break: break-word;
+  }
+</style>
+
+<script>
+  type Item = {
+    id: number; url: string; title: string; filename: string;
+    tags: string[]; width: number | null; height: number | null;
+  };
+
+  document.querySelectorAll<HTMLElement>("[data-mediafield]").forEach((root) => {
+    const $ = <T extends Element>(sel: string) => root.querySelector<T>(sel);
+
+    const hidden = $<HTMLInputElement>("[data-mf-value]")!;
+    const preview = $<HTMLElement>("[data-mf-preview]")!;
+    const img = $<HTMLImageElement>("[data-mf-img]")!;
+    const caption = $<HTMLElement>("[data-mf-caption]")!;
+    const file = $<HTMLInputElement>("[data-mf-file]")!;
+    const titleBox = $<HTMLInputElement>("[data-mf-title]")!;
+    const tagsBox = $<HTMLInputElement>("[data-mf-tags]")!;
+    const status = $<HTMLElement>("[data-mf-status]")!;
+    const clear = $<HTMLButtonElement>("[data-mf-clear]")!;
+    const browse = $<HTMLButtonElement>("[data-mf-browse]")!;
+    const library = $<HTMLElement>("[data-mf-library]")!;
+    const grid = $<HTMLElement>("[data-mf-grid]")!;
+    const search = $<HTMLInputElement>("[data-mf-search]")!;
+
+    function say(message: string, bad = false) {
+      status.textContent = message;
+      if (bad) status.setAttribute("data-bad", "");
+      else status.removeAttribute("data-bad");
+    }
+
+    function show(item: Item | null) {
+      hidden.value = item ? String(item.id) : "";
+      clear.hidden = !item;
+      if (!item) {
+        img.hidden = true;
+        img.removeAttribute("src");
+        caption.textContent = "Nothing chosen";
+        preview.setAttribute("data-empty", "true");
+        return;
+      }
+      img.src = item.url;
+      img.alt = item.title || item.filename;
+      img.hidden = false;
+      caption.textContent = item.title || item.filename.slice(0, 12) + "…";
+      preview.removeAttribute("data-empty");
+    }
+
+    async function load(q = ""): Promise<Item[]> {
+      const r = await fetch(`/api/admin/media${q ? `?q=${encodeURIComponent(q)}` : ""}`);
+      return r.ok ? await r.json() : [];
+    }
+
+    /* The field is rendered with an id and nothing else — the picture it names
+       lives at a URL the server knows and the markup does not — so the first
+       thing to do is find out what that id actually is. */
+    if (hidden.value) {
+      load().then((items) => {
+        const found = items.find((i) => String(i.id) === hidden.value);
+        if (found) show(found);
+        else caption.textContent = `#${hidden.value} — not in the library`;
+      });
+    }
+
+    file.addEventListener("change", async () => {
+      const chosen = file.files?.[0];
+      if (!chosen) return;
+      say(`Uploading ${chosen.name}…`);
+
+      const body = new FormData();
+      body.append("file", chosen);
+      if (titleBox.value.trim()) body.append("title", titleBox.value.trim());
+      if (tagsBox.value.trim()) body.append("tags", tagsBox.value.trim());
+
+      try {
+        const r = await fetch("/api/admin/media", { method: "POST", body });
+        const item = await r.json().catch(() => null);
+        if (!r.ok) {
+          say(item?.detail ?? "That did not upload.", true);
+          return;
+        }
+        show(item);
+        say(item.deduped
+          ? "Already in the library — the same image, so the same file."
+          : "Uploaded, and added to the library.");
+        file.value = "";
+      } catch {
+        say("That did not upload.", true);
+      }
+    });
+
+    clear.addEventListener("click", () => {
+      show(null);
+      say("Removed from this item. The image itself is still in the library.");
+    });
+
+    browse.addEventListener("click", async () => {
+      library.hidden = !library.hidden;
+      if (library.hidden) return;
+      grid.textContent = "Loading…";
+      paint(await load());
+      search.focus();
+    });
+
+    let timer: number | undefined;
+    search.addEventListener("input", () => {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(async () => paint(await load(search.value)), 200);
+    });
+
+    function paint(items: Item[]) {
+      grid.textContent = "";
+      if (!items.length) {
+        grid.textContent = "Nothing matches.";
+        return;
+      }
+      for (const item of items) {
+        const button = document.createElement("button");
+        button.type = "button";           // never submits the form it sits in
+        button.className = "mf-pick";
+        const thumb = document.createElement("img");
+        thumb.src = item.url;
+        thumb.alt = item.title || item.filename;
+        thumb.loading = "lazy";
+        const name = document.createElement("span");
+        name.textContent = item.title || item.filename.slice(0, 10) + "…";
+        button.append(thumb, name);
+        button.addEventListener("click", () => {
+          show(item);
+          library.hidden = true;
+          say(`Using ${item.title || item.filename.slice(0, 12)}.`);
+        });
+        grid.append(button);
+      }
+    }
+  });
+</script>
