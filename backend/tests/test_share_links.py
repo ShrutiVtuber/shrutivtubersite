@@ -70,9 +70,30 @@ def test_chart_pages_ask_not_to_be_indexed(page: str):
     assert re.search(r"\bnoindex\b", text), f"{page} does not send noindex"
 
 
-def test_robots_keeps_crawlers_out_of_chart_pages():
+def test_robots_does_not_block_the_chart_pages():
+    """
+    This test used to assert the opposite, and the reversal is the point.
+
+    Blocking `/chart/` in robots.txt looked like the careful choice — those
+    pages carry birth data. It is in fact the weaker one. A disallowed URL can
+    still be listed in a result from links alone, because the crawler is
+    forbidden to FETCH it and so never reads the `noindex` that would have kept
+    it out. `noindex` is the mechanism, and it only works on a page a crawler
+    is allowed to read; the test above is the one doing the real work.
+
+    It also broke the share loop, which is what made it visible: comparisons are
+    posted as `/chart/compare/s/…`, and X, Discord, Facebook and Slack all read
+    robots.txt before fetching a link to build its preview. Every shared card
+    was a bare grey link.
+
+    Full crawl rules in test_robots_allows_shares.py.
+    """
     robots = (SRC / "pages" / "robots.txt.ts").read_text()
-    assert "Disallow: /chart/" in robots
+    live = robots[robots.index("Sitemap:") - 400:]
+    assert "Disallow: /chart/" not in live, (
+        "the chart pages are blocked again — every shared comparison will "
+        "unfurl without its card"
+    )
 
 
 def test_the_shared_page_does_not_print_the_place_name():
@@ -109,7 +130,7 @@ def test_the_person_block_is_built_after_the_links_it_reads():
     search engines find it.
     """
     base = (SRC / "layouts" / "BaseLayout.astro").read_text()
-    assert base.index("const socials") < base.index("const jsonLd")
+    assert base.index("const socials") < base.index("const homeLd")
 
 
 def test_the_journal_keeps_the_structured_data_it_is_given():

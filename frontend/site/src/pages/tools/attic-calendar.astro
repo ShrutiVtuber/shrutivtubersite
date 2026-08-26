@@ -91,16 +91,11 @@ const RULE_NAME: Record<string, string> = {
 ---
 
 <ToolLayout
-  title="Attic calendar"
-  native="Ἀττικός"
-  description="The lunisolar month of Athens, kept current: opened at the noumenia, running full or hollow, and counted backwards through its last third."
-  glyph="☽"
   rule={RULE_NAME[reckoning]}
   ruleLabel="month opens"
   place={place}
   date={d?.gregorian}
   disclosure="○"
-  reckoned="A month opens at the noumenia and runs thirty days (full) or twenty-nine (hollow), which emerges from where the next conjunction falls rather than from a table. The first two thirds count forward; the last counts backwards by how many days remain, and the final day — ἕνη καὶ νέα, 'old and new' — belongs to both months at once. Twelve such months fall about eleven days short of the solar year, so a thirteenth is inserted seven times in nineteen, after Poseideon."
 >
   <div slot="parameters" class="params">
     <DisagreementControl

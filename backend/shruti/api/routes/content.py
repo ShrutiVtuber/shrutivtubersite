@@ -19,7 +19,7 @@ from sqlmodel import select
 from shruti.core.db import get_session
 from shruti.models import (
     Credit, FanArt, Media, Outfit, ProfileField, Project, Section, SocialLink,
-    Sponsor,
+    Sponsor, Tool,
 )
 
 router = APIRouter(prefix="/api/content", tags=["content"])
@@ -255,6 +255,47 @@ async def get_featured_sponsors(
         if len(out) == FEATURED_SPONSORS:
             break
     return out
+
+
+@router.get("/tools")
+async def get_tools(session: AsyncSession = Depends(get_session)) -> list[dict]:
+    """
+    The instruments, as she has them.
+
+    This table has existed since the site was designed and nothing read it. The
+    name and the one-line description of every instrument lived instead as
+    literals inside each .astro file — so the only copy on the site she could
+    not edit was the copy most likely to need editing, and the admin screen that
+    looked like it edited them changed nothing at all.
+
+    Now the row is the source: the tool page takes its heading, its subtitle and
+    its meta description from here, and /tools builds its cards from the same
+    rows. One edit, three places, no drift.
+
+    Hidden rows are withheld rather than marked. A tool is hidden because it has
+    no page behind it — geomantic-shield was designed and never built — and a
+    card linking to a 404 is worse than no card.
+    """
+    rows = (
+        await session.execute(
+            select(Tool).where(Tool.visible.is_(True)).order_by(Tool.position)
+        )
+    ).scalars().all()
+    return [
+        {
+            "slug": t.slug,
+            "name": t.name,
+            "native": t.native,
+            "glyph": t.glyph or "✶",
+            "category": t.category,
+            "summary": t.summary,
+            "reckoned": t.reckoned,
+            "landingBlurb": t.landing_blurb or t.summary,
+            "bodyMd": t.body_md,
+            "href": f"/tools/{t.slug}",
+        }
+        for t in rows
+    ]
 
 
 @router.get("/fan-art")

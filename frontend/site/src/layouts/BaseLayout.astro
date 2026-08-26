@@ -32,9 +32,18 @@ interface Props {
    */
   ogImage?: string;
   ogImageAlt?: string;
+  /**
+   * Page-specific structured data, already shaped.
+   *
+   * The home page's Person/WebSite is built below and is the site's identity;
+   * this is for what a particular page IS — an instrument, a product, a class.
+   * Passed in rather than inferred, because guessing a type from a URL is how
+   * a shop page ends up claiming to be a course.
+   */
+  jsonLd?: Record<string, unknown> | null;
 }
 const { title, description = "", bare = false, noindex = false,
-        ogImage, ogImageAlt } = Astro.props;
+        ogImage, ogImageAlt, jsonLd: pageLd = null } = Astro.props;
 const siteUrl = import.meta.env.SHRUTI_SITE_URL ?? "https://shrutivtuber.com";
 
 const [live, links] = await Promise.all([
@@ -63,7 +72,7 @@ const socials: SocialLink[] = Object.values(links?.groups ?? {})
  * Emitted only on the home page. Repeating a Person on every page says the
  * same thing forty times and dilutes which URL is the canonical one for it. */
 const isHome = Astro.url.pathname === "/";
-const jsonLd = isHome
+const homeLd = isHome
   ? {
       "@context": "https://schema.org",
       "@graph": [
@@ -119,7 +128,8 @@ const jsonLd = isHome
     <link rel="alternate" type="application/rss+xml"
           title="Shruti — the journal" href="/journal/rss.xml" />
 
-    {jsonLd && <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />}
+    {homeLd && <script type="application/ld+json" set:html={JSON.stringify(homeLd)} />}
+    {pageLd && <script type="application/ld+json" set:html={JSON.stringify(pageLd)} />}
     <meta name="theme-color" content="#121829" media="(prefers-color-scheme: dark)" />
     <meta name="theme-color" content="#F8F6F3" media="(prefers-color-scheme: light)" />
 

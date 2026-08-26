@@ -331,8 +331,28 @@ class Tool(TimestampMixin, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     slug: str = Field(index=True, unique=True)
     name: str
+    # The one line. It is the page's own subtitle, its meta description and its
+    # card on /tools — one row, three places, so there is nowhere for them to
+    # drift apart. It used to be a literal in each .astro file, which meant a
+    # correction had to be made twice and could only be made by an engineer.
     summary: str = ""
     body_md: str = ""
+
+    # The mark beside the name. Type, not an icon — ☉ ◐ Σ.
+    glyph: str = "✶"
+    # Native-script subtitle where the instrument has one: पञ्चाङ्ग, Ἀττικός.
+    native: str = ""
+    # How /tools groups them. Not alphabetical — it is how they are used.
+    category: str = ""
+    # "How it is reckoned" — the passage in the aside explaining the rule the
+    # instrument follows. Several hundred words of authored prose per tool, and
+    # it lived in the .astro file, which put the most correction-prone writing
+    # on the site behind a deploy.
+    reckoned: str = ""
+    # The landing page's own line for this instrument — shorter and aimed at
+    # somebody who has not decided to care yet. A different job from `summary`,
+    # which is why it is a different column and not the same one reused.
+    landing_blurb: str = ""
     locale: str = Field(default="en", index=True)   # en | el — Greek pages are uncontested
     position: int = Field(default=0)
     visible: bool = Field(default=False)

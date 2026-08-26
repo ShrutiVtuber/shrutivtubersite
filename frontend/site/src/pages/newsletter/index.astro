@@ -42,7 +42,7 @@ interface Issue { slug: string; subject: string; sentAt: string | null }
 const issues = (await site<Issue[]>("/api/newsletter/archive")) ?? [];
 ---
 
-<BaseLayout title="The monthly letter — Shruti" description="One letter a month, and the archive of every one so far.">
+<BaseLayout title="The monthly letter — Shruti" description="One letter a month on magick, astrology and what got built, plus the full archive. No tracking pixels, and one click to leave whenever you like.">
   <div class="page letter">
     <SectionHeader
       as="h1" glyph="⁂" eyebrow="The monthly letter" title="Once a month"

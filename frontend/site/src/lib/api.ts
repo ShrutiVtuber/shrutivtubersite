@@ -81,6 +81,7 @@ export const PATHS = {
   schedule: "/api/schedule",
   links: "/api/content/links",
   projects: "/api/content/projects",
+  tools: "/api/content/tools",
   profile: "/api/content/profile",
   page: (name: string) => `/api/content/page/${name}`,
   products: "/api/shop/products",

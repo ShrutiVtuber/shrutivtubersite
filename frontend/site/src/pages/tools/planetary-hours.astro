@@ -75,15 +75,11 @@ const GLYPH: Record<string, string> = {
 ---
 
 <ToolLayout
-  title="Planetary hours"
-  description="The day divided by its own light: twelve hours from sunrise to sunset and twelve more from sunset to sunrise, so an hour is only sixty minutes twice a year."
-  glyph="☉"
   rule={RULE_NAME[convention]}
   ruleLabel="sunrise"
   place={place}
   date={new Date().toISOString().slice(0, 10)}
   disclosure="○"
-  reckoned="Sunrise to sunset is divided into twelve equal parts and sunset to the next sunrise into twelve more, so day-hours and night-hours are the same length only at the equinoxes. The first hour of the day belongs to the ruler of the weekday, and the rest follow the Chaldean order — Saturn, Jupiter, Mars, Sun, Venus, Mercury, Moon — running continuously through the night into the next dawn."
 >
   <div slot="parameters" class="params">
     <DisagreementControl

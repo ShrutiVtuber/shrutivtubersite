@@ -8,13 +8,17 @@
  */
 import BaseLayout from "./BaseLayout.astro";
 import ProvenanceBlock from "../components/tools/ProvenanceBlock.astro";
+import { instruments } from "../lib/instruments";
 
 interface Props {
-  title: string;
-  /** Native-script subtitle where one exists — पञ्चाङ्ग, Ἀττικός. */
-  native?: string;
-  description: string;
-  glyph?: string;
+  /* Name, subtitle, description, glyph and the "how it is reckoned" passage all
+     come from the instrument's row now — see lib/instruments.ts. They are not
+     props any more, because a prop is a second place to write them and the
+     whole point was to have one.
+
+     What IS still a prop is everything computed per request: which rule is in
+     force for the options this visitor chose, the place, the date. Those are
+     state, not copy, and they do not belong in a table. */
   /** Meta bar: the rule currently in force. */
   rule?: string;
   ruleLabel?: string;
@@ -28,33 +32,78 @@ interface Props {
   noJs?: string;
 }
 const {
-  title, native, description, glyph = "✶", rule, ruleLabel,
-  place, date, disclosure = "○", reckoned, where = "server", noJs,
+  rule, ruleLabel, place, date, disclosure = "○", where = "server", noJs,
 } = Astro.props;
 
-/* The solar and lunar trackers were missing from here, so the only way to
-   reach them was a link on the Today page — an instrument you can only find by
-   already being somewhere else is one most people never find. They give the
-   adoration hours: sunrise, culmination, sunset and nadir, and the same four
-   for the Moon.
-   Named "stations" here because that is what the pages they open are headed,
-   and a link that disagrees with its destination is a papercut. */
-const INSTRUMENTS: [string, string, string][] = [
-  ["☉", "Planetary hours", "/tools/planetary-hours"],
-  ["◉", "Solar stations", "/tools/solar-stations"],
-  ["☾", "Lunar stations", "/tools/lunar-stations"],
-  ["◐", "Pañcāṅga", "/tools/pancanga"],
-  ["☾", "Hindu calendar", "/tools/hindu-calendar"],
-  ["☽", "Attic calendar", "/tools/attic-calendar"],
-  ["✶", "Natal chart", "/tools/natal-chart"],
-  ["Σ", "Isopsephy", "/tools/isopsephy"],
-  ["●", "Sigil generator", "/tools/sigil-generator"],
-];
 const here = Astro.url.pathname;
+const slug = here.replace(/^\/tools\//, "").replace(/\/$/, "");
+const all = await instruments();
+const self = all.find((i) => i.slug === slug);
+
+/* No row means the instrument is hidden or the backend is unreachable. The
+   page still computes — that is the daemon's job, not this table's — but it
+   says so with the slug rather than inventing a title, because a page headed
+   with a plausible guess is one nobody notices is broken. */
+const title = self?.name ?? slug.replace(/-/g, " ");
+const native = self?.native ?? "";
+const description = self?.summary ?? "";
+const glyph = self?.glyph || "✶";
+const reckoned = self?.reckoned ?? "";
+
+/* The list is shared with the /tools hub — see lib/instruments.ts for why. */
 const DISCLOSURE_WORD = { "○": "public", "◐": "named, not detailed", "●": "under seal" };
+
+/* What this page IS, for machines.
+ *
+ * Nothing outside the site could previously tell that these nine pages are
+ * working instruments rather than articles about instruments. That matters
+ * less for a blue link than it used to and more for everything else: an
+ * assistant asked "how do I work out the planetary hour right now" picks what
+ * it can identify as a tool, and `WebApplication` plus a zero-price `Offer` is
+ * how you say free, works in a browser, no sign-in.
+ *
+ * Deliberately not claiming a rating or a review count. Both are eligible for
+ * stars in a result, both would be invented, and inventing them is the one
+ * thing in this file that could get the site penalised rather than ignored.
+ */
+const SITE = (import.meta.env.SHRUTI_SITE_URL ?? "https://shrutivtuber.com").replace(/\/$/, "");
+const pageUrl = `${SITE}${here}`;
+
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebApplication",
+      "@id": `${pageUrl}#app`,
+      name: title,
+      url: pageUrl,
+      description,
+      applicationCategory: "ReferenceApplication",
+      operatingSystem: "Any",
+      /* Every instrument computes server-side and renders without scripting.
+         It is unusual enough to be worth stating. */
+      browserRequirements: "No JavaScript required",
+      isAccessibleForFree: true,
+      offers: { "@type": "Offer", price: "0", priceCurrency: "EUR" },
+      inLanguage: "en",
+      author: { "@id": `${SITE}/#person` },
+      publisher: { "@id": `${SITE}/#person` },
+      isPartOf: { "@id": `${SITE}/#website` },
+    },
+    {
+      "@type": "BreadcrumbList",
+      "@id": `${pageUrl}#breadcrumbs`,
+      itemListElement: [
+        { "@type": "ListItem", position: 1, name: "Home", item: `${SITE}/` },
+        { "@type": "ListItem", position: 2, name: "Instruments", item: `${SITE}/tools` },
+        { "@type": "ListItem", position: 3, name: title, item: pageUrl },
+      ],
+    },
+  ],
+};
 ---
 
-<BaseLayout title={`${title} — Shruti`} description={description}>
+<BaseLayout title={`${title} — Shruti`} description={description} jsonLd={jsonLd}>
   <div class="page tool">
     <section class="tool-hero">
       <div class="tool-hero-inner">
@@ -106,7 +155,7 @@ const DISCLOSURE_WORD = { "○": "public", "◐": "named, not detailed", "●": 
       <span class="t-eyebrow">Other instruments</span>
       <div class="others-row">
         {
-          INSTRUMENTS.filter(([, , href]) => href !== here).map(([g, name, href]) => (
+          all.filter((i) => i.href !== here).map(({ glyph: g, name, href }) => (
             <a href={href}>
               <span aria-hidden="true" class="t-glyph">{g}</span> {name}
             </a>

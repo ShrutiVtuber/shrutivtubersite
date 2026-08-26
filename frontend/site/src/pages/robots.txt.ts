@@ -8,11 +8,24 @@
  * crawler following them produces sign-in pages in search results and a pile
  * of pointless load. `/api/` is excluded because indexing JSON helps nobody.
  *
- * `/chart/` is here for a stronger reason than tidiness. Those pages are
- * reached by an unguessable token and every one of them carries somebody's
- * chart, which is their birth data drawn. They already send `noindex`; this
- * says it a second way, because a shared link that turns up in a search
- * result is a failure nobody would notice until it had happened.
+ * `/chart/` is deliberately NOT disallowed, and that is the opposite of what
+ * it used to say. Those pages carry somebody's birth data drawn, so the first
+ * instinct is to block the whole prefix — but blocking here is both weaker
+ * and more damaging than it looks.
+ *
+ * Weaker, because a URL disallowed in robots.txt can still be listed in a
+ * search result from links alone: the crawler is forbidden to FETCH it, so it
+ * never reads the `noindex` that would actually keep it out. Keeping a page
+ * out of an index is `noindex`'s job, and `noindex` only works on a page a
+ * crawler is allowed to read. Every private chart page sends it.
+ *
+ * More damaging, because the compatibility share link — the whole point of
+ * that feature — lives at `/chart/compare/s/…`, and its card at
+ * `/api/charts/compare/…/card.png`. Twitter/X, Discord, Facebook and Slack
+ * all check robots.txt before fetching a link to build its preview. Under the
+ * old rules every shared comparison unfurled as a bare grey link with no
+ * image, on exactly the platforms the feature exists for. Nothing errors,
+ * nothing logs, and the page itself is perfectly fine when opened by hand.
  */
 import type { APIRoute } from "astro";
 
@@ -54,6 +67,9 @@ export const GET: APIRoute = async () => {
     );
   }
 
+  /* `Allow: /api/charts/compare/` sits under the broader `Disallow: /api/`
+     on purpose. RFC 9309 resolves a conflict by the LONGEST matching rule, so
+     the share card is reachable while the rest of the JSON stays out. */
   const body = `User-agent: *
 Allow: /
 Disallow: /admin
@@ -61,7 +77,7 @@ Disallow: /account
 Disallow: /signin
 Disallow: /signup
 Disallow: /api/
-Disallow: /chart/
+Allow: /api/charts/compare/
 
 Sitemap: ${origin}/sitemap.xml
 `;

@@ -2,12 +2,19 @@
 /* Ported from `components/feedback/EmptyState.jsx`; contract in
    `EmptyState.d.ts`. Empty states are AUTHORED, quiet and honest — never a
    shrug, never fake liveness. The glyph is type, not an icon. */
-interface Props { glyph?: string; title: string; body?: string; compact?: boolean; }
-const { glyph = "○", title, body, compact = false } = Astro.props;
+interface Props {
+  glyph?: string; title: string; body?: string; compact?: boolean;
+  /* An empty state is usually a hole inside a page that has its own heading,
+     so h3 is right. On the few pages that ARE the empty state — an expired
+     sign-in link, say — it is the only heading there is, and a page whose
+     outline starts at h3 has no top level at all. */
+  as?: "h1" | "h2" | "h3";
+}
+const { glyph = "○", title, body, compact = false, as: Tag = "h3" } = Astro.props;
 ---
 <div class="sh-empty" data-compact={compact}>
   <span class="sh-em-glyph t-glyph" aria-hidden="true">{glyph}</span>
-  <h3 class="sh-em-title">{title}</h3>
+  <Tag class="sh-em-title">{title}</Tag>
   {body && <p class="sh-em-body">{body}</p>}
   <div class="sh-em-action"><slot name="action" /></div>
 </div>

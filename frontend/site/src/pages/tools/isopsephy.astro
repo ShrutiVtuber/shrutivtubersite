@@ -33,15 +33,10 @@ const current = CIPHERS[slug];
 ---
 
 <ToolLayout
-  title="Isopsephy"
-  native="Ἰσοψηφία"
-  description="Letter-reckoning in six scripts, each by its own table. Matches are only ever found inside one system."
-  glyph="Σ"
   rule={`${LANGUAGE_LABEL[current.language]} — ${current.name}`}
   ruleLabel="system"
   disclosure="○"
   where="device"
-  reckoned="Each script is summed under its own table and nothing is converted between them. Greek keeps the numeral-only letters — digamma 6, koppa 90, sampi 900 — because omitting them silently produces wrong sums for many words. Hebrew finals take ordinary values. Arabic uses abjad order, which is not alphabet order. Coptic follows the Greek scheme plus soou, fai and shai; the demotic-derived letters carry no value, which is a fact about the system rather than an omission."
 >
   <div slot="parameters" class="params">
     <form class="cipher-form" method="GET">

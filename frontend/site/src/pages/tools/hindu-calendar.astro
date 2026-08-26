@@ -111,16 +111,11 @@ const RULE_NAME: Record<string, string> = {
 ---
 
 <ToolLayout
-  title="Hindu calendar"
-  native="पञ्चाङ्ग · वर्ष"
-  description="The lunisolar year: its months with their Gregorian spans, the eras that count it, and the festivals each month carries."
-  glyph="☾"
   rule={RULE_NAME[reckoning]}
   ruleLabel="month ends"
   place={place}
   date={String(year)}
   disclosure="○"
-  reckoned="A lunar month is one lunation, and the year is twelve of them — about eleven days short of the solar year. When a lunar month contains no solar transition an intercalary month is inserted, adhika māsa, and the year runs to thirteen. The rarer opposite, kṣaya māsa, removes one. Festivals never fall in an adhika month: they wait for the nija month that follows, and that rule is authentic rather than a simplification."
 >
   <div slot="parameters" class="params">
     <DisagreementControl

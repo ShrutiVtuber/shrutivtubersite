@@ -28,7 +28,12 @@ const STATIC: [path: string, priority: string, changefreq: string][] = [
   ["/work", "0.7", "monthly"],
   ["/schedule", "0.7", "weekly"],
   ["/videos", "0.7", "weekly"],
-  ["/journal", "0.8", "weekly"],
+  /* Trailing slash deliberate: /journal 301s to /journal/, and a sitemap
+     that lists the redirecting form spends a crawl on the hop every time. */
+  ["/journal/", "0.8", "weekly"],
+  /* The hub the nine instruments hang off. It is the page worth linking to
+     from outside, so it outranks any single calculator in this list. */
+  ["/tools", "0.9", "monthly"],
   ["/horoscopes", "0.8", "weekly"],
   ["/horoscopes/archive", "0.6", "weekly"],
   ["/fan-works", "0.5", "monthly"],

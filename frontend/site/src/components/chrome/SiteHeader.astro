@@ -90,8 +90,11 @@ const current = (href: string) => (href === "/" ? here === "/" : here.startsWith
         ))
       }
       <span class="site-menu-rule"></span>
-      <a href="/tools/solar-stations">Solar stations</a>
-      <a href="/tools/lunar-stations">Lunar stations</a>
+      {/* One link where two used to be. The menu listed the solar and lunar
+          stations — two of nine, picked because they were the two with no
+          other way in — and left the other seven reachable only from the
+          landing page. The hub covers all of them and is one item shorter. */}
+      <a href="/tools">Instruments</a>
       <a href="/newsletter">The monthly letter</a>
       <a href={signedIn ? "/account" : "/signin"}>{signedIn ? "Account" : "Sign in"}</a>
       <a href="/support">Support the work</a>

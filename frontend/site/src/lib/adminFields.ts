@@ -255,8 +255,34 @@ export const FIELDS: Record<string, Record<string, FieldSpec>> = {
   },
 
   tools: {
-    name: { label: "Name", group: "Content" },
-    summary: { label: "Summary", group: "Content", help: "One line, shown in the tools list." },
+    name: { label: "Name", group: "Content", help: "The heading on the instrument's own page." },
+    native: {
+      label: "Native subtitle", group: "Content",
+      placeholder: "पञ्चाङ्ग",
+      help: "In its own script, where it has one. Sits beside the name. Leave blank otherwise.",
+    },
+    summary: {
+      label: "One line", type: "textarea", group: "Content",
+      help: "Does three jobs: the line under the heading, the card on /tools, and the description a search result or a Discord link shows. Aim for 120–160 characters.",
+    },
+    landing_blurb: {
+      label: "Line on the landing page", type: "textarea", group: "Content",
+      help: "The card on the front page. Shorter and more inviting than the line above — it is read by someone who has not decided to care yet. Leave blank to reuse the one line.",
+    },
+    reckoned: {
+      label: "How it is reckoned", type: "textarea", group: "Content",
+      help: "The rule the instrument follows, shown in the aside. This is the passage that explains why the numbers are what they are.",
+    },
+    glyph: {
+      label: "Glyph", group: "Details",
+      placeholder: "☉",
+      help: "One character, set in the display face. Type, not an icon.",
+    },
+    category: {
+      label: "Group", group: "Details",
+      placeholder: "Calendars",
+      help: "How /tools groups it — Time, Calendars, Figures, Letters. A new name here makes a new group, in the order the instruments are ordered.",
+    },
     body_md: COMMON.body_md,
     media_id: { label: "Image", type: "media", group: "Image" },
     locale: { label: "Language", group: "Details", help: "Leave blank unless it is language-specific." },

@@ -176,15 +176,11 @@ const ASPECT_BASIS: Record<string, string> = {
 ---
 
 <ToolLayout
-  title="Natal chart"
-  description="A figure for a moment and a place. The tables are the reading; the wheel is drawn from the same numbers."
-  glyph="✶"
   rule={tradition === "vedic" ? "sidereal zodiac, graha dṛṣṭi" : "tropical zodiac, whole-sign places"}
   ruleLabel="tradition"
   place={place || (date ? `${lat.toFixed(2)}, ${lon.toFixed(2)}` : undefined)}
   date={date || undefined}
   disclosure="○"
-  reckoned="Positions come from Swiss Ephemeris and are shown as computed, not rounded first and not interpreted. Which zodiac they are read against, and which houses they are placed in, is the choice above — the two traditions sit about twenty-four degrees apart, which is enough to move the Sun a whole sign for the same birth."
 >
   <div slot="parameters" class="params">
     <DisagreementControl

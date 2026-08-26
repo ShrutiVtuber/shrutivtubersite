@@ -23,6 +23,7 @@ import StationTable from "../../components/tables/StationTable.astro";
 import ExportBlock from "../../components/tables/ExportBlock.astro";
 import Button from "../../components/forms/Button.astro";
 import { stations, nextStation, SOLAR, LUNAR, GLYPHS, PRESETS } from "../../lib/stations";
+import { instrument } from "../../lib/instruments";
 
 /* SSR, so no getStaticPaths — params come off the URL. Anything that is not
    one of the two known kinds is a 404 rather than a silent fallback to solar,
@@ -82,7 +83,11 @@ const dedications = names.map(
   (n) => table?.table?.[0]?.stations.find((s) => s.name === n)?.dedication ?? "",
 );
 const feed = `/api/astro/stations/ical?lat=${lat}&lon=${lon}&body=${body}&preset=${preset}&days=${days}`;
-const title = kind === "lunar" ? "Lunar stations" : "Solar stations";
+/* Name and copy from the instrument's row, like every other tool. This page
+   is two instruments rather than one — solar and lunar are separate rows — so
+   it looks them up by the kind in the URL. */
+const self = await instrument(`${kind}-stations`);
+const title = self?.name ?? (kind === "lunar" ? "Lunar stations" : "Solar stations");
 
 /* Polar. The test is NOT "every cell is empty" — at Longyearbyen in December
  * noon and midnight still occur, because a culmination happens whether or not
@@ -109,19 +114,15 @@ const polarReason = noRiseOrSet
 
 <BaseLayout
   title={`${title} — Shruti`}
-  description={`Four daily ${kind} stations for any place, up to a month ahead, exportable to your calendar.`}
+  description={self?.summary ?? ""}
 >
   <div class="page stations">
     <SectionHeader
       as="h1"
-      glyph={kind === "lunar" ? "☾" : "☉"}
+      glyph={self?.glyph || (kind === "lunar" ? "☾" : "☉")}
       eyebrow="Theourgia · instrument"
       title={title}
-      body={
-        kind === "lunar"
-          ? "Moonrise, culmination, moonset and nadir — with the Moon's phase beside them. The Moon rises about fifty minutes later each day and skips a civil day regularly; where a station does not occur, the table says so."
-          : "Sunrise, noon, sunset and midnight — the structural skeleton of a daily rite. The tool computes the times; which deity belongs to which station is yours to choose or ignore."
-      }
+      body={self?.summary ?? ""}
     />
 
     <div class="meta-bar t-tabular">

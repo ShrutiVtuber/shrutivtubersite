@@ -20,6 +20,7 @@ import SponsorRow from "../components/brand/SponsorRow.astro";
 import PollCard from "../components/community/PollCard.astro";
 import HappeningNow from "../components/community/HappeningNow.astro";
 import { site, type LiveStatus, type LinkGroups, type Project, PATHS } from "../lib/api";
+import { instruments } from "../lib/instruments";
 import { pageSections } from "../lib/content";
 import { badgeFrom } from "../lib/live";
 import type { SocialLink } from "../components/brand/SocialLinkRow.astro";
@@ -117,47 +118,23 @@ const sectionsLive: Record<string, boolean> = Astro.locals.sectionsLive ?? {};
 const openPoll = ((await site<any[]>("/api/community/polls/open")) ?? [])
   .find((p: any) => !p.closed) ?? null;
 
+/* The nine instruments come from their rows — see lib/instruments.ts. The
+   landing page's line for each is its own field, because a stranger skimming
+   wants a different sentence from somebody already on the tool.
+
+   "Day at a glance" is not one of them and is written here: it points at
+   /today, which is a page rather than an instrument, and giving it a row would
+   mean putting a card on /tools that leaves /tools. */
+const TODAY = {
+  glyph: "☾", name: "Day at a glance", href: "/today", wide: true,
+  answers: "What the sky is doing right now, where you are — luminaries, stations, the planetary hour, and today in four reckonings.",
+};
 const INSTRUMENTS = [
-  {
-    glyph: "☾", name: "Day at a glance", href: "/today", wide: true,
-    answers: "What the sky is doing right now, where you are — luminaries, stations, the planetary hour, and today in four reckonings.",
-  },
-  {
-    glyph: "☉", name: "Solar stations", href: "/tools/solar-stations",
-    answers: "Sunrise, noon, sunset and midnight for a month ahead, exportable to your calendar.",
-  },
-  {
-    glyph: "☾", name: "Lunar stations", href: "/tools/lunar-stations",
-    answers: "Moonrise, culmination, moonset and nadir — with the phase beside them.",
-  },
-  {
-    glyph: "☉", name: "Planetary hours", href: "/tools/planetary-hours",
-    answers: "The day divided by its own light, so an hour is only sixty minutes twice a year.",
-  },
-  {
-    glyph: "◐", name: "Pañcāṅga", href: "/tools/pancanga",
-    answers: "The five limbs of the day, each with the moment it ends.",
-  },
-  {
-    glyph: "☾", name: "Hindu calendar", href: "/tools/hindu-calendar",
-    answers: "The lunisolar year, its months and its festivals — amānta or pūrṇimānta, your choice.",
-  },
-  {
-    glyph: "☽", name: "Attic calendar", href: "/tools/attic-calendar",
-    answers: "The month of Athens, opened at the noumenia and counted backwards through its last third.",
-  },
-  {
-    glyph: "✶", name: "Natal chart", href: "/tools/natal-chart",
-    answers: "A figure for a moment and a place, Hellenistic or Vedic — and honest about an unknown birth time.",
-  },
-  {
-    glyph: "Σ", name: "Isopsephy", href: "/tools/isopsephy",
-    answers: "Letter-reckoning in six scripts. Runs on your machine; nothing typed leaves it.",
-  },
-  {
-    glyph: "●", name: "Sigil generator", href: "/tools/sigil-generator",
-    answers: "Intent reduced and drawn, every step shown. Also on your machine only.",
-  },
+  TODAY,
+  ...(await instruments()).map((i) => ({
+    glyph: i.glyph, name: i.name, href: i.href, wide: false,
+    answers: i.landingBlurb,
+  })),
 ];
 ---
 

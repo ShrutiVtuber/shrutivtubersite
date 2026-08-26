@@ -23,14 +23,10 @@ const keepVowels = q.get("vowels") === "keep";
 ---
 
 <ToolLayout
-  title="Sigil generator"
-  description="Intent, reduced and drawn. Every step of the reduction is shown, and the figure is the same every time for the same letters."
-  glyph="●"
   rule="letter collapse, after Spare"
   ruleLabel="method"
   disclosure="◐"
   where="device"
-  reckoned="A statement of intent is put into capitals, stripped to letters, then reduced — vowels struck unless you keep them, then repeats struck — leaving a set of letters. Each letter has a fixed position on a circle, and the figure is the path through them in order, marked at its start and crossed at its end. Because the positions are fixed, the same letters always give the same figure."
 >
   <div slot="parameters" class="params">
     <form class="sigil-form" method="GET" data-sigil-form>

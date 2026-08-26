@@ -21,11 +21,12 @@ const money = (p: ShopProduct) =>
   `${(p.priceCents / 100).toFixed(2)} ${p.currency.toUpperCase()}`;
 ---
 
-<BaseLayout title="Shop — Shruti" description="Things to buy: printed matter, files, and the odd object.">
+<BaseLayout title="Shop — Shruti" description="Printed matter, files and the odd object. The instruments on this site are free and always will be — this is for the things that cost something to make.">
   <div class="page">
     <SectionHeader
       glyph="✶"
       eyebrow="Shop"
+      as="h1"
       title="Things you can have"
       body="Printed matter, files, and the odd object. Prices include tax."
     />

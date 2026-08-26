@@ -82,16 +82,11 @@ const limbs = d
 ---
 
 <ToolLayout
-  title="Pañcāṅga"
-  native="पञ्चाङ्ग"
-  description="The five limbs of the day — tithi, vāra, nakṣatra, yoga and karaṇa — each with the moment it ends."
-  glyph="◐"
   rule={RULE_NAME[convention]}
   ruleLabel="sunrise"
   place={place}
   date={d?.at?.slice(0, 10)}
   disclosure="○"
-  reckoned="The five limbs are measured from the Sun and Moon, not from a table. A tithi is the Moon gaining twelve degrees on the Sun; a nakṣatra is one of twenty-seven equal divisions of the sidereal circle; a yoga is their summed longitudes; a karaṇa is half a tithi, so two of them usually fall in one day. Only the vāra is tied to the horizon, and it begins at sunrise — which is why the sunrise rule above moves the whole day rather than one number."
 >
   <div slot="parameters" class="params">
     <DisagreementControl

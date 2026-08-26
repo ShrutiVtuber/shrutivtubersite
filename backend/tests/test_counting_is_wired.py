@@ -33,7 +33,14 @@ TOOLS = SRC / "pages" / "tools"
 
 
 def _tool_pages() -> list[Path]:
-    return sorted(TOOLS.glob("*.astro")) if TOOLS.is_dir() else []
+    """
+    The instruments themselves. `index.astro` is the hub that lists them — it
+    computes nothing, so there is nothing for a visitor to press and nothing to
+    report as used.
+    """
+    if not TOOLS.is_dir():
+        return []
+    return sorted(p for p in TOOLS.glob("*.astro") if p.name != "index.astro")
 
 
 def test_the_tools_are_actually_being_read():

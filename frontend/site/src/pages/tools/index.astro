@@ -1,0 +1,156 @@
+---
+/* The hub for the nine instruments.
+ *
+ * There was no such page. Nine working tools, cross-linked to each other by
+ * the row at the foot of each one, and no single URL that meant "the
+ * instruments". That has three costs, and only the first is obvious:
+ *
+ *   1. Nobody arriving at the site could see the set. The header lists them,
+ *      but a menu is not a page and cannot be linked to.
+ *   2. Anyone linking to the tools from outside had to pick one of nine, so
+ *      every mention split its weight nine ways.
+ *   3. The instruments are the part of this site a stranger might search for
+ *      without ever having heard of Shruti — and a set of nine has a claim
+ *      ("free, no account, no advertising, shown working") that no single
+ *      calculator page can make on its own.
+ *
+ * Deliberately not a marketing page. The claim it makes is the true one, and
+ * the honest caveat about what these are for sits on it rather than being
+ * left implied.
+ */
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import SectionHeader from "../../components/brand/SectionHeader.astro";
+import Prose from "../../components/content/Prose.astro";
+import { instruments, categories } from "../../lib/instruments";
+import { pageSections } from "../../lib/content";
+
+export const prerender = false;
+
+const SITE = (import.meta.env.SHRUTI_SITE_URL ?? "https://shrutivtuber.com").replace(/\/$/, "");
+const sections = await pageSections("tools");
+
+/* One fetch, and the grouping is derived from what came back rather than from
+   a list kept beside it. Adding a category is typing it into a row. */
+const all = await instruments();
+const GROUPS = categories(all);
+
+/* An ItemList of the nine, so the set is legible as a set rather than as nine
+   unrelated pages that happen to share a path prefix. */
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "CollectionPage",
+      "@id": `${SITE}/tools#page`,
+      name: "Instruments",
+      url: `${SITE}/tools`,
+      description:
+        "Nine free instruments for magickal and astrological practice: planetary hours, " +
+        "three calendars, natal charts, isopsephy and more. No account, no advertising.",
+      isPartOf: { "@id": `${SITE}/#website` },
+      about: { "@id": `${SITE}/#person` },
+    },
+    {
+      "@type": "ItemList",
+      "@id": `${SITE}/tools#list`,
+      name: "Instruments",
+      numberOfItems: all.length,
+      itemListElement: all.map((i, n) => ({
+        "@type": "ListItem",
+        position: n + 1,
+        name: i.name,
+        url: `${SITE}${i.href}`,
+      })),
+    },
+    {
+      "@type": "BreadcrumbList",
+      "@id": `${SITE}/tools#breadcrumbs`,
+      itemListElement: [
+        { "@type": "ListItem", position: 1, name: "Home", item: `${SITE}/` },
+        { "@type": "ListItem", position: 2, name: "Instruments", item: `${SITE}/tools` },
+      ],
+    },
+  ],
+};
+---
+
+<BaseLayout
+  title="Instruments — Shruti"
+  description="Nine free instruments for magickal and astrological practice: planetary hours, the pañcāṅga, three calendars, natal charts and letter-reckoning. No account, no advertising."
+  jsonLd={jsonLd}
+>
+  <div class="page instruments">
+    <SectionHeader
+      as="h1" glyph="✶" eyebrow="Theourgia"
+      title="The instruments"
+      body="Nine of them, all free, none of them asking for an account. They are built on stream and the working is shown — every one says which rule it followed and where the numbers came from, because a figure you cannot check is a figure you have to take on faith."
+    />
+
+    {GROUPS.map((group) => {
+      const of = all.filter((i) => i.category === group);
+      return of.length === 0 ? null : (
+        <section class="inst-group">
+          <h2 class="t-eyebrow">{group}</h2>
+          <ul class="inst-grid">
+            {of.map((i) => (
+              <li>
+                <a class="inst-card" href={i.href}>
+                  <span class="inst-glyph t-glyph" aria-hidden="true">{i.glyph}</span>
+                  <span class="inst-name">{i.name}</span>
+                  <span class="inst-blurb">{i.summary}</span>
+                </a>
+              </li>
+            ))}
+          </ul>
+        </section>
+      );
+    })}
+
+    {sections.map((s) => (
+      <section class="inst-said">
+        {s.title && <h2>{s.title}</h2>}
+        <Prose html={s.html} />
+      </section>
+    ))}
+
+    <section class="inst-note">
+      <h2>What these are, and what they are not</h2>
+      <Prose html={`<p>Every instrument here computes something with a definite answer — where a
+        body was, when a month opened, what a set of letters sums to. That part is arithmetic and
+        it is either right or wrong, so each page shows the rule it used and you can check it.</p>
+        <p>What the numbers <em>mean</em> is a different question, and none of these answer it.
+        They will not tell you what to do, and nothing here predicts anything. They are for people
+        who already have a practice and want the reckoning done properly.</p>`} />
+    </section>
+  </div>
+</BaseLayout>
+
+<style>
+  .instruments { display: grid; gap: var(--space-5); }
+  .inst-group { display: grid; gap: 12px; }
+  .inst-grid {
+    list-style: none; margin: 0; padding: 0;
+    display: grid; gap: var(--space-3);
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr));
+  }
+  .inst-card {
+    display: grid; gap: 6px; height: 100%;
+    padding: 18px 20px;
+    border: var(--border-w) solid var(--line);
+    border-radius: var(--radius-md);
+    background: color-mix(in srgb, var(--surface-veil) 40%, transparent);
+    text-decoration: none; color: inherit;
+    transition: border-color var(--dur-2) var(--ease-in-out),
+                background var(--dur-2) var(--ease-in-out);
+  }
+  .inst-card:hover, .inst-card:focus-visible {
+    border-color: var(--line-strong);
+    background: color-mix(in srgb, var(--surface-veil) 70%, transparent);
+  }
+  .inst-glyph { font-family: var(--font-display); font-size: 24px; line-height: 1; color: var(--ink-faint); }
+  .inst-name { font: 500 var(--text-h4) var(--font-display); color: var(--ink); }
+  .inst-blurb { font-size: var(--text-sm); color: var(--ink-soft); line-height: var(--leading-body); }
+
+  .inst-note, .inst-said { display: grid; gap: 10px; max-width: 62ch; }
+  .inst-note h2, .inst-said h2 { font: 500 var(--text-h3) var(--font-display); color: var(--ink); margin: 0; }
+</style>
