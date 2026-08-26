@@ -1,272 +1,872 @@
 ---
-/* The front door for "are we compatible".
+/* The front door for "are we compatible" — designed pass, per
+ * `docs/design/HANDOFF_COMPATIBLE.md`.
  *
- * Until this existed the only way in was: open the natal instrument, cast,
- * scroll past four tables, keep the chart, find the invite panel, press it.
- * That is five steps for somebody who arrived wanting to do one thing, and it
- * is the opposite of a thing people pass around.
+ * The loop this page exists to run: two people compare charts → they get an
+ * image worth posting → they post it and tag each other → their audiences
+ * click through → some of them make one. Its job is to make a stranger want to
+ * do the thing in about eight seconds, and to make the result worth posting.
  *
- * So this page casts, keeps and makes the invitation in ONE submit, shows what
- * the card looks like before anybody commits, and is honest about what the
- * reading is in the same breath as being fun about it. Those are not in
- * tension: the tradition is more interesting than a made-up percentage, and
- * saying so is part of the pitch.
+ * The single most important decision, and the one the first version got wrong:
+ * **the hero shows the output rather than describing the product.** A filled-in
+ * share card is the hero object. The form is not the hero — asking somebody for
+ * their birth time before showing them why is backwards.
  *
- * The prose blocks are editable in the admin under `page = "compatible"`, so
- * she can rewrite the pitch without a deploy.
+ * Everything is one submit. Casting, keeping and making the invitation happen
+ * in a single request; do not add steps.
+ *
+ * ONE DELIBERATE DEPARTURE FROM THE HANDOFF, and it is flagged rather than
+ * hidden. The design describes "seven testimonies" with bands at "0–1 of 7",
+ * "2 of 7" and so on. The engine does not work that way: `core/synastry.py`
+ * counts every degree-based contact and bands them by the RATIO of harmonious
+ * to hard, with a minimum sample before the extreme bands are claimed. Shipping
+ * the design's numbers over this engine would put a fixed denominator on the
+ * page that nothing computes. The fixed rubric is arguably the better product —
+ * it is more legible on a card and it makes the no-birth-time case elegant —
+ * but adopting it changes every verdict already issued, so it is her call and
+ * not a thing to slip in behind a design pass. Until then the plates say what
+ * the engine actually does.
  */
 import BaseLayout from "../layouts/BaseLayout.astro";
-import SectionHeader from "../components/brand/SectionHeader.astro";
 import PlaceField from "../components/forms/PlaceField.astro";
 import CsrfField from "../components/forms/CsrfField.astro";
+import ConsentCheckbox from "../components/forms/ConsentCheckbox.astro";
 import Button from "../components/forms/Button.astro";
 import Prose from "../components/content/Prose.astro";
 import SectionFigure from "../components/blocks/SectionFigure.astro";
 import { pageSections } from "../lib/content";
 import { site, SITE_URL } from "../lib/api";
-import { asReader } from "../lib/account";
+import { asReader, account } from "../lib/account";
 import { verifyCsrf } from "../lib/csrf";
 
 export const prerender = false;
 
-let failed = "";
+/* Text presentation for the astronomical glyphs. Without U+FE0E a browser
+   substitutes a colour-emoji font that ignores `color`, and the mark stops
+   being type. There is no emoji anywhere on this site. */
+const TEXT = "︎";
+const MOON = `☾${TEXT}`;
+const OPEN = `○${TEXT}`;
+const SEALED = `●${TEXT}`;
+
+let errors: string[] = [];
 let made: { ownerToken: string; shareToken: string } | null = null;
+let noTime = false;
+let name = "";
+
+const me = await account(Astro);
+const signedIn = Boolean(me);
 
 if (Astro.request.method === "POST") {
   const form = await Astro.request.formData();
+  noTime = form.get("unknownTime") === "1";
+  name = String(form.get("label") ?? "").trim();
+
   if (!verifyCsrf(Astro.cookies, form)) {
-    failed = "That did not go through. Reload the page and try again.";
+    errors = ["That did not go through. Reload the page and try again."];
   } else {
-    const unknown = form.get("unknownTime") === "1";
-    const r = await asReader(Astro, "/api/charts/start", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        birth_date: String(form.get("date") ?? ""),
-        birth_time: unknown ? null : String(form.get("time") ?? ""),
-        time_unknown: unknown || !String(form.get("time") ?? ""),
-        place_name: String(form.get("place") ?? ""),
-        lat: Number(form.get("lat") ?? 0),
-        lon: Number(form.get("lon") ?? 0),
-        label: String(form.get("label") ?? ""),
-        consent: form.get("consent") === "1",
-      }),
-    });
-    if (r.ok && r.body?.shareToken) made = r.body;
-    else failed = r.body?.detail ?? "That did not work. Nothing has been kept.";
+    /* Server-side validation with the same messages the design gives the
+       client, because the client's copy is not the one that has to be right. */
+    const date = String(form.get("date") ?? "");
+    const place = String(form.get("place") ?? "");
+    if (!date) errors.push("A birth date is needed — without it there is no chart to cast.");
+    if (!place) errors.push("A birth place is needed. Start typing a city and pick one from the list.");
+    if (!signedIn && form.get("consent") !== "1") {
+      errors.push("The consent below has to be ticked before a chart can be kept.");
+    }
+
+    if (errors.length === 0) {
+      const r = await asReader(Astro, "/api/charts/start", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          birth_date: date,
+          birth_time: noTime ? null : String(form.get("time") ?? ""),
+          time_unknown: noTime || !String(form.get("time") ?? ""),
+          place_name: place,
+          lat: Number(form.get("lat") ?? 0),
+          lon: Number(form.get("lon") ?? 0),
+          label: name,
+          consent: signedIn || form.get("consent") === "1",
+        }),
+      });
+      if (r.ok && r.body?.shareToken) made = r.body;
+      else errors.push(r.body?.detail ?? "That did not work. Nothing has been kept.");
+    }
   }
 }
 
 const sections = await pageSections("compatible");
 const designs = (await site<any[]>("/api/charts/card-designs")) ?? [];
+
 const inviteUrl = made ? `${SITE_URL}/chart/invite/${made.shareToken}` : "";
+const ownUrl = made ? `${SITE_URL}/chart/${made.ownerToken}` : "";
+const who = name || "Someone";
+
+const SUGGESTED =
+  "Two birth charts, five possible answers, no percentages anywhere. " +
+  "Compare with me and let's see which one we get ↓";
+
+/* The hero card. Rose horizon reads on a white timeline and a black one, which
+   is why the designer chose it — but the row is data, so fall back rather than
+   hard-code a key that somebody may rename in the admin. */
+const heroDesign = designs.find((d: any) => d.key === "rose-horizon") ?? designs[0];
+
+/* The five bands, in the order the count rises.
+ *
+ * `share` is the harmonious share of contacts at which the engine actually
+ * cuts — read straight off `core/synastry.py`. The design drew this as seven
+ * filled-or-empty bars, which reads as "n of 7"; nothing computes a
+ * denominator of seven, so it is drawn as the proportion instead. Same
+ * graphic job — the rise across the row — without inventing a number. */
+const BANDS = [
+  {
+    key: "contrary-to-sect", name: "Contrary to sect", share: 0.15,
+    range: "under 30% harmonious",
+    says: "Almost everything in contact is a hard aspect. The tradition would say the two charts are working against each other's grain.",
+  },
+  {
+    key: "hard-going", name: "Hard going", share: 0.36,
+    range: "30–42% harmonious",
+    says: "Squares and oppositions carry most of the testimony. Not hostility — friction. The useful part is that friction is legible: you will be told exactly where it sits.",
+  },
+  {
+    key: "mixed-testimony", name: "Mixed testimony", share: 0.5,
+    range: "42–58% harmonious",
+    says: "The witnesses disagree with each other. An astrologer counting this in a horary would say the question is not yet ripe — which is a real answer, and the most honest one here.",
+  },
+  {
+    key: "well-aspected", name: "Well aspected", share: 0.64,
+    range: "58–70% harmonious",
+    says: "Trines and sextiles between the lights, and the malefics keeping out of it. The ordinary good case — and by some distance the most common one.",
+  },
+  {
+    key: "same-sky", name: "Written in the same sky", share: 0.85,
+    range: "70%+ · and at least eight contacts",
+    says: "Overwhelmingly harmonious. It needs a real sample as well as a high share — two contacts that both happen to be trines is a small sample, not a verdict — so this band is genuinely uncommon.",
+  },
+];
+
+const ALMANAC = [
+  ["Prediction", "none offered — nothing here says what will happen"],
+  ["Percentage", "never computed — a count, or nothing"],
+  ["Authorities", "disagreeing since Ptolemy — ours is one reading of many"],
+  ["Verdicts", "hand-written by me, not generated"],
+  ["Engine", "Swiss Ephemeris · AGPL · source on request"],
+];
 ---
 
 <BaseLayout
   title="Are we compatible? — Shruti"
-  description="Compare two birth charts and see what the tradition makes of the pair. Free, no account, and it says what it cannot know."
+  description="Compare two birth charts and see what the tradition makes of the pair. Free, no account, about forty seconds — and it says what it cannot know."
+  bare
 >
-  <div class="page compat">
-    <SectionHeader
-      as="h1" glyph="✶" eyebrow="For fun"
-      title="Are we compatible?"
-      body="Put your chart next to somebody else's and see what two thousand years of practice has to say about the pair of you. It takes twenty seconds, needs no account, and gives you something worth posting."
-    />
+  <main class="cx">
 
-    {
-      made ? (
-        <section class="done">
-          <h2>Your invitation is ready</h2>
-          <p class="lead">
-            Send this to whoever you want to compare with. They fill in one
-            form and you both land on the result.
+    {/* ── 1. Sky hero ─────────────────────────────────────────────────── */}
+    <section class="sky cx-hero">
+      <span class="sky-stars" aria-hidden="true"></span>
+      <div class="cx-in cx-hero-grid">
+        <div class="sky-veil cx-cap">
+          <p class="t-eyebrow">Free · no account · about forty seconds</p>
+          <h1>See what the sky makes of you two.</h1>
+          <p class="cx-cycle">
+            <span class="cx-cycle-lbl t-tabular">Five possible answers ·</span>{" "}
+            <span class="cx-cycle-word" data-cycle>{BANDS[0].name}</span>
           </p>
-          <label class="out">
-            <span class="lbl">The link</span>
-            <input type="text" readonly value={inviteUrl} onclick="this.select()" />
-          </label>
-          <label class="out">
-            <span class="lbl">Something to post with it</span>
-            <textarea readonly rows="2" onclick="this.select()">{`Compare charts with me — ${inviteUrl}`}</textarea>
-          </label>
-          <p class="fine">
-            <strong>Keep this page's other link too.</strong>{" "}
-            <a href={`/chart/${made.ownerToken}`}>Your chart lives here</a> — it
-            is how you come back, change what you share, or delete the lot.
+          <p class="cx-sub">
+            Two birth charts weighed against each other by rules older than the
+            telescope — and an image worth posting at the end of it.
           </p>
-        </section>
-      ) : (
-        <section class="start">
-          <h2>Start here</h2>
-          {failed && <p class="bad">{failed}</p>}
-          <form method="POST" class="c-form">
-            <CsrfField />
-            <label>
-              <span class="lbl">What to call you</span>
-              <input class="in" name="label" maxlength="80" placeholder="Your name or handle" />
-            </label>
-            <div class="two">
-              <label>
-                <span class="lbl">Birth date</span>
-                <input class="in" type="date" name="date" required />
-              </label>
-              <label>
-                <span class="lbl">Birth time</span>
-                <input class="in" type="time" name="time" />
-              </label>
-            </div>
-            <label class="check">
-              <input type="checkbox" name="unknownTime" value="1" />
-              <span>I don't know my birth time</span>
-            </label>
-            <p class="hint">
-              Without it the planets still work. The angles do not, and the
-              reading tells you which parts it has left out rather than
-              guessing them.
+          <div class="cx-cta">
+            <Button size="lg" href="#start">Compare two charts</Button>
+            <Button size="lg" variant="ghost" href="#answers">What the answers mean</Button>
+          </div>
+          <p class="cx-foot">
+            Nothing kept but the two charts. Only the person on a face can put
+            that face on a card.
+          </p>
+        </div>
+
+        <figure class="cx-hero-card">
+          <a href="#showcase">
+            {heroDesign ? (
+              <img src={`/api/charts/card-sample.png?design=${heroDesign.key}`}
+                   width="1200" height="630" loading="eager"
+                   alt={`An example share card in the ${heroDesign.name} design`} />
+            ) : (
+              <span class="cx-art-absent">The card is drawn when the first comparison is made.</span>
+            )}
+          </a>
+          <figcaption>
+            This is the thing you get. 1200×630, drawn on our own server,
+            carrying its own disclaimer so it can travel without this page.
+          </figcaption>
+        </figure>
+      </div>
+      <span class="sky-horizon" aria-hidden="true"></span>
+    </section>
+
+    {/* ── 2. Start ────────────────────────────────────────────────────── */}
+    <section class="cx-in cx-sec" id="start">
+      <div class="cx-two">
+        <div class="cx-explain">
+          <p class="t-eyebrow">Your half of it</p>
+          <h2>One submit does all three.</h2>
+          <ol class="cx-roman">
+            <li><span class="cx-num t-tabular">i</span><span>Casts your chart from the Swiss Ephemeris — the same engine as the natal instrument.</span></li>
+            <li><span class="cx-num t-tabular">ii</span><span>Keeps it behind a link that only you have.</span></li>
+            <li><span class="cx-num t-tabular">iii</span><span>Makes one invitation to hand to anybody. They fill in their half; the comparison appears for both of you.</span></li>
+          </ol>
+
+          <div class="cx-branch">
+            <p class="t-eyebrow"><span class="t-glyph" aria-hidden="true">{MOON}</span> Without a time</p>
+            <p class="cx-branch-lead">Then it says so, instead of guessing at it.</p>
+            <p class="cx-branch-body">
+              Four minutes of clock error is a whole degree of Ascendant, so a
+              chart with no time has no angles at all — and every contact that
+              needs one drops out of the count. The result names them rather
+              than quietly leaving them off.
             </p>
-            <PlaceField lat={37.9838} lon={23.7275} place="" />
-            <label class="check">
-              <input type="checkbox" name="consent" value="1" required />
-              <span>
-                I agree to my birth date, time and place being stored so the
-                comparison can be kept. I can delete it whenever I like, and it
-                goes on its own after a year.
-              </span>
-            </label>
-            <div>
-              <Button size="lg" type="submit" data-track="compare:started">
-                Make my invitation
-              </Button>
+            <div class="cx-plates">
+              <p class="cx-plate cx-plate-good"><span>Sun, Moon, Mercury, Venus, Mars, Jupiter, Saturn</span><em>weighed</em></p>
+              <p class="cx-plate cx-plate-no"><span>Ascendant and Midheaven</span><em>cannot be weighed</em></p>
             </div>
-          </form>
-        </section>
-      )
-    }
+            <p class="cx-branch-foot">
+              Find the time later and the chart takes it and recounts. Nothing
+              has to be cast again.
+            </p>
+          </div>
+        </div>
 
-    <section class="cards">
-      <h2>What you get to post</h2>
-      <p class="lead">
-        Every comparison makes its own image, in whichever design you pick.
-        Both of you appear on it, and so does the count behind the verdict.
-      </p>
-      <div class="card-row">
-        {designs.slice(0, 2).map((d: any) => (
-          <figure>
+        <div class="cx-formwrap">
+          {made ? (
+            <div class="cx-done">
+              <div class="cx-card">
+                <p class="t-eyebrow cx-rose">Cast · kept · ready</p>
+                <h3>Now hand it to somebody.</h3>
+                <p class="cx-done-line">
+                  {noTime
+                    ? `${who}'s chart is cast without a time, so the contacts that need an Ascendant are set aside and named on the result. It is kept behind the link below.`
+                    : `${who}'s chart is cast and kept behind the link below. Nothing else was stored.`}
+                </p>
+
+                <p class="cx-lbl">The invitation — send this out</p>
+                <div class="cx-copyrow">
+                  <input class="cx-code" type="text" readonly value={inviteUrl}
+                         aria-label="Your invitation link" onclick="this.select()" />
+                  <button type="button" class="cx-copy" data-copy={inviteUrl}>Copy link</button>
+                </div>
+
+                <div class="cx-share">
+                  <a href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(SUGGESTED)}&url=${encodeURIComponent(inviteUrl)}`}
+                     rel="noopener noreferrer" target="_blank">Post on X</a>
+                  <a href={`https://bsky.app/intent/compose?text=${encodeURIComponent(`${SUGGESTED} ${inviteUrl}`)}`}
+                     rel="noopener noreferrer" target="_blank">Post on Bluesky</a>
+                  <a href={`/chart/invite/${made.shareToken}`}>See what they will see →</a>
+                </div>
+                <p class="cx-fine">
+                  Plain links, the way every other page here works — no SDK, no
+                  button script, no pixel. Nothing loads from those sites until
+                  you click.
+                </p>
+
+                <p class="cx-lbl">Something to post with it</p>
+                <div class="cx-copyrow">
+                  <textarea class="cx-code" rows="3" aria-label="Suggested post text">{SUGGESTED}</textarea>
+                  <button type="button" class="cx-copy" data-copy={SUGGESTED}>Copy text</button>
+                </div>
+                <p class="cx-fine">Edit it. It is only a suggestion.</p>
+              </div>
+
+              <div class="cx-keep">
+                <p class="t-eyebrow cx-rose">
+                  <span class="t-glyph" aria-hidden="true">{SEALED}</span> Keep this one for yourself
+                </p>
+                <div class="cx-copyrow">
+                  <input class="cx-code" type="text" readonly value={ownUrl}
+                         aria-label="The link back to your own chart" onclick="this.select()" />
+                  <button type="button" class="cx-copy cx-copy-rose" data-copy={ownUrl}>Copy link</button>
+                </div>
+                <p class="cx-keep-body">
+                  This link is the <strong>only</strong> way back to your chart.
+                  We never asked for your email, so there is nothing we could
+                  send you if it goes missing — and no account to recover. Put
+                  it where you keep things.
+                </p>
+                <p class="cx-keep-links">
+                  <a href={ownUrl}>Open it now</a>
+                  <a href={`data:text/plain;charset=utf-8,${encodeURIComponent(ownUrl)}`}
+                     download="my-chart-link.txt">Download it as a text file</a>
+                  <a href="/signup">Attach it to an account later</a>
+                </p>
+              </div>
+
+              <p class="cx-again"><a href="/compatible">Cast another chart</a></p>
+            </div>
+          ) : (
+            <form method="POST" class="cx-card cx-form" novalidate>
+              <CsrfField />
+
+              {errors.length > 0 && (
+                <div class="cx-errs" role="alert">
+                  <p class="cx-errs-t">
+                    {errors.length === 1 ? "One thing is missing" : `${errors.length} things are missing`}
+                  </p>
+                  <ul>{errors.map((e) => <li>{e}</li>)}</ul>
+                </div>
+              )}
+
+              <label class="cx-field">
+                <span class="cx-flabel">Name or handle <em class="cx-opt">optional</em></span>
+                <input class="cx-input" name="label" maxlength="80" placeholder="Someone" value={name} />
+                <span class="cx-help">Whatever should sit under your face on the card. Leave it and you are “Someone”.</span>
+              </label>
+
+              <div class="cx-row">
+                <label class="cx-field">
+                  <span class="cx-flabel">Birth date <em class="cx-req">required</em></span>
+                  <input class="cx-input" type="date" name="date" required />
+                </label>
+                <label class="cx-field" data-time-field hidden={noTime}>
+                  <span class="cx-flabel">Birth time <em class="cx-opt">optional</em></span>
+                  <input class="cx-input" type="time" name="time" />
+                </label>
+              </div>
+
+              <label class="cx-check">
+                <input type="checkbox" name="unknownTime" value="1" checked={noTime} data-no-time />
+                <span>
+                  I don’t know my birth time
+                  <em>The angles get left out of the count — and named.</em>
+                </span>
+              </label>
+
+              <div class="cx-field">
+                <span class="cx-flabel">Birth place <em class="cx-req">required</em></span>
+                <PlaceField lat={37.9838} lon={23.7275} place="" />
+                <span class="cx-help">The gazetteer is on our own server; typing here reaches nobody else.</span>
+              </div>
+
+              {signedIn ? (
+                <div class="cx-signed">
+                  <p class="t-eyebrow">Signed in</p>
+                  <p>Your account already carries this consent.</p>
+                  <p><a href="/account">Review or withdraw</a></p>
+                </div>
+              ) : (
+                <ConsentCheckbox
+                  name="consent"
+                  basis="consent"
+                  required
+                  label="I give Shruti my birth date, time and place so that this chart can be cast, kept behind my own link, and compared with charts I invite."
+                  explanation="Used for nothing else: no profiling, no advertising, no sale, and nothing shared with anybody except the person you send your invitation to. Kept until you delete it — the delete button is on your chart page and it takes effect the same second."
+                  wording="Never pre-ticked, never bundled with anything else."
+                  error={errors.some((e) => e.includes("consent")) ? "This one is required." : undefined}
+                />
+              )}
+
+              <div class="cx-submit">
+                <Button size="lg" type="submit" data-track="compare:started">
+                  Cast it and make an invitation
+                </Button>
+                <p class="cx-fine t-tabular">One request. No account, no email, no confirmation step.</p>
+              </div>
+            </form>
+          )}
+        </div>
+      </div>
+    </section>
+
+    {/* ── 3. Card showcase ────────────────────────────────────────────── */}
+    <section class="cx-in cx-sec" id="showcase">
+      <div class="cx-head">
+        <div>
+          <p class="t-eyebrow">The image you get</p>
+          <h2>Pick a card, or let it pick one.</h2>
+          <p class="cx-lead">
+            Every comparison is drawn as an image on our own server. The designs
+            are rows in a table — Shruti adds one and it appears here.
+          </p>
+        </div>
+        <p class="cx-count t-tabular">
+          {designs.length === 1 ? "1 design" : `${designs.length} designs`} · more get added
+        </p>
+      </div>
+
+      <div class="cx-cards">
+        {designs.map((d: any, i: number) => (
+          <figure class="cx-cardfig" style={`--tilt:${[-0.7, 0.6, -0.5][i % 3]}deg`}>
             <img src={`/api/charts/card-sample.png?design=${d.key}`}
                  width="1200" height="630" loading="lazy"
                  alt={`An example share card in the ${d.name} design`} />
-            <figcaption>{d.name}</figcaption>
+            <figcaption>
+              <span class="cx-cardname">{d.name}</span>
+              <span class="cx-cardtag t-tabular">{d.backdrop ? "backdrop" : i === 0 ? "default" : "flat"}</span>
+              <span class="cx-cardnote">{d.blurb || "One of hers."}</span>
+            </figcaption>
           </figure>
+        ))}
+        {designs.length === 0 && (
+          <div class="sky cx-absent">
+            <span class="sky-stars" aria-hidden="true"></span>
+            <p>Design added, no sample drawn yet. The first comparison to use it makes one.</p>
+            <span class="sky-horizon" aria-hidden="true"></span>
+          </div>
+        )}
+      </div>
+    </section>
+
+    {/* ── 4. The five answers ─────────────────────────────────────────── */}
+    <section class="cx-in cx-sec" id="answers">
+      <div class="cx-headblock">
+        <p class="t-eyebrow">The five answers</p>
+        <h2>The testimonies are weighed. Five things they can add up to.</h2>
+        <p class="cx-lead">
+          These are real terms of art, not moods. A <strong>testimony</strong> is
+          how a horary astrologer weighs a question; <strong>sect</strong> is the
+          division of charts into day and night, and it changes which planets
+          help. You always see the count that produced the verdict.
+        </p>
+      </div>
+
+      <div class="cx-bands">
+        {BANDS.map((b) => (
+          <article class="cx-band" data-band={b.key}>
+            <span class="cx-tally" aria-hidden="true">
+              <i style={`--share:${Math.round(b.share * 100)}%`}></i>
+            </span>
+            <p class="cx-range t-tabular">{b.range}</p>
+            <h3>
+              {b.name}
+              {b.key === "same-sky" && <span class="t-glyph" aria-hidden="true"> {MOON}</span>}
+            </h3>
+            <p class="cx-bandsays">{b.says}</p>
+          </article>
         ))}
       </div>
     </section>
 
-    <section class="bands">
-      <h2>The five answers</h2>
-      <p class="lead">
-        No percentage. A number out of a hundred would look like a measurement,
-        and nobody has measured anything — so you get one of five, in the
-        tradition's own words, with the count that produced it sitting right
-        beside it so you can argue with it.
-      </p>
-      <ol class="band-list">
-        <li><span>Contrary to sect</span> — almost everything here is a hard aspect.</li>
-        <li><span>Hard going</span> — more friction than ease.</li>
-        <li><span>Mixed testimony</span> — both, in roughly equal measure. Most pairs land here.</li>
-        <li><span>Well aspected</span> — more ease than friction, by a clear margin.</li>
-        <li><span>Written in the same sky</span> — overwhelmingly harmonious, and genuinely uncommon.</li>
-      </ol>
-      <p class="fine">
-        "Mixed testimony" and "contrary to sect" are real terms of art, not
-        invented whimsy — testimonies are how a horary astrologer weighs a
-        question, and sect is the day-or-night division that decides which
-        planets are working in your favour.
-      </p>
+    {/* ── 5. The honest note ──────────────────────────────────────────── */}
+    <section class="cx-in cx-sec">
+      <div class="cx-honest">
+        <div class="cx-honest-l">
+          <p class="t-eyebrow"><span class="t-glyph" aria-hidden="true">{OPEN}</span> The honest part</p>
+          <h2>It is a reading, not a result.</h2>
+          <p class="cx-lead">
+            Astrologers have argued about these rules for two thousand years and
+            have not finished. I am not going to pretend a share card settles it
+            — and the disagreement is the interesting part, not an
+            embarrassment.
+          </p>
+          <p class="cx-lead">
+            <strong>It does not predict anything</strong>, and there is no
+            percentage in it anywhere. It reads the contacts between two charts
+            and tells you what classical practice attaches to them. Post it
+            because it is fun, not because it is a verdict.
+          </p>
+          <p class="cx-sign"><span class="cx-sign-rule" aria-hidden="true"></span> Shruti</p>
+        </div>
+        <dl class="cx-almanac">
+          {ALMANAC.map(([k, v]) => (
+            <div class="cx-alrow">
+              <dt>{k}</dt>
+              <span class="cx-leader" aria-hidden="true"></span>
+              <dd class="t-tabular">{v}</dd>
+            </div>
+          ))}
+        </dl>
+      </div>
     </section>
 
-    <section class="honest">
-      <h2>What this is, and is not</h2>
-      <p class="lead">
-        It reads the contacts between two charts and tells you what classical
-        practice attaches to them. That is a real thing, done properly, with
-        the same ephemeris as everything else here.
-      </p>
-      <p class="lead">
-        <strong>It does not predict anything.</strong> It cannot tell you
-        whether to date someone, work with them, or trust them, and the
-        authorities it draws on have disagreed with each other for two
-        millennia. Post it because it is fun, not because it is a verdict.
-      </p>
-    </section>
-
-    {/* Anything she has added in the admin for this page. */}
-    {
-      sections.length > 0 && (
-        <div class="page-sections">
+    {/* ── 6. Admin blocks ─────────────────────────────────────────────── */}
+    {sections.length > 0 && (
+      <section class="cx-in cx-sec cx-more">
+        <p class="t-eyebrow">More from Shruti</p>
+        <div class="cx-blocks">
           {sections.map((s) => (
-            <section class="page-section">
+            <div class="cx-block">
               {s.title && <h2>{s.title}</h2>}
               <SectionFigure media={s.media} title={s.title} />
               <Prose html={s.html} />
-            </section>
+            </div>
           ))}
         </div>
-      )
-    }
-  </div>
+      </section>
+    )}
+
+    {/* ── 7. Close ────────────────────────────────────────────────────── */}
+    <div class="cx-in"><span class="cx-close" aria-hidden="true"></span></div>
+  </main>
 </BaseLayout>
 
-<style>
-  .compat { max-width: 860px; display: grid; gap: var(--space-7); }
-  .compat h2 { font: 600 var(--text-h3) var(--font-display); color: var(--ink); margin: 0; }
-  .lead { font: 400 var(--text-body) / var(--leading-body) var(--font-body); color: var(--ink-soft); margin: 0; max-width: 64ch; }
-  .fine { font: 400 var(--text-sm) / 1.7 var(--font-body); color: var(--ink-faint); margin: 0; max-width: 64ch; }
-  .bad { font: 400 var(--text-sm) var(--font-body); color: var(--live); margin: 0; }
+<script>
+  /* Progressive only. Everything below already works without it: the cycling
+     word renders statically, the time field is honoured server-side, and every
+     copy target is selectable text. */
+  const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-  .start, .done {
-    display: grid; gap: var(--space-4); justify-items: start;
-    padding: var(--space-6);
-    background: var(--surface-card);
-    border: var(--border-w) solid var(--line);
-    border-radius: var(--radius-md);
+  // The cycling verdict word. Never started at all under reduced motion —
+  // collapsing the transition to 1ms would still be a word changing every
+  // 2.6 seconds in somebody's peripheral vision.
+  const word = document.querySelector<HTMLElement>("[data-cycle]");
+  if (word && !reduced) {
+    const names = ["Contrary to sect", "Hard going", "Mixed testimony",
+                   "Well aspected", "Written in the same sky"];
+    let i = 0;
+    setInterval(() => {
+      word.style.opacity = "0";
+      setTimeout(() => {
+        i = (i + 1) % names.length;
+        word.textContent = names[i];
+        word.style.opacity = "1";
+      }, 210);
+    }, 2600);
   }
-  .c-form { display: grid; gap: var(--space-4); width: 100%; max-width: 46ch; }
-  .c-form label { display: grid; gap: 6px; }
-  .two { display: grid; gap: var(--space-4); grid-template-columns: 1fr 1fr; }
-  .lbl {
-    font: 600 var(--text-micro) var(--font-body); letter-spacing: var(--tracking-eyebrow);
-    text-transform: uppercase; color: var(--ink-faint);
+
+  // "I don't know my birth time" hides the time field rather than leaving a
+  // control that is ignored — the server honours the checkbox either way.
+  const noTime = document.querySelector<HTMLInputElement>("[data-no-time]");
+  const timeField = document.querySelector<HTMLElement>("[data-time-field]");
+  if (noTime && timeField) {
+    const sync = () => { timeField.hidden = noTime.checked; };
+    noTime.addEventListener("change", sync);
+    sync();
   }
-  .in, .out input, .out textarea {
-    font: 400 var(--text-sm) var(--font-body); color: var(--ink);
-    background: var(--surface-page); border: var(--border-w) solid var(--line);
-    border-radius: var(--radius-sm); padding: 8px 10px; min-height: 44px;
+
+  // Copy buttons. The value is visible and selectable in every case, so this
+  // is a convenience and never the only route.
+  document.querySelectorAll<HTMLButtonElement>("[data-copy]").forEach((b) => {
+    b.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(b.dataset.copy ?? "");
+        const was = b.textContent;
+        b.textContent = "Copied";
+        setTimeout(() => { b.textContent = was; }, 1800);
+      } catch {
+        /* Clipboard refused — the text beside the button is still selectable. */
+      }
+    });
+  });
+</script>
+
+
+<style>
+  /* Widths. The sky panel is the only thing that breaks out; everything else
+     sits in the same 1120 column so the page reads as one object. */
+  .cx { display: block; overflow-x: hidden; }
+  .cx-in {
+    max-width: var(--page-max); margin: 0 auto;
+    padding-inline: clamp(16px, 4vw, 32px);
+  }
+  .cx-sec { padding-top: clamp(44px, 7vw, 84px); }
+  .cx-sec + .cx-sec { border-top: var(--border-w) solid var(--line); }
+  .cx-close {
+    display: block; height: 1px; background: var(--horizon-line);
+    margin-top: clamp(44px, 7vw, 84px);
+  }
+
+  .cx h2 {
+    font: 600 clamp(1.6rem, 3.2vw, 2.1rem) / var(--leading-heading) var(--font-display);
+    color: var(--ink); margin: 0; text-wrap: balance;
+  }
+  .cx h3 { font: 600 var(--text-h4) var(--font-display); color: var(--ink); margin: 0; }
+  .cx-lead {
+    font: 400 var(--text-body) / var(--leading-body) var(--font-body);
+    color: var(--ink-soft); margin: 0; max-width: 62ch;
+  }
+  .cx-fine { font: 400 var(--text-micro) / 1.6 var(--font-body); color: var(--ink-faint); margin: 0; }
+  .cx-rose { color: var(--rose); }
+
+  /* ── hero ──────────────────────────────────────────────────────────── */
+  .cx-hero {
+    position: relative; border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+    padding: clamp(28px, 5vw, 56px) 0 0;
+  }
+  .cx-hero-grid {
+    display: grid; gap: clamp(26px, 4vw, 52px); align-items: center;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 330px), 1fr));
+    padding-bottom: clamp(28px, 5vw, 56px);
+  }
+  /* Text over the sky always sits on a veil — never a gradient scrim. */
+  .cx-cap {
+    padding: clamp(22px, 3.5vw, 34px); max-width: 37rem;
+    border-radius: var(--radius-md); display: grid; gap: 14px;
+  }
+  .cx-cap h1 {
+    font: 500 clamp(2.2rem, 5.2vw, 3.3rem) / 1.02 var(--font-display);
+    letter-spacing: -.015em; color: var(--ink); margin: 0; text-wrap: pretty;
+  }
+  .cx-cycle { margin: 0; display: flex; gap: 8px; flex-wrap: wrap; align-items: baseline; }
+  .cx-cycle-lbl {
+    font: 400 var(--text-xs) var(--font-mono); text-transform: uppercase;
+    letter-spacing: var(--tracking-caps); color: var(--ink-faint);
+  }
+  .cx-cycle-word {
+    font: 500 var(--text-body) var(--font-display); color: var(--rose);
+    transition: opacity 200ms var(--ease-out);
+  }
+  .cx-sub {
+    font: 400 var(--text-prose) / 1.6 var(--font-display);
+    color: var(--ink-soft); margin: 0; max-width: 38ch;
+  }
+  .cx-cta { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 4px; }
+  .cx-foot {
+    font: 400 var(--text-xs) / 1.6 var(--font-body);
+    color: var(--ink-faint); margin: 0; max-width: 44ch;
+  }
+
+  /* The card lies ON the sky — the one place shadow-3 is right. */
+  .cx-hero-card { margin: 0; display: grid; gap: 12px; }
+  .cx-hero-card a { display: block; }
+  .cx-hero-card img {
+    width: 100%; height: auto; display: block; border-radius: 2px;
+    border: 1px solid color-mix(in srgb, var(--horizon-line) 70%, transparent);
+    box-shadow: var(--shadow-3);
+    transform: rotate(-1.4deg);
+    transition: transform var(--dur-2) var(--ease-out);
+  }
+  .cx-hero-card a:hover img, .cx-hero-card a:focus-visible img { transform: rotate(0deg); }
+  .cx-hero-card figcaption {
+    font: 400 var(--text-xs) / 1.6 var(--font-mono);
+    color: var(--ink-soft); max-width: 46ch;
+  }
+  .cx-art-absent {
+    display: grid; place-items: center; aspect-ratio: 1200 / 630;
+    border: var(--border-w) dashed var(--line-strong); border-radius: 2px;
+    font: 400 var(--text-xs) var(--font-mono); color: var(--ink-faint);
+    padding: 16px; text-align: center;
+  }
+
+  /* ── start ─────────────────────────────────────────────────────────── */
+  .cx-two {
+    display: grid; gap: clamp(26px, 4vw, 48px); align-items: start;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 400px), 1fr));
+  }
+  .cx-explain { display: grid; gap: 14px; max-width: 46ch; }
+  .cx-roman { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 12px; }
+  .cx-roman li { display: flex; gap: 12px; align-items: baseline; }
+  .cx-roman span:last-child {
+    font: 400 var(--text-sm) / 1.65 var(--font-body); color: var(--ink-soft);
+  }
+  .cx-num {
+    flex: none; width: 1.6em;
+    font: 400 var(--text-xs) var(--font-mono); color: var(--rose);
+  }
+
+  .cx-branch {
+    display: grid; gap: 10px; margin-top: 8px; padding-top: 20px;
+    border-top: var(--border-w) solid var(--line);
+  }
+  .cx-branch-lead { font: 400 var(--text-prose) var(--font-display); color: var(--ink); margin: 0; }
+  .cx-branch-body, .cx-branch-foot {
+    font: 400 var(--text-sm) / 1.65 var(--font-body); color: var(--ink-soft); margin: 0;
+  }
+  .cx-branch-foot { color: var(--ink-faint); font-size: var(--text-xs); }
+  .cx-plates { display: grid; gap: 1px; background: var(--line); border-radius: var(--radius-sm); overflow: hidden; }
+  .cx-plate {
+    display: flex; gap: 10px; justify-content: space-between; flex-wrap: wrap;
+    margin: 0; padding: 10px 12px; background: var(--surface-card);
+    font: 400 var(--text-xs) var(--font-mono); color: var(--ink-soft);
+  }
+  .cx-plate em { font-style: normal; }
+  .cx-plate-good em { color: var(--accent); }
+  .cx-plate-no em { color: var(--rose); }
+
+  /* ── the form card ─────────────────────────────────────────────────── */
+  .cx-card {
+    background: var(--surface-card); border: var(--border-w) solid var(--line);
+    border-radius: var(--radius-md); box-shadow: var(--shadow-1);
+    padding: clamp(18px, 3vw, 26px); display: grid; gap: 19px;
+  }
+  .cx-field { display: grid; gap: 6px; }
+  .cx-flabel {
+    display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap;
+    font: 600 var(--text-xs) var(--font-body); color: var(--ink-soft);
+  }
+  .cx-req, .cx-opt { font: 400 var(--text-micro) var(--font-mono); font-style: normal; }
+  .cx-req { color: var(--rose); }
+  .cx-opt { color: var(--ink-faint); }
+  .cx-input, .cx-code {
+    font: 400 var(--text-sm) var(--font-mono); color: var(--ink);
+    background: var(--surface-page); border: var(--border-w) solid var(--line-strong);
+    border-radius: var(--radius-sm); padding: 11px 12px; min-height: 44px;
     width: 100%; box-sizing: border-box;
   }
-  .out { display: grid; gap: 6px; width: 100%; max-width: 52ch; }
-  .check { display: flex; gap: 10px; align-items: flex-start; }
-  .check span { font: 400 var(--text-sm) / 1.6 var(--font-body); color: var(--ink); }
-  .check input { margin-top: 4px; flex: none; }
-  .hint { font: 400 var(--text-xs) / 1.7 var(--font-body); color: var(--ink-faint); margin: 0; max-width: 56ch; }
+  .cx-help { font: 400 var(--text-micro) / 1.6 var(--font-body); color: var(--ink-faint); }
+  .cx-row { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr)); }
 
-  .cards, .bands, .honest { display: grid; gap: var(--space-4); }
-  .card-row { display: grid; gap: var(--space-4); grid-template-columns: 1fr 1fr; }
-  .card-row figure { margin: 0; display: grid; gap: 8px; }
-  .card-row img {
-    width: 100%; height: auto; display: block;
-    border: var(--border-w) solid var(--line); border-radius: var(--radius-sm);
+  .cx-check {
+    display: flex; gap: 10px; align-items: flex-start; min-height: 44px;
+    background: var(--surface-inset); border-radius: var(--radius-sm); padding: 11px 12px;
   }
-  .card-row figcaption {
+  .cx-check input { margin-top: 3px; flex: none; accent-color: var(--accent); }
+  .cx-check span { font: 400 var(--text-sm) / 1.55 var(--font-body); color: var(--ink); display: grid; gap: 2px; }
+  .cx-check em {
+    font: 400 var(--text-micro) var(--font-body); font-style: normal; color: var(--ink-faint);
+  }
+
+  .cx-signed {
+    display: grid; gap: 4px; background: var(--surface-inset);
+    border: var(--border-w) solid var(--line); border-radius: var(--radius-md); padding: 14px 16px;
+  }
+  .cx-signed p { margin: 0; font: 400 var(--text-sm) var(--font-body); color: var(--ink-soft); }
+
+  .cx-submit {
+    display: grid; gap: 10px; justify-items: start;
+    padding-top: 16px; border-top: var(--border-w) solid var(--line);
+  }
+
+  /* Live-red belongs to the live badge; the validation block is its one
+     legitimate other use on this site. */
+  .cx-errs {
+    background: var(--live-wash); border: var(--border-w) solid var(--live);
+    border-left-width: 3px; border-radius: var(--radius-md); padding: 15px 17px;
+  }
+  .cx-errs-t { margin: 0 0 6px; font: 600 var(--text-sm) var(--font-body); color: var(--live); }
+  .cx-errs ul { margin: 0; padding-left: 18px; }
+  .cx-errs li { font: 400 var(--text-sm) / 1.6 var(--font-body); color: var(--ink); }
+
+  /* ── done ──────────────────────────────────────────────────────────── */
+  .cx-done { display: grid; gap: 18px; }
+  .cx-done-line { font: 400 var(--text-sm) / 1.65 var(--font-body); color: var(--ink-soft); margin: 0; }
+  .cx-lbl {
     font: 600 var(--text-micro) var(--font-body); letter-spacing: var(--tracking-eyebrow);
-    text-transform: uppercase; color: var(--ink-faint);
+    text-transform: uppercase; color: var(--ink-faint); margin: 4px 0 0;
+  }
+  .cx-copyrow { display: flex; gap: 8px; align-items: stretch; flex-wrap: wrap; }
+  .cx-copyrow .cx-code { flex: 1 1 min(100%, 220px); }
+  .cx-copy {
+    flex: none; min-height: 44px; padding: 0 14px; cursor: pointer;
+    font: 500 var(--text-xs) var(--font-body); color: var(--on-accent);
+    background: var(--accent); border: var(--border-w) solid var(--accent);
+    border-radius: var(--radius-sm);
+  }
+  .cx-copy:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+  .cx-copy-rose {
+    background: transparent; color: var(--rose); border-color: var(--rose);
+  }
+  .cx-copy-rose:hover { background: var(--rose-wash); }
+  .cx-share { display: flex; gap: 14px; flex-wrap: wrap; }
+  .cx-share a { font: 500 var(--text-sm) var(--font-body); color: var(--accent); }
+
+  .cx-keep {
+    background: var(--rose-wash); border: var(--border-w) solid var(--rose);
+    border-left-width: 3px; border-radius: var(--radius-md);
+    padding: 16px 18px; display: grid; gap: 10px;
+  }
+  .cx-keep-body { font: 400 var(--text-sm) / 1.65 var(--font-body); color: var(--ink); margin: 0; }
+  .cx-keep-links { display: flex; gap: 14px; flex-wrap: wrap; margin: 0; }
+  .cx-keep-links a { font: 400 var(--text-micro) var(--font-mono); color: var(--rose); }
+  .cx-again a { font: 400 var(--text-sm) var(--font-body); color: var(--ink-faint); }
+
+  /* ── showcase ──────────────────────────────────────────────────────── */
+  .cx-head {
+    display: flex; gap: 18px; justify-content: space-between;
+    align-items: flex-end; flex-wrap: wrap; margin-bottom: 20px;
+  }
+  .cx-head > div { display: grid; gap: 8px; }
+  .cx-count { font: 400 var(--text-xs) var(--font-mono); color: var(--ink-faint); margin: 0; }
+  /* min(100%, 290px) is what stops this overflowing at 320px, and it is also
+     why the row survives 1, 3 or 5 designs. */
+  .cx-cards {
+    display: grid; gap: clamp(18px, 2.6vw, 28px);
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 290px), 1fr));
+  }
+  .cx-cardfig { margin: 0; display: grid; gap: 10px; }
+  .cx-cardfig img {
+    width: 100%; height: auto; display: block; border-radius: 2px;
+    border: var(--border-w) solid var(--line); box-shadow: var(--shadow-1);
+    transform: rotate(var(--tilt, 0deg));
+    transition: transform var(--dur-2) var(--ease-out), box-shadow var(--dur-2) var(--ease-out);
+  }
+  .cx-cardfig:hover img { transform: rotate(0deg); box-shadow: var(--shadow-2); }
+  .cx-cardfig figcaption { display: grid; gap: 3px; }
+  .cx-cardname { font: 600 var(--text-h4) var(--font-display); color: var(--ink); }
+  .cx-cardtag {
+    font: 400 var(--text-micro) var(--font-mono); color: var(--rose);
+    text-transform: lowercase;
+  }
+  .cx-cardnote { font: 400 var(--text-xs) / 1.6 var(--font-body); color: var(--ink-soft); }
+  .cx-absent {
+    display: grid; place-items: center; aspect-ratio: 1200 / 630;
+    border-radius: var(--radius-md); position: relative; padding: 20px; text-align: center;
+  }
+  .cx-absent p { font: 400 var(--text-xs) var(--font-mono); color: var(--ink-soft); margin: 0; max-width: 34ch; }
+
+  /* ── the five answers ──────────────────────────────────────────────── */
+  .cx-headblock { display: grid; gap: 10px; max-width: 60ch; margin-bottom: 22px; }
+  .cx-bands {
+    display: grid; gap: 14px; align-items: stretch;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 205px), 1fr));
+  }
+  .cx-band {
+    background: var(--surface-card); border: var(--border-w) solid var(--line);
+    border-top: 2px solid var(--line-strong); border-radius: var(--radius-md);
+    box-shadow: var(--shadow-1); padding: 18px 17px; display: grid; gap: 11px;
+    align-content: start;
+    transition: box-shadow var(--dur-2) var(--ease-out), border-color var(--dur-2) var(--ease-out);
+  }
+  .cx-band:hover { box-shadow: var(--shadow-2); border-color: var(--line-strong); }
+  .cx-band[data-band="well-aspected"] { border-top-color: var(--accent); }
+  .cx-band[data-band="same-sky"] {
+    background: var(--rose-wash); border-color: var(--rose); border-top-color: var(--rose);
+  }
+  .cx-band[data-band="same-sky"] .cx-bandsays { color: var(--ink); }
+
+  /* The proportion, not a count out of seven — see the note in the frontmatter. */
+  .cx-tally {
+    display: block; height: 6px; border-radius: 2px;
+    background: var(--line); overflow: hidden;
+  }
+  .cx-tally i { display: block; height: 100%; width: var(--share); background: var(--rose); }
+  .cx-range {
+    font: 400 var(--text-micro) var(--font-mono); letter-spacing: .06em;
+    color: var(--ink-faint); margin: 0;
+  }
+  .cx-band h3 { font: 600 1.3rem var(--font-display); }
+  .cx-bandsays { font: 400 var(--text-xs) / 1.65 var(--font-body); color: var(--ink-soft); margin: 0; }
+
+  /* ── the honest note ───────────────────────────────────────────────── */
+  .cx-honest {
+    border-top: var(--border-w) solid var(--rose);
+    background: var(--surface-veil); border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+    padding: clamp(24px, 4vw, 44px);
+    display: grid; gap: clamp(24px, 4vw, 44px); align-items: start;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+  }
+  .cx-honest-l { display: grid; gap: 12px; max-width: 34ch; }
+  .cx-honest-l h2 { font-weight: 500; font-size: clamp(1.7rem, 3.6vw, 2.3rem); }
+  .cx-sign {
+    display: flex; gap: 10px; align-items: center; margin: 6px 0 0;
+    font: 500 var(--text-body) var(--font-display); color: var(--ink);
+  }
+  .cx-sign-rule {
+    display: block; width: 28px; height: 1px;
+    background: color-mix(in srgb, var(--rose) 45%, transparent);
+  }
+  .cx-almanac { margin: 0; display: grid; gap: 12px; }
+  .cx-alrow { display: flex; gap: 8px; align-items: baseline; }
+  .cx-alrow dt { font: 600 var(--text-sm) var(--font-body); color: var(--ink); flex: none; }
+  .cx-leader {
+    flex: 1 1 auto; border-bottom: 1px dotted var(--line-strong);
+    transform: translateY(-4px);
+  }
+  .cx-alrow dd {
+    margin: 0; flex: none; text-align: right; max-width: 30ch;
+    font: 400 var(--text-xs) var(--font-mono); color: var(--ink-soft);
   }
 
-  .band-list { margin: 0; padding-left: 1.4em; display: grid; gap: 8px; }
-  .band-list li { font: 400 var(--text-sm) / 1.7 var(--font-body); color: var(--ink-soft); }
-  .band-list span { font-weight: 600; color: var(--ink); }
+  /* ── admin blocks ──────────────────────────────────────────────────── */
+  .cx-more { display: grid; gap: 18px; }
+  .cx-blocks { display: grid; gap: clamp(28px, 4vw, 48px); }
+  .cx-block { display: grid; gap: 10px; }
+  .cx-block + .cx-block {
+    border-top: var(--border-w) solid var(--line);
+    padding-top: clamp(28px, 4vw, 48px);
+  }
 
-  @media (max-width: 640px) {
-    .two { grid-template-columns: 1fr; }
-    .card-row { grid-template-columns: 1fr; }
+  @media (prefers-reduced-motion: reduce) {
+    .cx-hero-card img, .cx-cardfig img, .cx-cycle-word { transition: none; }
   }
 </style>

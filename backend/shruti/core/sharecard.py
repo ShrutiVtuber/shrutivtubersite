@@ -94,6 +94,21 @@ def _fit(draw, text: str, font, limit: int) -> str:
     return (text + "…") if text else ""
 
 
+def _wrap(text: str, at: int) -> list[str]:
+    """Word-wrap at roughly `at` characters, never mid-word."""
+    words, lines, line = text.split(), [], ""
+    for w in words:
+        candidate = f"{line} {w}".strip()
+        if len(candidate) > at and line:
+            lines.append(line)
+            line = w
+        else:
+            line = candidate
+    if line:
+        lines.append(line)
+    return lines
+
+
 def comparison_card(
     *,
     left_name: str,
@@ -107,98 +122,160 @@ def comparison_card(
     design: dict | None = None,
     backdrop: bytes | None = None,
 ) -> bytes:
-    """One PNG. Never raises — a missing card must not take down the page."""
+    """
+    One PNG. Never raises — a missing card must not take down the page.
+
+    Laid out to `docs/design/HANDOFF_COMPATIBLE.md`. Four things changed from
+    the first version and each is the reason for the one under it:
+
+    1. **The verdict is the card.** 88px, left-aligned, on the optical centre.
+       Centred between two avatars it read as a caption. It is the only line
+       that has to survive being a thumbnail on a phone.
+    2. **Avatars smaller, overlapped, top-left.** Overlapped they read as a
+       pair; on opposite edges they read as a versus graphic. Smaller also
+       stops the art-absent state looking like a failure — avatars are
+       uploaded by each chart's own owner, so half-empty pairs are common.
+    3. **Count and top marker on one line under the verdict.** They are the
+       evidence FOR the verdict, and having them right there is what stops the
+       card reading as a horoscope.
+    4. **The disclaimer sits on the bottom rule opposite the site name.**
+       Structural furniture rather than small print, which is the only way a
+       disclaimer survives a future redesign. Never at reduced opacity.
+
+    ONE SUBSTITUTION from the handoff, deliberate and visible: it specifies
+    JetBrains Mono for the count, the marker and the site name. Only the two
+    brand faces ship as TrueType — the mono exists in the site's fonts as
+    .woff2, which Pillow cannot read — so those lines are set in Commissioner.
+    Naming a font that is not there does not fail loudly; it silently falls
+    back to a bitmap face and the card looks broken.
+    """
     from PIL import Image, ImageDraw
 
     design = design or {}
-    INK = _rgb(design.get("ink", ""), FALLBACK["ink"])
-    SOFT = _rgb(design.get("soft", ""), FALLBACK["soft"])
-    FAINT = _rgb(design.get("faint", ""), FALLBACK["faint"])
+    # Handoff colour roles, mapped onto the columns that store them.
+    VERDICT = _rgb(design.get("ink", ""), FALLBACK["ink"])          # verdict
+    NAMES = _rgb(design.get("soft", ""), FALLBACK["soft"])          # names
+    MARKER = _rgb(design.get("faint", ""), FALLBACK["faint"])       # marker
+    NOTE = _rgb(design.get("line", ""), FALLBACK["faint"])          # note / rules
     PAPER = _rgb(design.get("background", ""), FALLBACK["background"])
-    LINE = _rgb(design.get("line", ""), FALLBACK["line"])
-    ROSE = _rgb(design.get("accent", ""), FALLBACK["accent"])
+    COUNT = _rgb(design.get("accent", ""), FALLBACK["accent"])      # count
+
+    M = 72                      # margin, all four sides
+    INNER = WIDTH - M * 2
 
     card = Image.new("RGB", (WIDTH, HEIGHT), PAPER)
 
-    # An optional full-bleed backdrop. Covered, not stretched: a design's
-    # artwork squashed to 1200x630 is somebody's picture distorted.
     if backdrop:
         try:
             art = Image.open(BytesIO(backdrop)).convert("RGB")
+            # Cover, never squash: a design's artwork stretched to 1200x630 is
+            # somebody's picture distorted.
             scale = max(WIDTH / art.width, HEIGHT / art.height)
             art = art.resize((round(art.width * scale), round(art.height * scale)),
                              Image.LANCZOS)
             card.paste(art, ((WIDTH - art.width) // 2, (HEIGHT - art.height) // 2))
             if design.get("scrim"):
-                # Under the text only, so the picture is still the picture.
-                veil = Image.new("RGBA", (WIDTH, HEIGHT), (*PAPER, 0))
-                ImageDraw.Draw(veil).rectangle((0, 120, WIDTH, 500), fill=(*PAPER, 190))
+                # Two bands, not one. The strip left between them keeps a slice
+                # of the artwork visible under the verdict and echoes the
+                # site's horizon rule — it is the design, not a gap.
+                veil = Image.new("RGBA", (WIDTH, HEIGHT), (0, 0, 0, 0))
+                vd = ImageDraw.Draw(veil)
+                vd.rectangle((0, 196, WIDTH, 482), fill=(*PAPER, 173))
+                vd.rectangle((0, 502, WIDTH, HEIGHT), fill=(*PAPER, 173))
                 card = Image.alpha_composite(card.convert("RGBA"), veil).convert("RGB")
         except Exception:                              # noqa: BLE001
             log.info("a card backdrop could not be read; using the flat colour")
 
     draw = ImageDraw.Draw(card)
 
-    display = _font("EBGaramond-SemiBold.ttf", 58)
-    small = _font("Commissioner.ttf", 26)
-    tiny = _font("Commissioner.ttf", 22)
-    huge = _font("EBGaramond-SemiBold.ttf", 92)
+    f_name = _font("Commissioner.ttf", 27)
+    f_count = _font("Commissioner.ttf", 27)
+    f_marker = _font("Commissioner.ttf", 22)
+    f_note = _font("Commissioner.ttf", 19)
+    f_mark = _font("Commissioner.ttf", 20)
+    f_initial = _font("EBGaramond-SemiBold.ttf", 40)
 
-    # A horizon line, the site's one recurring motif.
-    draw.line((0, HEIGHT - 96, WIDTH, HEIGHT - 96), fill=LINE, width=2)
+    # ── top band: the pair ────────────────────────────────────────────────
+    AV, TOP = 92, 72
+    centres = [(M, TOP), (M + 72, TOP)]          # 20px of overlap
+    faces = (left_avatar, right_avatar)
+    names = (left_name or "—", right_name or "—")
 
-    # The two avatars, or two quiet placeholders where there are none. A
-    # missing avatar must not leave a hole — plenty of people will have one
-    # side and not the other.
-    size = 168
-    for avatar, cx in ((left_avatar, 250), (right_avatar, WIDTH - 250)):
-        box = (cx - size // 2, 118)
+    # Drawn back to front so the second disc overlaps the first.
+    for (avatar, name), (x, y) in zip(zip(faces, names), centres):
+        placed = False
         if avatar:
             try:
-                card.paste(_circle(Image.open(BytesIO(avatar)), size), box,
-                           _circle(Image.open(BytesIO(avatar)), size))
-                continue
-            except Exception:                          # noqa: BLE001
-                log.info("an avatar could not be read; drawing the placeholder")
-        draw.ellipse((box[0], box[1], box[0] + size, box[1] + size),
-                     outline=LINE, width=3)
+                disc = _circle(Image.open(BytesIO(avatar)), AV)
+                card.paste(disc, (x, y), disc)
+                placed = True
+            except Exception:                      # noqa: BLE001
+                log.info("an avatar could not be read; drawing the art-absent disc")
+        if not placed:
+            # Art-absent, not broken: a flat disc in the names colour at 12%,
+            # a ring at 50%, and the initial. Half-empty pairs are the norm.
+            plate = Image.new("RGBA", (AV, AV), (0, 0, 0, 0))
+            pd = ImageDraw.Draw(plate)
+            pd.ellipse((0, 0, AV - 1, AV - 1), fill=(*NAMES, 31),
+                       outline=(*NAMES, 128), width=1)
+            letter = (name.strip() or "?")[0].upper()
+            lw = pd.textlength(letter, font=f_initial)
+            pd.text(((AV - lw) / 2, AV / 2 - 26), letter, font=f_initial, fill=(*NAMES, 210))
+            card = Image.alpha_composite(card.convert("RGBA"),
+                                         Image.new("RGBA", (WIDTH, HEIGHT), (0, 0, 0, 0)))
+            card.paste(plate, (x, y), plate)
+            card = card.convert("RGB")
+            draw = ImageDraw.Draw(card)
 
-    # Their names under each.
-    for name, cx in ((left_name, 250), (right_name, WIDTH - 250)):
-        text = _fit(draw, name or "—", small, 300)
-        w = draw.textlength(text, font=small)
-        draw.text((cx - w / 2, 118 + size + 22), text, font=small, fill=INK)
+    # Names, baseline-aligned with the disc centres.
+    name_y = TOP + AV // 2 - 17
+    x = 262
+    first = _fit(draw, names[0], f_name, 300)
+    draw.text((x, name_y), first, font=f_name, fill=NAMES)
+    x += draw.textlength(first, font=f_name) + 10
+    draw.text((x, name_y), "and", font=f_name, fill=MARKER)
+    x += draw.textlength("and", font=f_name) + 10
+    draw.text((x, name_y), _fit(draw, names[1], f_name, WIDTH - M - x),
+              font=f_name, fill=NAMES)
 
-    # The band, in the middle, where the eye lands — one phrase to screenshot.
-    # Sized to fit rather than truncated: "Written in the same sky" is the
-    # longest and it is also the one people most want to post.
-    verdict = _font("EBGaramond-SemiBold.ttf", 62)
-    if draw.textlength(band, font=verdict) > 420:
-        verdict = _font("EBGaramond-SemiBold.ttf", 46)
-    w = draw.textlength(band, font=verdict)
-    draw.text((WIDTH / 2 - w / 2, 168), band, font=verdict, fill=INK)
+    # ── the two hairlines, at 38% ─────────────────────────────────────────
+    rules = Image.new("RGBA", (WIDTH, HEIGHT), (0, 0, 0, 0))
+    rd = ImageDraw.Draw(rules)
+    rd.rectangle((M, 190, WIDTH - M, 190), fill=(*NOTE, 97))
+    rd.rectangle((M, 502, WIDTH - M, 502), fill=(*NOTE, 97))
+    card = Image.alpha_composite(card.convert("RGBA"), rules).convert("RGB")
+    draw = ImageDraw.Draw(card)
 
-    # The count underneath, always, so the band can be argued with. A verdict
-    # with its own evidence beside it is a different thing from a verdict.
+    # ── middle band: the verdict, then its evidence ───────────────────────
+    # Wrap at twenty characters and step down only if it still will not fit.
+    # "Written in the same sky" is the longest of the five and sits at 88, so
+    # the ladder only ever fires on a band added later.
+    lines: list[str] = []
+    for size in (88, 76, 68):
+        f_verdict = _font("EBGaramond-SemiBold.ttf", size)
+        lines = _wrap(band, 20)
+        if len(lines) <= 2 and all(draw.textlength(l, font=f_verdict) <= INNER for l in lines):
+            break
+    y = 236
+    for line in lines[:2]:
+        draw.text((M, y), line, font=f_verdict, fill=VERDICT)
+        y += int(size * 0.98)
+
+    # 20px in the handoff measured from a single-line verdict. Two lines put a
+    # descender where that gap was, so it is measured from the descender here.
+    tally_y = y + 30
     tally = f"{harmonious} harmonious · {hard} hard"
-    w = draw.textlength(tally, font=tiny)
-    draw.text((WIDTH / 2 - w / 2, 258), tally, font=tiny, fill=FAINT)
+    draw.text((M, tally_y), tally, font=f_count, fill=COUNT)
+    x = M + draw.textlength(tally, font=f_count) + 16
+    draw.text((x, tally_y + 5), _fit(draw, headline, f_marker, WIDTH - M - x),
+              font=f_marker, fill=MARKER)
 
-    # The top marker, across the card.
-    text = _fit(draw, headline, display, WIDTH - 160)
-    w = draw.textlength(text, font=display)
-    draw.text((WIDTH / 2 - w / 2, 372), text, font=display, fill=INK)
-
-    # And the line that stops it being a claim. On the card itself, not only
-    # on the page — a card travels without its page.
+    # ── bottom band: the disclaimer is furniture, not small print ─────────
     note = "What the tradition says about the configurations present. Not a prediction."
-    text = _fit(draw, note, tiny, WIDTH - 120)
-    w = draw.textlength(text, font=tiny)
-    draw.text((WIDTH / 2 - w / 2, 452), text, font=tiny, fill=SOFT)
-
+    draw.text((M, 520), _fit(draw, note, f_note, INNER - 220), font=f_note, fill=NOTE)
     mark = "shrutivtuber.com"
-    w = draw.textlength(mark, font=tiny)
-    draw.text((WIDTH / 2 - w / 2, HEIGHT - 62), mark, font=tiny, fill=ROSE)
+    draw.text((WIDTH - M - draw.textlength(mark, font=f_mark), 521),
+              mark, font=f_mark, fill=NOTE)
 
     out = BytesIO()
     card.save(out, format="PNG", optimize=True)

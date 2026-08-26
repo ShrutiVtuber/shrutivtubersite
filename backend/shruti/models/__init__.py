@@ -215,6 +215,13 @@ class CardDesign(TimestampMixin, table=True):
     faint: str = "#6E7890"
     line: str = "#DCD6DC"
     accent: str = "#A85A76"
+    # One line under the name in the showcase, so a visitor knows what the
+    # design is FOR rather than only what it is called.
+    blurb: str = ""
+    # A backdrop that ships with the application, by filename in
+    # `shruti/assets`. `media_id` covers anything she uploads; this covers the
+    # one that is part of the design and must exist on a fresh install.
+    backdrop_asset: str = ""
 
     media_id: Optional[int] = Field(default=None, foreign_key="media.id")
 

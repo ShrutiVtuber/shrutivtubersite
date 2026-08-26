@@ -511,6 +511,46 @@ async def write_reading(
     return _comparison_view(row, left, right, owner=True)
 
 
+async def _backdrop_for(design: CardDesign, session: AsyncSession) -> bytes | None:
+    """
+    The art behind a card, from wherever this design keeps it.
+
+    Two sources on purpose. `media_id` is anything she uploads. `backdrop_asset`
+    names a file that SHIPS with the application — the Rose horizon sky is part
+    of the design rather than content, and a fresh install has to have it
+    without somebody remembering to upload a PNG.
+
+    Never raises. A card without its backdrop is still a card; a 500 here would
+    take out the page embedding it.
+    """
+    if design.media_id:
+        art = await session.get(Media, design.media_id)
+        if art is not None:
+            try:
+                from shruti.core.storage import fetch
+
+                got = await fetch(art.filename)
+                if got and got[0]:
+                    return got[0]
+            except Exception:                          # noqa: BLE001
+                pass
+
+    if design.backdrop_asset:
+        from pathlib import Path as _Path
+
+        # Basename only: this is a database field, and a row reading
+        # "../../etc/passwd" must not be able to reach it.
+        safe = _Path(design.backdrop_asset).name
+        candidate = _Path(__file__).resolve().parents[2] / "assets" / safe
+        try:
+            if candidate.is_file():
+                return candidate.read_bytes()
+        except Exception:                              # noqa: BLE001
+            pass
+
+    return None
+
+
 @router.get("/card-sample.png")
 async def card_sample(
     design: str = "light", session: AsyncSession = Depends(get_session)
@@ -539,17 +579,7 @@ async def card_sample(
     if chosen is None:
         raise HTTPException(404, "no design is available")
 
-    backdrop = None
-    if chosen.media_id:
-        art = await session.get(Media, chosen.media_id)
-        if art is not None:
-            try:
-                from shruti.core.storage import fetch
-
-                got = await fetch(art.filename)
-                backdrop = got[0] if got else None
-            except Exception:                          # noqa: BLE001
-                backdrop = None
+    backdrop = await _backdrop_for(chosen, session)
 
     png = comparison_card(
         left_name="Someone", right_name="Someone else",
@@ -638,7 +668,11 @@ async def card_designs(session: AsyncSession = Depends(get_session)) -> list[dic
         )
     ).scalars().all()
     return [{"key": d.key, "name": d.name or d.key,
-             "background": d.background, "ink": d.ink} for d in rows]
+             "background": d.background, "ink": d.ink,
+             "blurb": d.blurb,
+             # The showcase labels a design by what it IS, and "backdrop" is
+             # the one distinction a visitor can see before clicking.
+             "backdrop": bool(d.media_id or d.backdrop_asset)} for d in rows]
 
 
 class DesignIn(BaseModel):
@@ -1028,17 +1062,7 @@ async def card(
         "scrim": chosen.scrim,
     } if chosen else {}
 
-    backdrop = None
-    if chosen is not None and chosen.media_id:
-        art = await session.get(Media, chosen.media_id)
-        if art is not None:
-            try:
-                from shruti.core.storage import fetch
-
-                got = await fetch(art.filename)
-                backdrop = got[0] if got else None
-            except Exception:                          # noqa: BLE001
-                backdrop = None
+    backdrop = await _backdrop_for(chosen, session) if chosen else None
 
     from shruti.core.sharecard import comparison_card
 

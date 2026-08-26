@@ -35,7 +35,14 @@ PAGES = _pages_dir()
 
 # Pages that lay themselves out and mean to: the reader carries an outline
 # beside the lesson and is deliberately wider than a column of prose.
-LAYS_ITSELF_OUT = {"classes/[slug]/[lesson].astro"}
+LAYS_ITSELF_OUT = {
+    "classes/[slug]/[lesson].astro",
+    # The compatibility page opens on a full-bleed sky panel that has to reach
+    # both edges of the window, so it cannot sit inside a fixed-width wrapper.
+    # It supplies its own `.cx-in` column at the same `--page-max` for every
+    # section below the panel — it is laid out, not unwrapped.
+    "compatible.astro",
+}
 
 # Sections with their own established idiom, which is not this one.
 NOT_OURS = ("journal/", "admin/", "tools/")
