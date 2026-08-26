@@ -41,13 +41,25 @@ against Germany by mistake and is marked not-applicable in
 **The overlays.** Design handoff at `docs/design/HANDOFF_OVERLAYS.md`;
 reconciliation with the schema at `docs/design/OVERLAYS_DELTAS.md`.
 
-Six surfaces specified. **Counter bar, alerts, sky chart and hours strip are
-done — all six OBS surfaces are built, and both web variants are on the
-site, and sound is done.** The overlay set from the handoff is complete.
-Next: — counter bar and sky chart on the site itself,
-   themed and responsive rather than transparent and fixed
-4. Sound upload (§7): per-type file, per-type gain, global mute, served from
-   her own origin and preloaded on connect
+**The overlay set from the handoff is complete.** All six OBS surfaces, both
+web variants, and sound:
+
+| | |
+|---|---|
+| Counter bar (wide + compact) | `/overlay/counter` |
+| Alerts — nine kinds, one queue | `/overlay/alerts` |
+| Supporters ticker | `/overlay/ticker` |
+| Sky chart | `/overlay/sky` |
+| Planetary hours strip | `/overlay/hours` |
+| Countdown | `/overlay/countdown` |
+| Web variants | `SkyCard` on `/`, `CounterCard` on `/support` |
+| Sound | uploaded and assigned in `/admin/counters` |
+
+She mints the tokens herself in `/admin/counters` — there are none in either
+database, by design. Each URL is one OBS Browser Source at 1920 × 1080.
+
+Nothing from the handoff is outstanding. What is left is hers, not mine — see
+the list below.
 
 ## Decisions not to re-litigate
 
