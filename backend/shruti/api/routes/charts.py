@@ -594,6 +594,129 @@ async def _cross(left: SavedChart, right: SavedChart, tradition: str, orb: float
     return body.get("data", body)
 
 
+class InviteIn(BaseModel):
+    """Their birth details, cast and compared in one step."""
+
+    birth_date: str = Field(max_length=10)
+    birth_time: Optional[str] = Field(default=None, max_length=5)
+    time_unknown: bool = False
+    place_name: str = Field(default="", max_length=160)
+    lat: float = 0.0
+    lon: float = 0.0
+    label: str = Field(default="", max_length=80)
+    tradition: str = "hellenistic"
+    consent: bool = False
+
+
+@router.post("/invite/{token}", status_code=201)
+async def accept_invite(
+    token: str,
+    body: InviteIn,
+    user: User | None = Depends(current_user),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """
+    Somebody accepts an invitation to compare charts.
+
+    `token` is the INVITER's share token — the thing they posted or sent. This
+    keeps the guest's own chart and builds the comparison in one step, because
+    asking a person who arrived from a tweet to cast a chart, keep it, copy its
+    address and paste it somewhere else is four chances to lose them.
+
+    **The guest owns their own chart.** They get its owner token back, so
+    deleting it later is theirs to do and takes the comparison with it. The
+    inviter never gains any power over it — they hold a share token, and a
+    share token has never been able to act as an owner anywhere in this file.
+    """
+    theirs = (
+        await session.execute(
+            select(SavedChart).where(SavedChart.share_token == token)
+        )
+    ).scalar_one_or_none()
+    if theirs is None:
+        raise HTTPException(404, "that invitation is not valid any more")
+    if theirs.expires_at and theirs.expires_at < _now():
+        raise HTTPException(410, "that invitation has expired")
+    if not body.birth_date:
+        raise HTTPException(400, "a chart needs a date")
+    if user is None and not body.consent:
+        raise HTTPException(
+            400, "keeping your chart means storing birth data, which needs consent"
+        )
+
+    mine = SavedChart(
+        owner_token=_token(),
+        user_id=user.id if user else None,
+        label=body.label.strip() or "Mine",
+        tradition=body.tradition if body.tradition in TRADITIONS else "hellenistic",
+        figure="wheel",
+        birth_date=body.birth_date,
+        birth_time=None if body.time_unknown else (body.birth_time or None),
+        time_unknown=body.time_unknown,
+        place_name=body.place_name.strip(),
+        lat=body.lat,
+        lon=body.lon,
+        last_seen_at=_now(),
+    )
+    if user is None:
+        from shruti.core.consents import CONSENT_VERSION, NATIVITY
+
+        mine.consent_version = CONSENT_VERSION
+        mine.consent_wording = NATIVITY.wording
+        mine.consent_source = "chart-invite"
+        mine.consent_at = _now()
+        mine.expires_at = _now() + timedelta(days=ORPHAN_DAYS)
+
+    session.add(mine)
+    await session.commit()
+    await session.refresh(mine)
+
+    both = Comparison(
+        owner_token=_token(),
+        user_id=user.id if user else None,
+        left_id=theirs.id,
+        right_id=mine.id,
+        label=f"{theirs.label or 'Them'} and {mine.label}",
+        tradition=mine.tradition,
+    )
+    if user is None:
+        both.expires_at = _now() + timedelta(days=ORPHAN_DAYS)
+    session.add(both)
+    await session.commit()
+    await session.refresh(both)
+
+    # Shared immediately: an invitation whose result only one person can see
+    # is not an invitation.
+    both.share_token = _token()
+    both.shared_at = _now()
+    await session.commit()
+
+    return {
+        "chartToken": mine.owner_token,
+        "comparisonToken": both.owner_token,
+        "shareToken": both.share_token,
+    }
+
+
+@router.get("/invite/{token}")
+async def read_invite(
+    token: str, session: AsyncSession = Depends(get_session)
+) -> dict:
+    """Who is inviting, and nothing else about them."""
+    theirs = (
+        await session.execute(
+            select(SavedChart).where(SavedChart.share_token == token)
+        )
+    ).scalar_one_or_none()
+    if theirs is None:
+        raise HTTPException(404, "that invitation is not valid any more")
+    if theirs.expires_at and theirs.expires_at < _now():
+        raise HTTPException(410, "that invitation has expired")
+    # The name they gave their chart, and whether there is a face to show.
+    # Not the moment: that is theirs until a comparison exists.
+    return {"label": theirs.label or "Someone", "hasAvatar": bool(theirs.avatar_media_id)}
+
+
 @router.get("/compare/{which}/{token}/reading")
 async def reading(
     which: str, token: str, session: AsyncSession = Depends(get_session)
@@ -654,6 +777,7 @@ async def card(
                     left.label or "The first", right.label or "The second")
     except Exception:                                  # noqa: BLE001
         said = {"tally": {"harmonious": 0, "hard": 0},
+                "band": {"name": "Mixed testimony"},
                 "cardHeadline": "Two charts"}
 
     async def avatar(chart: SavedChart) -> bytes | None:
@@ -678,6 +802,7 @@ async def card(
         left_name=left.label or "—",
         right_name=right.label or "—",
         headline=said.get("cardHeadline", ""),
+        band=said.get("band", {}).get("name", ""),
         harmonious=said["tally"]["harmonious"],
         hard=said["tally"]["hard"],
         left_avatar=await avatar(left),

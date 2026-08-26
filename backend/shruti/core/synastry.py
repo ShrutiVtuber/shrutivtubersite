@@ -91,6 +91,73 @@ def _tone(aspect: str, a: str, b: str) -> str:
     return "neither"
 
 
+# The five bands, worst to best, with the tradition's own vocabulary.
+#
+# **A band rather than a percentage**, and the difference is not pedantry: a
+# number out of a hundred claims a precision nobody has, where "mixed
+# testimony" says the thing an astrologer would actually say and admits its own
+# width. It is still one word to screenshot, which is what it is for.
+#
+# "Mixed testimony" and "contrary to sect" are real terms of art, not invented
+# whimsy — testimonies are how horary weighs a question, and sect is the
+# day/night division that decides which planets are working in your favour.
+BANDS = [
+    ("contrary-to-sect", "Contrary to sect",
+     "Almost everything here is a hard aspect. The tradition would say the two "
+     "charts are working against each other's grain."),
+    ("hard-going", "Hard going",
+     "More friction than ease. Classically this is read as a relationship that "
+     "asks work of both people rather than one that runs by itself."),
+    ("mixed-testimony", "Mixed testimony",
+     "Ease and friction in roughly equal measure — which is what most pairs of "
+     "charts look like, and what the tradition expects."),
+    ("well-aspected", "Well aspected",
+     "More ease than friction, by a clear margin. The tradition reads an "
+     "easiness that does not have to be worked for."),
+    ("same-sky", "Written in the same sky",
+     "Overwhelmingly harmonious, which is genuinely uncommon. Take it in the "
+     "spirit it is offered."),
+]
+
+# Below this many contacts, the extreme bands are not claimed. Two aspects both
+# harmonious is not "written in the same sky", it is a small sample — and a
+# verdict that swings on one contact is a verdict nobody should post.
+ENOUGH_TO_BE_SURE = 8
+
+
+def band(tally: dict) -> dict:
+    """
+    Which band, and why. Never a number out of a hundred.
+
+    The ratio is arithmetic; the bands are a judgement about where to cut it,
+    and the cuts are stated here rather than buried so anybody can disagree
+    with them out loud.
+    """
+    good, bad = tally["harmonious"], tally["hard"]
+    total = good + bad
+    if total == 0:
+        key, name, says = BANDS[2]
+        return {"key": key, "name": name, "says":
+                "Almost nothing in contact at all, which is its own answer and "
+                "not a middling one.", "ratio": None, "sample": 0}
+
+    ratio = good / total
+    if ratio >= 0.70:
+        index = 4 if total >= ENOUGH_TO_BE_SURE else 3
+    elif ratio >= 0.58:
+        index = 3
+    elif ratio >= 0.42:
+        index = 2
+    elif ratio >= 0.30:
+        index = 1
+    else:
+        index = 0 if total >= ENOUGH_TO_BE_SURE else 1
+
+    key, name, says = BANDS[index]
+    return {"key": key, "name": name, "says": says,
+            "ratio": round(ratio, 3), "sample": total}
+
+
 def read(by_degree: list[dict], left: str, right: str) -> dict:
     """
     A reading of the degree-based configurations.
@@ -136,7 +203,9 @@ def read(by_degree: list[dict], left: str, right: str) -> dict:
         "tally": tally,
         "markers": found,
         "angleContacts": len(angles),
-        # The one-line thing somebody screenshots. A count, never a score.
+        # The one word somebody screenshots, and the count behind it. The
+        # count is always shown WITH the band so the band can be argued with.
+        "band": band(tally),
         "headline": _headline(tally, found),
         # Shorter, for the share card — where the tally is already drawn large
         # and repeating it in the headline both truncates and says it twice.

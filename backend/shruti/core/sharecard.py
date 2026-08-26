@@ -85,6 +85,7 @@ def comparison_card(
     left_name: str,
     right_name: str,
     headline: str,
+    band: str,
     harmonious: int,
     hard: int,
     left_avatar: bytes | None = None,
@@ -126,16 +127,22 @@ def comparison_card(
         w = draw.textlength(text, font=small)
         draw.text((cx - w / 2, 118 + size + 22), text, font=small, fill=INK)
 
-    # The tally, in the middle, where the eye lands.
-    tally = f"{harmonious}–{hard}"
-    w = draw.textlength(tally, font=huge)
-    draw.text((WIDTH / 2 - w / 2, 150), tally, font=huge, fill=INK)
+    # The band, in the middle, where the eye lands — one phrase to screenshot.
+    # Sized to fit rather than truncated: "Written in the same sky" is the
+    # longest and it is also the one people most want to post.
+    verdict = _font("EBGaramond-SemiBold.ttf", 62)
+    if draw.textlength(band, font=verdict) > 420:
+        verdict = _font("EBGaramond-SemiBold.ttf", 46)
+    w = draw.textlength(band, font=verdict)
+    draw.text((WIDTH / 2 - w / 2, 168), band, font=verdict, fill=INK)
 
-    label = "harmonious — hard"
-    w = draw.textlength(label, font=tiny)
-    draw.text((WIDTH / 2 - w / 2, 262), label, font=tiny, fill=FAINT)
+    # The count underneath, always, so the band can be argued with. A verdict
+    # with its own evidence beside it is a different thing from a verdict.
+    tally = f"{harmonious} harmonious · {hard} hard"
+    w = draw.textlength(tally, font=tiny)
+    draw.text((WIDTH / 2 - w / 2, 258), tally, font=tiny, fill=FAINT)
 
-    # The headline, across the card.
+    # The top marker, across the card.
     text = _fit(draw, headline, display, WIDTH - 160)
     w = draw.textlength(text, font=display)
     draw.text((WIDTH / 2 - w / 2, 372), text, font=display, fill=INK)

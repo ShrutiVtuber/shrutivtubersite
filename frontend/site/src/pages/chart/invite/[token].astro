@@ -1,0 +1,154 @@
+---
+/* "Shruti wants to compare charts with you."
+ *
+ * The page somebody lands on from a tweet or a DM. **One form, one press.**
+ * Asking a person who arrived from a link to cast a chart, keep it, copy its
+ * address and paste it somewhere else is four chances to lose them — so this
+ * casts, keeps and compares in a single submit, and hands them the ownership
+ * of their own chart on the way out.
+ *
+ * No account needed, here least of all. Somebody who followed a link from a
+ * friend is the least likely person on the site to sign up first.
+ */
+import BaseLayout from "../../../layouts/BaseLayout.astro";
+import SectionHeader from "../../../components/brand/SectionHeader.astro";
+import PlaceField from "../../../components/forms/PlaceField.astro";
+import CsrfField from "../../../components/forms/CsrfField.astro";
+import Button from "../../../components/forms/Button.astro";
+import EmptyState from "../../../components/feedback/EmptyState.astro";
+import { site } from "../../../lib/api";
+import { asReader } from "../../../lib/account";
+import { verifyCsrf } from "../../../lib/csrf";
+
+export const prerender = false;
+
+const token = Astro.params.token ?? "";
+let failed = "";
+
+if (Astro.request.method === "POST") {
+  const form = await Astro.request.formData();
+  if (!verifyCsrf(Astro.cookies, form)) {
+    failed = "That did not go through. Reload the page and try again.";
+  } else {
+    const unknown = form.get("unknownTime") === "1";
+    const made = await asReader(Astro, `/api/charts/invite/${token}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        birth_date: String(form.get("date") ?? ""),
+        birth_time: unknown ? null : String(form.get("time") ?? ""),
+        time_unknown: unknown || !String(form.get("time") ?? ""),
+        place_name: String(form.get("place") ?? ""),
+        lat: Number(form.get("lat") ?? 0),
+        lon: Number(form.get("lon") ?? 0),
+        label: String(form.get("label") ?? ""),
+        consent: form.get("consent") === "1",
+      }),
+    });
+    if (made.ok && made.body?.comparisonToken) {
+      return Astro.redirect(`/chart/compare/${made.body.comparisonToken}`, 303);
+    }
+    failed = made.body?.detail
+      ?? "That did not work. Nothing has been kept.";
+  }
+}
+
+const who = await site<any>(`/api/charts/invite/${token}`).catch(() => null);
+---
+
+<BaseLayout
+  title={who ? `${who.label} wants to compare charts` : "An invitation — Shruti"}
+  description="Cast your chart and see what the tradition says about the two of you."
+>
+  <div class="page invite">
+    {
+      !who ? (
+        <EmptyState
+          glyph="○"
+          title="That invitation is not valid any more"
+          body="The person who sent it may have taken the link back, or it may have passed its year. They can send you another."
+        />
+      ) : (
+        <>
+          <SectionHeader
+            as="h1" glyph="✶" eyebrow="An invitation"
+            title={`${who.label} wants to compare charts`}
+            body="Give your birth details and this will read the two charts against each other — what the tradition attaches to the contacts between them. It takes about twenty seconds."
+          />
+
+          {failed && <p class="bad">{failed}</p>}
+
+          <form method="POST" class="i-form">
+            <CsrfField />
+            <label>
+              <span class="lbl">What to call you</span>
+              <input class="in" name="label" maxlength="80" placeholder="Your name or handle" />
+            </label>
+            <div class="two">
+              <label>
+                <span class="lbl">Birth date</span>
+                <input class="in" type="date" name="date" required />
+              </label>
+              <label>
+                <span class="lbl">Birth time</span>
+                <input class="in" type="time" name="time" />
+              </label>
+            </div>
+            <label class="check">
+              <input type="checkbox" name="unknownTime" value="1" />
+              <span>I don't know my birth time</span>
+            </label>
+            <p class="hint">
+              Without a time the planets still work — the angles do not, and the
+              reading says which parts it has left out rather than guessing them.
+            </p>
+
+            <PlaceField lat={37.9838} lon={23.7275} place="" />
+
+            <label class="check">
+              <input type="checkbox" name="consent" value="1" required />
+              <span>
+                I agree to my birth date, time and place being stored so this
+                comparison can be kept. I can delete it at any time, from its
+                own page, and it goes on its own after a year.
+              </span>
+            </label>
+
+            <div>
+              <Button type="submit" data-track="invite:accepted">
+                Compare our charts
+              </Button>
+            </div>
+            <p class="hint">
+              No account needed. You will get your own address for your chart,
+              and deleting it takes the comparison with it.
+            </p>
+          </form>
+        </>
+      )
+    }
+  </div>
+</BaseLayout>
+
+<style>
+  .invite { max-width: 640px; display: grid; gap: var(--space-5); }
+  .bad { font: 400 var(--text-sm) var(--font-body); color: var(--live); margin: 0; }
+  .i-form { display: grid; gap: var(--space-4); }
+  .i-form label { display: grid; gap: 6px; }
+  .two { display: grid; gap: var(--space-4); grid-template-columns: 1fr 1fr; }
+  .lbl {
+    font: 600 var(--text-micro) var(--font-body); letter-spacing: var(--tracking-eyebrow);
+    text-transform: uppercase; color: var(--ink-faint);
+  }
+  .in {
+    font: 400 var(--text-sm) var(--font-body); color: var(--ink);
+    background: var(--surface-page); border: var(--border-w) solid var(--line);
+    border-radius: var(--radius-sm); padding: 8px 10px; min-height: 44px;
+    width: 100%; box-sizing: border-box;
+  }
+  .check { display: flex; gap: 10px; align-items: flex-start; }
+  .check span { font: 400 var(--text-sm) / 1.6 var(--font-body); color: var(--ink); }
+  .check input { margin-top: 4px; flex: none; }
+  .hint { font: 400 var(--text-xs) / 1.7 var(--font-body); color: var(--ink-faint); margin: 0; max-width: 60ch; }
+  @media (max-width: 560px) { .two { grid-template-columns: 1fr; } }
+</style>

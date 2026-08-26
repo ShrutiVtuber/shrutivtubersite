@@ -126,6 +126,31 @@ const readable = (iso: string | null) =>
             </div>
           </div>
 
+          {
+            c.shared && (
+              <section class="panel invite-panel">
+                <h2>Invite someone to compare</h2>
+                <p class="fine">
+                  The same link, framed as an invitation. They give their birth
+                  details on one page and land straight on the comparison —
+                  no account, no copying addresses between tabs.
+                </p>
+                <label class="link-out">
+                  <span>The invitation</span>
+                  <input type="text" readonly value={`${SITE_URL}/chart/invite/${c.shareToken}`} onclick="this.select()" />
+                </label>
+                <label class="link-out">
+                  <span>Something to post with it</span>
+                  <textarea readonly rows="2" onclick="this.select()">{`Compare charts with me — ${SITE_URL}/chart/invite/${c.shareToken}`}</textarea>
+                </label>
+                <p class="fine">
+                  Taking the share link back below also cancels every
+                  invitation made from it. They are the same token.
+                </p>
+              </section>
+            )
+          }
+
           <section class="panel">
             <h2>Hand it to somebody</h2>
             {
@@ -277,5 +302,11 @@ const readable = (iso: string | null) =>
 
   @media (max-width: 720px) {
     .chart-grid { grid-template-columns: 1fr; }
+  }
+  .link-out textarea {
+    font: 400 var(--text-sm) / 1.6 var(--font-body); color: var(--ink);
+    background: var(--surface-page); border: var(--border-w) solid var(--line);
+    border-radius: var(--radius-sm); padding: 8px 10px; width: 100%;
+    box-sizing: border-box; resize: vertical;
   }
 </style>

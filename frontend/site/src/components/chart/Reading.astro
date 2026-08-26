@@ -12,23 +12,47 @@
  * predictive validity.
  */
 interface Marker { title: string; says: string; aspect: string; tone: string; detail: string }
+interface Band { key: string; name: string; says: string; ratio: number | null; sample: number }
 interface Props {
   tally: { harmonious: number; hard: number; neither: number };
   markers: Marker[];
   headline: string;
   caveats: string[];
+  band?: Band;
 }
-const { tally, markers, headline, caveats } = Astro.props;
+const { tally, markers, headline, caveats, band } = Astro.props;
 ---
 
 <section class="reading">
   <div class="r-head">
     <span class="t-eyebrow">What the tradition says</span>
-    <p class="r-tally">
-      <strong>{tally.harmonious}</strong> harmonious
-      <span class="r-sep">·</span>
-      <strong>{tally.hard}</strong> hard
-    </p>
+    {
+      band && (
+        <>
+          <p class="r-band" data-band={band.key}>{band.name}</p>
+          {/* The count is always beside the verdict, never instead of it. A
+              band with its own evidence next to it is a different thing from
+              a band — it can be argued with, which a number out of a hundred
+              cannot. */}
+          <p class="r-tally">
+            <strong>{tally.harmonious}</strong> harmonious
+            <span class="r-sep">·</span>
+            <strong>{tally.hard}</strong> hard
+            {band.sample > 0 && band.sample < 8 && (
+              <span class="r-small"> · a small sample, so the extremes are not claimed</span>
+            )}
+          </p>
+          <p class="r-says">{band.says}</p>
+        </>
+      )
+    }
+    {!band && (
+      <p class="r-tally">
+        <strong>{tally.harmonious}</strong> harmonious
+        <span class="r-sep">·</span>
+        <strong>{tally.hard}</strong> hard
+      </p>
+    )}
     <p class="r-headline">{headline}</p>
   </div>
 
@@ -86,4 +110,11 @@ const { tally, markers, headline, caveats } = Astro.props;
     font: 400 var(--text-xs) / 1.7 var(--font-body); color: var(--ink-faint);
     max-width: 68ch;
   }
+  .r-band { font: 600 var(--text-h2) var(--font-display); color: var(--ink); margin: 8px 0 0; }
+  /* The two ends get a tint and the middle three do not, because the middle
+     three are where most pairs land and colouring them would imply a verdict
+     the tradition does not give. */
+  .r-band[data-band="same-sky"] { color: var(--accent); }
+  .r-band[data-band="contrary-to-sect"] { color: var(--rose); }
+  .r-small { color: var(--ink-faint); }
 </style>
