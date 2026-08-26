@@ -570,6 +570,120 @@ def _media_columns(model: type) -> tuple[str, ...]:
     return tuple(out)
 
 
+@router.get("/media/orphans")
+async def media_orphans(
+    session: AsyncSession = Depends(get_session),
+    _: str = Depends(require_admin),
+) -> dict:
+    """
+    Files in the bucket that no row knows about, and rows whose file is gone.
+
+    Deleting through the admin has always removed the object too, so nothing
+    here should ever find anything — which is exactly why it is worth being
+    able to look. The ways an orphan appears are all outside that route: an
+    upload that stored the file and then failed to commit, a database restored
+    from before an upload, or somebody clearing rows in SQL.
+
+    The reverse direction is reported in the same breath because it is the same
+    question asked the other way round, and it is the more visible failure: a
+    row whose file has gone renders as a broken image on a live page.
+
+    **"Orphan" means orphaned according to THIS database.** Development and
+    production point at the same bucket, so every production image looks like
+    an orphan from a laptop — which is why the answer carries the environment
+    and why sweeping is refused anywhere but production. Found the hard way:
+    this check, run locally, called four live project thumbnails orphans.
+    """
+    from shruti.core.storage import list_objects, r2_configured
+
+    env = get_settings().env
+    if not r2_configured():
+        return {"configured": False, "env": env, "canSweep": False,
+                "orphans": [], "missing": [], "checked": 0}
+
+    known = {
+        m.filename: m
+        for m in (await session.execute(
+            select(Media).where(Media.storage_backend == "r2")
+        )).scalars().all()
+    }
+    objects = await list_objects()
+    in_bucket = {name for name, _ in objects}
+
+    return {
+        "configured": True,
+        "env": env,
+        # Only the environment that owns the bucket may act on this list.
+        "canSweep": env == "production",
+        "checked": len(objects),
+        # In the bucket, in no row.
+        "orphans": [
+            {"filename": name, "sizeBytes": size}
+            for name, size in sorted(objects) if name not in known
+        ],
+        # In a row, not in the bucket.
+        "missing": [
+            {"id": m.id, "filename": f, "title": m.title}
+            for f, m in sorted(known.items()) if f not in in_bucket
+        ],
+    }
+
+
+class SweepIn(BaseModel):
+    filenames: list[str] = Field(default_factory=list)
+
+
+@router.post("/media/orphans/sweep")
+async def sweep_orphans(
+    body: SweepIn,
+    session: AsyncSession = Depends(get_session),
+    _: str = Depends(require_admin),
+) -> dict:
+    """
+    Delete named objects from the bucket.
+
+    Named explicitly rather than "delete everything the last check found":
+    a sweep that re-derives its own list would race an upload happening in
+    another tab and delete a file whose row had not been committed yet. She
+    sees a list, and what she confirms is what goes.
+
+    Every name is re-checked against the database first. A file that has
+    acquired a row since the listing is skipped and said so, rather than
+    deleted because a page was stale.
+
+    **Refused outside production.** Development shares the production bucket,
+    so a laptop's database calls every live image an orphan — running this
+    there would delete the site's pictures from a machine that had never
+    displayed them. The listing is safe to read anywhere; only the environment
+    that owns the bucket may act on it.
+    """
+    if get_settings().env != "production":
+        raise HTTPException(
+            409,
+            "sweeping is only allowed in production. This environment shares "
+            "the bucket, so its idea of an orphan includes every file that "
+            "belongs to the live site.",
+        )
+
+    from shruti.core.storage import delete as delete_stored
+
+    deleted: list[str] = []
+    skipped: list[str] = []
+    for name in body.filenames[:500]:
+        claimed = (await session.execute(
+            select(Media).where(Media.filename == name)
+        )).scalars().first()
+        if claimed is not None:
+            skipped.append(name)
+            continue
+        await delete_stored(name, "r2")
+        deleted.append(name)
+
+    if deleted:
+        log.info("swept %d orphaned object(s) from the bucket", len(deleted))
+    return {"deleted": deleted, "skipped": skipped}
+
+
 @router.delete("/media/{media_id}", status_code=204)
 async def delete_media(
     media_id: int,

@@ -357,6 +357,14 @@ Moving the existing files across is a separate, small job: upload each, flip
 - **Signed URLs.** Everything stored is public art, so public read is right for
   now. If private media ever appears — an unpublished commission, a member-only
   file — it needs presigned GETs, and the signer for that is already here.
-- **Deleting from the bucket.** Removing a Media row does not remove the object.
-  Content-addressed keys make that safe rather than leaky (an orphan costs
-  storage, not exposure), but it should be tidied eventually.
+- ~~**Deleting from the bucket.**~~ Done. Deleting a media row deletes the
+  object, and has since that route was written — this note was stale. What was
+  genuinely missing was any way to FIND an orphan, since every way one appears
+  is outside that route: an upload that stored the file and then failed to
+  commit, a database restored from before an upload, or rows cleared in SQL.
+  `/admin/media` now lists both directions of disagreement and can sweep.
+
+  **The trap that surfaced while building it:** development and production
+  share one bucket, so a laptop's database calls every production image an
+  orphan. The check run locally listed four live project thumbnails. The
+  listing is safe to read anywhere; sweeping is refused outside production.

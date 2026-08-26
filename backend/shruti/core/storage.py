@@ -25,10 +25,12 @@ forever.
 from __future__ import annotations
 
 import hashlib
+import re
 import hmac
 import logging
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from html import unescape
 from pathlib import Path
 from urllib.parse import quote
 
@@ -58,10 +60,25 @@ def signing_key(secret: str, date: str, region: str, service: str) -> bytes:
     return _sign(k, "aws4_request")
 
 
+def canonical_query(params: dict[str, str]) -> str:
+    """
+    The query string as SigV4 wants it: sorted by key, both halves encoded.
+
+    Sorted by the ENCODED key, which is the specification's wording and differs
+    from sorting the raw ones whenever a character encodes to something that
+    sorts differently. It has never mattered for the keys used here, and it is
+    written correctly anyway so it never has to be discovered.
+    """
+    pairs = sorted(
+        (quote(k, safe="~"), quote(v, safe="~")) for k, v in params.items()
+    )
+    return "&".join(f"{k}={v}" for k, v in pairs)
+
+
 def authorization_header(
     *, method: str, host: str, path: str, payload: bytes,
     access_key: str, secret_key: str, region: str, service: str,
-    amz_date: str, content_type: str,
+    amz_date: str, content_type: str, query: str = "",
 ) -> dict[str, str]:
     """
     Build the SigV4 headers for one request.
@@ -84,7 +101,7 @@ def authorization_header(
     canonical_request = "\n".join([
         method,
         quote(path, safe="/~"),
-        "",                                  # no query string
+        query,
         canonical_headers,
         signed_headers,
         payload_hash,
@@ -213,6 +230,68 @@ async def _delete_r2(filename: str) -> None:
     # there. 404 is treated the same way for the same reason as on disk.
     if r.status_code not in (200, 204, 404):
         raise RuntimeError(f"R2 returned {r.status_code} deleting {filename}")
+
+
+async def list_objects(prefix: str = "") -> list[tuple[str, int]]:
+    """
+    Every key in the bucket, with its size.
+
+    Exists so orphans can be FOUND, not just avoided. Deleting a media row
+    removes its object, and has since that route was written — but that only
+    protects files deleted through the admin. A failed upload, a database
+    restored from before an upload, or somebody clearing rows in SQL all leave
+    an object nothing in the database knows about, and without a listing there
+    is no way to discover one short of opening the Cloudflare dashboard.
+
+    Paginated properly rather than taking the first page: a truncated listing
+    would report a bucket as clean by looking at part of it, which is worse
+    than not looking.
+    """
+    if not r2_configured():
+        return []
+
+    s = get_settings()
+    host = f"{s.r2_account_id}.r2.cloudflarestorage.com"
+    path = f"/{s.r2_bucket}"
+
+    out: list[tuple[str, int]] = []
+    token = ""
+    for _ in range(200):                     # 200k keys, then something is wrong
+        params = {"list-type": "2", "max-keys": "1000"}
+        if prefix:
+            params["prefix"] = prefix
+        if token:
+            params["continuation-token"] = token
+        query = canonical_query(params)
+
+        headers = authorization_header(
+            method="GET", host=host, path=path, payload=b"",
+            access_key=s.r2_access_key_id, secret_key=s.r2_secret_access_key,
+            region="auto", service="s3",
+            amz_date=datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ"),
+            content_type="application/octet-stream",
+            query=query,
+        )
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            r = await client.get(f"https://{host}{path}?{query}", headers=headers)
+        if r.status_code != 200:
+            raise RuntimeError(f"R2 returned {r.status_code} listing the bucket")
+
+        body = r.text
+        for chunk in re.findall(r"<Contents>(.*?)</Contents>", body, re.S):
+            key = re.search(r"<Key>(.*?)</Key>", chunk, re.S)
+            size = re.search(r"<Size>(\d+)</Size>", chunk)
+            if key:
+                out.append((unescape(key.group(1)), int(size.group(1)) if size else 0))
+
+        truncated = "<IsTruncated>true</IsTruncated>" in body
+        nxt = re.search(r"<NextContinuationToken>(.*?)</NextContinuationToken>",
+                        body, re.S)
+        if not truncated or not nxt:
+            break
+        token = unescape(nxt.group(1))
+
+    return out
 
 
 def public_url(filename: str, backend: str = "r2") -> str:

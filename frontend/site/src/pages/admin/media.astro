@@ -69,6 +69,27 @@ if (Astro.request.method === "POST") {
       failed = r.ok ? "" : (r.body?.detail ?? "That did not save.");
     }
 
+    if (action === "sweep") {
+      const names = form.getAll("orphan").map(String);
+      if (names.length === 0) {
+        failed = "Tick at least one file first.";
+      } else {
+        const r = await asAdmin(Astro, "/api/admin/media/orphans/sweep", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ filenames: names }),
+        });
+        if (r.ok) {
+          const n = (r.body?.deleted ?? []).length;
+          const skipped = (r.body?.skipped ?? []).length;
+          notice = `${n} file${n === 1 ? "" : "s"} removed from the bucket.`
+            + (skipped ? ` ${skipped} skipped — something claimed them since the check.` : "");
+        } else {
+          failed = r.body?.detail ?? "That could not be swept.";
+        }
+      }
+    }
+
     if (action === "delete" && id) {
       const r = await asAdmin(Astro, `/api/admin/media/${id}`, { method: "DELETE" });
       /* A refusal here is the useful kind: it names what still points at the
@@ -106,6 +127,13 @@ const here = (extra: Record<string, string> = {}) => {
 };
 
 const onR2 = items.filter((m) => m.storage === "r2").length;
+
+/* Only asked for when the storage it describes is actually in use — on disk
+   there is no bucket to be out of step with. */
+const orphanCall = onR2 > 0
+  ? await asAdmin(Astro, "/api/admin/media/orphans")
+  : { ok: false, body: null };
+const bucket = orphanCall.ok ? orphanCall.body : null;
 const kb = (n: number) => `${Math.round(n / 1024)} KB`;
 ---
 
@@ -119,6 +147,71 @@ const kb = (n: number) => `${Math.round(n / 1024)} KB`;
 
   {notice && <p class="adm-ok" role="status">{notice}</p>}
   {failed && <p class="adm-bad" role="alert">{failed}</p>}
+
+  {bucket?.configured && (bucket.orphans.length > 0 || bucket.missing.length > 0) && (
+    <section class="adm-card bucket">
+      <h2 class="adm-h2">The bucket and the library disagree</h2>
+
+      {bucket.missing.length > 0 && (
+        <>
+          <p class="adm-note">
+            <strong>{bucket.missing.length} record{bucket.missing.length === 1 ? "" : "s"}
+            {bucket.missing.length === 1 ? " has" : " have"} no file.</strong> These
+            render as broken images wherever they are used. Re-upload the
+            picture, or delete the record and point whatever used it somewhere
+            else.
+          </p>
+          <ul class="plain">
+            {bucket.missing.map((m: any) => (
+              <li><code>{m.filename}</code> {m.title && <span class="dim">— {m.title}</span>}</li>
+            ))}
+          </ul>
+        </>
+      )}
+
+      {bucket.orphans.length > 0 && (
+        <>
+          <p class="adm-note">
+            <strong>{bucket.orphans.length} file{bucket.orphans.length === 1 ? "" : "s"} in
+            the bucket {bucket.orphans.length === 1 ? "has" : "have"} no record.</strong>
+            {" "}Nothing on the site can reach {bucket.orphans.length === 1 ? "it" : "them"},
+            and {bucket.orphans.length === 1 ? "it is" : "they are"} costing storage.
+          </p>
+
+          {!bucket.canSweep ? (
+            <p class="adm-bad" role="status">
+              This is the <strong>{bucket.env}</strong> environment, which shares
+              the bucket with the live site — so this list includes every file
+              belonging to production. Sweeping is only possible from production
+              itself.
+            </p>
+          ) : (
+            <form method="POST" class="sweep">
+              <CsrfField />
+              <input type="hidden" name="action" value="sweep" />
+              <ul class="plain">
+                {bucket.orphans.map((o: any) => (
+                  <li>
+                    <label class="ck">
+                      <input type="checkbox" name="orphan" value={o.filename} />
+                      <code>{o.filename}</code>
+                      <span class="dim">{(o.sizeBytes / 1024).toFixed(0)} KB</span>
+                    </label>
+                  </li>
+                ))}
+              </ul>
+              <p class="adm-note">
+                Ticked files are deleted from the bucket permanently. Each is
+                re-checked first, so anything that has gained a record since
+                this page loaded is skipped rather than removed.
+              </p>
+              <Button type="submit" variant="ghost">Delete the ticked files</Button>
+            </form>
+          )}
+        </>
+      )}
+    </section>
+  )}
 
   <form method="POST" enctype="multipart/form-data" class="adm-card upload">
     <CsrfField />
@@ -236,6 +329,13 @@ const kb = (n: number) => `${Math.round(n / 1024)} KB`;
 </AdminLayout>
 
 <style>
+  .bucket { display: grid; gap: 10px; margin-bottom: 16px; }
+  .bucket .plain { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+  .bucket code { font-family: var(--font-mono); font-size: var(--text-xs); }
+  .bucket .dim { color: var(--ink-faint); font-size: var(--text-xs); }
+  .ck { display: flex; align-items: baseline; gap: 8px; cursor: pointer; }
+  .sweep { display: grid; gap: 10px; justify-items: start; }
+
   .head { display: flex; gap: var(--space-4); align-items: baseline; flex-wrap: wrap; }
   .upload { max-width: 520px; }
   .field { display: grid; gap: 4px; }

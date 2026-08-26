@@ -143,3 +143,94 @@ def test_only_generated_filenames_reach_the_bucket() -> None:
         "a b.png", "a?b.png", "", "x" * 300,
     ):
         assert not SAFE.match(bad), bad
+
+
+# ── the bucket listing, and orphans ─────────────────────────────────────────
+
+def test_the_query_string_is_canonical_and_sorted() -> None:
+    """
+    SigV4 sorts by the ENCODED key and encodes both halves. A listing that gets
+    this wrong fails with a 403 and nothing useful said, which is the same bad
+    afternoon as a wrong signature.
+    """
+    from shruti.core.storage import canonical_query
+
+    got = canonical_query({
+        "list-type": "2",
+        "continuation-token": "1/abc+def=",
+        "max-keys": "1000",
+    })
+    assert got == (
+        "continuation-token=1%2Fabc%2Bdef%3D&list-type=2&max-keys=1000"
+    )
+
+
+def test_the_query_string_is_signed() -> None:
+    """
+    The signer used to hardcode an empty query string, which was correct while
+    it only ever did PUT, GET and DELETE on a bare key. A listing carries its
+    parameters in the query, so an unsigned one is a signature over a request
+    that was not sent.
+    """
+    common = dict(
+        method="GET", host="acct.r2.cloudflarestorage.com", path="/bucket",
+        payload=b"", access_key="AK", secret_key="SK",
+        region="auto", service="s3", amz_date="20260826T120000Z",
+        content_type="application/octet-stream",
+    )
+    bare = authorization_header(**common)
+    listed = authorization_header(**common, query="list-type=2")
+    assert bare["Authorization"] != listed["Authorization"], (
+        "the query string is not part of what gets signed")
+
+
+def test_the_listing_pages_rather_than_taking_the_first_page() -> None:
+    """
+    A truncated listing reports a bucket as clean by looking at part of it —
+    worse than not looking, because it is believed.
+    """
+    import inspect
+
+    from shruti.core.storage import list_objects
+
+    src = inspect.getsource(list_objects)
+    assert "IsTruncated" in src
+    assert "NextContinuationToken" in src
+    assert "continuation-token" in src
+
+
+def test_sweeping_is_refused_outside_production() -> None:
+    """
+    Development points at the SAME bucket as the live site, so a laptop's
+    database calls every production image an orphan. Found the hard way: this
+    check, run locally, listed four live project thumbnails as orphans.
+
+    The listing is safe to read anywhere. Only the environment that owns the
+    bucket may act on it.
+    """
+    import inspect
+
+    from shruti.api.routes.admin import media_orphans, sweep_orphans
+
+    sweep = inspect.getsource(sweep_orphans)
+    assert 'env != "production"' in sweep, "the sweep runs anywhere"
+    # And the refusal comes before anything is deleted.
+    assert sweep.index("production") < sweep.index("delete_stored")
+
+    listing = inspect.getsource(media_orphans)
+    assert '"canSweep"' in listing, "the page cannot tell whether it may act"
+
+
+def test_a_swept_name_is_rechecked_against_the_database() -> None:
+    """
+    The page she is looking at may be minutes old. A file that has gained a
+    row since the listing must be skipped, not deleted because the page was
+    stale.
+    """
+    import inspect
+
+    from shruti.api.routes.admin import sweep_orphans
+
+    src = inspect.getsource(sweep_orphans)
+    assert "select(Media).where(Media.filename == name)" in src
+    assert "skipped" in src
