@@ -76,6 +76,14 @@ const status = (await asAdmin(Astro, "/api/twitch/admin/status")).body ?? {};
 const linked = Boolean(status.connected);
 const events = (await asAdmin(Astro, "/api/twitch/admin/recent")).body ?? [];
 
+/* Asked of TWITCH, not of us. The page used to report only what the last press
+   did, which answers the wrong question — a press that worked looked exactly
+   like one that did nothing, which is precisely how the first successful
+   subscribe was mistaken for a failure. */
+const subs = (await asAdmin(Astro, "/api/twitch/admin/subscriptions")).body ?? {};
+const live = (subs.subscriptions ?? []) as any[];
+const listening = live.filter((x) => x.status === "enabled").length;
+
 const SOURCES = [
   ["twitch.bits", "Cheer — bits"],
   ["twitch.sub", "Subscription"],
@@ -133,8 +141,8 @@ const when = (iso: string) =>
       )}
     </section>
 
-    <section class="step">
-      <h2>2 · Start receiving</h2>
+    <section class="step" data-done={listening > 0 || undefined}>
+      <h2>2 · Start receiving {listening > 0 ? `— ${listening} live` : ""}</h2>
       <p>
         Asks Twitch to post events to this site. It verifies the address at
         this moment, so the site must already be deployed — which it is if you
@@ -144,6 +152,26 @@ const when = (iso: string) =>
         Safe to press twice. Anything already subscribed comes back as
         “already” rather than doubling.
       </p>
+
+      {subs.unreachable ? (
+        <p class="bad">Twitch could not be reached just now, so this list may be stale.</p>
+      ) : live.length === 0 ? (
+        <p class="fine">Twitch is holding no subscriptions yet.</p>
+      ) : (
+        <div class="scroll">
+          <table>
+            <thead><tr><th>Twitch is sending</th><th>Status</th></tr></thead>
+            <tbody>
+              {live.map((x) => (
+                <tr>
+                  <td><code>{x.type}</code></td>
+                  <td data-ok={x.status === "enabled" || undefined}>{x.status}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
       <form method="POST">
         <CsrfField />
         <input type="hidden" name="action" value="subscribe" />

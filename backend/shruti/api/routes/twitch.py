@@ -337,3 +337,43 @@ async def clear_tests(
         sqldelete(SupportEvent).where(SupportEvent.message == "(a test event)"))
     await session.commit()
     return {"removed": result.rowcount}
+
+
+@router.get("/admin/subscriptions")
+async def subscriptions(
+    session: AsyncSession = Depends(get_session),
+    _: str = Depends(require_admin),
+) -> dict:
+    """
+    What Twitch currently holds — asked of Twitch, not of us.
+
+    The page used to report only what the last press did, which answers the
+    wrong question. "Did it work?" is about the state now, and a press that
+    succeeded looked identical to one that did nothing. Asking the source means
+    the page is right even after a restart, a redeploy, or somebody revoking
+    the authorisation from their Twitch settings.
+    """
+    if not _cid():
+        return {"configured": False, "subscriptions": []}
+    try:
+        async with httpx.AsyncClient(timeout=15) as c:
+            tok = (await c.post(TOKEN_URL, data={
+                "client_id": _cid(), "client_secret": _secret(),
+                "grant_type": "client_credentials"})).json()["access_token"]
+            r = await c.get(EVENTSUB_URL, headers={
+                "Client-ID": _cid(), "Authorization": f"Bearer {tok}"})
+            body = r.json()
+    except Exception as exc:                        # noqa: BLE001
+        log.warning("could not list eventsub subscriptions: %s", type(exc).__name__)
+        return {"configured": True, "unreachable": True, "subscriptions": []}
+
+    rows = [{
+        "type": e.get("type", ""),
+        # "enabled" is the only good one. Anything else — especially
+        # `webhook_callback_verification_failed` — means it is not listening,
+        # and that reads as silence rather than as an error.
+        "status": e.get("status", ""),
+        "callback": ((e.get("transport") or {}).get("callback") or ""),
+    } for e in body.get("data", [])]
+    return {"configured": True, "subscriptions": rows,
+            "total": body.get("total", len(rows))}
