@@ -126,7 +126,104 @@ decision the multi-server rule exists to avoid.
 
 ---
 
-## Open, being researched
+## What the research changed — 26 August 2026
+
+Four findings, in order of how much they cost us. Full report in the
+conversation; the load-bearing ones are recorded here because two of them
+invalidate decisions written above.
+
+### 1. Discord already does member sync. Natively. Free. Since 2015.
+
+A YouTube Partner with memberships enabled, or a Twitch Affiliate/Partner,
+connects their channel in **Server Settings → Integrations** and Discord
+auto-creates a member role plus one role per tier, syncs in near real time with
+a weekly reconciliation pass, and offers a configurable grace period and
+kick-on-expiry.
+
+**The feature we planned to charge for is a free first-party feature**, serving
+exactly the same population — there is no segment we could sync for that
+Discord cannot. "Membership sync" cannot be the paid hook. The decision above
+that sync is the gate is therefore **void and needs replacing**.
+
+What is *not* commoditised: the nine instruments, the collab planner, the
+comparison loop, and VTuber-tuned everything-else. **There is no
+VTuber-specific bot on the market at all** — which is either a real gap or a
+market too small to have attracted anyone, and this research cannot tell which.
+
+### 2. The YouTube members API is closed to us anyway
+
+Both endpoint pages now read: *"Reach out to your Google or YouTube
+representative to request access."* The self-serve application form was
+withdrawn — the 2022 archived page linked one, and that URL now returns 401.
+There is **no public record of any independent developer being granted access**,
+and five years of Stack Overflow questions from developers holding the correct
+scope and receiving 403s sit unanswered.
+
+One worry turned out to be unfounded: **no security assessment applies.** The
+scope is *sensitive*, not *restricted*, so the multi-thousand-pound annual CASA
+audit is not in play. Moot, given the above, but worth not fearing.
+
+### 3. Discord's cut is 15%, not 10% — and price parity is mandatory
+
+From the Developer Policy, in force since **7 October 2024**: any developer
+offering paid features that Discord's Premium Apps products support **must**
+also sell them through Discord, at a price no higher than anywhere else.
+External Stripe billing is not banned; it can no longer be the only channel.
+
+The fee is **15% to the first $1M cumulative, then 30%**, plus about 6%
+processing. Do not confuse it with the 10% Server Subscriptions fee — that is
+the creator selling their own server, is US-only, and is a different product.
+
+**And it breaks decision 7 above.** Discord's own docs: *"You can offer either
+user subscription SKUs or guild subscription SKUs, but not both
+simultaneously."* Billing a person *or* a server is not available on Discord's
+rail — one or the other. Monthly only, too: no annual option, while every
+competitor discounts annually.
+
+### 4. A role-sync bot needs no privileged intents — build REST-first
+
+This one is free money. Gateway intents govern *events*; REST calls are
+governed by *permissions*.
+
+- `GET /guilds/{id}/members` (**List**) requires the Guild Members intent
+- `GET /guilds/{id}/members/{user.id}` (**Get**) requires none
+- `PUT/DELETE .../roles/{role.id}` needs only `MANAGE_ROLES`
+- Interaction payloads already carry the member object, no intent required
+
+So: user links their account → backend assigns the role by REST → the bot needs
+`MANAGE_ROLES` and a role positioned above the target, and **nothing
+privileged**. Since Discord rejects intent requests where *"an alternative
+approach would work"*, asking for Guild Members would be both unnecessary and a
+likely rejection. Review triggers at **10,000 users** (not 100 servers);
+verification triggers at **100 servers**.
+
+**Turn Server Members Intent OFF.**
+
+## What the incumbents charge
+
+Per **server** is the norm. Verified from official pages: **Streamcord Pro
+$2.99/mo** (and it bills through Discord's own Premium Apps, not Stripe).
+Corroborated but not primary-verified: **MEE6 ~$11.99/mo**, **Dyno
+$4.17–8.33/mo**, **Carl-bot $7.99/mo** for one server.
+
+Sync, meanwhile, is free everywhere — Discord native, Patreon (10% of income,
+integration included), Ko-fi (0–5%, and **no longer requires Gold**).
+
+---
+
+## Reopened by the research
+
+1. **What is the paid tier, if not sync?** The instruments and the collab and
+   comparison commands are the only things nobody else has.
+2. **Person or server billing — pick one.** Discord permits only one kind of
+   SKU, and parity pricing means we cannot simply route around it.
+3. **Is this still worth building?** Honestly asked. The differentiators are
+   real and unique; the commodity half is free. That may still be a product,
+   but it is a different one from the plan above.
+
+---
+
+## Previously open, now answered
 
 Both gate the pricing page:
 

@@ -35,6 +35,8 @@ declare -A EXPECT=(
   [SHRUTI_YOUTUBE_API_KEY]="AIza|YouTube Data API key|console.cloud.google.com/apis/credentials"
   [SHRUTI_RESEND_API_KEY]="re_|Resend API key|resend.com/api-keys"
   [SHRUTI_SECRET_KEY]="|session signing secret|anything long and random"
+  [SHRUTI_DISCORD_BOT_TOKEN]="|Discord BOT TOKEN|discord.com/developers → your app → Bot → Reset Token"
+  [SHRUTI_DISCORD_CLIENT_SECRET]="|Discord app Client Secret|discord.com/developers → your app → OAuth2"
 )
 
 if [[ -n "${EXPECT[$KEY]:-}" ]]; then
@@ -65,6 +67,21 @@ if [[ "$VALUE" == live_* && "$KEY" == SHRUTI_TWITCH_* ]]; then
   echo "  Anyone holding it can stream to the channel. Reset it in the Twitch" >&2
   echo "  dashboard, then get a Client ID and Secret from dev.twitch.tv instead." >&2
   exit 1
+fi
+
+# Discord tokens have no fixed prefix, so shape is the only check available:
+# three dot-separated parts, the first being the app id in base64. The mistake
+# this catches is the common one — pasting the APPLICATION ID or the PUBLIC KEY
+# where the token goes. Both are on the same page, neither is secret, and
+# neither works.
+if [[ "$KEY" == SHRUTI_DISCORD_BOT_TOKEN ]]; then
+  if [[ "$VALUE" != *.*.* ]]; then
+    echo "  REFUSED. A Discord bot token has three dot-separated parts." >&2
+    echo "  That looks like the Application ID or the Public Key — those are" >&2
+    echo "  on the same page, are not secret, and will not authenticate." >&2
+    echo "  The token is under Bot → Reset Token, and is shown ONCE." >&2
+    exit 1
+  fi
 fi
 
 if [[ -n "$PREFIX" && "$VALUE" != "$PREFIX"* ]]; then
