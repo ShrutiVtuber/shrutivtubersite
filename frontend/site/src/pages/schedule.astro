@@ -25,9 +25,50 @@ const statusOf = (r: ScheduleRow): "live" | "upcoming" | "past" => {
   if (now >= start && now <= end) return "live";
   return now > end ? "past" : "upcoming";
 };
+
+/* Upcoming streams as Events.
+ *
+ * "When is she live" is the one question about a creator that a search engine
+ * can answer directly, and it can only do it if the times are marked up. Only
+ * FUTURE streams are published: a past date presented as an event is a wrong
+ * answer with a confident face, and the whole point of this page is that the
+ * time is right.
+ *
+ * `eventAttendanceMode` and a `location` of type VirtualLocation are the parts
+ * usually left off, and without them an online stream reads as an event with
+ * no venue rather than as one you attend from anywhere.
+ */
+const SITE = (import.meta.env.SHRUTI_SITE_URL ?? "https://shrutivtuber.com").replace(/\/$/, "");
+const upcoming = rows.filter((r) => statusOf(r) !== "past");
+const jsonLd = upcoming.length
+  ? {
+      "@context": "https://schema.org",
+      "@graph": upcoming.map((r) => ({
+        "@type": "Event",
+        name: r.title,
+        startDate: r.startsAt,
+        ...(r.durationMinutes
+          ? { endDate: new Date(new Date(r.startsAt).getTime() + r.durationMinutes * 60_000).toISOString() }
+          : {}),
+        eventAttendanceMode: "https://schema.org/OnlineEventAttendanceMode",
+        eventStatus: "https://schema.org/EventScheduled",
+        location: {
+          "@type": "VirtualLocation",
+          url: r.url || SITE,
+        },
+        organizer: { "@id": `${SITE}/#person` },
+        performer: { "@id": `${SITE}/#person` },
+        ...(r.notesMd ? { description: r.notesMd.replace(/[*_`#>\[\]]/g, "").trim() } : {}),
+      })),
+    }
+  : null;
 ---
 
-<BaseLayout title="Schedule — Shruti" description="When Shruti is live: upcoming streams of programming, astrology and magickal practice, authored in Athens and shown in your own timezone.">
+<BaseLayout
+  title="Schedule — Shruti"
+  description="When Shruti is live: upcoming streams of programming, astrology and magickal practice, authored in Athens and shown in your own timezone."
+  jsonLd={jsonLd}
+>
   <div class="page">
     <div class="section-head">
       <SectionHeader

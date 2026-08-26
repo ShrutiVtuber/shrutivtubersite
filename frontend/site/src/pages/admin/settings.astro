@@ -21,7 +21,14 @@ import { verifyCsrf } from "../../lib/csrf";
 
 const FIELDS: [string, string, string][] = [
   ["imprint.entity", "Entity", "The registered name, e.g. ShrutiVTuber, LLC"],
-  ["imprint.street", "Street", "The VIRTUAL OFFICE — never a home address"],
+  /* This used to read "the VIRTUAL OFFICE — never a home address". That is
+     good personal-safety advice and it may not be lawful: the EU e-commerce
+     rules every member state implements ask for the geographic address at
+     which the provider is ESTABLISHED, and a mail-forwarding box is not
+     obviously that. The two goals are genuinely in tension and the resolution
+     is a lawyer's, not a form field's — so the help text now says so instead
+     of confidently recommending one side of it. */
+  ["imprint.street", "Street", "A real address you can legally be reached at. A forwarding box may not satisfy this — ask your lawyer before relying on one."],
   ["imprint.postcode", "Postcode", ""],
   ["imprint.city", "City", ""],
   ["imprint.country", "Country", "Two letters, e.g. GR"],

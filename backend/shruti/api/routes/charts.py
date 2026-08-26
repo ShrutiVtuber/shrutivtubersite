@@ -912,6 +912,53 @@ async def reading(
                 left.label or "The first", right.label or "The second")
 
 
+@router.get("/invite/{token}/card.png")
+async def invite_card_png(
+    token: str, session: AsyncSession = Depends(get_session)
+) -> Response:
+    """
+    The image an invitation unfurls with.
+
+    The invite is the link that gets posted publicly, tagging somebody — so it
+    is the most-seen image in the whole compatibility loop and it was the only
+    one that did not exist. It rendered with the site's default card, which says
+    nothing about who is asking or what is being asked.
+
+    Never raises for a missing avatar or a bad design: a plain card is a card,
+    and a 500 here would take out the page that embeds it.
+    """
+    theirs = (
+        await session.execute(
+            select(SavedChart).where(SavedChart.share_token == token)
+        )
+    ).scalar_one_or_none()
+    if theirs is None:
+        raise HTTPException(404, "that invitation is not valid any more")
+    if theirs.expires_at and theirs.expires_at < _now():
+        raise HTTPException(410, "that invitation has expired")
+
+    avatar: bytes | None = None
+    if theirs.avatar_media_id:
+        media = await session.get(Media, theirs.avatar_media_id)
+        if media is not None:
+            try:
+                from shruti.core.storage import fetch
+
+                got = await fetch(media.filename)
+                avatar = got[0] if got else None
+            except Exception:                          # noqa: BLE001
+                avatar = None
+
+    from shruti.core.sharecard import invite_card
+
+    png = invite_card(name=theirs.label or "Someone", avatar=avatar)
+    return Response(
+        content=png,
+        media_type="image/png",
+        headers={"Cache-Control": "public, max-age=3600"},
+    )
+
+
 @router.get("/compare/{which}/{token}/card.png")
 async def card(
     which: str, token: str, session: AsyncSession = Depends(get_session)

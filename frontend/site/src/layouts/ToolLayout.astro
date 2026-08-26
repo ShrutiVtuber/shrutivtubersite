@@ -8,7 +8,8 @@
  */
 import BaseLayout from "./BaseLayout.astro";
 import ProvenanceBlock from "../components/tools/ProvenanceBlock.astro";
-import { instruments } from "../lib/instruments";
+import { instruments, parseFaq, faqPageNode } from "../lib/instruments";
+import InstrumentNotes from "../components/tools/InstrumentNotes.astro";
 
 interface Props {
   /* Name, subtitle, description, glyph and the "how it is reckoned" passage all
@@ -50,6 +51,11 @@ const description = self?.summary ?? "";
 const glyph = self?.glyph || "✶";
 const reckoned = self?.reckoned ?? "";
 
+/* The explanation and the questions live on the row and render in
+   InstrumentNotes; only the count is needed here, to decide whether there is a
+   FAQPage to publish at all. */
+const faq = parseFaq(self?.faqMd ?? "");
+
 /* The list is shared with the /tools hub — see lib/instruments.ts for why. */
 const DISCLOSURE_WORD = { "○": "public", "◐": "named, not detailed", "●": "under seal" };
 
@@ -90,6 +96,7 @@ const jsonLd = {
       publisher: { "@id": `${SITE}/#person` },
       isPartOf: { "@id": `${SITE}/#website` },
     },
+    ...faqPageNode(faq, pageUrl),
     {
       "@type": "BreadcrumbList",
       "@id": `${pageUrl}#breadcrumbs`,
@@ -151,6 +158,8 @@ const jsonLd = {
       </aside>
     </div>
 
+    <InstrumentNotes instrument={self ?? null} />
+
     <nav class="others" aria-label="Other instruments">
       <span class="t-eyebrow">Other instruments</span>
       <div class="others-row">
@@ -168,6 +177,7 @@ const jsonLd = {
 
 <style>
   .tool { display: grid; gap: var(--space-5); }
+
 
   /* Exactly one sky panel per page — this is it. */
   .tool-hero {

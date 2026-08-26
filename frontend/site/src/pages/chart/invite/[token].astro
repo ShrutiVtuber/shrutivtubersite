@@ -16,13 +16,21 @@ import PlaceField from "../../../components/forms/PlaceField.astro";
 import CsrfField from "../../../components/forms/CsrfField.astro";
 import Button from "../../../components/forms/Button.astro";
 import EmptyState from "../../../components/feedback/EmptyState.astro";
-import { site } from "../../../lib/api";
+import { site, SITE_URL } from "../../../lib/api";
 import { asReader } from "../../../lib/account";
 import { verifyCsrf } from "../../../lib/csrf";
 
 export const prerender = false;
 
 const token = Astro.params.token ?? "";
+
+/* The card this page unfurls with.
+ *
+ * This is the link somebody posts publicly to tag another creator, so it is
+ * seen by that creator's whole timeline before anyone has compared anything.
+ * It used to unfurl with the site's default card — which made the most public
+ * moment in the loop look like a link to a homepage. */
+const inviteCard = `${SITE_URL}/api/charts/invite/${token}/card.png`;
 let failed = "";
 
 if (Astro.request.method === "POST") {
@@ -59,6 +67,8 @@ const who = await site<any>(`/api/charts/invite/${token}`).catch(() => null);
 <BaseLayout
   title={who ? `${who.label} wants to compare charts` : "An invitation — Shruti"}
   description="Cast your chart and see what the tradition says about the two of you."
+  ogImage={inviteCard}
+  ogImageAlt={who ? `${who.label} wants to compare charts with you` : "An invitation to compare charts"}
 >
   <div class="page invite">
     {

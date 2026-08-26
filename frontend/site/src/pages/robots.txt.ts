@@ -78,6 +78,7 @@ Disallow: /signin
 Disallow: /signup
 Disallow: /api/
 Allow: /api/charts/compare/
+Allow: /api/charts/invite/
 
 Sitemap: ${origin}/sitemap.xml
 `;

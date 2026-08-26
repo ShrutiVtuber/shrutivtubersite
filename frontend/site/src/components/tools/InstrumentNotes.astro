@@ -1,0 +1,51 @@
+---
+/* The explanation and the questions, under an instrument.
+ *
+ * A component rather than markup repeated in two layouts: seven instruments
+ * sit in ToolLayout and two — the solar and lunar stations — are a single page
+ * built on BaseLayout instead. Written twice, the second copy is the one that
+ * would quietly miss a change.
+ */
+import Prose from "../content/Prose.astro";
+import { parseFaq, type Instrument } from "../../lib/instruments";
+import { renderMarkdown } from "../../lib/markdown";
+
+interface Props { instrument: Instrument | null }
+const { instrument } = Astro.props;
+
+const aboutHtml = instrument?.bodyMd ? await renderMarkdown(instrument.bodyMd) : "";
+const faq = parseFaq(instrument?.faqMd ?? "");
+const answers = await Promise.all(faq.map((f) => renderMarkdown(f.a)));
+---
+
+{aboutHtml && (
+  <section class="tool-about">
+    <h2>About this instrument</h2>
+    <Prose html={aboutHtml} />
+  </section>
+)}
+
+{faq.length > 0 && (
+  <section class="tool-faq">
+    <h2>Questions</h2>
+    <dl>
+      {faq.map((f, i) => (
+        <div class="qa">
+          <dt>{f.q}</dt>
+          <dd><Prose html={answers[i]} /></dd>
+        </div>
+      ))}
+    </dl>
+  </section>
+)}
+
+<style>
+  .tool-about, .tool-faq { display: grid; gap: 12px; max-width: 68ch; }
+  .tool-about h2, .tool-faq h2 {
+    font: 500 var(--text-h3) var(--font-display); color: var(--ink); margin: 0;
+  }
+  .tool-faq dl { margin: 0; display: grid; gap: 18px; }
+  .tool-faq .qa { display: grid; gap: 5px; }
+  .tool-faq dt { font: 600 var(--text-body) var(--font-body); color: var(--ink); }
+  .tool-faq dd { margin: 0; color: var(--ink-soft); }
+</style>

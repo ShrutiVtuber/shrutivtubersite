@@ -283,7 +283,14 @@ export const FIELDS: Record<string, Record<string, FieldSpec>> = {
       placeholder: "Calendars",
       help: "How /tools groups it — Time, Calendars, Figures, Letters. A new name here makes a new group, in the order the instruments are ordered.",
     },
-    body_md: COMMON.body_md,
+    body_md: {
+      label: "About this instrument", type: "textarea", group: "Content",
+      help: "The longer explanation, under the result. This is where the page earns its place — what the thing is, how to read what it gives you, and where the rule came from.",
+    },
+    faq_md: {
+      label: "Questions", type: "textarea", group: "Content",
+      help: "Each ### heading is a question, the text under it is the answer. Rendered on the page AND published as structured data, so a search engine can show them. Only real questions — inventing them to game a rich result is the one thing here that gets a site penalised.",
+    },
     media_id: { label: "Image", type: "media", group: "Image" },
     locale: { label: "Language", group: "Details", help: "Leave blank unless it is language-specific." },
     slug: COMMON.slug,

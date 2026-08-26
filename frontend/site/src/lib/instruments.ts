@@ -31,6 +31,10 @@ export interface Instrument {
   reckoned: string;
   /** The landing page's shorter line. Falls back to `summary` when unset. */
   landingBlurb: string;
+  /** The longer explanation, markdown. May be empty. */
+  bodyMd: string;
+  /** Questions as markdown — each `### ` is one. May be empty. */
+  faqMd: string;
   href: string;
 }
 
@@ -63,4 +67,49 @@ export function categories(all: Instrument[]): string[] {
   const seen: string[] = [];
   for (const i of all) if (i.category && !seen.includes(i.category)) seen.push(i.category);
   return seen;
+}
+
+
+export interface Question { q: string; a: string }
+
+/**
+ * Questions out of the markdown field.
+ *
+ * Each `### ` heading is a question and the prose under it is the answer. The
+ * page and the structured data are both built from this one parse, so the
+ * answer a search engine shows is by construction the answer on the page.
+ */
+export function parseFaq(md: string): Question[] {
+  if (!md?.trim()) return [];
+  return md
+    .split(/^###\s+/m)
+    .slice(1)
+    .map((chunk) => {
+      const [first, ...rest] = chunk.split("\n");
+      return { q: first.trim(), a: rest.join("\n").trim() };
+    })
+    .filter((x) => x.q && x.a);
+}
+
+/** Markdown stripped to plain text — schema.org wants prose, not asterisks. */
+export function plain(md: string): string {
+  return md
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
+    .replace(/[*_`#>]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** A FAQPage node, or nothing when there are no questions to publish. */
+export function faqPageNode(faq: Question[], pageUrl: string): object[] {
+  if (!faq.length) return [];
+  return [{
+    "@type": "FAQPage",
+    "@id": `${pageUrl}#faq`,
+    mainEntity: faq.map((f) => ({
+      "@type": "Question",
+      name: f.q,
+      acceptedAnswer: { "@type": "Answer", text: plain(f.a) },
+    })),
+  }];
 }

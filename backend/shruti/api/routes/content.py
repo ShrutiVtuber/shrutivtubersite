@@ -291,6 +291,7 @@ async def get_tools(session: AsyncSession = Depends(get_session)) -> list[dict]:
             "summary": t.summary,
             "reckoned": t.reckoned,
             "landingBlurb": t.landing_blurb or t.summary,
+            "faqMd": t.faq_md,
             "bodyMd": t.body_md,
             "href": f"/tools/{t.slug}",
         }

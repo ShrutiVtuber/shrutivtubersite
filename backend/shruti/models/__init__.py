@@ -353,6 +353,11 @@ class Tool(TimestampMixin, table=True):
     # somebody who has not decided to care yet. A different job from `summary`,
     # which is why it is a different column and not the same one reused.
     landing_blurb: str = ""
+    # Questions people actually arrive with, as markdown: each `### ` heading is
+    # a question and the prose under it is the answer. Parsed into FAQPage
+    # structured data as well as rendered, which is why the shape is fixed —
+    # but it is still just markdown in a textarea.
+    faq_md: str = ""
     locale: str = Field(default="en", index=True)   # en | el — Greek pages are uncontested
     position: int = Field(default=0)
     visible: bool = Field(default=False)

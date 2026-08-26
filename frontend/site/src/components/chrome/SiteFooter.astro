@@ -117,7 +117,12 @@ const year = new Date().getUTCFullYear();
           password is wrong. The page itself is auth-guarded, so the link
           reveals nothing. */}
       <p>
-        © {year} {holder} · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a>
+        {/* The instruments are the part of this site a stranger is most likely
+            to arrive for and the part with no room in the header. A footer link
+            costs no header width and gives the hub one site-wide inbound link,
+            which is what makes it the page worth linking to from outside. */}
+        © {year} {holder} · <a href="/tools">Instruments</a>
+        · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a>
         · <a href="/admin" class="admin-link">Admin</a>
       </p>
       <span class="seal seal-ring" title="Soror Eu. A.">S∴E.A.</span>

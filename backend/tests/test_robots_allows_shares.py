@@ -75,6 +75,7 @@ def _allowed(path: str) -> bool:
     "/chart/compare/s/abc123",
     "/api/charts/compare/s/abc123/card.png",
     "/chart/invite/abc123",
+    "/api/charts/invite/abc123/card.png",
     "/chart/s/abc123",
 ])
 def test_shared_paths_are_crawlable(path: str) -> None:

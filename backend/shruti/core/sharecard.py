@@ -203,3 +203,88 @@ def comparison_card(
     out = BytesIO()
     card.save(out, format="PNG", optimize=True)
     return out.getvalue()
+
+
+def invite_card(
+    *,
+    name: str,
+    avatar: bytes | None = None,
+    design: dict | None = None,
+    backdrop: bytes | None = None,
+) -> bytes:
+    """
+    The image an INVITATION turns into on a timeline.
+
+    A comparison already had one; the invite did not, and the invite is the more
+    public of the two. It is the link somebody posts to tag another creator, so
+    it is seen by that creator's whole timeline before anybody has compared
+    anything — and it was unfurling with the generic site card, which made the
+    most public moment in the loop look like a link to a homepage.
+
+    Deliberately simpler than the comparison card. There is no tally yet and
+    nothing to be honest or dishonest about: one name, one face, and what is
+    being asked.
+    """
+    from PIL import Image, ImageDraw
+
+    design = design or {}
+    INK = _rgb(design.get("ink", ""), FALLBACK["ink"])
+    SOFT = _rgb(design.get("soft", ""), FALLBACK["soft"])
+    FAINT = _rgb(design.get("faint", ""), FALLBACK["faint"])
+    PAPER = _rgb(design.get("background", ""), FALLBACK["background"])
+    LINE = _rgb(design.get("line", ""), FALLBACK["line"])
+    ROSE = _rgb(design.get("accent", ""), FALLBACK["accent"])
+
+    card = Image.new("RGB", (WIDTH, HEIGHT), PAPER)
+
+    if backdrop:
+        try:
+            art = Image.open(BytesIO(backdrop)).convert("RGB")
+            scale = max(WIDTH / art.width, HEIGHT / art.height)
+            art = art.resize((round(art.width * scale), round(art.height * scale)),
+                             Image.LANCZOS)
+            card.paste(art, ((WIDTH - art.width) // 2, (HEIGHT - art.height) // 2))
+        except Exception:                              # noqa: BLE001
+            log.warning("invite card backdrop would not open; using the flat colour")
+
+    draw = ImageDraw.Draw(card)
+
+    # The two faces actually shipped in assets/fonts. Naming a weight that is
+    # not there does not fail loudly — `_font` falls back to Pillow's bitmap
+    # default, and the card renders looking like a 1997 error dialogue.
+    eyebrow = _font("Commissioner.ttf", 24)
+    display = _font("EBGaramond-SemiBold.ttf", 62)
+    body = _font("Commissioner.ttf", 28)
+    mark = _font("EBGaramond-SemiBold.ttf", 26)
+
+    # A face if there is one, on the left, so the eye lands on a person.
+    text_left = 96
+    if avatar:
+        try:
+            face = _circle(Image.open(BytesIO(avatar)), 260)
+            card.paste(face, (96, (HEIGHT - 260) // 2), face)
+            text_left = 96 + 260 + 56
+        except Exception:                              # noqa: BLE001
+            log.warning("invite card avatar would not open; drawing without it")
+
+    limit = WIDTH - text_left - 96
+
+    draw.text((text_left, 168), "AN INVITATION", font=eyebrow, fill=ROSE)
+
+    who = _fit(draw, name or "Someone", display, limit)
+    draw.text((text_left, 214), who, font=display, fill=INK)
+
+    draw.text((text_left, 300), _fit(draw, "wants to compare charts with you.", body, limit),
+              font=body, fill=SOFT)
+
+    draw.line((text_left, 372, text_left + min(limit, 420), 372), fill=LINE, width=2)
+
+    draw.text((text_left, 396),
+              _fit(draw, "No account needed. It takes one form.", body, limit),
+              font=body, fill=FAINT)
+
+    draw.text((text_left, HEIGHT - 96), "shrutivtuber.com", font=mark, fill=FAINT)
+
+    out = BytesIO()
+    card.save(out, format="PNG", optimize=True)
+    return out.getvalue()
