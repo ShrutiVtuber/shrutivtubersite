@@ -112,3 +112,39 @@ def test_ordinary_pages_wrap_themselves_in_page():
         "these render inside BaseLayout without .page, so their content runs "
         "to the edge of the window: " + ", ".join(sorted(missing))
     )
+
+
+# ── copy meant for the operator, printed for everybody ──────────────────────
+
+def test_no_public_page_tells_a_reader_about_the_admin():
+    """
+    Empty states are the site's honest answer to missing content, and they are
+    shown to READERS. Four of them explained where the content is entered —
+    "This page is edited in the admin", "Projects are added in the admin" —
+    which is a note to the operator printed on a page for everybody else.
+
+    They only appear when something is empty, which is exactly the state a site
+    is in on the day it launches.
+    """
+    import re
+
+    # Comment blocks are stripped WHOLE rather than line by line: a multi-line
+    # comment's continuation lines do not start with a marker, and checking
+    # per-line flags them as copy. That is how this test first failed on three
+    # of its own explanatory comments.
+    def prose(text: str) -> str:
+        text = re.sub(r"\{/\*.*?\*/\}", " ", text, flags=re.S)
+        text = re.sub(r"/\*.*?\*/", " ", text, flags=re.S)
+        return re.sub(r"(?m)^\s*//.*$", " ", text)
+
+    offenders = []
+    for page in _pages():
+        if page.name.startswith(".") or "admin" in str(page):
+            continue
+        for line in prose(page.read_text()).splitlines():
+            stripped = line.strip()
+            if re.search(r"\b(in|to|from) the admin\b|admin panel", stripped, re.I):
+                offenders.append(f"{page.name}: {stripped[:80]}")
+    assert not offenders, (
+        "operator-facing copy on a public page:\n  " + "\n  ".join(offenders)
+    )

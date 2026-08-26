@@ -60,7 +60,7 @@ const credits = (who?.credits ?? []).map((c) => ({
             <EmptyState
               glyph="○"
               title="Nothing written here yet"
-              body="This page is edited in the admin — the words go in there, not in a deploy."
+              body="Not written up yet. The instruments are, though — they are on the work page and they all run without an account."
             />
           )
         }
@@ -73,12 +73,16 @@ const credits = (who?.credits ?? []).map((c) => ({
             fields.length > 0 ? (
               <ProfileFieldTable columns={1} fields={fields} />
             ) : (
-              /* Not a placeholder for sample values. The bundle's birthday,
-                 height and debut are sample data, and the readme is explicit
-                 that no oshi mark exists and one must not be invented. */
-              <p class="side-absent">
-                Profile fields are not set yet. They are added in the admin, one at a time.
-              </p>
+              /* Nothing at all, deliberately.
+                 Not sample values — the bundle's birthday, height and debut are
+                 sample data and the readme is explicit that no oshi mark exists
+                 and one must not be invented. And not a sentence either: there
+                 is nothing to tell a READER about a fact table with no facts in
+                 it, and the line that used to be here explained where the facts
+                 are entered, which is a note to the operator printed on a page
+                 for everybody else. An absent sidebar block is invisible; a
+                 sentence saying it is absent is not. */
+              null
             )
           }
         </div>
