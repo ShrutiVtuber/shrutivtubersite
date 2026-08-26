@@ -336,3 +336,58 @@ server, or a network.
 **One portal change when the endpoint is live:** set the Interactions Endpoint
 URL. Discord validates it on save by sending a signed PING, so it can only be
 set *after* the service is deployed and answering — not before.
+
+
+---
+
+## What replacing the other bots actually costs
+
+Asked 26 August 2026: can the other bots be cancelled once vcordbot has their
+features? Yes eventually — but the features divide sharply along a line that is
+not obvious from a feature list, and it is the line that decides the schedule.
+
+**Free, and needs nothing new.** These need no privileged intent and no review,
+because a slash command carries its own data and everything else is an outbound
+REST call:
+
+- stream alerts and live announcements
+- scheduled and recurring posts
+- reaction roles, if done as buttons or slash commands rather than by watching
+  reactions on old messages
+- custom commands
+- the instruments, the collab planner, the comparison loop
+
+**Costs the Guild Members intent.** Welcome messages, goodbye messages,
+member-join logging — anything that reacts to somebody arriving or leaving.
+Review at 10,000 users.
+
+**Costs the Message Content intent, which is the hard one.** Automod, keyword
+filters, starboard, XP and levels from chatting. This is the most scrutinised
+intent Discord grants, and asking for it is a commitment rather than a
+checkbox.
+
+**So the honest order is:** a stream-alert bot can be retired soon. A
+general-purpose moderation bot means deliberately walking back into the
+privileged-intent path we just walked out of — worth doing, but as a decision,
+not as a side effect of a feature list.
+
+## On configuring her live server directly
+
+Asked, and declined, for two reasons — the second being the one that actually
+settles it.
+
+**It would not work.** Another bot's configuration lives in *its* database and
+*its* dashboard. Discord's API exposes channels, roles and permissions; it does
+not expose what MEE6 is set up to do. "Mirror the other bots' settings" cannot
+be done by inspection from inside Discord, by anyone.
+
+**And the blast radius is other people.** There are real members in that server.
+Role and channel changes are visible to all of them, some are awkward to undo,
+and a mistake is public rather than private. The bot deliberately holds four
+permissions and no Manage Roles; widening that to configure a server once would
+give away the property that makes it safe.
+
+**What works instead:** she reads off what each bot is configured to do — every
+dashboard shows it — and vcordbot is configured to match. Then both run in
+parallel for a week before anything is cancelled, so a gap is discovered while
+there is still a fallback.
