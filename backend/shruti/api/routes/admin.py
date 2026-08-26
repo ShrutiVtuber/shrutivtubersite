@@ -31,7 +31,8 @@ from shruti.core.config import get_settings
 from shruti.core.db import get_session
 from shruti.models.accounts import SavedChart, User
 from shruti.models import (BannedEmail, Course, FanArt, Product, ProductPhoto, 
-    ContactMessage, Credit, GrowthItem, Media, ProfileField, Project, Question,
+    ContactMessage, Credit, GrowthItem, Media, OfficialPlace, ProfileField,
+    Project, Question,
     CardDesign, Outfit, ScheduleEntry, Section, SocialLink, Sponsor, Tool,
 )
 
@@ -52,6 +53,7 @@ EDITABLE: dict[str, type[SQLModel]] = {
     "outfits": Outfit,
     "card-designs": CardDesign,
     "growth": GrowthItem,
+    "official": OfficialPlace,
 }
 
 ALLOWED_IMAGE = {

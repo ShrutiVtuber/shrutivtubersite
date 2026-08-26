@@ -323,6 +323,38 @@ class Sponsor(TimestampMixin, table=True):
     visible: bool = Field(default=True)
 
 
+class OfficialPlace(TimestampMixin, table=True):
+    """
+    A place that is genuinely hers, listed so the ones that are not can be told apart.
+
+    Counterfeit VTuber merch stores run as networks rather than one-offs: two of
+    them share the same four nameservers and one operator, one carries
+    "OFFICIAL" in its page title while its own body text says "Fan", and one
+    misspells the creator's name. A creator cannot get those taken down quickly,
+    but they can own the page that says which ones are real — and a page on
+    their own domain is the thing they can point at.
+
+    `kind` groups them so the page can be read at a glance, and `note` is the
+    sentence that says what the place is FOR. A bare list of links asks somebody
+    to trust a URL, which is the same thing the fakes are asking.
+
+    Deliberately not merged into `SocialLink`: those are profiles to follow and
+    they live in the footer. These are claims about authenticity, and the reason
+    for saying them is different.
+    """
+
+    __tablename__ = "official_place"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    label: str = ""
+    url: str = ""
+    # shop | social | membership | community | other
+    kind: str = Field(default="other", index=True)
+    note: str = ""
+    position: int = Field(default=0)
+    visible: bool = Field(default=True)
+
+
 class GrowthItem(TimestampMixin, table=True):
     """
     Something to do, or something to build, kept where she will see it.

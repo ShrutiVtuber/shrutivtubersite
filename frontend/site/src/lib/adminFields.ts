@@ -52,6 +52,21 @@ export const MEDIA_USE: Record<string, { label: string; where: string } | { unus
   // Tools list themselves by name and summary; no template draws a picture for
   // one. The column exists, so the day a tool page wants an illustration this
   // is one line — but until then, saying so beats a control that does nothing.
+  official: {
+    label: { label: "Name", group: "Content", placeholder: "The shop" },
+    url: { label: "Address", type: "url", group: "Content", help: "The full URL. The domain is shown to readers, because the domain is the part worth comparing." },
+    kind: {
+      label: "Kind", type: "select", group: "Details",
+      options: [
+        { value: "shop", label: "Shop" },
+        { value: "membership", label: "Membership or support" },
+        { value: "community", label: "Community" },
+        { value: "social", label: "Profile" },
+        { value: "other", label: "Something else" },
+      ],
+    },
+    note: { label: "What it is for", type: "textarea", group: "Content", help: "One sentence. A bare link asks somebody to trust a URL, which is what the fakes are asking too." },
+  },
   tools: { unused: true },
   "card-designs": {
     label: "Backdrop",

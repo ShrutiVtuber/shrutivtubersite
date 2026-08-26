@@ -19,7 +19,7 @@ from sqlmodel import select
 from shruti.core.db import get_session
 from shruti.models import (
     Credit, FanArt, Media, Outfit, ProfileField, Project, Section, SocialLink,
-    Sponsor, Tool,
+    OfficialPlace, Sponsor, Tool,
 )
 
 router = APIRouter(prefix="/api/content", tags=["content"])
@@ -327,6 +327,26 @@ async def get_fan_art(session: AsyncSession = Depends(get_session)) -> list[dict
         }
         for f, m in rows
     ]
+
+
+@router.get("/official")
+async def official_places(session: AsyncSession = Depends(get_session)) -> list[dict]:
+    """
+    Everywhere that is actually hers.
+
+    Read by /official, which exists so that the stores impersonating creators
+    have something authoritative to be checked against. Only visible rows: a
+    place she has hidden is one she is no longer vouching for, and vouching is
+    the entire function of this list.
+    """
+    rows = (
+        await session.execute(
+            select(OfficialPlace).where(OfficialPlace.visible.is_(True))
+            .order_by(OfficialPlace.position, OfficialPlace.id)
+        )
+    ).scalars().all()
+    return [{"label": r.label, "url": r.url, "kind": r.kind, "note": r.note}
+            for r in rows]
 
 
 @router.get("/imprint")

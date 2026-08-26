@@ -1,0 +1,133 @@
+---
+/* Which places are actually hers.
+ *
+ * Counterfeit VTuber merch stores are not one-offs, they are networks: two of
+ * them share the same four nameservers and one operator, one carries
+ * "OFFICIAL" in its page title while its own body says "Fan", and one
+ * misspells the creator's name. A creator cannot get those down quickly. What
+ * they can do is own the page that says which ones are real — on a domain they
+ * control, which is the thing they can point at.
+ *
+ * The rows are hers to edit, and the page says plainly what the absence of a
+ * row means. A list that says "these are official" without saying "and nothing
+ * else is" leaves the reader exactly where they started.
+ */
+import BaseLayout from "../layouts/BaseLayout.astro";
+import SectionHeader from "../components/brand/SectionHeader.astro";
+import Prose from "../components/content/Prose.astro";
+import EmptyState from "../components/feedback/EmptyState.astro";
+import { pageSections } from "../lib/content";
+import { site } from "../lib/api";
+
+export const prerender = false;
+
+interface Place { label: string; url: string; kind: string; note: string }
+
+const places = (await site<Place[]>("/api/content/official")) ?? [];
+const sections = await pageSections("official");
+
+/* Grouped in the order somebody checking a suspicious link would look. */
+const GROUPS: [string, string, string][] = [
+  ["shop", "Shops", "Anywhere you can buy something from her."],
+  ["membership", "Memberships and support", "Where money reaches her directly."],
+  ["community", "Community", "Where she actually talks to people."],
+  ["social", "Profiles", "The accounts that are her."],
+  ["other", "Everything else", ""],
+];
+const present = GROUPS.filter(([k]) => places.some((p) => p.kind === k));
+
+const host = (url: string) => {
+  try { return new URL(url).host.replace(/^www\./, ""); } catch { return url; }
+};
+---
+
+<BaseLayout
+  title="Official places — Shruti"
+  description="Every shop, profile and community that is genuinely Shruti's, listed in one place — so anything not on this list can be recognised for what it is."
+>
+  <div class="page official">
+    <SectionHeader
+      as="h1" glyph="✦" eyebrow="Authenticity"
+      title="The places that are actually mine"
+      body="If it is not on this list, it is not me. That is the whole point of the page — there are shops using creators' names and art without asking, and the only useful answer is a list you can check on a domain I control."
+    />
+
+    {places.length === 0 ? (
+      <EmptyState
+        glyph="○"
+        title="Nothing listed yet"
+        body="This page is up before the list is, which is the wrong way round and will not last long. Until it is filled in, treat it as saying nothing rather than as saying everything is fine."
+      />
+    ) : (
+      <>
+        {present.map(([kind, title, blurb]) => (
+          <section class="of-group">
+            <h2>{title}</h2>
+            {blurb && <p class="of-blurb">{blurb}</p>}
+            <ul class="of-list">
+              {places.filter((p) => p.kind === kind).map((p) => (
+                <li>
+                  <a class="of-row" href={p.url} rel="me noopener">
+                    <span class="of-label">{p.label}</span>
+                    <span class="of-host t-tabular">{host(p.url)}</span>
+                    {p.note && <span class="of-note">{p.note}</span>}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ))}
+
+        <section class="of-warn">
+          <h2>If you find something that is not here</h2>
+          <p>
+            It is not mine, whatever it says about itself. Some of these copy a
+            creator's art, their name and even the word “official” onto a
+            storefront that has nothing to do with them. Nobody is expected to
+            spot that from the page itself — that is why this list exists.
+          </p>
+          <p>
+            Do not buy from it, and if you have the time,{" "}
+            <a href="/contact">tell me</a>. Knowing which ones exist is most of
+            what I can do about them.
+          </p>
+        </section>
+      </>
+    )}
+
+    {sections.map((s) => (
+      <section class="of-said">
+        {s.title && <h2>{s.title}</h2>}
+        <Prose html={s.html} />
+      </section>
+    ))}
+  </div>
+</BaseLayout>
+
+<style>
+  .official { display: grid; gap: var(--space-6); max-width: 68ch; }
+  .official h2 { font: 600 var(--text-h3) var(--font-display); color: var(--ink); margin: 0; }
+  .of-group, .of-said { display: grid; gap: 12px; }
+  .of-blurb { font: 400 var(--text-sm) var(--font-body); color: var(--ink-soft); margin: 0; }
+
+  .of-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+  .of-row {
+    display: grid; gap: 3px; text-decoration: none; color: inherit;
+    padding: 13px 15px;
+    background: var(--surface-card); border: var(--border-w) solid var(--line);
+    border-radius: var(--radius-md);
+    transition: border-color var(--dur-2) var(--ease-in-out);
+  }
+  .of-row:hover, .of-row:focus-visible { border-color: var(--accent); }
+  .of-label { font: 600 var(--text-body) var(--font-body); color: var(--ink); }
+  /* The host, shown deliberately: the domain is the thing worth comparing. */
+  .of-host { font: 400 var(--text-xs) var(--font-mono); color: var(--accent); }
+  .of-note { font: 400 var(--text-sm) / 1.6 var(--font-body); color: var(--ink-soft); }
+
+  .of-warn {
+    display: grid; gap: 10px; padding: 18px 20px;
+    background: var(--rose-wash); border: var(--border-w) solid var(--rose);
+    border-left-width: 3px; border-radius: var(--radius-md);
+  }
+  .of-warn p { font: 400 var(--text-sm) / 1.7 var(--font-body); color: var(--ink); margin: 0; }
+</style>

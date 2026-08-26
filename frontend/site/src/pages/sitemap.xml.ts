@@ -34,6 +34,13 @@ const STATIC: [path: string, priority: string, changefreq: string][] = [
   /* The hub the nine instruments hang off. It is the page worth linking to
      from outside, so it outranks any single calculator in this list. */
   ["/tools", "0.9", "monthly"],
+  /* Deliberately indexable: somebody checking whether a shop is real should
+     be able to find this by searching, not only by already being here. */
+  ["/official", "0.6", "monthly"],
+  /* The collab planner is for other creators rather than for her audience,
+     which is exactly why it is worth being findable: it is the page most
+     likely to earn a link from somebody else's site. */
+  ["/collab", "0.7", "monthly"],
   ["/horoscopes", "0.8", "weekly"],
   ["/horoscopes/archive", "0.6", "weekly"],
   ["/fan-works", "0.5", "monthly"],
