@@ -70,8 +70,17 @@ class Astro:
     async def hindu(self, when: str, lat: float, lon: float) -> dict:
         return await self._get("/hindu-calendar", {"when": when, "lat": lat, "lon": lon})
 
-    async def isopsephy(self, text: str, language: str = "greek") -> dict:
-        return await self._get("/isopsephy", {"text": text, "language": language})
+    async def isopsephy(self, text: str, cipher: str = "greek-iso") -> dict:
+        """
+        Sum a word under one table.
+
+        The parameter is `cipher` and it takes a SLUG — not `language` taking
+        a language name. Sending the wrong one is not an error: the daemon
+        ignores it, falls back to Greek, and returns a confident total with
+        every Hebrew letter listed as unmatched. That is the worst shape a bug
+        can take on this site, so the mapping lives in one place and is tested.
+        """
+        return await self._get("/isopsephy", {"text": text, "cipher": cipher})
 
     async def sigil(self, intent: str) -> dict:
         return await self._get("/sigil", {"intent": intent})

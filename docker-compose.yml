@@ -130,6 +130,31 @@ services:
       start_period: 30s
     networks: [shruti]
 
+  # vcordbot — the Discord bot, and deliberately just a web service.
+  #
+  # Behind its own profile so an ordinary `up` does not start it: it is a
+  # separate product that happens to share a box, and the website must not
+  # depend on it in either direction.
+  #
+  # It reaches the ephemeris over the interop network and holds NO credential
+  # for the website — not a token it must not misuse, but none to misuse.
+  bot:
+    profiles: ["bot"]
+    build:
+      context: ./bot
+      target: prod
+    restart: unless-stopped
+    env_file: [.env]
+    environment:
+      SHRUTI_ASTRO_INTERNAL: http://shruti-astro:8000
+      SHRUTI_SITE_URL: ${SHRUTI_SITE_URL:-https://shrutivtuber.com}
+      VCORDBOT_URL: ${VCORDBOT_URL:-https://bot.shrutivtuber.com}
+    ports:
+      # Bound to loopback: Caddy terminates TLS and proxies. Discord must reach
+      # it over HTTPS with a valid certificate, so it is never exposed directly.
+      - "127.0.0.1:8250:8000"
+    networks: [shruti, shruti-interop]
+
 volumes:
   # Written by the beeranked agent, read by caddy. One direction only.
   journal:

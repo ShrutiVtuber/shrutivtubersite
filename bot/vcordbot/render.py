@@ -66,8 +66,13 @@ def planetary_hours(data: dict, place: str, bot_url: str, site_url: str) -> dict
     now = data.get("current") or {}
     ruler = now.get("ruler", "—")
     glyph = GLYPH.get(ruler, "")
-    index = now.get("index", 0)
-    part = "night" if now.get("isNight") else "day"
+    # The daemon numbers all twenty-four continuously, so a night hour arrives
+    # as 13–24. Printing that raw gives "the 13 hour of the night", which is
+    # both ungrammatical and wrong — it is the first.
+    raw = now.get("index", 0)
+    night = bool(now.get("isNight"))
+    index = raw - 12 if night and raw > 12 else raw
+    part = "night" if night else "day"
 
     lines = [
         f"**{glyph} {ruler}** — the {ROMAN[index] if 0 < index < len(ROMAN) else index} hour of the {part}.",
@@ -91,12 +96,27 @@ def isopsephy(data: dict, bot_url: str, site_url: str) -> dict:
     total = data.get("total", 0)
     cipher = (data.get("cipher") or {}).get("name", "isopsephy")
     letters = data.get("letters") or []
+    unmatched = data.get("unmatched") or []
     breakdown = " + ".join(f"{l['char']} {l['value']}" for l in letters[:24])
     if len(letters) > 24:
         breakdown += " …"
 
     reduction = (data.get("reduction") or {}).get("final")
-    unmatched = data.get("unmatched") or []
+
+    # Everything ignored and a total of nought is not an answer, it is a
+    # mismatch between the text and the table. Saying "0" would be confidently
+    # wrong, which is the one thing this site does not do.
+    if letters == [] and unmatched:
+        return embed(f"“{data.get('text','')}”", "\n".join([
+            f"Nothing in that has a value in the **{cipher}** table.",
+            "",
+            f"Ignored: {' '.join(unmatched[:12])}",
+            "",
+            "Try a different script — each is summed by its own table and "
+            "nothing converts between them.",
+            "",
+            footer(bot_url, site_url),
+        ]), url=f"{site_url}/tools/isopsephy")
 
     lines = [f"## {total}", ""]
     if breakdown:

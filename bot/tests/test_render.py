@@ -83,3 +83,42 @@ def test_letters_with_no_value_are_named_rather_than_dropped() -> None:
 def test_a_failure_does_not_blame_the_person() -> None:
     e = render.failure("The ephemeris took too long to answer.", BOT, SITE)
     assert "you" not in e["description"].lower().split("posted")[0]
+
+
+def test_a_night_hour_is_numbered_within_the_night() -> None:
+    """
+    The daemon numbers all twenty-four continuously, so the first hour of the
+    night arrives as 13. Rendering that raw produced "the 13 hour of the
+    night" — ungrammatical, and wrong by twelve.
+    """
+    e = render.planetary_hours(
+        {"current": {"index": 13, "ruler": "Sun", "isNight": True,
+                     "endsAt": "2026-08-26T20:00:00+00:00"},
+         "sunrise": "2026-08-26T03:49:25+00:00",
+         "sunset": "2026-08-26T17:03:48+00:00", "dayRuler": "Mercury"},
+        "Athens", BOT, SITE)
+    assert "i hour of the night" in e["description"]
+    assert "13" not in e["description"].split("Sunrise")[0]
+
+
+def test_a_day_hour_keeps_its_number() -> None:
+    e = render.planetary_hours(
+        {"current": {"index": 5, "ruler": "Mars", "isNight": False,
+                     "endsAt": "2026-08-26T09:20:25+00:00"},
+         "sunrise": "2026-08-26T03:49:25+00:00",
+         "sunset": "2026-08-26T17:03:48+00:00", "dayRuler": "Mercury"},
+        "Athens", BOT, SITE)
+    assert "v hour of the day" in e["description"]
+
+
+def test_a_text_with_no_values_says_so_rather_than_answering_nought() -> None:
+    """
+    Everything ignored and a total of nought is a mismatch between the text and
+    the table, not a sum. Printing "0" is confidently wrong.
+    """
+    e = render.isopsephy(
+        {"text": "אמת", "total": 0, "letters": [], "unmatched": ["א", "מ", "ת"],
+         "cipher": {"name": "Isopsephy"}, "reduction": {"final": 0}}, BOT, SITE)
+    assert "## 0" not in e["description"]
+    assert "Nothing in that has a value" in e["description"]
+    assert "Try a different script" in e["description"]

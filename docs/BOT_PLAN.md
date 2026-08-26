@@ -119,10 +119,9 @@ decision the multi-server rule exists to avoid.
 2. **Dashboard and the free/paid split.** Config moves out of chat. Stripe,
    entitlements checked in one place, graceful downgrade that says so rather
    than going quiet.
-3. **Twitch member sync.** Two OAuth flows — the streamer once, each viewer
-   once. Tokens encrypted at rest. A reconcile job, because webhooks get missed
-   and a role that never expires is a paid perk given away.
-4. **YouTube sync, and the collab commands.** Gated on Google access.
+3. **The collab and comparison commands.** The growth mechanism: the loop
+   running inside somebody else's server, with the footer on it.
+4. ~~Member sync~~ — dropped, see above.
 
 ---
 
@@ -242,7 +241,7 @@ her: it is her CPU, her bandwidth and her on-call. That is fine at ten servers
 and a question at a thousand. Verification is still required past **100
 servers** — free does not exempt it.
 
-### Recommendation: drop member sync
+### Decided: member sync is dropped
 
 It was in scope because it was the strongest reason to pay. Nothing is paid
 now, and:
@@ -254,9 +253,9 @@ now, and:
   we would hold other people's OAuth tokens — by a distance the biggest
   security liability in the whole design
 
-Building it would mean taking on token custody for a feature the platform
-already provides free. **Not built unless a specific need appears that the
-native integrations genuinely cannot meet** — at which point the argument will
+Agreed 26 August 2026. Building it would mean taking on token custody for a
+feature the platform already provides free. **Not built unless a specific need
+appears that the native integrations genuinely cannot meet** — at which point the argument will
 be about reliability and cross-platform orchestration, and it can be made then
 with evidence.
 
@@ -303,3 +302,37 @@ changes the business model.
 - **Storing other people's OAuth tokens** raises the stakes of a breach a lot.
   Separate database, encrypted at rest, documented revocation.
 - **Support is the hidden cost.** Most of it will be somebody's permissions.
+
+
+---
+
+## Transport: HTTP interactions rather than the gateway
+
+Decided once member sync was dropped, because dropping it changed the answer.
+
+A bot with **no privileged intents and no need to observe events** does not
+need a persistent websocket. Discord will POST each interaction to an endpoint
+instead, and everything this bot does is either a reply to a slash command or
+an outbound REST call.
+
+Why it is the better fit here:
+
+- It is **an ordinary web service**, which this stack already knows how to
+  build, deploy, reverse-proxy and restart. No connection to babysit, no
+  reconnection logic, no sharding — ever.
+- **Nothing to keep alive on one box.** For something free that one person
+  maintains, the operational shape matters more than the throughput.
+- Announcements are outbound REST either way, so nothing is lost.
+
+The cost, stated: it cannot be exercised until there is a public HTTPS endpoint,
+where a gateway bot can be run from a laptop immediately. That is a real
+inconvenience during development and not a reason to carry a websocket forever.
+
+**The dispatcher is a pure function from an interaction payload to a response
+payload**, so the transport is a thin adapter and this decision stays cheap to
+reverse. That is also what lets every command be tested without a token, a
+server, or a network.
+
+**One portal change when the endpoint is live:** set the Interactions Endpoint
+URL. Discord validates it on save by sending a signed PING, so it can only be
+set *after* the service is deployed and answering — not before.
