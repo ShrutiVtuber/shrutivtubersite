@@ -1,0 +1,267 @@
+---
+/* Connecting Twitch, once.
+ *
+ * Two buttons and a lot of explanation, because both actions are one-way
+ * enough to deserve it: authorising hands this site a token for her channel,
+ * and subscribing asks Twitch to start posting to a public URL.
+ *
+ * The order matters and the page says so. Twitch verifies the callback at the
+ * moment a subscription is created, so the endpoint has to be deployed and
+ * answering first — a subscription created against a dead URL fails with an
+ * error that reads like a permission problem.
+ */
+import AdminLayout from "../../layouts/AdminLayout.astro";
+import CsrfField from "../../components/forms/CsrfField.astro";
+import Button from "../../components/forms/Button.astro";
+import { asAdmin } from "../../lib/admin";
+import { verifyCsrf } from "../../lib/csrf";
+
+export const prerender = false;
+
+let notice = "";
+let failed = "";
+let result: any = null;
+
+if (Astro.request.method === "POST") {
+  const form = await Astro.request.formData();
+  if (!verifyCsrf(Astro.cookies, form)) {
+    failed = "That did not go through. Reload and try again.";
+  } else if (form.get("action") === "connect") {
+    const r = await asAdmin(Astro, "/api/twitch/admin/authorize-url");
+    if (r.ok && r.body?.url) return Astro.redirect(r.body.url, 303);
+    failed = r.body?.detail ?? "Could not build the authorisation link.";
+  } else if (form.get("action") === "test") {
+    const r = await asAdmin(Astro, "/api/twitch/admin/test", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        source: String(form.get("source") ?? "twitch.bits"),
+        quantity: Number(form.get("quantity") ?? 100),
+        amount_minor: Number(form.get("amount") ?? 0),
+        who: String(form.get("who") ?? "A test"),
+      }),
+    });
+    notice = r.ok ? "Recorded. It is in the list below." : "";
+    if (!r.ok) failed = r.body?.detail ?? "Could not record that.";
+  } else if (form.get("action") === "clear-tests") {
+    const r = await asAdmin(Astro, "/api/twitch/admin/tests", { method: "DELETE" });
+    notice = r.ok ? `Removed ${r.body?.removed ?? 0} test event(s).` : "";
+  } else if (form.get("action") === "subscribe") {
+    const r = await asAdmin(Astro, "/api/twitch/admin/subscribe", { method: "POST" });
+    if (r.ok) {
+      result = r.body;
+      notice = `Asked Twitch for ${(r.body.created ?? []).length} subscription(s).`;
+    } else {
+      failed = r.body?.detail ?? "Twitch refused that.";
+    }
+  }
+}
+
+const status = (await asAdmin(Astro, "/api/twitch/admin/status")).body ?? {};
+const linked = Boolean(status.connected);
+const events = (await asAdmin(Astro, "/api/twitch/admin/recent")).body ?? [];
+
+const SOURCES = [
+  ["twitch.bits", "Cheer — bits"],
+  ["twitch.sub", "Subscription"],
+  ["twitch.gift", "Gifted subs"],
+  ["twitch.raid", "Raid — viewers"],
+  ["twitch.follow", "Follow"],
+  ["youtube.superchat", "YouTube Super Chat — money"],
+  ["stripe.support", "Stripe support — money"],
+  ["workshop.signup", "Workshop signup"],
+  ["course.signup", "Course signup"],
+];
+
+const shown = (e: any) =>
+  e.amountMinor > 0
+    ? `${(e.amountMinor / 100).toFixed(2)} ${String(e.currency).toUpperCase()}`
+    : String(e.quantity);
+const when = (iso: string) =>
+  iso ? new Date(iso).toLocaleString("en-GB", { dateStyle: "short", timeStyle: "short" }) : "";
+---
+
+<AdminLayout title="Twitch">
+  <div class="tw">
+    <h1>Twitch</h1>
+    <p class="lede">
+      So subscriptions, gifts, cheers, raids and follows can feed your counters
+      and raise alerts. This is <strong>your</strong> token for
+      <strong>your</strong> channel — the thing you can revoke from Twitch at
+      any time.
+    </p>
+    {notice && <p class="ok">{notice}</p>}
+    {failed && <p class="bad">{failed}</p>}
+
+    <section class="step" data-done={linked || undefined}>
+      <h2>1 · Authorise</h2>
+      <p>
+        {linked
+          ? `Connected as broadcaster ${status.broadcaster}.`
+          : "Sends you to Twitch to grant three scopes on your own channel: subscriptions, bits and followers. Raids need none."}
+      </p>
+      <form method="POST">
+        <CsrfField />
+        <input type="hidden" name="action" value="connect" />
+        <Button type="submit" variant={linked ? "secondary" : "primary"}>
+          {linked ? "Authorise again" : "Connect Twitch"}
+        </Button>
+      </form>
+    </section>
+
+    <section class="step">
+      <h2>2 · Start receiving</h2>
+      <p>
+        Asks Twitch to post events to this site. It verifies the address at
+        this moment, so the site must already be deployed — which it is if you
+        are reading this.
+      </p>
+      <p class="fine">
+        Safe to press twice. Anything already subscribed comes back as
+        “already” rather than doubling.
+      </p>
+      <form method="POST">
+        <CsrfField />
+        <input type="hidden" name="action" value="subscribe" />
+        <Button type="submit" disabled={!linked}>Start receiving events</Button>
+      </form>
+
+      {result && (
+        <div class="result">
+          {result.created?.length > 0 && (
+            <p class="ok">Created: {result.created.join(", ")}</p>
+          )}
+          {result.already?.length > 0 && (
+            <p class="fine">Already there: {result.already.join(", ")}</p>
+          )}
+          {result.failed?.length > 0 && (
+            <ul class="fails">
+              {result.failed.map((f: any) => (
+                <li><strong>{f.type}</strong> — {f.status} {f.detail}</li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+    </section>
+
+    <section class="step">
+      <h2>3 · Fire a test</h2>
+      <p>
+        A real row in the real table, so counters and overlays can be seen
+        working without waiting for somebody to actually cheer. Marked as a
+        test, and removable in one press.
+      </p>
+      <form method="POST" class="test">
+        <CsrfField />
+        <input type="hidden" name="action" value="test" />
+        <label>
+          <span>What</span>
+          <select name="source">
+            {SOURCES.map(([v, l]) => <option value={v}>{l}</option>)}
+          </select>
+        </label>
+        <label>
+          <span>How many</span>
+          <input name="quantity" value="100" inputmode="numeric" />
+        </label>
+        <label>
+          <span>Or money, in cents</span>
+          <input name="amount" value="0" inputmode="numeric" />
+        </label>
+        <label>
+          <span>Who</span>
+          <input name="who" value="A test" maxlength="120" />
+        </label>
+        <div><Button type="submit">Record it</Button></div>
+      </form>
+      <form method="POST">
+        <CsrfField />
+        <input type="hidden" name="action" value="clear-tests" />
+        <button type="submit" class="clear">Remove all test events</button>
+      </form>
+    </section>
+
+    <section class="step">
+      <h2>What has arrived</h2>
+      {events.length === 0 ? (
+        <p class="fine">
+          Nothing yet. That is the correct state before anything has happened —
+          it does not mean anything is broken.
+        </p>
+      ) : (
+        <div class="scroll">
+          <table>
+            <thead><tr><th>When</th><th>Source</th><th>Who</th><th>Amount</th></tr></thead>
+            <tbody>
+              {events.map((e: any) => (
+                <tr data-test={e.message === "(a test event)" || undefined}>
+                  <td class="t-tabular">{when(e.at)}</td>
+                  <td><code>{e.source}</code></td>
+                  <td>{e.who || "—"}</td>
+                  <td class="t-tabular">{shown(e)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+
+    <section class="step">
+      <h2>What arrives</h2>
+      <ul class="what">
+        <li><strong>Subscriptions</strong> — new, resubs with their month count, and gifts</li>
+        <li><strong>Cheers</strong> — bits, counted as bits and never as money</li>
+        <li><strong>Raids</strong> — with how many arrived</li>
+        <li><strong>Follows</strong> — quietly</li>
+      </ul>
+      <p class="fine">
+        A gifted subscription arrives twice from Twitch — once for the giver and
+        once for the recipient. Only the giver's is counted, or every gift would
+        be doubled.
+      </p>
+    </section>
+  </div>
+</AdminLayout>
+
+<style>
+  .tw { display: grid; gap: var(--space-5); max-width: 70ch; }
+  .tw h1 { font: 500 var(--text-h1) var(--font-display); color: var(--ink); margin: 0; }
+  .tw h2 { font: 600 var(--text-h3) var(--font-display); color: var(--ink); margin: 0; }
+  .lede { font: 400 var(--text-body) / var(--leading-body) var(--font-body); color: var(--ink-soft); margin: 0; }
+  .ok { font: 400 var(--text-sm) var(--font-body); color: var(--accent); margin: 0; }
+  .bad { font: 400 var(--text-sm) var(--font-body); color: var(--live); margin: 0; }
+  .fine { font: 400 var(--text-xs) / 1.7 var(--font-body); color: var(--ink-faint); margin: 0; }
+  .step {
+    display: grid; gap: 10px; padding: 18px 20px;
+    background: var(--surface-card); border: var(--border-w) solid var(--line);
+    border-radius: var(--radius-md);
+  }
+  .step[data-done] { border-color: var(--accent); }
+  .step p { font: 400 var(--text-sm) / 1.65 var(--font-body); color: var(--ink-soft); margin: 0; }
+  .what { margin: 0; padding-left: 20px; display: grid; gap: 6px; }
+  .what li { font: 400 var(--text-sm) var(--font-body); color: var(--ink-soft); }
+  .result { display: grid; gap: 6px; margin-top: 6px; }
+  .fails { margin: 0; padding-left: 18px; }
+  .fails li { font: 400 var(--text-xs) var(--font-mono); color: var(--live); }
+
+  .test { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr)); align-items: end; }
+  .test label { display: grid; gap: 4px; }
+  .test span { font: 600 var(--text-micro) var(--font-body); text-transform: uppercase; letter-spacing: var(--tracking-eyebrow); color: var(--ink-faint); }
+  .test input, .test select {
+    font: 400 var(--text-sm) var(--font-body); color: var(--ink);
+    background: var(--surface-page); border: var(--border-w) solid var(--line);
+    border-radius: var(--radius-sm); padding: 8px 10px; min-height: 40px; width: 100%; box-sizing: border-box;
+  }
+  .clear { cursor: pointer; background: none; border: none; padding: 0;
+    font: 400 var(--text-micro) var(--font-body); color: var(--ink-faint); }
+  .clear:hover { color: var(--live); }
+
+  .scroll { overflow-x: auto; border: var(--border-w) solid var(--line); border-radius: var(--radius-sm); }
+  table { border-collapse: collapse; width: 100%; font-size: var(--text-xs); }
+  th, td { text-align: left; padding: 7px 11px; border-bottom: var(--border-w) solid var(--line); white-space: nowrap; }
+  thead th { font: 600 var(--text-micro) var(--font-body); text-transform: uppercase; letter-spacing: var(--tracking-eyebrow); color: var(--ink-faint); background: var(--surface-inset); }
+  tbody tr:last-child td { border-bottom: none; }
+  tr[data-test] td { color: var(--ink-faint); font-style: italic; }
+</style>

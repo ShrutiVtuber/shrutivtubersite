@@ -1,0 +1,47 @@
+---
+/* Where Twitch sends her back.
+ *
+ * It does one thing — swap the code for tokens — and then gets out of the way.
+ * The code is single-use and short-lived, so this must not be a page somebody
+ * lands on twice: it redirects on success rather than rendering something with
+ * a spent code still in the address bar.
+ */
+import AdminLayout from "../../../layouts/AdminLayout.astro";
+import { asAdmin } from "../../../lib/admin";
+
+export const prerender = false;
+
+const code = Astro.url.searchParams.get("code") ?? "";
+const state = Astro.url.searchParams.get("state") ?? "";
+const denied = Astro.url.searchParams.get("error") ?? "";
+
+let failed = "";
+
+if (!denied && code && state) {
+  const r = await asAdmin(Astro, "/api/twitch/admin/exchange", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ code, state }),
+  });
+  if (r.ok) return Astro.redirect("/admin/twitch", 303);
+  failed = r.body?.detail ?? "Twitch would not accept that code.";
+}
+---
+
+<AdminLayout title="Twitch">
+  <div class="cb">
+    <h1>{denied ? "Not authorised" : "That did not work"}</h1>
+    <p>
+      {denied
+        ? "Twitch says the authorisation was declined. Nothing has changed, and you can try again whenever."
+        : failed || "No code came back from Twitch, which usually means the link was opened directly rather than followed from Twitch."}
+    </p>
+    <p><a href="/admin/twitch">Back to Twitch</a></p>
+  </div>
+</AdminLayout>
+
+<style>
+  .cb { display: grid; gap: 12px; max-width: 60ch; }
+  .cb h1 { font: 500 var(--text-h2) var(--font-display); color: var(--ink); margin: 0; }
+  .cb p { font: 400 var(--text-body) / var(--leading-body) var(--font-body); color: var(--ink-soft); margin: 0; }
+</style>

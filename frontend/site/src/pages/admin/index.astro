@@ -55,6 +55,8 @@ const skyEntries: any[] = skyList.body?.entries ?? [];
 const growthRows = (await asAdmin(Astro, "/api/admin/growth")).body ?? [];
 const growthLeft = (growthRows as any[]).filter((r) => !r.done && r.visible !== false).length;
 
+const twitchLinked = Boolean((await asAdmin(Astro, "/api/twitch/admin/status")).body?.connected);
+
 ---
 
 <AdminLayout title="Overview">
@@ -130,6 +132,12 @@ const growthLeft = (growthRows as any[]).filter((r) => !r.done && r.visible !== 
     {/* Not a number about the site — a number about her. It is the only tile
         that counts something she has to go and do in the world, which is why
         it earns a place beside the ones that count content. */}
+    <a class="adm-card tile" href="/admin/twitch">
+      <span class="adm-lbl">Twitch</span>
+      <span class="big">{twitchLinked ? "on" : "off"}</span>
+      <span class="sub">{twitchLinked ? "events arriving" : "not connected yet"}</span>
+    </a>
+
     <a class="adm-card tile" href="/admin/growth">
       <span class="adm-lbl">Growing</span>
       <span class="big">{growthLeft}</span>
