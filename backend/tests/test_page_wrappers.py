@@ -45,7 +45,15 @@ LAYS_ITSELF_OUT = {
 }
 
 # Sections with their own established idiom, which is not this one.
-NOT_OURS = ("journal/", "admin/", "tools/")
+NOT_OURS = (
+    "journal/", "admin/", "tools/",
+    # Overlays are not pages for readers. They are her own OBS surfaces, seen
+    # by nobody but her while she sets them up, and their idle state is
+    # deliberately an instruction TO HER — "Overlay connected · pick a counter
+    # in the admin" — because the alternative on a live stream is a blank
+    # rectangle nobody can interpret.
+    "overlay/",
+)
 
 
 def _pages() -> list[Path]:
