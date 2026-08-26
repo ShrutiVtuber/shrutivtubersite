@@ -114,6 +114,26 @@ const closed = (polls ?? []).filter((p: any) => p.closed).slice(0, 2);
       </section>
     </div>
 
+    {/* Given its own block rather than a link in a list: it is the thing
+        most likely to bring somebody here who has never heard of the site. */}
+    <section class="c-block c-compat">
+      <div class="cc-words">
+        <span class="t-eyebrow">For fun</span>
+        <h2>Are we compatible?</h2>
+        <p class="c-note">
+          Put your chart beside somebody else's and see what the tradition
+          makes of the pair. Twenty seconds, no account, and it gives you a
+          card worth posting. It says what it cannot know, which is most of it.
+        </p>
+        <div class="c-acts">
+          <Button href="/compatible" data-track="compare:from-community">Compare charts →</Button>
+        </div>
+      </div>
+      <img class="cc-card" src="/api/charts/card-sample.png?design=dark"
+           width="1200" height="630" loading="lazy"
+           alt="An example of the card a comparison produces" />
+    </section>
+
     <section class="c-block" id="polls">
       <h2>Have a say</h2>
       {
@@ -177,4 +197,18 @@ const closed = (polls ?? []).filter((p: any) => p.closed).slice(0, 2);
   @media (max-width: 960px) { .c-top { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
   @media (max-width: 640px) { .c-top { grid-template-columns: 1fr; } }
   .c-card > * { min-width: 0; max-width: 100%; }
+  .c-compat {
+    display: grid; gap: var(--space-5); align-items: center;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+    padding: var(--space-5);
+    background: var(--surface-card);
+    border: var(--border-w) solid var(--line);
+    border-radius: var(--radius-md);
+  }
+  .cc-words { display: grid; gap: 10px; justify-items: start; min-width: 0; }
+  .cc-card {
+    width: 100%; height: auto; display: block;
+    border: var(--border-w) solid var(--line); border-radius: var(--radius-sm);
+  }
+  @media (max-width: 720px) { .c-compat { grid-template-columns: 1fr; } }
 </style>

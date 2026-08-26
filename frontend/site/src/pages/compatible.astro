@@ -1,0 +1,272 @@
+---
+/* The front door for "are we compatible".
+ *
+ * Until this existed the only way in was: open the natal instrument, cast,
+ * scroll past four tables, keep the chart, find the invite panel, press it.
+ * That is five steps for somebody who arrived wanting to do one thing, and it
+ * is the opposite of a thing people pass around.
+ *
+ * So this page casts, keeps and makes the invitation in ONE submit, shows what
+ * the card looks like before anybody commits, and is honest about what the
+ * reading is in the same breath as being fun about it. Those are not in
+ * tension: the tradition is more interesting than a made-up percentage, and
+ * saying so is part of the pitch.
+ *
+ * The prose blocks are editable in the admin under `page = "compatible"`, so
+ * she can rewrite the pitch without a deploy.
+ */
+import BaseLayout from "../layouts/BaseLayout.astro";
+import SectionHeader from "../components/brand/SectionHeader.astro";
+import PlaceField from "../components/forms/PlaceField.astro";
+import CsrfField from "../components/forms/CsrfField.astro";
+import Button from "../components/forms/Button.astro";
+import Prose from "../components/content/Prose.astro";
+import SectionFigure from "../components/blocks/SectionFigure.astro";
+import { pageSections } from "../lib/content";
+import { site, SITE_URL } from "../lib/api";
+import { asReader } from "../lib/account";
+import { verifyCsrf } from "../lib/csrf";
+
+export const prerender = false;
+
+let failed = "";
+let made: { ownerToken: string; shareToken: string } | null = null;
+
+if (Astro.request.method === "POST") {
+  const form = await Astro.request.formData();
+  if (!verifyCsrf(Astro.cookies, form)) {
+    failed = "That did not go through. Reload the page and try again.";
+  } else {
+    const unknown = form.get("unknownTime") === "1";
+    const r = await asReader(Astro, "/api/charts/start", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        birth_date: String(form.get("date") ?? ""),
+        birth_time: unknown ? null : String(form.get("time") ?? ""),
+        time_unknown: unknown || !String(form.get("time") ?? ""),
+        place_name: String(form.get("place") ?? ""),
+        lat: Number(form.get("lat") ?? 0),
+        lon: Number(form.get("lon") ?? 0),
+        label: String(form.get("label") ?? ""),
+        consent: form.get("consent") === "1",
+      }),
+    });
+    if (r.ok && r.body?.shareToken) made = r.body;
+    else failed = r.body?.detail ?? "That did not work. Nothing has been kept.";
+  }
+}
+
+const sections = await pageSections("compatible");
+const designs = (await site<any[]>("/api/charts/card-designs")) ?? [];
+const inviteUrl = made ? `${SITE_URL}/chart/invite/${made.shareToken}` : "";
+---
+
+<BaseLayout
+  title="Are we compatible? — Shruti"
+  description="Compare two birth charts and see what the tradition makes of the pair. Free, no account, and it says what it cannot know."
+>
+  <div class="page compat">
+    <SectionHeader
+      as="h1" glyph="✶" eyebrow="For fun"
+      title="Are we compatible?"
+      body="Put your chart next to somebody else's and see what two thousand years of practice has to say about the pair of you. It takes twenty seconds, needs no account, and gives you something worth posting."
+    />
+
+    {
+      made ? (
+        <section class="done">
+          <h2>Your invitation is ready</h2>
+          <p class="lead">
+            Send this to whoever you want to compare with. They fill in one
+            form and you both land on the result.
+          </p>
+          <label class="out">
+            <span class="lbl">The link</span>
+            <input type="text" readonly value={inviteUrl} onclick="this.select()" />
+          </label>
+          <label class="out">
+            <span class="lbl">Something to post with it</span>
+            <textarea readonly rows="2" onclick="this.select()">{`Compare charts with me — ${inviteUrl}`}</textarea>
+          </label>
+          <p class="fine">
+            <strong>Keep this page's other link too.</strong>{" "}
+            <a href={`/chart/${made.ownerToken}`}>Your chart lives here</a> — it
+            is how you come back, change what you share, or delete the lot.
+          </p>
+        </section>
+      ) : (
+        <section class="start">
+          <h2>Start here</h2>
+          {failed && <p class="bad">{failed}</p>}
+          <form method="POST" class="c-form">
+            <CsrfField />
+            <label>
+              <span class="lbl">What to call you</span>
+              <input class="in" name="label" maxlength="80" placeholder="Your name or handle" />
+            </label>
+            <div class="two">
+              <label>
+                <span class="lbl">Birth date</span>
+                <input class="in" type="date" name="date" required />
+              </label>
+              <label>
+                <span class="lbl">Birth time</span>
+                <input class="in" type="time" name="time" />
+              </label>
+            </div>
+            <label class="check">
+              <input type="checkbox" name="unknownTime" value="1" />
+              <span>I don't know my birth time</span>
+            </label>
+            <p class="hint">
+              Without it the planets still work. The angles do not, and the
+              reading tells you which parts it has left out rather than
+              guessing them.
+            </p>
+            <PlaceField lat={37.9838} lon={23.7275} place="" />
+            <label class="check">
+              <input type="checkbox" name="consent" value="1" required />
+              <span>
+                I agree to my birth date, time and place being stored so the
+                comparison can be kept. I can delete it whenever I like, and it
+                goes on its own after a year.
+              </span>
+            </label>
+            <div>
+              <Button size="lg" type="submit" data-track="compare:started">
+                Make my invitation
+              </Button>
+            </div>
+          </form>
+        </section>
+      )
+    }
+
+    <section class="cards">
+      <h2>What you get to post</h2>
+      <p class="lead">
+        Every comparison makes its own image, in whichever design you pick.
+        Both of you appear on it, and so does the count behind the verdict.
+      </p>
+      <div class="card-row">
+        {designs.slice(0, 2).map((d: any) => (
+          <figure>
+            <img src={`/api/charts/card-sample.png?design=${d.key}`}
+                 width="1200" height="630" loading="lazy"
+                 alt={`An example share card in the ${d.name} design`} />
+            <figcaption>{d.name}</figcaption>
+          </figure>
+        ))}
+      </div>
+    </section>
+
+    <section class="bands">
+      <h2>The five answers</h2>
+      <p class="lead">
+        No percentage. A number out of a hundred would look like a measurement,
+        and nobody has measured anything — so you get one of five, in the
+        tradition's own words, with the count that produced it sitting right
+        beside it so you can argue with it.
+      </p>
+      <ol class="band-list">
+        <li><span>Contrary to sect</span> — almost everything here is a hard aspect.</li>
+        <li><span>Hard going</span> — more friction than ease.</li>
+        <li><span>Mixed testimony</span> — both, in roughly equal measure. Most pairs land here.</li>
+        <li><span>Well aspected</span> — more ease than friction, by a clear margin.</li>
+        <li><span>Written in the same sky</span> — overwhelmingly harmonious, and genuinely uncommon.</li>
+      </ol>
+      <p class="fine">
+        "Mixed testimony" and "contrary to sect" are real terms of art, not
+        invented whimsy — testimonies are how a horary astrologer weighs a
+        question, and sect is the day-or-night division that decides which
+        planets are working in your favour.
+      </p>
+    </section>
+
+    <section class="honest">
+      <h2>What this is, and is not</h2>
+      <p class="lead">
+        It reads the contacts between two charts and tells you what classical
+        practice attaches to them. That is a real thing, done properly, with
+        the same ephemeris as everything else here.
+      </p>
+      <p class="lead">
+        <strong>It does not predict anything.</strong> It cannot tell you
+        whether to date someone, work with them, or trust them, and the
+        authorities it draws on have disagreed with each other for two
+        millennia. Post it because it is fun, not because it is a verdict.
+      </p>
+    </section>
+
+    {/* Anything she has added in the admin for this page. */}
+    {
+      sections.length > 0 && (
+        <div class="page-sections">
+          {sections.map((s) => (
+            <section class="page-section">
+              {s.title && <h2>{s.title}</h2>}
+              <SectionFigure media={s.media} title={s.title} />
+              <Prose html={s.html} />
+            </section>
+          ))}
+        </div>
+      )
+    }
+  </div>
+</BaseLayout>
+
+<style>
+  .compat { max-width: 860px; display: grid; gap: var(--space-7); }
+  .compat h2 { font: 600 var(--text-h3) var(--font-display); color: var(--ink); margin: 0; }
+  .lead { font: 400 var(--text-body) / var(--leading-body) var(--font-body); color: var(--ink-soft); margin: 0; max-width: 64ch; }
+  .fine { font: 400 var(--text-sm) / 1.7 var(--font-body); color: var(--ink-faint); margin: 0; max-width: 64ch; }
+  .bad { font: 400 var(--text-sm) var(--font-body); color: var(--live); margin: 0; }
+
+  .start, .done {
+    display: grid; gap: var(--space-4); justify-items: start;
+    padding: var(--space-6);
+    background: var(--surface-card);
+    border: var(--border-w) solid var(--line);
+    border-radius: var(--radius-md);
+  }
+  .c-form { display: grid; gap: var(--space-4); width: 100%; max-width: 46ch; }
+  .c-form label { display: grid; gap: 6px; }
+  .two { display: grid; gap: var(--space-4); grid-template-columns: 1fr 1fr; }
+  .lbl {
+    font: 600 var(--text-micro) var(--font-body); letter-spacing: var(--tracking-eyebrow);
+    text-transform: uppercase; color: var(--ink-faint);
+  }
+  .in, .out input, .out textarea {
+    font: 400 var(--text-sm) var(--font-body); color: var(--ink);
+    background: var(--surface-page); border: var(--border-w) solid var(--line);
+    border-radius: var(--radius-sm); padding: 8px 10px; min-height: 44px;
+    width: 100%; box-sizing: border-box;
+  }
+  .out { display: grid; gap: 6px; width: 100%; max-width: 52ch; }
+  .check { display: flex; gap: 10px; align-items: flex-start; }
+  .check span { font: 400 var(--text-sm) / 1.6 var(--font-body); color: var(--ink); }
+  .check input { margin-top: 4px; flex: none; }
+  .hint { font: 400 var(--text-xs) / 1.7 var(--font-body); color: var(--ink-faint); margin: 0; max-width: 56ch; }
+
+  .cards, .bands, .honest { display: grid; gap: var(--space-4); }
+  .card-row { display: grid; gap: var(--space-4); grid-template-columns: 1fr 1fr; }
+  .card-row figure { margin: 0; display: grid; gap: 8px; }
+  .card-row img {
+    width: 100%; height: auto; display: block;
+    border: var(--border-w) solid var(--line); border-radius: var(--radius-sm);
+  }
+  .card-row figcaption {
+    font: 600 var(--text-micro) var(--font-body); letter-spacing: var(--tracking-eyebrow);
+    text-transform: uppercase; color: var(--ink-faint);
+  }
+
+  .band-list { margin: 0; padding-left: 1.4em; display: grid; gap: 8px; }
+  .band-list li { font: 400 var(--text-sm) / 1.7 var(--font-body); color: var(--ink-soft); }
+  .band-list span { font-weight: 600; color: var(--ink); }
+
+  @media (max-width: 640px) {
+    .two { grid-template-columns: 1fr; }
+    .card-row { grid-template-columns: 1fr; }
+  }
+</style>

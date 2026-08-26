@@ -365,3 +365,54 @@ def test_inviting_does_not_hide_behind_making_a_share_link_first():
     # And the panel is not behind `c.shared`.
     panel = page[page.index("invite-panel"):][:900]
     assert "c.shared ?" in panel, "it should show the link OR the button, never nothing"
+
+
+# ── the front door ──────────────────────────────────────────────────────────
+
+def test_there_is_a_page_about_it_that_is_not_the_natal_instrument():
+    """
+    Until this existed the only way in was: open the instrument, cast, scroll
+    past four tables, keep, find the invite panel, press it. Five steps for
+    somebody who arrived wanting to do one thing.
+    """
+    page = SRC / "pages" / "compatible.astro"
+    assert page.is_file()
+    text = page.read_text()
+    assert "/api/charts/start" in text, "the page should cast and invite in one submit"
+
+
+def test_the_front_door_is_reachable_from_the_community_page():
+    community = (SRC / "pages" / "community.astro").read_text()
+    assert '/compatible' in community
+
+
+def test_the_page_is_editable_without_a_deploy():
+    text = (SRC / "pages" / "compatible.astro").read_text()
+    assert 'pageSections("compatible")' in text
+
+
+def test_the_page_says_what_it_is_not():
+    """
+    Being fun about it and being honest about it are not in tension — but the
+    honest half has to actually be on the page people arrive at.
+    """
+    text = (SRC / "pages" / "compatible.astro").read_text()
+    lowered = text.lower()
+    assert "does not predict" in lowered
+    assert "no percentage" in lowered
+
+
+def test_starting_needs_consent_when_there_is_no_account():
+    from shruti.api.routes import charts
+
+    source = inspect.getsource(charts.start)
+    assert "body.consent" in source
+    assert "compare-start" in source, "the consent record should say where it came from"
+
+
+def test_the_sample_card_uses_invented_people():
+    """Nobody's real chart advertises the feature."""
+    from shruti.api.routes import charts
+
+    source = inspect.getsource(charts.card_sample)
+    assert "Someone" in source

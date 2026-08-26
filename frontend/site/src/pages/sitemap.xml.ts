@@ -44,6 +44,7 @@ const STATIC: [path: string, priority: string, changefreq: string][] = [
   ["/tools/solar-stations", "0.9", "monthly"],
   ["/tools/lunar-stations", "0.9", "monthly"],
   ["/tools/planetary-hours", "0.9", "monthly"],
+  ["/compatible", "0.8", "monthly"],
   ["/partners", "0.5", "monthly"],
   ["/tools/natal-chart", "0.9", "monthly"],
   ["/tools/attic-calendar", "0.9", "monthly"],

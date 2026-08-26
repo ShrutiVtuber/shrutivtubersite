@@ -511,6 +511,123 @@ async def write_reading(
     return _comparison_view(row, left, right, owner=True)
 
 
+@router.get("/card-sample.png")
+async def card_sample(
+    design: str = "light", session: AsyncSession = Depends(get_session)
+) -> Response:
+    """
+    A card with invented people on it, for the page that explains the feature.
+
+    Fixed names and a fixed tally, so the example is the same every time
+    somebody looks and nobody's real chart is used to advertise anything.
+    """
+    from shruti.core.sharecard import comparison_card
+
+    chosen = (
+        await session.execute(
+            select(CardDesign).where(CardDesign.key == design,
+                                     CardDesign.visible.is_(True))
+        )
+    ).scalar_one_or_none()
+    if chosen is None:
+        chosen = (
+            await session.execute(
+                select(CardDesign).where(CardDesign.visible.is_(True))
+                .order_by(CardDesign.position, CardDesign.id)
+            )
+        ).scalars().first()
+    if chosen is None:
+        raise HTTPException(404, "no design is available")
+
+    backdrop = None
+    if chosen.media_id:
+        art = await session.get(Media, chosen.media_id)
+        if art is not None:
+            try:
+                from shruti.core.storage import fetch
+
+                got = await fetch(art.filename)
+                backdrop = got[0] if got else None
+            except Exception:                          # noqa: BLE001
+                backdrop = None
+
+    png = comparison_card(
+        left_name="Someone", right_name="Someone else",
+        headline="Luminaries in contact", band="Written in the same sky",
+        harmonious=14, hard=3,
+        design={"background": chosen.background, "ink": chosen.ink,
+                "soft": chosen.soft, "faint": chosen.faint,
+                "line": chosen.line, "accent": chosen.accent,
+                "scrim": chosen.scrim},
+        backdrop=backdrop,
+    )
+    return Response(content=png, media_type="image/png",
+                    headers={"Cache-Control": "public, max-age=3600"})
+
+
+class StartIn(BaseModel):
+    """Everything needed to be ready to invite somebody, in one submit."""
+
+    birth_date: str = Field(max_length=10)
+    birth_time: Optional[str] = Field(default=None, max_length=5)
+    time_unknown: bool = False
+    place_name: str = Field(default="", max_length=160)
+    lat: float = 0.0
+    lon: float = 0.0
+    label: str = Field(default="", max_length=80)
+    consent: bool = False
+
+
+@router.post("/start", status_code=201)
+async def start(
+    body: StartIn,
+    user: User | None = Depends(current_user),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """
+    Cast, keep and make an invitation in one step.
+
+    The long way round — cast on the instrument, scroll, keep, find the invite
+    panel, press it — is four pages for somebody who arrived wanting to do one
+    thing. This is the front door, and it hands back the invitation ready to
+    send.
+    """
+    if not body.birth_date:
+        raise HTTPException(400, "a chart needs a date")
+    if user is None and not body.consent:
+        raise HTTPException(
+            400, "keeping a chart means storing birth data, which needs consent"
+        )
+
+    chart = SavedChart(
+        owner_token=_token(),
+        share_token=_token(),
+        user_id=user.id if user else None,
+        label=body.label.strip() or "Mine",
+        birth_date=body.birth_date,
+        birth_time=None if body.time_unknown else (body.birth_time or None),
+        time_unknown=body.time_unknown,
+        place_name=body.place_name.strip(),
+        lat=body.lat,
+        lon=body.lon,
+        last_seen_at=_now(),
+        shared_at=_now(),
+    )
+    if user is None:
+        from shruti.core.consents import CONSENT_VERSION, NATIVITY
+
+        chart.consent_version = CONSENT_VERSION
+        chart.consent_wording = NATIVITY.wording
+        chart.consent_source = "compare-start"
+        chart.consent_at = _now()
+        chart.expires_at = _now() + timedelta(days=ORPHAN_DAYS)
+
+    session.add(chart)
+    await session.commit()
+    await session.refresh(chart)
+    return {"ownerToken": chart.owner_token, "shareToken": chart.share_token}
+
+
 @router.get("/card-designs")
 async def card_designs(session: AsyncSession = Depends(get_session)) -> list[dict]:
     """The designs somebody may pick between when sharing."""
