@@ -355,6 +355,140 @@ class OfficialPlace(TimestampMixin, table=True):
     visible: bool = Field(default=True)
 
 
+class SupportEvent(TimestampMixin, table=True):
+    """
+    One thing somebody did that a counter might count.
+
+    **Events are recorded once; counters are views over them.** A counter is
+    not a running total that gets incremented — it is a sum computed from the
+    events matching its sources inside its window. That is a deliberate choice
+    with three consequences worth having:
+
+    - a counter created today counts what already happened, rather than
+      starting at nought and lying about the campaign;
+    - a counter's sources can be changed afterwards and the total is simply
+      right, with nothing to recompute or migrate;
+    - a double-counted webhook cannot corrupt a stored total, because there is
+      no stored total. It shows up as one extra row and can be deleted.
+
+    `external_id` carries the platform's own identifier and is unique per
+    source. Stripe retries webhooks and Twitch retries EventSub deliveries —
+    both by design — so idempotency is not an optimisation here, it is the
+    difference between a goal bar that is right and one that drifts upward
+    every time a delivery is retried.
+    """
+
+    __tablename__ = "support_event"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+
+    # "stripe.support" | "stripe.membership" | "stripe.shop" | "twitch.sub" |
+    # "twitch.gift" | "twitch.bits" | "twitch.raid" | "twitch.follow" |
+    # "youtube.superchat" | "course.signup" | "workshop.signup"
+    source: str = Field(index=True)
+
+    # The platform's own id for this thing. Unique with `source`, so a retried
+    # delivery is a no-op rather than a second row.
+    external_id: str = Field(default="", index=True)
+
+    # Money, in minor units, as Stripe counts it. Zero for a follow or a raid.
+    amount_minor: int = 0
+    currency: str = "eur"
+
+    # Everything that is not money: bits cheered, viewers raided, months
+    # subscribed, people signed up. One field because a counter only ever wants
+    # one number, and which number it is depends on the source.
+    quantity: int = 0
+
+    # What to put on screen. A display name they chose, never an email.
+    who: str = ""
+
+    # Their words, and NOT shown until somebody has read them. A stranger's
+    # text going straight onto a live stream is a hazard this site will not
+    # take, so the default is the safe one and approving is a deliberate act.
+    message: str = ""
+    message_approved: bool = Field(default=False)
+
+    # For the alert overlay: whether this has already been shown once.
+    announced: bool = Field(default=False, index=True)
+
+    occurred_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc),
+                                  sa_type=UTC_TS, index=True)
+
+
+class Counter(TimestampMixin, table=True):
+    """
+    A target, a unit, and the sources that fill it.
+
+    Deliberately not called a goal. "€300 for a microphone" and "20 people on
+    the December workshop" are the same object, and naming it after money would
+    have made the second one an afterthought — which is how the unit ends up
+    being a euro sign that sometimes says something else.
+
+    `sources` is a comma-separated list of `SupportEvent.source` values. She
+    chooses per counter, because during the move off Twitch she wants both her
+    own income and the platform's visible, sometimes together and sometimes
+    apart.
+    """
+
+    __tablename__ = "counter"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    slug: str = Field(index=True, unique=True)
+
+    # Her words. "A new microphone", not "Goal 1".
+    name: str = ""
+    note: str = ""
+
+    # "money" | "people" | "bits" — decides how the target is read and rendered.
+    unit: str = "money"
+    # Minor units when the unit is money; a plain count otherwise.
+    target: int = 0
+    currency: str = "eur"
+
+    sources: str = ""
+
+    # Optional window. Outside it, events do not count — which is what makes
+    # "this month" and "this campaign" possible without a new table.
+    starts_at: Optional[datetime] = Field(default=None, sa_type=UTC_TS)
+    ends_at: Optional[datetime] = Field(default=None, sa_type=UTC_TS)
+
+    visible: bool = Field(default=True)
+    position: int = Field(default=0)
+
+
+class OverlayToken(TimestampMixin, table=True):
+    """
+    An unguessable address for one overlay.
+
+    Anybody holding the URL can see the overlay, and she will have OBS settings
+    open on a stream sooner or later — so the token is revocable, and revoking
+    is a delete rather than a flag, because a revoked token that still works
+    for an hour is not revoked.
+
+    `motion` lives here rather than on the counter: it is a property of the
+    machine the overlay is displayed on, not of the thing being counted. She
+    streams from more than one.
+    """
+
+    __tablename__ = "overlay_token"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    token: str = Field(index=True, unique=True)
+
+    # "counter" | "alerts" | "ticker" | "sky" | "hours" | "countdown"
+    kind: str = Field(index=True)
+    label: str = ""
+
+    # Which counter this shows, where that means anything.
+    counter_id: Optional[int] = Field(default=None, foreign_key="counter.id")
+
+    # "full" | "reduced" | "still"
+    motion: str = "reduced"
+
+    last_seen: Optional[datetime] = Field(default=None, sa_type=UTC_TS)
+
+
 class GrowthItem(TimestampMixin, table=True):
     """
     Something to do, or something to build, kept where she will see it.
