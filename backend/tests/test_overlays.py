@@ -354,3 +354,82 @@ def test_the_web_variants_are_reachable() -> None:
     )
     assert "CounterCard" in used, "CounterCard is on no page"
     assert "SkyCard" in used, "SkyCard is on no page"
+
+
+def test_an_unassigned_alert_is_silent_with_no_fallback() -> None:
+    """
+    §7. A default sound she did not choose would play on her stream before she
+    had ever heard it, which is the one thing an alert must not do. Follows in
+    particular start silent and stay silent until she gives them something.
+    """
+    page = code_of(SRC / "pages" / "overlay" / "alerts.astro")
+    assert "if (!el) return;" in page, "there is no early return for a missing sound"
+    for beep in ("default.wav", "fallback", "beep.", "chime.mp3"):
+        assert beep not in page.lower(), f"a fallback sound ({beep}) is wired in"
+
+
+def test_sounds_are_preloaded_and_never_fetched_mid_stream() -> None:
+    """
+    §7: nothing may be fetched when an alert fires, and no request may leave
+    the machine mid-stream. Everything is loaded once, at connect.
+    """
+    page = code_of(SRC / "pages" / "overlay" / "alerts.astro")
+    assert "loadSounds()" in page
+    assert 'preload = "auto"' in page and ".load()" in page
+
+    # The play path touches the map and nothing else — no fetch, no new Audio.
+    ring = page.split("function ring(")[1].split("\n      }")[0]
+    for network in ("fetch(", "new Audio", "XMLHttpRequest"):
+        assert network not in ring, f"ring() reaches the network via {network}"
+
+
+def test_a_queued_alert_sounds_on_arrival() -> None:
+    """
+    §7: on arrival only. The sound is the signal that something happened; the
+    plate is how it is read. A gift queued behind three others should not have
+    its noise held back until its turn comes round — nor played twice.
+    """
+    page = code_of(SRC / "pages" / "overlay" / "alerts.astro")
+    poll = page.split("async function poll(")[1]
+    assert "ring(e.source)" in poll, "sound does not fire when the event arrives"
+
+    # Just pump's own body: the slice must stop at its closing brace, or it
+    # swallows ring()'s definition and the assertion is meaningless.
+    after = page.split("async function pump(")[1]
+    pump = after.split("\n      }")[0]
+    assert "ring(" not in pump, "the sound also fires when the plate is shown"
+
+
+def test_a_sound_url_is_resolved_and_never_assembled() -> None:
+    """
+    Where a file is served from depends on the backend its own row landed in.
+    A path built from the filename sends the overlay to a bucket the file has
+    never been in — a silent alert, found on a stream.
+    """
+    route = code_of(BACKEND / "api" / "routes" / "overlay.py")
+    body = route.split("@router.get('/sounds')")[1].split("@router.get")[0]
+    assert "public_url" in body
+    assert "/media/" not in body, "the URL is assembled by hand"
+
+
+def test_muting_unassigns_nothing() -> None:
+    """
+    She will want them back after the quiet stream. A mute that made her
+    reassign nine files is a mute nobody uses.
+    """
+    route = code_of(BACKEND / "api" / "routes" / "overlay.py")
+    body = route.split("async def set_mute(")[1].split("\n\n\n")[0]
+    assert "overlay.sound_muted" in body
+    assert "delete" not in body.lower(), "muting touches the assignments"
+
+
+def test_the_gain_only_turns_a_sound_down() -> None:
+    """
+    Boosting a file already at full scale clips it — and it would clip on the
+    stream rather than in the admin where she could hear it.
+    """
+    route = code_of(BACKEND / "api" / "routes" / "overlay.py")
+    assert "ge=-40, le=0" in route
+
+    page = code_of(SRC / "pages" / "overlay" / "alerts.astro")
+    assert "Math.min(1, Math.pow(10," in page, "volume can exceed unity"

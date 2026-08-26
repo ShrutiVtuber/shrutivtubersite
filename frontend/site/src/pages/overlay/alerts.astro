@@ -151,6 +151,53 @@ if (token) {
         pump();
       }
 
+      /* SOUND (§7).
+       *
+       * Everything is fetched once, here, and held. Nothing goes out to the
+       * network when an alert fires: a noise that has to be downloaded first
+       * plays late, and on a bad minute of network does not play at all.
+       *
+       * A kind with no file is SILENT. There is deliberately no fallback beep —
+       * a default sound she never chose would play on her stream before she had
+       * heard it, which is the one thing an alert must not do. Follows have no
+       * sound unless she gives them one.
+       */
+      const audio = new Map<string, HTMLAudioElement>();
+      let muted = false;
+
+      async function loadSounds() {
+        if (!token) return;
+        try {
+          const r = await fetch(`/api/overlay/sounds?t=${encodeURIComponent(token)}`);
+          if (!r.ok) return;
+          const d = await r.json();
+          muted = Boolean(d.muted);
+          for (const [kind, s] of Object.entries<any>(d.sounds ?? {})) {
+            const el = new Audio(s.url);
+            el.preload = "auto";
+            /* dB to linear. Attenuation only, so this can never exceed 1 and
+               the element can never be asked for gain it does not have. */
+            el.volume = Math.max(0, Math.min(1, Math.pow(10, (s.gainDb ?? 0) / 20)));
+            el.load();
+            audio.set(kind, el);
+          }
+        } catch {
+          /* No sound is a fine degradation; a silent overlay still works. */
+        }
+      }
+
+      function ring(source: string) {
+        if (muted) return;
+        const el = audio.get(source);
+        if (!el) return;                       // unassigned is silent
+        try {
+          /* Rewound rather than cloned: two gifts a second apart should
+             re-trigger one sound, not stack two copies of it. */
+          el.currentTime = 0;
+          void el.play();
+        } catch { /* an autoplay refusal must not break the queue */ }
+      }
+
       async function poll() {
         if (!token) return;
         try {
@@ -159,7 +206,13 @@ if (token) {
           for (const e of (await r.json()).events ?? []) {
             cursor = Math.max(cursor, e.id);
             const a = toAlert(e);
-            if (a) queue.push(a);
+            if (!a) continue;
+            queue.push(a);
+            /* On ARRIVAL, not on display (§7). The sound is the signal that
+               something happened; the plate is how it is read. A gift queued
+               behind three others should not have its noise held back until
+               its turn comes round. */
+            ring(e.source);
           }
           showWaiting();
           pump();
@@ -168,7 +221,7 @@ if (token) {
         }
       }
 
-      poll();
+      loadSounds().then(poll);
       setInterval(poll, 5000);
     </script>
   </body>

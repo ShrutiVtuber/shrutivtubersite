@@ -384,6 +384,51 @@ async def countdown(t: str, session: AsyncSession = Depends(get_session)) -> dic
     return payload
 
 
+@router.get("/sounds")
+async def sounds(t: str, session: AsyncSession = Depends(get_session)) -> dict:
+    """
+    Every sound this overlay might need, all at once, at connect time.
+
+    The handoff is unambiguous (§7): nothing may be fetched when an alert
+    fires, and no request may leave the machine mid-stream. So the page gets
+    the whole set on load and preloads it — an alert that has to go and get its
+    noise plays it late, or during a bad minute of network, not at all.
+
+    Kinds with no row are simply absent. There is no fallback beep: a default
+    sound she did not choose would play on her stream without her having heard
+    it first.
+    """
+    await _overlay(t, session)
+    from shruti.core.storage import public_url
+    from shruti.models import AlertSound, Media
+
+    rows = (await session.execute(select(AlertSound))).scalars().all()
+    names = [r.filename for r in rows if r.filename]
+
+    # Resolved through the media row's OWN backend, never assembled by hand:
+    # a file uploaded before R2 was switched on is still on disk, and guessing
+    # the path from current settings sends the overlay to a bucket the file has
+    # never been in — a silent alert, discovered on a stream.
+    media = {} if not names else {
+        m.filename: public_url(m.filename, m.storage_backend)
+        for m in (await session.execute(
+            select(Media).where(Media.filename.in_(names))
+        )).scalars().all()
+    }
+
+    muted = (await settings_store.get_many(
+        session, ("overlay.sound_muted",)
+    )).get("overlay.sound_muted", "0") == "1"
+
+    return {
+        "muted": muted,
+        "sounds": {
+            r.kind: {"url": media[r.filename], "gainDb": r.gain_db}
+            for r in rows if r.filename and r.filename in media
+        },
+    }
+
+
 # ── the admin side ──────────────────────────────────────────────────────────
 #
 # Separated from everything above by more than a comment: nothing above needs a
@@ -533,3 +578,85 @@ async def revoke_overlay(
     if row is not None:
         await session.delete(row)
         await session.commit()
+
+
+class SoundIn(BaseModel):
+    kind: str
+    filename: str = ""
+    # Attenuation only. Boosting a file that is already at full scale clips
+    # it, and it would clip on her stream rather than in the admin where she
+    # could hear it — the honest fix for a quiet sound is to normalise the file
+    # before uploading it.
+    gain_db: float = Field(default=0.0, ge=-40, le=0)
+
+
+@router.get("/admin/sounds")
+async def admin_sounds(
+    session: AsyncSession = Depends(get_session),
+    _: str = Depends(require_admin),
+) -> dict:
+    from shruti.models import AlertSound
+
+    rows = (await session.execute(select(AlertSound))).scalars().all()
+    muted = (await settings_store.get_many(
+        session, ("overlay.sound_muted",)
+    )).get("overlay.sound_muted", "0") == "1"
+    return {
+        "muted": muted,
+        "sounds": {r.kind: {"filename": r.filename, "gainDb": r.gain_db}
+                   for r in rows},
+    }
+
+
+@router.put("/admin/sounds")
+async def set_sound(
+    body: SoundIn,
+    session: AsyncSession = Depends(get_session),
+    _: str = Depends(require_admin),
+) -> dict:
+    """
+    Assign a sound to one kind, or clear it.
+
+    An empty filename deletes the row rather than storing a blank one, so
+    "silent" has exactly one representation — no row — and nothing downstream
+    has to know that "" and absent mean the same thing.
+    """
+    from shruti.models import AlertSound
+
+    if body.kind not in counters.SOURCES:
+        raise HTTPException(422, f"unknown alert kind: {body.kind}")
+
+    row = (await session.execute(
+        select(AlertSound).where(AlertSound.kind == body.kind)
+    )).scalar_one_or_none()
+
+    name = body.filename.strip()
+    if not name:
+        if row is not None:
+            await session.delete(row)
+            await session.commit()
+        return {"kind": body.kind, "filename": "", "gainDb": 0.0}
+
+    if row is None:
+        row = AlertSound(kind=body.kind)
+        session.add(row)
+    row.filename = name
+    row.gain_db = body.gain_db
+    await session.commit()
+    return {"kind": row.kind, "filename": row.filename, "gainDb": row.gain_db}
+
+
+@router.put("/admin/sounds/mute")
+async def set_mute(
+    on: bool,
+    session: AsyncSession = Depends(get_session),
+    _: str = Depends(require_admin),
+) -> dict:
+    """
+    One switch that silences everything, without unassigning anything.
+
+    Which is the point: she is going to want the sounds back after the quiet
+    stream, and a mute that made her reassign nine files is a mute nobody uses.
+    """
+    await settings_store.put_many(session, {"overlay.sound_muted": "1" if on else "0"})
+    return {"muted": on}

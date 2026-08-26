@@ -81,6 +81,43 @@ if (Astro.request.method === "POST") {
       } else {
         failed = r.body?.detail ?? "That could not be made.";
       }
+    } else if (action === "upload-sound") {
+      const f = form.get("sound");
+      if (f instanceof File && f.size > 0) {
+        const body = new FormData();
+        body.append("file", f);
+        body.append("title", String(form.get("sound_title") ?? "") || f.name);
+        const r = await asAdmin(Astro, "/api/admin/sounds", { method: "POST", body });
+        if (r.ok) {
+          notice = `Uploaded. Assign it to an alert below.`;
+        } else {
+          failed = r.body?.detail ?? "That file could not be uploaded.";
+        }
+      } else {
+        failed = "Choose a WAV or OGG file first.";
+      }
+    } else if (action === "assign-sound") {
+      const r = await asAdmin(Astro, "/api/overlay/admin/sounds", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          kind: String(form.get("kind") ?? ""),
+          filename: String(form.get("filename") ?? ""),
+          gain_db: Number(form.get("gain_db") ?? 0),
+        }),
+      });
+      notice = r.ok
+        ? (form.get("filename") ? "Assigned." : "Silenced. That alert makes no sound.")
+        : "";
+      if (!r.ok) failed = r.body?.detail ?? "That could not be saved.";
+    } else if (action === "mute") {
+      const on = form.get("on") === "1";
+      const r = await asAdmin(Astro, `/api/overlay/admin/sounds/mute?on=${on}`, { method: "PUT" });
+      notice = r.ok
+        ? (on ? "Muted. Nothing is unassigned — flip it back when you want them."
+              : "Sound on.")
+        : "";
+      if (!r.ok) failed = "That could not be saved.";
     } else if (action === "ticker-line") {
       const r = await asAdmin(Astro, "/api/admin/settings", {
         method: "PUT",
@@ -101,6 +138,13 @@ if (Astro.request.method === "POST") {
 const counters = (await asAdmin(Astro, "/api/overlay/admin/counters")).body ?? [];
 const tickerLine = (await asAdmin(Astro, "/api/admin/settings?prefix=overlay."))
   .body?.["overlay.ticker_standing"] ?? "";
+
+const soundState = (await asAdmin(Astro, "/api/overlay/admin/sounds")).body
+  ?? { muted: false, sounds: {} };
+/* Everything already uploaded as an alert sound, so assigning is a pick from a
+   list rather than typing a hash by hand. */
+const soundFiles = ((await asAdmin(Astro, "/api/admin/media?tag=alert-sound")).body ?? [])
+  .filter((m: any) => String(m.mimeType ?? "").startsWith("audio/"));
 const overlays = (await asAdmin(Astro, "/api/overlay/admin/overlays")).body ?? [];
 
 const SYMBOL: Record<string, string> = { eur: "€", gbp: "£", usd: "$" };
@@ -203,6 +247,96 @@ const nameOf = (id: number | null) =>
     </section>
 
     <section class="block">
+      <h2>Sound</h2>
+      <p class="fine">
+        Your own files, one per alert. An alert with nothing assigned is
+        <strong>silent</strong> — there is no default beep, because a sound you
+        have not heard should never play on your stream. Follows are silent
+        until you give them something.
+      </p>
+      <p class="fine">
+        WAV or OGG, up to 512 KB each. They are loaded into the overlay when it
+        connects and held there, so nothing is fetched mid-stream.
+      </p>
+
+      <form method="post" enctype="multipart/form-data" class="stack">
+        <CsrfField />
+        <input type="hidden" name="action" value="upload-sound" />
+        <label><span>Add a sound</span>
+          <input type="file" name="sound" accept=".wav,.ogg,audio/wav,audio/ogg" /></label>
+        <label><span>Call it</span>
+          <input name="sound_title" maxlength="80" placeholder="Little bell" /></label>
+        <button class="btn">Upload</button>
+      </form>
+
+      <form method="post" class="mute-row">
+        <CsrfField />
+        <input type="hidden" name="action" value="mute" />
+        <input type="hidden" name="on" value={soundState.muted ? "0" : "1"} />
+        <button class="btn ghost">
+          {soundState.muted ? "Un-mute everything" : "Mute everything"}
+        </button>
+        <span class="fine">
+          {soundState.muted
+            ? "Everything is silent. Nothing has been unassigned."
+            : "Silences every alert without unassigning anything."}
+        </span>
+      </form>
+
+      {soundFiles.length === 0 ? (
+        <p class="fine">Nothing uploaded yet, so every alert is silent.</p>
+      ) : (
+        <table class="rows">
+          <thead><tr><th>Alert</th><th>Sound</th><th>Level</th><th></th></tr></thead>
+          <tbody>
+            {SOURCES.map(([key, label]) => {
+              const cur = soundState.sounds?.[key] ?? { filename: "", gainDb: 0 };
+              return (
+                <tr>
+                  <td>{label}</td>
+                  <td colspan="3">
+                    <form method="post" class="assign">
+                      <CsrfField />
+                      <input type="hidden" name="action" value="assign-sound" />
+                      <input type="hidden" name="kind" value={key} />
+                      <select name="filename">
+                        <option value="" selected={!cur.filename}>Silent</option>
+                        {soundFiles.map((m: any) => (
+                          <option value={m.filename} selected={cur.filename === m.filename}>
+                            {m.title || m.filename}
+                          </option>
+                        ))}
+                      </select>
+                      <label class="gain">
+                        <span class="fine">dB</span>
+                        <input type="number" name="gain_db" value={cur.gainDb ?? 0}
+                               min="-40" max="0" step="1" />
+                      </label>
+                      <button class="btn ghost small">Save</button>
+                      {cur.filename && (
+                        /* The row's own URL, never a path built from the
+                           filename — where a file is served from depends on
+                           which backend it landed in. */
+                        <audio controls preload="none"
+                               src={soundFiles.find((m: any) => m.filename === cur.filename)?.url}
+                        ></audio>
+                      )}
+                    </form>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      )}
+      <p class="fine">
+        The level only turns a sound <em>down</em>. If one is too quiet,
+        normalise the file before uploading — turning it up here would clip it
+        on the stream rather than in this page, where you could hear it.
+      </p>
+    </section>
+
+    <section class="block">
       <h2>What the ticker says before anyone has given</h2>
       <p class="fine">
         The supporters row runs along the bottom of the stream for the whole
@@ -212,7 +346,7 @@ const nameOf = (id: number | null) =>
         row still earns its space on the first day of a campaign.
       </p>
       <form method="post" class="stack">
-        <input type="hidden" name="_csrf" value={csrf} />
+        <CsrfField />
         <input type="hidden" name="action" value="ticker-line" />
         <label><span>Your standing line</span>
           <input name="standing" value={tickerLine} maxlength="120"

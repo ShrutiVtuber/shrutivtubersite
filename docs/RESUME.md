@@ -43,9 +43,8 @@ reconciliation with the schema at `docs/design/OVERLAYS_DELTAS.md`.
 
 Six surfaces specified. **Counter bar, alerts, sky chart and hours strip are
 done — all six OBS surfaces are built, and both web variants are on the
-site.** Next:
-
-1. **Sound upload** (handoff §7) — counter bar and sky chart on the site itself,
+site, and sound is done.** The overlay set from the handoff is complete.
+Next: — counter bar and sky chart on the site itself,
    themed and responsive rather than transparent and fixed
 4. Sound upload (§7): per-type file, per-type gain, global mute, served from
    her own origin and preloaded on connect

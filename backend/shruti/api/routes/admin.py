@@ -61,6 +61,15 @@ ALLOWED_IMAGE = {
     "image/webp": ".webp", "image/avif": ".avif", "image/svg+xml": ".svg",
 }
 
+# Alert sounds. WAV and OGG only, and small: every one of these is preloaded
+# into the overlay on connect, so the total is what her streaming machine holds
+# in memory for the whole session, not what it fetches when something happens.
+ALLOWED_AUDIO = {
+    "audio/wav": ".wav", "audio/x-wav": ".wav", "audio/wave": ".wav",
+    "audio/ogg": ".ogg", "application/ogg": ".ogg",
+}
+MAX_SOUND_BYTES = 512 * 1024
+
 
 # ── session ─────────────────────────────────────────────────────────────────
 
@@ -151,6 +160,58 @@ def _clean_tags(raw: str) -> str:
             out.append(tag)
     return ",".join(out)
 
+
+
+@router.post("/sounds", status_code=201)
+async def upload_sound(
+    file: UploadFile = File(...),
+    title: str = Form(""),
+    session: AsyncSession = Depends(get_session),
+    _: str = Depends(require_admin),
+) -> dict:
+    """
+    Upload one alert sound.
+
+    The same store as the images, on purpose — one uploader, one hash-named
+    file, one place things live. What differs is the allow-list and the
+    ceiling: WAV or OGG at 512 KB, because these are held in memory on her
+    streaming machine for the whole session rather than fetched when needed.
+
+    Uploading does not assign it to anything. Choosing which noise belongs to a
+    gift is a separate decision from having the file, and merging the two would
+    mean an upload could start playing on her stream before she had heard it.
+    """
+    if file.content_type not in ALLOWED_AUDIO:
+        raise HTTPException(
+            415, f"unsupported type {file.content_type!r}; "
+                 f"allowed: WAV or OGG"
+        )
+
+    data = await file.read()
+    if len(data) > MAX_SOUND_BYTES:
+        raise HTTPException(413, "the file is larger than 512 KB")
+    if not data:
+        raise HTTPException(422, "the file is empty")
+
+    digest = hashlib.sha256(data).hexdigest()[:32]
+    filename = f"{digest}{ALLOWED_AUDIO[file.content_type]}"
+
+    existing = (await session.execute(
+        select(Media).where(Media.filename == filename)
+    )).scalars().first()
+    if existing:
+        return _media_payload(existing) | {"deduped": True}
+
+    from shruti.core.storage import put as store_media
+
+    stored = await store_media(filename, data, file.content_type)
+    row = Media(filename=filename, mime_type=file.content_type,
+                size_bytes=len(data), storage_backend=stored.backend,
+                title=title.strip(), tags="alert-sound")
+    session.add(row)
+    await session.commit()
+    await session.refresh(row)
+    return _media_payload(row)
 
 
 @router.post("/media", status_code=201)

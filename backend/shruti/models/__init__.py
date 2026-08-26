@@ -494,6 +494,40 @@ class OverlayToken(TimestampMixin, table=True):
     last_seen: Optional[datetime] = Field(default=None, sa_type=UTC_TS)
 
 
+class AlertSound(TimestampMixin, table=True):
+    """
+    One sound, assigned to one kind of alert.
+
+    Hers, uploaded through the admin — not a library of stock chimes. The row
+    exists per kind rather than a single "sounds on" flag because the useful
+    version of this is a different noise for a gift than for a follow, and a
+    design that only allows one is a design she stops using.
+
+    **An unassigned kind is SILENT.** There is deliberately no fallback beep:
+    a default sound she did not choose is a sound that plays on her stream
+    without her having heard it first, which is the one thing an alert must
+    never do.
+
+    `gain_db` rather than a 0–1 volume because that is the unit the rest of her
+    audio chain speaks, and because a linear volume slider spends most of its
+    travel on the part nobody can hear.
+    """
+
+    __tablename__ = "alert_sound"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+
+    # The alert source it belongs to: "stripe.support", "twitch.gift", and so
+    # on — the same keys SupportEvent.source uses, so nothing has to translate.
+    kind: str = Field(index=True, unique=True)
+
+    # The Media row's filename. A hash, so the same upload is stored once and
+    # the URL never changes.
+    filename: str = ""
+
+    gain_db: float = 0.0
+
+
 class GrowthItem(TimestampMixin, table=True):
     """
     Something to do, or something to build, kept where she will see it.
