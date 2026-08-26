@@ -81,6 +81,16 @@ if (Astro.request.method === "POST") {
       } else {
         failed = r.body?.detail ?? "That could not be made.";
       }
+    } else if (action === "ticker-line") {
+      const r = await asAdmin(Astro, "/api/admin/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          values: { "overlay.ticker_standing": String(form.get("standing") ?? "").trim() },
+        }),
+      });
+      notice = r.ok ? "Saved. The ticker picks it up within a few minutes." : "";
+      if (!r.ok) failed = "That could not be saved.";
     } else if (action === "revoke") {
       await asAdmin(Astro, `/api/overlay/admin/overlays/${form.get("id")}`, { method: "DELETE" });
       notice = "Revoked. That address stops working immediately.";
@@ -89,6 +99,8 @@ if (Astro.request.method === "POST") {
 }
 
 const counters = (await asAdmin(Astro, "/api/overlay/admin/counters")).body ?? [];
+const tickerLine = (await asAdmin(Astro, "/api/admin/settings?prefix=overlay."))
+  .body?.["overlay.ticker_standing"] ?? "";
 const overlays = (await asAdmin(Astro, "/api/overlay/admin/overlays")).body ?? [];
 
 const SYMBOL: Record<string, string> = { eur: "€", gbp: "£", usd: "$" };
@@ -191,6 +203,26 @@ const nameOf = (id: number | null) =>
     </section>
 
     <section class="block">
+      <h2>What the ticker says before anyone has given</h2>
+      <p class="fine">
+        The supporters row runs along the bottom of the stream for the whole
+        session. Before there is a name to put in it, it does <strong>not</strong>
+        say "no supporters yet" — that tells the room nobody has given, at the
+        moment it is most expensive to say. It carries this line instead, so the
+        row still earns its space on the first day of a campaign.
+      </p>
+      <form method="post" class="stack">
+        <input type="hidden" name="_csrf" value={csrf} />
+        <input type="hidden" name="action" value="ticker-line" />
+        <label><span>Your standing line</span>
+          <input name="standing" value={tickerLine} maxlength="120"
+                 placeholder="Support goes straight into the tools and the time." /></label>
+        <p class="fine">One line. It is truncated at the plate edge, not wrapped.</p>
+        <button class="btn">Save</button>
+      </form>
+    </section>
+
+    <section class="block">
       <h2>Overlays</h2>
       <p class="fine">
         Each is a separate Browser Source at <strong>1920 × 1080</strong>. Add
@@ -236,6 +268,8 @@ const nameOf = (id: number | null) =>
             <option value="alerts">Alerts</option>
             <option value="sky">Sky chart</option>
             <option value="hours">Planetary hours</option>
+            <option value="ticker">Supporters ticker</option>
+            <option value="countdown">Countdown</option>
           </select></label>
         <label><span>Size</span>
           <select name="size">

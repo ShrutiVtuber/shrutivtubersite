@@ -38,6 +38,40 @@ def _src() -> Path:
 
 SRC = _src()
 
+# The routes and the pages have to agree, so the tests read both.
+BACKEND = Path(__file__).resolve().parents[1] / "shruti"
+
+
+def code_of(path: Path) -> str:
+    """
+    A file's source with its prose removed.
+
+    Written because this exact trap has now cost several rounds: a test asserts
+    a page never says "no supporters yet", and the page's own comment explaining
+    WHY it never says that trips the assertion. Rewording the comment to dodge
+    the grep would delete the explanation to protect the test — precisely
+    backwards. So the tests read code, and the comments are free to say
+    anything they need to.
+    """
+    text = path.read_text(encoding="utf-8")
+
+    if path.suffix == ".py":
+        tree = ast.parse(text)
+        for node in ast.walk(tree):
+            if isinstance(node, (ast.Module, ast.FunctionDef, ast.AsyncFunctionDef,
+                                 ast.ClassDef)) and ast.get_docstring(node):
+                node.body = node.body[1:]
+        # unparse drops comments too, which is the other half of the job.
+        return ast.unparse(tree)
+
+    # Astro/TS: block comments, JSX comments, and line comments that are not
+    # part of a URL.
+    text = re.sub(r"\{/\*.*?\*/\}", "", text, flags=re.S)
+    text = re.sub(r"/\*.*?\*/", "", text, flags=re.S)
+    text = re.sub(r"(?<![:/])//[^\n]*", "", text)
+    return text
+
+
 
 def test_obs_can_reach_an_overlay_without_a_session() -> None:
     """
@@ -177,3 +211,78 @@ def test_drift_is_reported_rather_than_animated() -> None:
     """
     page = (SRC / "pages" / "overlay" / "sky.astro").read_text(encoding="utf-8")
     assert "drift(" in page and "/ h" in page
+
+
+def test_the_ticker_never_advertises_that_nobody_has_given() -> None:
+    """
+    Handoff §8. The row runs along the bottom for the whole session, so on the
+    first day of a campaign an empty state that says "no supporters yet" tells
+    the room nobody has given, at exactly the moment that costs the most. Her
+    standing line takes the space instead.
+    """
+    page = code_of(SRC / "pages" / "overlay" / "ticker.astro")
+    assert "no supporters" not in page.lower()
+    assert "standing" in page
+
+
+def test_the_standing_line_is_hers_and_lives_in_one_place() -> None:
+    """
+    A sentence baked into the page would be a second place to maintain her
+    words — the thing she asked never to have to do again.
+    """
+    route = (BACKEND / "api" / "routes" / "overlay.py").read_text(encoding="utf-8")
+    assert "overlay.ticker_standing" in route
+    admin = (SRC / "pages" / "admin" / "counters.astro").read_text(encoding="utf-8")
+    assert "overlay.ticker_standing" in admin, "she cannot edit it"
+
+
+def test_the_ticker_shows_no_amounts() -> None:
+    """
+    Names only. Figures beside names turn everyone who gave a little into a
+    small number displayed next to a bigger one, for the whole stream — the
+    counter bar carries the total, which is the number that means anything.
+    """
+    route = code_of(BACKEND / "api" / "routes" / "overlay.py")
+    body = route.split("@router.get('/ticker')")[1].split("@router.get")[0]
+    assert "amount_minor" not in body, "the ticker payload carries amounts"
+
+    page = (SRC / "pages" / "overlay" / "ticker.astro").read_text(encoding="utf-8")
+    assert "amountMinor" not in page
+
+
+def test_the_countdown_sends_two_instants_not_a_remaining_count() -> None:
+    """
+    Her streaming PC's clock and the server's disagree. A remaining-seconds
+    figure computed here and ticked down there compounds that for the length of
+    a stream; two instants let the page correct the offset once, at load.
+    """
+    route = code_of(BACKEND / "api" / "routes" / "overlay.py")
+    body = route.split("@router.get('/countdown')")[1].split("@router.get")[0]
+    # unparse normalises quotes, so the key is matched without them.
+    assert "'now'" in body and "endsAt" in body
+    for guess in ("remaining", "seconds_left", "secondsLeft"):
+        assert guess not in body, "the server is counting down for the client"
+
+    page = (SRC / "pages" / "overlay" / "countdown.astro").read_text(encoding="utf-8")
+    assert "offset" in page and "data-now" in page
+
+
+def test_a_closed_window_says_so_rather_than_counting_backwards() -> None:
+    page = (SRC / "pages" / "overlay" / "countdown.astro").read_text(encoding="utf-8")
+    assert "Window closed" in page
+    assert "left <= 0" in page, "nothing stops the face going negative"
+
+
+def test_neither_surface_repaints_when_it_is_not_in_the_scene() -> None:
+    """
+    An idle overlay composes no frames (§11). The countdown is the one place a
+    per-second repaint is honest — and only while a seconds digit is on the
+    face.
+    """
+    cd = (SRC / "pages" / "overlay" / "countdown.astro").read_text(encoding="utf-8")
+    assert "visibilitychange" in cd and "clearInterval" in cd
+    assert "30000" in cd, "it ticks per second even when showing days"
+
+    tick = (SRC / "pages" / "overlay" / "ticker.astro").read_text(encoding="utf-8")
+    assert "setInterval" in tick and "4 * 60 * 1000" in tick, (
+        "a row of words must not poll faster than names arrive")

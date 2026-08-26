@@ -1,0 +1,194 @@
+---
+/* The countdown — surface 6.
+ *
+ * How long the window has left. The one place in this set where a per-second
+ * repaint is honest, because a second genuinely is the unit being shown.
+ *
+ * The clock correction is the whole trick: the server sends its own instant
+ * alongside the deadline, never a remaining count. Her streaming PC's clock
+ * and the server's disagree by some seconds, and a remaining-seconds figure
+ * computed there and then ticked down here compounds that error for the length
+ * of a stream. Two instants let the page measure the offset once, at load, and
+ * be right for the rest of the session.
+ */
+import "../../styles/global.css";
+import "../../styles/overlay.css";
+import { SITE_API } from "../../lib/api";
+
+export const prerender = false;
+
+const token = Astro.url.searchParams.get("t") ?? "";
+
+let data: any = null;
+let unreachable = false;
+if (token) {
+  try {
+    const r = await fetch(`${SITE_API}/api/overlay/countdown?t=${encodeURIComponent(token)}`);
+    if (r.ok) data = await r.json();
+  } catch {
+    unreachable = true;
+  }
+}
+
+const motion = data?.motion ?? "reduced";
+const skin = data?.appearance ?? "almanac";
+const counter = data?.counter ?? null;
+const endsAt = counter?.endsAt ?? "";
+const serverNow = data?.now ?? "";
+
+/* Rendered server-side too, so the surface is correct in the first frame OBS
+   composites rather than showing dashes until the script runs. */
+function parts(ms: number) {
+  const s = Math.max(0, Math.floor(ms / 1000));
+  return {
+    days: Math.floor(s / 86400),
+    hours: Math.floor((s % 86400) / 3600),
+    mins: Math.floor((s % 3600) / 60),
+    secs: s % 60,
+  };
+}
+const initial = endsAt && serverNow
+  ? parts(new Date(endsAt).getTime() - new Date(serverNow).getTime())
+  : null;
+const closed = initial !== null &&
+  new Date(endsAt).getTime() <= new Date(serverNow).getTime();
+const pad = (n: number) => String(n).padStart(2, "0");
+---
+
+<html lang="en">
+  <head><meta charset="utf-8" /><title>countdown</title>
+    <meta name="robots" content="noindex, nofollow" /></head>
+  <body>
+    <div class="ov ov-countdown" data-skin={skin} data-motion={motion}>
+      <div class="ov-plate box" data-ends={endsAt || undefined} data-now={serverNow || undefined}>
+        {!counter ? (
+          <>
+            <span class="ov-eyebrow">Countdown</span>
+            {/* The same words whether the token is missing, the backend is
+                unreachable, or no counter is picked — because from where she is
+                sitting they are the same situation, and three different
+                sentences would only make her guess which one she is in. */}
+            <p class="say">Overlay connected · pick a counter in the admin.</p>
+          </>
+        ) : !endsAt ? (
+          /* A counter with no deadline is not an error and not a zero. It is a
+             thing with no closing date, and the surface says which. */
+          <>
+            <span class="ov-eyebrow ov-oneline">{counter.name}</span>
+            <p class="say">Open · no closing date</p>
+          </>
+        ) : closed ? (
+          /* A closed window says so. It does not count upward into negatives. */
+          <>
+            <span class="ov-eyebrow ov-oneline">{counter.name}</span>
+            <p class="say closed">Window closed</p>
+          </>
+        ) : (
+          <>
+            <span class="ov-eyebrow ov-oneline">{counter.name}</span>
+            <p class="clock ov-fig" data-clock>
+              {initial!.days > 0
+                ? `${initial!.days}d ${pad(initial!.hours)}:${pad(initial!.mins)}`
+                : `${pad(initial!.hours)}:${pad(initial!.mins)}:${pad(initial!.secs)}`}
+            </p>
+            <span class="tail">{initial!.days > 0 ? "days · hrs · min" : "hrs · min · sec"}</span>
+          </>
+        )}
+      </div>
+    </div>
+
+    <script>
+      const box = document.querySelector<HTMLElement>(".box");
+      const out = document.querySelector<HTMLElement>("[data-clock]");
+      const tail = document.querySelector<HTMLElement>(".tail");
+      const endsAt = box?.dataset.ends ? Date.parse(box.dataset.ends) : NaN;
+      const serverNow = box?.dataset.now ? Date.parse(box.dataset.now) : NaN;
+
+      /* Measured once. Every reading afterwards is the local clock plus this,
+         so the page and the server never drift apart mid-stream. */
+      const offset = Number.isFinite(serverNow) ? serverNow - Date.now() : 0;
+      const pad = (n: number) => String(n).padStart(2, "0");
+
+      let timer: number | undefined;
+
+      function paint() {
+        if (!out || !Number.isFinite(endsAt)) return;
+        const left = endsAt - (Date.now() + offset);
+        if (left <= 0) {
+          out.textContent = "Window closed";
+          out.classList.add("closed");
+          if (tail) tail.textContent = "";
+          stop();
+          return;
+        }
+        const s = Math.floor(left / 1000);
+        const d = Math.floor(s / 86400);
+        const h = Math.floor((s % 86400) / 3600);
+        const m = Math.floor((s % 3600) / 60);
+        const text = d > 0
+          ? `${d}d ${pad(h)}:${pad(m)}`
+          : `${pad(h)}:${pad(m)}:${pad(s % 60)}`;
+        /* Only when it actually changed. Writing the same string every second
+           is a repaint the encoder pays for and nobody can see. */
+        if (out.textContent !== text) out.textContent = text;
+        if (tail) {
+          const word = d > 0 ? "days · hrs · min" : "hrs · min · sec";
+          if (tail.textContent !== word) tail.textContent = word;
+        }
+        /* Past a day there is no seconds digit on the face, so there is
+           nothing to repaint every second and the interval slows to match
+           what is actually shown. */
+        retime(d > 0 ? 30000 : 1000);
+      }
+
+      let period = 0;
+      function retime(ms: number) {
+        if (period === ms) return;
+        period = ms;
+        if (timer) clearInterval(timer);
+        timer = window.setInterval(paint, ms);
+      }
+      function stop() {
+        if (timer) { clearInterval(timer); timer = undefined; }
+        period = 0;
+      }
+
+      /* An overlay that is not in the scene composes no frames. */
+      document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "visible") paint(); else stop();
+      });
+      if (Number.isFinite(endsAt)) paint();
+
+      /* Picks up a deadline she moves in the admin without touching OBS. */
+      setInterval(() => window.location.reload(), 10 * 60 * 1000);
+    </script>
+  </body>
+</html>
+
+<style>
+  /* Handoff §4: 340 wide, auto height, right 64, top 64. */
+  .ov-countdown .box {
+    position: absolute; right: 64px; top: 64px; width: 340px;
+    padding: 14px 18px 16px; display: grid; gap: 2px;
+  }
+
+  .clock {
+    margin: 0;
+    font-size: 40px; font-weight: 600; line-height: 1.05;
+    color: var(--dusk-ink);
+    /* Tabular already, from .ov-fig — this stops the colons breathing as the
+       digits either side of them change width class. */
+    font-feature-settings: "tnum" 1;
+  }
+  /* Full cross-fades the face on change (§11); Reduced and Still swap it
+     outright. 120ms, so a digit is never mid-fade when the next one lands. */
+  .ov[data-motion="full"] .clock { transition: opacity 120ms ease; }
+
+  .tail {
+    font: 400 10px var(--font-mono); letter-spacing: .1em;
+    color: var(--dusk-ink-faint); text-transform: uppercase;
+  }
+
+  .say { margin: 2px 0 0; font: 400 15px var(--font-display); color: var(--dusk-ink-soft); }
+  .closed { color: var(--dusk-rose); font-size: 22px; font-weight: 500; }
+</style>

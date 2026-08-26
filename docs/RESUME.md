@@ -32,6 +32,7 @@ against Germany by mistake and is marked not-applicable in
 | Counters + counter overlay | `/admin/counters`, `/overlay/counter` |
 | Alerts overlay — nine members, one queue | `/overlay/alerts` |
 | Sky chart + hours strip | `/overlay/sky`, `/overlay/hours` |
+| Ticker + countdown | `/overlay/ticker`, `/overlay/countdown` |
 | Guard: every sitemap page must be linked | `test_every_page_is_reachable.py` |
 
 ## In flight
@@ -40,10 +41,9 @@ against Germany by mistake and is marked not-applicable in
 reconciliation with the schema at `docs/design/OVERLAYS_DELTAS.md`.
 
 Six surfaces specified. **Counter bar, alerts, sky chart and hours strip are
-done.** Next:
+done — all six OBS surfaces are built.** Next:
 
-1. **Ticker and countdown** — the two remaining OBS surfaces
-2. **The two web variants** — counter bar and sky chart on the site itself,
+1. **The two web variants** — counter bar and sky chart on the site itself,
    themed and responsive rather than transparent and fixed
 4. Sound upload (§7): per-type file, per-type gain, global mute, served from
    her own origin and preloaded on connect

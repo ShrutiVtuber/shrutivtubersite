@@ -24,7 +24,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
-from shruti.core import counters
+from shruti.core import counters, settings_store
 from shruti.core.db import get_session
 from shruti.models import Counter, OverlayToken
 
@@ -291,6 +291,108 @@ class CounterIn(BaseModel):
     target: int = Field(default=0, ge=0)
     currency: str = Field(default="eur", max_length=3)
     sources: list[str] = Field(default_factory=list)
+
+
+@router.get("/ticker")
+async def ticker(t: str, limit: int = 18,
+                 session: AsyncSession = Depends(get_session)) -> dict:
+    """
+    Who has supported, most recent first — a row of names, and nothing else.
+
+    Amounts are deliberately absent. The ticker runs along the bottom of the
+    stream for the whole session; a row of figures turns everyone who gave a
+    little into a small number displayed beside a bigger one, permanently. The
+    counter bar carries the total, which is the number that means anything.
+
+    When there is nothing yet, the row does NOT say "no supporters yet" — an
+    empty state that advertises emptiness is worse than no row at all. It
+    carries her standing line instead (§8), so the space still earns itself at
+    the start of a campaign. The line is hers, out of settings, because a
+    sentence baked in here would be a second place to maintain her words.
+    """
+    row = await _overlay(t, session)
+    from shruti.models import SupportEvent
+
+    q = select(SupportEvent).order_by(SupportEvent.occurred_at.desc())
+
+    # Scoped to the counter when the overlay has one, so a ticker beside a
+    # campaign bar shows that campaign's supporters rather than all traffic.
+    counter_row = (
+        await session.get(Counter, row.counter_id) if row.counter_id else None
+    )
+    if counter_row is not None:
+        sources = [x for x in (counter_row.sources or "").split(",") if x]
+        if sources:
+            q = q.where(SupportEvent.source.in_(sources))
+        if counter_row.starts_at:
+            q = q.where(SupportEvent.occurred_at >= counter_row.starts_at)
+        if counter_row.ends_at:
+            q = q.where(SupportEvent.occurred_at < counter_row.ends_at)
+
+    rows = (await session.execute(q.limit(max(1, min(limit, 60))))).scalars().all()
+
+    seen: set[str] = set()
+    names: list[dict] = []
+    for e in rows:
+        who = (e.who or "").strip()
+        # Anonymous is a state the design draws in italic, not a name to
+        # deduplicate — five anonymous gifts are five supporters.
+        anon = not who
+        key = who.casefold() if who else f"anon-{e.id}"
+        if key in seen:
+            continue
+        seen.add(key)
+        names.append({"who": who or "Anonymous", "anonymous": anon,
+                      "source": e.source})
+
+    standing = (await settings_store.get_many(
+        session, ("overlay.ticker_standing",)
+    )).get("overlay.ticker_standing", "").strip()
+
+    return {
+        "motion": row.motion,
+        "appearance": row.appearance or "almanac",
+        "names": names,
+        "standing": standing,
+        "label": counter_row.name if counter_row is not None else "",
+    }
+
+
+@router.get("/countdown")
+async def countdown(t: str, session: AsyncSession = Depends(get_session)) -> dict:
+    """
+    How long the window has left.
+
+    The server sends the deadline and its own clock, never a remaining count.
+    Her streaming PC's clock and this one disagree by some seconds, and a
+    remaining-seconds figure computed here and then ticked down there compounds
+    that drift for the whole stream. Sending both instants lets the page
+    correct for the offset once, at load, and be right afterwards.
+
+    A window that has closed is a real state and says so; it does not count
+    upward into negative numbers.
+    """
+    row = await _overlay(t, session)
+    payload: dict = {
+        "motion": row.motion,
+        "appearance": row.appearance or "almanac",
+        "now": datetime.now(timezone.utc).isoformat(),
+        "counter": None,
+    }
+    if row.counter_id is None:
+        return payload
+
+    c = await session.get(Counter, row.counter_id)
+    if c is None or not c.visible:
+        return payload
+
+    payload["counter"] = {
+        "name": c.name,
+        "note": c.note,
+        "endsAt": c.ends_at.isoformat() if c.ends_at else None,
+        "startsAt": c.starts_at.isoformat() if c.starts_at else None,
+    }
+    return payload
 
 
 class OverlayIn(BaseModel):
