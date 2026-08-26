@@ -36,13 +36,12 @@ bot.shrutivtuber.com {
         header_up X-Forwarded-Host {host}
     }
 
-    log {
-        output file /var/log/caddy/bot.shrutivtuber.log {
-            roll_size 10mb
-            roll_keep 5
-        }
-        # The body carries interaction content. The default log does not
-        # include it, and it must stay that way.
-        format json
-    }
+    # No custom log block. Caddy's own access log already records these, and a
+    # per-site file needs a path its user can create — which this one could
+    # not, and the failure surfaced only as "Reload failed for caddy.service".
+    #
+    # Worth keeping true either way: the request body carries interaction
+    # content, and neither the default log nor anything added later should
+    # include it.
+
 }
