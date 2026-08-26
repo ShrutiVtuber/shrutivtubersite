@@ -57,6 +57,8 @@ const growthLeft = (growthRows as any[]).filter((r) => !r.done && r.visible !== 
 
 const twitchLinked = Boolean((await asAdmin(Astro, "/api/twitch/admin/status")).body?.connected);
 
+const overlayCount = ((await asAdmin(Astro, "/api/overlay/admin/overlays")).body ?? []).length;
+
 ---
 
 <AdminLayout title="Overview">
@@ -136,6 +138,15 @@ const twitchLinked = Boolean((await asAdmin(Astro, "/api/twitch/admin/status")).
       <span class="adm-lbl">Twitch</span>
       <span class="big">{twitchLinked ? "on" : "off"}</span>
       <span class="sub">{twitchLinked ? "events arriving" : "not connected yet"}</span>
+    </a>
+
+    <a class="adm-card tile" href="/admin/counters">
+      <span class="adm-lbl">Stream overlays</span>
+      <span class="big">{overlayCount}</span>
+      <span class="sub">
+        {overlayCount === 0 ? "none set up yet" :
+         overlayCount === 1 ? "browser source" : "browser sources"}
+      </span>
     </a>
 
     <a class="adm-card tile" href="/admin/growth">

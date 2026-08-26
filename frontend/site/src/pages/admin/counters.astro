@@ -147,6 +147,17 @@ const soundFiles = ((await asAdmin(Astro, "/api/admin/media?tag=alert-sound")).b
   .filter((m: any) => String(m.mimeType ?? "").startsWith("audio/"));
 const overlays = (await asAdmin(Astro, "/api/overlay/admin/overlays")).body ?? [];
 
+/* Her words for each surface, in one place — the picker, the list and the
+   instructions all read from it, so renaming one renames all three. */
+const SURFACE: Record<string, string> = {
+  counter: "Counter bar",
+  alerts: "Alerts",
+  ticker: "Supporters ticker",
+  sky: "Sky chart",
+  hours: "Planetary hours",
+  countdown: "Countdown",
+};
+
 const SYMBOL: Record<string, string> = { eur: "€", gbp: "£", usd: "$" };
 const show = (c: any, v: number) =>
   c.unit === "money" ? `${SYMBOL[c.currency] ?? ""}${(v / 100).toFixed(0)}` : String(v);
@@ -154,20 +165,90 @@ const nameOf = (id: number | null) =>
   counters.find((c: any) => c.id === id)?.name ?? "—";
 ---
 
-<AdminLayout title="Counters">
+<AdminLayout title="Stream">
   <div class="cn">
-    <h1>Counters</h1>
+    <h1>Stream overlays</h1>
     <p class="lede">
-      A target, a unit, and what feeds it. The same object counts euros and
-      people — “€300 for a microphone” and “20 on the December workshop” differ
-      only in the unit.
+      Six things you can put on the stream, all fed from here. Each one is a
+      separate Browser Source in OBS — add only the ones you want.
     </p>
+
+    <details class="how" open={overlays.length === 0}>
+      <summary>How to put one on the stream</summary>
+
+      <ol class="steps">
+        <li>
+          <strong>Make a counter first</strong> if the overlay needs one — the
+          bar, the countdown and the ticker all show a counter; the sky chart
+          and the hours strip do not. The form is further down this page.
+        </li>
+        <li>
+          <strong>Make the overlay</strong> under <em>Overlays</em>, below.
+          Pick which surface, which counter, and how much animation the machine
+          you stream from can afford.
+        </li>
+        <li>
+          <strong>Copy the address.</strong> It is shown once, at the top of
+          this page, straight after you make it. Nothing can retrieve it
+          afterwards — that is deliberate, because this page gets screen-shared.
+          Losing one costs nothing: make another and paste the new address in.
+        </li>
+        <li>
+          <strong>In OBS:</strong> Sources → <em>+</em> → <strong>Browser</strong>.
+          Paste the address into <em>URL</em>. Set <strong>Width 1920</strong>
+          and <strong>Height 1080</strong>. Leave the custom CSS box alone —
+          the page is already transparent.
+        </li>
+        <li>
+          Tick <strong>“Shutdown source when not visible”</strong> and
+          <strong>“Refresh browser when scene becomes active”</strong>. The
+          first stops an overlay you are not showing from costing you frames;
+          the second makes it pick up changes you make here.
+        </li>
+      </ol>
+
+      <p class="fine">
+        Every surface draws in its own corner of a 1920 × 1080 canvas, so
+        several can sit on top of each other without colliding — the hours
+        strip is top left, the countdown top right, alerts across the middle,
+        the sky chart on the right, the ticker and the bar along the bottom.
+        Drag them anywhere you like in OBS; nothing here depends on where they
+        end up.
+      </p>
+
+      <table class="surfaces">
+        <thead><tr><th>Surface</th><th>Needs a counter</th><th>What it shows</th></tr></thead>
+        <tbody>
+          <tr><td>Counter bar</td><td>yes</td>
+              <td>A goal and how far along it is. Wide, or compact.</td></tr>
+          <tr><td>Alerts</td><td>no</td>
+              <td>Support, subs, gifts, bits, raids, class and workshop signups, follows.</td></tr>
+          <tr><td>Supporters ticker</td><td>optional</td>
+              <td>A row of names along the bottom. No amounts, on purpose.</td></tr>
+          <tr><td>Sky chart</td><td>no</td>
+              <td>The sky right now, from your own ephemeris, with the Moon’s drift.</td></tr>
+          <tr><td>Planetary hours</td><td>no</td>
+              <td>Past, current and next hour, and whose day it is.</td></tr>
+          <tr><td>Countdown</td><td>yes</td>
+              <td>How long a counter’s window has left.</td></tr>
+        </tbody>
+      </table>
+
+      <p class="fine">
+        <strong>Nothing here can change the site.</strong> An overlay address is
+        read-only and scoped to one surface — if one leaks on a stream, the most
+        anyone can do is watch a bar you were already showing them.
+      </p>
+    </details>
     {notice && <p class="ok">{notice}</p>}
     {failed && <p class="bad">{failed}</p>}
 
     {minted && (
       <section class="minted">
-        <p class="ov-once">Add this as a Browser Source in OBS, 1920 × 1080.</p>
+        <p class="ov-once">
+          Made. In OBS: Sources → + → Browser, paste this into URL, set
+          1920 × 1080.
+        </p>
         <input class="url" type="text" readonly value={minted} onclick="this.select()" />
         <p class="fine">
           <strong>This is the only time it is shown.</strong> Nothing here can
@@ -374,9 +455,9 @@ const nameOf = (id: number | null) =>
           {overlays.map((o: any) => (
             <li>
               <div>
-                <p class="nm">{o.label || o.kind}</p>
+                <p class="nm">{o.label || SURFACE[o.kind] || o.kind}</p>
                 <p class="fine">
-                  {o.kind} · {o.appearance} · motion {o.motion}
+                  {SURFACE[o.kind] ?? o.kind} · {o.appearance} · motion {o.motion}
                   {o.counterId && ` · ${nameOf(o.counterId)}`}
                   {o.lastSeen ? ` · last seen ${new Date(o.lastSeen).toLocaleString("en-GB", { dateStyle: "short", timeStyle: "short" })}` : " · never opened"}
                 </p>
@@ -398,23 +479,25 @@ const nameOf = (id: number | null) =>
         <input type="hidden" name="action" value="new-overlay" />
         <label><span>Surface</span>
           <select name="kind">
-            <option value="counter">Counter bar</option>
-            <option value="alerts">Alerts</option>
-            <option value="sky">Sky chart</option>
-            <option value="hours">Planetary hours</option>
-            <option value="ticker">Supporters ticker</option>
-            <option value="countdown">Countdown</option>
+            {Object.entries(SURFACE).map(([v, label]) => (
+              <option value={v}>{label}</option>
+            ))}
           </select></label>
-        <label><span>Size</span>
+        <label><span>Size <em class="fine">counter bar only</em></span>
           <select name="size">
             <option value="wide">Wide — 1360px</option>
             <option value="compact">Compact — 620px</option>
           </select></label>
-        <label><span>Which counter <em class="fine">counter bar only</em></span>
+        <label><span>Which counter</span>
           <select name="counter_id">
-            <option value="">— none yet —</option>
+            <option value="">— none —</option>
             {counters.map((c: any) => <option value={c.id}>{c.name}</option>)}
-          </select></label>
+          </select>
+          <em class="fine">
+            The bar and the countdown need one. The ticker uses it to show only
+            that campaign&rsquo;s supporters. The sky chart, the hours strip and
+            alerts ignore it.
+          </em></label>
         <label><span>Appearance</span>
           <select name="appearance">
             <option value="almanac">Almanac</option>
@@ -425,9 +508,18 @@ const nameOf = (id: number | null) =>
             <option value="reduced">Reduced — everyday</option>
             <option value="full">Full — the strong machine</option>
             <option value="still">Still — no animation</option>
-          </select></label>
+          </select>
+          <em class="fine">
+            This is about the machine you stream from, not about the design.
+            Still is complete and legible — it is the weaker PC and a bad night,
+            not a lesser version.
+          </em></label>
         <label><span>Label, for you</span>
-          <input name="label" maxlength="80" placeholder="Main scene" /></label>
+          <input name="label" maxlength="80" placeholder="Main scene" />
+          <em class="fine">
+            Only ever shown on this page. Name it after the OBS scene it goes
+            in, so revoking the right one later is obvious.
+          </em></label>
         <div class="wide"><Button type="submit">Make an overlay</Button></div>
       </form>
     </section>
@@ -435,6 +527,29 @@ const nameOf = (id: number | null) =>
 </AdminLayout>
 
 <style>
+  .how {
+    border: var(--border-w) solid var(--line);
+    border-radius: var(--radius-md);
+    background: var(--surface-card);
+    padding: 14px 18px;
+    margin: 0 0 20px;
+  }
+  .how > summary {
+    cursor: pointer; font-weight: 600; font-family: var(--font-display);
+    font-size: var(--text-md);
+  }
+  .how[open] > summary { margin-bottom: 10px; }
+  .steps { margin: 0 0 12px; padding-left: 20px; display: grid; gap: 8px; }
+  .steps li { line-height: 1.55; }
+
+  .surfaces { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: var(--text-sm); }
+  .surfaces th, .surfaces td {
+    text-align: left; padding: 6px 10px 6px 0;
+    border-bottom: 1px solid var(--line); vertical-align: top;
+  }
+  .surfaces th { color: var(--ink-faint); font-weight: 600; }
+  .surfaces td:first-child { white-space: nowrap; font-weight: 500; }
+
   .cn { display: grid; gap: var(--space-5); max-width: 78ch; }
   .cn h1 { font: 500 var(--text-h1) var(--font-display); color: var(--ink); margin: 0; }
   .cn h2 { font: 600 var(--text-h3) var(--font-display); color: var(--ink); margin: 0; }

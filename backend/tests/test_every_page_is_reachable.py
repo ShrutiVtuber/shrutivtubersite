@@ -102,3 +102,38 @@ def test_every_promised_page_is_linked_from_somewhere(path: str) -> None:
     assert clean in _all_links(), (
         f"{path} is in the sitemap and nothing links to it — it can only be "
         f"reached by typing the address")
+
+
+# ── the admin, which is browsed too ──────────────────────────────────────────
+#
+# The rule above exempts /admin from the sitemap because it is noindex and
+# nobody arrives at it from a search. That exemption quietly bought a second
+# bug: an admin page can exist, deploy, work, and be linked from nowhere at
+# all — which is exactly what happened to /admin/counters. She built six
+# overlay surfaces and could not find the page that mints them.
+#
+# Reached from the nav or from an Overview tile both count. Reached from
+# neither does not.
+
+ADMIN_PAGES = sorted(
+    p.stem if p.stem != "index" else ""
+    for p in (SRC / "pages" / "admin").glob("*.astro")
+)
+
+# Arrived at by redirect, by a link in an email, or from another admin page's
+# own flow — never by browsing to it.
+ADMIN_NOT_BROWSED = {"signin", "signout", "reset"}
+
+
+@pytest.mark.parametrize("page", [p for p in ADMIN_PAGES if p not in ADMIN_NOT_BROWSED])
+def test_every_admin_page_is_reachable_by_clicking(page: str) -> None:
+    href = f"/admin/{page}" if page else "/admin"
+
+    layout = (SRC / "layouts" / "AdminLayout.astro").read_text(encoding="utf-8")
+    overview = (SRC / "pages" / "admin" / "index.astro").read_text(encoding="utf-8")
+
+    linked = f'"{href}"' in layout or f'href="{href}"' in overview
+    assert linked, (
+        f"{href} exists but nothing links to it — add it to AdminLayout's NAV "
+        f"or give it a tile on the Overview"
+    )
