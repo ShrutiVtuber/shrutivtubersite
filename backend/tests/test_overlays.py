@@ -286,3 +286,71 @@ def test_neither_surface_repaints_when_it_is_not_in_the_scene() -> None:
     tick = (SRC / "pages" / "overlay" / "ticker.astro").read_text(encoding="utf-8")
     assert "setInterval" in tick and "4 * 60 * 1000" in tick, (
         "a row of words must not poll faster than names arrive")
+
+
+def test_the_web_variants_and_the_overlay_share_one_ephemeris() -> None:
+    """
+    Two code paths computing where the Moon is would eventually disagree, and
+    the one that disagreed would be the one on the stream — found by somebody
+    in chat rather than by a test.
+    """
+    public = code_of(BACKEND / "api" / "routes" / "public.py")
+    assert "sky_now" in public, "the web card computes its own sky"
+
+    overlay = code_of(BACKEND / "api" / "routes" / "overlay.py")
+    assert "async def sky_now" in overlay
+
+
+def test_the_web_variants_obey_the_reader_not_the_encoder() -> None:
+    """
+    §11: the overlay's motion setting is about her streaming machine; the media
+    query is about her reader. A web card taking `motion` would be applying the
+    wrong person's preference.
+    """
+    comp = SRC / "components" / "counters"
+    for name in ("CounterCard.astro", "SkyCard.astro"):
+        page = code_of(comp / name)
+        assert "data-motion" not in page, f"{name} reads the encoder's setting"
+    card = code_of(comp / "CounterCard.astro")
+    assert "prefers-reduced-motion" in card
+
+
+def test_the_web_variants_show_both_clocks() -> None:
+    """
+    §12: the site's dual-time rule does not apply on the overlay — it is her
+    screen, in her timezone — but it DOES apply to the two web variants.
+    """
+    comp = SRC / "components" / "counters"
+    for name in ("CounterCard.astro", "SkyCard.astro"):
+        page = code_of(comp / name)
+        assert "Europe/Athens" in page, f"{name} does not author in Athens"
+        assert "resolvedOptions" in page, f"{name} never shows the reader's zone"
+        # Server-rendered first, so a reader without JavaScript still gets a
+        # time rather than an empty element the script was meant to fill.
+        assert "Intl.DateTimeFormat" in page.split("<script>")[0]
+
+
+def test_the_counter_card_clamps_the_bar_and_not_the_number() -> None:
+    """
+    The overrun is the best thing that can happen to a goal. The fill must stay
+    inside its track; the figure must not.
+    """
+    card = code_of(SRC / "components" / "counters" / "CounterCard.astro")
+    assert "Math.min(100, pct)" in card, "the fill can leave its track"
+    assert "const current = counter.current ?? 0;" in card
+    assert "Math.min(100, current" not in card
+
+
+def test_the_web_variants_are_reachable() -> None:
+    """
+    Written because it has already happened once: /collab and /official were
+    built, deployed and linked from nowhere, and she found them, not a test.
+    A component nothing imports is the same bug one level down.
+    """
+    pages = (SRC / "pages")
+    used = "\n".join(
+        p.read_text(encoding="utf-8")
+        for p in pages.rglob("*.astro")
+    )
+    assert "CounterCard" in used, "CounterCard is on no page"
+    assert "SkyCard" in used, "SkyCard is on no page"

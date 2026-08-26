@@ -1,0 +1,218 @@
+---
+/* The sky wheel, on the website.
+ *
+ * The web variant of the overlay's surface 4. Same geometry, same reading, and
+ * emphatically the same numbers — /api/sky and /api/overlay/sky are one
+ * function behind two doors, because two code paths computing where the Moon
+ * is would eventually disagree and the one that disagreed would be the one on
+ * the stream.
+ *
+ * What differs from the overlay is everything about the room it stands in: it
+ * takes the reader's theme rather than a dusk ramp, it reflows, it answers
+ * `prefers-reduced-motion` rather than her encoder's motion setting, and it
+ * obeys the site's dual-time rule — the overlay is exempt because it is her
+ * screen in her timezone, and this is not.
+ */
+import { SITE_API } from "../../lib/api";
+
+interface Props {
+  lat?: number;
+  lon?: number;
+  /* Where this sits in the page's outline. */
+  level?: 2 | 3;
+}
+const { lat = 37.9838, lon = 23.7275, level = 3 } = Astro.props;
+const H = `h${level}` as const;
+
+let d: any = null;
+try {
+  const r = await fetch(`${SITE_API}/api/sky?lat=${lat}&lon=${lon}`);
+  if (r.ok) d = await r.json();
+} catch { /* the card is omitted rather than drawn empty — see below */ }
+
+const TEXT = "︎";
+const GLYPH: Record<string, string> = {
+  Sun: `☉${TEXT}`, Moon: `☾${TEXT}`, Mercury: `☿${TEXT}`, Venus: `♀${TEXT}`,
+  Mars: `♂${TEXT}`, Jupiter: `♃${TEXT}`, Saturn: `♄${TEXT}`,
+};
+/* U+FE0E on every one, or a browser substitutes a colour-emoji font and the
+   marks stop taking the ink colour — the same trap as the overlay. */
+const SIGN_GLYPH = "♈♉♊♋♌♍♎♏♐♑♒♓".split("").map((g) => g + TEXT);
+const SIGNS = ["Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo",
+               "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces"];
+
+const R = 148, CX = 164, CY = 164;
+/* 0° Aries at the left, running anticlockwise — the way every chart on this
+   site is drawn, so this reads as the same instrument as /tools. */
+const pos = (lonDeg: number, radius: number) => {
+  const a = ((180 - lonDeg) * Math.PI) / 180;
+  return { x: CX + radius * Math.cos(a), y: CY - radius * Math.sin(a) };
+};
+
+const bodies = (d?.bodies ?? []) as any[];
+const moon = bodies.find((b) => b.name === "Moon");
+const ok = bodies.length > 0 && !d?.unreachable;
+
+function drift(perHour: number): string {
+  const sign = perHour < 0 ? "−" : "+";
+  const abs = Math.abs(perHour);
+  const deg = Math.floor(abs);
+  const min = Math.round((abs - deg) * 60);
+  return `${sign}${deg}°${String(min).padStart(2, "0")}′ / h`;
+}
+function inHours(h: number | null | undefined): string {
+  if (h === null || h === undefined) return "";
+  return h < 1 ? `${Math.round(h * 60)} min` : `${h.toFixed(1)} h`;
+}
+
+/* Athens, and the reader's own zone added by the script below. */
+const at = d?.at ? new Date(d.at) : null;
+const athens = at
+  ? new Intl.DateTimeFormat("en-GB", {
+      hour: "2-digit", minute: "2-digit", timeZone: "Europe/Athens",
+    }).format(at)
+  : "";
+---
+
+{/* An unreachable ephemeris means no card. On the overlay the surface holds
+    its last numbers because a hole in her scene is worse than a stale minute;
+    on a page that is rendered fresh for every reader there is no last state to
+    hold, and a wheel with nothing on it would be a picture of a lie. */}
+{ok && (
+  <article class="sky-card">
+    <header>
+      <H class="title">The sky now</H>
+      <p class="at">
+        <time datetime={d.at} data-at={d.at}>{athens}</time>
+        <span class="zone" data-zone>Athens</span>
+      </p>
+    </header>
+
+    <div class="wheel">
+      <svg viewBox="0 0 328 328" role="img"
+           aria-label={`The positions of ${bodies.length} bodies. ` +
+             bodies.map((b) => `${b.name} at ${b.degree.toFixed(0)} degrees ${b.sign}`).join(", ")}>
+        <circle cx={CX} cy={CY} r={R} class="rim" />
+        <circle cx={CX} cy={CY} r={R - 30} class="rim" />
+        {SIGNS.map((_, i) => {
+          const a = pos(i * 30, R);
+          const b = pos(i * 30, R - 30);
+          return <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} class="spoke" />;
+        })}
+        {SIGN_GLYPH.map((g, i) => {
+          const p = pos(i * 30 + 15, R - 15);
+          const here = bodies.some((b) => SIGNS.indexOf(b.sign) === i);
+          return <text x={p.x} y={p.y + 5} class={here ? "sg on" : "sg"}
+                       text-anchor="middle">{g}</text>;
+        })}
+        {(d.aspects ?? []).slice(0, 8).map((asp: any) => {
+          const from = bodies.find((b) => b.name === asp.from);
+          const to = bodies.find((b) => b.name === asp.to);
+          if (!from || !to) return null;
+          const a = pos(from.longitude, R - 52);
+          const b = pos(to.longitude, R - 52);
+          return <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} class="chord" />;
+        })}
+        {bodies.map((b: any) => {
+          const p = pos(b.longitude, R - 52);
+          return (
+            <g>
+              <text x={p.x} y={p.y + 6} class="bg" text-anchor="middle">{GLYPH[b.name]}</text>
+              {b.retrograde && <text x={p.x + 11} y={p.y - 5} class="rx">℞</text>}
+            </g>
+          );
+        })}
+      </svg>
+    </div>
+
+    <dl class="read">
+      {bodies.slice(0, 3).map((b: any) => (
+        <div class="row">
+          <dt><span class="glyph" aria-hidden="true">{GLYPH[b.name]}</span> {b.name}</dt>
+          <span class="lead" aria-hidden="true"></span>
+          <dd>{b.degree.toFixed(0)}° {b.sign}{b.retrograde ? " ℞" : ""}</dd>
+        </div>
+      ))}
+      {moon && (
+        <div class="row">
+          <dt>drifting</dt>
+          <span class="lead" aria-hidden="true"></span>
+          <dd>{drift(moon.perHour)}</dd>
+        </div>
+      )}
+      {moon?.ingressInHours && (
+        <div class="row">
+          <dt>enters {SIGNS[(SIGNS.indexOf(moon.sign) + 1) % 12]}</dt>
+          <span class="lead" aria-hidden="true"></span>
+          <dd>in {inHours(moon.ingressInHours)}</dd>
+        </div>
+      )}
+    </dl>
+  </article>
+)}
+
+<script>
+  /* The reader's zone beside Athens. Progressive: the Athens time is already
+     correct in the HTML, so a reader without JavaScript loses the second
+     reading rather than the time. */
+  for (const el of document.querySelectorAll<HTMLTimeElement>("[data-at]")) {
+    const at = new Date(el.dateTime);
+    if (Number.isNaN(at.getTime())) continue;
+    const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (!zone || zone === "Europe/Athens") continue;
+    const local = new Intl.DateTimeFormat("en-GB",
+      { hour: "2-digit", minute: "2-digit" }).format(at);
+    const tag = el.parentElement?.querySelector<HTMLElement>("[data-zone]");
+    if (tag) tag.textContent = `Athens · ${local} your time`;
+  }
+</script>
+
+<style>
+  .sky-card {
+    display: grid;
+    gap: 14px;
+    padding: 20px;
+    background: var(--surface-card);
+    border: var(--border-w) solid var(--line);
+    border-radius: var(--radius-md);
+  }
+  .sky-card header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  .title { margin: 0; font-family: var(--font-display); font-size: var(--text-lg); }
+  .at {
+    margin: 0; font-family: var(--font-mono); font-variant-numeric: tabular-nums;
+    font-size: var(--text-xs); color: var(--ink-faint);
+  }
+  .zone { margin-left: 6px; }
+
+  /* The wheel is square and never wider than its column. Unlike the overlay,
+     which is authored at one fixed size and rendered 1:1, this has to survive
+     a phone. */
+  .wheel { max-width: 328px; width: 100%; margin: 0 auto; }
+  .wheel svg { width: 100%; height: auto; display: block; }
+
+  .rim { fill: none; stroke: var(--line); stroke-width: 1; }
+  .spoke { stroke: var(--line); stroke-width: 1; }
+  .sg { fill: var(--ink-faint); font-size: 13px; opacity: .55; }
+  /* A sector holding a body is inked. Everything else recedes, so the wheel
+     reads as where things ARE rather than as twelve equal labels. */
+  .sg.on { fill: var(--accent); opacity: 1; }
+  .chord { stroke: var(--line-strong); stroke-width: 1; opacity: .5; }
+  .bg { fill: var(--ink); font-size: 19px; }
+  .rx { fill: var(--rose); font-size: 11px; font-family: var(--font-mono); }
+
+  .read { margin: 0; display: grid; gap: 6px; }
+  .row { display: flex; align-items: baseline; gap: 8px; font-size: var(--text-sm); }
+  .row dt { color: var(--ink-soft); white-space: nowrap; }
+  .row dd {
+    margin: 0; color: var(--ink); white-space: nowrap;
+    font-family: var(--font-mono); font-variant-numeric: tabular-nums;
+  }
+  .glyph { color: var(--accent); }
+  /* The dotted almanac leader, the same one /tools uses. */
+  .lead {
+    flex: 1;
+    border-bottom: 1px dotted var(--line-strong);
+    transform: translateY(-3px);
+    min-width: 12px;
+  }
+</style>

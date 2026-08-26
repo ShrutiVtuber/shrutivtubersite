@@ -11,6 +11,7 @@ import SectionHeader from "../components/brand/SectionHeader.astro";
 import Button from "../components/forms/Button.astro";
 import Badge from "../components/navigation/Badge.astro";
 import CsrfField from "../components/forms/CsrfField.astro";
+import CounterCard from "../components/counters/CounterCard.astro";
 import { pageSections } from "../lib/content";
 import { site, SITE_API } from "../lib/api";
 import { verifyCsrf } from "../lib/csrf";
@@ -139,6 +140,16 @@ const TIERS = [
    its amount is chosen by the giver, not configured. */
 const offerable = (key: string) => open && (key === "one-off" || priced.has(key));
 
+/* What the money is currently for. The same counters the overlay draws — a
+   reader who arrives from a clip should be able to see the goal they just
+   watched somebody fill, and a page asking for support that cannot say what
+   for is asking a stranger to take it on trust. */
+let goals: any[] = [];
+try {
+  const r = await fetch(`${SITE_API}/api/counters`);
+  if (r.ok) goals = await r.json();
+} catch { /* the block is omitted; the rest of the page still sells */ }
+
 /* Every block the admin has added to /support. */
 ---
 
@@ -159,6 +170,15 @@ const offerable = (key: string) => open && (key === "one-off" || priced.has(key)
         </p>
       )
     }
+
+    {goals.length > 0 && (
+      <section class="goals">
+        <h2>What it is going towards</h2>
+        <div class="goal-list">
+          {goals.map((g: any) => <CounterCard counter={g} level={3} />)}
+        </div>
+      </section>
+    )}
 
     <div class="tiers">
       {
@@ -257,6 +277,13 @@ const offerable = (key: string) => open && (key === "one-off" || priced.has(key)
 </BaseLayout>
 
 <style>
+  .goals { display: grid; gap: 12px; margin: 0 0 var(--space-6, 32px); }
+  .goals h2 { margin: 0; font-family: var(--font-display); font-size: var(--text-lg); }
+  .goal-list { display: grid; gap: 12px; }
+  @media (min-width: 720px) {
+    .goal-list { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+  }
+
   /* Loud on purpose. A site taking test cards looks exactly like one that
      works — the failure is silent and on the wrong side of the sale. */
   .testmode {

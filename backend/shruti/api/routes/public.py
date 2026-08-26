@@ -10,9 +10,10 @@ from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
+from shruti.core import counters as counters_core
 from shruti.core.db import get_session
 from shruti.core.mail import send
-from shruti.models import ContactMessage, Question, ScheduleEntry
+from shruti.models import ContactMessage, Counter, Question, ScheduleEntry
 
 log = logging.getLogger(__name__)
 
@@ -151,3 +152,60 @@ async def list_questions(session: AsyncSession = Depends(get_session)) -> list[d
         }
         for q in rows
     ]
+
+
+@router.get("/counters")
+async def public_counters(session: AsyncSession = Depends(get_session)) -> list[dict]:
+    """
+    The counters she has chosen to show, and where they have got to.
+
+    The same numbers the overlay draws, minus the token: what is on the stream
+    is already public, and a reader who arrives from a clip should be able to
+    see the goal they just watched someone fill. `visible` is the switch —
+    a counter she is keeping to herself does not appear here.
+
+    Contributor counts are included; individual supporters are not. Who gave is
+    hers to show on her own stream, not a list this route hands to anyone who
+    asks.
+    """
+    rows = (
+        await session.execute(
+            select(Counter)
+            .where(Counter.visible == True)  # noqa: E712 — SQL, not Python
+            .order_by(Counter.position, Counter.id)
+        )
+    ).scalars().all()
+
+    out = []
+    for c in rows:
+        p = await counters_core.progress(session, c)
+        out.append({
+            "slug": c.slug,
+            "name": c.name,
+            "note": c.note,
+            "unit": c.unit,
+            "currency": c.currency,
+            "target": c.target,
+            # Uncapped, exactly as the overlay gets it. Clamping at the target
+            # would throw away the overrun, which is the best thing that can
+            # happen to a goal.
+            "current": p["current"],
+            "contributors": p["contributors"],
+            "startsAt": c.starts_at.isoformat() if c.starts_at else None,
+            "endsAt": c.ends_at.isoformat() if c.ends_at else None,
+        })
+    return out
+
+
+@router.get("/sky")
+async def public_sky(lat: float = 37.9838, lon: float = 23.7275) -> dict:
+    """
+    The same sky the overlay draws, without the token.
+
+    It is the same function behind both, deliberately. Two code paths computing
+    where the Moon is would eventually disagree, and the one that disagreed
+    would be the one on the stream — discovered by somebody in chat.
+    """
+    from shruti.api.routes.overlay import sky_now
+
+    return await sky_now(lat, lon)

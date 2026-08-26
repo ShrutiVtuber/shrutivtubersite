@@ -19,6 +19,7 @@ import SignPicker from "../components/navigation/SignPicker.astro";
 import SponsorRow from "../components/brand/SponsorRow.astro";
 import PollCard from "../components/community/PollCard.astro";
 import HappeningNow from "../components/community/HappeningNow.astro";
+import SkyCard from "../components/counters/SkyCard.astro";
 import { site, type LiveStatus, type LinkGroups, type Project, PATHS } from "../lib/api";
 import { instruments } from "../lib/instruments";
 import { pageSections } from "../lib/content";
@@ -209,7 +210,14 @@ const INSTRUMENTS = [
       />
       <Button variant="ghost" href="/today">Day at a glance →</Button>
     </div>
-    <div class="instruments">
+    {/* A working wheel, not a screenshot of one. The links below say what the
+        instruments answer; this one is already answering, computed by her own
+        ephemeris while the page loads. It is also the surface people will have
+        just seen on the stream, which is the whole point of a web variant —
+        somebody arriving from a clip finds the same instrument here. */}
+    <div class="instrument-proof">
+      <SkyCard level={3} />
+      <div class="instruments">
       {
         INSTRUMENTS.map((i) => (
           <a class="instrument" href={i.href} data-wide={i.wide || undefined}>
@@ -220,6 +228,7 @@ const INSTRUMENTS = [
           </a>
         ))
       }
+      </div>
     </div>
   </section>
 
@@ -355,6 +364,11 @@ const INSTRUMENTS = [
 </BaseLayout>
 
 <style>
+  .instrument-proof { display: grid; gap: 16px; }
+  @media (min-width: 900px) {
+    .instrument-proof { grid-template-columns: minmax(280px, 360px) 1fr; align-items: start; }
+  }
+
   .horo-absent {
     font: 400 var(--text-body) / var(--leading-body) var(--font-body);
     color: var(--ink-faint); margin: 0; max-width: 62ch;

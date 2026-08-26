@@ -158,24 +158,22 @@ async def _from_daemon(path: str, params: dict) -> dict:
     return body.get("data", body)
 
 
-@router.get("/sky")
-async def sky(t: str, lat: float = 37.9838, lon: float = 23.7275,
-              session: AsyncSession = Depends(get_session)) -> dict:
+async def sky_now(lat: float = 37.9838, lon: float = 23.7275) -> dict:
     """
     The sky, as finished numbers.
 
-    **The client never computes astronomy.** Everything here — positions,
-    drift, the next ingress — is worked out on the server and pushed; the page
-    eases between two known sets and does nothing else. That is not tidiness:
-    OBS renders the overlay on her streaming machine, beside the encoder, and
-    an ephemeris running in that browser costs frames on the stream.
+    **No client computes astronomy — neither of them.** Everything here is
+    worked out on the server: positions, drift, the next ingress. The overlay
+    page eases between two known sets and does nothing else, because OBS
+    renders it on her streaming machine beside the encoder and an ephemeris in
+    that browser costs frames on the stream. The website's card has no such
+    excuse and gets the same treatment anyway, because the two must never be
+    able to disagree about where the Moon is.
 
     The drift figure is the point. The Moon moves about half a degree an hour,
     so an animated dot would be a lie at stream length — the honest signal that
     this is live is the rate beside it, and a clock that never stops.
     """
-    await _overlay(t, session)
-
     now = datetime.now(timezone.utc)
     try:
         chart = await _from_daemon("/chart", {
@@ -229,6 +227,14 @@ async def sky(t: str, lat: float = 37.9838, lon: float = 23.7275,
             "ascendant": (chart.get("angles") or {}).get("ascendant")}
 
 
+@router.get("/sky")
+async def sky(t: str, lat: float = 37.9838, lon: float = 23.7275,
+              session: AsyncSession = Depends(get_session)) -> dict:
+    """The same sky, behind the overlay's token."""
+    await _overlay(t, session)
+    return await sky_now(lat, lon)
+
+
 @router.get("/hours")
 async def hours(t: str, lat: float = 37.9838, lon: float = 23.7275,
                 session: AsyncSession = Depends(get_session)) -> dict:
@@ -274,23 +280,6 @@ async def hours(t: str, lat: float = 37.9838, lon: float = 23.7275,
         "current": cell(current),
         "next": cell(by_index.get((index or 0) + 1)),
     }
-
-
-# ── the admin side ──────────────────────────────────────────────────────────
-#
-# Separated from everything above by more than a comment: nothing above needs a
-# credential and nothing below works without one.
-
-from shruti.api.deps import require_admin          # noqa: E402
-
-
-class CounterIn(BaseModel):
-    name: str = Field(default="", max_length=120)
-    note: str = Field(default="", max_length=200)
-    unit: str = Field(default="money")
-    target: int = Field(default=0, ge=0)
-    currency: str = Field(default="eur", max_length=3)
-    sources: list[str] = Field(default_factory=list)
 
 
 @router.get("/ticker")
@@ -393,6 +382,23 @@ async def countdown(t: str, session: AsyncSession = Depends(get_session)) -> dic
         "startsAt": c.starts_at.isoformat() if c.starts_at else None,
     }
     return payload
+
+
+# ── the admin side ──────────────────────────────────────────────────────────
+#
+# Separated from everything above by more than a comment: nothing above needs a
+# credential and nothing below works without one.
+
+from shruti.api.deps import require_admin          # noqa: E402
+
+
+class CounterIn(BaseModel):
+    name: str = Field(default="", max_length=120)
+    note: str = Field(default="", max_length=200)
+    unit: str = Field(default="money")
+    target: int = Field(default=0, ge=0)
+    currency: str = Field(default="eur", max_length=3)
+    sources: list[str] = Field(default_factory=list)
 
 
 class OverlayIn(BaseModel):

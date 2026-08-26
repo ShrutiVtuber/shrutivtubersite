@@ -1,0 +1,188 @@
+---
+/* The counter bar, on the website.
+ *
+ * The same numbers the overlay draws, and deliberately NOT the same component.
+ * The overlay is a fixed 1920x1080 canvas composited over video with its own
+ * dusk ramp and a motion setting for her encoder; this is a card in a page
+ * that reflows, takes the reader's theme, and answers `prefers-reduced-motion`
+ * because that is about the reader rather than her streaming machine.
+ *
+ * What the two must never disagree about is the arithmetic — so neither of
+ * them does any. Both draw what /api/counters and /api/overlay/counter return,
+ * and both get the figure UNCAPPED.
+ */
+interface Props {
+  counter: {
+    slug: string; name: string; note?: string;
+    unit: string; currency?: string;
+    target: number; current: number; contributors?: number;
+    endsAt?: string | null;
+  };
+  /* A heading level, because this card appears under an h1 on /support and
+     under an h2 in a list. Hard-coding one would break the outline in the
+     other place. */
+  level?: 2 | 3;
+}
+const { counter, level = 3 } = Astro.props;
+const H = `h${level}` as const;
+
+const SYMBOL: Record<string, string> = { eur: "€", gbp: "£", usd: "$" };
+const isMoney = counter.unit === "money";
+
+function figure(value: number): string {
+  if (isMoney) {
+    return `${SYMBOL[counter.currency ?? "eur"] ?? ""}${(value / 100).toLocaleString("en-GB",
+      { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+  }
+  return value.toLocaleString("en-GB");
+}
+const UNIT_WORD: Record<string, string> = {
+  people: "people", bits: "bits", subs: "subscriptions", money: "",
+};
+
+const current = counter.current ?? 0;
+const target = counter.target ?? 0;
+/* The FILL is clamped so the bar cannot run past its own track. The NUMBERS
+   are not — a goal that has been beaten says so, and hiding that is throwing
+   away the best thing that can happen to one. */
+const pct = target > 0 ? (current / target) * 100 : 0;
+const fill = Math.round(Math.max(0, Math.min(100, pct)) * 10) / 10;
+const met = target > 0 && current >= target;
+const over = met ? current - target : 0;
+const remaining = Math.max(0, target - current);
+const word = UNIT_WORD[counter.unit] ?? "";
+
+/* Athens is where she is; the reader is wherever they are. The site's rule is
+   that both are shown rather than one being silently assumed — the same rule
+   the schedule follows. The overlay is exempt (it is her screen, in her
+   timezone); this is not. */
+const ends = counter.endsAt ? new Date(counter.endsAt) : null;
+const athens = ends
+  ? new Intl.DateTimeFormat("en-GB", {
+      day: "numeric", month: "long", hour: "2-digit", minute: "2-digit",
+      timeZone: "Europe/Athens",
+    }).format(ends)
+  : "";
+const closed = ends ? ends.getTime() <= Date.now() : false;
+---
+
+<article class="counter-card" data-met={met ? "" : undefined}>
+  <header>
+    <H class="name">{counter.name}</H>
+    {counter.note && <p class="note">{counter.note}</p>}
+  </header>
+
+  <p class="figures">
+    <span class="now">{figure(current)}</span>
+    <span class="of">of {figure(target)}</span>
+    {word && <span class="word">{word}</span>}
+  </p>
+
+  <div class="track" role="img"
+       aria-label={target > 0
+         ? `${figure(current)} of ${figure(target)}${word ? " " + word : ""}, ${Math.round(pct)} percent`
+         : figure(current)}>
+    <span class="fill" style={`width:${fill}%`}></span>
+    {/* Where the target was. Only drawn once it has been passed, because
+        before that the end of the track already says it. */}
+    {met && over > 0 && <span class="tick"></span>}
+  </div>
+
+  <p class="under">
+    {met ? (
+      <span class="over">
+        {over > 0 ? `${figure(over)} over · thank you` : "Met · thank you"}
+      </span>
+    ) : (
+      <span class="left">{figure(remaining)}{word ? ` ${word}` : ""} to go</span>
+    )}
+    {typeof counter.contributors === "number" && counter.contributors > 0 && (
+      <span class="who">
+        {counter.contributors === 1 ? "1 person" : `${counter.contributors} people`}
+      </span>
+    )}
+  </p>
+
+  {ends && (
+    <p class="when">
+      {closed ? "Closed " : "Open until "}
+      <time datetime={counter.endsAt!} data-when={counter.endsAt!}>{athens}</time>
+      <span class="zone" data-zone>Athens</span>
+    </p>
+  )}
+</article>
+
+<script>
+  /* The deadline is authored in Athens and rendered there server-side, so it
+     is correct before this runs. This adds the reader's own zone beside it —
+     progressive, because a date that only exists after JavaScript is a date
+     some readers never get. */
+  for (const el of document.querySelectorAll<HTMLTimeElement>("[data-when]")) {
+    const at = new Date(el.dateTime);
+    if (Number.isNaN(at.getTime())) continue;
+    const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (!zone || zone === "Europe/Athens") continue;
+
+    const local = new Intl.DateTimeFormat("en-GB", {
+      day: "numeric", month: "long", hour: "2-digit", minute: "2-digit",
+    }).format(at);
+    const tag = el.parentElement?.querySelector<HTMLElement>("[data-zone]");
+    if (tag) tag.textContent = `Athens · ${local} your time`;
+  }
+</script>
+
+<style>
+  .counter-card {
+    display: grid;
+    gap: 10px;
+    padding: 20px;
+    background: var(--surface-card);
+    border: var(--border-w) solid var(--line);
+    border-radius: var(--radius-md);
+  }
+  .counter-card header { display: grid; gap: 4px; }
+  .name { margin: 0; font-family: var(--font-display); font-size: var(--text-lg); }
+  .note { margin: 0; color: var(--ink-soft); font-size: var(--text-sm); }
+
+  .figures {
+    margin: 0;
+    display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap;
+    font-family: var(--font-mono); font-variant-numeric: tabular-nums;
+  }
+  .now { font-size: var(--text-xl); font-weight: 600; color: var(--ink); }
+  .of, .word { font-size: var(--text-sm); color: var(--ink-faint); }
+
+  .track {
+    position: relative;
+    height: 10px;
+    background: var(--surface-inset);
+    border: var(--border-w) solid var(--line);
+    border-radius: var(--radius-full, 999px);
+    overflow: hidden;
+  }
+  .fill {
+    position: absolute; inset: 0 auto 0 0;
+    background: var(--accent);
+    border-radius: inherit;
+    transition: width var(--dur-3, 600ms) var(--ease-in-out, ease);
+  }
+  [data-met] .fill { background: var(--rose); }
+  .tick { position: absolute; top: 0; bottom: 0; right: 0; width: 1px; background: var(--surface-card); }
+
+  .under {
+    margin: 0;
+    display: flex; gap: 12px; flex-wrap: wrap;
+    font-size: var(--text-sm); color: var(--ink-soft);
+  }
+  .over { color: var(--rose); font-weight: 600; }
+  .who { color: var(--ink-faint); }
+
+  .when { margin: 0; font-size: var(--text-xs); color: var(--ink-faint); }
+  .zone { margin-left: 6px; }
+
+  /* Her encoder's motion setting has no business here. This is the reader's
+     preference, and the site honours it everywhere else too. */
+  @media (prefers-reduced-motion: reduce) {
+    .fill { transition: none; }
+  }
+</style>
