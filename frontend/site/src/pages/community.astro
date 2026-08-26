@@ -134,6 +134,22 @@ const closed = (polls ?? []).filter((p: any) => p.closed).slice(0, 2);
            alt="An example of the card a comparison produces" />
     </section>
 
+    {/* The other creator-facing tool. It sits beside the comparison because
+        both are things another VTuber uses and links back from — which is the
+        whole reason they exist. */}
+    <section class="c-block c-tool" id="collab">
+      <span class="t-eyebrow">For creators</span>
+      <h2>When can all of us be live?</h2>
+      <p class="c-note">
+        Put everybody in, get the hours that work for all of them, and send the
+        link. Nothing is stored — the whole plan lives in the address — so it
+        still works in six months and there is no account to lose.
+      </p>
+      <div class="c-acts">
+        <Button href="/collab" variant="secondary">Plan a collab →</Button>
+      </div>
+    </section>
+
     <section class="c-block" id="polls">
       <h2>Have a say</h2>
       {
@@ -190,6 +206,7 @@ const closed = (polls ?? []).filter((p: any) => p.closed).slice(0, 2);
   .c-note { font: 400 var(--text-sm) / 1.7 var(--font-body); color: var(--ink-soft); margin: 0; max-width: 52ch; }
   .c-acts { display: flex; gap: var(--space-3); flex-wrap: wrap; margin-top: 4px; }
 
+  .c-tool { display: grid; gap: 10px; }
   .c-block { display: grid; gap: var(--space-4); }
   .c-block h2 { font: 600 var(--text-h3) var(--font-display); color: var(--ink); margin: 0; }
   .c-polls { display: grid; gap: var(--space-4); }

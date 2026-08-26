@@ -31,6 +31,11 @@ const money = (p: ShopProduct) =>
       body="Printed matter, files, and the odd object. Prices include tax."
     />
 
+    <p class="of-note">
+      This is the only shop that is mine. <a href="/official">Everywhere else that is</a>,
+      and anything not on that list is not me.
+    </p>
+
     {
       products.length === 0 ? (
         <EmptyState
@@ -66,6 +71,7 @@ const money = (p: ShopProduct) =>
 </BaseLayout>
 
 <style>
+  .of-note { font: 400 var(--text-sm) / 1.7 var(--font-body); color: var(--ink-faint); margin: 0; max-width: 62ch; }
   .shop-grid {
     display: grid; gap: var(--space-5); margin-top: var(--space-6);
     grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr));

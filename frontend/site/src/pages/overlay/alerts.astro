@@ -1,0 +1,237 @@
+---
+/* Alerts — surface 2.
+ *
+ * The most-seen thing in the set and the most likely to be resented. Three
+ * rules from the handoff §6 carry it, and all three are about restraint:
+ *
+ *   one plate at a time, never two;
+ *   a message only when a person has approved it;
+ *   the follow is the quietest member by a wide margin.
+ *
+ * The page holds no state across reloads on purpose. OBS reloads a browser
+ * source whenever the scene is re-added, and replaying an hour of alerts at
+ * that moment would be the worst possible behaviour — so the cursor starts at
+ * the newest event and only moves forward.
+ */
+import "../../styles/global.css";
+import "../../styles/overlay.css";
+import { SITE_API } from "../../lib/api";
+
+export const prerender = false;
+
+const token = Astro.url.searchParams.get("t") ?? "";
+
+let motion = "reduced";
+let skin = "almanac";
+let cursor = 0;
+
+if (token) {
+  try {
+    const r = await fetch(`${SITE_API}/api/overlay/counter?t=${encodeURIComponent(token)}`);
+    if (r.ok) {
+      const d = await r.json();
+      motion = d.motion ?? "reduced";
+      skin = d.appearance ?? "almanac";
+    }
+    /* Start from the newest event that already exists, so opening the overlay
+       does not announce everything that happened before it was opened. */
+    const e = await fetch(`${SITE_API}/api/overlay/events?t=${encodeURIComponent(token)}&since=0`);
+    if (e.ok) {
+      const seen = (await e.json()).events ?? [];
+      cursor = seen.length ? Math.max(...seen.map((x: any) => x.id)) : 0;
+    }
+  } catch {
+    /* An overlay never blanks and never errors. With no data it simply waits. */
+  }
+}
+---
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>alerts</title>
+    <meta name="robots" content="noindex, nofollow" />
+  </head>
+  <body>
+    <div class="ov ov-alerts" data-skin={skin} data-motion={motion}
+         data-token={token} data-cursor={cursor}>
+      <div class="zone">
+        <!-- One plate. Never two. Filled and emptied by the script below. -->
+        <div class="slot" hidden>
+          <div class="ov-plate plate">
+            <span class="mark" aria-hidden="true"></span>
+            <div class="said">
+              <p class="ov-eyebrow eyebrow"></p>
+              <p class="headline ov-oneline"></p>
+              <p class="message" hidden></p>
+            </div>
+            <div class="amount">
+              <span class="fig ov-fig"></span>
+              <span class="unit"></span>
+            </div>
+            <!-- Drains left to right for exactly the hold. It announces the
+                 departure, so the plate leaving never reads as a glitch. -->
+            <span class="rule" aria-hidden="true"></span>
+          </div>
+        </div>
+
+        <!-- Waiting alerts are ticks and a count, not a second plate. -->
+        <p class="waiting" hidden><span class="ticks"></span><span class="count"></span></p>
+      </div>
+    </div>
+
+    <script>
+      import { toAlert } from "../../lib/alerts";
+
+      const root = document.querySelector(".ov-alerts") as HTMLElement;
+      const token = root.dataset.token ?? "";
+      const still = root.dataset.motion === "still";
+      const slot = root.querySelector(".slot") as HTMLElement;
+      const plate = root.querySelector(".plate") as HTMLElement;
+      const waiting = root.querySelector(".waiting") as HTMLElement;
+      let cursor = Number(root.dataset.cursor ?? 0);
+
+      const queue: any[] = [];
+      let showing = false;
+
+      const ARRIVE = still ? 0 : 240;
+      const DEPART = still ? 0 : 420;
+
+      function paint(a: any) {
+        plate.dataset.tone = a.tone;
+        plate.dataset.quiet = a.quiet ? "" : undefined;
+        (plate.querySelector(".mark") as HTMLElement).textContent = a.glyph;
+        (plate.querySelector(".eyebrow") as HTMLElement).textContent = a.eyebrow;
+        (plate.querySelector(".headline") as HTMLElement).textContent = a.headline;
+        (plate.querySelector(".fig") as HTMLElement).textContent = a.amount;
+        (plate.querySelector(".unit") as HTMLElement).textContent = a.unit;
+        const msg = plate.querySelector(".message") as HTMLElement;
+        // Absent, not empty. Two lines instead of three, with no capsule to
+        // sit there looking broken.
+        msg.hidden = !a.message;
+        msg.textContent = a.message ?? "";
+      }
+
+      function drain(ms: number) {
+        const rule = plate.querySelector(".rule") as HTMLElement;
+        rule.style.transition = "none";
+        rule.style.width = "100%";
+        if (still) return;                     // full width, no animation
+        // Two frames, so the reset is committed before the transition starts.
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+          rule.style.transition = `width ${ms}ms linear`;
+          rule.style.width = "0%";
+        }));
+      }
+
+      function showWaiting() {
+        const n = queue.length;
+        waiting.hidden = n === 0;
+        (waiting.querySelector(".ticks") as HTMLElement).textContent = "·".repeat(Math.min(n, 6));
+        (waiting.querySelector(".count") as HTMLElement).textContent = n ? String(n) : "";
+      }
+
+      async function pump() {
+        if (showing || queue.length === 0) return;
+        showing = true;
+        const a = queue.shift();
+        showWaiting();
+
+        paint(a);
+        slot.hidden = false;
+        slot.dataset.state = "in";
+        drain(a.hold);
+
+        await new Promise((r) => setTimeout(r, ARRIVE + a.hold));
+        slot.dataset.state = "out";
+        await new Promise((r) => setTimeout(r, DEPART));
+        slot.hidden = true;
+        delete slot.dataset.state;
+        showing = false;
+        pump();
+      }
+
+      async function poll() {
+        if (!token) return;
+        try {
+          const r = await fetch(`/api/overlay/events?t=${encodeURIComponent(token)}&since=${cursor}`);
+          if (!r.ok) return;
+          for (const e of (await r.json()).events ?? []) {
+            cursor = Math.max(cursor, e.id);
+            const a = toAlert(e);
+            if (a) queue.push(a);
+          }
+          showWaiting();
+          pump();
+        } catch {
+          /* Held, not blanked. The next tick tries again. */
+        }
+      }
+
+      poll();
+      setInterval(poll, 5000);
+    </script>
+  </body>
+</html>
+
+<style>
+  /* Geometry from handoff §4: 920 wide, centred, bottom-anchored in its zone. */
+  .zone {
+    position: absolute; left: 50%; transform: translateX(-50%);
+    top: 64px; width: 920px;
+    display: grid; justify-items: center; gap: 10px;
+  }
+
+  .plate {
+    position: relative; width: 920px; box-sizing: border-box;
+    padding: 18px 22px 20px;
+    display: grid; grid-template-columns: auto 1fr auto; gap: 18px;
+    align-items: center; overflow: hidden;
+  }
+  .slot { transition: opacity 240ms var(--ease-out), transform 240ms var(--ease-out); }
+  .slot[data-state="in"] { opacity: 1; transform: translateY(0); }
+  .slot[data-state="out"] { opacity: 0; transform: translateY(-5px); }
+  .slot[hidden] { display: none; }
+
+  .mark { font: 400 30px var(--font-display); color: var(--dusk-accent); font-variant-emoji: text; }
+  .plate[data-tone="rose"] .mark { color: var(--dusk-rose); }
+
+  .said { display: grid; gap: 3px; min-width: 0; }
+  .headline { font: 500 27px var(--font-display); color: var(--dusk-ink); margin: 0; }
+  .eyebrow { margin: 0; }
+  .message {
+    font: 400 15px / 1.5 var(--font-body); color: var(--dusk-ink-soft); margin: 4px 0 0;
+    border-top: 1px solid var(--dusk-line); padding-top: 7px;
+  }
+
+  /* Every kind shares this slot: €5, 1,000 bits, 5 recipients, 42 viewers. */
+  .amount { display: grid; justify-items: end; gap: 2px; flex: none; }
+  .fig { font: 500 30px var(--font-mono); color: var(--dusk-accent); }
+  .plate[data-tone="rose"] .fig { color: var(--dusk-rose); }
+  .unit {
+    font: 600 11px var(--font-body); letter-spacing: .14em;
+    text-transform: uppercase; color: var(--dusk-ink-faint);
+  }
+
+  .rule {
+    position: absolute; left: 0; bottom: 0; height: 2px; width: 100%;
+    background: var(--dusk-rose);
+  }
+
+  /* The follow: no plate, no mark, no amount. A capsule and a name. */
+  .plate[data-quiet] {
+    width: auto; min-width: 260px; padding: 9px 18px;
+    grid-template-columns: 1fr; gap: 0;
+    background: color-mix(in srgb, var(--dusk-card) 88%, transparent);
+  }
+  .plate[data-quiet] .mark,
+  .plate[data-quiet] .amount,
+  .plate[data-quiet] .rule { display: none; }
+  .plate[data-quiet] .headline { font-size: 18px; }
+  .plate[data-quiet] .eyebrow { font-size: 10px; }
+
+  .waiting { display: flex; gap: 8px; align-items: center; margin: 0; }
+  .waiting[hidden] { display: none; }
+  .ticks { font: 400 18px var(--font-mono); color: var(--dusk-ink-faint); letter-spacing: 4px; }
+  .count { font: 400 11px var(--font-mono); color: var(--dusk-ink-faint); }
+</style>
