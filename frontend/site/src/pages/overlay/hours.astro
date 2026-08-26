@@ -1,0 +1,121 @@
+---
+/* The planetary hours strip — surface 5.
+ *
+ * Past, current, next. It does exactly one thing, roughly once an hour: the
+ * hour turns over. That moment is the only animation this surface ever needs,
+ * and between turnovers it must compose nothing at all — the seconds are not
+ * shown here, so there is genuinely nothing to repaint for an hour.
+ */
+import "../../styles/global.css";
+import "../../styles/overlay.css";
+import { SITE_API } from "../../lib/api";
+
+export const prerender = false;
+
+const token = Astro.url.searchParams.get("t") ?? "";
+const lat = Number(Astro.url.searchParams.get("lat") ?? 37.9838);
+const lon = Number(Astro.url.searchParams.get("lon") ?? 23.7275);
+
+let d: any = null;
+let motion = "reduced";
+let skin = "almanac";
+if (token) {
+  try {
+    const meta = await fetch(`${SITE_API}/api/overlay/counter?t=${encodeURIComponent(token)}`);
+    if (meta.ok) { const m = await meta.json(); motion = m.motion; skin = m.appearance; }
+    const r = await fetch(`${SITE_API}/api/overlay/hours?t=${encodeURIComponent(token)}&lat=${lat}&lon=${lon}`);
+    if (r.ok) d = await r.json();
+  } catch { /* held, never blanked */ }
+}
+
+/* Text presentation, or a client substitutes a colour-emoji font and the mark
+   stops taking the ink colour. */
+const TEXT = "︎";
+const GLYPH: Record<string, string> = {
+  Sun: `☉${TEXT}`, Moon: `☾${TEXT}`, Mars: `♂${TEXT}`, Mercury: `☿${TEXT}`,
+  Jupiter: `♃${TEXT}`, Venus: `♀${TEXT}`, Saturn: `♄${TEXT}`,
+};
+const ROMAN = ["", "i", "ii", "iii", "iv", "v", "vi", "vii", "viii", "ix", "x", "xi", "xii"];
+const cells = d ? [d.past, d.current, d.next] : [null, null, null];
+
+/* How far through the current hour we are, so the rule can show it without
+   anything having to tick. */
+let through = 0;
+if (d?.current?.startsAt && d?.current?.endsAt) {
+  const a = new Date(d.current.startsAt).getTime();
+  const b = new Date(d.current.endsAt).getTime();
+  through = Math.max(0, Math.min(100, ((Date.now() - a) / (b - a)) * 100));
+}
+---
+
+<html lang="en">
+  <head><meta charset="utf-8" /><title>hours</title>
+    <meta name="robots" content="noindex, nofollow" /></head>
+  <body>
+    <div class="ov ov-hours" data-skin={skin} data-motion={motion}>
+      <div class="ov-plate strip">
+        {!d || d.unreachable ? (
+          <p class="held">
+            <span class="ov-eyebrow">Planetary hours</span>
+            <span class="held-say">{token ? "Waiting for the ephemeris." : "Overlay connected · no token."}</span>
+          </p>
+        ) : (
+          <>
+            {cells.map((c: any, i: number) => (
+              <div class="cell" data-now={i === 1 ? "" : undefined}>
+                <span class="g t-glyph" aria-hidden="true">{c ? GLYPH[c.ruler] ?? "" : ""}</span>
+                <span class="who">{c?.ruler ?? "—"}</span>
+                <span class="ord ov-fig">
+                  {c ? `${ROMAN[c.index] ?? c.index} · ${c.isNight ? "night" : "day"}` : ""}
+                </span>
+                {i === 1 && <span class="run" style={`width:${through}%`}></span>}
+              </div>
+            ))}
+            <div class="tail">
+              <span class="ov-eyebrow">the day belongs to</span>
+              <span class="day">{GLYPH[d.dayRuler] ?? ""} {d.dayRuler}</span>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  </body>
+</html>
+
+<style>
+  /* Handoff §4: 620 x 76, left 64, top 64. */
+  .ov-hours .strip {
+    position: absolute; left: 64px; top: 64px; width: 620px; height: 76px;
+    display: flex; align-items: stretch; padding: 0; overflow: hidden;
+  }
+  .cell {
+    position: relative; flex: 1; display: grid; align-content: center;
+    gap: 1px; padding: 0 14px; min-width: 0;
+    border-right: 1px solid var(--dusk-line);
+  }
+  .cell:last-of-type { border-right: none; }
+  /* Past and next are quiet; only the current hour is fully inked, so the
+     strip reads as "where we are" rather than as three equal facts. */
+  .cell .who { font: 500 15px var(--font-display); color: var(--dusk-ink-faint); }
+  .cell .g { font: 400 17px var(--font-display); color: var(--dusk-ink-faint); font-variant-emoji: text; }
+  .cell .ord { font: 400 10px var(--font-mono); color: var(--dusk-ink-faint); letter-spacing: .06em; }
+  .cell[data-now] { background: color-mix(in srgb, var(--dusk-veil) 60%, transparent); }
+  .cell[data-now] .who { color: var(--dusk-ink); font-size: 18px; }
+  .cell[data-now] .g { color: var(--dusk-accent); font-size: 20px; }
+  .cell[data-now] .ord { color: var(--dusk-ink-soft); }
+
+  /* How far through this hour we are. Set once at render — nothing ticks. */
+  .run {
+    position: absolute; left: 0; bottom: 0; height: 2px;
+    background: var(--dusk-rose);
+  }
+
+  .tail {
+    display: grid; align-content: center; gap: 2px; padding: 0 16px;
+    border-left: 1px solid var(--dusk-line); flex: none;
+  }
+  .day { font: 500 14px var(--font-display); color: var(--dusk-ink-soft); white-space: nowrap; }
+
+  .held { margin: 0; padding: 0 16px; display: grid; align-content: center; gap: 3px; }
+  .held-say { font: 400 15px var(--font-display); color: var(--dusk-ink-soft); }
+</style>

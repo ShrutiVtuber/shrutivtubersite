@@ -134,3 +134,46 @@ def test_the_overlay_background_is_transparent() -> None:
     css = (SRC / "styles" / "overlay.css").read_text(encoding="utf-8")
     assert "background: transparent !important" in css
     assert "overflow: hidden" in css, "a scrollbar on a stream is a visible bug"
+
+
+def test_the_instruments_never_ship_an_ephemeris_to_the_browser() -> None:
+    """
+    The overlay renders on her streaming machine, beside the encoder. Positions
+    are computed on the server and pushed as finished numbers; the page draws
+    them and does nothing else. An ephemeris running in that browser costs
+    frames on the stream.
+    """
+    for name in ("sky.astro", "hours.astro"):
+        page = (SRC / "pages" / "overlay" / name).read_text(encoding="utf-8")
+        body = page.split("<script>")[-1] if "<script>" in page else ""
+        for forbidden in ("Math.sin", "Math.cos", "julian", "ephemeris"):
+            assert forbidden not in body, (
+                f"{name}'s client script computes astronomy — it must not")
+
+
+def test_the_sky_clock_stops_when_the_surface_is_hidden() -> None:
+    """
+    The seconds digit is the only thing that repaints. An overlay not in the
+    scene must compose no frames at all.
+    """
+    page = (SRC / "pages" / "overlay" / "sky.astro").read_text(encoding="utf-8")
+    assert "visibilitychange" in page
+    assert "clearInterval" in page
+
+
+def test_the_hours_strip_composes_nothing_between_turnovers() -> None:
+    """
+    It shows no seconds, so between one hour and the next there is genuinely
+    nothing to repaint — and there must be no interval pretending otherwise.
+    """
+    page = (SRC / "pages" / "overlay" / "hours.astro").read_text(encoding="utf-8")
+    assert "setInterval" not in page
+
+
+def test_drift_is_reported_rather_than_animated() -> None:
+    """
+    The Moon moves about half a degree an hour. A moving dot would be a lie at
+    stream length, so the honest liveness tell is the rate in words.
+    """
+    page = (SRC / "pages" / "overlay" / "sky.astro").read_text(encoding="utf-8")
+    assert "drift(" in page and "/ h" in page

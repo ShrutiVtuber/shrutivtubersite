@@ -193,8 +193,15 @@ const nameOf = (id: number | null) =>
     <section class="block">
       <h2>Overlays</h2>
       <p class="fine">
-        Each is a separate Browser Source. Add only the ones you want; none
-        depends on another being present.
+        Each is a separate Browser Source at <strong>1920 × 1080</strong>. Add
+        only the ones you want; none depends on another being present, and each
+        draws in its own corner of the canvas so several can overlap without
+        colliding.
+      </p>
+      <p class="fine">
+        The sky chart and the hours strip take an optional
+        <code>&amp;lat=</code> and <code>&amp;lon=</code> — without them they
+        use Athens.
       </p>
       {overlays.length > 0 && (
         <ul class="list">
@@ -224,13 +231,18 @@ const nameOf = (id: number | null) =>
         <CsrfField />
         <input type="hidden" name="action" value="new-overlay" />
         <label><span>Surface</span>
-          <select name="kind"><option value="counter">Counter bar</option></select></label>
+          <select name="kind">
+            <option value="counter">Counter bar</option>
+            <option value="alerts">Alerts</option>
+            <option value="sky">Sky chart</option>
+            <option value="hours">Planetary hours</option>
+          </select></label>
         <label><span>Size</span>
           <select name="size">
             <option value="wide">Wide — 1360px</option>
             <option value="compact">Compact — 620px</option>
           </select></label>
-        <label><span>Which counter</span>
+        <label><span>Which counter <em class="fine">counter bar only</em></span>
           <select name="counter_id">
             <option value="">— none yet —</option>
             {counters.map((c: any) => <option value={c.id}>{c.name}</option>)}

@@ -1,0 +1,219 @@
+---
+/* The sky chart — surface 4, and the reason this set is worth building.
+ *
+ * A live figure of the day's sky, on screen while she writes the software that
+ * computes it.
+ *
+ * **What ticks is the clock, not the bodies.** The Moon moves about half a
+ * degree an hour — invisible over a minute, and an animated dot would be a lie
+ * at stream length. The honest signal that this is live is the drift rate
+ * beside it and a seconds digit that never stops: one text node repainting,
+ * which is also the cheapest thing that could possibly run on her machine.
+ *
+ * Positions arrive finished from the server. No ephemeris ships to the
+ * browser — it renders beside the encoder, and frames are the budget.
+ */
+import "../../styles/global.css";
+import "../../styles/overlay.css";
+import { SITE_API } from "../../lib/api";
+
+export const prerender = false;
+
+const token = Astro.url.searchParams.get("t") ?? "";
+const lat = Number(Astro.url.searchParams.get("lat") ?? 37.9838);
+const lon = Number(Astro.url.searchParams.get("lon") ?? 23.7275);
+
+let d: any = null;
+let motion = "reduced";
+let skin = "almanac";
+if (token) {
+  try {
+    const meta = await fetch(`${SITE_API}/api/overlay/counter?t=${encodeURIComponent(token)}`);
+    if (meta.ok) { const m = await meta.json(); motion = m.motion; skin = m.appearance; }
+    const r = await fetch(`${SITE_API}/api/overlay/sky?t=${encodeURIComponent(token)}&lat=${lat}&lon=${lon}`);
+    if (r.ok) d = await r.json();
+  } catch { /* held, never blanked */ }
+}
+
+const TEXT = "︎";
+const GLYPH: Record<string, string> = {
+  Sun: `☉${TEXT}`, Moon: `☾${TEXT}`, Mercury: `☿${TEXT}`, Venus: `♀${TEXT}`,
+  Mars: `♂${TEXT}`, Jupiter: `♃${TEXT}`, Saturn: `♄${TEXT}`,
+};
+/* U+FE0E on every one, or a client swaps in a colour-emoji font and the
+   sector marks stop taking the ink colour. */
+const SIGN_GLYPH = "♈♉♊♋♌♍♎♏♐♑♒♓".split("").map((g) => g + TEXT);
+const SIGNS = ["Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo",
+               "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces"];
+
+const R = 148;          // the wheel
+const CX = 164;
+const CY = 164;
+
+/* 0° Aries at the left, running anticlockwise — the way every chart on this
+   site is already drawn, so this reads as the same instrument as /tools. */
+const pos = (lonDeg: number, radius: number) => {
+  const a = ((180 - lonDeg) * Math.PI) / 180;
+  return { x: CX + radius * Math.cos(a), y: CY - radius * Math.sin(a) };
+};
+
+const bodies = (d?.bodies ?? []) as any[];
+const moon = bodies.find((b) => b.name === "Moon");
+
+/* Degrees per hour as degrees-and-minutes, which is how an astrologer reads a
+   rate and how the handoff writes it. */
+function drift(perHour: number): string {
+  const sign = perHour < 0 ? "−" : "+";
+  const abs = Math.abs(perHour);
+  const deg = Math.floor(abs);
+  const min = Math.round((abs - deg) * 60);
+  return `${sign}${deg}°${String(min).padStart(2, "0")}′ / h`;
+}
+function inHours(h: number | null): string {
+  if (h === null || h === undefined) return "";
+  if (h < 1) return `${Math.round(h * 60)} min`;
+  return `${h.toFixed(1)} h`;
+}
+---
+
+<html lang="en">
+  <head><meta charset="utf-8" /><title>sky</title>
+    <meta name="robots" content="noindex, nofollow" /></head>
+  <body>
+    <div class="ov ov-sky" data-skin={skin} data-motion={motion}>
+      <div class="ov-plate chart">
+        {!d || d.unreachable || bodies.length === 0 ? (
+          <p class="held">
+            <span class="ov-eyebrow">The sky</span>
+            <span class="held-say">{token ? "Waiting for the ephemeris." : "Overlay connected · no token."}</span>
+          </p>
+        ) : (
+          <>
+            <div class="head">
+              <span class="ov-eyebrow">The sky now</span>
+              <!-- The one thing that repaints, and the honest tell that this
+                   is live rather than a picture. -->
+              <span class="clock ov-fig" data-clock>—</span>
+            </div>
+
+            <svg viewBox="0 0 328 328" width="328" height="328" aria-hidden="true">
+              <circle cx={CX} cy={CY} r={R} class="rim" />
+              <circle cx={CX} cy={CY} r={R - 30} class="rim inner" />
+              {SIGNS.map((_, i) => {
+                const a = pos(i * 30, R);
+                const b = pos(i * 30, R - 30);
+                return <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} class="spoke" />;
+              })}
+              {SIGN_GLYPH.map((g, i) => {
+                const p = pos(i * 30 + 15, R - 15);
+                const here = bodies.some((b) => SIGNS.indexOf(b.sign) === i);
+                return <text x={p.x} y={p.y + 5} class={here ? "sg on" : "sg"}
+                             text-anchor="middle">{g}</text>;
+              })}
+              {(d.aspects ?? []).slice(0, 8).map((asp: any) => {
+                const from = bodies.find((b) => b.name === asp.from);
+                const to = bodies.find((b) => b.name === asp.to);
+                if (!from || !to) return null;
+                const a = pos(from.longitude, R - 52);
+                const b = pos(to.longitude, R - 52);
+                return <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} class="chord" />;
+              })}
+              {bodies.map((b: any) => {
+                const p = pos(b.longitude, R - 52);
+                return (
+                  <g>
+                    <text x={p.x} y={p.y + 6} class="bg" text-anchor="middle">{GLYPH[b.name]}</text>
+                    {b.retrograde && <text x={p.x + 11} y={p.y - 5} class="rx">℞</text>}
+                  </g>
+                );
+              })}
+            </svg>
+
+            <dl class="read">
+              {bodies.slice(0, 3).map((b: any) => (
+                <div class="row">
+                  <dt><span class="t-glyph" aria-hidden="true">{GLYPH[b.name]}</span> {b.name}</dt>
+                  <span class="lead" aria-hidden="true"></span>
+                  <dd class="ov-fig">{b.degree.toFixed(0)}° {b.sign}</dd>
+                </div>
+              ))}
+              {moon && (
+                <div class="row drift">
+                  <dt>drifting</dt>
+                  <span class="lead" aria-hidden="true"></span>
+                  <dd class="ov-fig">{drift(moon.perHour)}</dd>
+                </div>
+              )}
+              {moon?.ingressInHours && (
+                <div class="row">
+                  <dt>enters {SIGNS[(SIGNS.indexOf(moon.sign) + 1) % 12]}</dt>
+                  <span class="lead" aria-hidden="true"></span>
+                  <dd class="ov-fig">in {inHours(moon.ingressInHours)}</dd>
+                </div>
+              )}
+            </dl>
+          </>
+        )}
+      </div>
+    </div>
+
+    <script>
+      /* The only thing on this page that repaints, and it is one text node.
+         Stopped when the surface is not in the scene, so a hidden overlay
+         composes nothing at all. */
+      const el = document.querySelector("[data-clock]") as HTMLElement | null;
+      let timer: number | undefined;
+      function tick() {
+        if (!el) return;
+        el.textContent = new Date().toLocaleTimeString("en-GB", { hour12: false });
+      }
+      function start() {
+        if (timer || !el) return;
+        tick();
+        timer = window.setInterval(tick, 1000);
+      }
+      function stop() {
+        if (timer) { clearInterval(timer); timer = undefined; }
+      }
+      document.addEventListener("visibilitychange", () =>
+        document.visibilityState === "visible" ? start() : stop());
+      start();
+
+      /* Positions are pushed, never computed here. A refetch on the hour is
+         enough: nothing on this wheel moves faster than the readout admits. */
+      setInterval(() => window.location.reload(), 15 * 60 * 1000);
+    </script>
+  </body>
+</html>
+
+<style>
+  /* Handoff §4: 428 wide, right 64, top 392. */
+  .ov-sky .chart {
+    position: absolute; right: 64px; top: 392px; width: 428px;
+    padding: 16px 18px 18px; display: grid; gap: 10px; justify-items: center;
+  }
+  .head { display: flex; justify-content: space-between; align-items: baseline; width: 100%; }
+  .clock { font: 400 15px var(--font-mono); color: var(--dusk-ink-soft); }
+
+  .rim { fill: none; stroke: var(--dusk-line); stroke-width: 1; }
+  .inner { stroke: var(--dusk-line); }
+  .spoke { stroke: var(--dusk-line); stroke-width: 1; }
+  .sg { font: 15px var(--font-display); fill: var(--dusk-ink-faint); }
+  /* A sector holding something is inked. Everything else recedes, so the eye
+     lands on where the sky actually is. */
+  .sg.on { fill: var(--dusk-accent); }
+  .chord { stroke: var(--dusk-line-strong); stroke-width: 1; stroke-dasharray: 2 3; }
+  .bg { font: 19px var(--font-display); fill: var(--dusk-ink); }
+  .rx { font: 10px var(--font-mono); fill: var(--dusk-rose); }
+
+  /* Dotted leaders, as the almanac rows on /today. Same instrument, same hand. */
+  .read { margin: 0; display: grid; gap: 6px; width: 100%; }
+  .row { display: flex; align-items: baseline; gap: 7px; }
+  .row dt { font: 400 14px var(--font-body); color: var(--dusk-ink-soft); flex: none; }
+  .lead { flex: 1 1 auto; border-bottom: 1px dotted var(--dusk-line-strong); transform: translateY(-4px); }
+  .row dd { margin: 0; font: 400 13px var(--font-mono); color: var(--dusk-ink); flex: none; }
+  .drift dd { color: var(--dusk-rose); }
+
+  .held { margin: 0; display: grid; gap: 3px; padding: 8px 0; }
+  .held-say { font: 400 15px var(--font-display); color: var(--dusk-ink-soft); }
+</style>

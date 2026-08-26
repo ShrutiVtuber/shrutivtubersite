@@ -134,6 +134,148 @@ async def events(t: str, since: int = 0,
     } for e in rows]}
 
 
+# ── the instruments ─────────────────────────────────────────────────────────
+
+SIGNS = ["Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo",
+         "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces"]
+
+# Drawn on the wheel, in the order the tradition names them. Uranus, Neptune
+# and Pluto are omitted deliberately: this is a Hellenistic instrument and the
+# outers are not part of that reading — the same choice /today already makes.
+DRAWN = ["Sun", "Moon", "Mercury", "Venus", "Mars", "Jupiter", "Saturn"]
+
+
+async def _from_daemon(path: str, params: dict) -> dict:
+    import os
+
+    import httpx
+
+    base = os.environ.get("SHRUTI_ASTRO_INTERNAL", "http://shruti-astro:8000").rstrip("/")
+    async with httpx.AsyncClient(timeout=10.0) as c:
+        r = await c.get(f"{base}{path}", params=params)
+    r.raise_for_status()
+    body = r.json()
+    return body.get("data", body)
+
+
+@router.get("/sky")
+async def sky(t: str, lat: float = 37.9838, lon: float = 23.7275,
+              session: AsyncSession = Depends(get_session)) -> dict:
+    """
+    The sky, as finished numbers.
+
+    **The client never computes astronomy.** Everything here — positions,
+    drift, the next ingress — is worked out on the server and pushed; the page
+    eases between two known sets and does nothing else. That is not tidiness:
+    OBS renders the overlay on her streaming machine, beside the encoder, and
+    an ephemeris running in that browser costs frames on the stream.
+
+    The drift figure is the point. The Moon moves about half a degree an hour,
+    so an animated dot would be a lie at stream length — the honest signal that
+    this is live is the rate beside it, and a clock that never stops.
+    """
+    await _overlay(t, session)
+
+    now = datetime.now(timezone.utc)
+    try:
+        chart = await _from_daemon("/chart", {
+            "when": now.isoformat(), "lat": lat, "lon": lon})
+    except Exception as exc:                        # noqa: BLE001
+        # The overlay holds its last state rather than blanking, so an
+        # unreachable ephemeris is reported and not raised.
+        log.warning("sky unavailable: %s", type(exc).__name__)
+        return {"at": now.isoformat(), "unreachable": True, "bodies": []}
+
+    bodies = []
+    for b in chart.get("bodies", []):
+        name = b.get("name", "")
+        if name not in DRAWN:
+            continue
+        lon_deg = float(b.get("longitude", 0.0))
+        # The daemon speaks degrees per DAY; the readout is per hour, which is
+        # the unit at which a stream-length change is legible.
+        per_hour = float(b.get("speed", 0.0)) / 24.0
+        dign = b.get("dignities") or {}
+        sign = dign.get("sign") or SIGNS[int(lon_deg // 30) % 12]
+
+        # How long until it changes sign, from where it is and how fast it is
+        # going. Retrograde bodies are walking backwards toward the boundary
+        # behind them, which is why the direction is taken from the sign of the
+        # speed rather than assumed.
+        into_sign = lon_deg % 30.0
+        ingress_in = None
+        if abs(per_hour) > 1e-6:
+            remaining = (30.0 - into_sign) if per_hour > 0 else into_sign
+            hours = remaining / abs(per_hour)
+            if hours <= 72:
+                ingress_in = round(hours, 2)
+
+        bodies.append({
+            "name": name,
+            "longitude": round(lon_deg, 4),
+            "sign": sign,
+            "degree": round(into_sign, 2),
+            "perHour": round(per_hour, 4),
+            "retrograde": bool(b.get("retrograde")),
+            "ingressInHours": ingress_in,
+        })
+
+    aspects = [{
+        "from": a.get("from"), "to": a.get("to"), "aspect": a.get("aspect"),
+    } for a in ((chart.get("aspects") or {}).get("configurations") or [])
+        if a.get("from") in DRAWN and a.get("to") in DRAWN]
+
+    return {"at": now.isoformat(), "bodies": bodies, "aspects": aspects[:12],
+            "ascendant": (chart.get("angles") or {}).get("ascendant")}
+
+
+@router.get("/hours")
+async def hours(t: str, lat: float = 37.9838, lon: float = 23.7275,
+                session: AsyncSession = Depends(get_session)) -> dict:
+    """
+    Past, current and next planetary hour.
+
+    Three cells, because the strip shows where the day has got to and not only
+    where it is. The turnover is the only thing this surface ever animates.
+    """
+    await _overlay(t, session)
+    now = datetime.now(timezone.utc)
+    try:
+        data = await _from_daemon("/planetary-hours", {
+            "when": now.isoformat(), "lat": lat, "lon": lon})
+    except Exception as exc:                        # noqa: BLE001
+        log.warning("hours unavailable: %s", type(exc).__name__)
+        return {"at": now.isoformat(), "unreachable": True}
+
+    all_hours = data.get("hours") or []
+    current = data.get("current") or {}
+    index = current.get("index")
+
+    def cell(h: dict | None) -> dict | None:
+        if not h:
+            return None
+        raw = h.get("index", 0)
+        night = bool(h.get("isNight"))
+        return {
+            "ruler": h.get("ruler", ""),
+            # Numbered within its own half. The daemon counts all twenty-four
+            # continuously, so the first hour of the night arrives as 13.
+            "index": raw - 12 if night and raw > 12 else raw,
+            "isNight": night,
+            "startsAt": h.get("startsAt"),
+            "endsAt": h.get("endsAt"),
+        }
+
+    by_index = {h.get("index"): h for h in all_hours}
+    return {
+        "at": now.isoformat(),
+        "dayRuler": data.get("dayRuler", ""),
+        "past": cell(by_index.get((index or 0) - 1)),
+        "current": cell(current),
+        "next": cell(by_index.get((index or 0) + 1)),
+    }
+
+
 # ── the admin side ──────────────────────────────────────────────────────────
 #
 # Separated from everything above by more than a comment: nothing above needs a

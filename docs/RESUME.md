@@ -30,18 +30,21 @@ against Germany by mistake and is marked not-applicable in
 | **vcordbot** — Discord bot | `bot/`, live at bot.shrutivtuber.com |
 | Twitch EventSub | `/admin/twitch` |
 | Counters + counter overlay | `/admin/counters`, `/overlay/counter` |
+| Alerts overlay — nine members, one queue | `/overlay/alerts` |
+| Sky chart + hours strip | `/overlay/sky`, `/overlay/hours` |
+| Guard: every sitemap page must be linked | `test_every_page_is_reachable.py` |
 
 ## In flight
 
 **The overlays.** Design handoff at `docs/design/HANDOFF_OVERLAYS.md`;
 reconciliation with the schema at `docs/design/OVERLAYS_DELTAS.md`.
 
-Six surfaces specified. **Counter bar is done.** Next, in this order:
+Six surfaces specified. **Counter bar, alerts, sky chart and hours strip are
+done.** Next:
 
-1. **Alerts** — Twitch events are already arriving, so this is the surface that
-   shows them
-2. Sky chart and planetary hours strip — the differentiators
-3. Ticker, countdown, the two web variants
+1. **Ticker and countdown** — the two remaining OBS surfaces
+2. **The two web variants** — counter bar and sky chart on the site itself,
+   themed and responsive rather than transparent and fixed
 4. Sound upload (§7): per-type file, per-type gain, global mute, served from
    her own origin and preloaded on connect
 
@@ -82,6 +85,10 @@ Six surfaces specified. **Counter bar is done.** Next, in this order:
 6. **Prod containers are baked images.** A new migration or module needs
    `--build` before it exists in the container.
 7. **`Astro.url` reports localhost behind Caddy.** Use `SITE_URL`.
+8. **A page can ship reachable by nobody.** `/collab` and `/official` were
+   built, deployed and in the sitemap with zero inbound links. Guarded now —
+   and the guard has to know that the instruments and the primary nav are
+   linked from DATA, not from literal hrefs.
 
 ## Access facts
 
