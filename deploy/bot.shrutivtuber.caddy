@@ -1,0 +1,48 @@
+# vcordbot — the Discord interactions endpoint.
+#
+# A separate site block rather than a path on shrutivtuber.com, because the bot
+# is a separate product that will eventually have its own domain. Moving it
+# then means editing this file and the OAuth redirect list, and nothing else.
+#
+# Install:
+#   sudo install -m 644 deploy/bot.shrutivtuber.caddy /etc/caddy/Caddyfile.d/
+#   sudo caddy-reload
+
+bot.shrutivtuber.com {
+    encode gzip zstd
+
+    tls {
+        dns cloudflare {env.CLOUDFLARE_API_TOKEN_SHRUTI}
+        resolvers 1.1.1.1 8.8.8.8
+        propagation_timeout 5m
+    }
+
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        X-Content-Type-Options "nosniff"
+        Referrer-Policy "no-referrer"
+        # Nothing here is a page. There is no HTML, no script and no browser
+        # audience — so everything is denied rather than narrowed.
+        Content-Security-Policy "default-src 'none'; frame-ancestors 'none'"
+        -Server
+    }
+
+    # Discord signs the timestamp CONCATENATED WITH THE EXACT REQUEST BODY, so
+    # anything that rewrites, re-encodes or re-compresses the body on its way
+    # through breaks verification — and breaks it in the one way that looks
+    # like a bug in our code. Caddy passes bodies through untouched; this note
+    # is here for whoever is tempted to add a body-rewriting directive.
+    reverse_proxy 127.0.0.1:8250 {
+        header_up X-Forwarded-Host {host}
+    }
+
+    log {
+        output file /var/log/caddy/bot.shrutivtuber.log {
+            roll_size 10mb
+            roll_keep 5
+        }
+        # The body carries interaction content. The default log does not
+        # include it, and it must stay that way.
+        format json
+    }
+}
