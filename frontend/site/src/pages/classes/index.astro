@@ -8,7 +8,7 @@
 import BaseLayout from "../../layouts/BaseLayout.astro";
 import SectionHeader from "../../components/brand/SectionHeader.astro";
 import EmptyState from "../../components/feedback/EmptyState.astro";
-import { site } from "../../lib/api";
+import { site, SITE_URL } from "../../lib/api";
 
 export const prerender = false;
 
@@ -22,6 +22,28 @@ interface CourseCard {
 const courses = (await site<CourseCard[]>("/api/classes")) ?? [];
 const classes = courses.filter((c) => c.kind === "class");
 const workshops = courses.filter((c) => c.kind === "workshop");
+
+/* The listing's own markup. Each course page already carries Course and
+   CourseInstance with its offer; this says what is on the list and in what
+   order. Classes and workshops are one list here because they are one list on
+   the page — splitting the markup while the page does not would describe a
+   page that does not exist. */
+const listLd = courses.length === 0 ? null : {
+  "@context": "https://schema.org",
+  "@type": "CollectionPage",
+  name: "Classes and workshops",
+  url: `${SITE_URL}/classes`,
+  mainEntity: {
+    "@type": "ItemList",
+    numberOfItems: courses.length,
+    itemListElement: courses.map((c, i) => ({
+      "@type": "ListItem",
+      position: i + 1,
+      url: `${SITE_URL}/classes/${c.slug}`,
+      name: c.title,
+    })),
+  },
+};
 
 const money = (c: CourseCard) =>
   c.priceCents === 0
@@ -40,6 +62,7 @@ const when = (iso: string | null) =>
 ---
 
 <BaseLayout
+  jsonLd={listLd}
   title="Classes — Shruti"
   description="Recorded classes and live workshops on astrology, theurgy and the software of practice."
 >

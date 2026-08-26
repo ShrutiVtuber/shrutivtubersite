@@ -12,16 +12,40 @@
 import BaseLayout from "../../layouts/BaseLayout.astro";
 import SectionHeader from "../../components/brand/SectionHeader.astro";
 import EmptyState from "../../components/feedback/EmptyState.astro";
-import { site, PATHS, type ShopProduct } from "../../lib/api";
+import { site, SITE_URL, PATHS, type ShopProduct } from "../../lib/api";
 
 export const prerender = false;
 
 const products = (await site<ShopProduct[]>(PATHS.products)) ?? [];
+/* An ItemList of what is for sale. The individual product pages already carry
+   full Product markup with an offer; this is the listing telling a crawler
+   what is on it and in what order, which is what makes the shop eligible to
+   surface as a set rather than as nine unrelated pages.
+
+   Only what is actually purchasable is listed. A sold-out or unopened row on
+   a list a search engine may show is an invitation to a dead end. */
+const listLd = products.length === 0 ? null : {
+  "@context": "https://schema.org",
+  "@type": "CollectionPage",
+  name: "Shop",
+  url: `${SITE_URL}/shop`,
+  mainEntity: {
+    "@type": "ItemList",
+    numberOfItems: products.length,
+    itemListElement: products.map((p, i) => ({
+      "@type": "ListItem",
+      position: i + 1,
+      url: `${SITE_URL}/shop/${p.slug}`,
+      name: p.name,
+    })),
+  },
+};
+
 const money = (p: ShopProduct) =>
   `${(p.priceCents / 100).toFixed(2)} ${p.currency.toUpperCase()}`;
 ---
 
-<BaseLayout title="Shop — Shruti" description="Printed matter, files and the odd object. The instruments on this site are free and always will be — this is for the things that cost something to make.">
+<BaseLayout jsonLd={listLd} title="Shop — Shruti" description="Printed matter, files and the odd object. The instruments on this site are free and always will be — this is for the things that cost something to make.">
   <div class="page">
     <SectionHeader
       glyph="✶"

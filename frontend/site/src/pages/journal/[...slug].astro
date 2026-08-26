@@ -20,6 +20,7 @@ import Masthead from "../../components/journal/Masthead.astro";
 import NotFound from "../../components/journal/NotFound.astro";
 import ReleasePage from "../../components/journal/ReleasePage.astro";
 import { read } from "../../lib/journal/parse";
+import { SITE_URL } from "../../lib/api";
 import { KIND_LABEL } from "../../lib/journal/types";
 import "../../styles/journal.css";
 
@@ -48,6 +49,35 @@ if (page && (page.type === "article" || page.type === "docs" || page.type === "w
   related = (index?.entries ?? []).filter((e) => e.href !== here);
 }
 
+/* The journal's own markup, which BeeRanked does not supply for an index.
+   An article page gets BlogPosting from the engine; a section index gets
+   nothing, so a crawler sees a list of links with no statement that it is a
+   blog or what is on it.
+
+   Only for indexes, and only when there is something to list — an empty
+   ItemList claims a page has contents it does not. */
+/* Every listing shape the engine has: the section front, the everything page,
+   a category, and a docs or wiki index. Not the sitemap, which is a directory
+   rather than a set of posts, and not an article, which BeeRanked already
+   marks up as a BlogPosting on its own. */
+const LISTINGS = new Set(["hub", "all", "index", "category"]);
+const isIndex = Boolean(page && LISTINGS.has(page.type));
+const listed = (page?.entries ?? []).filter((e: any) => e?.href && e?.title);
+const journalLd = !isIndex || listed.length === 0 ? null : {
+  "@context": "https://schema.org",
+  "@type": "Blog",
+  name: page.title,
+  description: page.description ?? undefined,
+  url: `${SITE_URL}/journal/${parts.join("/")}`.replace(/\/$/, ""),
+  blogPost: listed.slice(0, 50).map((e: any) => ({
+    "@type": "BlogPosting",
+    headline: e.title,
+    url: e.href.startsWith("http") ? e.href : `${SITE_URL}${e.href}`,
+    ...(e.date ? { datePublished: e.date } : {}),
+    ...(e.description ? { description: e.description } : {}),
+  })),
+};
+
 const LEDE: Record<string, string> = {
   hub: "Notes on practice, and on the software written as practice. Documentation for the instruments, and what changed in them.",
   all: "Everything in the section, newest first.",
@@ -57,6 +87,7 @@ const LEDE: Record<string, string> = {
 ---
 
 <BaseLayout
+  jsonLd={journalLd}
   title={page ? `${page.title} — Shruti` : "Nothing is filed here — Shruti"}
   description={page?.description}
 >
