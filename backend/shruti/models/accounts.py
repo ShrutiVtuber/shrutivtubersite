@@ -454,6 +454,16 @@ class SavedChart(TimestampMixin, table=True):
     # record still says what this person actually read after the wording
     # changes. Empty when the chart belongs to an account, where the consent
     # lives on the account.
+    # Their own face on the share card, put there by them.
+    #
+    # **Uploaded, never fetched.** Pulling somebody's avatar off Twitter or
+    # YouTube because a third person typed their handle puts a face on a
+    # shareable image without its owner agreeing — and for a VTuber that image
+    # is usually commissioned art with its own licence. Each side of a
+    # comparison carries the avatar its OWN owner uploaded, so nobody appears
+    # on a card they did not put themselves on.
+    avatar_media_id: Optional[int] = Field(default=None, foreign_key="media.id")
+
     consent_version: str = ""
     consent_wording: str = ""
     consent_source: str = ""

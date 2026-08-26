@@ -12,10 +12,11 @@
 import BaseLayout from "../../../../layouts/BaseLayout.astro";
 import SectionHeader from "../../../../components/brand/SectionHeader.astro";
 import SynastryTable from "../../../../components/chart/SynastryTable.astro";
+import Reading from "../../../../components/chart/Reading.astro";
 import ChartFigure from "../../../../components/chart/ChartFigure.astro";
 import EmptyState from "../../../../components/feedback/EmptyState.astro";
 import Prose from "../../../../components/content/Prose.astro";
-import { site, askAstro } from "../../../../lib/api";
+import { site, askAstro, SITE_URL } from "../../../../lib/api";
 import { renderMarkdown } from "../../../../lib/markdown";
 
 export const prerender = false;
@@ -35,12 +36,25 @@ const cross = c
     )
   : null;
 const d = cross?.data ?? null;
+
+/* What the tradition says about what is there. Generated from the
+   configurations, never a score — see backend/shruti/core/synastry.py. */
+const said = c ? await site<any>(`/api/charts/compare/s/${token}/reading`).catch(() => null) : null;
+
+/* The share image. Absolute, and pointed at the API rather than rendered
+   here: a card that a timeline fetches must not need a session. */
+const cardUrl = c ? `${SITE_URL}/api/charts/compare/s/${token}/card.png` : undefined;
 const readingHtml = c?.readingMd ? await renderMarkdown(c.readingMd) : "";
 const leftName = c?.left?.label || "The first";
 const rightName = c?.right?.label || "The second";
 ---
 
-<BaseLayout title="A comparison — Shruti" description="Two charts, read against each other." noindex>
+{/* Deliberately not noindex: this is the page people post, and a share card
+    that search engines and social scrapers refuse to fetch is a grey box.
+    The address is still unguessable and nothing on the site links to one. */}
+<BaseLayout title={`${c?.label || "Two charts"} — compared`}
+            description="Two charts, read against each other."
+            ogImage={cardUrl} ogImageAlt="Two charts compared">
   <div class="page shared-compare">
     {
       !c ? (
@@ -72,6 +86,13 @@ const rightName = c?.right?.label || "The second";
               </figure>
             ))}
           </div>
+
+          {
+            said && (
+              <Reading tally={said.tally} markers={said.markers}
+                       headline={said.headline} caveats={said.caveats} />
+            )
+          }
 
           {d && (
             <SynastryTable

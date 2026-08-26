@@ -12,13 +12,14 @@
 import BaseLayout from "../../../layouts/BaseLayout.astro";
 import SectionHeader from "../../../components/brand/SectionHeader.astro";
 import SynastryTable from "../../../components/chart/SynastryTable.astro";
+import Reading from "../../../components/chart/Reading.astro";
 import ChartFigure from "../../../components/chart/ChartFigure.astro";
 import CsrfField from "../../../components/forms/CsrfField.astro";
 import Button from "../../../components/forms/Button.astro";
 import EmptyState from "../../../components/feedback/EmptyState.astro";
 import Prose from "../../../components/content/Prose.astro";
 import { asReader } from "../../../lib/account";
-import { SITE_URL, askAstro } from "../../../lib/api";
+import { SITE_URL, askAstro, site } from "../../../lib/api";
 import { verifyCsrf } from "../../../lib/csrf";
 import { renderMarkdown } from "../../../lib/markdown";
 
@@ -78,13 +79,22 @@ const cross = c
   : null;
 const d = cross?.data ?? null;
 
+/* What the tradition says about what is there. Generated from the
+   configurations, never a score — see backend/shruti/core/synastry.py. */
+const said = c ? await site<any>(`/api/charts/compare/o/${token}/reading`).catch(() => null) : null;
+
+/* The share image. Absolute, and pointed at the API rather than rendered
+   here: a card that a timeline fetches must not need a session. */
+const cardUrl = c ? `${SITE_URL}/api/charts/compare/o/${token}/card.png` : undefined;
+
 const shareUrl = c?.shareToken ? `${SITE_URL}/chart/compare/s/${c.shareToken}` : "";
 const readingHtml = c?.readingMd ? await renderMarkdown(c.readingMd) : "";
 const leftName = c?.left?.label || "The first";
 const rightName = c?.right?.label || "The second";
 ---
 
-<BaseLayout title="A comparison — Shruti" description="Two charts, read against each other." noindex>
+<BaseLayout title="A comparison — Shruti" description="Two charts, read against each other."
+            ogImage={cardUrl} ogImageAlt="Two charts compared" noindex>
   <div class="page compare">
     {
       !c ? (
@@ -120,6 +130,13 @@ const rightName = c?.right?.label || "The second";
               </figure>
             ))}
           </div>
+
+          {
+            said && (
+              <Reading tally={said.tally} markers={said.markers}
+                       headline={said.headline} caveats={said.caveats} />
+            )
+          }
 
           {
             d ? (

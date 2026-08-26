@@ -59,7 +59,12 @@ def test_every_model_with_a_media_id_is_checked_before_deleting():
     first sign would be a blank picture on a live page.
     """
     import shruti.models as models
-    import shruti.models.accounts  # noqa: F401 — registers the rest of the tables
+    import shruti.models.accounts as account_models
+
+    # BOTH modules. Scanning only `shruti.models` and calling the result
+    # "every model" is how SavedChart gained an avatar column and stayed
+    # unguarded while this test went on passing.
+    modules = (models, account_models)
 
     def media_columns(model: type) -> set[str]:
         # Only real tables. A SQLModel declared with table=False can still carry
@@ -76,7 +81,8 @@ def test_every_model_with_a_media_id_is_checked_before_deleting():
 
     with_media = {
         model.__name__: media_columns(model)
-        for model in vars(models).values()
+        for module in modules
+        for model in vars(module).values()
         if isinstance(model, type)
         and getattr(model, "__tablename__", None)
         and media_columns(model)

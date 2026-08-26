@@ -1,0 +1,89 @@
+---
+/* What the tradition says about what is there.
+ *
+ * **A tally, never a score.** A percentage would look like a measurement of a
+ * relationship — it compresses a dozen incompatible classical judgments into
+ * one number and invites the reader to believe a machine has weighed them.
+ * "Fifteen harmonious to eleven hard" is simply a count, is true, and survives
+ * being screenshotted, which is the point.
+ *
+ * The caveats are ON the reading rather than in a footer. They travel with it,
+ * and the first one is the one /terms already promises: nothing here claims
+ * predictive validity.
+ */
+interface Marker { title: string; says: string; aspect: string; tone: string; detail: string }
+interface Props {
+  tally: { harmonious: number; hard: number; neither: number };
+  markers: Marker[];
+  headline: string;
+  caveats: string[];
+}
+const { tally, markers, headline, caveats } = Astro.props;
+---
+
+<section class="reading">
+  <div class="r-head">
+    <span class="t-eyebrow">What the tradition says</span>
+    <p class="r-tally">
+      <strong>{tally.harmonious}</strong> harmonious
+      <span class="r-sep">·</span>
+      <strong>{tally.hard}</strong> hard
+    </p>
+    <p class="r-headline">{headline}</p>
+  </div>
+
+  {
+    markers.length > 0 && (
+      <ul class="r-markers">
+        {markers.map((m) => (
+          <li data-tone={m.tone}>
+            <span class="r-title">{m.title}</span>
+            <span class="r-detail t-tabular">{m.detail}</span>
+            <p class="r-says">{m.says}</p>
+          </li>
+        ))}
+      </ul>
+    )
+  }
+
+  <ul class="r-caveats">
+    {caveats.map((c) => <li>{c}</li>)}
+  </ul>
+</section>
+
+<style>
+  .reading {
+    display: grid; gap: var(--space-5);
+    padding: var(--space-5);
+    background: var(--surface-card);
+    border: var(--border-w) solid var(--line);
+    border-radius: var(--radius-md);
+  }
+  .r-tally { font: 400 var(--text-h3) var(--font-display); color: var(--ink); margin: 8px 0 0; }
+  .r-tally strong { font-weight: 600; }
+  .r-sep { color: var(--ink-faint); margin: 0 8px; }
+  .r-headline { font: 400 var(--text-body) var(--font-body); color: var(--ink-soft); margin: 6px 0 0; }
+
+  .r-markers { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-4); }
+  .r-markers li {
+    display: grid; gap: 4px;
+    padding-left: var(--space-4);
+    border-left: 2px solid var(--line);
+  }
+  /* Colour only where the tradition itself divides them, and quietly. */
+  .r-markers li[data-tone="harmonious"] { border-left-color: var(--accent); }
+  .r-markers li[data-tone="hard"] { border-left-color: var(--rose); }
+  .r-title { font: 600 var(--text-body) var(--font-display); color: var(--ink); }
+  .r-detail { font: 400 var(--text-xs) var(--font-body); color: var(--ink-faint); }
+  .r-says { font: 400 var(--text-sm) / 1.7 var(--font-body); color: var(--ink-soft); margin: 4px 0 0; max-width: 62ch; }
+
+  .r-caveats {
+    list-style: none; margin: 0; padding: var(--space-4) 0 0;
+    border-top: var(--border-w) solid var(--line);
+    display: grid; gap: 8px;
+  }
+  .r-caveats li {
+    font: 400 var(--text-xs) / 1.7 var(--font-body); color: var(--ink-faint);
+    max-width: 68ch;
+  }
+</style>

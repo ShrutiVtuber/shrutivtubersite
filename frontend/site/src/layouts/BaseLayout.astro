@@ -23,8 +23,18 @@ interface Props {
   bare?: boolean;
   /** Kept out of search results — the admin, and anything behind sign-in. */
   noindex?: boolean;
+  /**
+   * A page-specific share image, absolute.
+   *
+   * A comparison generates its own — two avatars and a tally — because the
+   * share IS the feature and a link with no image is a grey box on every
+   * timeline it lands on.
+   */
+  ogImage?: string;
+  ogImageAlt?: string;
 }
-const { title, description = "", bare = false, noindex = false } = Astro.props;
+const { title, description = "", bare = false, noindex = false,
+        ogImage, ogImageAlt } = Astro.props;
 const siteUrl = import.meta.env.SHRUTI_SITE_URL ?? "https://shrutivtuber.com";
 
 const [live, links] = await Promise.all([
@@ -122,10 +132,10 @@ const jsonLd = isHome
     <meta property="og:title" content={title} />
     {description && <meta property="og:description" content={description} />}
     <meta property="og:url" content={new URL(Astro.url.pathname, siteUrl).href} />
-    <meta property="og:image" content={new URL("/social-card.png", siteUrl).href} />
+    <meta property="og:image" content={ogImage ?? new URL("/social-card.png", siteUrl).href} />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
-    <meta property="og:image:alt" content="Shruti — instruments for magick, astrology and divination" />
+    <meta property="og:image:alt" content={ogImageAlt ?? "Shruti — instruments for magick, astrology and divination"} />
     <meta name="twitter:card" content="summary_large_image" />
 
     {/* Runs before any stylesheet so a stored dark preference never flashes

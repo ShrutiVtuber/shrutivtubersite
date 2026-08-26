@@ -29,6 +29,7 @@ chart expires; opening it puts the clock back.
 """
 from __future__ import annotations
 
+import os
 import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Optional
@@ -41,6 +42,7 @@ from sqlmodel import select
 from shruti.api.routes.accounts import current_user
 from shruti.core.consents import CONSENT_VERSION, NATIVITY
 from shruti.core.db import get_session
+from shruti.models import Media
 from shruti.models.accounts import Comparison, SavedChart, User
 
 router = APIRouter(prefix="/api/charts", tags=["charts"])
@@ -564,3 +566,125 @@ async def open_shared_comparison(
         raise HTTPException(410, "this comparison has expired")
     left, right = await _load_comparison(row, session)
     return _comparison_view(row, left, right, owner=False)
+
+
+# ── the reading, and the image it travels as ────────────────────────────────
+
+
+async def _cross(left: SavedChart, right: SavedChart, tradition: str, orb: float) -> dict:
+    """Ask the ephemeris what the two charts do to each other."""
+    import httpx
+
+    def moment(c: SavedChart) -> str:
+        clock = "12:00" if c.time_unknown else (c.birth_time or "12:00")
+        return f"{c.birth_date}T{clock}:00"
+
+    # The same environment variable the journal reads. One name for one thing.
+    base = os.environ.get("SHRUTI_ASTRO_INTERNAL", "http://shruti-astro:8000").rstrip("/")
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        r = await client.get(f"{base}/synastry", params={
+            "when_a": moment(left), "lat_a": left.lat, "lon_a": left.lon,
+            "when_b": moment(right), "lat_b": right.lat, "lon_b": right.lon,
+            "tradition": tradition, "orb": orb,
+            "time_unknown_a": str(left.time_unknown).lower(),
+            "time_unknown_b": str(right.time_unknown).lower(),
+        })
+    r.raise_for_status()
+    body = r.json()
+    return body.get("data", body)
+
+
+@router.get("/compare/{which}/{token}/reading")
+async def reading(
+    which: str, token: str, session: AsyncSession = Depends(get_session)
+) -> dict:
+    """
+    What the tradition says about these two charts.
+
+    Generated from the configurations actually present. **Never a score** — see
+    `core/synastry.py` for why a percentage would be the dishonest shape.
+    """
+    if which not in ("o", "s"):
+        raise HTTPException(404, "no such comparison")
+    column = Comparison.owner_token if which == "o" else Comparison.share_token
+    row = (
+        await session.execute(select(Comparison).where(column == token))
+    ).scalar_one_or_none()
+    if row is None:
+        raise HTTPException(404, "no such comparison")
+
+    left, right = await _load_comparison(row, session)
+    try:
+        cross = await _cross(left, right, row.tradition, row.orb)
+    except Exception:                                  # noqa: BLE001
+        raise HTTPException(503, "the ephemeris could not be reached")
+
+    from shruti.core.synastry import read
+
+    return read(cross.get("byDegree", []),
+                left.label or "The first", right.label or "The second")
+
+
+@router.get("/compare/{which}/{token}/card.png")
+async def card(
+    which: str, token: str, session: AsyncSession = Depends(get_session)
+) -> Response:
+    """
+    The image a share turns into on a timeline.
+
+    Generated rather than screenshotted, so it is right every time and does not
+    depend on whose browser made it. Cached hard: the inputs are two birth
+    moments and neither changes.
+    """
+    if which not in ("o", "s"):
+        raise HTTPException(404, "no such comparison")
+    column = Comparison.owner_token if which == "o" else Comparison.share_token
+    row = (
+        await session.execute(select(Comparison).where(column == token))
+    ).scalar_one_or_none()
+    if row is None:
+        raise HTTPException(404, "no such comparison")
+
+    left, right = await _load_comparison(row, session)
+    try:
+        cross = await _cross(left, right, row.tradition, row.orb)
+        from shruti.core.synastry import read
+
+        said = read(cross.get("byDegree", []),
+                    left.label or "The first", right.label or "The second")
+    except Exception:                                  # noqa: BLE001
+        said = {"tally": {"harmonious": 0, "hard": 0},
+                "cardHeadline": "Two charts"}
+
+    async def avatar(chart: SavedChart) -> bytes | None:
+        if not chart.avatar_media_id:
+            return None
+        media = await session.get(Media, chart.avatar_media_id)
+        if media is None:
+            return None
+        try:
+            from shruti.core.storage import fetch
+
+            got = await fetch(media.filename)
+            return got[0] if got else None
+        except Exception:                              # noqa: BLE001
+            # A card without an avatar is a card. A 500 here would take out
+            # the page that embeds it.
+            return None
+
+    from shruti.core.sharecard import comparison_card
+
+    png = comparison_card(
+        left_name=left.label or "—",
+        right_name=right.label or "—",
+        headline=said.get("cardHeadline", ""),
+        harmonious=said["tally"]["harmonious"],
+        hard=said["tally"]["hard"],
+        left_avatar=await avatar(left),
+        right_avatar=await avatar(right),
+    )
+    return Response(
+        content=png,
+        media_type="image/png",
+        headers={"Cache-Control": "public, max-age=86400"},
+    )
