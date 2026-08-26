@@ -20,12 +20,37 @@ interface Props {
 const { status = "unknown", title, game, viewers, nextStream, href, compact = false } = Astro.props;
 const Tag = href ? "a" : "span";
 const word = status === "live" ? "Live" : status === "offline" ? "Offline" : "Status unavailable";
+
+/* `role="status"` REPLACES the implicit link role, and a status region does not
+   take its accessible name from its contents the way a link does — so as an
+   anchor this announced itself to a screen reader as a nameless thing in the
+   tab order, while looking perfectly labelled on screen. Caught by Lighthouse
+   on every page, because the header carries one.
+
+   The live region belongs to the text that changes, not to the anchor. As a
+   link it is a link and takes its name from its own words, which is what it
+   was showing all along; the status role moves inside.
+
+   No aria-label: one was tried and it made things worse. The hero badge shows
+   more than the word — "Offline · streams announced on Discord" — and a label
+   that does not contain every visible word is its own failure, because a voice
+   user saying what they can see then cannot activate it. */
+const linked = Boolean(href);
 const count = viewers != null ? new Intl.NumberFormat("en").format(viewers) : null;
 ---
 
-<Tag class="sh-live" data-status={status} href={href} role="status" aria-live="polite">
+<Tag
+  class="sh-live"
+  data-status={status}
+  href={href}
+  role={linked ? undefined : "status"}
+  aria-live={linked ? undefined : "polite"}
+>
   <span class="sh-dot" aria-hidden="true"></span>
-  <span class="sh-word">{word}</span>
+  {/* When this is a link the live region lives here, on the words that
+      actually change, rather than on the anchor. */}
+  <span class="sh-word" role={linked ? "status" : undefined}
+        aria-live={linked ? "polite" : undefined}>{word}</span>
   {
     !compact && status === "live" && (title || game) && (
       <span class="sh-meta">

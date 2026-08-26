@@ -32,7 +32,7 @@ const v = await astro<Version>("/version");
 ---
 
 <section class="prov">
-  <h3>Provenance</h3>
+  <h2 class="prov-head">Provenance</h2>
   <p class="prov-intro">
     The astrology is only as good as the engineering behind it, so the engineering is on the table.
   </p>
@@ -66,7 +66,11 @@ const v = await astro<Version>("/version");
 </section>
 
 <style>
-  .prov h3 { font: 600 var(--text-h4) var(--font-display); color: var(--ink); margin: 0 0 8px; }
+  /* h2, like the reckoning block above it. Both are top-level sections of
+     the aside — and where an instrument has no reckoning passage yet this is
+     the FIRST heading after the page's h1, which is how solar-stations and
+     lunar-stations were failing heading-order while the others passed. */
+  .prov-head { font: 600 var(--text-h4) var(--font-display); color: var(--ink); margin: 0 0 8px; }
   .prov-intro { margin: 0 0 12px; font-size: var(--text-sm); line-height: 1.6; color: var(--ink-soft); }
   .prov-rows {
     font-family: var(--font-mono);

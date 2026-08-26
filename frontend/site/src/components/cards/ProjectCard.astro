@@ -43,7 +43,7 @@ const st = STATUS[status] ?? STATUS.active;
   </div>
   <div class="sh-proj-body">
     <div class="sh-proj-top">
-      <h3 class="sh-proj-name">{name}</h3>
+      <h2 class="sh-proj-name">{name}</h2>
       <span class="sh-proj-status" data-tone={st.tone}>{st.word}</span>
     </div>
     {tagline && <p class="sh-proj-tag">{tagline}</p>}
@@ -98,6 +98,9 @@ const st = STATUS[status] ?? STATUS.active;
   .sh-proj-shot [data-horizon] { position: absolute; left: 0; right: 0; bottom: 0; height: 1px; background: var(--horizon-line); }
   .sh-proj-body { display: grid; gap: 8px; padding: 18px 20px 20px; }
   .sh-proj-top { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  /* h2 rather than h3: these follow the page's h1 with nothing between, on
+     /work and anywhere else a card appears. Named by class, so the level can
+     be right without the type size moving. */
   .sh-proj-name { font-family: var(--font-display); font-size: var(--text-h3); font-weight: 600; color: var(--ink); margin: 0; }
   .sh-proj-status {
     font-size: var(--text-micro);

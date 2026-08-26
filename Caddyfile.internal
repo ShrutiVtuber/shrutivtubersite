@@ -58,6 +58,40 @@
 		header Cache-Control "public, max-age=604800"
 	}
 
+	# ── Fonts ────────────────────────────────────────────────────────────────
+	#
+	# Every filename here carries a hash of its own contents
+	# (`commissioner-cf71c8ef.woff2`), so the bytes behind a given name can
+	# never change — which is exactly the condition `immutable` states. Astro
+	# serves everything in `public/` with `max-age=0`, because it cannot know
+	# that; we can.
+	#
+	# Worth doing rather than a micro-optimisation: Lighthouse measured 455 KiB
+	# being re-fetched on a repeat visit, and the two faces preloaded in the
+	# head are the ones a reader waits on before seeing a word.
+	handle /fonts/* {
+		reverse_proxy site:4321
+		header >Cache-Control "public, max-age=31536000, immutable"
+	}
+
+	# ── Unhashed static files ────────────────────────────────────────────────
+	#
+	# These keep their names across deploys, so `immutable` would be a lie —
+	# a changed favicon would never reach anybody who had seen the old one. A
+	# week is long enough to stop the repeat-visit refetch and short enough
+	# that a change lands without anyone having to clear anything.
+	#
+	# `first-paint.js` is deliberately NOT in here: it decides the theme before
+	# the first frame, and a stale copy is a flash of the wrong one.
+	@static_unhashed path /favicon.ico /favicon-32.png /apple-touch-icon.png /site.webmanifest /social-card.png
+	handle @static_unhashed {
+		reverse_proxy site:4321
+		# `>` replaces. Plain `header` APPENDS, which left two Cache-Control
+		# lines on the response — Astro's max-age=0 and ours — and a browser
+		# handed two of those believes the first.
+		header >Cache-Control "public, max-age=604800"
+	}
+
 	# ── Admin ───────────────────────────────────────────────────────────────
 	#
 	# Server-rendered by Astro rather than a separate React SPA. The design

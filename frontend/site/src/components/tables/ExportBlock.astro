@@ -34,7 +34,7 @@ const {
 
   <div class="eb-feed">
     <div class="eb-feed-head">
-      <h3>Subscribe to the feed</h3>
+      <h2 class="eb-head">Subscribe to the feed</h2>
       <span class="eb-tag">stays correct · notifies</span>
     </div>
     <p class="eb-body">
@@ -51,7 +51,7 @@ const {
 
   <div class="eb-rest">
     <div class="eb-col">
-      <h3 class="eb-sub">Download a snapshot</h3>
+      <h2 class="eb-sub">Download a snapshot</h2>
       <p class="eb-body">
         A fixed <code class="eb-inline">.ics</code> file of the range shown. It does not update —
         <strong>it will go stale</strong>, so take it only if you want exactly these dates and
@@ -64,7 +64,7 @@ const {
     {
       googleLinks.length > 0 && (
         <div class="eb-col">
-          <h3 class="eb-sub">Add one station to Google</h3>
+          <h2 class="eb-sub">Add one station to Google</h2>
           <p class="eb-body">A single event for a single station, if you only keep one of the four.</p>
           <div class="eb-pills">
             {googleLinks.map((g) => (
@@ -93,7 +93,12 @@ const {
     gap: 10px;
   }
   .eb-feed-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
-  .eb-feed-head h3 { margin: 0; font: 600 var(--text-h4) var(--font-display); color: var(--ink); }
+  /* h2, all three. They are three parallel ways to take the data away, at
+     the same level as each other and directly under the page's h1 — as h3
+     they skipped a level, and this block sits before the main column in the
+     DOM so its first heading was the first on the page. Sizes unchanged; the
+     classes carry them. */
+  .eb-feed-head .eb-head { margin: 0; font: 600 var(--text-h4) var(--font-display); color: var(--ink); }
   .eb-tag {
     font: 600 0.625rem var(--font-mono);
     letter-spacing: var(--tracking-caps);

@@ -47,7 +47,26 @@ const answer = await askAstro<{
   `/chart?when=${encodeURIComponent(moment)}&lat=${lat}&lon=${lon}` +
   `&tradition=${tradition}&house_system=${houseSystem}&vedic_style=${style}`,
 );
-const svg = answer?.data?.diagram?.svg ?? "";
+const raw = answer?.data?.diagram?.svg ?? "";
+
+/* The daemon marks the drawing `role="img"` and gives it no name, so a screen
+   reader announces "image" and stops. The daemon is the wrong place to fix it:
+   what this figure IS depends on the page that asked for it — a nativity, the
+   sky right now, somebody else's chart — and only the caller knows which.
+
+   So the name is set here, from the caption where there is one and from what
+   was actually asked for where there is not. Appended rather than replacing
+   anything: if the drawing ever grows a <title> of its own, that wins, because
+   an aria-label would silently override it. */
+const described = caption?.trim() ||
+  `Chart wheel for ${date}${timeUnknown ? "" : time ? `, ${time}` : ""}, ` +
+  `latitude ${lat.toFixed(2)}, longitude ${lon.toFixed(2)}` +
+  (timeUnknown ? ", time of day unknown so the angles are not drawn" : "");
+
+const svg = raw.includes("<title")
+  ? raw
+  : raw.replace(/<svg\b([^>]*)>/, (m, attrs) =>
+      /aria-label=/.test(attrs) ? m : `<svg${attrs} aria-label="${described.replace(/"/g, "&quot;")}">`);
 ---
 
 {

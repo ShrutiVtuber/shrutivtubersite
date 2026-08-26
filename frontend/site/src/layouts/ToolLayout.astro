@@ -151,7 +151,7 @@ const jsonLd = {
         {
           reckoned && (
             <section class="reckoned">
-              <h3>How it is reckoned</h3>
+              <h2>How it is reckoned</h2>
               <p>{reckoned}</p>
             </section>
           )
@@ -239,7 +239,10 @@ const jsonLd = {
   .tool-cols { display: flex; gap: var(--space-5); flex-wrap: wrap; align-items: start; }
   .tool-results { flex: 1 1 520px; min-width: 0; display: grid; gap: var(--space-4); }
   .tool-aside { flex: 1 1 280px; max-width: 440px; display: grid; gap: var(--space-5); }
-  .reckoned h3 { font: 600 var(--text-h4) var(--font-display); color: var(--ink); margin: 0 0 8px; }
+  /* h2, not h3. The aside comes before the main column in the DOM, so its
+     heading was the first after the page's h1 — a skipped level on every
+     instrument page. The tag is the outline; the size is unchanged. */
+  .reckoned h2 { font: 600 var(--text-h4) var(--font-display); color: var(--ink); margin: 0 0 8px; }
   .reckoned p { font: 400 var(--text-sm) / 1.7 var(--font-body); color: var(--ink-soft); margin: 0; }
   .theourgia-link { font: 500 var(--text-sm) var(--font-body); color: var(--accent); text-decoration: none; }
   .theourgia-link:hover { color: var(--accent-hover); text-decoration: underline; }

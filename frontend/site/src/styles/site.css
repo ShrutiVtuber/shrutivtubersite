@@ -160,7 +160,10 @@
   gap: var(--space-6);
   align-items: start;
 }
-.site-footer h4 {
+/* Was `h4`. These are top-level sections of the footer landmark, and on a
+   page whose deepest heading is h2 an h4 skips a level — in the footer of
+   every page on the site. The tag changed; not one value below did. */
+.site-footer .col-head {
   font-family: var(--font-body);
   font-size: var(--text-micro);
   font-weight: 600;

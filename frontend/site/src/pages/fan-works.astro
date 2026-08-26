@@ -50,6 +50,7 @@ const works = all.slice((page - 1) * PER_PAGE, page * PER_PAGE);
     {pageCount > 1 && <Pagination page={page} pageCount={pageCount} hrefFor={(p) => `/fan-works?page=${p}`} />}
 
     <EmptyState
+      as="h2"
       glyph="◐"
       title="Made something?"
       body="Tag it #ShrutiArts so it can be found, or send it through the contact form with the credit you want shown. Read the derivative work guidelines first — they're short."

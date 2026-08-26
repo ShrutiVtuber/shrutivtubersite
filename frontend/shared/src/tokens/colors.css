@@ -4,10 +4,28 @@
 :root{
   /* Dawn ramp (light) */
   --dawn-page:#F8F6F3; --dawn-card:#FFFFFF; --dawn-veil:#F1ECEF; --dawn-inset:#ECE7EB;
-  --dawn-ink:#26304A; --dawn-ink-soft:#4A5470; --dawn-ink-faint:#6E7890;
+  --dawn-ink:#26304A; --dawn-ink-soft:#4A5470;
+  /* Was #6E7890. Darkened 2026-08-26 — NOT a restyle, a defect.
+   *
+   * That value measured 4.10:1 on the page ground, 4.42 on cards, 3.78 on the
+   * veil and 3.62 on insets. WCAG AA wants 4.5:1 for text this size, so every
+   * eyebrow, caption and secondary label on the site failed, on every page.
+   *
+   * This is the minimum correction that clears 4.5 on all four grounds, at the
+   * SAME hue (222.4 deg) and the SAME saturation (13.4%) — only lightness
+   * moves, 0.498 to 0.432. Now 5.24 / 5.65 / 4.84 / 4.63.
+   *
+   * The dusk ramp was measured too and needed nothing: its faint ink already
+   * clears 4.62 against its darkest ground. */
+  --dawn-ink-faint:#5F677C;
   --dawn-line:#DCD6DC; --dawn-line-strong:#B9B3BE;
   --dawn-accent:#33639C; --dawn-accent-hover:#2A527F; --dawn-accent-wash:#E3EDF7;
-  --dawn-rose:#A85A76; --dawn-rose-hover:#914862; --dawn-rose-wash:#F6E7ED;
+  /* Was #A85A76. Same correction as the faint ink and for the same reason:
+   4.44 on the page, 4.10 on the veil, 3.92 on insets and 4.00 on its OWN
+   wash — which is where it is most often used, as a rose badge on rose.
+   Minimum darkening at the same hue (340.6 deg) and saturation; now
+   5.27 / 5.69 / 4.87 / 4.66 / 4.76. The hover was already darker and passes. */
+  --dawn-rose:#98506A; --dawn-rose-hover:#914862; --dawn-rose-wash:#F6E7ED;
   --dawn-live:#A62639; --dawn-live-wash:#F9E9EB;
   --dawn-sky-zenith:#A9CDEC; --dawn-sky-mid:#D9D3E8; --dawn-sky-horizon:#F2DCD9; --dawn-horizon-line:#C9A9B4;
   /* Dusk ramp (dark) */

@@ -158,8 +158,15 @@ const {
   }
   /* With scripting on, the coordinate boxes step back: they are the fallback,
      not the interface. They stay reachable and stay submitted. */
-  :global(html.js) .place-manual { opacity: 0.62; }
-  :global(html.js) .place-manual:focus-within { opacity: 1; }
+  /* This used to be `opacity: 0.62` when scripting is on, to push the manual
+     coordinates behind the search box. It made the labels 2.2:1 and the inputs
+     3.9:1 — unreadable text, in a form somebody may actually need when a place
+     will not resolve.
+     
+     Dimming is not available here: even 0.9 puts faint ink under 4.5, because
+     that token now sits at the minimum that passes. So the de-emphasis is
+     structural instead — the tokens already say which of these is secondary,
+     and this block is below the search and smaller than it. */
 </style>
 
 <script>

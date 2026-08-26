@@ -11,6 +11,7 @@ Both are one request.
 from __future__ import annotations
 
 import hashlib
+import re
 import json
 import logging
 from datetime import datetime, timezone
@@ -162,6 +163,46 @@ def _clean_tags(raw: str) -> str:
 
 
 
+def _dimensions(data: bytes, content_type: str) -> tuple[int | None, int | None]:
+    """
+    How big the image is, for both kinds of image.
+
+    Pillow reads rasters and cannot read SVG, which used to mean every vector
+    upload stored `null` for both — and a null width is an `<img>` with nothing
+    to reserve space with, so the page reflows when it arrives. That is a real
+    layout shift, and it was showing up in Lighthouse as an unsized image.
+
+    An SVG's size comes from its `viewBox` where it has one, because that is
+    the ratio that survives whatever `width` says; `width`/`height` attributes
+    are the fallback, and a percentage in either is correctly no answer at all.
+    """
+    if content_type == "image/svg+xml":
+        head = data[:4096].decode("utf-8", "replace")
+        box = re.search(
+            r'viewBox\s*=\s*["\']\s*[-\d.eE]+[ ,]+[-\d.eE]+[ ,]+'
+            r'([\d.eE]+)[ ,]+([\d.eE]+)', head)
+        if box:
+            try:
+                return round(float(box.group(1))), round(float(box.group(2)))
+            except ValueError:
+                return None, None
+        got: list[int | None] = []
+        for attr in ("width", "height"):
+            m = re.search(rf'<svg[^>]*?\b{attr}\s*=\s*["\']([\d.]+)(px)?["\']', head)
+            got.append(round(float(m.group(1))) if m else None)
+        return got[0], got[1]
+
+    try:
+        from io import BytesIO
+
+        from PIL import Image
+
+        with Image.open(BytesIO(data)) as im:
+            return im.size
+    except Exception:                              # noqa: BLE001
+        return None, None
+
+
 @router.post("/sounds", status_code=201)
 async def upload_sound(
     file: UploadFile = File(...),
@@ -268,16 +309,7 @@ async def upload_media(
             await session.refresh(existing)
         return _media_payload(existing) | {"deduped": True}
 
-    width = height = None
-    try:
-        from io import BytesIO
-
-        from PIL import Image
-
-        with Image.open(BytesIO(data)) as im:
-            width, height = im.size
-    except Exception:                              # noqa: BLE001 — SVG has no raster size
-        pass
+    width, height = _dimensions(data, file.content_type)
 
     # Storage decides where it goes: R2 when configured, disk otherwise, and
     # disk again if R2 is unreachable — an upload should not be lost because a

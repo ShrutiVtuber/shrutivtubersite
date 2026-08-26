@@ -118,6 +118,25 @@ const homeLd = isHome
     {/* A crescent rather than the wordmark: at sixteen pixels a wordmark is a
         smudge, and the brief forbids inventing a seal. Transparent, so it
         reads on a light tab bar and a dark one. */}
+    {/* The two faces every page paints before anything else.
+     *
+     * Without these, Lighthouse measured the layout shift on this site as
+     * entirely "Web font loaded": text drew in the fallback, the real face
+     * arrived, and every line reflowed. Discovered as a CLS of 0.126 on
+     * /about, which is a visible jump, not a number.
+     *
+     * Only the LATIN subsets, and only these two families. Both are variable
+     * fonts, so one file each covers every weight the design uses — 36 KB and
+     * 43 KB. The Greek and Devanagari subsets are left to load on demand,
+     * because a reader of an English page must not pay for scripts that page
+     * never shows. `crossorigin` is required even though these are same-origin:
+     * fonts are fetched in CORS mode, and without it the preload is ignored
+     * and quietly fetched a second time. */}
+    <link rel="preload" as="font" type="font/woff2" crossorigin
+          href="/fonts/commissioner-cf71c8ef.woff2" />
+    <link rel="preload" as="font" type="font/woff2" crossorigin
+          href="/fonts/ebgaramond-ef73a8c5.woff2" />
+
     <link rel="icon" href="/favicon.ico" sizes="any" />
     <link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />

@@ -37,7 +37,7 @@ const svg = icons[`../../icons/${platform}.svg`] ?? null;
         <span class="sh-vid-play" aria-hidden="true">▶</span>
         {duration && <span class="sh-vid-dur">{duration}</span>}
       </span>
-      <h3 class="sh-vid-title">{title}</h3>
+      <h2 class="sh-vid-title">{title}</h2>
       <span class="sh-vid-meta">
         <span class="sh-vid-plat">
           {svg && <i aria-hidden="true" set:html={svg} />}
@@ -96,6 +96,10 @@ const svg = icons[`../../icons/${platform}.svg`] ?? null;
     padding: 2px 6px;
   }
   .sh-vid:hover .sh-vid-thumb { border-color: var(--line-strong); box-shadow: var(--shadow-2); }
+/* h2, like the project cards and for the same reason: on /videos these
+     follow the page's h1 with nothing between them, so h3 skipped a level.
+     The class carries the size, so the outline could be corrected without
+     the design moving. */
   .sh-vid-title {
     font-size: var(--text-sm);
     font-weight: 600;

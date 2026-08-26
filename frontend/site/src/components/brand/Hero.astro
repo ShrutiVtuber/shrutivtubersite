@@ -15,13 +15,17 @@ interface Props {
   subtitle?: string;
   art?: string | null;
   artAlt?: string;
+  /** Intrinsic size of `art`, so the browser reserves its box before it lands. */
+  artWidth?: number;
+  artHeight?: number;
   clouds?: string | null;
   minHeight?: number;
   /** Full-bleed: the sky spans the viewport, the words stay in the column. */
   bleed?: boolean;
 }
 const {
-  greeting, title, subtitle, art, artAlt = "", clouds, minHeight = 420, bleed = false,
+  greeting, title, subtitle, art, artAlt = "", artWidth, artHeight,
+  clouds, minHeight = 420, bleed = false,
 } = Astro.props;
 ---
 
@@ -41,7 +45,25 @@ const {
     <div class="sh-hero-actions"><slot name="actions" /></div>
     <div class="sh-hero-foot"><slot name="footnote" /></div>
   </div>
-  {art && <img class="sh-hero-art" src={art} alt={artAlt} />}
+  {art && (
+    /* The hero art is the Largest Contentful Paint on any page that has one,
+       so it gets every hint there is:
+         - AVIF and WebP beside the original, which took the avatar from 226 KB
+           to 14 KB. The browser picks; the original stays as the last source
+           so nothing regresses for a client that wants it.
+         - `fetchpriority="high"`, because it is discovered in markup like any
+           other image and would otherwise queue behind the stylesheets.
+         - width and height, so its box exists before it arrives.
+       Never `loading="lazy"`: lazy-loading the LCP element delays the very
+       thing the metric measures. */
+    <picture>
+      <source srcset={art.replace(/\.(png|jpe?g)$/i, ".avif")} type="image/avif" />
+      <source srcset={art.replace(/\.(png|jpe?g)$/i, ".webp")} type="image/webp" />
+      <img class="sh-hero-art" src={art} alt={artAlt}
+           width={artWidth} height={artHeight}
+           fetchpriority="high" decoding="async" />
+    </picture>
+  )}
   <div class="sh-hero-horizon" aria-hidden="true"></div>
 </section>
 

@@ -449,8 +449,20 @@ const moonProgress = today ? (today.moon.tropical.degree % 30) / 30 : 0;
   }
   .r-name { font: 600 var(--text-micro) var(--font-body); letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; color: var(--ink-faint); }
   .r-val { font: 500 var(--text-body) var(--font-display); color: var(--ink); }
+  /* A link sitting inside a line of text has to be tellable from that text by
+   something other than colour — the accent is only 1.09:1 against the ink
+   beside it, which is invisible to most colour-blind readers and to anyone on
+   a poor screen. Underlined, like every other link in prose on this site. */
   .r-rule { grid-column: 2; font: 400 var(--text-xs) var(--font-body); color: var(--ink-faint); }
-  .r-rule a { color: var(--accent); text-decoration: none; }
+  .r-rule a {
+    color: var(--accent);
+    /* Was `none`. A link sitting inside a line of text has to be tellable from
+       that text by something other than colour — the accent is 1.09:1 against
+       the ink beside it, which is nothing at all to a colour-blind reader or
+       on a poor screen. Underlined, like every other link in prose here. */
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
   .undef { margin: 0; padding-left: 1.2em; font: 400 var(--text-sm) / 1.6 var(--font-body); color: var(--ink-soft); }
 </style>
 

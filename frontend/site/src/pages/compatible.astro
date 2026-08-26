@@ -161,7 +161,10 @@ const ALMANAC = [
   description="Compare two birth charts and see what the tradition makes of the pair. Free, no account, about forty seconds — and it says what it cannot know."
   bare
 >
-  <main class="cx">
+  {/* id="main" is the skip link's target. The layout renders that
+      link on every page; a page with its own <main> has to carry the
+      anchor or the first thing a keyboard user presses does nothing. */}
+  <main id="main" class="cx">
 
     {/* ── 1. Sky hero ─────────────────────────────────────────────────── */}
     <section class="sky cx-hero">

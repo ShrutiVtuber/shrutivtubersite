@@ -6,6 +6,24 @@
 @tailwind utilities;
 
 @layer base {
+  /* Links in running text are underlined.
+   *
+   * Tailwind's preflight sets `text-decoration: inherit` on every anchor,
+   * which in a paragraph means no underline at all — leaving COLOUR as the
+   * only thing separating a link from the words around it. The accent is about
+   * 1.2:1 against body ink, so to a colour-blind reader, or anyone on a poor
+   * screen or in sunlight, those links are invisible. Lighthouse caught it on
+   * /support, /contact, /privacy and /today.
+   *
+   * Scoped to running text — paragraphs, list text and definitions — so nav
+   * rows and card links, which are unambiguous by position, are untouched.
+   * Anything that only LOOKS like text but is a control opts out by class. */
+  :where(p, dd, blockquote, figcaption) a:not(.sh-btn):not([role="button"]) {
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    text-decoration-thickness: from-font;
+  }
+
   /* The page must paint its own ground. A transparent body borrows whatever
      is behind it, which in a dark client means dark-on-dark. */
   html {

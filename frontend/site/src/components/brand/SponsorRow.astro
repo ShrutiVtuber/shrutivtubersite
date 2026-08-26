@@ -16,6 +16,13 @@
  * engines ask to be told, it costs nothing, and not saying so is the kind of
  * small dishonesty that is expensive later.
  */
+interface Logo {
+  url: string;
+  alt: string;
+  width?: number | null;
+  height?: number | null;
+}
+
 interface Sponsor {
   slug: string;
   name: string;
@@ -24,8 +31,8 @@ interface Sponsor {
   ctaLabel: string;
   background: string;
   ink: string;
-  media: { url: string; alt: string } | null;
-  mediaDark: { url: string; alt: string } | null;
+  media: Logo | null;
+  mediaDark: Logo | null;
 }
 interface Props {
   sponsors: Sponsor[];
@@ -68,8 +75,14 @@ const { sponsors, bare = false } = Astro.props;
               }
               data-plain={!s.background || undefined}
             >
+              {/* width and height are load-bearing, not decoration: without
+                  them the browser reserves nothing and the row jumps when the
+                  logo arrives. CSS still decides the drawn size — the
+                  attributes only hand over the ratio to reserve space with. */}
               {s.media ? (
-                <img class="s-logo" src={s.media.url} alt={s.media.alt || s.name} loading="lazy" />
+                <img class="s-logo" src={s.media.url} alt={s.media.alt || s.name}
+                     width={s.media.width ?? undefined}
+                     height={s.media.height ?? undefined} loading="lazy" />
               ) : (
                 <span class="s-name">{s.name}</span>
               )}
