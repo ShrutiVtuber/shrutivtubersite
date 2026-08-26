@@ -211,7 +211,62 @@ integration included), Ko-fi (0–5%, and **no longer requires Gold**).
 
 ---
 
-## Reopened by the research
+## Decided after the research: it is free. All of it.
+
+26 August 2026. The paid tier is gone, and with it most of the plan's
+complexity and all of its risk.
+
+**What this removes outright.** Discord's 15%-rising-to-30% cut, the October
+2024 price-parity obligation, the either-user-SKUs-or-guild-SKUs restriction,
+the monthly-only limitation, entitlement checks, graceful downgrade, a customer
+portal, refunds, failed payments, and every support conversation that begins
+"I paid for". Phase 2 collapses from "dashboard and the free/paid split" to
+"dashboard".
+
+It also settles a decision the research had voided: **billing a person or a
+server is moot** when nothing is billed.
+
+**What this makes more important, not less.** The attribution footer is now on
+every message permanently, with no way to remove it — so it has to be
+genuinely tasteful. A footer people tolerate is worth everything here; a
+footer people remove the bot over costs everything. One line, subtext, never
+its own embed, never twice.
+
+**What success now means.** Not revenue. The bot is a growth engine for
+shrutivtuber.com — it puts nine instruments nobody else has in front of exactly
+the people who would want them, in rooms we could not otherwise reach. Measured
+in servers, in command use, and in sign-ups that arrive from that footer.
+
+**The natural ceiling worth knowing about.** Free to a server is not free to
+her: it is her CPU, her bandwidth and her on-call. That is fine at ten servers
+and a question at a thousand. Verification is still required past **100
+servers** — free does not exempt it.
+
+### Recommendation: drop member sync
+
+It was in scope because it was the strongest reason to pay. Nothing is paid
+now, and:
+
+- Discord syncs Twitch and YouTube natively and free
+- Patreon and Ko-fi both include Discord integration at no extra charge
+- The YouTube API is closed to us regardless
+- It is the largest chunk of work, the only real on-call risk, and the reason
+  we would hold other people's OAuth tokens — by a distance the biggest
+  security liability in the whole design
+
+Building it would mean taking on token custody for a feature the platform
+already provides free. **Not built unless a specific need appears that the
+native integrations genuinely cannot meet** — at which point the argument will
+be about reliability and cross-platform orchestration, and it can be made then
+with evidence.
+
+Consequence: **no privileged intents, no OAuth token storage, no verification
+of sensitive scopes.** The bot becomes something that can be reasoned about in
+an afternoon.
+
+---
+
+## Previously reopened, now closed
 
 1. **What is the paid tier, if not sync?** The instruments and the collab and
    comparison commands are the only things nobody else has.
