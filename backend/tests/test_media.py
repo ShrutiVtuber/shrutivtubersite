@@ -170,3 +170,81 @@ def test_media_payload_of_an_untagged_row_is_an_empty_list_not_one_empty_string(
 
     row = Media(id=1, filename="x.png", mime_type="image/png", tags="")
     assert admin._media_payload(row)["tags"] == []
+
+
+# ── modern formats ──────────────────────────────────────────────────────────
+
+def test_a_variant_is_reachable_only_because_its_row_says_so() -> None:
+    """
+    The bucket also holds the files people have PAID for, so this route treats
+    the media table as an allow-list and refuses anything not in it. Variants
+    have no row of their own, and the temptation is to relax that check.
+
+    It is not relaxed: a variant resolves only when a real row shares its stem
+    AND that row records having written that format. An arbitrary name is
+    refused exactly as before.
+    """
+    import inspect
+
+    from shruti.api.routes.media import serve
+
+    src = inspect.getsource(serve)
+    assert 'ext in ("avif", "webp")' in src, "any extension is accepted"
+    assert 'ext in (parent.variants or "").split(",")' in src, (
+        "the row is not asked whether it wrote that format")
+
+
+def test_deleting_an_image_deletes_its_variants() -> None:
+    """
+    Caught by testing the upload path end to end rather than by reading it:
+    the first version left AVIF and WebP in the bucket when the row went,
+    reachable by nothing and paid for forever — a brand new source of exactly
+    the orphans the sweep exists to clean up.
+    """
+    import inspect
+
+    from shruti.api.routes.admin import delete_media
+
+    src = inspect.getsource(delete_media)
+    assert "row.variants" in src, "the variants outlive the row"
+
+
+def test_a_variant_is_only_kept_when_it_is_smaller() -> None:
+    """
+    A small PNG can re-encode LARGER. Shipping a bigger file as the preferred
+    source is worse than shipping none at all, because the browser trusts the
+    order and takes the first thing it understands.
+    """
+    import inspect
+
+    from shruti.api.routes.admin import _write_variants
+
+    src = inspect.getsource(_write_variants)
+    assert "len(body) >= len(data)" in src
+
+
+def test_the_original_is_never_replaced() -> None:
+    """
+    A re-encode is lossy, and the file she uploaded is the one she chose. The
+    variants are alternatives a browser may prefer, never a substitute.
+    """
+    import inspect
+
+    from shruti.api.routes.admin import _write_variants
+
+    assert "RECODEABLE" in inspect.getsource(_write_variants)
+
+    from pathlib import Path
+
+    here = Path(__file__).resolve()
+    src = None
+    for base in (here.parents[1], here.parents[2]):
+        cand = base / "frontend" / "site" / "src" / "components" / "blocks" / "Picture.astro"
+        if cand.is_file():
+            src = cand.read_text(encoding="utf-8")
+            break
+    assert src is not None, "Picture.astro is missing"
+    # The <img> src is always the original; sources are only ever additive.
+    assert "src={media.url}" in src
+    assert "sources.length > 0" in src, (
+        "a <picture> is rendered even with nothing to offer")

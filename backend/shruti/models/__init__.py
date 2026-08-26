@@ -59,6 +59,15 @@ class Media(TimestampMixin, table=True):
     # a bucket that does not contain them.
     storage_backend: str = "local"      # local | r2
 
+    # Which modern formats exist beside the original, comma-separated:
+    # "avif,webp". Recorded rather than guessed, because the page has to know
+    # whether to offer a <source> BEFORE the browser asks for it — a source
+    # pointing at a file that is not there is a broken image, not a fallback.
+    #
+    # Empty for anything that cannot usefully be re-encoded: SVG is already
+    # small and lossless, and an animated GIF would lose its animation.
+    variants: str = ""
+
     # What she calls it. The filename is a content hash and always will be —
     # that is what makes the URL stable and the same image upload once — so the
     # human name is kept beside it and renaming never touches the file.

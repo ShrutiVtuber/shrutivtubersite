@@ -6,6 +6,8 @@
  * gradient with a "screenshot pending" plate and a horizon hairline. It is not
  * a placeholder to be replaced by a grey box.
  */
+import Picture from "../blocks/Picture.astro";
+
 interface Props {
   name: string;
   tagline?: string;
@@ -13,7 +15,13 @@ interface Props {
   status?: "active" | "maintained" | "archived";
   repoHref?: string;
   liveHref?: string;
-  screenshot?: string | null;
+  /** The whole media row, not just its URL — the alternative formats and the
+   *  dimensions live on it, and a bare string throws both away. */
+  screenshot?: {
+    url: string; alt?: string;
+    width?: number | null; height?: number | null;
+    sources?: { type: string; url: string }[] | null;
+  } | null;
   meta?: string;
 }
 const {
@@ -32,7 +40,7 @@ const st = STATUS[status] ?? STATUS.active;
   <div class="sh-proj-shot" data-empty={!screenshot}>
     {
       screenshot ? (
-        <img src={screenshot} alt={`${name} screenshot`} loading="lazy" />
+        <Picture media={screenshot} alt={`${name} screenshot`} />
       ) : (
         <Fragment>
           <span data-plate>screenshot pending</span>

@@ -11,8 +11,14 @@
  * on every page that uses them, and a floated image would need a second column
  * that none of those pages has.
  */
+import Picture from "./Picture.astro";
+
 interface Props {
-  media: { url: string; alt: string } | null;
+  media: {
+    url: string; alt: string;
+    width?: number | null; height?: number | null;
+    sources?: { type: string; url: string }[] | null;
+  } | null;
   /** Falls back to the block's own title when no alt text was written. */
   title?: string;
 }
@@ -21,12 +27,9 @@ const { media, title } = Astro.props;
 {
   media && (
     <figure class="sec-fig">
-      <img
-        src={media.url}
-        alt={media.alt || title || ""}
-        loading="lazy"
-        decoding="async"
-      />
+      {/* Through Picture so this gets the AVIF and WebP the uploader wrote,
+          and its own dimensions, without every block deciding separately. */}
+      <Picture media={media} alt={media.alt || title || ""} />
     </figure>
   )
 }

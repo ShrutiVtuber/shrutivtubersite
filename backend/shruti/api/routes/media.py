@@ -61,6 +61,23 @@ async def serve(
     known = (
         await session.execute(select(Media).where(Media.filename == filename))
     ).scalar_one_or_none()
+
+    if known is None:
+        # It may be a modern-format variant, which has no row of its own —
+        # `photo.avif` beside `photo.png`. The allow-list is NOT relaxed to let
+        # those through: the row is still required, and the row must itself say
+        # it wrote that format. A name whose stem matches nothing, or whose
+        # extension the row never recorded, is refused exactly as before.
+        stem, _, ext = filename.rpartition(".")
+        if stem and ext in ("avif", "webp"):
+            parent = (
+                await session.execute(
+                    select(Media).where(Media.filename.like(f"{stem}.%"))
+                )
+            ).scalars().first()
+            if parent is not None and ext in (parent.variants or "").split(","):
+                known = parent
+
     if known is None:
         raise HTTPException(404, "no such file")
 

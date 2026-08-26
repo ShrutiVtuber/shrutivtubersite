@@ -129,10 +129,19 @@ def _media_payload(m: Media) -> dict:
     """
     from shruti.core.storage import public_url
 
+    stem = m.filename.rsplit(".", 1)[0]
+    have = [v for v in (m.variants or "").split(",") if v]
+
     return {
         "id": m.id,
         "filename": m.filename,
         "url": public_url(m.filename, m.storage_backend),
+        # Sorted best-first, which is the order <picture> needs: a browser
+        # takes the FIRST source it understands, so avif must precede webp.
+        "sources": [
+            {"type": f"image/{v}", "url": public_url(f"{stem}.{v}", m.storage_backend)}
+            for v in ("avif", "webp") if v in have
+        ],
         "mimeType": m.mime_type,
         "width": m.width,
         "height": m.height,
@@ -161,6 +170,63 @@ def _clean_tags(raw: str) -> str:
             out.append(tag)
     return ",".join(out)
 
+
+
+# What can usefully be re-encoded. SVG is already small and lossless, and a GIF
+# would lose its animation — both are left exactly as uploaded.
+RECODEABLE = {"image/png", "image/jpeg", "image/webp"}
+
+
+async def _write_variants(filename: str, data: bytes, content_type: str) -> str:
+    """
+    Write AVIF and WebP beside the original, and say which ones landed.
+
+    Not a nicety: the four project thumbnails on the landing page are PNGs, and
+    Lighthouse put 121 KiB on that one page alone. The site's own hero art went
+    from 226 KB to 14 KB on the same treatment.
+
+    The ORIGINAL is always kept and always remains the `src`. These are extra
+    sources a browser may prefer, never a replacement — a re-encode is lossy,
+    and the file she uploaded is the one she chose.
+
+    A failure here is logged and swallowed. Losing a smaller copy of an image
+    is a slower page; losing the upload because the smaller copy failed is her
+    work gone.
+    """
+    if content_type not in RECODEABLE:
+        return ""
+
+    from io import BytesIO
+
+    from PIL import Image
+
+    from shruti.core.storage import put as store_media
+
+    stem = filename.rsplit(".", 1)[0]
+    written: list[str] = []
+    for fmt, ext, mime, opts in (
+        ("AVIF", ".avif", "image/avif", {"quality": 70}),
+        ("WEBP", ".webp", "image/webp", {"quality": 88, "method": 6}),
+    ):
+        try:
+            buf = BytesIO()
+            with Image.open(BytesIO(data)) as im:
+                if fmt == "AVIF" and im.mode not in ("RGB", "RGBA"):
+                    im = im.convert("RGBA")
+                im.save(buf, fmt, **opts)
+            body = buf.getvalue()
+            # Only if it actually helps. A small PNG can re-encode LARGER, and
+            # shipping a bigger file as the preferred source is worse than
+            # shipping none.
+            if len(body) >= len(data):
+                log.info("%s of %s was not smaller; skipped", fmt, filename)
+                continue
+            await store_media(f"{stem}{ext}", body, mime)
+            written.append(ext.lstrip("."))
+        except Exception as exc:                   # noqa: BLE001
+            log.warning("could not write %s for %s: %s", fmt, filename, type(exc).__name__)
+
+    return ",".join(written)
 
 
 def _dimensions(data: bytes, content_type: str) -> tuple[int | None, int | None]:
@@ -310,6 +376,7 @@ async def upload_media(
         return _media_payload(existing) | {"deduped": True}
 
     width, height = _dimensions(data, file.content_type)
+    variants = await _write_variants(filename, data, file.content_type)
 
     # Storage decides where it goes: R2 when configured, disk otherwise, and
     # disk again if R2 is unreachable — an upload should not be lost because a
@@ -320,7 +387,7 @@ async def upload_media(
 
     row = Media(filename=filename, mime_type=file.content_type,
                 width=width, height=height, size_bytes=len(data),
-                storage_backend=stored.backend,
+                storage_backend=stored.backend, variants=variants,
                 title=title.strip(), tags=_clean_tags(tags),
                 alt_text=alt_text.strip())
     session.add(row)
@@ -762,6 +829,14 @@ async def delete_media(
     from shruti.core.storage import delete as delete_stored
 
     await delete_stored(row.filename, row.storage_backend)
+
+    # And every format written beside it. Missing this was caught by testing
+    # the upload path end to end: deleting a picture left its AVIF and WebP
+    # in the bucket, reachable by nothing and paid for forever — a new source
+    # of exactly the orphans the sweep exists to clean up.
+    stem = row.filename.rsplit(".", 1)[0]
+    for variant in (v for v in (row.variants or "").split(",") if v):
+        await delete_stored(f"{stem}.{variant}", row.storage_backend)
     await session.delete(row)
     await session.commit()
     return Response(status_code=204)

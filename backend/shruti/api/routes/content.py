@@ -30,10 +30,19 @@ def _media_payload(m: Media | None) -> dict | None:
         return None
     from shruti.core.storage import public_url
 
+    stem = m.filename.rsplit(".", 1)[0]
+    have = [v for v in (m.variants or "").split(",") if v]
+
     return {
         # Resolved per row: a file stored locally before R2 was configured must
         # keep pointing at /media/*, not at a bucket it was never put in.
         "url": public_url(m.filename, m.storage_backend),
+        # Best first — a browser takes the first <source> it understands, so
+        # avif has to precede webp or webp always wins.
+        "sources": [
+            {"type": f"image/{v}", "url": public_url(f"{stem}.{v}", m.storage_backend)}
+            for v in ("avif", "webp") if v in have
+        ],
         "alt": m.alt_text,
         "width": m.width,
         "height": m.height,

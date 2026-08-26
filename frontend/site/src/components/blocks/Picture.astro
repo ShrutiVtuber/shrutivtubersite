@@ -1,0 +1,59 @@
+---
+/* One uploaded image, in whatever format the reader's browser prefers.
+ *
+ * Every uploaded image on this site goes through here, so the decision about
+ * formats is made once. The backend writes AVIF and WebP beside the original
+ * and RECORDS which of them landed — a <source> pointing at a file that was
+ * never written is a broken image, not a graceful fallback, so this only ever
+ * offers what actually exists.
+ *
+ * The original stays the `src` and always will. A re-encode is lossy and the
+ * file she uploaded is the one she chose; these are alternatives a browser may
+ * prefer, never a replacement.
+ *
+ * With no alternatives this renders a plain <img> rather than a <picture>
+ * wrapping one, because an element that changes nothing still changes layout.
+ */
+interface Source { type: string; url: string }
+interface Props {
+  media: {
+    url: string;
+    alt?: string;
+    width?: number | null;
+    height?: number | null;
+    sources?: Source[] | null;
+  } | null;
+  /** Overrides the media's own alt — for a decorative use, pass "". */
+  alt?: string;
+  class?: string;
+  /** The one image above the fold. Never lazy, always high priority. */
+  lcp?: boolean;
+  sizes?: string;
+}
+const { media, alt, class: klass, lcp = false, sizes } = Astro.props;
+const sources = media?.sources ?? [];
+const text = alt ?? media?.alt ?? "";
+---
+
+{media && (
+  sources.length > 0 ? (
+    <picture>
+      {sources.map((s) => <source srcset={s.url} type={s.type} sizes={sizes} />)}
+      <img
+        src={media.url} alt={text} class={klass}
+        width={media.width ?? undefined} height={media.height ?? undefined}
+        loading={lcp ? "eager" : "lazy"}
+        fetchpriority={lcp ? "high" : undefined}
+        decoding="async"
+      />
+    </picture>
+  ) : (
+    <img
+      src={media.url} alt={text} class={klass}
+      width={media.width ?? undefined} height={media.height ?? undefined}
+      loading={lcp ? "eager" : "lazy"}
+      fetchpriority={lcp ? "high" : undefined}
+      decoding="async"
+    />
+  )
+)}

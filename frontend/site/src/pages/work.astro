@@ -77,7 +77,7 @@ const INSTRUMENTS: [string, string, string, string][] = [
                   status={(p.status as "active" | "maintained" | "archived") ?? "active"}
                   repoHref={p.repoUrl || undefined}
                   liveHref={p.siteUrl || undefined}
-                  screenshot={p.media?.url ?? null}
+                  screenshot={p.media ?? null}
                   meta={[p.licence, p.stack].filter(Boolean).join(" · ") || undefined}
                 />
                 <div>
