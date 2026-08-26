@@ -15,6 +15,7 @@ from __future__ import annotations
 import json
 import logging
 import secrets
+from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import APIRouter, Depends, File, HTTPException, Request, Response, UploadFile
@@ -34,6 +35,55 @@ router = APIRouter(prefix="/api/shop", tags=["shop"])
 KINDS = ("physical", "digital")
 
 
+def availability(p: Product, now: datetime | None = None) -> dict:
+    """
+    Whether a thing can be bought right now, and what to say if it cannot.
+
+    One function because there are three callers — the shop list, the product
+    page and the checkout — and three implementations of "is this on sale" is
+    how a disabled button ends up in front of a working endpoint.
+
+    The states are distinct on purpose. "Sold out" and "not open yet" and
+    "closed" all mean you cannot buy it, and they mean completely different
+    things to somebody reading the page: one is bad luck, one is a date to come
+    back on, and one is over.
+    """
+    now = now or datetime.now(timezone.utc)
+
+    def _aware(dt: datetime | None) -> datetime | None:
+        # Postgres gives these back aware; a naive one from anywhere else would
+        # raise on comparison rather than be quietly wrong, which is right, but
+        # only if it never happens.
+        if dt is None:
+            return None
+        return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+
+    opens, closes = _aware(p.opens_at), _aware(p.closes_at)
+
+    if opens and now < opens:
+        return {"state": "not-yet", "buyable": False,
+                "opensAt": opens.isoformat(), "closesAt": closes.isoformat() if closes else None,
+                "leadTime": p.lead_time, "madeToOrder": p.made_to_order}
+    if closes and now >= closes:
+        return {"state": "closed", "buyable": False,
+                "opensAt": opens.isoformat() if opens else None, "closesAt": closes.isoformat(),
+                "leadTime": p.lead_time, "madeToOrder": p.made_to_order}
+
+    # Made to order has no shelf to run out of. Stock is simply not the
+    # question for these, and pretending it is would put "sold out" on
+    # something she can print this afternoon.
+    if not p.made_to_order and p.stock is not None and p.stock <= 0:
+        return {"state": "sold-out", "buyable": False,
+                "opensAt": opens.isoformat() if opens else None,
+                "closesAt": closes.isoformat() if closes else None,
+                "leadTime": p.lead_time, "madeToOrder": False}
+
+    return {"state": "open", "buyable": True,
+            "opensAt": opens.isoformat() if opens else None,
+            "closesAt": closes.isoformat() if closes else None,
+            "leadTime": p.lead_time, "madeToOrder": p.made_to_order}
+
+
 def _public(p: Product, media: Media | None,
             photos: list[Media] | None = None) -> dict:
     from shruti.core.storage import public_url
@@ -48,7 +98,9 @@ def _public(p: Product, media: Media | None,
         "currency": p.currency,
         # Sold out is a real state and not the same as absent: a thing that
         # exists and cannot be had right now should say so rather than vanish.
-        "soldOut": p.stock is not None and p.stock <= 0,
+        "soldOut": p.stock is not None and p.stock <= 0 and not p.made_to_order,
+        # The whole availability picture, so a caller never has to re-derive it.
+        "availability": availability(p),
         "media": None if media is None else {
             "url": public_url(media.filename, media.storage_backend),
             "alt": media.alt_text,
@@ -138,7 +190,17 @@ async def checkout(
     ).scalar_one_or_none()
     if product is None:
         raise HTTPException(404, "no such product")
-    if product.stock is not None and product.stock < body.quantity:
+    # The window is enforced HERE and not only on the button. A disabled
+    # control in front of a working endpoint is not a closed shop.
+    state = availability(product)
+    if not state["buyable"]:
+        raise HTTPException(409, {
+            "not-yet": "that has not opened yet",
+            "closed": "that drop has closed",
+            "sold-out": "that is sold out",
+        }.get(state["state"], "that cannot be bought right now"))
+    if (not product.made_to_order and product.stock is not None
+            and product.stock < body.quantity):
         raise HTTPException(409, "there are not that many left")
     if not product.stripe_price_id:
         raise HTTPException(503, "that product is not finished being set up")
@@ -360,6 +422,10 @@ class ProductIn(BaseModel):
     media_id: int | None = None
     file_id: int | None = None
     stock: int | None = None
+    made_to_order: bool = False
+    lead_time: str = ""
+    opens_at: str | None = None
+    closes_at: str | None = None
     tax_code: str = "txcd_10000000"
     visible: bool = False
     position: int = 0
@@ -371,6 +437,9 @@ def _admin_payload(p: Product) -> dict:
         "tagline": p.tagline, "body_md": p.body_md,
         "price_cents": p.price_cents, "currency": p.currency,
         "media_id": p.media_id, "file_id": p.file_id, "stock": p.stock,
+        "made_to_order": p.made_to_order, "lead_time": p.lead_time,
+        "opens_at": p.opens_at.isoformat() if p.opens_at else None,
+        "closes_at": p.closes_at.isoformat() if p.closes_at else None,
         "tax_code": p.tax_code, "visible": p.visible, "position": p.position,
         "stripeProductId": p.stripe_product_id,
         "stripePriceId": p.stripe_price_id,

@@ -573,6 +573,25 @@ class Product(TimestampMixin, table=True):
     # digital product is and some physical ones are.
     stock: Optional[int] = None
 
+    # Printed or made when somebody orders it, rather than taken off a shelf.
+    # `stock` stops meaning anything for these: there is no shelf. What a buyer
+    # needs instead is how long it will take, which is `lead_time`.
+    made_to_order: bool = False
+    # In her words — "ships in two to three weeks". Prose rather than a number
+    # of days, because the honest answer is usually a range and a caveat.
+    lead_time: str = ""
+
+    # A drop window. Both null means always open, which is the right default
+    # for anything batch-printed and kept on a shelf.
+    #
+    # **Two selling models, deliberately, because she has both.** Some things
+    # are printed in a batch and sit there until they sell; others are a drop
+    # tied to a birthday or an outfit reveal, open for a fortnight and then
+    # gone. One table serves both: a window is an optional pair of dates rather
+    # than a different kind of product.
+    opens_at: Optional[datetime] = Field(default=None, sa_type=UTC_TS)
+    closes_at: Optional[datetime] = Field(default=None, sa_type=UTC_TS)
+
     # Stripe's own tax code. `txcd_10000000` is general digital goods, which is
     # what the memberships already use; physical things want their own.
     tax_code: str = "txcd_10000000"

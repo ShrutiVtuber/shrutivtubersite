@@ -48,6 +48,16 @@ const [lead, ...rest] = gallery;
 const html = await renderMarkdown(product.bodyMd);
 const money = `${(product.priceCents / 100).toFixed(2)} ${product.currency.toUpperCase()}`;
 
+/* Availability comes from the API, which is also what the checkout enforces.
+   Deriving it again here would be a second opinion, and the two would drift. */
+const av = product.availability ?? { state: product.soldOut ? "sold-out" : "open",
+                                     buyable: !product.soldOut, leadTime: "",
+                                     opensAt: null, closesAt: null, madeToOrder: false };
+
+const dateWords = (iso: string | null) =>
+  iso ? new Date(iso).toLocaleDateString("en-GB",
+        { day: "numeric", month: "long", year: "numeric" }) : "";
+
 /* A shop page that does not say it is a shop page gets treated as an article.
  * Price, currency and availability are the three a result actually shows, and
  * all three are already on this page in words — this states them in the form a
@@ -73,9 +83,12 @@ const jsonLd = {
     url: productUrl,
     price: (product.priceCents / 100).toFixed(2),
     priceCurrency: product.currency.toUpperCase(),
-    availability: product.soldOut
-      ? "https://schema.org/SoldOut"
-      : "https://schema.org/InStock",
+    availability: {
+      "open": "https://schema.org/InStock",
+      "sold-out": "https://schema.org/SoldOut",
+      "not-yet": "https://schema.org/PreOrder",
+      "closed": "https://schema.org/Discontinued",
+    }[av.state] ?? "https://schema.org/InStock",
     seller: { "@id": `${SITE}/#person` },
   },
 };
@@ -112,9 +125,19 @@ const jsonLd = {
 
       {failed && <p class="adm-bad" role="alert">{failed}</p>}
 
+      {av.leadTime && av.buyable && (
+        <p class="lead-time">{av.leadTime}</p>
+      )}
+
       {
-        product.soldOut ? (
-          <p class="sold">Sold out. There may be more later.</p>
+        !av.buyable ? (
+          <p class="sold" data-state={av.state}>
+            {av.state === "not-yet"
+              ? `Opens ${dateWords(av.opensAt)}. Nothing to do until then — it will simply be on sale.`
+              : av.state === "closed"
+              ? `That drop closed ${dateWords(av.closesAt)}. Things here come back when they come back, and this page will say so.`
+              : "Sold out. There may be more later."}
+          </p>
         ) : (
           <form method="POST" class="buy">
             <CsrfField />
@@ -159,6 +182,11 @@ const jsonLd = {
   .eyebrow a { color: var(--accent); text-decoration: none; }
   h1 { margin: 0; font: 600 var(--text-h2) var(--font-display); color: var(--ink); }
   .dek { margin: 0; font: 400 var(--text-body) var(--font-body); color: var(--ink-soft); }
+  .lead-time {
+    font: 400 var(--text-sm) var(--font-mono); color: var(--ink-soft);
+    margin: var(--space-2) 0 0;
+  }
+  .sold[data-state="not-yet"] { color: var(--accent); }
   .price { margin: var(--space-3) 0 0; font: 500 var(--text-h3) var(--font-mono); color: var(--accent); }
   .taxline { margin: 0; font: 400 var(--text-xs) var(--font-body); color: var(--ink-soft); }
   .sold { font: 500 var(--text-body) var(--font-body); color: var(--ink-soft); }

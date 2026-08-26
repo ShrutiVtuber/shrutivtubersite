@@ -41,7 +41,9 @@ const money = (p: ShopProduct) =>
       ) : (
         <div class="shop-grid">
           {products.map((p) => (
-            <a class="shop-card" href={`/shop/${p.slug}`} data-sold={p.soldOut || undefined}>
+            <a class="shop-card" href={`/shop/${p.slug}`}
+               data-sold={p.availability?.buyable === false || undefined}
+               data-state={p.availability?.state}>
               <div class="shot" data-empty={!p.media}>
                 {p.media
                   ? <img src={p.media.url} alt={p.media.alt || p.name} loading="lazy" />

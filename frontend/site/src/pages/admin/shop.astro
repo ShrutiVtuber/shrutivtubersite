@@ -73,6 +73,12 @@ if (Astro.request.method === "POST") {
         media_id: num(form, "media_id"),
         file_id: num(form, "file_id"),
         stock: num(form, "stock"),
+        made_to_order: String(form.get("made_to_order") ?? "off") === "on",
+        lead_time: String(form.get("lead_time") ?? ""),
+        /* Empty means "no window", which is the always-open case and the
+           default. A blank date must not become the epoch. */
+        opens_at: String(form.get("opens_at") ?? "") || null,
+        closes_at: String(form.get("closes_at") ?? "") || null,
         visible: String(form.get("visible") ?? "off") === "on",
         position: Number(form.get("position") ?? 0),
       };
@@ -170,7 +176,8 @@ const files: any[] = Array.isArray(fileList.body) ? fileList.body : [];
 const BLANK = {
   id: "", slug: "", name: "", kind: "digital", tagline: "", body_md: "",
   price_cents: 0, tax_code: "txcd_10000000", media_id: null, file_id: null,
-  stock: null, visible: false, position: 0,
+  stock: null, made_to_order: false, lead_time: "",
+  opens_at: null, closes_at: null, visible: false, position: 0,
 };
 const row = creating ? BLANK : products.find((p) => String(p.id) === editing) ?? null;
 
@@ -327,7 +334,44 @@ const toSend = orders.filter((o) => o.fulfilment === "to_send");
             <span class="adm-lbl">Stock, for a physical one</span>
             <input class="adm-input" name="stock" value={row.stock ?? ""} inputmode="numeric"
                    placeholder="leave blank for no limit" />
-            <p class="hint">Counts down as they sell. At zero it shows as sold out rather than vanishing.</p>
+            <p class="hint">Counts down as they sell. At zero it shows as sold out rather than vanishing. Ignored for a made-to-order thing — there is no shelf to run out of.</p>
+          </label>
+
+          <div class="field field--check">
+            <input type="hidden" name="made_to_order" value="off" />
+            <label>
+              <input type="checkbox" name="made_to_order" checked={row.made_to_order} />
+              <span>Made to order</span>
+            </label>
+            <p class="hint">Printed when somebody buys it. It never sells out; what a buyer needs instead is how long it takes.</p>
+          </div>
+
+          <label class="field">
+            <span class="adm-lbl">How long it takes</span>
+            <input class="adm-input" name="lead_time" value={row.lead_time ?? ""}
+                   placeholder="ships in 2–3 weeks" />
+            <p class="hint">Your words, shown beside the price. A range with a caveat is more honest than a number of days.</p>
+          </label>
+        </section>
+
+        <section class="group">
+          <h3 class="group-head">A drop, or always open</h3>
+          <p class="hint">
+            Leave both blank and it is simply on sale — right for anything you
+            batch-print and keep. Fill them in for a drop: a fortnight around a
+            birthday or an outfit reveal, and then gone. Before it opens the
+            page says when; after it closes it says the drop is over. Both are
+            enforced at checkout, not just on the button.
+          </p>
+          <label class="field">
+            <span class="adm-lbl">Opens</span>
+            <input class="adm-input" type="datetime-local" name="opens_at"
+                   value={row.opens_at ? String(row.opens_at).slice(0, 16) : ""} />
+          </label>
+          <label class="field">
+            <span class="adm-lbl">Closes</span>
+            <input class="adm-input" type="datetime-local" name="closes_at"
+                   value={row.closes_at ? String(row.closes_at).slice(0, 16) : ""} />
           </label>
         </section>
 
