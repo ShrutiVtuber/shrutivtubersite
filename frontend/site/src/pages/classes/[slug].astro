@@ -54,12 +54,49 @@ const REASON: Record<string, string> = {
   gift: "Yours.",
   free: "Free to anybody.",
 };
+/* Course, so a class reads as a class rather than as a page about one.
+ *
+ * `hasCourseInstance` is the part that matters and the part usually left out:
+ * without it a course has no mode and no start, and an online class with a
+ * date is exactly what somebody searching is trying to find. Free classes say
+ * zero rather than omitting the price — an absent price reads as unknown, and
+ * unknown is worse than free.
+ */
+const SITE_ORIGIN = (import.meta.env.SHRUTI_SITE_URL ?? "https://shrutivtuber.com").replace(/\/$/, "");
+/* `slug` from the params, not `course.slug` — every other link on this page
+   uses the param, and the payload is not guaranteed to echo it back. A
+   canonical URL reading /classes/undefined would be worse than none. */
+const courseUrl = `${SITE_ORIGIN}/classes/${slug}`;
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@type": "Course",
+  "@id": `${courseUrl}#course`,
+  name: course.title,
+  description: course.tagline,
+  url: courseUrl,
+  provider: { "@id": `${SITE_ORIGIN}/#person` },
+  inLanguage: "en",
+  offers: {
+    "@type": "Offer",
+    url: courseUrl,
+    price: (course.priceCents / 100).toFixed(2),
+    priceCurrency: course.currency || "EUR",
+    category: course.priceCents === 0 ? "Free" : "Paid",
+  },
+  hasCourseInstance: {
+    "@type": "CourseInstance",
+    courseMode: "Online",
+    ...(course.startsAt ? { startDate: course.startsAt } : {}),
+    courseWorkload: `PT${Math.max(1, lessons.length)}H`,
+  },
+};
+
 const grantedBy = course.access.reason.startsWith("tier:")
   ? `Included with your ${course.access.reason.slice(5)} membership. It stays yours while that does.`
   : REASON[course.access.reason] ?? "";
 ---
 
-<BaseLayout title={`${course.title} — Shruti`} description={course.tagline}>
+<BaseLayout title={`${course.title} — Shruti`} description={course.tagline} jsonLd={jsonLd}>
   <div class="page course">
     <header class="head">
       {course.kind === "workshop" && when && <p class="when">{when}</p>}

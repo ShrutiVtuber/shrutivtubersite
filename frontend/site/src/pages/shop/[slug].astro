@@ -47,9 +47,41 @@ const [lead, ...rest] = gallery;
 
 const html = await renderMarkdown(product.bodyMd);
 const money = `${(product.priceCents / 100).toFixed(2)} ${product.currency.toUpperCase()}`;
+
+/* A shop page that does not say it is a shop page gets treated as an article.
+ * Price, currency and availability are the three a result actually shows, and
+ * all three are already on this page in words — this states them in the form a
+ * machine reads, from the same values, so they cannot disagree with the label
+ * beside the button.
+ *
+ * No rating and no review count. Both would be invented, and an invented
+ * rating is the one thing here that gets a site penalised rather than ignored.
+ */
+const SITE = (import.meta.env.SHRUTI_SITE_URL ?? "https://shrutivtuber.com").replace(/\/$/, "");
+const productUrl = `${SITE}/shop/${product.slug}`;
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@type": "Product",
+  "@id": `${productUrl}#product`,
+  name: product.name,
+  description: product.tagline,
+  url: productUrl,
+  ...(lead?.url ? { image: new URL(lead.url, SITE).href } : {}),
+  brand: { "@type": "Brand", name: "Shruti" },
+  offers: {
+    "@type": "Offer",
+    url: productUrl,
+    price: (product.priceCents / 100).toFixed(2),
+    priceCurrency: product.currency.toUpperCase(),
+    availability: product.soldOut
+      ? "https://schema.org/SoldOut"
+      : "https://schema.org/InStock",
+    seller: { "@id": `${SITE}/#person` },
+  },
+};
 ---
 
-<BaseLayout title={`${product.name} — Shruti`} description={product.tagline}>
+<BaseLayout title={`${product.name} — Shruti`} description={product.tagline} jsonLd={jsonLd}>
   <div class="page product">
     <div class="shots">
       <div class="shot" data-empty={!lead}>
