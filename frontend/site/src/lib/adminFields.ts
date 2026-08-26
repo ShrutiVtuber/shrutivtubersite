@@ -147,7 +147,7 @@ export const FIELDS: Record<string, Record<string, FieldSpec>> = {
     },
     url: {
       label: "Where it goes", type: "url", group: "Links",
-      placeholder: "https://beeranked.com",
+      placeholder: "https://beeranked.online",
       help: "Use whatever tracking link they gave you, if they gave you one.",
     },
     cta_label: {
