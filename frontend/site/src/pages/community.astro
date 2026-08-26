@@ -1,0 +1,180 @@
+---
+/* The hub — what is happening, and the ways in.
+ *
+ * She asked for people to come here to find out what is going on with Shruti,
+ * with the platforms as extra ways to engage rather than the only ones. So
+ * this page is the answer to "what is she doing right now": whether she is
+ * live, what is next, what is open to vote on, who is in the room, what she
+ * has just written, and where to ask her something.
+ *
+ * Everything here works signed out. The account is offered where it genuinely
+ * adds something and nowhere else.
+ */
+import BaseLayout from "../layouts/BaseLayout.astro";
+import SectionHeader from "../components/brand/SectionHeader.astro";
+import PollCard from "../components/community/PollCard.astro";
+import GlyphGame from "../components/community/GlyphGame.astro";
+import NotifyButton from "../components/community/NotifyButton.astro";
+import LiveBadge from "../components/brand/LiveBadge.astro";
+import Button from "../components/forms/Button.astro";
+import { site, PATHS, type LiveStatus } from "../lib/api";
+import { verifyCsrf } from "../lib/csrf";
+import { SITE_API } from "../lib/api";
+
+export const prerender = false;
+
+/* Voting without scripting: the poll card posts here. */
+if (Astro.request.method === "POST") {
+  const form = await Astro.request.formData();
+  if (verifyCsrf(Astro.cookies, form) && String(form.get("action")) === "vote") {
+    const slug = String(form.get("poll") ?? "");
+    const option = Number(form.get("option") ?? 0);
+    if (slug && option) {
+      await fetch(`${SITE_API}/api/community/polls/${slug}/vote`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          /* The vote is attributed to the READER, not to this server. Without
+             these the backend would hash the site container's address and
+             every signed-out vote on the site would be one voter. */
+          "x-forwarded-for": Astro.request.headers.get("x-forwarded-for")
+            ?? Astro.clientAddress ?? "",
+          "user-agent": Astro.request.headers.get("user-agent") ?? "",
+          cookie: Astro.request.headers.get("cookie") ?? "",
+        },
+        body: JSON.stringify({ option_id: option }),
+      }).catch(() => {});
+    }
+    return Astro.redirect("/community#polls", 303);
+  }
+}
+
+const [live, polls, room, schedule] = await Promise.all([
+  site<LiveStatus>(PATHS.live),
+  site<any[]>("/api/community/polls/open"),
+  site<any>("/api/community/discord"),
+  site<any[]>("/api/content/schedule").catch(() => []),
+]);
+const open = (polls ?? []).filter((p: any) => !p.closed);
+const closed = (polls ?? []).filter((p: any) => p.closed).slice(0, 2);
+---
+
+<BaseLayout
+  title="Community — Shruti"
+  description="What is happening: live status, what is next, what is open to vote on, and the room."
+>
+  <div class="page community">
+    <SectionHeader
+      as="h1" glyph="◈" eyebrow="Community"
+      title="What is going on"
+      body="The site is the hub — everything here is first, and the platforms are extra ways in rather than the only ones."
+    />
+
+    <div class="c-top">
+      <section class="c-card c-live">
+        <span class="t-eyebrow">Right now</span>
+        <LiveBadge status={live?.status ?? "offline"} href="/videos" />
+        <p class="c-note">
+          {live?.status === "live"
+            ? "She is on. The stream is the fastest way to say something to her."
+            : "Not live at the moment. The schedule below says when next."}
+        </p>
+        <div class="c-acts">
+          <Button variant="secondary" href="/schedule">The schedule →</Button>
+        </div>
+      </section>
+
+      <section class="c-card c-room">
+        <span class="t-eyebrow">The room</span>
+        <p class="c-count">
+          {room?.online != null
+            ? <><strong>{room.online}</strong> here now</>
+            : <>Discord</>}
+        </p>
+        <p class="c-note">
+          Where things get talked about between streams. This number is fetched
+          by the server, not your browser — Discord is not told you were here.
+        </p>
+        {
+          room?.invite && (
+            <div class="c-acts">
+              <a class="sh-btn" data-variant="secondary" data-size="md"
+                 href={room.invite} rel="noopener" target="_blank"
+                 data-track="discord:joined">
+                <span>Join the Discord</span>
+              </a>
+            </div>
+          )
+        }
+      </section>
+
+      <section class="c-card c-notify">
+        <span class="t-eyebrow">When she goes live</span>
+        <NotifyButton />
+      </section>
+    </div>
+
+    <section class="c-block" id="polls">
+      <h2>Have a say</h2>
+      {
+        open.length === 0 && closed.length === 0 ? (
+          <p class="c-note">
+            Nothing open at the moment. When there is a decision worth putting
+            to people, it appears here — and on the home page.
+          </p>
+        ) : (
+          <div class="c-polls">
+            {open.map((p: any) => <PollCard poll={p} />)}
+            {closed.map((p: any) => <PollCard poll={p} />)}
+          </div>
+        )
+      }
+    </section>
+
+    <section class="c-block">
+      <h2>Ask her something</h2>
+      <p class="c-note">
+        Questions get answered in public, where the next person with the same
+        one can read the answer. Nothing appears until she has approved it.
+      </p>
+      <div class="c-acts">
+        <Button variant="secondary" href="/contact#ask">Ask a question →</Button>
+      </div>
+    </section>
+
+    <section class="c-block">
+      <h2>While you are here</h2>
+      <GlyphGame />
+    </section>
+  </div>
+</BaseLayout>
+
+<style>
+  .community { display: grid; gap: var(--space-7); min-width: 0; }
+  .c-top { display: grid; gap: var(--space-4); grid-template-columns: repeat(3, minmax(0, 1fr)); min-width: 0; }
+  .c-card {
+    display: grid; gap: 12px; align-content: start;
+    /* A grid item will not shrink below its content's min-content width, and
+       the live badge's meta line is `white-space: nowrap` with an ellipsis
+       waiting to be used. Without this the card cannot get narrower than that
+       one line and pushes the whole page 24px wide at 360. The ellipsis is
+       there to be used; this is what lets it. */
+    min-width: 0;
+    padding: var(--space-5);
+    background: var(--surface-card);
+    border: var(--border-w) solid var(--line);
+    border-radius: var(--radius-md);
+  }
+  .c-count { font: 600 var(--text-h3) var(--font-display); color: var(--ink); margin: 0; }
+  .c-count strong { font-weight: 600; }
+  .c-note { font: 400 var(--text-sm) / 1.7 var(--font-body); color: var(--ink-soft); margin: 0; max-width: 52ch; }
+  .c-acts { display: flex; gap: var(--space-3); flex-wrap: wrap; margin-top: 4px; }
+
+  .c-block { display: grid; gap: var(--space-4); }
+  .c-block h2 { font: 600 var(--text-h3) var(--font-display); color: var(--ink); margin: 0; }
+  .c-polls { display: grid; gap: var(--space-4); }
+
+  @media (max-width: 960px) { .c-top { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (max-width: 640px) { .c-top { grid-template-columns: 1fr; } }
+  .c-card > * { min-width: 0; max-width: 100%; }
+</style>

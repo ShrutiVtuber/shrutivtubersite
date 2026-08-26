@@ -1,0 +1,156 @@
+---
+/* "Tell me when she goes live."
+ *
+ * **No account, and no email.** A browser notification needs neither, which is
+ * why this is worth having alongside the letter: it is the lowest-cost way
+ * somebody can ask to be told something, and asking for an address first
+ * turns a favour into a transaction.
+ *
+ * Every state is spoken rather than implied. A browser that has blocked
+ * notifications cannot be un-blocked by this page and says so, instead of
+ * offering a button that does nothing — which is what most sites do and why
+ * people stop trusting the prompt.
+ */
+---
+
+<div class="notify" data-notify>
+  <p class="n-state" data-notify-state>Checking…</p>
+  <button type="button" class="n-go" data-notify-go hidden
+          data-track="push:subscribed">Notify me</button>
+  <p class="n-fine" data-notify-fine></p>
+</div>
+
+<noscript>
+  <p class="n-fine">
+    Notifications need scripting. <a href="/newsletter">The monthly letter</a>
+    does not, and neither does the schedule.
+  </p>
+</noscript>
+
+<script>
+  (() => {
+    const box = document.querySelector("[data-notify]");
+    if (!box) return;
+    const state = box.querySelector("[data-notify-state]");
+    const fine = box.querySelector("[data-notify-fine]");
+    const go = box.querySelector("[data-notify-go]");
+
+    const supported =
+      "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+
+    const say = (main, small) => {
+      state.textContent = main;
+      fine.textContent = small || "";
+    };
+
+    if (!supported) {
+      /* iOS only allows this for a site added to the home screen, and saying
+         so beats a dead button. */
+      say(
+        "This browser cannot do notifications.",
+        "On an iPhone, add the site to your home screen first and it can. Otherwise the monthly letter or the schedule will do it.",
+      );
+      return;
+    }
+
+    const b64 = (s) => {
+      const pad = "=".repeat((4 - (s.length % 4)) % 4);
+      const raw = atob((s + pad).replace(/-/g, "+").replace(/_/g, "/"));
+      return Uint8Array.from([...raw].map((c) => c.charCodeAt(0)));
+    };
+
+    let key = "";
+
+    const draw = async () => {
+      if (Notification.permission === "denied") {
+        say(
+          "Notifications are blocked for this site.",
+          "That is a browser setting and this page cannot change it — look for the padlock beside the address.",
+        );
+        go.hidden = true;
+        return;
+      }
+      const reg = await navigator.serviceWorker.getRegistration();
+      const sub = reg && (await reg.pushManager.getSubscription());
+      if (sub) {
+        say("You will be told when she goes live.", "One press to stop, and nothing is stored but this browser's push address.");
+        go.hidden = false;
+        go.textContent = "Stop notifying me";
+        go.dataset.on = "1";
+      } else {
+        say("Get a notification when a stream starts.", "No account, no email address. Works while the site is closed.");
+        go.hidden = !key;
+        go.textContent = "Notify me";
+        delete go.dataset.on;
+      }
+    };
+
+    const subscribe = async () => {
+      const permission = await Notification.requestPermission();
+      if (permission !== "granted") { await draw(); return; }
+      const reg = await navigator.serviceWorker.register("/sw.js");
+      await navigator.serviceWorker.ready;
+      const sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: b64(key),
+      });
+      await fetch("/api/community/push/subscribe", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ endpoint: sub.endpoint, wants_live: true }),
+      });
+      await draw();
+    };
+
+    const unsubscribe = async () => {
+      const reg = await navigator.serviceWorker.getRegistration();
+      const sub = reg && (await reg.pushManager.getSubscription());
+      if (sub) {
+        await fetch("/api/community/push/unsubscribe", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ endpoint: sub.endpoint }),
+        }).catch(() => {});
+        await sub.unsubscribe();
+      }
+      await draw();
+    };
+
+    go.addEventListener("click", async () => {
+      go.disabled = true;
+      try {
+        if (go.dataset.on) await unsubscribe();
+        else await subscribe();
+      } catch {
+        say("That did not work.", "Something in the browser refused. Nothing has changed.");
+      }
+      go.disabled = false;
+    });
+
+    (async () => {
+      try {
+        const r = await fetch("/api/community/push/key");
+        key = r.ok ? (await r.json()).key : "";
+      } catch { key = ""; }
+      if (!key) {
+        say("Notifications are not switched on yet.", "The monthly letter and the schedule both work today.");
+        return;
+      }
+      await draw();
+    })();
+  })();
+</script>
+
+<style>
+  .notify { display: grid; gap: 10px; justify-items: start; }
+  .n-state { font: 400 var(--text-body) var(--font-body); color: var(--ink); margin: 0; max-width: 46ch; }
+  .n-fine { font: 400 var(--text-sm) / 1.6 var(--font-body); color: var(--ink-soft); margin: 0; max-width: 50ch; }
+  .n-fine:empty { display: none; }
+  .n-go {
+    font: 500 var(--text-sm) var(--font-body); color: var(--surface-page);
+    background: var(--accent); border: 0; border-radius: var(--radius-sm);
+    padding: 10px 18px; min-height: 44px; cursor: pointer;
+  }
+  .n-go[data-on] { background: none; color: var(--ink-soft); border: var(--border-w) solid var(--line); }
+  .n-go:disabled { opacity: 0.6; cursor: default; }
+</style>

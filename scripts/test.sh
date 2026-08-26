@@ -19,10 +19,19 @@ cd "$(dirname "$0")/.."
 
 docker build --quiet --target dev -t shruti-backend-test ./backend >/dev/null
 
+# Mounted read-only, and more than just `shruti`:
+#   frontend/site/src     the page-wrapper and structured-data guards read it
+#   frontend/site/public  the service worker lives there
+#   backend/alembic       the dev stage does not ship it, and some guarantees
+#                         live in a migration rather than in code
+# A guard that cannot read the file it guards passes on an empty string, which
+# is the way this kind of check usually lies.
 exec docker run --rm \
   -v "$PWD/backend/shruti:/app/shruti:ro" \
   -v "$PWD/backend/tests:/app/tests:ro" \
+  -v "$PWD/backend/alembic:/app/alembic:ro" \
   -v "$PWD/frontend/site/src:/app/frontend/site/src:ro" \
+  -v "$PWD/frontend/site/public:/app/frontend/site/public:ro" \
   -e SHRUTI_SECRET_KEY=test-only-not-a-real-key \
   shruti-backend-test \
   python -m pytest tests "$@"

@@ -133,6 +133,30 @@ class Settings(BaseSettings):
 
     # Extra origins this site answers as, comma separated. Normally blank; see
     # shruti/core/origins.py for why a request header can never add one.
+    # ── the Discord widget ──────────────────────────────────────────────────
+    #
+    # The guild id, and only the guild id. The widget endpoint is public and
+    # unauthenticated — no bot token, no scopes — which is why this is safe to
+    # call from the server on every visitor's behalf.
+    #
+    # Unset, the community panel still renders with the invite link and simply
+    # does not show a count. That is the right failure: a link that works
+    # beats a number that lies.
+    # ── web push ────────────────────────────────────────────────────────────
+    #
+    # Generated once by scripts/vapid-keys.py and then left alone: a browser
+    # binds each subscription to the key it was made with, so changing these
+    # silently invalidates every subscriber at once.
+    #
+    # `vapid_subject` must be a mailto: or https: URL. Push services use it to
+    # contact whoever is sending, and some reject a push without it.
+    vapid_private_key: str = ""
+    vapid_public_key: str = ""
+    vapid_subject: str = ""
+
+    discord_guild_id: str = ""
+    discord_invite: str = ""
+
     passkey_origins: str = ""
 
     @property

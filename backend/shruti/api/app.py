@@ -11,7 +11,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from shruti.api.routes import (
-    accounts, admin, billing, charts, classes, content, horoscopes,
+    accounts, admin, billing, charts, classes, community, content, horoscopes,
     insight, journal, live, media, newsletter, passkeys, places, public,
     shop, videos
 )
@@ -115,6 +115,7 @@ app.include_router(shop.router)
 app.include_router(classes.router)
 app.include_router(insight.router)
 app.include_router(charts.router)
+app.include_router(community.router)
 app.include_router(public.router)
 app.include_router(places.router)
 app.include_router(accounts.router)

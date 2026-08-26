@@ -1,0 +1,177 @@
+---
+/* Learn the glyphs.
+ *
+ * The brief for a VTuber site says "interactive mini-games, lore-themed". The
+ * obvious version for an astrology channel is a fortune-telling toy, and this
+ * site cannot ship one: every instrument here says out loud what it cannot
+ * compute, and /terms says nothing on the site is advice or predictive. A game
+ * that pretended to divine anything would contradict the whole of it in the
+ * name of engagement.
+ *
+ * So the game teaches the alphabet instead. Twelve signs, seven planets, the
+ * two nodes: the symbols somebody needs before any chart on this site is
+ * readable to them. It is genuinely useful, it is fast, and it makes the
+ * instruments more legible rather than less trustworthy.
+ *
+ * Entirely in the browser. No score is sent anywhere, no account is asked for,
+ * nothing is stored but the best streak — on the reader's own device.
+ */
+---
+
+<section class="game" data-glyph-game>
+  <div class="g-head">
+    <span class="t-eyebrow">Learn the glyphs</span>
+    <h3>Twenty-one symbols, and every chart here becomes readable</h3>
+    <p class="g-lead">
+      The signs, the planets and the nodes. Nothing is sent anywhere and no
+      account is asked for — the streak lives in this browser and nowhere else.
+    </p>
+  </div>
+
+  <div class="g-board">
+    <div class="g-prompt">
+      <span class="g-glyph" data-glyph aria-live="polite">·</span>
+      <span class="g-hint" data-hint>Press start</span>
+    </div>
+    <div class="g-answers" data-answers></div>
+  </div>
+
+  <div class="g-foot">
+    <button type="button" class="g-go" data-start
+            data-track="game:played" data-track-tool="glyph-game">Start</button>
+    <span class="g-score">
+      Streak <strong data-streak>0</strong> · best <strong data-best>0</strong>
+    </span>
+  </div>
+
+  <noscript>
+    <p class="g-lead">This one needs scripting. Everything else on the site does not.</p>
+  </noscript>
+</section>
+
+<script>
+  (() => {
+    const root = document.querySelector("[data-glyph-game]");
+    if (!root) return;
+
+    /* The variation selector matters here for the same reason it matters on
+       the chart wheel: U+2648..U+2653 default to EMOJI presentation, and
+       without it the twelve signs render as coloured badges rather than as the
+       glyphs somebody is trying to learn. */
+    const T = "︎";
+    const DECK = [
+      ["♈" + T, "Aries"], ["♉" + T, "Taurus"], ["♊" + T, "Gemini"],
+      ["♋" + T, "Cancer"], ["♌" + T, "Leo"], ["♍" + T, "Virgo"],
+      ["♎" + T, "Libra"], ["♏" + T, "Scorpio"], ["♐" + T, "Sagittarius"],
+      ["♑" + T, "Capricorn"], ["♒" + T, "Aquarius"], ["♓" + T, "Pisces"],
+      ["☉", "Sun"], ["☾", "Moon"], ["☿", "Mercury"],
+      ["♀", "Venus"], ["♂", "Mars"], ["♃", "Jupiter"],
+      ["♄", "Saturn"], ["☊", "Rahu — north node"], ["☋", "Ketu — south node"],
+    ];
+
+    const glyphEl = root.querySelector("[data-glyph]");
+    const hintEl = root.querySelector("[data-hint]");
+    const answersEl = root.querySelector("[data-answers]");
+    const streakEl = root.querySelector("[data-streak]");
+    const bestEl = root.querySelector("[data-best]");
+    const startEl = root.querySelector("[data-start]");
+
+    let streak = 0;
+    let best = 0;
+    try { best = Number(localStorage.getItem("shruti_glyph_best") || 0) || 0; } catch { best = 0; }
+    bestEl.textContent = String(best);
+
+    const pick = (n, from) => {
+      const pool = from.slice();
+      const out = [];
+      while (out.length < n && pool.length) {
+        out.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
+      }
+      return out;
+    };
+
+    let answer = null;
+
+    const ask = () => {
+      const [correct, ...rest] = pick(4, DECK);
+      answer = correct;
+      glyphEl.textContent = correct[0];
+      hintEl.textContent = "Which is it?";
+      answersEl.replaceChildren();
+      for (const [, name] of pick(4, [correct, ...rest])) {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "g-answer";
+        b.textContent = name;
+        b.addEventListener("click", () => judge(b, name));
+        answersEl.append(b);
+      }
+    };
+
+    const judge = (button, name) => {
+      const right = name === answer[1];
+      button.dataset.verdict = right ? "right" : "wrong";
+      for (const b of answersEl.querySelectorAll("button")) {
+        b.disabled = true;
+        if (b.textContent === answer[1]) b.dataset.verdict = "right";
+      }
+      streak = right ? streak + 1 : 0;
+      streakEl.textContent = String(streak);
+      if (streak > best) {
+        best = streak;
+        bestEl.textContent = String(best);
+        try { localStorage.setItem("shruti_glyph_best", String(best)); } catch {}
+      }
+      hintEl.textContent = right ? answer[1] : "It was " + answer[1];
+      setTimeout(ask, right ? 550 : 1100);
+    };
+
+    startEl.addEventListener("click", () => {
+      startEl.textContent = "Start again";
+      streak = 0;
+      streakEl.textContent = "0";
+      ask();
+    });
+  })();
+</script>
+
+<style>
+  .game {
+    display: grid; gap: var(--space-5);
+    padding: var(--space-5);
+    background: var(--surface-card);
+    border: var(--border-w) solid var(--line);
+    border-radius: var(--radius-md);
+  }
+  .g-head h3 { font: 600 var(--text-h4) var(--font-display); color: var(--ink); margin: 6px 0 0; }
+  .g-lead { font: 400 var(--text-sm) / 1.7 var(--font-body); color: var(--ink-soft); margin: 8px 0 0; max-width: 56ch; }
+
+  .g-board { display: grid; gap: var(--space-4); justify-items: center; }
+  .g-prompt { display: grid; gap: 6px; justify-items: center; min-height: 96px; align-content: center; }
+  .g-glyph { font: 400 64px/1 var(--font-display); color: var(--ink); }
+  .g-hint { font: 400 var(--text-sm) var(--font-body); color: var(--ink-soft); min-height: 1.4em; }
+
+  .g-answers { display: grid; gap: 8px; grid-template-columns: repeat(2, minmax(0, 1fr)); width: 100%; max-width: 460px; }
+  .g-answer {
+    font: 400 var(--text-body) var(--font-body); color: var(--ink);
+    background: var(--surface-page); border: var(--border-w) solid var(--line);
+    border-radius: var(--radius-sm); padding: 12px 14px; min-height: 44px; cursor: pointer;
+  }
+  .g-answer:hover:not(:disabled) { border-color: var(--accent); }
+  .g-answer:disabled { cursor: default; }
+  .g-answer[data-verdict="right"] { border-color: var(--accent); background: var(--accent-wash); }
+  .g-answer[data-verdict="wrong"] { border-color: var(--live); }
+
+  .g-foot { display: flex; gap: var(--space-4); align-items: center; justify-content: space-between; flex-wrap: wrap; }
+  .g-go {
+    font: 500 var(--text-sm) var(--font-body); color: var(--surface-page);
+    background: var(--accent); border: 0; border-radius: var(--radius-sm);
+    padding: 10px 18px; min-height: 44px; cursor: pointer;
+  }
+  .g-score { font: 400 var(--text-sm) var(--font-body); color: var(--ink-soft); }
+  .g-score strong { color: var(--ink); font-variant-numeric: tabular-nums; }
+
+  @media (max-width: 560px) {
+    .g-answers { grid-template-columns: 1fr; }
+  }
+</style>

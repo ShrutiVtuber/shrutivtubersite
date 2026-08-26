@@ -17,6 +17,7 @@ import ProjectCard from "../components/cards/ProjectCard.astro";
 import ScheduleItem from "../components/tables/ScheduleItem.astro";
 import SignPicker from "../components/navigation/SignPicker.astro";
 import SponsorRow from "../components/brand/SponsorRow.astro";
+import PollCard from "../components/community/PollCard.astro";
 import { site, type LiveStatus, type LinkGroups, type Project, PATHS } from "../lib/api";
 import { pageSections } from "../lib/content";
 import { badgeFrom } from "../lib/live";
@@ -106,6 +107,11 @@ const AVATAR = "/brand/avatar-square.png";
    so the loudest page on the site never thanks somebody who stopped months
    ago. */
 const sponsors = (await site<any[]>("/api/content/sponsors/featured")) ?? [];
+
+/* The newest open poll, and only one. A live question is a reason to come
+   back; a column of them is a survey. The community page has the rest. */
+const openPoll = ((await site<any[]>("/api/community/polls/open")) ?? [])
+  .find((p: any) => !p.closed) ?? null;
 
 const INSTRUMENTS = [
   {
@@ -221,6 +227,18 @@ const INSTRUMENTS = [
   {/* After the instruments and before the account invitation: somebody who has
       just seen what the site does is the right person to read who pays for it,
       and it must not be the first thing anybody meets. */}
+  {
+    openPoll && (
+      <section class="section page home-poll">
+        <div class="hp-head">
+          <span class="t-eyebrow">Have a say</span>
+          <a class="hp-all" href="/community">Everything happening →</a>
+        </div>
+        <PollCard poll={openPoll} />
+      </section>
+    )
+  }
+
   <SponsorRow sponsors={sponsors} />
 
   {/* An INVITATION, not a teaser. The design's rule for the signed-out state
@@ -458,4 +476,9 @@ const INSTRUMENTS = [
     margin: 0;
     max-width: 52ch;
   }
+
+  .home-poll { display: grid; gap: var(--space-4); }
+  .hp-head { display: flex; gap: var(--space-4); align-items: baseline; justify-content: space-between; flex-wrap: wrap; }
+  .hp-all { font: 500 var(--text-sm) var(--font-body); color: var(--accent); text-decoration: none; }
+  .hp-all:hover { text-decoration: underline; }
 </style>

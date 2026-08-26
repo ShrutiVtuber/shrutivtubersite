@@ -1,0 +1,163 @@
+---
+/* A question, and the answers coming in.
+ *
+ * **The results update without a reload**, by asking the server every few
+ * seconds while the page is visible — not a websocket. A socket would be
+ * nicer and would also mean a long-lived connection per reader through Caddy,
+ * a reconnect story, and a class of failure for a feature whose whole job is
+ * to show a bar getting longer. Polling stops when the tab is hidden, so a
+ * forgotten tab costs nothing.
+ *
+ * Works with scripting off: it is a real form that posts, and the page it
+ * posts to renders the result.
+ */
+import CsrfField from "../forms/CsrfField.astro";
+
+interface Option { id: number; label: string; votes: number; share: number }
+interface Poll {
+  id: number; slug: string; question: string; note: string;
+  closed: boolean; closesAt: string; total: number;
+  youChose: number | null; options: Option[];
+}
+interface Props { poll: Poll }
+const { poll } = Astro.props;
+const voted = poll.youChose != null;
+const shown = (share: number) => (voted || poll.closed ? share : 0);
+---
+
+<section class="poll" data-poll={poll.slug}>
+  <div class="p-head">
+    <span class="t-eyebrow">{poll.closed ? "Closed" : "Open now"}</span>
+    <h3>{poll.question}</h3>
+    {poll.note && <p class="p-note">{poll.note}</p>}
+  </div>
+
+  {/* Posts to /community, which handles it and comes back — the card appears
+      on pages that have no POST handler of their own, and a form that posts to
+      a page which ignores it looks exactly like a vote that was counted. */}
+  <form method="POST" action="/community#polls" class="p-form" data-poll-form>
+    <CsrfField />
+    <input type="hidden" name="action" value="vote" />
+    <input type="hidden" name="poll" value={poll.slug} />
+    <ul class="p-options">
+      {poll.options.map((o) => (
+        <li data-option={o.id}>
+          <button
+            type="submit" name="option" value={o.id} class="p-option"
+            data-chosen={poll.youChose === o.id || undefined}
+            disabled={poll.closed || undefined}
+            data-track="poll:voted" data-track-tool={poll.slug}
+          >
+            {/* The bar sits behind the label rather than beside it: a row that
+                is both the control and the result should read as one thing. */}
+            <span class="p-bar" style={`width:${shown(o.share)}%`} aria-hidden="true"></span>
+            <span class="p-label">{o.label}</span>
+            <span class="p-share" data-share>{voted || poll.closed ? `${o.share}%` : ""}</span>
+          </button>
+        </li>
+      ))}
+    </ul>
+  </form>
+
+  <p class="p-foot">
+    <span data-poll-total>{poll.total}</span>{poll.total === 1 ? " answer" : " answers"}
+    {voted && !poll.closed && <span> · yours is counted, and you can change it</span>}
+    {!voted && !poll.closed && <span> · no account needed</span>}
+  </p>
+</section>
+
+<script>
+  (() => {
+    const cards = Array.from(document.querySelectorAll("[data-poll]"));
+    if (!cards.length) return;
+
+    const draw = (card, poll) => {
+      const voted = poll.youChose != null || poll.closed;
+      const total = card.querySelector("[data-poll-total]");
+      if (total) total.textContent = String(poll.total);
+      for (const o of poll.options) {
+        const row = card.querySelector('[data-option="' + o.id + '"]');
+        if (!row) continue;
+        const bar = row.querySelector(".p-bar");
+        const share = row.querySelector("[data-share]");
+        if (bar) bar.style.width = (voted ? o.share : 0) + "%";
+        if (share) share.textContent = voted ? o.share + "%" : "";
+        const button = row.querySelector(".p-option");
+        if (button) {
+          if (poll.youChose === o.id) button.setAttribute("data-chosen", "");
+          else button.removeAttribute("data-chosen");
+        }
+      }
+    };
+
+    const refresh = async (card) => {
+      try {
+        const r = await fetch("/api/community/polls/" + card.dataset.poll);
+        if (r.ok) draw(card, await r.json());
+      } catch {
+        /* A poll that cannot refresh keeps showing the last real numbers. */
+      }
+    };
+
+    for (const card of cards) {
+      const form = card.querySelector("[data-poll-form]");
+      form?.addEventListener("submit", async (e) => {
+        const button = e.submitter;
+        if (!button || !button.value) return;
+        e.preventDefault();
+        try {
+          const r = await fetch("/api/community/polls/" + card.dataset.poll + "/vote", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ option_id: Number(button.value) }),
+          });
+          if (r.ok) draw(card, await r.json());
+          else form.submit();
+        } catch {
+          form.submit();
+        }
+      });
+    }
+
+    let timer;
+    const tick = () => cards.forEach(refresh);
+    const start = () => { if (timer === undefined) timer = window.setInterval(tick, 6000); };
+    const stop = () => { if (timer !== undefined) { clearInterval(timer); timer = undefined; } };
+    document.addEventListener("visibilitychange", () => (document.hidden ? stop() : start()));
+    if (!document.hidden) start();
+  })();
+</script>
+
+<style>
+  .poll {
+    display: grid; gap: var(--space-4);
+    padding: var(--space-5);
+    background: var(--surface-card);
+    border: var(--border-w) solid var(--line);
+    border-radius: var(--radius-md);
+  }
+  .p-head h3 { font: 600 var(--text-h4) var(--font-display); color: var(--ink); margin: 6px 0 0; }
+  .p-note { font: 400 var(--text-sm) / 1.7 var(--font-body); color: var(--ink-soft); margin: 8px 0 0; max-width: 58ch; }
+
+  .p-options { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+  .p-option {
+    position: relative; width: 100%; display: flex; gap: var(--space-3);
+    align-items: center; justify-content: space-between;
+    padding: 12px 14px; min-height: 44px;
+    font: 400 var(--text-body) var(--font-body); color: var(--ink); text-align: left;
+    background: var(--surface-page);
+    border: var(--border-w) solid var(--line); border-radius: var(--radius-sm);
+    cursor: pointer; overflow: hidden;
+  }
+  .p-option:hover:not(:disabled) { border-color: var(--accent); }
+  .p-option:disabled { cursor: default; }
+  .p-option[data-chosen] { border-color: var(--accent); }
+  .p-bar {
+    position: absolute; inset: 0 auto 0 0; z-index: 0;
+    background: var(--accent-wash);
+    transition: width var(--dur-3) var(--ease-out);
+  }
+  .p-label, .p-share { position: relative; z-index: 1; }
+  .p-share { font: 500 var(--text-sm) var(--font-body); color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+  .p-foot { font: 400 var(--text-sm) var(--font-body); color: var(--ink-faint); margin: 0; }
+</style>

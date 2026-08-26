@@ -627,6 +627,101 @@ class Visit(TimestampMixin, table=True):
     referrer: str = ""
 
 
+class PushSubscription(TimestampMixin, table=True):
+    """
+    One browser that asked to be told when she goes live.
+
+    `endpoint` is a URL at Mozilla's or Google's push service, unique per
+    browser profile. It is not an identifier of a person and cannot be used to
+    reach anything except that browser's notification tray — but it IS stable
+    for as long as the subscription lives, so it is the one column here worth
+    treating carefully.
+
+    No keys are stored, because nothing is encrypted: the push carries no
+    payload and the service worker asks this site what to say. See
+    `shruti/core/push.py` for why.
+
+    `user_id` is set when somebody was signed in at the time, only so that
+    deleting an account takes their subscriptions with it. Notifying is not
+    account-gated and never will be — asking for an account before telling
+    somebody a stream started is a toll booth on a favour.
+    """
+
+    __tablename__ = "push_subscription"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    endpoint: str = Field(index=True, unique=True)
+    user_id: Optional[int] = Field(default=None, foreign_key="site_user.id", index=True)
+
+    # Which notices they want. Separate flags because "tell me when a stream
+    # starts" and "tell me when a horoscope is up" are different appetites.
+    wants_live: bool = True
+    wants_writing: bool = False
+
+    # For pruning: a subscription that has failed repeatedly is dead, and push
+    # services rate-limit senders who keep trying gone endpoints.
+    failures: int = Field(default=0)
+    last_sent_at: Optional[datetime] = Field(default=None, sa_type=UTC_TS)
+
+
+# ── polls ───────────────────────────────────────────────────────────────────
+
+class Poll(TimestampMixin, table=True):
+    """
+    A question put to whoever is reading, with the answers fixed at creation.
+
+    **The answers cannot be edited once it exists.** Changing a label after
+    people have voted silently changes what their vote meant: the count stays
+    attached to a row that now says something else, and nobody can tell. A
+    different set of answers is a different poll.
+    """
+
+    __tablename__ = "poll"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    slug: str = Field(index=True, unique=True)
+    question: str = ""
+    # The line under it — context, or the promise about what she'll do with it.
+    note: str = ""
+
+    # ISO instant, or "". Closing by time as well as by hand, so a poll run
+    # during a stream stops on its own rather than staying open for a month.
+    closes_at: str = ""
+    closed: bool = False
+    visible: bool = True
+
+
+class PollOption(TimestampMixin, table=True):
+    __tablename__ = "poll_option"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    poll_id: int = Field(foreign_key="poll.id", index=True)
+    label: str = ""
+    position: int = Field(default=0)
+
+
+class PollVote(TimestampMixin, table=True):
+    """
+    One vote, and the honest limit on what "one" means.
+
+    `voter` is the account when there is one, and otherwise the same
+    daily-rotating hash the visit counter uses — address, browser, date and a
+    server secret. So a signed-out person votes once a day per browser and
+    cannot be recognised tomorrow, which is exactly the trade the counter
+    makes. Somebody determined can vote again from another network. This is a
+    poll on a VTuber's website, and the alternative is making an account a
+    condition of answering a question about which game to play.
+    """
+
+    __tablename__ = "poll_vote"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    poll_id: int = Field(foreign_key="poll.id", index=True)
+    option_id: int = Field(foreign_key="poll_option.id", index=True)
+    # "user:12" or "day:<hash>". Never an address.
+    voter: str = Field(index=True)
+
+
 # ── classes and workshops ───────────────────────────────────────────────────
 
 class Course(TimestampMixin, table=True):

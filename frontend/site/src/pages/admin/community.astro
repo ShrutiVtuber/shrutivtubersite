@@ -1,0 +1,233 @@
+---
+/* Polls, and telling people things.
+ *
+ * Two controls that are easy to misuse and so are shaped to be hard to.
+ * A poll's answers cannot be edited after it exists — changing a label
+ * silently changes what somebody's vote meant. And a notification goes to
+ * every browser that asked, at once, with no undo: the confirm says how many.
+ */
+import AdminLayout from "../../layouts/AdminLayout.astro";
+import CsrfField from "../../components/forms/CsrfField.astro";
+import Button from "../../components/forms/Button.astro";
+import Badge from "../../components/navigation/Badge.astro";
+import { asAdmin } from "../../lib/admin";
+import { verifyCsrf } from "../../lib/csrf";
+
+export const prerender = false;
+
+let notice = "";
+let failed = "";
+
+if (Astro.request.method === "POST") {
+  const form = await Astro.request.formData();
+  if (!verifyCsrf(Astro.cookies, form)) {
+    failed = "That did not save. Reload the page and try again.";
+  } else {
+    const action = String(form.get("action") ?? "");
+    const id = String(form.get("id") ?? "");
+
+    if (action === "create-poll") {
+      const options = String(form.get("options") ?? "")
+        .split("\n").map((o) => o.trim()).filter(Boolean);
+      const r = await asAdmin(Astro, "/api/community/admin/polls", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          question: String(form.get("question") ?? ""),
+          note: String(form.get("note") ?? ""),
+          options,
+          visible: true,
+        }),
+      });
+      notice = r.ok ? "Poll opened. It is on the community page and the home page now." : "";
+      if (!r.ok) failed = r.body?.detail ?? "That could not be created.";
+    } else if (action === "close-poll" || action === "reopen-poll") {
+      const current = await asAdmin(Astro, "/api/community/admin/polls");
+      const poll = (current.body ?? []).find((p: any) => String(p.id) === id);
+      if (poll) {
+        const r = await asAdmin(Astro, `/api/community/admin/polls/${id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            question: poll.question, note: poll.note, closes_at: poll.closesAt ?? "",
+            closed: action === "close-poll", visible: poll.visible ?? true,
+          }),
+        });
+        notice = r.ok ? (action === "close-poll" ? "Closed." : "Open again.") : "";
+        if (!r.ok) failed = "That did not change.";
+      }
+    } else if (action === "delete-poll") {
+      const r = await asAdmin(Astro, `/api/community/admin/polls/${id}`, { method: "DELETE" });
+      notice = r.ok ? "Deleted, votes and all." : "";
+      if (!r.ok) failed = "That could not be deleted.";
+    } else if (action === "notify") {
+      const r = await asAdmin(Astro, "/api/community/admin/push/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          kind: String(form.get("kind") ?? "live"),
+          title: String(form.get("title") ?? ""),
+          body: String(form.get("body") ?? ""),
+          url: String(form.get("url") ?? "/"),
+          only_live_subscribers: String(form.get("audience") ?? "live") === "live",
+        }),
+      });
+      if (r.ok) {
+        notice = `Sent to ${r.body.sent} of ${r.body.of}.`
+          + (r.body.gone ? ` ${r.body.gone} had gone and were removed.` : "")
+          + (r.body.failed ? ` ${r.body.failed} did not go through.` : "");
+      } else {
+        failed = r.body?.detail ?? "That did not send.";
+      }
+    }
+  }
+}
+
+const [pollCall, pushCall] = await Promise.all([
+  asAdmin(Astro, "/api/community/admin/polls"),
+  asAdmin(Astro, "/api/community/admin/push/count"),
+]);
+const polls: any[] = Array.isArray(pollCall.body) ? pollCall.body : [];
+const push = pushCall.body ?? {};
+---
+
+<AdminLayout title="Community">
+  <h1 class="adm-h">Community</h1>
+
+  {notice && <p class="adm-ok">{notice}</p>}
+  {failed && <p class="adm-bad">{failed}</p>}
+
+  <section class="adm-card">
+    <h2 class="adm-lbl">Tell everybody something</h2>
+    {
+      !push.configured ? (
+        <p class="adm-note">
+          Notifications are not set up. Run <code>scripts/vapid-keys.py</code> on
+          the server, put the three lines in <code>.env</code>, and restart —
+          then this works. <strong>Do not regenerate the keys afterwards</strong>:
+          every browser binds its subscription to the key it saw, so a new pair
+          silently unsubscribes everybody without telling them.
+        </p>
+      ) : (
+        <>
+          <p class="adm-note">
+            <strong>{push.live}</strong> {push.live === 1 ? "browser has" : "browsers have"} asked
+            to be told when a stream starts, and <strong>{push.writing}</strong> about new writing.
+            No account and no email address is involved. It goes at once and cannot be recalled.
+          </p>
+          <form method="POST" class="write"
+                onsubmit="return confirm('Send this notification now? It cannot be recalled.')">
+            <CsrfField />
+            <input type="hidden" name="action" value="notify" />
+            <label>
+              <span class="adm-lbl">Who</span>
+              <select class="adm-input" name="audience">
+                <option value="live">Everyone who wants stream alerts ({push.live})</option>
+                <option value="writing">Everyone who wants writing alerts ({push.writing})</option>
+              </select>
+            </label>
+            <label>
+              <span class="adm-lbl">Title</span>
+              <input class="adm-input" name="title" maxlength="120" required
+                     placeholder="Shruti is live" />
+            </label>
+            <label>
+              <span class="adm-lbl">The line under it</span>
+              <input class="adm-input" name="body" maxlength="200"
+                     placeholder="Building the dasha calculator." />
+            </label>
+            <label>
+              <span class="adm-lbl">Where it goes when pressed</span>
+              <input class="adm-input" name="url" value="/videos" maxlength="200" />
+            </label>
+            <div><Button type="submit">Send it</Button></div>
+          </form>
+        </>
+      )
+    }
+  </section>
+
+  <section class="adm-card">
+    <h2 class="adm-lbl">Open a poll</h2>
+    <p class="adm-note">
+      The answers are fixed once it exists. Editing one afterwards would
+      silently change what somebody's vote meant — a different set of answers
+      is a different poll.
+    </p>
+    <form method="POST" class="write">
+      <CsrfField />
+      <input type="hidden" name="action" value="create-poll" />
+      <label>
+        <span class="adm-lbl">The question</span>
+        <input class="adm-input" name="question" maxlength="200" required
+               placeholder="What should I build on stream next?" />
+      </label>
+      <label>
+        <span class="adm-lbl">A line under it</span>
+        <input class="adm-input" name="note" maxlength="400"
+               placeholder="I'll start whichever wins on the first stream of September." />
+      </label>
+      <label>
+        <span class="adm-lbl">The answers</span>
+        <textarea class="adm-area" name="options" rows="5" required
+                  placeholder="One per line.&#10;At least two."></textarea>
+      </label>
+      <div><Button type="submit">Open it</Button></div>
+    </form>
+  </section>
+
+  <section class="adm-card">
+    <h2 class="adm-lbl">Polls</h2>
+    {
+      polls.length === 0 ? (
+        <p class="adm-note">None yet.</p>
+      ) : (
+        <ul class="polls">
+          {polls.map((p) => (
+            <li>
+              <div class="p-row">
+                <span class="p-q">{p.question}</span>
+                <Badge tone={p.closed ? "faint" : "accent"}>{p.closed ? "closed" : "open"}</Badge>
+                <span class="p-n">{p.total} {p.total === 1 ? "answer" : "answers"}</span>
+              </div>
+              <ul class="p-results">
+                {p.options.map((o: any) => (
+                  <li><span>{o.label}</span><span class="t-tabular">{o.votes} · {o.share}%</span></li>
+                ))}
+              </ul>
+              <div class="p-acts">
+                <form method="POST">
+                  <CsrfField />
+                  <input type="hidden" name="action" value={p.closed ? "reopen-poll" : "close-poll"} />
+                  <input type="hidden" name="id" value={p.id} />
+                  <Button type="submit" variant="secondary">{p.closed ? "Open it again" : "Close it"}</Button>
+                </form>
+                <form method="POST" onsubmit="return confirm('Delete this poll and every vote on it?')">
+                  <CsrfField />
+                  <input type="hidden" name="action" value="delete-poll" />
+                  <input type="hidden" name="id" value={p.id} />
+                  <button type="submit" class="erase">Delete</button>
+                </form>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )
+    }
+  </section>
+</AdminLayout>
+
+<style>
+  .write { display: grid; gap: var(--space-4); max-width: 62ch; }
+  .write label { display: grid; gap: 6px; }
+  .polls { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-5); }
+  .polls > li { border-top: var(--border-w) solid var(--line); padding-top: var(--space-4); display: grid; gap: 10px; }
+  .p-row { display: flex; gap: var(--space-3); align-items: baseline; flex-wrap: wrap; }
+  .p-q { font: 500 var(--text-body) var(--font-body); color: var(--ink); }
+  .p-n { font: 400 var(--text-sm) var(--font-body); color: var(--ink-faint); }
+  .p-results { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; max-width: 52ch; }
+  .p-results li { display: flex; justify-content: space-between; gap: var(--space-3); font: 400 var(--text-sm) var(--font-body); color: var(--ink-soft); }
+  .p-acts { display: flex; gap: var(--space-4); align-items: center; flex-wrap: wrap; }
+  .erase { font: 500 var(--text-xs) var(--font-body); color: var(--live); background: none; border: 0; cursor: pointer; padding: 6px 4px; }
+  .erase:hover { text-decoration: underline; }
+</style>
