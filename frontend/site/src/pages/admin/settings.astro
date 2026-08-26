@@ -57,6 +57,22 @@ if (Astro.request.method === "POST") {
           : "The holding page is up. Only you see the site."
         : "";
       failed = r.ok ? "" : "That did not save.";
+    } else if (String(form.get("action") ?? "") === "section") {
+      const name = String(form.get("section") ?? "");
+      const live = form.get("live") === "1";
+      const r = await asAdmin(Astro, "/api/admin/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ values: { [`page.${name}`]: live ? "1" : "0" } }),
+      });
+      notice = r.ok
+        ? live
+          ? "Published — visitors can reach it now."
+          : "Hidden. Visitors get a 404; you still see it and can keep building."
+        : "";
+      /* The backend refuses to hide classes while anybody holds one, and says
+         how many. Its sentence is better than anything generic here. */
+      failed = r.ok ? "" : (r.body?.detail ?? "That did not save.");
     }
 
     const r = await asAdmin(Astro, "/api/admin/settings", {
@@ -72,6 +88,16 @@ if (Astro.request.method === "POST") {
 const read = await asAdmin(Astro, "/api/admin/settings?prefix=imprint.");
 const stateRead = await asAdmin(Astro, "/api/admin/settings?prefix=site.");
 const holdingOn = (stateRead.ok ? stateRead.body?.settings ?? {} : {})["site.coming_soon"] !== "0";
+
+/* Sections she can finish in private. Absent means published — a section that
+   vanished because a settings row was missing would be the worst surprise. */
+const pageRead = await asAdmin(Astro, "/api/admin/settings?prefix=page.");
+const pageValues: Record<string, string> = pageRead.ok ? (pageRead.body?.settings ?? {}) : {};
+const SECTIONS: [string, string, string][] = [
+  ["shop", "Shop", "Products, prices and orders. Hidden, nobody can find or buy — and everything you build stays here waiting."],
+  ["horoscopes", "Horoscopes", "Draft and stage as many months as you like. None of it is public until the section is."],
+  ["classes", "Classes", "Courses, lessons and workshops. Cannot be hidden once anybody holds a place — they paid for it."],
+];
 
 const keyRead = await asAdmin(Astro, "/api/passkeys/admin");
 const passkeys: PasskeyRow[] = keyRead.ok ? (keyRead.body?.passkeys ?? []) : [];
@@ -120,6 +146,46 @@ const live = on && complete;
       </Button>
     </form>
   </section>
+
+      <section class="adm-card">
+        <div class="state-head">
+          <h2 class="h2">Sections you are still building</h2>
+        </div>
+        <p class="adm-note">
+          A hidden section gives visitors a 404 and its links come out of the
+          navigation, so nobody is sent somewhere that is not there. <strong>You
+          still see it and can keep working</strong> — write twelve horoscopes,
+          price a shelf of products, record a course, and publish the whole
+          thing when it is ready rather than in pieces.
+        </p>
+        <ul class="sections">
+          {
+            SECTIONS.map(([name, label, note]) => {
+              const live = pageValues[`page.${name}`] !== "0";
+              return (
+                <li>
+                  <div class="sec-row">
+                    <span class="sec-name">{label}</span>
+                    <Badge tone={live ? "accent" : "faint"}>
+                      {live ? "published" : "hidden — 404 for visitors"}
+                    </Badge>
+                  </div>
+                  <p class="adm-note sec-note">{note}</p>
+                  <form method="POST">
+                    <CsrfField />
+                    <input type="hidden" name="action" value="section" />
+                    <input type="hidden" name="section" value={name} />
+                    <input type="hidden" name="live" value={live ? "0" : "1"} />
+                    <Button type="submit" variant="secondary">
+                      {live ? `Hide ${label.toLowerCase()}` : `Publish ${label.toLowerCase()}`}
+                    </Button>
+                  </form>
+                </li>
+              );
+            })
+          }
+        </ul>
+      </section>
 
   <form method="POST" class="adm-card">
     <h2 class="h2">Legal imprint</h2>
@@ -186,4 +252,9 @@ const live = on && complete;
   .switch input { margin-top: 3px; accent-color: var(--accent); width: 18px; height: 18px; flex: none; }
   .switch > span { display: grid; gap: 3px; }
   .switch strong { font: 500 var(--text-body) var(--font-body); color: var(--ink); }
+  .sections { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-5); }
+  .sections > li { border-top: var(--border-w) solid var(--line); padding-top: var(--space-4); display: grid; gap: 8px; justify-items: start; }
+  .sec-row { display: flex; gap: var(--space-3); align-items: baseline; flex-wrap: wrap; }
+  .sec-name { font: 600 var(--text-body) var(--font-display); color: var(--ink); }
+  .sec-note { max-width: 62ch; }
 </style>

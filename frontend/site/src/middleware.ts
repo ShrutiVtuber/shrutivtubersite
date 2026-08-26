@@ -60,26 +60,60 @@ const PASS_THROUGH = /^\/(_astro|_image|api|media|favicon|apple-touch-icon|icon-
  * a database round trip per asset would be absurd — but the toggle has to take
  * effect quickly enough that she does not think it is broken, so the window is
  * seconds rather than minutes. */
-let holdingState: { on: boolean; at: number } | null = null;
+let holdingState: { on: boolean; at: number; sections: Record<string, boolean> } | null = null;
 const HOLDING_TTL_MS = 5_000;
 
-async function holdingPageIsOn(): Promise<boolean> {
+/* Sections she can finish in private.
+ *
+ * Each is a whole area that can be built out — products written, twelve
+ * horoscopes drafted, a course recorded — while the public gets a 404. The
+ * admin is untouched: hiding a section changes what VISITORS reach and nothing
+ * about what she can make.
+ *
+ * A 404 rather than a "coming soon" page, deliberately. A section that is not
+ * ready should not be advertised, and a teaser is a promise with a date on it
+ * that nobody agreed to. The links come out of the nav at the same time, so
+ * nobody is sent to one.
+ *
+ * Absent means live: a section that vanished because a settings row was missing
+ * would be the worst kind of surprise. */
+const SECTION_PATHS: Record<string, string> = {
+  "/shop": "shop",
+  "/horoscopes": "horoscopes",
+  "/classes": "classes",
+};
+
+function sectionOf(path: string): string | null {
+  for (const [prefix, name] of Object.entries(SECTION_PATHS)) {
+    if (path === prefix || path.startsWith(prefix + "/")) return name;
+  }
+  return null;
+}
+
+async function siteState(): Promise<{ on: boolean; sections: Record<string, boolean> }> {
   const now = Date.now();
-  if (holdingState && now - holdingState.at < HOLDING_TTL_MS) return holdingState.on;
+  if (holdingState && now - holdingState.at < HOLDING_TTL_MS) return holdingState;
   try {
     const r = await fetch(`${SITE_API}/api/content/site-state`);
     if (!r.ok) throw new Error(String(r.status));
     const body = await r.json();
-    holdingState = { on: Boolean(body?.comingSoon), at: now };
+    holdingState = {
+      on: Boolean(body?.comingSoon),
+      sections: body?.sections ?? {},
+      at: now,
+    };
   } catch {
     /* If the backend cannot be asked, keep the LAST KNOWN answer, and default
      * to showing the site rather than the holding page. Getting this backwards
      * would mean a backend hiccup takes the whole live site down and replaces
      * it with "coming soon", which is far worse than briefly showing a site
-     * that was meant to be hidden. */
-    holdingState = { on: holdingState?.on ?? false, at: now };
+     * that was meant to be hidden.
+     *
+     * Sections default to LIVE for the same reason: a blip should not 404 the
+     * shop. */
+    holdingState = { on: holdingState?.on ?? false, sections: holdingState?.sections ?? {}, at: now };
   }
-  return holdingState.on;
+  return holdingState;
 }
 
 async function isOperator(token: string | undefined): Promise<boolean> {
@@ -116,7 +150,35 @@ export const onRequest = defineMiddleware(async (context, next) => {
    * in, in which case she gets the real site and can work on it in public
    * without publishing it. */
   if (!PASS_THROUGH.test(path) && !ALWAYS_OPEN.includes(path)) {
-    if (await holdingPageIsOn()) {
+    const state = await siteState();
+    /* Handed to the header and the footer so a hidden section has no link.
+       They read what the gate decided rather than asking again — two sources
+       for one answer is how a nav ends up pointing at a 404. */
+    context.locals.sectionsLive = state.sections;
+
+    /* A section she has not published yet. Checked before the holding page so
+       the two do not have to know about each other: while the holding page is
+       up nobody reaches either, and after it comes down this still holds. */
+    const section = sectionOf(path);
+    if (section && state.sections[section] === false) {
+      if (!(await isOperator(token))) {
+        /* A rewrite so the visitor keeps the URL they asked for — a redirect
+           would rewrite the link they were given.
+           The status is set HERE rather than trusted to the page: a rewrite
+           keeps the status of the request it came from, so /404 rendered
+           through one comes back 200. A 200 saying "not found" is a lie told
+           to a crawler as much as to a person, and it is exactly how pages
+           that do not exist get indexed. */
+        const notFound = await context.rewrite("/404");
+        return new Response(notFound.body, {
+          status: 404,
+          headers: notFound.headers,
+        });
+      }
+      context.locals.previewingSection = section;
+    }
+
+    if (state.on) {
       if (!(await isOperator(token))) {
         /* A REWRITE, not a redirect: the visitor stays at the URL they asked
          * for. A redirect would rewrite every shared link to /coming-soon and

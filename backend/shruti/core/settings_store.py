@@ -35,6 +35,41 @@ IMPRINT_VISIBLE = "imprint.visible"
 COMING_SOON = "site.coming_soon"
 
 
+# ── sections that can be finished in private ────────────────────────────────
+#
+# Each of these is a whole area of the site that can be built out — products
+# written, twelve horoscopes drafted, a course recorded — while the public
+# still gets a 404. The admin is unaffected: hiding a section changes what
+# VISITORS can reach and nothing about what she can make.
+#
+# **Absent means live.** A section that vanished because a settings row was
+# missing would be the worst kind of surprise, so the default is the state the
+# site has always had and hiding is a deliberate act.
+#
+# A 404 rather than a "coming soon" page, deliberately: a section that is not
+# ready should not be advertised, and a teaser is a promise with a date
+# attached that nobody wrote down.
+SECTIONS = {
+    "shop": "page.shop",
+    "horoscopes": "page.horoscopes",
+    "classes": "page.classes",
+}
+
+# Which URL prefixes belong to each, so the middleware and the sitemap agree
+# about what "hiding the shop" covers.
+SECTION_PATHS = {
+    "shop": ("/shop",),
+    "horoscopes": ("/horoscopes",),
+    "classes": ("/classes",),
+}
+
+
+async def sections_live(session: AsyncSession) -> dict[str, bool]:
+    """Which sections a visitor may reach. Absent means live."""
+    values = await get_many(session, tuple(SECTIONS.values()))
+    return {name: values.get(key, "1") != "0" for name, key in SECTIONS.items()}
+
+
 async def get_many(session: AsyncSession, keys: tuple[str, ...] | list[str]) -> dict[str, str]:
     rows = (
         await session.execute(select(SiteSetting).where(SiteSetting.key.in_(list(keys))))

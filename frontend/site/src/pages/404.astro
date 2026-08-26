@@ -3,6 +3,14 @@
    handoff: an error page is still the brand talking. */
 import BaseLayout from "../layouts/BaseLayout.astro";
 import Button from "../components/forms/Button.astro";
+
+/* Said explicitly, because this page is REWRITTEN to as well as routed to.
+ * Astro sets 404 for an address that matches nothing, but a rewrite keeps the
+ * status of the request it came from — so a section she has not published yet
+ * would render this page with a 200. A 200 saying "not found" is a lie told to
+ * a crawler as much as to a person, and it is how pages that do not exist end
+ * up indexed. */
+Astro.response.status = 404;
 ---
 
 <BaseLayout title="Not found — Shruti" description="This page is in another sky.">

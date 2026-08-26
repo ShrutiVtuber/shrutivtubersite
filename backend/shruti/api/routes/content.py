@@ -311,6 +311,12 @@ async def site_state(session: AsyncSession = Depends(get_session)) -> dict:
     every request, and making it require a credential would mean shipping one
     to a process that has no user.
     """
-    from shruti.core.settings_store import coming_soon
+    from shruti.core.settings_store import coming_soon, sections_live
 
-    return {"comingSoon": await coming_soon(session)}
+    return {
+        "comingSoon": await coming_soon(session),
+        # Which whole sections a visitor may reach. The middleware asks for
+        # this in the same call it already makes for the holding page, so
+        # gating a section costs no extra round trip on every request.
+        "sections": await sections_live(session),
+    }

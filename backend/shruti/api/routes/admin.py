@@ -769,13 +769,39 @@ async def write_settings(
     session: AsyncSession = Depends(get_session),
     _: str = Depends(require_admin),
 ) -> dict:
-    from shruti.core.settings_store import get_all, put_many
+    from shruti.core.settings_store import SECTIONS, get_all, put_many
 
     # Keys are namespaced and short; nothing here is a path or a template.
     clean = {
         k: v for k, v in body.values.items()
         if k and len(k) <= 64 and len(v) <= 500
     }
+
+    # **Hiding a section must never take away something somebody bought.**
+    #
+    # Hiding the shop or the horoscopes costs a visitor a browse page. Hiding
+    # classes would 404 the page a student watches their lessons on, and they
+    # paid for those — a section being "not ready" is a fact about the site,
+    # not about their purchase. So this refuses rather than quietly locking
+    # them out, and says how many people it would have affected.
+    if clean.get(SECTIONS["classes"]) == "0":
+        from shruti.models import Entitlement
+
+        held = (
+            await session.execute(
+                select(Entitlement).where(Entitlement.revoked_at.is_(None))
+            )
+        ).scalars().all()
+        if held:
+            raise HTTPException(
+                409,
+                f"{len(held)} " + ("person has" if len(held) == 1 else "people have")
+                + " access to a class. Hiding the section would 404 the page they"
+                " watch on, and they paid for it. Unpublish the individual"
+                " courses instead — that stops new sales without taking anything"
+                " away.",
+            )
+
     await put_many(session, clean)
     return {"ok": True, "settings": await get_all(session)}
 

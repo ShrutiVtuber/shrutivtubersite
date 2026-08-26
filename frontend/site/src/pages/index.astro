@@ -109,6 +109,9 @@ const AVATAR = "/brand/avatar-square.png";
 const sponsors = (await site<any[]>("/api/content/sponsors/featured")) ?? [];
 const room = await site<any>("/api/community/discord");
 
+/* What the middleware decided, so the page and the gate cannot disagree. */
+const sectionsLive: Record<string, boolean> = Astro.locals.sectionsLive ?? {};
+
 /* The newest open poll, and only one. A live question is a reason to come
    back; a column of them is a survey. The community page has the rest. */
 const openPoll = ((await site<any[]>("/api/community/polls/open")) ?? [])
@@ -306,35 +309,42 @@ const INSTRUMENTS = [
   </section>
 
 
-  <section class="section page">
-    <div class="section-head">
-      <SectionHeader
-        glyph="☾"
-        eyebrow="Horoscopes"
-        title={monthName ? `${monthName}, one per sign` : "This month, one per sign"}
-        body="Twelve readings a month, written by hand and signed Soror Eu. A. Pick a sign — or save a nativity and yours comes up first."
-      />
-      <Button variant="ghost" href="/horoscopes">
-        {anyReading ? "All twelve →" : "How they work →"}
-      </Button>
-    </div>
-    {
-      anyReading ? (
-        <SignPicker
-          signs={readings.map((r) => ({ sign: r.sign, published: r.published }))}
-          hrefFor={(s) => `/horoscopes/${s}/monthly`}
+  {
+    /* Gone entirely while the section is unpublished. Hiding only the links
+       would leave a heading promising twelve readings with no way to reach
+       one, which reads as broken rather than as not-yet. */
+    sectionsLive.horoscopes !== false && (
+    <section class="section page">
+      <div class="section-head">
+        <SectionHeader
+          glyph="☾"
+          eyebrow="Horoscopes"
+          title={monthName ? `${monthName}, one per sign` : "This month, one per sign"}
+          body="Twelve readings a month, written by hand and signed Soror Eu. A. Pick a sign — or save a nativity and yours comes up first."
         />
-      ) : (
-        /* No date promised. A month named here and missed reads as an
-           abandoned site, which is a worse thing to say than "not yet". */
-        <p class="horo-absent">
-          ○ The first set is not up yet. When it is, twelve go up together — and
-          every past month stays readable in <a href="/horoscopes/archive">the archive</a>
-          rather than being replaced.
-        </p>
-      )
-    }
-  </section>
+        <Button variant="ghost" href="/horoscopes">
+          {anyReading ? "All twelve →" : "How they work →"}
+        </Button>
+      </div>
+      {
+        anyReading ? (
+          <SignPicker
+            signs={readings.map((r) => ({ sign: r.sign, published: r.published }))}
+            hrefFor={(s) => `/horoscopes/${s}/monthly`}
+          />
+        ) : (
+          /* No date promised. A month named here and missed reads as an
+             abandoned site, which is a worse thing to say than "not yet". */
+          <p class="horo-absent">
+            ○ The first set is not up yet. When it is, twelve go up together — and
+            every past month stays readable in <a href="/horoscopes/archive">the archive</a>
+            rather than being replaced.
+          </p>
+        )
+      }
+    </section>
+    )
+  }
 
   <section class="section page">
     <div class="section-head">

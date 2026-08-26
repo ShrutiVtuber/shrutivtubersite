@@ -16,6 +16,19 @@ interface Props {
 const { live, signedIn = false, withArt = false } = Astro.props;
 const here = Astro.url.pathname;
 
+/* A section she has not published yet has no link. The middleware already
+   404s it, and a nav item pointing at a 404 is worse than no nav item: it says
+   the site is broken rather than that the thing is not ready.
+
+   Read from locals, which the middleware fills, so the header and the gate
+   cannot disagree — one asks the backend, the other reads what it decided. */
+const hidden = new Set(
+  Object.entries(Astro.locals.sectionsLive ?? {})
+    .filter(([, live]) => live === false)
+    .map(([name]) => `/${name}`),
+);
+const visible = (href: string) => !hidden.has(href);
+
 const NAV: [string, string][] = [
   ["/", "Home"],
   ["/today", "Today"],
@@ -45,7 +58,7 @@ const current = (href: string) => (href === "/" ? here === "/" : here.startsWith
       </a>
       <nav class="site-nav" aria-label="Primary">
         {
-          NAV.map(([href, label]) => (
+          NAV.filter(([href]) => visible(href)).map(([href, label]) => (
             <a href={href} aria-current={current(href) ? "page" : undefined}>
               {label}
             </a>
@@ -70,7 +83,7 @@ const current = (href: string) => (href === "/" ? here === "/" : here.startsWith
     </div>
     <nav id="site-menu" class="site-menu" aria-label="Primary, mobile" hidden>
       {
-        NAV.map(([href, label]) => (
+        NAV.filter(([href]) => visible(href)).map(([href, label]) => (
           <a href={href} aria-current={current(href) ? "page" : undefined}>
             {label}
           </a>

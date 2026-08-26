@@ -37,6 +37,14 @@ const imprint = await site<Imprint>("/api/content/imprint");
  * then it is the name of the person who made the site, which is true. */
 const holder = imprint?.visible && imprint.entity ? imprint.entity : "Shruti";
 
+/* Same rule as the header: no link to a section that 404s. */
+const hidden = new Set(
+  Object.entries(Astro.locals.sectionsLive ?? {})
+    .filter(([, live]) => live === false)
+    .map(([name]) => `/${name}`),
+);
+const shown = (href: string) => !hidden.has(href);
+
 const SITE: [string, string][] = [
   ["/work", "Work"],
   ["/classes", "Classes"],
@@ -77,7 +85,7 @@ const year = new Date().getUTCFullYear();
       </div>
       <div>
         <h4>Site</h4>
-        <ul>{SITE.map(([href, label]) => <li><a href={href}>{label}</a></li>)}</ul>
+        <ul>{SITE.filter(([href]) => shown(href)).map(([href, label]) => <li><a href={href}>{label}</a></li>)}</ul>
       </div>
       <div>
         <h4>Elsewhere</h4>

@@ -18,7 +18,7 @@ import type { APIRoute } from "astro";
  * is invisibly wrong for as long as nobody opens it. */
 const SITE = (import.meta.env.SHRUTI_SITE_URL ?? "https://shrutivtuber.com").replace(/\/$/, "");
 
-import { site } from "../lib/api";
+import { site, SITE_API } from "../lib/api";
 
 /** Weekly-ish reference surfaces, and the pages that are simply always there. */
 const STATIC: [path: string, priority: string, changefreq: string][] = [
@@ -61,6 +61,23 @@ const SIGNS = [
 const escape = (text: string) =>
   text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
+/* A hidden section is not in the sitemap. Listing a URL that returns 404 is
+   how a site teaches a crawler to distrust its own sitemap. */
+async function hiddenSections(): Promise<Set<string>> {
+  try {
+    const r = await fetch(`${SITE_API}/api/content/site-state`);
+    if (!r.ok) return new Set();
+    const body = await r.json();
+    return new Set(
+      Object.entries(body?.sections ?? {})
+        .filter(([, live]) => live === false)
+        .map(([name]) => `/${name}`),
+    );
+  } catch {
+    return new Set();
+  }
+}
+
 export const GET: APIRoute = async () => {
   const origin = SITE;
 
@@ -72,8 +89,16 @@ export const GET: APIRoute = async () => {
         `    <changefreq>${changefreq}</changefreq>\n    <priority>${priority}</priority>\n  </url>`,
     );
 
-  for (const [path, priority, changefreq] of STATIC) add(path, priority, changefreq);
-  for (const sign of SIGNS) add(`/horoscopes/${sign}/monthly`, "0.7", "monthly");
+  const hidden = await hiddenSections();
+  const reachable = (path: string) =>
+    ![...hidden].some((prefix) => path === prefix || path.startsWith(prefix + "/"));
+
+  for (const [path, priority, changefreq] of STATIC) {
+    if (reachable(path)) add(path, priority, changefreq);
+  }
+  if (reachable("/horoscopes")) {
+    for (const sign of SIGNS) add(`/horoscopes/${sign}/monthly`, "0.7", "monthly");
+  }
 
   /* Published writing, if the backend is reachable. Absent, the static list
      above is still a valid sitemap. */
