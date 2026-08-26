@@ -128,12 +128,43 @@ best moment it will ever have. Design the overrun.
 Sizes: a **wide** form (a strip along the bottom or top) and a **compact** form
 (a corner block). Both, please — scenes differ.
 
-### 4.2 Alert
+### 4.2 Alerts — a family, not one thing
 
 Somebody just supported. This is the most-seen thing here and the most likely
 to be resented if it is wrong.
 
-It carries: **who** (a name they chose), **what** (an amount or a tier), and
+**Support arrives through several doors and they are not interchangeable.**
+This is the part of the brief that expanded most, so it is set out in full:
+
+| Source | What arrives | The unit is |
+|---|---|---|
+| **Her own Stripe** | one-off support, a membership starting | money — €5 |
+| **Twitch subscription** | new, renewed, or **gifted** | a tier — T1/T2/T3 — and a month count |
+| **Twitch gift bomb** | one person gifting many at once | a count of recipients |
+| **Twitch cheer** | bits | bits — "1,000 bits", which is *not* money |
+| **Twitch raid** | another streamer arriving with their audience | viewers — "42 viewers" |
+| **Twitch follow** | the smallest possible signal | nothing at all |
+| **YouTube Super Chat** | a paid, coloured, pinned message | money, and a duration/colour tier |
+
+**Four consequences the design has to answer:**
+
+1. **The amount is not one type.** €5, 1,000 bits, three months, 42 viewers and
+   a Super Chat's own colour tier all occupy the same slot. Design the slot so
+   all five read correctly and none of them looks like a mistake.
+2. **A gift is three people**: the giver, the recipient, and sometimes a count.
+   A gift bomb is a giver and a number. Say how each is worded and weighted —
+   the giver is the one being thanked.
+3. **A raid is not a donation.** It is somebody arriving with a crowd, and it
+   is the one alert that should probably feel different in kind rather than
+   just in degree.
+4. **A follow is worth almost nothing and happens constantly.** Say whether it
+   deserves an alert at all, and if so how quiet it has to be. Getting this
+   wrong is the single most common way a stream becomes unwatchable.
+
+They must read as **one family** — a viewer should recognise instantly that
+something good happened, and only then work out which kind.
+
+Each carries: **who** (a name they chose), **what** (from the table above), and
 optionally **a short message they wrote**.
 
 Design the **arrival, the hold and the departure** as three separate things
@@ -195,6 +226,8 @@ To a stream start, or to a merch drop closing. Simple, but state:
 | **Alert queue of several** | Design the wait. |
 | **A supporter with no message** | The common case. |
 | **A very long name** | Somebody will be called `xX_the_longest_possible_handle_Xx`. |
+| **A gift with an unknown recipient** | Twitch sometimes anonymises the giver, and sometimes the gift is to the whole channel. Both need wording that is not a blank. |
+| **An anonymous cheer** | Bits can be cheered anonymously. "Anonymous" is a name, and should look deliberate. |
 
 ---
 
@@ -215,6 +248,18 @@ To a stream start, or to a merch drop closing. Simple, but state:
 - **Money comes through Stripe**, which is live and already handles
   `checkout.session.completed` and all three subscription events. Goals are fed
   by real payments, not by anything typed in.
+- **Platform events come too, and she chooses what counts.** Twitch
+  subscriptions, gifts, cheers, raids and follows arrive by EventSub; YouTube
+  Super Chats by reading the live chat while she is streaming. A goal in the
+  admin says which sources count toward it, because "€300 for a microphone" and
+  "a thousand bits this month" are different questions and she may want either.
+- **One gap, and it is not ours to close.** YouTube *memberships* cannot be
+  read: the API is gated behind a Google partner relationship, the self-serve
+  application was withdrawn, and no independent developer has publicly been
+  granted access. Discord's own integration handles the Discord-role half of
+  that for free. So **new YouTube members will not raise an alert**, and the
+  design must not imply a completeness that does not exist. Super Chats are
+  unaffected.
 - **Goals are rows**, created and edited in the admin without a deploy — the
   same rule as everything else on this site.
 - **Messages from supporters are moderated before they appear on screen.**
@@ -228,6 +273,8 @@ To a stream start, or to a merch drop closing. Simple, but state:
 ## 8. Acceptance
 
 - Legible over a white editor, a dark room and a bright window.
+- Every alert type in the table above is drawn, and they read as one family.
+- €5, 1,000 bits, three months and 42 viewers all sit correctly in one slot.
 - Nothing scrolls, nothing overflows, nothing shows a scrollbar.
 - Idle overlays compose no frames.
 - Every state above is drawn, including the ones that look like nothing.
