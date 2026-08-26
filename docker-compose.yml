@@ -153,11 +153,17 @@ services:
       # Bound to loopback: Caddy terminates TLS and proxies. Discord must reach
       # it over HTTPS with a valid certificate, so it is never exposed directly.
       - "127.0.0.1:8250:8000"
+    volumes:
+      # Its own database, on its own volume — not a schema beside the site's.
+      # The bot having no route to site data is easier to guarantee when there
+      # is no shared server to be wrong about.
+      - bot_data:/data
     networks: [shruti, shruti-interop]
 
 volumes:
   # Written by the beeranked agent, read by caddy. One direction only.
   journal:
+  bot_data:
   postgres_data:
   media:
   caddy_data:

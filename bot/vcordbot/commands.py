@@ -10,7 +10,10 @@ unimplemented.
 from __future__ import annotations
 
 # Discord application command option types.
+SUB_COMMAND = 1
 STRING = 3
+CHANNEL = 7
+ROLE = 8
 
 # Every instrument the ephemeris can answer without storing anything. The
 # chart commands are deliberately absent for now: a chart is birth data, and
@@ -50,5 +53,52 @@ COMMANDS: list[dict] = [
         ],
     },
 ]
+
+COMMANDS.append({
+    "name": "announce",
+    "description": "Say something in this server when a channel goes live.",
+    # Manage Server. Discord hides the command from anybody else, which is the
+    # good half — the handler checks it too, because a default_member_permissions
+    # is a UI hint and not an authorisation.
+    "default_member_permissions": str(1 << 5),
+    # Announcements belong to a server, not to a person's DMs.
+    "dm_permission": False,
+    "options": [
+        {"type": SUB_COMMAND, "name": "here",
+         "description": "Post announcements in this channel.",
+         "options": [
+             {"type": ROLE, "name": "mention", "required": False,
+              "description": "A role to ping. Only this role can ever be pinged."},
+         ]},
+        {"type": SUB_COMMAND, "name": "watch",
+         "description": "Watch a channel and announce when it goes live.",
+         "options": [
+             {"type": STRING, "name": "platform", "required": True,
+              "description": "Where to watch.",
+              "choices": [{"name": "Twitch", "value": "twitch"},
+                          {"name": "YouTube", "value": "youtube"}]},
+             {"type": STRING, "name": "handle", "required": True,
+              "description": "A Twitch login, or a YouTube channel id starting UC."},
+         ]},
+        {"type": SUB_COMMAND, "name": "unwatch",
+         "description": "Stop watching one.",
+         "options": [
+             {"type": STRING, "name": "platform", "required": True,
+              "description": "Where it was watched.",
+              "choices": [{"name": "Twitch", "value": "twitch"},
+                          {"name": "YouTube", "value": "youtube"}]},
+             {"type": STRING, "name": "handle", "required": True,
+              "description": "The same handle you added."},
+         ]},
+        {"type": SUB_COMMAND, "name": "message",
+         "description": "What the announcement says. {handle} {title} {game} {url}",
+         "options": [
+             {"type": STRING, "name": "template", "required": True,
+              "description": "e.g. {handle} is live — {title} {url}"},
+         ]},
+        {"type": SUB_COMMAND, "name": "status",
+         "description": "What this server is set up to announce."},
+    ],
+})
 
 NAMES = {c["name"] for c in COMMANDS}

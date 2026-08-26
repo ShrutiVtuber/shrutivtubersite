@@ -18,18 +18,62 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timezone
 
+import asyncio
+from contextlib import asynccontextmanager
+
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 from fastapi import FastAPI, Header, HTTPException, Request
 
-from vcordbot import config
+from vcordbot import announce, config, storage
 from vcordbot.astro import Astro
 from vcordbot.dispatch import dispatch
 
+# uvicorn configures its own loggers and leaves everybody else at WARNING, so
+# the watcher's own lines never appeared. Set it here rather than wondering
+# later whether silence means "nothing happened" or "nothing is running".
+logging.basicConfig(level=logging.INFO,
+                    format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 log = logging.getLogger("vcordbot")
 
+# Held so `/health` can say whether the sweep is actually running. "Silence"
+# and "stopped" look identical from outside, and only one of them is fine.
+_watcher: "asyncio.Task | None" = None
+
 CFG = config.load()
-app = FastAPI(title="vcordbot", docs_url=None, redoc_url=None, openapi_url=None)
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    """
+    The watcher runs beside the web service rather than as a second container.
+
+    It needs no connection to Discord — it polls the platforms and posts over
+    REST — so it is a task, not a process. Cancelled cleanly on shutdown so a
+    redeploy does not leave a sweep half-finished.
+    """
+    global _watcher
+    storage.setup()
+    if CFG.token:
+        _watcher = asyncio.create_task(
+            announce.loop(CFG.token, CFG.bot_url, CFG.site_url))
+        log.info("watching for streams every %ss", announce.INTERVAL)
+    else:
+        log.warning("no token — the watcher is NOT running")
+    try:
+        yield
+    finally:
+        if _watcher:
+            _watcher.cancel()
+            try:
+                await _watcher
+            except asyncio.CancelledError:
+                pass
+            _watcher = None
+
+
+app = FastAPI(title="vcordbot", docs_url=None, redoc_url=None, openapi_url=None,
+              lifespan=lifespan)
 
 
 def _verifier() -> Ed25519PublicKey | None:
@@ -48,7 +92,11 @@ VERIFIER = _verifier()
 @app.get("/health")
 async def health() -> dict:
     """No secrets, no counts, nothing about who uses it."""
-    return {"ok": True, "app": CFG.app_id or None, "verifying": VERIFIER is not None}
+    running = _watcher is not None and not _watcher.done()
+    return {"ok": True, "app": CFG.app_id or None,
+            "verifying": VERIFIER is not None,
+            "watcher": "running" if running else "stopped",
+            "watching": len(storage.watches())}
 
 
 @app.post("/interactions")

@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import ast
 import inspect
-import re
+import textwrap
 from types import FunctionType, ModuleType
 
 
@@ -25,16 +25,14 @@ def code_of(target: ModuleType | FunctionType) -> str:
     Use this for any assertion of the form "this must not mention X". Searching
     raw source means a file cannot explain a decision without violating it.
     """
-    source = inspect.getsource(target)
-    if isinstance(target, FunctionType):
-        source = re.sub(r"^\s+", "", source.split("\n")[0]) + "\n" + \
-                 "\n".join(source.split("\n")[1:])
-        source = inspect.cleandoc(inspect.getsource(target))
+    # A function defined inside a class or another function comes back from
+    # `getsource` still indented, and `ast.parse` refuses it. Dedent first.
+    source = textwrap.dedent(inspect.getsource(target))
 
     tree = ast.parse(source)
     for node in ast.walk(tree):
         if isinstance(node, (ast.Module, ast.ClassDef, ast.FunctionDef,
                              ast.AsyncFunctionDef)) and ast.get_docstring(node):
             node.body = node.body[1:]
-    # ast.unparse drops comments entirely, which is the other half of the job.
+    # `ast.unparse` drops comments entirely, which is the other half of the job.
     return ast.unparse(tree)
