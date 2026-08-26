@@ -152,7 +152,12 @@ const jsonLd = {
           reckoned && (
             <section class="reckoned">
               <h2>How it is reckoned</h2>
-              <p>{reckoned}</p>
+              {/* Split on blank lines. It was one <p> holding the whole passage, so
+          anything she wrote as two paragraphs rendered as one wall — which
+          quietly taught the editor that paragraphs do not work here. Not
+          markdown: this is prose, and the field should stay a plain textarea
+          rather than becoming another thing with syntax to remember. */}
+              {reckoned.split(/\n\s*\n/).map((para: string) => <p>{para.trim()}</p>)}
             </section>
           )
         }
@@ -244,6 +249,7 @@ const jsonLd = {
      instrument page. The tag is the outline; the size is unchanged. */
   .reckoned h2 { font: 600 var(--text-h4) var(--font-display); color: var(--ink); margin: 0 0 8px; }
   .reckoned p { font: 400 var(--text-sm) / 1.7 var(--font-body); color: var(--ink-soft); margin: 0; }
+  .reckoned p + p { margin-top: var(--space-3); }
   .theourgia-link { font: 500 var(--text-sm) var(--font-body); color: var(--accent); text-decoration: none; }
   .theourgia-link:hover { color: var(--accent-hover); text-decoration: underline; }
 

@@ -252,6 +252,18 @@ const polarReason = noRiseOrSet
 
     <RememberPlace place={place} lat={lat} lon={lon} />
 
+    {/* The reckoning passage. Every other instrument gets this from ToolLayout,
+        which this page does not use — so these two had the column, had it
+        editable in the admin, and had nowhere for it to appear. The text was
+        never missing; the surface was. Exactly the shape of half-built thing
+        that survives a sweep, because both halves look finished on their own. */}
+    {self?.reckoned && (
+      <section class="reckoned">
+        <h2>How it is reckoned</h2>
+        {self.reckoned.split(/\n\s*\n/).map((para: string) => <p>{para.trim()}</p>)}
+      </section>
+    )}
+
     <InstrumentNotes instrument={self} />
 
     <ToolCta />
@@ -260,6 +272,18 @@ const polarReason = noRiseOrSet
 
 <style>
   .stations { display: grid; gap: var(--space-5); }
+
+  /* Same treatment as the aside on the other seven instruments, so the two
+     pages read as the same object even though one is built differently. */
+  .reckoned {
+    padding: var(--space-4);
+    border: var(--border-w) solid var(--line);
+    border-radius: var(--radius-md);
+    background: var(--surface-card);
+  }
+  .reckoned h2 { font: 600 var(--text-h4) var(--font-display); color: var(--ink); margin: 0 0 8px; }
+  .reckoned p { margin: 0; font-size: var(--text-sm); line-height: 1.65; color: var(--ink-soft); }
+  .reckoned p + p { margin-top: var(--space-3); }
   .meta-bar {
     display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
     font: 400 var(--text-xs) var(--font-mono); color: var(--ink-soft);
