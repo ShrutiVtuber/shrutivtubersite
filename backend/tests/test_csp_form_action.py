@@ -30,24 +30,51 @@ def _src() -> Path:
 SRC = _src()
 
 # Somewhere a person is deliberately sent off-site.
-OFF_SITE = ("id.twitch.tv", "discord.com/oauth2", "accounts.google.com",
-            "connect.stripe.com")
+# The three that redirect to Stripe. Allowed only because the CSP names those
+# origins; adding a page here without adding its origin there reintroduces the
+# silent failure.
+PAYMENT_PAGES = {
+    "pages/account.astro",
+    "pages/shop/[slug].astro",
+    "pages/support.astro",
+}
 
 
 def _pages() -> list[Path]:
     return sorted(SRC.rglob("*.astro"))
 
 
-def test_the_csp_still_restricts_form_action() -> None:
-    """
-    If this ever stops being true the guard below is unnecessary — but it is
-    also a security property worth keeping, so it should be a decision rather
-    than a drift.
-    """
+def _caddy() -> str:
     caddy = SRC.parents[2] / "deploy" / "shrutivtuber.caddy"
     if not caddy.is_file():
         pytest.skip("deploy config not mounted")
-    assert "form-action 'self'" in caddy.read_text()
+    return caddy.read_text()
+
+
+def test_the_csp_names_stripe_or_nobody_can_pay() -> None:
+    """
+    Buying, supporting and managing a subscription are each a POST here
+    answered with a redirect to Stripe. With `form-action 'self'` alone the
+    browser blocks that redirect **after the session has been created** — the
+    server logs a clean 303, Stripe logs a session, and the buyer sees a page
+    that did nothing.
+
+    This is the guard for a bug that shipped: it was found only because the
+    same mechanism broke the Twitch button, which somebody happened to click.
+    """
+    caddy = _caddy()
+    assert "checkout.stripe.com" in caddy, "nobody can buy anything"
+    assert "billing.stripe.com" in caddy, "nobody can manage a subscription"
+
+
+def test_form_action_is_still_restricted_to_a_named_list() -> None:
+    """
+    Widened, not removed. `form-action` with a wildcard would let any injected
+    form post anywhere, which is the attack the directive exists to stop.
+    """
+    caddy = _caddy()
+    assert "form-action 'self'" in caddy
+    assert "form-action *" not in caddy
 
 
 def test_nothing_redirects_off_site_from_a_form_post() -> None:
@@ -69,6 +96,12 @@ def test_nothing_redirects_off_site_from_a_form_post() -> None:
             # A variable holding a URL is the dangerous case. Flag it unless the
             # file says why it is safe.
             if "safeNext" in target or "next" in target.lower():
+                continue
+            # Payment redirects are allowed BECAUSE the CSP names their
+            # destinations — asserted above. They cannot become links: creating
+            # a Stripe session has side effects and its URL is single-use, so a
+            # link would mint one on every page view.
+            if page.relative_to(SRC).as_posix() in PAYMENT_PAGES:
                 continue
             offenders.append(f"{page.relative_to(SRC)}: Astro.redirect({target})")
     assert not offenders, (

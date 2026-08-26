@@ -32,10 +32,20 @@ shrutivtuber.com {
         X-Content-Type-Options "nosniff"
         Referrer-Policy "strict-origin-when-cross-origin"
         Permissions-Policy "interest-cohort=()"
+        # form-action names Stripe on purpose, and removing it breaks paying.
+        #
+        # Buying, supporting and managing a subscription are all a POST to this
+        # site answered with a redirect to Stripe. `form-action` governs the
+        # WHOLE redirect chain after a form submission, not just where the form
+        # points — so with 'self' alone the browser blocks the redirect after
+        # the session has already been created. The server logs a clean 303,
+        # Stripe logs a created session, and the buyer sees a page that did
+        # nothing. curl cannot reproduce it: curl does not implement CSP.
+        #
         # 'unsafe-inline' covers the no-flash theme script and design-system
         # inline styles. img-src allows data: for inlined marks. YouTube/Twitch
         # embeds need frame-src; drop those entries if embeds are removed.
-        Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self'; frame-src https://www.youtube-nocookie.com https://player.twitch.tv; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+        Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self'; frame-src https://www.youtube-nocookie.com https://player.twitch.tv; base-uri 'self'; form-action 'self' https://checkout.stripe.com https://billing.stripe.com; frame-ancestors 'none'"
         -Server
     }
 
