@@ -26,10 +26,6 @@ if (Astro.request.method === "POST") {
   const form = await Astro.request.formData();
   if (!verifyCsrf(Astro.cookies, form)) {
     failed = "That did not go through. Reload and try again.";
-  } else if (form.get("action") === "connect") {
-    const r = await asAdmin(Astro, "/api/twitch/admin/authorize-url");
-    if (r.ok && r.body?.url) return Astro.redirect(r.body.url, 303);
-    failed = r.body?.detail ?? "Could not build the authorisation link.";
   } else if (form.get("action") === "test") {
     const r = await asAdmin(Astro, "/api/twitch/admin/test", {
       method: "POST",
@@ -56,6 +52,25 @@ if (Astro.request.method === "POST") {
     }
   }
 }
+
+/* The authorise URL is fetched on RENDER and offered as a link, and that is
+ * not a style preference — it is the only thing that works.
+ *
+ * It was a form that posted here and answered 303 to Twitch. The server did
+ * that correctly and browsers refused it, silently: the site's CSP carries
+ * `form-action 'self'`, and that directive governs the WHOLE redirect chain
+ * following a form submission, not merely where the form points. So the POST
+ * was allowed, the redirect to id.twitch.tv was blocked, and the page simply
+ * sat there.
+ *
+ * Nothing appears in the network tab, nothing in the server log — the server
+ * answered perfectly — and curl reproduces none of it, because curl does not
+ * implement CSP. A plain link navigation is not governed by `form-action`,
+ * which makes this both correct and testable.
+ *
+ * Do not turn it back into a form without widening the site's CSP, which is a
+ * worse trade for one page. */
+const auth = (await asAdmin(Astro, "/api/twitch/admin/authorize-url")).body ?? {};
 
 const status = (await asAdmin(Astro, "/api/twitch/admin/status")).body ?? {};
 const linked = Boolean(status.connected);
@@ -100,13 +115,22 @@ const when = (iso: string) =>
           ? `Connected as broadcaster ${status.broadcaster}.`
           : "Sends you to Twitch to grant three scopes on your own channel: subscriptions, bits and followers. Raids need none."}
       </p>
-      <form method="POST">
-        <CsrfField />
-        <input type="hidden" name="action" value="connect" />
-        <Button type="submit" variant={linked ? "secondary" : "primary"}>
-          {linked ? "Authorise again" : "Connect Twitch"}
-        </Button>
-      </form>
+      {auth.url ? (
+        <>
+          <Button href={auth.url} variant={linked ? "secondary" : "primary"}>
+            {linked ? "Authorise again" : "Connect Twitch"}
+          </Button>
+          <p class="fine">
+            Asks for: {(auth.scopes ?? []).join(", ")}. Twitch will show you the
+            same list before you agree.
+          </p>
+        </>
+      ) : (
+        <p class="bad">
+          No Twitch client id is configured, so there is nothing to authorise
+          against yet.
+        </p>
+      )}
     </section>
 
     <section class="step">

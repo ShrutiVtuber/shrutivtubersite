@@ -167,7 +167,14 @@ async def exchange(
     stored = (await settings_store.get_many(session, [K_STATE])).get(K_STATE, "")
     # A mismatched state means the round trip was not the one we started.
     if not stored or state != stored:
-        raise HTTPException(400, "that authorisation did not come from here")
+        # Most often innocent: the page was open in two tabs and the older
+        # link was used, because each render mints a fresh state. Say what to
+        # do rather than only what went wrong.
+        raise HTTPException(
+            400,
+            "That authorisation did not match. If the page was open in more "
+            "than one tab, go back to Twitch settings, reload, and use the "
+            "link there.")
 
     site = os.environ.get("SHRUTI_SITE_URL", "https://shrutivtuber.com").rstrip("/")
     async with httpx.AsyncClient(timeout=15) as c:
