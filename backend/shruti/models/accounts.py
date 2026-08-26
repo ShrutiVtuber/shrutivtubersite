@@ -480,3 +480,31 @@ class SavedChart(TimestampMixin, table=True):
     # Null for a chart with an owner. Set, and pushed forward on every
     # opening, for one without.
     expires_at: Optional[datetime] = Field(default=None, sa_type=UTC_TS)
+
+
+class CollabGroup(TimestampMixin, table=True):
+    """
+    A set of people and their streaming hours, kept against an account.
+
+    The planner works perfectly without one — everybody is in the query string,
+    which is what makes a plan shareable and what makes the tool worth using
+    for somebody who arrived from a link. This is the thing an account BUYS:
+    the group you type in once stops being something you have to keep the tab
+    open for.
+
+    That is deliberately the same bargain as a saved chart. The tool never
+    withholds anything to make the account look necessary; signing in removes a
+    chore rather than unlocking a feature.
+
+    `participants` is the encoded form the URL already uses — `name|zone|from|to`,
+    one per line. Stored as the page's own format rather than normalised into
+    rows, because there is nothing to query here: a group is only ever read
+    whole, and a table of people would be machinery earning nothing.
+    """
+
+    __tablename__ = "collab_group"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="site_user.id", index=True)
+    name: str = ""
+    participants: str = ""
