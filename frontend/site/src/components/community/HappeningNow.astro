@@ -1,0 +1,116 @@
+---
+/* One band answering "what is going on with Shruti".
+ *
+ * Two cards, not three. The next stream was a card here and is not any more:
+ * /schedule is a page that does it properly, and repeating it on the landing
+ * page bought a third box for something a link already covers. The landing
+ * page's job is interaction, support, the community and an overview of what
+ * the site does — a timetable is none of those.
+ *
+ * The Discord count comes from this server, not from an embedded widget. An
+ * embed is an iframe, and an iframe means every reader's browser talks to
+ * Discord whether or not they have an account there — the site makes zero
+ * third-party requests on every page, and that is easy to lose by accident.
+ */
+interface Props {
+  live: { status?: string } | null;
+  room: { online: number | null; invite: string; name: string } | null;
+}
+const { live, room } = Astro.props;
+const isLive = live?.status === "live";
+---
+
+<section class="section page happening">
+  <div class="h-head">
+    <div>
+      <span class="t-eyebrow">Right now</span>
+      <h2>What is going on</h2>
+    </div>
+    <a class="h-all" href="/community">Everything happening →</a>
+  </div>
+
+  <div class="h-cards">
+    <div class="h-card" data-live={isLive || undefined}>
+      <span class="h-lbl">The stream</span>
+      <p class="h-big">
+        {isLive ? <><span class="h-dot" aria-hidden="true"></span>Live now</> : "Offline"}
+      </p>
+      {
+        isLive
+          ? <p class="h-note">She is on. The chat is the fastest way to say something to her.</p>
+          : <p class="h-note">
+              The schedule says when next — streams are announced on Discord
+              first.
+            </p>
+      }
+      <a class="h-go" href={isLive ? "/videos" : "/schedule"}>
+        {isLive ? "Watch →" : "The schedule →"}
+      </a>
+    </div>
+
+    <div class="h-card h-room">
+      <span class="h-lbl">The room</span>
+      <p class="h-big">
+        {room?.online != null ? <>{room.online} <span class="h-unit">here now</span></> : "Discord"}
+      </p>
+      <p class="h-note">
+        Where things get talked about between streams, and where a stream is
+        announced first.
+      </p>
+      {
+        room?.invite && (
+          <a class="h-go" href={room.invite} rel="noopener" target="_blank"
+             data-track="discord:joined">Join the Discord →</a>
+        )
+      }
+    </div>
+
+  </div>
+</section>
+
+<style>
+  .happening { display: grid; gap: var(--space-5); }
+  .h-head { display: flex; gap: var(--space-4); align-items: flex-end; justify-content: space-between; flex-wrap: wrap; }
+  .h-head h2 { font: 600 var(--text-h3) var(--font-display); color: var(--ink); margin: 6px 0 0; }
+  .h-all { font: 500 var(--text-sm) var(--font-body); color: var(--accent); text-decoration: none; white-space: nowrap; }
+  .h-all:hover { text-decoration: underline; }
+
+  .h-cards { display: grid; gap: var(--space-4); grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .h-card {
+    display: grid; gap: 10px; align-content: start; min-width: 0;
+    padding: var(--space-5);
+    background: var(--surface-card);
+    border: var(--border-w) solid var(--line);
+    border-radius: var(--radius-md);
+  }
+  /* Live is the only state that gets colour. Everything else is quiet, so the
+     one that matters is the one that reads. */
+  .h-card[data-live] { border-color: var(--live); }
+  .h-card > * { min-width: 0; max-width: 100%; }
+
+  .h-lbl {
+    font: 600 var(--text-micro) var(--font-body); letter-spacing: var(--tracking-eyebrow);
+    text-transform: uppercase; color: var(--ink-faint);
+  }
+  .h-big {
+    font: 600 var(--text-h4) var(--font-display); color: var(--ink); margin: 0;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .h-unit { font: 400 var(--text-sm) var(--font-body); color: var(--ink-soft); }
+  .h-dot {
+    width: 9px; height: 9px; border-radius: 50%; background: var(--live); flex: none;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .h-card[data-live] .h-dot { animation: h-pulse 2s var(--ease-out) infinite; }
+  }
+  @keyframes h-pulse { 0%, 100% { opacity: 1 } 50% { opacity: 0.45 } }
+
+  .h-note { font: 400 var(--text-sm) / 1.6 var(--font-body); color: var(--ink-soft); margin: 0; }
+  .h-go {
+    margin-top: 4px; font: 500 var(--text-sm) var(--font-body);
+    color: var(--accent); text-decoration: none;
+  }
+  .h-go:hover { text-decoration: underline; }
+
+  @media (max-width: 640px) { .h-cards { grid-template-columns: 1fr; } }
+</style>

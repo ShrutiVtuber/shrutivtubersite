@@ -103,7 +103,10 @@ const { sponsors, bare = false } = Astro.props;
 
   .s-card {
     display: grid; gap: 12px; align-content: start; justify-items: start;
-    min-height: 168px; padding: var(--space-5);
+    /* Enough that a card with only a wordmark still reads as a card, and not
+       so much that a single sponsor sits in a pool of its own colour. Several
+       cards match height on their own — grid items stretch. */
+    min-height: 140px; padding: var(--space-5);
     border-radius: var(--radius-md);
     border: var(--border-w) solid transparent;
     text-decoration: none;
