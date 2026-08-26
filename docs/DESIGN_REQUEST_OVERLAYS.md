@@ -63,8 +63,12 @@ The client should never be recomputing astronomy sixty times a second.
 
 **An OBS overlay and a website widget are different designs**, not one design
 resized: transparent, fixed-size and single-appearance versus themed,
-responsive and working in both light and dark. Same data, two treatments. Two
-earn the second treatment; the rest do not.
+responsive and working in both light and dark. Same data, two treatments.
+
+**Two earn the second treatment for now** — the counter bar and the sky chart.
+That is a starting point rather than a rule: more may be brought to the site
+later, so the two web variants should establish a pattern a third could follow
+rather than being one-offs.
 
 **Out of scope:** chat overlays, the site's existing pages, the Discord bot.
 
@@ -117,10 +121,18 @@ The most-seen surface here and the most likely to be resented.
 | **Twitch raid** | a streamer arriving with their audience | viewers — "42 viewers" |
 | **YouTube Super Chat** | a paid, pinned, coloured message | money, and its own colour tier |
 | **Course or workshop signup** | somebody has joined a thing she teaches | a person, and which course |
+| **Twitch follow** | the smallest signal there is | nothing at all — just a name |
 
-**Follows do not raise an alert.** They are constant and worth almost nothing,
-and alerting on them is the single most common way a stream becomes
-unwatchable. They may feed a counter instead.
+**Follows do alert, and they are the design problem in this table.** They are
+constant, they carry no amount, and alerting loudly on them is the commonest
+way a stream becomes unwatchable — so make them **the quietest member of the
+family by a wide margin.** Shortest hold, smallest footprint, least motion,
+probably no sound. A viewer should register a follow the way you register
+someone entering a room, not the way you register applause.
+
+They are also the one alert most likely to be switched off later, so treat
+"follows off" as an ordinary configuration rather than an absence: the family
+must not look like it is missing a member.
 
 **Four things the design has to answer:**
 
@@ -261,7 +273,7 @@ the site's normal light and dark rules.
 - **Supporter messages are moderated before they reach the screen.**
 - **The instruments are computed by her own ephemeris.** The numbers are real.
 - **Motion is a per-overlay setting** with three levels, all designed.
-- **Follows do not alert.**
+- **Follows alert**, quietly, and can be switched off per overlay.
 - **No third-party requests, ever.**
 - **Nothing may assume Twitch or YouTube.**
 
@@ -277,7 +289,8 @@ must not imply a completeness that does not exist. Super Chats are unaffected.
 
 - Legible over a white editor, a dark room and a bright window.
 - Nothing scrolls, overflows, or shows a scrollbar.
-- Every alert type drawn, reading as one family.
+- Every alert type drawn, reading as one family — and a follow is unmistakably
+  the smallest of them.
 - €5, 1,000 bits, three months, 42 viewers and `14 / 20 people` all sit
   correctly in the same slot.
 - All three motion levels drawn. **Still is complete and legible.**
