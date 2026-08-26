@@ -61,6 +61,22 @@ database, by design. Each URL is one OBS Browser Source at 1920 × 1080.
 Nothing from the handoff is outstanding. What is left is hers, not mine — see
 the list below.
 
+## Next session: the commission progress tracker
+
+Agreed 2026-08-27. The thing from the tweet she saved — clients having to beg
+for updates on a commission, no Trello, no visible progress. On the growth list
+twice: build it, then use it on her own commissions first, which is the only
+way to find out whether it is any good.
+
+Everything else outstanding is on `/admin/growth` — 26 items, and that list is
+the source of truth rather than this file.
+
+**She is writing page copy in the meantime.** Do not touch content she may be
+editing: `section`, `tool` (name, summary, body_md, faq_md, landing_blurb,
+reckoned), and anything under `/admin/blocks`.
+
+---
+
 ## Decisions not to re-litigate
 
 - **The astrology engine is not changed to fit a design.** Her words: *"don't
