@@ -2,288 +2,295 @@
 
 ## 0. What this is for, and why it is not a widget set
 
-Shruti currently uses StreamElements for alerts and goal bars. She wants to
-stop — not because it is bad, but because **her income runs through other
-people's platforms and she wants it to run through her own.** Twitch takes
-half a subscription. YouTube memberships are Google's. StreamElements' tip page
-is StreamElements'. She already has Stripe, a shop, memberships and a support
-page; what she does not have is the part that makes her own income path
-*visible on stream*, which is exactly the part that makes people use it.
+Shruti uses StreamElements for alerts and goal bars and wants to stop — not
+because it is bad, but because **her income runs through other people's
+platforms and she wants it to run through her own.** Twitch takes half a
+subscription. YouTube memberships are Google's. StreamElements' tip page is
+StreamElements'. She already has Stripe, a shop, memberships, classes and a
+support page. What she does not have is the part that makes her own income path
+*visible on stream*, which is the part that makes people use it.
 
-So this is not decoration. **Every one of these overlays exists to move
-somebody from watching to supporting through a route she controls** — or, in
-the case of the instruments, to make the stream unmistakably hers.
+So this is not decoration. **Every surface here exists to move somebody from
+watching to supporting by a route she controls** — or, for the sky chart and
+the planetary hours, to make the stream unmistakably hers.
 
 She intends to leave Twitch and YouTube eventually and stream on her own terms.
-Nothing here should assume either platform: an overlay is a browser source, and
-a browser source works the same wherever the stream ends up.
+Nothing here may assume either platform: an overlay is a browser source, and a
+browser source works wherever the stream ends up.
 
 ---
 
-## 1. The mistake this exists to avoid
+## 1. The three ways this fails, and only one is a taste question
 
-Overlays fail in a way that no other design on this site can, and it is worth
-naming before anything is drawn.
+**It is composited over video nobody has seen.** The background is not a colour
+— it is her, moving, in a room whose lighting changes, sometimes with a bright
+window behind her, sometimes with a white code editor filling the screen. Every
+decision that assumes a background is wrong. Text without a plate or an outline
+is legible in rehearsal and gone the moment she opens an IDE.
 
-**They are composited over video nobody has seen.** The background is not a
-colour — it is her, moving, in a room with lighting that changes, sometimes
-bright, sometimes nearly black, sometimes with a bright window behind her.
-Every design decision that assumes a background is wrong here. Text with no
-plate behind it will be legible in rehearsal and illegible the moment she opens
-a white IDE.
+**It is watched, not read.** Under a second, in the corner of an eye, often at
+480p on a phone, often while somebody is talking. Anything needing a second
+look does not work.
 
-**They are watched, not read.** A viewer looks at a goal bar for under a
-second, in the corner of their eye, often at 480p on a phone, often while
-someone is talking. Anything that needs reading twice does not work.
+**And there are two compute budgets, not one — this is the part that is
+usually got wrong.**
 
-**They cost CPU that the encoder needs.** OBS renders a browser source
-continuously, on the same machine that is encoding video. An animation that
-would be unremarkable on a web page competes directly with frame rate. This is
-a real budget, not a nicety.
+| | Where it runs | Can she buy her way out? |
+|---|---|---|
+| Rendering the overlay — animation, redraw | **Her streaming PC**, in OBS's embedded Chromium, beside the encoder | **No.** It costs frames on the stream. |
+| Computing positions, processing events, pushing updates | The server | Yes, and it is cheap |
 
-The first version of anything like this always has: a thin bar with no plate, a
-number in the site's body face at 14px, and a shimmer animation on the fill.
-All three are wrong for the reasons above.
-
----
-
-## 2. Scope
-
-**In scope — five surfaces:**
-
-| # | Overlay | Purpose |
-|---|---------|---------|
-| 1 | **Goal bar** | A target she sets in the admin, filled by real Stripe money |
-| 2 | **Alert** | Somebody just supported — a moment, then gone |
-| 3 | **Supporters ticker** | The recent few, quietly, always on |
-| 4 | **Instrument strip** | Planetary hour and today's sky — the thing only she has |
-| 5 | **Countdown** | To stream start, or to a drop closing |
-
-**Also in scope:** the admin surface where a goal is created and an overlay's
-URL is copied.
-
-**Out of scope:** the site's own pages, the Discord bot, anything to do with
-chat. A chat overlay is a different problem and is not being asked for.
+**She wants animation and has agreed to pay for it — so put the expensive half
+on the machine that can afford it.** Sky positions are computed on the server
+and pushed as finished numbers; the client interpolates cheaply between them.
+The client should never be recomputing astronomy sixty times a second.
 
 ---
 
-## 3. Constraints, and these are harder than the site's
+## 2. Scope, locked
 
-**Transparent.** The page background is transparent and OBS composites it. No
-overlay may paint a full-bleed background. Every plate is a deliberate,
-bounded shape.
+**Seven surfaces:**
 
-**Fixed canvas, no scrolling ever.** Each overlay is added at a stated size and
-never scrolls. Content that could overflow must be designed to truncate,
-marquee or collapse — a scrollbar in a stream is a visible bug.
+| # | Surface | OBS | On the site |
+|---|---------|-----|-------------|
+| 1 | **Counter bar** — wide and compact | ✓ | ✓ |
+| 2 | **Alerts** | ✓ | — |
+| 3 | **Supporters ticker** | ✓ | — |
+| 4 | **Sky chart, ticking** | ✓ | ✓ |
+| 5 | **Planetary hours strip** | ✓ | — |
+| 6 | **Countdown** | ✓ | — |
+| 7 | **Admin** — creating counters, copying overlay URLs, motion settings | — | ✓ |
 
-Design at **1920×1080**, and state what happens at **2560×1440** — OBS scales a
-browser source, so the choice is whether it is rendered at the larger size or
-scaled up and softened. Say which.
+**An OBS overlay and a website widget are different designs**, not one design
+resized: transparent, fixed-size and single-appearance versus themed,
+responsive and working in both light and dark. Same data, two treatments. Two
+earn the second treatment; the rest do not.
 
-**Legible over anything.** Assume the worst background you can: a bright white
-code editor, a pale sky, her own face. Every piece of text needs either a plate
-or an outline. Do not rely on drop shadow alone.
-
-**Animation budget.** Movement is allowed where it carries meaning — a bar
-filling, an alert arriving. Continuous ambient animation is not: no shimmer, no
-pulsing glow, no particles, nothing that repaints when nothing has changed.
-When an overlay is idle it should be composing **zero frames**.
-
-**Zero external requests**, as everywhere on this site. Fonts are self-hosted
-already. This matters more here, not less: OBS on a flaky connection must not
-show a fallback face mid-stream.
-
-**Tokens in the URL.** Each overlay URL carries an unguessable token. The design
-must never display the token, and must assume the page could be seen if she
-shares her screen with OBS settings open.
-
-**Themes do not apply.** These are not read in a browser with a preference —
-they are composited on her stream, and she picks the look. Design one canonical
-appearance, and say which parts she can recolour from the admin.
+**Out of scope:** chat overlays, the site's existing pages, the Discord bot.
 
 ---
 
-## 4. The five surfaces
+## 3. The counter — and it is not only money
 
-### 4.1 Goal bar
+The centrepiece, and it generalises further than "goal bar" suggests.
 
-The centrepiece, and the reason the rest exists.
+**A counter is a target, a unit, and a chosen set of sources.** She creates it
+in the admin and picks what feeds it:
 
-A goal has: a **name** ("A new microphone", "Keep the lights on for March"), a
-**target**, a **current amount**, and optionally a **deadline**. It is filled by
-real Stripe payments — one-off support, memberships, shop orders, or any
-combination she chooses in the admin.
+| Source | Arrives as |
+|---|---|
+| Stripe — one-off support, memberships, shop orders | money |
+| Twitch — subscriptions, gifts, bits | tiers, counts, bits |
+| YouTube — Super Chats | money |
+| **Course signups** | people |
+| **Workshop signups** | people |
 
-Design needs to carry:
-- what the goal is for, in her words
-- how far along it is — the number, and the shape
-- how much is left, which is the part that actually moves people
-- optionally, time remaining
+So "€300 for a microphone" and "20 people on the December workshop" are the
+same object with different units. **Design the unit as a first-class thing**,
+not as a euro sign that sometimes says something else. A bar reading `14 / 20
+people` and one reading `€184 / €300` must both look deliberate.
 
-**Say what happens at 100% and beyond.** A goal that is met and then keeps
-receiving money is a good problem, and a bar that stops at full throws away the
-best moment it will ever have. Design the overrun.
+Platform events count toward totals when she says so — that is her choice per
+counter, because during the move off Twitch she wants both visible.
 
-Sizes: a **wide** form (a strip along the bottom or top) and a **compact** form
-(a corner block). Both, please — scenes differ.
+A counter carries: a **name in her words**, a **target**, **progress**, **what
+remains** — which is the part that actually moves people — and optionally a
+**deadline**.
 
-### 4.2 Alerts — a family, not one thing
+**Design the overrun.** A counter that is met and keeps receiving is the best
+moment the design will ever have, and a bar that stops at full throws it away.
 
-Somebody just supported. This is the most-seen thing here and the most likely
-to be resented if it is wrong.
+---
 
-**Support arrives through several doors and they are not interchangeable.**
-This is the part of the brief that expanded most, so it is set out in full:
+## 4. Alerts — a family, not one thing
+
+The most-seen surface here and the most likely to be resented.
+
+**Support arrives through several doors and they are not interchangeable:**
 
 | Source | What arrives | The unit is |
 |---|---|---|
-| **Her own Stripe** | one-off support, a membership starting | money — €5 |
-| **Twitch subscription** | new, renewed, or **gifted** | a tier — T1/T2/T3 — and a month count |
+| **Stripe** | one-off support, a membership starting | money — €5 |
+| **Twitch subscription** | new, renewed, or **gifted** | a tier — T1/T2/T3 — and months |
 | **Twitch gift bomb** | one person gifting many at once | a count of recipients |
 | **Twitch cheer** | bits | bits — "1,000 bits", which is *not* money |
-| **Twitch raid** | another streamer arriving with their audience | viewers — "42 viewers" |
-| **Twitch follow** | the smallest possible signal | nothing at all |
-| **YouTube Super Chat** | a paid, coloured, pinned message | money, and a duration/colour tier |
+| **Twitch raid** | a streamer arriving with their audience | viewers — "42 viewers" |
+| **YouTube Super Chat** | a paid, pinned, coloured message | money, and its own colour tier |
+| **Course or workshop signup** | somebody has joined a thing she teaches | a person, and which course |
 
-**Four consequences the design has to answer:**
+**Follows do not raise an alert.** They are constant and worth almost nothing,
+and alerting on them is the single most common way a stream becomes
+unwatchable. They may feed a counter instead.
+
+**Four things the design has to answer:**
 
 1. **The amount is not one type.** €5, 1,000 bits, three months, 42 viewers and
-   a Super Chat's own colour tier all occupy the same slot. Design the slot so
-   all five read correctly and none of them looks like a mistake.
-2. **A gift is three people**: the giver, the recipient, and sometimes a count.
-   A gift bomb is a giver and a number. Say how each is worded and weighted —
-   the giver is the one being thanked.
-3. **A raid is not a donation.** It is somebody arriving with a crowd, and it
-   is the one alert that should probably feel different in kind rather than
-   just in degree.
-4. **A follow is worth almost nothing and happens constantly.** Say whether it
-   deserves an alert at all, and if so how quiet it has to be. Getting this
-   wrong is the single most common way a stream becomes unwatchable.
+   a person's name in a course all occupy the same slot. All five must read
+   correctly and none may look like a mistake.
+2. **A gift is three people** — giver, recipient, sometimes a count. A gift bomb
+   is a giver and a number. The giver is the one being thanked.
+3. **A raid is not a donation.** Somebody arrived with a crowd. It probably
+   differs in kind rather than degree.
+4. They must read as **one family** — a viewer should know instantly that
+   something good happened, and only then which kind.
 
-They must read as **one family** — a viewer should recognise instantly that
-something good happened, and only then work out which kind.
+Each carries **who**, **what**, and optionally **a short message**.
 
-Each carries: **who** (a name they chose), **what** (from the table above), and
-optionally **a short message they wrote**.
+Design the **arrival, the hold and the departure** as three things with stated
+durations. An alert that arrives beautifully and vanishes abruptly reads as a
+glitch.
 
-Design the **arrival, the hold and the departure** as three separate things
-with stated durations. An alert that arrives beautifully and then vanishes
-abruptly reads as a glitch.
-
-**Two things that are not negotiable:**
+**Two non-negotiables:**
 
 - **A queue.** Two supporters within a second must not overlap. Design what the
-  second one does while it waits.
-- **Messages are moderated before they appear.** Anything a stranger typed
-  going straight onto a live stream is a hazard, and this site does not take
-  that risk. The design should assume a message may be absent, and must look
-  deliberate rather than broken when it is.
-
-### 4.3 Supporters ticker
-
-The recent few, quiet and continuous. Names only, or names and amounts — say
-which you recommend and why. This is the one overlay that is always on screen,
-so it has the strictest legibility and the smallest animation budget.
-
-Design its empty state properly. A new goal with nobody in it yet is the normal
-state at the start of every campaign, and "no supporters yet" written on a
-stream is worse than nothing.
-
-### 4.4 Instrument strip
-
-**This is the one nobody else can have, and it is why this set is worth
-building rather than buying.**
-
-A small persistent strip showing the current **planetary hour** and its ruler,
-and something of **today's sky**. It is on screen while she writes the software
-that computes it, which is the whole joke and the whole brand in one object.
-
-It should feel like an instrument panel rather than a widget — it belongs to
-the same world as `/tools`, and it is the one place here where the site's
-existing visual language should be recognisable at a glance.
-
-Say what it shows when the hour turns over. That is the only thing it ever
-does, roughly once an hour, and it should be worth noticing.
-
-### 4.5 Countdown
-
-To a stream start, or to a merch drop closing. Simple, but state:
-- what it looks like at hours, at minutes, and at under a minute
-- what it does when it reaches zero — it must not sit at 00:00 forever
-- whether it is ever on screen at the same time as the goal bar
+  second does while it waits.
+- **Messages are moderated before they appear.** A stranger's text going
+  straight onto a live stream is a hazard this site will not take. Assume a
+  message may be absent, and make that look deliberate rather than broken.
 
 ---
 
-## 5. States every one of these needs
+## 5. The instruments — the reason to build this rather than buy it
 
-| State | Why it matters |
+### 5.1 Sky chart, ticking
+
+A live chart of the day's sky, on screen while she writes the software that
+computes it. **Nobody else can have this**, and it is the whole brand in one
+object.
+
+It ticks. Say what that means: what moves, how often, and how a viewer can tell
+it is live rather than a picture. The Moon moves about half a degree an hour —
+visible over a stream, invisible over a minute — so the honest answer may be
+that the *time* ticks and the bodies drift.
+
+Positions come from her own ephemeris, computed on the server. The client is
+given numbers and draws them.
+
+Design the moment a body changes sign, and the moment an aspect comes exact.
+Those are the events worth noticing in three hours of streaming.
+
+### 5.2 Planetary hours strip
+
+Small, persistent: the current planetary hour and its ruler.
+
+It does exactly one thing, roughly once an hour — **the hour turns over.** That
+moment should be worth seeing, and it is the only animation this surface ever
+needs.
+
+Both of these should feel like an instrument panel rather than a widget. They
+belong to the same world as `/tools`, and this is the one place where the
+site's existing visual language should be recognisable at a glance.
+
+---
+
+## 6. Motion — a setting, not a constant
+
+**Because she streams from more than one machine**, motion is configurable per
+overlay in the admin, and the design must cover each level rather than
+degrading into one.
+
+| Level | Intent |
 |---|---|
-| **Nothing configured** | She adds the overlay before creating the goal. This is the first thing she will ever see, and "undefined" on a stream is unforgivable. |
-| **Zero progress** | Every goal starts here and stays here for a while. |
-| **Goal met, and overrun** | The best moment the design gets. |
-| **Connection lost** | The overlay is a page; her network can drop. It must hold its last known state and never blank. Say whether it shows anything about being stale. |
-| **Alert queue of several** | Design the wait. |
+| **Full** | What you would draw with no budget. Her strong machine. |
+| **Reduced** | Transitions kept, ambient motion dropped. The everyday setting. |
+| **Still** | No animation at all. State changes appear between frames. |
+
+**"Still" must not look broken.** It is the setting she will use on the weaker
+machine and possibly on a bad night, and an alert that only makes sense while
+moving is unusable there. Every surface must be legible and complete at Still.
+
+Even at Full: **an idle overlay should compose no frames.** Nothing repaints
+when nothing has changed. Motion is for things happening.
+
+For the two web variants, `prefers-reduced-motion` applies as it does
+everywhere else on the site, independently of this setting.
+
+---
+
+## 7. Constraints, harder than the site's
+
+**Transparent.** OBS composites the page. No overlay paints a full-bleed
+background; every plate is a deliberate, bounded shape.
+
+**Fixed canvas, never scrolls.** Each overlay is added at a stated size.
+Content that could overflow must truncate, marquee or collapse — a scrollbar on
+a stream is a visible bug. Design at **1920×1080** and say what happens at
+**2560×1440**.
+
+**Legible over anything.** Assume a white editor, a dark room, a bright window,
+her own face. Plate or outline; drop shadow alone is not enough.
+
+**Zero external requests**, as everywhere here — fonts included. It matters
+more on a stream, not less: a fallback face appearing mid-broadcast is worse
+than a slow page.
+
+**Tokens in the URL.** Overlay URLs carry an unguessable token. Never display
+it, and assume the page may be seen if she shares a screen with OBS settings
+open.
+
+**One appearance, not two themes** — for the OBS surfaces. She picks the look;
+say which parts she may recolour from the admin. The two web variants follow
+the site's normal light and dark rules.
+
+---
+
+## 8. States every surface needs
+
+| State | Why |
+|---|---|
+| **Nothing configured** | She will add the overlay before creating the counter. It is the first thing she ever sees, and "undefined" on a stream is unforgivable. |
+| **Zero progress** | Every counter starts here and stays a while. |
+| **Met, and overrun** | The best moment available. |
+| **Connection lost** | Her network can drop. Hold the last known state, never blank. Say whether staleness is shown. |
+| **A queue of several alerts** | Design the wait. |
 | **A supporter with no message** | The common case. |
-| **A very long name** | Somebody will be called `xX_the_longest_possible_handle_Xx`. |
-| **A gift with an unknown recipient** | Twitch sometimes anonymises the giver, and sometimes the gift is to the whole channel. Both need wording that is not a blank. |
-| **An anonymous cheer** | Bits can be cheered anonymously. "Anonymous" is a name, and should look deliberate. |
+| **A very long name** | Somebody is called `xX_the_longest_possible_handle_Xx`. |
+| **An anonymous cheer or gift** | Twitch permits both. "Anonymous" is a name and should look deliberate. |
+| **Empty ticker** | The normal state at the start of every campaign. "No supporters yet" on a stream is worse than nothing. |
 
 ---
 
-## 6. Deliverables
+## 9. What is settled — do not re-derive
 
-1. **Five overlays**, at 1920×1080, with the wide and compact variants of the
-   goal bar. All states above.
-2. **The admin surface** for creating a goal and copying an overlay URL. This
-   is an ordinary page in the existing admin and should look like it.
-3. **A statement of what she can recolour** from the admin, and what is fixed.
-4. **Stated dimensions** for each overlay, so they can be added to OBS without
-   guessing.
+- **Money comes through Stripe**, live, already handling
+  `checkout.session.completed` and all three subscription events.
+- **Platform events count when she says so**, per counter.
+- **Counters count people as readily as money** — course and workshop signups
+  are first-class.
+- **Counters are rows**, created and edited in the admin without a deploy.
+- **Supporter messages are moderated before they reach the screen.**
+- **The instruments are computed by her own ephemeris.** The numbers are real.
+- **Motion is a per-overlay setting** with three levels, all designed.
+- **Follows do not alert.**
+- **No third-party requests, ever.**
+- **Nothing may assume Twitch or YouTube.**
 
----
-
-## 7. What is already settled — do not re-derive
-
-- **Money comes through Stripe**, which is live and already handles
-  `checkout.session.completed` and all three subscription events. Goals are fed
-  by real payments, not by anything typed in.
-- **Platform events come too, and she chooses what counts.** Twitch
-  subscriptions, gifts, cheers, raids and follows arrive by EventSub; YouTube
-  Super Chats by reading the live chat while she is streaming. A goal in the
-  admin says which sources count toward it, because "€300 for a microphone" and
-  "a thousand bits this month" are different questions and she may want either.
-- **One gap, and it is not ours to close.** YouTube *memberships* cannot be
-  read: the API is gated behind a Google partner relationship, the self-serve
-  application was withdrawn, and no independent developer has publicly been
-  granted access. Discord's own integration handles the Discord-role half of
-  that for free. So **new YouTube members will not raise an alert**, and the
-  design must not imply a completeness that does not exist. Super Chats are
-  unaffected.
-- **Goals are rows**, created and edited in the admin without a deploy — the
-  same rule as everything else on this site.
-- **Messages from supporters are moderated before they appear on screen.**
-- **No third-party requests, ever**, including fonts.
-- **The instruments are computed by her own ephemeris**, exactly as the site's
-  tool pages are. The strip is not decorative — the numbers are real.
-- **These must not assume Twitch or YouTube.** She intends to leave both.
+**One gap, and it is not ours to close.** YouTube *memberships* cannot be read:
+the API is gated behind a Google partner relationship, the self-serve
+application was withdrawn, and no independent developer has publicly been
+granted access. **New YouTube members will not raise an alert**, and the design
+must not imply a completeness that does not exist. Super Chats are unaffected.
 
 ---
 
-## 8. Acceptance
+## 10. Acceptance
 
 - Legible over a white editor, a dark room and a bright window.
-- Every alert type in the table above is drawn, and they read as one family.
-- €5, 1,000 bits, three months and 42 viewers all sit correctly in one slot.
-- Nothing scrolls, nothing overflows, nothing shows a scrollbar.
+- Nothing scrolls, overflows, or shows a scrollbar.
+- Every alert type drawn, reading as one family.
+- €5, 1,000 bits, three months, 42 viewers and `14 / 20 people` all sit
+  correctly in the same slot.
+- All three motion levels drawn. **Still is complete and legible.**
 - Idle overlays compose no frames.
-- Every state above is drawn, including the ones that look like nothing.
-- A stranger watching for one second knows what the goal is and how far along.
+- Every state above drawn, including the ones that look like nothing.
+- A stranger watching for one second knows what the counter is for and how far
+  along it is.
 - It looks like the same hand as `/today` and `/tools`.
 
-## 9. Files
+## 11. Files
 
-- `frontend/site/src/pages/overlay/…` — the overlays
-- `frontend/site/src/pages/admin/goals.astro` — the admin surface
-- `backend/shruti/models/__init__.py` — the `Goal` rows
+- `frontend/site/src/pages/overlay/…` — the OBS surfaces
+- `frontend/site/src/components/counters/…` — the two web variants
+- `frontend/site/src/pages/admin/counters.astro` — the admin surface
+- `backend/shruti/models/__init__.py` — `Counter` and its sources
 - `docs/DESIGN_REQUEST_COMPATIBLE.md` — the house format this follows
