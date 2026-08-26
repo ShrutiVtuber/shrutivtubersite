@@ -24,7 +24,10 @@ import ExportBlock from "../../components/tables/ExportBlock.astro";
 import Button from "../../components/forms/Button.astro";
 import { stations, nextStation, SOLAR, LUNAR, GLYPHS, PRESETS } from "../../lib/stations";
 import { instrument, parseFaq, faqPageNode } from "../../lib/instruments";
+import { savedPlace } from "../../lib/account";
 import InstrumentNotes from "../../components/tools/InstrumentNotes.astro";
+import ToolCta from "../../components/brand/ToolCta.astro";
+import RememberPlace from "../../components/tools/RememberPlace.astro";
 
 /* SSR, so no getStaticPaths — params come off the URL. Anything that is not
    one of the two known kinds is a 404 rather than a silent fallback to solar,
@@ -36,9 +39,12 @@ const names = kind === "lunar" ? [...LUNAR] : [...SOLAR];
 
 const q = Astro.url.searchParams;
 const ATHENS = { lat: 37.9838, lon: 23.7275, label: "Athens, Greece" };
-const lat = Number(q.get("lat") ?? ATHENS.lat);
-const lon = Number(q.get("lon") ?? ATHENS.lon);
-const place = q.get("place") ?? (q.has("lat") ? "" : ATHENS.label);
+/* Where they are, if they have said. A URL still wins: a link somebody was
+   sent has to show the place it names rather than the reader's own. */
+const mine = await savedPlace(Astro);
+const lat = Number(q.get("lat") ?? (mine ? mine.lat : ATHENS.lat));
+const lon = Number(q.get("lon") ?? (mine ? mine.lon : ATHENS.lon));
+const place = q.get("place") ?? (q.has("lat") ? "" : (mine ? mine.name : ATHENS.label));
 /* Times only, until a visitor asks for otherwise.
  *
  * The dedications are a real person's devotional practice, not decoration for
@@ -244,7 +250,11 @@ const polarReason = noRiseOrSet
       )
     }
 
+    <RememberPlace place={place} lat={lat} lon={lon} />
+
     <InstrumentNotes instrument={self} />
+
+    <ToolCta />
   </div>
 </BaseLayout>
 

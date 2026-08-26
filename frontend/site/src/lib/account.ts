@@ -79,3 +79,24 @@ export async function asReader(
     return { ok: false, status: 0, body: null };
   }
 }
+
+
+export interface SavedPlace { name: string; lat: number; lon: number }
+
+/**
+ * Where the signed-in visitor is, if they have told us.
+ *
+ * Every instrument that needs a horizon defaulted to Athens, which is right
+ * for a stranger and wrong for the same person on their fourth visit. This is
+ * what the invitation on those pages promises, so it has to actually work
+ * before that copy is true.
+ *
+ * Null for anybody signed out, and for anybody who has not set one — both are
+ * ordinary and both mean "use the default".
+ */
+export async function savedPlace(astro: any): Promise<SavedPlace | null> {
+  const me = await account(astro);
+  const p = (me as any)?.place;
+  if (!p?.name || typeof p.lat !== "number" || typeof p.lon !== "number") return null;
+  return { name: p.name, lat: p.lat, lon: p.lon };
+}

@@ -1,0 +1,64 @@
+---
+/* The one invitation on a free instrument.
+ *
+ * The instruments are free, work signed out, and always will. That is the
+ * point of them and it is also what makes an invitation here credible — so
+ * this sits at the FOOT of the tool, after it has done its job, and it asks
+ * rather than gates. Nothing above it is withheld.
+ *
+ * **It only promises things that exist.** An account keeps the charts you cast
+ * and the groups you plan, and the letter announces new instruments. It does
+ * NOT yet remember your place or your reckoning, tempting as that line is —
+ * `user.timezone` is stored and no instrument reads it. Writing that here
+ * would be the site telling its first lie in the place it can least afford
+ * one, on a page whose whole argument is that it shows its working.
+ *
+ * Copy is a row (`page = "tools-cta"`), so she can rewrite the invitation
+ * everywhere at once without a deploy — and hide it entirely by unticking it.
+ */
+import Button from "../forms/Button.astro";
+import Prose from "../content/Prose.astro";
+import { pageSections } from "../../lib/content";
+import { account } from "../../lib/account";
+
+const me = await account(Astro);
+/* Somebody who already has an account is not the audience, and showing them a
+   sign-up box is how a site starts feeling like it wants something. */
+const block = me ? null : (await pageSections("tools-cta"))[0] ?? null;
+---
+
+{block && (
+  <aside class="cta">
+    <div class="cta-body">
+      {block.eyebrow && <p class="t-eyebrow">{block.eyebrow}</p>}
+      {block.title && <h2>{block.title}</h2>}
+      <Prose html={block.html} />
+    </div>
+    <div class="cta-do">
+      {block.linkUrl && (
+        <Button href={block.linkUrl}>{block.linkLabel || "Make an account"}</Button>
+      )}
+      <a class="cta-second" href="/newsletter">or just the monthly letter</a>
+    </div>
+  </aside>
+)}
+
+<style>
+  .cta {
+    display: grid; gap: var(--space-4); align-items: center;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
+    padding: clamp(18px, 3vw, 26px);
+    background: var(--surface-veil);
+    border: var(--border-w) solid var(--line);
+    border-radius: var(--radius-md);
+  }
+  .cta h2 {
+    font: 500 var(--text-h4) var(--font-display); color: var(--ink); margin: 0;
+  }
+  .cta-body { display: grid; gap: 6px; max-width: 54ch; }
+  .cta-body :global(p) {
+    font: 400 var(--text-sm) / 1.65 var(--font-body); color: var(--ink-soft); margin: 0;
+  }
+  .cta-do { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
+  .cta-second { font: 400 var(--text-xs) var(--font-body); color: var(--ink-faint); }
+</style>

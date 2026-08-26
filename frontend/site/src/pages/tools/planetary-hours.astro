@@ -17,12 +17,19 @@ import PlaceField from "../../components/forms/PlaceField.astro";
 import DisagreementControl from "../../components/tools/DisagreementControl.astro";
 import CannotCompute from "../../components/tools/CannotCompute.astro";
 import { askAstro } from "../../lib/api";
+import { savedPlace } from "../../lib/account";
 
 const q = Astro.url.searchParams;
 const ATHENS = { lat: 37.9838, lon: 23.7275, label: "Athens · 37.98°N 23.73°E" };
-const lat = Number(q.get("lat") ?? ATHENS.lat);
-const lon = Number(q.get("lon") ?? ATHENS.lon);
-const place = q.get("place") ?? (q.has("lat") ? `${lat.toFixed(2)}, ${lon.toFixed(2)}` : ATHENS.label);
+/* Where they are, if they have said. The URL still wins — a link
+   somebody was sent must show the place it names, not the reader's. */
+const mine = await savedPlace(Astro);
+const home = mine ?? ATHENS;
+const lat = Number(q.get("lat") ?? (mine ? mine.lat : ATHENS.lat));
+const lon = Number(q.get("lon") ?? (mine ? mine.lon : ATHENS.lon));
+const place = q.get("place") ?? (q.has("lat")
+  ? `${lat.toFixed(2)}, ${lon.toFixed(2)}`
+  : (mine ? mine.name : ATHENS.label));
 const convention = q.get("convention") === "hindu" ? "hindu" : "visible_disc";
 
 interface Hour {
@@ -80,6 +87,8 @@ const GLYPH: Record<string, string> = {
   place={place}
   date={new Date().toISOString().slice(0, 10)}
   disclosure="○"
+  lat={lat}
+  lon={lon}
 >
   <div slot="parameters" class="params">
     <DisagreementControl

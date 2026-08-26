@@ -10,6 +10,8 @@ import BaseLayout from "./BaseLayout.astro";
 import ProvenanceBlock from "../components/tools/ProvenanceBlock.astro";
 import { instruments, parseFaq, faqPageNode } from "../lib/instruments";
 import InstrumentNotes from "../components/tools/InstrumentNotes.astro";
+import ToolCta from "../components/brand/ToolCta.astro";
+import RememberPlace from "../components/tools/RememberPlace.astro";
 
 interface Props {
   /* Name, subtitle, description, glyph and the "how it is reckoned" passage all
@@ -24,6 +26,10 @@ interface Props {
   rule?: string;
   ruleLabel?: string;
   place?: string;
+  /* Only for the instruments that need a horizon — not the natal chart,
+     whose place is where somebody was BORN and must never be defaulted. */
+  lat?: number;
+  lon?: number;
   date?: string;
   /** ○ public · ◐ named, not detailed · ● under seal. */
   disclosure?: "○" | "◐" | "●";
@@ -33,7 +39,7 @@ interface Props {
   noJs?: string;
 }
 const {
-  rule, ruleLabel, place, date, disclosure = "○", where = "server", noJs,
+  rule, ruleLabel, place, date, lat, lon, disclosure = "○", where = "server", noJs,
 } = Astro.props;
 
 const here = Astro.url.pathname;
@@ -158,7 +164,13 @@ const jsonLd = {
       </aside>
     </div>
 
+    {place && lat !== undefined && lon !== undefined && (
+      <RememberPlace place={place} lat={lat} lon={lon} />
+    )}
+
     <InstrumentNotes instrument={self ?? null} />
+
+    <ToolCta />
 
     <nav class="others" aria-label="Other instruments">
       <span class="t-eyebrow">Other instruments</span>

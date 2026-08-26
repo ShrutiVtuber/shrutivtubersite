@@ -306,6 +306,11 @@ async def me(
         "email": user.email,
         "displayName": user.display_name,
         "timezone": user.timezone,
+        "place": {
+            "name": user.place_name,
+            "lat": user.place_lat,
+            "lon": user.place_lon,
+        } if user.place_name or user.place_lat is not None else None,
         "readingLanguage": user.reading_language,
         "preferredTradition": user.preferred_tradition,
         "houseSystem": user.house_system,
@@ -336,6 +341,42 @@ def _nativity_payload(n: Nativity | None) -> dict | None:
         "lat": n.lat, "lon": n.lon, "elevation": n.elevation,
         "timezone": n.timezone, "utcOffsetMinutes": n.utc_offset_minutes,
     }
+
+
+class PlaceIn(BaseModel):
+    """Where they are. Blank clears it."""
+
+    name: str = Field(default="", max_length=160)
+    lat: float | None = None
+    lon: float | None = None
+
+
+@router.put("/me/place")
+async def set_place(
+    body: PlaceIn,
+    user: User = Depends(require_user),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """
+    Remember where somebody is, or forget it.
+
+    One field for the whole set: clearing the name clears the coordinates too,
+    because a place with coordinates and no name renders as a pair of numbers
+    nobody recognises, and a name with no coordinates cannot be computed from.
+    """
+    name = body.name.strip()
+    if not name or body.lat is None or body.lon is None:
+        user.place_name, user.place_lat, user.place_lon = "", None, None
+    else:
+        # A latitude outside the poles is a typo or a probe, not a place.
+        if not (-90 <= body.lat <= 90) or not (-180 <= body.lon <= 180):
+            raise HTTPException(422, "that is not a point on the earth")
+        user.place_name = name
+        user.place_lat = float(body.lat)
+        user.place_lon = float(body.lon)
+    await session.commit()
+    return {"place": None if not user.place_name else {
+        "name": user.place_name, "lat": user.place_lat, "lon": user.place_lon}}
 
 
 class ProfileIn(BaseModel):
@@ -522,7 +563,12 @@ async def export_for(user: User, session: AsyncSession) -> dict:
         "exportedAt": datetime.now(timezone.utc).isoformat(),
         "profile": {
             "email": user.email, "displayName": user.display_name,
-            "timezone": user.timezone, "readingLanguage": user.reading_language,
+            "timezone": user.timezone,
+        "place": {
+            "name": user.place_name,
+            "lat": user.place_lat,
+            "lon": user.place_lon,
+        } if user.place_name or user.place_lat is not None else None, "readingLanguage": user.reading_language,
             "preferredTradition": user.preferred_tradition,
             "houseSystem": user.house_system, "ayanamsa": user.ayanamsa,
             "createdAt": user.created_at.isoformat() if user.created_at else None,

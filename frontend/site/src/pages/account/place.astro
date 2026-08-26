@@ -1,0 +1,42 @@
+---
+/* Remember, or forget, where you are.
+ *
+ * One page rather than a POST handler on each of six instruments. Every tool
+ * that needs a horizon links here with the place it is currently showing and a
+ * `next` to come back to, so the control works with scripting off and there is
+ * one implementation of "save my place" instead of six.
+ */
+import { asReader, account } from "../../lib/account";
+import { verifyCsrf } from "../../lib/csrf";
+
+export const prerender = false;
+
+const me = await account(Astro);
+if (!me) return Astro.redirect("/signin?next=/account", 303);
+
+/* Only ever a path on this site. A `next` taken from a form is attacker-
+   controlled, and an open redirect on a signed-in page is how somebody gets
+   walked to a convincing copy of it. */
+const safeNext = (raw: string) =>
+  raw.startsWith("/") && !raw.startsWith("//") ? raw : "/account";
+
+if (Astro.request.method === "POST") {
+  const form = await Astro.request.formData();
+  const next = safeNext(String(form.get("next") ?? "/account"));
+  if (!verifyCsrf(Astro.cookies, form)) return Astro.redirect(next, 303);
+
+  const forget = form.get("forget") === "1";
+  await asReader(Astro, "/api/account/me/place", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(forget ? { name: "" } : {
+      name: String(form.get("place") ?? ""),
+      lat: Number(form.get("lat") ?? 0),
+      lon: Number(form.get("lon") ?? 0),
+    }),
+  });
+  return Astro.redirect(next, 303);
+}
+
+return Astro.redirect("/account", 303);
+---

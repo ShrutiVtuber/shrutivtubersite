@@ -44,6 +44,20 @@ class User(TimestampMixin, table=True):
 
     display_name: str = ""
     timezone: str = ""
+
+    # Where they are, for the instruments that need a horizon.
+    #
+    # Every one of planetary hours, the stations and the three calendars is
+    # useless without a place and defaults to Athens, so a signed-in visitor
+    # was re-typing their own city on every page and every visit. This is the
+    # single most useful thing an account can remember, and until now the
+    # account remembered nothing an instrument read.
+    #
+    # NOT used by the natal chart: that place is where somebody was BORN,
+    # which is a different fact that happens to have the same shape.
+    place_name: str = ""
+    place_lat: Optional[float] = None
+    place_lon: Optional[float] = None
     reading_language: str = "en"
     # Reading preferences, not settings-page trivia: they decide which of two
     # incompatible reckonings a page shows first.

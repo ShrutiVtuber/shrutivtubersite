@@ -1,0 +1,77 @@
+---
+/* "Keep this place" — the account benefit, where it is useful.
+ *
+ * Shown only to somebody signed in, only on instruments that need a horizon,
+ * and only when it would change something: there is no point offering to
+ * remember a place that is already remembered.
+ *
+ * It is a form rather than a script because everything else here is.
+ */
+import CsrfField from "../forms/CsrfField.astro";
+import { account, savedPlace } from "../../lib/account";
+
+interface Props { place: string; lat: number; lon: number }
+const { place, lat, lon } = Astro.props;
+
+/* Signed out, there is no account to keep anything in — and `savedPlace`
+   returning null is true for them too, which is what put this control on a
+   public page the first time. The invitation for those visitors is ToolCta. */
+const me = await account(Astro);
+const saved = me ? await savedPlace(Astro) : null;
+const here = Astro.url.pathname + Astro.url.search;
+
+/* Coordinates rather than the label: two spellings of one city are the same
+   horizon, and offering to re-save it would be noise. */
+const same = saved
+  && Math.abs(saved.lat - lat) < 0.01
+  && Math.abs(saved.lon - lon) < 0.01;
+---
+
+{me && saved === null && place && (
+  <form class="rp" method="POST" action="/account/place">
+    <CsrfField />
+    <input type="hidden" name="place" value={place} />
+    <input type="hidden" name="lat" value={lat} />
+    <input type="hidden" name="lon" value={lon} />
+    <input type="hidden" name="next" value={here} />
+    <button type="submit">Keep {place} as my place</button>
+    <span>so every instrument opens here</span>
+  </form>
+)}
+
+{me && saved && !same && place && (
+  <form class="rp" method="POST" action="/account/place">
+    <CsrfField />
+    <input type="hidden" name="place" value={place} />
+    <input type="hidden" name="lat" value={lat} />
+    <input type="hidden" name="lon" value={lon} />
+    <input type="hidden" name="next" value={here} />
+    <button type="submit">Use {place} instead of {saved.name}</button>
+  </form>
+)}
+
+{me && same && (
+  <p class="rp rp-is">
+    <span>Opening at {saved!.name}, because that is your place.</span>
+    <form method="POST" action="/account/place">
+      <CsrfField />
+      <input type="hidden" name="forget" value="1" />
+      <input type="hidden" name="next" value={here} />
+      <button type="submit">Forget it</button>
+    </form>
+  </p>
+)}
+
+<style>
+  .rp {
+    display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; margin: 0;
+    font: 400 var(--text-xs) var(--font-body); color: var(--ink-faint);
+  }
+  .rp button {
+    cursor: pointer; background: none; border: none; padding: 0;
+    font: 500 var(--text-xs) var(--font-body); color: var(--accent);
+    text-decoration: underline; text-underline-offset: 2px;
+  }
+  .rp button:hover { color: var(--accent-hover); }
+  .rp-is form { display: inline; }
+</style>

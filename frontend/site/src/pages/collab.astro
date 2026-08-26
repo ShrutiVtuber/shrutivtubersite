@@ -20,6 +20,7 @@ import SectionHeader from "../components/brand/SectionHeader.astro";
 import Button from "../components/forms/Button.astro";
 import Prose from "../components/content/Prose.astro";
 import { pageSections } from "../lib/content";
+import ToolCta from "../components/brand/ToolCta.astro";
 import CsrfField from "../components/forms/CsrfField.astro";
 import { asReader, account } from "../lib/account";
 import { verifyCsrf } from "../lib/csrf";
@@ -327,6 +328,8 @@ const COMMON = [
         </section>
       </>
     )}
+
+    <ToolCta />
 
     {sections.map((s) => (
       <section class="cb-said">
