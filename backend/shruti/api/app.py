@@ -36,15 +36,35 @@ async def lifespan(app: FastAPI):
     # only thing allowed to touch production DDL.
 
     sky = asyncio.create_task(_sky_reconciler())
+    watch = asyncio.create_task(_live_watcher())
     try:
         yield
     finally:
         sky.cancel()
+        watch.cancel()
 
 
 # How often to look for entries published since the last pass. The work is
 # trivial when there is nothing to do — one query and a directory walk — so
 # this is about how soon a new entry gets its sky, not about load.
+# How often to look for a stream starting. A minute is late enough to be
+# polite to Twitch and early enough that a notification still means "now".
+LIVE_INTERVAL_S = int(os.environ.get("SHRUTI_LIVE_WATCH_SECONDS", "60"))
+
+
+async def _live_watcher() -> None:
+    """
+    Tell the people who asked, when a stream starts.
+
+    On a timer rather than on the page-load check, because the page-load check
+    only happens when somebody is already on the site — and the whole point of
+    the notification is to reach people who are not.
+    """
+    from shruti.core.livewatch import watcher
+
+    await watcher(LIVE_INTERVAL_S)
+
+
 SKY_INTERVAL_S = int(os.environ.get("SHRUTI_SKY_RECONCILE_SECONDS", "900"))
 
 

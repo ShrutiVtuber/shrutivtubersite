@@ -104,6 +104,11 @@ const jsonLd = isHome
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/site.webmanifest" />
 
+    {/* So a reader's browser and their feed app can both find it without
+        being told. */}
+    <link rel="alternate" type="application/rss+xml"
+          title="Shruti — the journal" href="/journal/rss.xml" />
+
     {jsonLd && <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />}
     <meta name="theme-color" content="#121829" media="(prefers-color-scheme: dark)" />
     <meta name="theme-color" content="#F8F6F3" media="(prefers-color-scheme: light)" />
