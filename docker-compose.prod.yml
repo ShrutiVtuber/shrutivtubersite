@@ -31,7 +31,12 @@ services:
 
   backend:
     command: ["uvicorn", "shruti.api.app:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "${SHRUTI_WORKERS:-2}"]
-    mem_limit: 384m
+    # 640m, up from 384m. The limit predates this service doing image work: an
+    # AVIF encode of a 1-megapixel photograph peaks around 174 MB, and on top
+    # of the app's own ~200 MB that was inside 384 with nothing to spare. A
+    # single upload silently OOM-killed the worker mid-request — no traceback,
+    # because a kill is not an exception. Measured on the box, not guessed.
+    mem_limit: 640m
     cpus: "0.50"
     logging:
       driver: json-file

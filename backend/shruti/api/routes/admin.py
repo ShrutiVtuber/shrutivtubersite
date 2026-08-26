@@ -202,6 +202,15 @@ async def _write_variants(filename: str, data: bytes, content_type: str) -> str:
 
     from shruti.core.storage import put as store_media
 
+    # The variant is downscaled past this. The ORIGINAL is untouched — this
+    # only bounds the alternative a browser may prefer, and 2400px is already
+    # more than any layout on this site draws.
+    #
+    # It is a memory guard as much as a size one: encoders scale with pixel
+    # count, and an unbounded upload can take a worker with it. A kill is not
+    # an exception, so it cannot be caught — it can only be not reached.
+    MAX_EDGE = 2400
+
     stem = filename.rsplit(".", 1)[0]
     written: list[str] = []
     for fmt, ext, mime, opts in (
@@ -211,6 +220,8 @@ async def _write_variants(filename: str, data: bytes, content_type: str) -> str:
         try:
             buf = BytesIO()
             with Image.open(BytesIO(data)) as im:
+                if max(im.size) > MAX_EDGE:
+                    im.thumbnail((MAX_EDGE, MAX_EDGE), Image.LANCZOS)
                 if fmt == "AVIF" and im.mode not in ("RGB", "RGBA"):
                     im = im.convert("RGBA")
                 im.save(buf, fmt, **opts)
