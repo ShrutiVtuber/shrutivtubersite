@@ -50,6 +50,11 @@ const useCall = await asAdmin(Astro, "/api/insight/summary?days=7");
 const use = useCall.body ?? {};
 const skyList = await asAdmin(Astro, "/api/journal/entries");
 const skyEntries: any[] = skyList.body?.entries ?? [];
+/* Only what is still outstanding. A dashboard tile showing "13" when twelve
+   are ticked would be a number that never moves. */
+const growthRows = (await asAdmin(Astro, "/api/admin/growth")).body ?? [];
+const growthLeft = (growthRows as any[]).filter((r) => !r.done && r.visible !== false).length;
+
 ---
 
 <AdminLayout title="Overview">
@@ -120,6 +125,15 @@ const skyEntries: any[] = skyList.body?.entries ?? [];
       <span class="sub">
         {letters.filter((i: any) => i.sentAt).length} sent · {reach.wouldReceive ?? 0} would receive
       </span>
+    </a>
+
+    {/* Not a number about the site — a number about her. It is the only tile
+        that counts something she has to go and do in the world, which is why
+        it earns a place beside the ones that count content. */}
+    <a class="adm-card tile" href="/admin/growth">
+      <span class="adm-lbl">Growing</span>
+      <span class="big">{growthLeft}</span>
+      <span class="sub">{growthLeft === 1 ? "thing left to do" : "things left to do"}</span>
     </a>
 
     <a class="adm-card tile" href="/admin/insight">

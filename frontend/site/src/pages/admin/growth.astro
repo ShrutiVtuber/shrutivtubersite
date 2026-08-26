@@ -1,0 +1,318 @@
+---
+/* The two lists that are hers rather than mine.
+ *
+ * "Things I can do myself to keep growing, so I can read it to stay
+ * motivated." That last clause is the whole design brief, and it makes this a
+ * different object from a task tracker: a checklist read for motivation has to
+ * carry its REASONS, not just its items. So every row shows why it is worth
+ * doing, with the evidence that made it worth doing, and the reasons are what
+ * the page is mostly made of.
+ *
+ * Two lists in one table. `do` is the growth checklist — the things no
+ * engineer can do for her. `build` is the tools queue, which she adds to
+ * whenever she reads something like the commission-tracker tweet.
+ *
+ * Ticking something keeps it rather than deleting it. A list that only ever
+ * shrinks shows no progress, and progress is the point.
+ */
+import AdminLayout from "../../layouts/AdminLayout.astro";
+import CsrfField from "../../components/forms/CsrfField.astro";
+import Button from "../../components/forms/Button.astro";
+import { asAdmin } from "../../lib/admin";
+import { verifyCsrf } from "../../lib/csrf";
+import { renderMarkdown } from "../../lib/markdown";
+
+export const prerender = false;
+
+let notice = "";
+let failed = "";
+
+if (Astro.request.method === "POST") {
+  const form = await Astro.request.formData();
+  if (!verifyCsrf(Astro.cookies, form)) {
+    failed = "That did not save. Reload the page and try again.";
+  } else {
+    const action = String(form.get("action") ?? "");
+    const id = String(form.get("id") ?? "");
+
+    if (action === "toggle") {
+      const r = await asAdmin(Astro, `/api/admin/growth/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ done: form.get("done") === "1" }),
+      });
+      if (!r.ok) failed = r.body?.detail ?? "That could not be saved.";
+    } else if (action === "add") {
+      const title = String(form.get("title") ?? "").trim();
+      if (!title) {
+        failed = "It needs a title, at least.";
+      } else {
+        const r = await asAdmin(Astro, "/api/admin/growth", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            kind: String(form.get("kind") ?? "do"),
+            title,
+            summary: String(form.get("summary") ?? ""),
+            why: String(form.get("why") ?? ""),
+            effort: String(form.get("effort") ?? ""),
+            owner: String(form.get("owner") ?? "you"),
+            position: 999,
+            visible: true,
+          }),
+        });
+        notice = r.ok ? "Added to the list." : "";
+        if (!r.ok) failed = r.body?.detail ?? "That could not be added.";
+      }
+    } else if (action === "delete") {
+      const r = await asAdmin(Astro, `/api/admin/growth/${id}`, { method: "DELETE" });
+      if (!r.ok) failed = r.body?.detail ?? "That could not be removed.";
+    }
+  }
+}
+
+const all = (await asAdmin(Astro, "/api/admin/growth")).body ?? [];
+const rows = (all as any[]).filter((r) => r.visible !== false)
+  .sort((a, b) => (a.position ?? 0) - (b.position ?? 0) || a.id - b.id);
+
+const todo = rows.filter((r) => r.kind === "do");
+const build = rows.filter((r) => r.kind === "build");
+
+/* Rendered here rather than in the loop so the markdown work happens once. */
+const whyHtml = new Map<number, string>();
+for (const r of rows) whyHtml.set(r.id, await renderMarkdown(r.why || ""));
+
+const doneCount = (list: any[]) => list.filter((r) => r.done).length;
+
+const OWNER_WORD: Record<string, string> = {
+  you: "yours", me: "mine", both: "both of us",
+};
+---
+
+<AdminLayout title="Growing">
+  <div class="gr">
+    <header class="gr-head">
+      <h1>Growing</h1>
+      <p class="gr-lede">
+        The things no engineer can do for you, and the things worth building
+        next. Every one says why, with what it came from — the reasons are the
+        useful part when you are deciding what to do on a Tuesday.
+      </p>
+      {notice && <p class="gr-ok">{notice}</p>}
+      {failed && <p class="gr-bad">{failed}</p>}
+    </header>
+
+    <section class="gr-sec">
+      <div class="gr-sechead">
+        <h2>Yours to do</h2>
+        <p class="gr-count t-tabular">{doneCount(todo)} of {todo.length} done</p>
+      </div>
+
+      <ol class="gr-list">
+        {todo.map((r) => (
+          <li class="gr-item" data-done={r.done || undefined}>
+            <form method="POST" class="gr-tick">
+              <CsrfField />
+              <input type="hidden" name="action" value="toggle" />
+              <input type="hidden" name="id" value={r.id} />
+              <input type="hidden" name="done" value={r.done ? "0" : "1"} />
+              <button type="submit" aria-label={r.done ? `Mark "${r.title}" as not done` : `Mark "${r.title}" as done`}>
+                <span aria-hidden="true">{r.done ? "✓" : ""}</span>
+              </button>
+            </form>
+
+            <div class="gr-body">
+              <p class="gr-title">{r.title}</p>
+              {r.summary && <p class="gr-sum">{r.summary}</p>}
+              <p class="gr-meta t-tabular">
+                {r.effort && <span>{r.effort}</span>}
+                {r.effort && r.owner && <span aria-hidden="true">·</span>}
+                {r.owner && <span>{OWNER_WORD[r.owner] ?? r.owner}</span>}
+              </p>
+              {r.why && (
+                <details class="gr-why">
+                  <summary>Why</summary>
+                  <div set:html={whyHtml.get(r.id)} />
+                </details>
+              )}
+            </div>
+
+            <form method="POST" class="gr-del">
+              <CsrfField />
+              <input type="hidden" name="action" value="delete" />
+              <input type="hidden" name="id" value={r.id} />
+              <button type="submit" aria-label={`Remove "${r.title}"`}>Remove</button>
+            </form>
+          </li>
+        ))}
+      </ol>
+    </section>
+
+    <section class="gr-sec">
+      <div class="gr-sechead">
+        <h2>Tools to create</h2>
+        <p class="gr-count t-tabular">{build.length} on the list</p>
+      </div>
+      <p class="gr-note">
+        Add to this whenever you read something that sounds like a gap. The
+        commission tracker below started as a tweet.
+      </p>
+
+      <ol class="gr-list">
+        {build.map((r) => (
+          <li class="gr-item" data-done={r.done || undefined}>
+            <form method="POST" class="gr-tick">
+              <CsrfField />
+              <input type="hidden" name="action" value="toggle" />
+              <input type="hidden" name="id" value={r.id} />
+              <input type="hidden" name="done" value={r.done ? "0" : "1"} />
+              <button type="submit" aria-label={r.done ? `Mark "${r.title}" as built` : `Mark "${r.title}" as built`}>
+                <span aria-hidden="true">{r.done ? "✓" : ""}</span>
+              </button>
+            </form>
+            <div class="gr-body">
+              <p class="gr-title">{r.title}</p>
+              {r.summary && <p class="gr-sum">{r.summary}</p>}
+              <p class="gr-meta t-tabular">
+                {r.effort && <span>{r.effort}</span>}
+                {r.effort && r.owner && <span aria-hidden="true">·</span>}
+                {r.owner && <span>{OWNER_WORD[r.owner] ?? r.owner}</span>}
+              </p>
+              {r.why && (
+                <details class="gr-why">
+                  <summary>Why</summary>
+                  <div set:html={whyHtml.get(r.id)} />
+                </details>
+              )}
+            </div>
+            <form method="POST" class="gr-del">
+              <CsrfField />
+              <input type="hidden" name="action" value="delete" />
+              <input type="hidden" name="id" value={r.id} />
+              <button type="submit" aria-label={`Remove "${r.title}"`}>Remove</button>
+            </form>
+          </li>
+        ))}
+      </ol>
+    </section>
+
+    <section class="gr-sec">
+      <h2>Add something</h2>
+      <form method="POST" class="gr-add">
+        <CsrfField />
+        <input type="hidden" name="action" value="add" />
+        <label>
+          <span>Which list</span>
+          <select name="kind">
+            <option value="do">Yours to do</option>
+            <option value="build">Tools to create</option>
+          </select>
+        </label>
+        <label>
+          <span>Title</span>
+          <input name="title" required maxlength="200" placeholder="What it is" />
+        </label>
+        <label>
+          <span>One line</span>
+          <input name="summary" maxlength="300" placeholder="Said shorter" />
+        </label>
+        <label class="gr-wide">
+          <span>Why — and what it came from</span>
+          <textarea name="why" rows="4" placeholder="Markdown. Paste the tweet, the number, the thing that made you write it down."></textarea>
+        </label>
+        <label>
+          <span>Effort</span>
+          <input name="effort" maxlength="80" placeholder="an afternoon" />
+        </label>
+        <label>
+          <span>Who</span>
+          <select name="owner">
+            <option value="you">Yours</option>
+            <option value="me">Mine</option>
+            <option value="both">Both of us</option>
+          </select>
+        </label>
+        <div class="gr-wide"><Button type="submit">Add it</Button></div>
+      </form>
+    </section>
+  </div>
+</AdminLayout>
+
+<style>
+  .gr { display: grid; gap: var(--space-6); max-width: 74ch; }
+  .gr-head { display: grid; gap: 10px; }
+  .gr h1 { font: 500 var(--text-h1) var(--font-display); color: var(--ink); margin: 0; }
+  .gr h2 { font: 600 var(--text-h3) var(--font-display); color: var(--ink); margin: 0; }
+  .gr-lede { font: 400 var(--text-body) / var(--leading-body) var(--font-body); color: var(--ink-soft); margin: 0; }
+  .gr-ok { font: 400 var(--text-sm) var(--font-body); color: var(--accent); margin: 0; }
+  .gr-bad { font: 400 var(--text-sm) var(--font-body); color: var(--live); margin: 0; }
+  .gr-note { font: 400 var(--text-sm) / 1.65 var(--font-body); color: var(--ink-faint); margin: 0; }
+
+  .gr-sec { display: grid; gap: 14px; }
+  .gr-sechead { display: flex; gap: 12px; align-items: baseline; justify-content: space-between; flex-wrap: wrap; }
+  .gr-count { font: 400 var(--text-xs) var(--font-mono); color: var(--ink-faint); margin: 0; }
+
+  .gr-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+  .gr-item {
+    display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: start;
+    background: var(--surface-card); border: var(--border-w) solid var(--line);
+    border-radius: var(--radius-md); padding: 14px 16px;
+  }
+  /* Done stays on the list and reads as finished rather than vanishing. */
+  .gr-item[data-done] { background: var(--surface-inset); border-color: var(--line); }
+  .gr-item[data-done] .gr-title { color: var(--ink-faint); text-decoration: line-through; }
+
+  .gr-tick { margin: 0; }
+  .gr-tick button {
+    width: 26px; height: 26px; margin-top: 2px; cursor: pointer;
+    display: grid; place-items: center;
+    background: var(--surface-page); border: var(--border-w) solid var(--line-strong);
+    border-radius: var(--radius-sm); color: var(--accent);
+    font: 600 var(--text-sm) var(--font-body);
+  }
+  .gr-tick button:hover { border-color: var(--accent); }
+
+  .gr-body { display: grid; gap: 4px; min-width: 0; }
+  .gr-title { font: 600 var(--text-body) var(--font-body); color: var(--ink); margin: 0; }
+  .gr-sum { font: 400 var(--text-sm) / 1.6 var(--font-body); color: var(--ink-soft); margin: 0; }
+  .gr-meta {
+    display: flex; gap: 8px; flex-wrap: wrap; margin: 2px 0 0;
+    font: 400 var(--text-micro) var(--font-mono); color: var(--ink-faint);
+  }
+  .gr-why { margin-top: 6px; }
+  .gr-why summary {
+    cursor: pointer; font: 500 var(--text-xs) var(--font-body); color: var(--accent);
+  }
+  .gr-why > div { margin-top: 8px; }
+  .gr-why :global(p) {
+    font: 400 var(--text-sm) / 1.7 var(--font-body); color: var(--ink-soft); margin: 0 0 10px;
+  }
+  .gr-why :global(p:last-child) { margin-bottom: 0; }
+  .gr-why :global(strong) { color: var(--ink); }
+  .gr-why :global(em) { color: var(--ink); }
+
+  .gr-del { margin: 0; }
+  .gr-del button {
+    cursor: pointer; background: none; border: none; padding: 2px 0;
+    font: 400 var(--text-micro) var(--font-body); color: var(--ink-faint);
+  }
+  .gr-del button:hover { color: var(--live); }
+
+  .gr-add {
+    display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
+    background: var(--surface-card); border: var(--border-w) solid var(--line);
+    border-radius: var(--radius-md); padding: 16px;
+  }
+  .gr-add label { display: grid; gap: 5px; }
+  .gr-wide { grid-column: 1 / -1; }
+  .gr-add span {
+    font: 600 var(--text-micro) var(--font-body); letter-spacing: var(--tracking-eyebrow);
+    text-transform: uppercase; color: var(--ink-faint);
+  }
+  .gr-add input, .gr-add select, .gr-add textarea {
+    font: 400 var(--text-sm) var(--font-body); color: var(--ink);
+    background: var(--surface-page); border: var(--border-w) solid var(--line);
+    border-radius: var(--radius-sm); padding: 9px 10px; min-height: 42px;
+    width: 100%; box-sizing: border-box;
+  }
+</style>

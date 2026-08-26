@@ -323,6 +323,43 @@ class Sponsor(TimestampMixin, table=True):
     visible: bool = Field(default=True)
 
 
+class GrowthItem(TimestampMixin, table=True):
+    """
+    Something to do, or something to build, kept where she will see it.
+
+    Two lists in one table because they are the same shape and differ only in
+    who does them. `kind="do"` is the growth checklist — the things no engineer
+    can do for her: change the Twitch category, submit a panel, ask the lawyer.
+    `kind="build"` is the tools queue — ideas for things this site could ship,
+    which she can add to whenever she reads a good one.
+
+    **`why` is a column and not a nicety.** A checklist with no reasons stops
+    being motivating the moment the reasoning leaves her head, and this one is
+    explicitly meant to be read for motivation rather than only ticked. Every
+    seeded row carries the evidence it came from.
+
+    `done` rather than deletion: a finished item is a thing she did, and a list
+    that only ever shrinks shows no progress.
+    """
+
+    __tablename__ = "growth_item"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    kind: str = Field(default="do", index=True)   # do | build
+    title: str = ""
+    # One line of what it is.
+    summary: str = ""
+    # Why it is worth doing, with the evidence. Markdown.
+    why: str = ""
+    # Rough effort, in her words — "an afternoon", "free", "a weekend".
+    effort: str = ""
+    # Who it needs. "you" | "me" | "both"
+    owner: str = "you"
+    done: bool = Field(default=False, index=True)
+    position: int = Field(default=0)
+    visible: bool = Field(default=True)
+
+
 class Tool(TimestampMixin, table=True):
     """
     A browser-runnable tool page (planetary hours, Attic calendar, isopsephy...).
