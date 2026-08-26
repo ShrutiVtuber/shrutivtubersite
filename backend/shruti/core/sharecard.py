@@ -19,6 +19,7 @@ relationship, and this site does not claim predictive validity for anything.
 from __future__ import annotations
 
 import logging
+import re
 from io import BytesIO
 from pathlib import Path
 
@@ -30,13 +31,26 @@ WIDTH, HEIGHT = 1200, 630
 
 FONTS = Path(__file__).resolve().parent.parent / "assets" / "fonts"
 
-# The site's palette, as the card must match the page it came from.
-INK = (38, 48, 74)
-SOFT = (74, 84, 112)
-FAINT = (110, 120, 144)
-PAPER = (246, 242, 239)
-LINE = (220, 214, 220)
-ROSE = (168, 90, 118)
+# The palette a design did not give us. Every design is a row now — see
+# `CardDesign` — and these are only what a missing or malformed one falls back
+# to, so a card always renders even if somebody saves a design with an empty
+# colour.
+FALLBACK = {
+    "background": "#F6F2EF",
+    "ink": "#26304A",
+    "soft": "#4A5470",
+    "faint": "#6E7890",
+    "line": "#DCD6DC",
+    "accent": "#A85A76",
+}
+
+_HEX = re.compile(r"^#[0-9a-fA-F]{6}$")
+
+
+def _rgb(value: str, fallback: str) -> tuple[int, int, int]:
+    """Hex to a tuple, falling back rather than raising on a bad one."""
+    raw = value if _HEX.match(value or "") else fallback
+    return tuple(int(raw[i:i + 2], 16) for i in (1, 3, 5))  # type: ignore[return-value]
 
 
 def _font(name: str, size: int):
@@ -90,11 +104,39 @@ def comparison_card(
     hard: int,
     left_avatar: bytes | None = None,
     right_avatar: bytes | None = None,
+    design: dict | None = None,
+    backdrop: bytes | None = None,
 ) -> bytes:
     """One PNG. Never raises — a missing card must not take down the page."""
     from PIL import Image, ImageDraw
 
+    design = design or {}
+    INK = _rgb(design.get("ink", ""), FALLBACK["ink"])
+    SOFT = _rgb(design.get("soft", ""), FALLBACK["soft"])
+    FAINT = _rgb(design.get("faint", ""), FALLBACK["faint"])
+    PAPER = _rgb(design.get("background", ""), FALLBACK["background"])
+    LINE = _rgb(design.get("line", ""), FALLBACK["line"])
+    ROSE = _rgb(design.get("accent", ""), FALLBACK["accent"])
+
     card = Image.new("RGB", (WIDTH, HEIGHT), PAPER)
+
+    # An optional full-bleed backdrop. Covered, not stretched: a design's
+    # artwork squashed to 1200x630 is somebody's picture distorted.
+    if backdrop:
+        try:
+            art = Image.open(BytesIO(backdrop)).convert("RGB")
+            scale = max(WIDTH / art.width, HEIGHT / art.height)
+            art = art.resize((round(art.width * scale), round(art.height * scale)),
+                             Image.LANCZOS)
+            card.paste(art, ((WIDTH - art.width) // 2, (HEIGHT - art.height) // 2))
+            if design.get("scrim"):
+                # Under the text only, so the picture is still the picture.
+                veil = Image.new("RGBA", (WIDTH, HEIGHT), (*PAPER, 0))
+                ImageDraw.Draw(veil).rectangle((0, 120, WIDTH, 500), fill=(*PAPER, 190))
+                card = Image.alpha_composite(card.convert("RGBA"), veil).convert("RGB")
+        except Exception:                              # noqa: BLE001
+            log.info("a card backdrop could not be read; using the flat colour")
+
     draw = ImageDraw.Draw(card)
 
     display = _font("EBGaramond-SemiBold.ttf", 58)

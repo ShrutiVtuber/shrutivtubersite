@@ -185,6 +185,48 @@ class Project(TimestampMixin, table=True):
     media_id: Optional[int] = Field(default=None, foreign_key="media.id")
 
 
+class CardDesign(TimestampMixin, table=True):
+    """
+    A look for the share card.
+
+    **Rows rather than a dict in the code**, so a new design is something she
+    makes on a Tuesday instead of something a developer deploys. The two that
+    ship — light and dark — are seeded rows like any other, and can be edited
+    or hidden the same way.
+
+    The colours are hex, and this is the second place on the site where storing
+    one is right: a card design IS a palette, the way a sponsor's brand is.
+
+    `media_id` is an optional full-bleed backdrop, 1200x630. With one, the
+    colours still matter — every word on the card is drawn in them, and a
+    design whose ink disappears into its own backdrop is the failure this
+    invites. The admin shows the card rendered before it is saved.
+    """
+
+    __tablename__ = "card_design"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    key: str = Field(index=True, unique=True)
+    name: str = ""
+
+    background: str = "#F6F2EF"
+    ink: str = "#26304A"
+    soft: str = "#4A5470"
+    faint: str = "#6E7890"
+    line: str = "#DCD6DC"
+    accent: str = "#A85A76"
+
+    media_id: Optional[int] = Field(default=None, foreign_key="media.id")
+
+    # Anything that would sit on a busy backdrop wants this; flat colours do
+    # not. A scrim under the text rather than over the whole image, so the
+    # picture is still the picture.
+    scrim: bool = Field(default=False)
+
+    position: int = Field(default=0)
+    visible: bool = Field(default=True)
+
+
 class Outfit(TimestampMixin, table=True):
     """
     A costume, and who drew it.

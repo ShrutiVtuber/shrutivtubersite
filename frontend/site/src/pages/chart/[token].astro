@@ -33,7 +33,14 @@ if (Astro.request.method === "POST") {
     failed = "That did not go through. Reload the page and try again.";
   } else {
     const action = String(form.get("action") ?? "");
-    if (action === "share") {
+    if (action === "invite") {
+      /* The same token a share uses, minted here so that inviting somebody is
+         one press rather than a step hidden behind another button. Nobody
+         thinks "to invite a friend I must first generate a share link". */
+      const r = await asReader(Astro, `/api/charts/o/${token}/share`, { method: "POST" });
+      notice = r.ok ? "Here is the invitation — send it to whoever you like." : "";
+      if (!r.ok) failed = "The invitation could not be made.";
+    } else if (action === "share") {
       const r = await asReader(Astro, `/api/charts/o/${token}/share`, { method: "POST" });
       notice = r.ok ? "There is a link to hand out now." : "";
       if (!r.ok) failed = "The link could not be made.";
@@ -126,30 +133,42 @@ const readable = (iso: string | null) =>
             </div>
           </div>
 
-          {
-            c.shared && (
-              <section class="panel invite-panel">
-                <h2>Invite someone to compare</h2>
-                <p class="fine">
-                  The same link, framed as an invitation. They give their birth
-                  details on one page and land straight on the comparison —
-                  no account, no copying addresses between tabs.
-                </p>
-                <label class="link-out">
-                  <span>The invitation</span>
-                  <input type="text" readonly value={`${SITE_URL}/chart/invite/${c.shareToken}`} onclick="this.select()" />
-                </label>
-                <label class="link-out">
-                  <span>Something to post with it</span>
-                  <textarea readonly rows="2" onclick="this.select()">{`Compare charts with me — ${SITE_URL}/chart/invite/${c.shareToken}`}</textarea>
-                </label>
-                <p class="fine">
-                  Taking the share link back below also cancels every
-                  invitation made from it. They are the same token.
-                </p>
-              </section>
-            )
-          }
+          {/* First, and never behind another button. Inviting is what most
+              people came here to do, and nobody thinks "to invite a friend I
+              must first generate a share link" — so this mints the token
+              itself when there isn't one. */}
+          <section class="panel invite-panel">
+            <h2>Invite someone to compare</h2>
+            <p class="fine">
+              They give their birth details on one page and land straight on the
+              comparison. No account, nothing to copy between tabs.
+            </p>
+            {
+              c.shared ? (
+                <>
+                  <label class="link-out">
+                    <span>The invitation</span>
+                    <input type="text" readonly value={`${SITE_URL}/chart/invite/${c.shareToken}`} onclick="this.select()" />
+                  </label>
+                  <label class="link-out">
+                    <span>Something to post with it</span>
+                    <textarea readonly rows="2" onclick="this.select()">{`Compare charts with me — ${SITE_URL}/chart/invite/${c.shareToken}`}</textarea>
+                  </label>
+                  <p class="fine">
+                    Taking the share link back below cancels every invitation
+                    made from it — they are the same token.
+                  </p>
+                </>
+              ) : (
+                <form method="POST">
+                  <CsrfField />
+                  <input type="hidden" name="action" value="invite" />
+                  <Button type="submit" data-track="invite:made">Make an invitation</Button>
+                </form>
+              )
+            }
+          </section>
+
 
           <section class="panel">
             <h2>Hand it to somebody</h2>

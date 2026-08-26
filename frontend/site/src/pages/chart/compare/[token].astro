@@ -54,6 +54,14 @@ if (Astro.request.method === "POST") {
       const r = await asReader(Astro, `/api/charts/compare/o/${token}/share`, { method: "DELETE" });
       notice = r.ok ? "The link has been taken back." : "";
       failed = r.ok ? "" : "That did not work.";
+    } else if (action === "design") {
+      const r = await asReader(Astro, `/api/charts/compare/o/${token}/design`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ design: String(form.get("design") ?? "") }),
+      });
+      notice = r.ok ? "Card design changed." : "";
+      failed = r.ok ? "" : "That design could not be used.";
     } else if (action === "forget") {
       const r = await asReader(Astro, `/api/charts/compare/o/${token}`, { method: "DELETE" });
       if (r.ok) return Astro.redirect("/tools/natal-chart", 303);
@@ -89,6 +97,7 @@ const cardUrl = c ? `${SITE_URL}/api/charts/compare/o/${token}/card.png` : undef
 
 const shareUrl = c?.shareToken ? `${SITE_URL}/chart/compare/s/${c.shareToken}` : "";
 const readingHtml = c?.readingMd ? await renderMarkdown(c.readingMd) : "";
+const designs = (await site<any[]>("/api/charts/card-designs")) ?? [];
 const leftName = c?.left?.label || "The first";
 const rightName = c?.right?.label || "The second";
 ---
@@ -184,6 +193,32 @@ const rightName = c?.right?.label || "The second";
           </section>
 
           <section class="panel">
+            <h2>How the card looks</h2>
+            <p class="fine">
+              This is the image a link turns into when it is posted. Pick
+              whichever suits where you are posting it — a light card on a dark
+              timeline is a lightbulb.
+            </p>
+            <img class="card-preview" src={`/api/charts/compare/o/${token}/card.png`}
+                 width="1200" height="630" alt="The share card for this comparison" />
+            {
+              designs.length > 1 && (
+                <form method="POST" class="designs">
+                  <CsrfField />
+                  <input type="hidden" name="action" value="design" />
+                  {designs.map((d: any) => (
+                    <button type="submit" name="design" value={d.key}
+                            class="design" data-on={(c.cardTheme ?? "light") === d.key || undefined}
+                            style={`background:${d.background};color:${d.ink}`}>
+                      {d.name}
+                    </button>
+                  ))}
+                </form>
+              )
+            }
+          </section>
+
+          <section class="panel">
             <h2>Hand it to somebody</h2>
             {
               c.shared ? (
@@ -273,4 +308,15 @@ const rightName = c?.right?.label || "The second";
   .link-out { display: grid; gap: 6px; width: 100%; }
 
   @media (max-width: 720px) { .two-up { grid-template-columns: 1fr; } }
+  .card-preview {
+    width: 100%; max-width: 560px; height: auto; display: block;
+    border: var(--border-w) solid var(--line); border-radius: var(--radius-sm);
+  }
+  .designs { display: flex; gap: 10px; flex-wrap: wrap; }
+  .design {
+    font: 500 var(--text-sm) var(--font-body);
+    border: 2px solid transparent; border-radius: var(--radius-sm);
+    padding: 10px 18px; min-height: 44px; cursor: pointer;
+  }
+  .design[data-on] { border-color: var(--accent); }
 </style>

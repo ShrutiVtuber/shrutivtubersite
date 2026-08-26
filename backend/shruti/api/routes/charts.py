@@ -42,7 +42,7 @@ from sqlmodel import select
 from shruti.api.routes.accounts import current_user
 from shruti.core.consents import CONSENT_VERSION, NATIVITY
 from shruti.core.db import get_session
-from shruti.models import Media
+from shruti.models import CardDesign, Media
 from shruti.models.accounts import Comparison, SavedChart, User
 
 router = APIRouter(prefix="/api/charts", tags=["charts"])
@@ -406,6 +406,7 @@ def _comparison_view(row: Comparison, left: SavedChart, right: SavedChart,
         "readingMd": row.reading_md,
         "tradition": row.tradition,
         "orb": row.orb,
+        "cardTheme": row.card_theme,
         "left": side(left),
         "right": side(right),
         "shared": row.share_token is not None,
@@ -508,6 +509,52 @@ async def write_reading(
     await session.commit()
     left, right = await _load_comparison(row, session)
     return _comparison_view(row, left, right, owner=True)
+
+
+@router.get("/card-designs")
+async def card_designs(session: AsyncSession = Depends(get_session)) -> list[dict]:
+    """The designs somebody may pick between when sharing."""
+    rows = (
+        await session.execute(
+            select(CardDesign).where(CardDesign.visible.is_(True))
+            .order_by(CardDesign.position, CardDesign.id)
+        )
+    ).scalars().all()
+    return [{"key": d.key, "name": d.name or d.key,
+             "background": d.background, "ink": d.ink} for d in rows]
+
+
+class DesignIn(BaseModel):
+    design: str = Field(max_length=60)
+
+
+@router.put("/compare/o/{token}/design")
+async def choose_design(
+    token: str, body: DesignIn, session: AsyncSession = Depends(get_session)
+) -> dict:
+    """
+    Which design the card is drawn in.
+
+    Stored on the comparison rather than passed in the card's URL, because
+    that URL goes into og:image and a social scraper fetches exactly what it
+    says — the choice has to be part of the page, not of the request.
+    """
+    row = (
+        await session.execute(select(Comparison).where(Comparison.owner_token == token))
+    ).scalar_one_or_none()
+    if row is None:
+        raise HTTPException(404, "no such comparison")
+    exists = (
+        await session.execute(
+            select(CardDesign).where(CardDesign.key == body.design,
+                                     CardDesign.visible.is_(True))
+        )
+    ).scalar_one_or_none()
+    if exists is None:
+        raise HTTPException(400, "no such design")
+    row.card_theme = body.design
+    await session.commit()
+    return {"design": row.card_theme}
 
 
 @router.post("/compare/o/{token}/share")
@@ -796,6 +843,39 @@ async def card(
             # the page that embeds it.
             return None
 
+    # Whichever design the owner chose, falling back to the first visible one
+    # so a card renders even if the chosen design was hidden or deleted.
+    chosen = (
+        await session.execute(
+            select(CardDesign).where(CardDesign.key == (row.card_theme or "light"))
+        )
+    ).scalar_one_or_none()
+    if chosen is None or not chosen.visible:
+        chosen = (
+            await session.execute(
+                select(CardDesign).where(CardDesign.visible.is_(True))
+                .order_by(CardDesign.position, CardDesign.id)
+            )
+        ).scalars().first()
+
+    design = {
+        "background": chosen.background, "ink": chosen.ink, "soft": chosen.soft,
+        "faint": chosen.faint, "line": chosen.line, "accent": chosen.accent,
+        "scrim": chosen.scrim,
+    } if chosen else {}
+
+    backdrop = None
+    if chosen is not None and chosen.media_id:
+        art = await session.get(Media, chosen.media_id)
+        if art is not None:
+            try:
+                from shruti.core.storage import fetch
+
+                got = await fetch(art.filename)
+                backdrop = got[0] if got else None
+            except Exception:                          # noqa: BLE001
+                backdrop = None
+
     from shruti.core.sharecard import comparison_card
 
     png = comparison_card(
@@ -807,6 +887,8 @@ async def card(
         hard=said["tally"]["hard"],
         left_avatar=await avatar(left),
         right_avatar=await avatar(right),
+        design=design,
+        backdrop=backdrop,
     )
     return Response(
         content=png,

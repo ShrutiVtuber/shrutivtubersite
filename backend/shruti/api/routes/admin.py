@@ -32,7 +32,7 @@ from shruti.core.db import get_session
 from shruti.models.accounts import SavedChart, User
 from shruti.models import (BannedEmail, Course, FanArt, Product, ProductPhoto, 
     ContactMessage, Credit, Media, ProfileField, Project, Question,
-    Outfit, ScheduleEntry, Section, SocialLink, Sponsor, Tool,
+    CardDesign, Outfit, ScheduleEntry, Section, SocialLink, Sponsor, Tool,
 )
 
 log = logging.getLogger(__name__)
@@ -50,6 +50,7 @@ EDITABLE: dict[str, type[SQLModel]] = {
     "fan-art": FanArt,
     "sponsors": Sponsor,
     "outfits": Outfit,
+    "card-designs": CardDesign,
 }
 
 ALLOWED_IMAGE = {
@@ -481,6 +482,7 @@ MEDIA_USERS: tuple[tuple[type, str], ...] = (
     # test below now walks BOTH modules — scanning one and calling it "every
     # model" is how this one slipped through unguarded.
     (SavedChart, "kept chart"),
+    (CardDesign, "share card design"),
 )
 
 

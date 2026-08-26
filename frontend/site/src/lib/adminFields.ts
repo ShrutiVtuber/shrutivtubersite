@@ -53,6 +53,10 @@ export const MEDIA_USE: Record<string, { label: string; where: string } | { unus
   // one. The column exists, so the day a tool page wants an illustration this
   // is one line — but until then, saying so beats a control that does nothing.
   tools: { unused: true },
+  "card-designs": {
+    label: "Backdrop",
+    where: "A full-bleed picture behind the share card, 1200x630. Optional — without one the card is the flat colour below. With one, check the ink still reads against it.",
+  },
   outfits: {
     label: "The costume",
     where: "Shown in the Outfits row on the About page. The whole piece, not a crop — a costume cropped to a square is the artist's work mishandled.",
@@ -130,6 +134,27 @@ export const FIELDS: Record<string, Record<string, FieldSpec>> = {
       help: "Names besides yours, if any.",
     },
     slug: COMMON.slug,
+  },
+
+  "card-designs": {
+    name: { label: "Name", group: "Content", placeholder: "Night" },
+    key: {
+      label: "Its key", group: "Publishing",
+      placeholder: "night",
+      help: "Short and stable. Somebody's chosen design is stored by this, so changing it resets them to the default.",
+    },
+    background: { label: "Background", type: "colour", group: "Colours", placeholder: "#121829" },
+    ink: { label: "Main text", type: "colour", group: "Colours", placeholder: "#EEF0F8" },
+    soft: { label: "Secondary text", type: "colour", group: "Colours", placeholder: "#B0B8CC" },
+    faint: { label: "Faint text", type: "colour", group: "Colours", placeholder: "#8A94AC" },
+    line: { label: "Rules and outlines", type: "colour", group: "Colours", placeholder: "#303A54" },
+    accent: { label: "The site name", type: "colour", group: "Colours", placeholder: "#D694AC" },
+    media_id: { label: "Backdrop", type: "media", group: "Image" },
+    scrim: {
+      label: "Veil behind the words",
+      type: "checkbox", group: "Image",
+      help: "For a busy backdrop. Lays the background colour softly behind the text only, so the picture is still the picture. Pointless without a backdrop.",
+    },
   },
 
   outfits: {

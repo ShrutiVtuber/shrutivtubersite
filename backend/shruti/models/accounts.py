@@ -381,6 +381,12 @@ class Comparison(TimestampMixin, table=True):
     tradition: str = "hellenistic"
     orb: float = 6.0
 
+    # Which palette the share card is drawn in. Stored rather than chosen by a
+    # query parameter because the card's address goes into og:image, and a
+    # scraper fetches whatever that says — so the choice has to be part of the
+    # page, not of the request.
+    card_theme: str = "light"
+
     shared_at: Optional[datetime] = Field(default=None, sa_type=UTC_TS)
     expires_at: Optional[datetime] = Field(default=None, sa_type=UTC_TS)
 
