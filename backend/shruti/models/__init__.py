@@ -486,6 +486,11 @@ class OverlayToken(TimestampMixin, table=True):
     # "full" | "reduced" | "still"
     motion: str = "reduced"
 
+    # "almanac" | "grimoire" — which ramp the plates take. On the overlay and
+    # not on the counter, for the same reason as motion: the same counter shown
+    # on two machines, or in two scenes, may want different ones.
+    appearance: str = "almanac"
+
     last_seen: Optional[datetime] = Field(default=None, sa_type=UTC_TS)
 
 

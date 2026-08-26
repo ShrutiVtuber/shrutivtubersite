@@ -53,8 +53,18 @@ const ALWAYS_OPEN = [
   "/newsletter/confirm", "/newsletter/unsubscribed", "/newsletter/preferences",
 ];
 
-/** Assets and machine endpoints, which a holding page must not swallow. */
-const PASS_THROUGH = /^\/(_astro|_image|api|media|favicon|apple-touch-icon|icon-|social-card|robots\.txt|sitemap\.xml|site\.webmanifest|passkeys\.js|first-paint\.js|brand\/)/;
+/** Assets and machine endpoints, which a holding page must not swallow.
+ *
+ * `/overlay/` is here for a sharper reason than the rest. An overlay is
+ * fetched by OBS, which is not signed in and never will be — it is a browser
+ * with no session carrying only a token in the URL. Left to the gate, every
+ * overlay would render the HOLDING PAGE, and the first place anybody would
+ * notice is on a live stream.
+ *
+ * It is safe to open because it is not open: each overlay authenticates by an
+ * unguessable token and returns nothing a stranger could not already see by
+ * watching the stream it is drawn on. */
+const PASS_THROUGH = /^\/(_astro|_image|api|media|overlay\/|favicon|apple-touch-icon|icon-|social-card|robots\.txt|sitemap\.xml|site\.webmanifest|passkeys\.js|first-paint\.js|brand\/)/;
 
 /* Asked once and remembered briefly. The middleware runs on EVERY request, and
  * a database round trip per asset would be absurd — but the toggle has to take

@@ -1,0 +1,166 @@
+---
+/* The counter bar — surface 1.
+ *
+ * The visible half of her own income path, and the reason the rest exists. If
+ * a decision here makes it less clear at a one-second glance, it is the wrong
+ * decision whatever it buys.
+ *
+ * Deliberately NOT inside BaseLayout: that layout brings a header, a footer,
+ * a theme, a background and a cookie notice, every one of which is wrong over
+ * video. An overlay is its own document.
+ *
+ * `?t=` is the whole authentication. It is a read-only credential scoped to
+ * one surface — see the module note in api/routes/overlay.py — and it is never
+ * rendered into the page, because OBS settings get screen-shared.
+ */
+import "../../styles/global.css";
+import "../../styles/overlay.css";
+import { SITE_API } from "../../lib/api";
+
+export const prerender = false;
+
+const token = Astro.url.searchParams.get("t") ?? "";
+const size = Astro.url.searchParams.get("size") === "compact" ? "compact" : "wide";
+
+let data: any = null;
+let unreachable = false;
+if (token) {
+  try {
+    const r = await fetch(`${SITE_API}/api/overlay/counter?t=${encodeURIComponent(token)}`);
+    if (r.ok) data = await r.json();
+  } catch {
+    /* The overlay must never blank. An unreachable backend renders the
+       held-state design, not an error page. */
+    unreachable = true;
+  }
+}
+
+const counter = data?.counter ?? null;
+const motion = data?.motion ?? "reduced";
+const skin = data?.appearance ?? "almanac";
+
+/* The unit is a FIELD, never inferred from whether a currency is present.
+   "14 / 20 people" and "€184 / €300" are one object, and deciding which by
+   sniffing the data is exactly how the people case becomes an afterthought. */
+const SYMBOL: Record<string, string> = { eur: "€", gbp: "£", usd: "$" };
+function figure(value: number): string {
+  if (!counter) return "";
+  if (counter.unit === "money") {
+    return `${SYMBOL[counter.currency] ?? ""}${(value / 100).toLocaleString("en-GB",
+      { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+  }
+  return value.toLocaleString("en-GB");
+}
+const UNIT_WORD: Record<string, string> = {
+  people: "people", bits: "bits", subs: "subs", money: "",
+};
+
+const current = counter?.current ?? 0;
+const target = counter?.target ?? 0;
+/* The FILL is clamped so the bar cannot overflow its track. The NUMBERS are
+   not — the overrun is the best moment this design gets, and reporting a
+   capped figure would throw it away. */
+const pct = target > 0 ? Math.min(100, (current / target) * 100) : 0;
+const met = target > 0 && current >= target;
+const over = met ? current - target : 0;
+const remaining = target > 0 ? Math.max(0, target - current) : 0;
+---
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>counter</title>
+    <meta name="robots" content="noindex, nofollow" />
+  </head>
+  <body>
+    <div class={`ov ov-counter ov-${size}`} data-skin={skin} data-motion={motion}>
+      <div class="ov-plate bar" data-met={met || undefined} data-stale={unreachable || undefined}>
+        {!token || !counter ? (
+          /* The first thing she ever sees, because the overlay is added to OBS
+             before the counter exists. An authored line, never `undefined`,
+             never blank. */
+          <p class="idle">
+            <span class="ov-eyebrow">Overlay connected</span>
+            <span class="idle-say">Pick a counter in the admin.</span>
+          </p>
+        ) : (
+          <>
+            <div class="head">
+              <span class="ov-name ov-oneline">{counter.name}</span>
+              <span class="tally ov-fig">
+                <b>{figure(current)}</b>
+                <i>/ {figure(target)}</i>
+                {UNIT_WORD[counter.unit] && <em>{UNIT_WORD[counter.unit]}</em>}
+              </span>
+            </div>
+
+            <div class="track" aria-hidden="true">
+              <span class="fill" style={`width:${pct}%`}></span>
+              {met && <span class="tick"></span>}
+            </div>
+
+            <div class="foot">
+              <span class="ov-eyebrow">
+                {met ? "thank you" : counter.note || "supporting the work"}
+              </span>
+              <span class="left ov-fig">
+                {met ? `+${figure(over)} over` : `${figure(remaining)} to go`}
+              </span>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  </body>
+</html>
+
+<style>
+  /* Geometry from the handoff §4, authored at 1920x1080 and rendered 1:1. */
+  .ov-counter .bar { position: absolute; padding: 18px 22px; display: grid; gap: 10px; }
+  .ov-wide .bar { left: 64px; top: 916px; width: 1360px; }
+  .ov-compact .bar { left: 64px; top: 916px; width: 620px; padding: 14px 16px; gap: 7px; }
+
+  .head { display: flex; align-items: baseline; justify-content: space-between; gap: 20px; }
+  .tally { display: flex; align-items: baseline; gap: 7px; flex: none; }
+  .tally b { font: 500 30px var(--font-mono); color: var(--dusk-ink); }
+  .tally i { font: 400 20px var(--font-mono); font-style: normal; color: var(--dusk-ink-faint); }
+  .tally em {
+    font: 600 12px var(--font-body); font-style: normal; letter-spacing: .14em;
+    text-transform: uppercase; color: var(--dusk-ink-faint);
+  }
+  .ov-compact .tally b { font-size: 22px; }
+  .ov-compact .tally i { font-size: 15px; }
+  .ov-compact .ov-name { font-size: 19px; }
+
+  /* An empty track is a designed shape, not an absence — a zero counter is
+     where every campaign starts and stays for a while. */
+  .track {
+    position: relative; height: 10px; border-radius: 5px;
+    background: var(--dusk-inset);
+    border: 1px solid var(--dusk-line);
+    overflow: hidden;
+  }
+  .ov-compact .track { height: 7px; }
+  .fill {
+    display: block; height: 100%; background: var(--dusk-accent);
+    transition: width 240ms var(--ease-out);
+  }
+  /* Past the target everything is rose, and a 1px tick marks where the target
+     was — so the overrun reads as a distance travelled rather than a full bar. */
+  .bar[data-met] .fill { background: var(--dusk-rose); }
+  .bar[data-met] { border-color: var(--dusk-rose); }
+  .tick { position: absolute; inset: 0 0 0 auto; width: 1px; background: var(--dusk-ink-faint); opacity: .6; }
+
+  .foot { display: flex; align-items: baseline; justify-content: space-between; gap: 20px; }
+  .left { font: 400 14px var(--font-mono); color: var(--dusk-ink-soft); }
+  .bar[data-met] .left { color: var(--dusk-rose); }
+
+  .idle { margin: 0; display: grid; gap: 4px; }
+  .idle-say { font: 400 17px var(--font-display); color: var(--dusk-ink-soft); }
+
+  /* Held, not blanked. Values drop back and the fill takes a dashed edge, so a
+     dropped connection reads as "as of a moment ago" rather than as zero. */
+  .bar[data-stale] .tally b,
+  .bar[data-stale] .left { color: var(--dusk-ink-soft); }
+  .bar[data-stale] .fill { border-right: 2px dashed var(--dusk-rose); }
+</style>

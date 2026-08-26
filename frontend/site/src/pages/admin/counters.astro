@@ -1,0 +1,307 @@
+---
+/* Counters, and the overlays that show them.
+ *
+ * The one rule this page is built around: **a token is shown exactly once,
+ * when the overlay is made, and never again.** OBS settings get screen-shared,
+ * and an admin that renders a credential every time it loads is a credential
+ * on stream. There is no route that returns it afterwards — losing it costs a
+ * new row and a paste, which is cheap.
+ */
+import AdminLayout from "../../layouts/AdminLayout.astro";
+import CsrfField from "../../components/forms/CsrfField.astro";
+import Button from "../../components/forms/Button.astro";
+import { asAdmin } from "../../lib/admin";
+import { verifyCsrf } from "../../lib/csrf";
+import { SITE_URL } from "../../lib/api";
+
+export const prerender = false;
+
+let notice = "";
+let failed = "";
+let minted = "";      // the one moment a token is readable
+
+const SOURCES: [string, string, string][] = [
+  ["stripe.support", "Support", "money"],
+  ["stripe.membership", "Memberships", "money"],
+  ["stripe.shop", "Shop orders", "money"],
+  ["youtube.superchat", "YouTube Super Chats", "money"],
+  ["twitch.sub", "Twitch subscriptions", "count"],
+  ["twitch.gift", "Twitch gifted subs", "count"],
+  ["twitch.bits", "Twitch bits", "bits"],
+  ["twitch.raid", "Raids", "count"],
+  ["twitch.follow", "Follows", "count"],
+  ["course.signup", "Course signups", "people"],
+  ["workshop.signup", "Workshop signups", "people"],
+];
+
+if (Astro.request.method === "POST") {
+  const form = await Astro.request.formData();
+  if (!verifyCsrf(Astro.cookies, form)) {
+    failed = "That did not save. Reload and try again.";
+  } else {
+    const action = String(form.get("action") ?? "");
+
+    if (action === "new-counter") {
+      const unit = String(form.get("unit") ?? "money");
+      const raw = Number(form.get("target") ?? 0);
+      const r = await asAdmin(Astro, "/api/overlay/admin/counters", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: String(form.get("name") ?? ""),
+          note: String(form.get("note") ?? ""),
+          unit,
+          /* Money is stored in minor units, as Stripe counts it — she types
+             euros. Everything else is already a plain count. */
+          target: unit === "money" ? Math.round(raw * 100) : Math.round(raw),
+          sources: form.getAll("sources").map(String),
+        }),
+      });
+      notice = r.ok ? "Counter made." : "";
+      if (!r.ok) failed = r.body?.detail ?? "That could not be made.";
+    } else if (action === "delete-counter") {
+      await asAdmin(Astro, `/api/overlay/admin/counters/${form.get("id")}`, { method: "DELETE" });
+      notice = "Counter removed. The events it counted are untouched.";
+    } else if (action === "new-overlay") {
+      const r = await asAdmin(Astro, "/api/overlay/admin/overlays", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          kind: String(form.get("kind") ?? "counter"),
+          label: String(form.get("label") ?? ""),
+          counter_id: form.get("counter_id") ? Number(form.get("counter_id")) : null,
+          motion: String(form.get("motion") ?? "reduced"),
+          appearance: String(form.get("appearance") ?? "almanac"),
+        }),
+      });
+      if (r.ok) {
+        const size = String(form.get("size") ?? "");
+        minted = `${SITE_URL}/overlay/${form.get("kind")}?t=${r.body.token}` +
+                 (size === "compact" ? "&size=compact" : "");
+      } else {
+        failed = r.body?.detail ?? "That could not be made.";
+      }
+    } else if (action === "revoke") {
+      await asAdmin(Astro, `/api/overlay/admin/overlays/${form.get("id")}`, { method: "DELETE" });
+      notice = "Revoked. That address stops working immediately.";
+    }
+  }
+}
+
+const counters = (await asAdmin(Astro, "/api/overlay/admin/counters")).body ?? [];
+const overlays = (await asAdmin(Astro, "/api/overlay/admin/overlays")).body ?? [];
+
+const SYMBOL: Record<string, string> = { eur: "€", gbp: "£", usd: "$" };
+const show = (c: any, v: number) =>
+  c.unit === "money" ? `${SYMBOL[c.currency] ?? ""}${(v / 100).toFixed(0)}` : String(v);
+const nameOf = (id: number | null) =>
+  counters.find((c: any) => c.id === id)?.name ?? "—";
+---
+
+<AdminLayout title="Counters">
+  <div class="cn">
+    <h1>Counters</h1>
+    <p class="lede">
+      A target, a unit, and what feeds it. The same object counts euros and
+      people — “€300 for a microphone” and “20 on the December workshop” differ
+      only in the unit.
+    </p>
+    {notice && <p class="ok">{notice}</p>}
+    {failed && <p class="bad">{failed}</p>}
+
+    {minted && (
+      <section class="minted">
+        <p class="ov-once">Add this as a Browser Source in OBS, 1920 × 1080.</p>
+        <input class="url" type="text" readonly value={minted} onclick="this.select()" />
+        <p class="fine">
+          <strong>This is the only time it is shown.</strong> Nothing here can
+          retrieve it again — not by design accident but on purpose, because
+          this page gets screen-shared. If it goes missing, make another
+          overlay and paste the new address in; it costs nothing.
+        </p>
+      </section>
+    )}
+
+    <section class="block">
+      <h2>What is being counted</h2>
+      {counters.length === 0 ? (
+        <p class="fine">None yet. The form below makes one.</p>
+      ) : (
+        <ul class="list">
+          {counters.map((c: any) => (
+            <li>
+              <div>
+                <p class="nm">{c.name}</p>
+                <p class="fine">
+                  {c.note || "no note"} · {c.sources.length} source{c.sources.length === 1 ? "" : "s"}
+                  {c.sources.length === 0 && " — nothing will ever count toward it"}
+                </p>
+              </div>
+              <span class="fig t-tabular">
+                {show(c, c.current)} / {show(c, c.target)}
+                {c.unit !== "money" && ` ${c.unit}`}
+              </span>
+              <form method="POST">
+                <CsrfField />
+                <input type="hidden" name="action" value="delete-counter" />
+                <input type="hidden" name="id" value={c.id} />
+                <button class="rm" type="submit">Remove</button>
+              </form>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+
+    <section class="block">
+      <h2>Make a counter</h2>
+      <form method="POST" class="grid">
+        <CsrfField />
+        <input type="hidden" name="action" value="new-counter" />
+        <label class="wide"><span>Name — your words</span>
+          <input name="name" required maxlength="120" placeholder="A new microphone" /></label>
+        <label class="wide"><span>One line under it</span>
+          <input name="note" maxlength="200" placeholder="for cleaner streams" /></label>
+        <label><span>Unit</span>
+          <select name="unit">
+            <option value="money">Money</option>
+            <option value="people">People</option>
+            <option value="bits">Bits</option>
+            <option value="subs">Subscriptions</option>
+          </select></label>
+        <label><span>Target</span>
+          <input name="target" required inputmode="decimal" placeholder="300" />
+          <em class="fine">Money in whole euros. Everything else a plain count.</em></label>
+        <fieldset class="wide srcs">
+          <legend>What counts toward it</legend>
+          {SOURCES.map(([v, label, kind]) => (
+            <label class="chk">
+              <input type="checkbox" name="sources" value={v} />
+              <span>{label} <em>{kind}</em></span>
+            </label>
+          ))}
+          <p class="fine">
+            YouTube memberships are <strong>not listed and cannot be</strong> —
+            the API is gated behind a Google partner relationship. Super Chats
+            are unaffected.
+          </p>
+        </fieldset>
+        <div class="wide"><Button type="submit">Make it</Button></div>
+      </form>
+    </section>
+
+    <section class="block">
+      <h2>Overlays</h2>
+      <p class="fine">
+        Each is a separate Browser Source. Add only the ones you want; none
+        depends on another being present.
+      </p>
+      {overlays.length > 0 && (
+        <ul class="list">
+          {overlays.map((o: any) => (
+            <li>
+              <div>
+                <p class="nm">{o.label || o.kind}</p>
+                <p class="fine">
+                  {o.kind} · {o.appearance} · motion {o.motion}
+                  {o.counterId && ` · ${nameOf(o.counterId)}`}
+                  {o.lastSeen ? ` · last seen ${new Date(o.lastSeen).toLocaleString("en-GB", { dateStyle: "short", timeStyle: "short" })}` : " · never opened"}
+                </p>
+              </div>
+              <span class="fig t-tabular">••••••••</span>
+              <form method="POST">
+                <CsrfField />
+                <input type="hidden" name="action" value="revoke" />
+                <input type="hidden" name="id" value={o.id} />
+                <button class="rm" type="submit">Revoke</button>
+              </form>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <form method="POST" class="grid">
+        <CsrfField />
+        <input type="hidden" name="action" value="new-overlay" />
+        <label><span>Surface</span>
+          <select name="kind"><option value="counter">Counter bar</option></select></label>
+        <label><span>Size</span>
+          <select name="size">
+            <option value="wide">Wide — 1360px</option>
+            <option value="compact">Compact — 620px</option>
+          </select></label>
+        <label><span>Which counter</span>
+          <select name="counter_id">
+            <option value="">— none yet —</option>
+            {counters.map((c: any) => <option value={c.id}>{c.name}</option>)}
+          </select></label>
+        <label><span>Appearance</span>
+          <select name="appearance">
+            <option value="almanac">Almanac</option>
+            <option value="grimoire">Grimoire</option>
+          </select></label>
+        <label><span>Motion</span>
+          <select name="motion">
+            <option value="reduced">Reduced — everyday</option>
+            <option value="full">Full — the strong machine</option>
+            <option value="still">Still — no animation</option>
+          </select></label>
+        <label><span>Label, for you</span>
+          <input name="label" maxlength="80" placeholder="Main scene" /></label>
+        <div class="wide"><Button type="submit">Make an overlay</Button></div>
+      </form>
+    </section>
+  </div>
+</AdminLayout>
+
+<style>
+  .cn { display: grid; gap: var(--space-5); max-width: 78ch; }
+  .cn h1 { font: 500 var(--text-h1) var(--font-display); color: var(--ink); margin: 0; }
+  .cn h2 { font: 600 var(--text-h3) var(--font-display); color: var(--ink); margin: 0; }
+  .lede { font: 400 var(--text-body) / var(--leading-body) var(--font-body); color: var(--ink-soft); margin: 0; }
+  .ok { font: 400 var(--text-sm) var(--font-body); color: var(--accent); margin: 0; }
+  .bad { font: 400 var(--text-sm) var(--font-body); color: var(--live); margin: 0; }
+  .fine { font: 400 var(--text-xs) / 1.7 var(--font-body); color: var(--ink-faint); margin: 0; }
+
+  .block { display: grid; gap: 12px; padding: 18px 20px;
+    background: var(--surface-card); border: var(--border-w) solid var(--line);
+    border-radius: var(--radius-md); }
+
+  .minted { display: grid; gap: 10px; padding: 18px 20px;
+    background: var(--rose-wash); border: var(--border-w) solid var(--rose);
+    border-left-width: 3px; border-radius: var(--radius-md); }
+  .ov-once { font: 600 var(--text-sm) var(--font-body); color: var(--ink); margin: 0; }
+  .url { font: 400 var(--text-xs) var(--font-mono); color: var(--ink);
+    background: var(--surface-card); border: var(--border-w) solid var(--line);
+    border-radius: var(--radius-sm); padding: 10px 12px; width: 100%; box-sizing: border-box; }
+
+  .list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+  .list li { display: grid; grid-template-columns: 1fr auto auto; gap: 14px; align-items: center;
+    padding: 11px 14px; background: var(--surface-inset);
+    border: var(--border-w) solid var(--line); border-radius: var(--radius-sm); }
+  .nm { font: 600 var(--text-sm) var(--font-body); color: var(--ink); margin: 0; }
+  .fig { font: 500 var(--text-sm) var(--font-mono); color: var(--accent); white-space: nowrap; }
+  .rm { cursor: pointer; background: none; border: none; padding: 0;
+    font: 400 var(--text-micro) var(--font-body); color: var(--ink-faint); }
+  .rm:hover { color: var(--live); }
+
+  .grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 190px), 1fr)); }
+  .grid label { display: grid; gap: 4px; }
+  .wide { grid-column: 1 / -1; }
+  .grid span { font: 600 var(--text-micro) var(--font-body); text-transform: uppercase;
+    letter-spacing: var(--tracking-eyebrow); color: var(--ink-faint); }
+  .grid input, .grid select {
+    font: 400 var(--text-sm) var(--font-body); color: var(--ink);
+    background: var(--surface-page); border: var(--border-w) solid var(--line);
+    border-radius: var(--radius-sm); padding: 9px 10px; min-height: 42px;
+    width: 100%; box-sizing: border-box; }
+  .srcs { border: var(--border-w) solid var(--line); border-radius: var(--radius-sm);
+    padding: 12px 14px; display: grid; gap: 7px; margin: 0; }
+  .srcs legend { font: 600 var(--text-micro) var(--font-body); text-transform: uppercase;
+    letter-spacing: var(--tracking-eyebrow); color: var(--ink-faint); padding: 0 4px; }
+  .chk { display: flex !important; gap: 9px; align-items: center; }
+  .chk input { width: auto; min-height: 0; }
+  .chk span { font: 400 var(--text-sm) var(--font-body); text-transform: none;
+    letter-spacing: 0; color: var(--ink); }
+  .chk em { font: 400 var(--text-micro) var(--font-mono); font-style: normal; color: var(--ink-faint); }
+</style>

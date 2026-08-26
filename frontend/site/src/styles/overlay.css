@@ -1,0 +1,101 @@
+/* The shared ground every overlay stands on.
+ *
+ * Not the site's stylesheet. An overlay is composited over video by OBS, and
+ * almost every assumption a web page makes is wrong here — there is no
+ * background, no viewport to be responsive to, no reader preference to honour,
+ * and no second chance if a font arrives late.
+ */
+
+/* Transparent, and it must stay that way. OBS composites the page over her
+   video; anything painted here that is not a deliberate plate becomes a
+   rectangle over her face. */
+html, body {
+  margin: 0;
+  padding: 0;
+  background: transparent !important;
+  overflow: hidden;              /* a scrollbar on a stream is a visible bug */
+  width: 1920px;
+  height: 1080px;
+}
+
+/* Authored at 1920x1080 and rendered 1:1. OBS scales the browser source itself
+   for a 1440p scene, so no viewport units, no media queries and no rem —
+   every length here is a pixel, on purpose. */
+.ov {
+  position: relative;
+  width: 1920px;
+  height: 1080px;
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Grimoire re-points the ramp and nothing else. Sizes, positions, hierarchy,
+   hold durations and every state are identical — there is no second set of
+   markup to keep in step, and forking the components per appearance is the one
+   thing this design must not become. */
+.ov[data-skin="grimoire"] {
+  --dusk-card: #241B33;
+  --dusk-veil: #332545;
+  --dusk-inset: #170F22;
+  --dusk-line: #42314F;
+  --dusk-line-strong: #61476C;
+  --dusk-ink: #F3E9F3;
+  --dusk-ink-soft: #C8B4CB;
+  --dusk-ink-faint: #9C87A4;
+  --dusk-accent: #DDB6C9;
+  --dusk-rose: #B98BC6;
+  --dusk-horizon-line: #8A6880;
+}
+
+/* THE PLATE — the thing that makes any of this legible.
+ *
+ * A drop shadow under bare text dies over a white editor. An EDGE does not:
+ * 94% opacity, a hairline, and a soft cast shadow, so the boundary survives
+ * whatever is behind it — her face, a bright window, a page of white code. */
+.ov-plate {
+  background: color-mix(in srgb, var(--dusk-card) 94%, transparent);
+  border: 1px solid var(--dusk-line);
+  border-radius: 10px;
+  box-shadow: 0 12px 34px rgba(6, 9, 18, .5);
+  color: var(--dusk-ink);
+  box-sizing: border-box;
+}
+
+.ov-eyebrow {
+  font: 600 12px var(--font-body);
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--dusk-ink-faint);
+}
+
+/* Every figure is tabular. A total that shifts sideways as it counts up is the
+   cheapest possible way to look unfinished. */
+.ov-fig {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.ov-name {
+  font: 500 26px var(--font-display);
+  color: var(--dusk-ink);
+}
+
+/* One line, always. Ellipsis at the plate edge rather than wrapping, shrinking
+   the type, or pushing the amount out of its slot. */
+.ov-oneline {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+/* Motion is a per-overlay setting because she streams from more than one
+   machine. Still is not a degraded mode — it is the weaker machine and a bad
+   night, and every surface must be complete and legible in it. */
+.ov[data-motion="still"] * {
+  transition: none !important;
+  animation: none !important;
+}
+
+/* An idle overlay composes no frames. There is no ambient loop at any level in
+   this file; anything that moves does so because something happened. */

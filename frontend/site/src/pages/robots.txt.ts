@@ -77,6 +77,8 @@ Disallow: /account
 Disallow: /signin
 Disallow: /signup
 Disallow: /api/
+# Overlays are token-addressed pages for OBS, not for readers.
+Disallow: /overlay/
 Allow: /api/charts/compare/
 Allow: /api/charts/invite/
 
