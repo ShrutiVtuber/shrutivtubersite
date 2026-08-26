@@ -18,7 +18,8 @@ from sqlmodel import select
 
 from shruti.core.db import get_session
 from shruti.models import (
-    Credit, FanArt, Media, ProfileField, Project, Section, SocialLink, Sponsor,
+    Credit, FanArt, Media, Outfit, ProfileField, Project, Section, SocialLink,
+    Sponsor,
 )
 
 router = APIRouter(prefix="/api/content", tags=["content"])
@@ -203,6 +204,27 @@ async def _sponsor_rows(session: AsyncSession):
             .order_by(Sponsor.position, Sponsor.id)
         )
     ).all()
+
+
+@router.get("/outfits")
+async def get_outfits(session: AsyncSession = Depends(get_session)) -> list[dict]:
+    """The costumes, in her order. The artist travels with the art."""
+    rows = (
+        await session.execute(
+            select(Outfit, Media)
+            .join(Media, Outfit.media_id == Media.id, isouter=True)
+            .where(Outfit.visible.is_(True))
+            .order_by(Outfit.position, Outfit.id)
+        )
+    ).all()
+    return [
+        {
+            "slug": o.slug, "name": o.name, "status": o.status, "note": o.note,
+            "artist": o.artist, "artistUrl": o.artist_url,
+            "media": _media_payload(m),
+        }
+        for o, m in rows
+    ]
 
 
 @router.get("/sponsors")

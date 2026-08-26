@@ -53,6 +53,10 @@ export const MEDIA_USE: Record<string, { label: string; where: string } | { unus
   // one. The column exists, so the day a tool page wants an illustration this
   // is one line — but until then, saying so beats a control that does nothing.
   tools: { unused: true },
+  outfits: {
+    label: "The costume",
+    where: "Shown in the Outfits row on the About page. The whole piece, not a crop — a costume cropped to a square is the artist's work mishandled.",
+  },
   sponsors: {
     label: "Logo",
     where: "Their mark, on the landing-page card and on the Partners page. Give it room — a logo cropped to a square is somebody's brand mishandled.",
@@ -124,6 +128,30 @@ export const FIELDS: Record<string, Record<string, FieldSpec>> = {
     contributors: {
       label: "Contributors", group: "Details",
       help: "Names besides yours, if any.",
+    },
+    slug: COMMON.slug,
+  },
+
+  outfits: {
+    name: { label: "What it is", group: "Content", placeholder: "Festival outfit" },
+    status: {
+      label: "Where it is up to", group: "Content",
+      placeholder: "in progress",
+      help: "Free text — \u201cin progress\u201d, \u201cplanned\u201d, \u201cretired\u201d, \u201cwinter only\u201d. Shown under the name. Blank shows nothing.",
+    },
+    note: {
+      label: "A line about it", group: "Content",
+      help: "Optional. What it is for, or when it comes out.",
+    },
+    media_id: { label: "The costume", type: "media", group: "Image" },
+    artist: {
+      label: "Who drew it", group: "Credit",
+      help: "Commissioned art gets its name on it. Blank means no credit is shown \u2014 which should only be true while there is no art yet.",
+    },
+    artist_url: {
+      label: "Their page", type: "url", group: "Credit",
+      placeholder: "https://\u2026",
+      help: "Makes the credit a link. Worth asking them for.",
     },
     slug: COMMON.slug,
   },

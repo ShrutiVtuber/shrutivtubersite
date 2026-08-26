@@ -185,6 +185,41 @@ class Project(TimestampMixin, table=True):
     media_id: Optional[int] = Field(default=None, foreign_key="media.id")
 
 
+class Outfit(TimestampMixin, table=True):
+    """
+    A costume, and who drew it.
+
+    The About page shipped this as three hard-coded slots — "base model",
+    "festival outfit", "dev-stream hoodie", all with no image and a badge
+    reading "3 commissions open". That is the design bundle's mock-up, and it
+    meant she could not add a fourth, could not upload art she had paid for,
+    and could not stop the page claiming three commissions were open.
+
+    **The artist is a column, not a note.** Costume art is commissioned work
+    and the person who drew it gets their name on it — the same rule the fan
+    works gallery follows, for the same reason.
+    """
+
+    __tablename__ = "outfit"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    slug: str = Field(index=True, unique=True)
+    name: str = ""
+    # "in progress", "planned", "retired", or whatever she wants to say. Free
+    # text because a fixed list would be wrong the first time a costume is
+    # seasonal.
+    status: str = ""
+    note: str = ""
+
+    artist: str = ""
+    artist_url: str = ""
+
+    media_id: Optional[int] = Field(default=None, foreign_key="media.id")
+
+    position: int = Field(default=0)
+    visible: bool = Field(default=True)
+
+
 class Sponsor(TimestampMixin, table=True):
     """
     Somebody paying to keep the channel running, and owed a proper place.

@@ -92,9 +92,21 @@ def sync(product: Any, *, interval: str = "") -> tuple[str, str]:
             log.info("price %s could not be read; making a product",
                      product.stripe_price_id)
 
+    stripe_product = None
     if product_id:
-        stripe_product = stripe.Product.modify(product_id, **payload)
-    else:
+        try:
+            stripe_product = stripe.Product.modify(product_id, **payload)
+        except Exception:                              # noqa: BLE001
+            # **This is what switching from test keys to live keys looks like.**
+            # Every id stored here was minted in the other mode and does not
+            # exist in this one, so modify fails on a perfectly valid row.
+            # Making a new product is the correct answer to "the thing this
+            # points at is not there" — the alternative is a 500 on save and a
+            # shop that cannot be published on the day it goes live.
+            log.info("product %s is not in this Stripe account or mode; creating",
+                     product_id)
+            product_id = ""
+    if stripe_product is None:
         stripe_product = stripe.Product.create(**payload)
 
     price_id = product.stripe_price_id

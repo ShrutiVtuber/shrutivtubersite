@@ -32,7 +32,7 @@ from shruti.core.db import get_session
 from shruti.models.accounts import User
 from shruti.models import (BannedEmail, Course, FanArt, Product, ProductPhoto, 
     ContactMessage, Credit, Media, ProfileField, Project, Question,
-    ScheduleEntry, Section, SocialLink, Sponsor, Tool,
+    Outfit, ScheduleEntry, Section, SocialLink, Sponsor, Tool,
 )
 
 log = logging.getLogger(__name__)
@@ -49,6 +49,7 @@ EDITABLE: dict[str, type[SQLModel]] = {
     "schedule": ScheduleEntry,
     "fan-art": FanArt,
     "sponsors": Sponsor,
+    "outfits": Outfit,
 }
 
 ALLOWED_IMAGE = {
@@ -475,6 +476,7 @@ MEDIA_USERS: tuple[tuple[type, str], ...] = (
     (ProductPhoto, "product photograph"),
     (Course, "class or workshop"),
     (Sponsor, "sponsor"),
+    (Outfit, "outfit"),
 )
 
 

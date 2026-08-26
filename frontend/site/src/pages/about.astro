@@ -20,9 +20,12 @@ import FanArtCard from "../components/cards/FanArtCard.astro";
 import EmptyState from "../components/feedback/EmptyState.astro";
 import Badge from "../components/navigation/Badge.astro";
 import { pageSections, profile } from "../lib/content";
+import { site } from "../lib/api";
 
 const [sections, who] = await Promise.all([pageSections("about"), profile()]);
 const fields = who?.fields ?? [];
+/* The costumes, from the database rather than from the markup. */
+const outfits = (await site<any[]>("/api/content/outfits")) ?? [];
 const credits = (who?.credits ?? []).map((c) => ({
   role: c.role, name: c.name, href: c.url, note: c.note,
 }));
@@ -101,22 +104,38 @@ const credits = (who?.credits ?? []).map((c) => ({
       </div>
     </div>
 
-    <section class="section costumes">
-      <div class="section-head">
-        <SectionHeader
-          glyph="✶"
-          eyebrow="Costumes"
-          title="Outfits"
-          body="Art arrives incrementally — empty slots are part of the design."
-        />
-        <Badge tone="rose">3 commissions open</Badge>
-      </div>
-      <div class="grid-3">
-        <FanArtCard image={null} artist="base model" platform="in progress" />
-        <FanArtCard image={null} artist="festival outfit" platform="planned" />
-        <FanArtCard image={null} artist="dev-stream hoodie" platform="planned" />
-      </div>
-    </section>
+      {
+        /* Was three hard-coded slots with no images and a badge claiming three
+           commissions were open — the design bundle's mock-up, shipped. She
+           could not add a fourth, could not upload art she had paid for, and
+           could not stop the page making a claim about commissions.
+
+           Absent entirely when there are none: an empty costume row says
+           nothing a reader wants and invites a placeholder later. */
+        outfits.length > 0 && (
+          <section class="section costumes">
+            <div class="section-head">
+              <SectionHeader
+                glyph="✶"
+                eyebrow="Costumes"
+                title="Outfits"
+                body="Commissioned work. Every one names the artist who drew it."
+              />
+            </div>
+            <div class="grid-3">
+              {outfits.map((o) => (
+                <FanArtCard
+                  image={o.media?.url ?? null}
+                  artist={o.artist || o.name}
+                  platform={o.status || undefined}
+                  artistHref={o.artistUrl || undefined}
+                  title={o.name}
+                />
+              ))}
+            </div>
+          </section>
+        )
+      }
   </div>
 </BaseLayout>
 

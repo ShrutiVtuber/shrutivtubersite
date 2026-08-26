@@ -53,5 +53,6 @@ export const KINDS = [
   { kind: "schedule", label: "Schedule", singular: "stream" },
   { kind: "fan-art", label: "Fan works", singular: "piece" },
   { kind: "tools", label: "Tools", singular: "tool" },
+  { kind: "outfits", label: "Outfits", singular: "outfit" },
   { kind: "sponsors", label: "Sponsors", singular: "sponsor" },
 ] as const;
