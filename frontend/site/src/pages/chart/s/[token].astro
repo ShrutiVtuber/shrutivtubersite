@@ -19,10 +19,51 @@ import SectionHeader from "../../../components/brand/SectionHeader.astro";
 import ChartFigure from "../../../components/chart/ChartFigure.astro";
 import EmptyState from "../../../components/feedback/EmptyState.astro";
 import { site } from "../../../lib/api";
+import { asReader } from "../../../lib/account";
+import { verifyCsrf } from "../../../lib/csrf";
+import CsrfField from "../../../components/forms/CsrfField.astro";
+import Button from "../../../components/forms/Button.astro";
 
 export const prerender = false;
 
 const token = Astro.params.token ?? "";
+let compareFailed = "";
+
+/* Comparing what somebody sent you against your own is the thing this feature
+   is FOR, and the visitor holds a share token rather than an owner token. The
+   API accepts either on the right-hand side and neither lets the holder act as
+   an owner — see `_chart_by_any`. */
+if (Astro.request.method === "POST") {
+  const form = await Astro.request.formData();
+  if (!verifyCsrf(Astro.cookies, form)) {
+    compareFailed = "That did not go through. Reload and try again.";
+  } else {
+    const mine = String(form.get("mine") ?? "").trim();
+    if (!mine) {
+      compareFailed = "Paste the address of one of your own kept charts first.";
+    } else {
+      /* They paste a URL, because that is what they have. Take the last path
+         segment and let the API decide whether it is a real token. */
+      const theirToken = mine.split("?")[0].replace(/\/$/, "").split("/").pop() ?? "";
+      const made = await asReader(Astro, "/api/charts/compare", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          left: theirToken,
+          right: token,
+          label: String(form.get("label") ?? ""),
+          consent: form.get("consent") === "1",
+        }),
+      });
+      if (made.ok && made.body?.ownerToken) {
+        return Astro.redirect(`/chart/compare/${made.body.ownerToken}`, 303);
+      }
+      compareFailed = made.status === 404
+        ? "That address did not match a chart you have kept."
+        : made.body?.detail ?? "The comparison could not be made.";
+    }
+  }
+}
 const c = await site<any>(`/api/charts/s/${token}`).catch(() => null);
 
 const TRADITION = { hellenistic: "Hellenistic", vedic: "Vedic" };
@@ -83,6 +124,35 @@ const FIGURE = { wheel: "a wheel", north: "a North Indian square", south: "a Sou
             from them.
           </p>
 
+          <section class="yours compare-with">
+            <h2>Compare it with yours</h2>
+            <p class="fine">
+              If you have kept a chart of your own, paste its address and this
+              will read the two against each other — and give you somewhere to
+              write what you make of it.
+            </p>
+            {compareFailed && <p class="c-bad">{compareFailed}</p>}
+            <form method="POST" class="c-form">
+              <CsrfField />
+              <label>
+                <span class="c-lbl">The address of your kept chart</span>
+                <input class="c-in" name="mine" placeholder="https://shrutivtuber.com/chart/…" />
+              </label>
+              <label>
+                <span class="c-lbl">Call the comparison something</span>
+                <input class="c-in" name="label" maxlength="80" placeholder="Us" />
+              </label>
+              <label class="c-consent">
+                <input type="checkbox" name="consent" value="1" />
+                <span>
+                  Keeping a comparison keeps a pointer at both birth moments.
+                  Deleting either chart deletes it.
+                </span>
+              </label>
+              <div><Button type="submit" data-track="comparison:made">Compare them</Button></div>
+            </form>
+          </section>
+
           <section class="yours">
             <h2>Cast your own</h2>
             <p class="fine">
@@ -129,4 +199,21 @@ const FIGURE = { wheel: "a wheel", north: "a North Indian square", south: "a Sou
     border-radius: var(--radius-md);
   }
   .yours h2 { font: 600 var(--text-h4) var(--font-display); color: var(--ink); margin: 0; }
+  .compare-with { text-align: left; justify-items: start; }
+  .c-form { display: grid; gap: var(--space-3); width: 100%; max-width: 46ch; text-align: left; }
+  .c-form label { display: grid; gap: 6px; }
+  .c-lbl {
+    font: 600 var(--text-micro) var(--font-body); letter-spacing: var(--tracking-eyebrow);
+    text-transform: uppercase; color: var(--ink-faint);
+  }
+  .c-in {
+    font: 400 var(--text-sm) var(--font-body); color: var(--ink);
+    background: var(--surface-page); border: var(--border-w) solid var(--line);
+    border-radius: var(--radius-sm); padding: 8px 10px; min-height: 40px;
+    width: 100%; box-sizing: border-box;
+  }
+  .c-consent { display: flex; gap: 10px; align-items: flex-start; }
+  .c-consent span { font: 400 var(--text-sm) / 1.6 var(--font-body); color: var(--ink-soft); }
+  .c-consent input { margin-top: 4px; flex: none; }
+  .c-bad { font: 400 var(--text-sm) var(--font-body); color: var(--live); margin: 0; }
 </style>

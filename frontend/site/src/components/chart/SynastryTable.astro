@@ -1,0 +1,140 @@
+---
+/* What two charts do to each other.
+ *
+ * **Only cross-chart configurations.** Each chart's own internal aspects are
+ * already on its own page, and including them here would bury the twenty lines
+ * somebody came to read under ninety they can get elsewhere.
+ *
+ * Both readings are shown because they answer different questions and the
+ * tradition does not agree with itself about which is primary: whole-sign says
+ * whether a configuration exists at all, degrees say how close it is and
+ * whether it is still closing. Neither is presented as the correct one.
+ */
+interface Cross {
+  from: string; to: string; aspect: string;
+  separationSigns?: number | null; orb?: number | null; applying?: boolean | null;
+}
+interface Props {
+  bySign: Cross[];
+  byDegree: Cross[];
+  undefined?: string[];
+  leftName: string;
+  rightName: string;
+}
+const { bySign, byDegree, undefined: undef = [], leftName, rightName } = Astro.props;
+
+/* "A Sun" and "B Moon" come back prefixed so the daemon can tell the charts
+   apart. A reader wants the names they gave. */
+const named = (raw: string) =>
+  raw.startsWith("A ") ? [leftName, raw.slice(2)] : [rightName, raw.slice(2)];
+---
+
+<div class="syn">
+  {
+    undef.length > 0 && (
+      <p class="syn-undef">
+        ◐ {undef.join(". ")}. Configurations to them are withheld rather than
+        computed from an assumed noon — an invented ascendant reads exactly as
+        confidently as a real one.
+      </p>
+    )
+  }
+
+  <section class="syn-block">
+    <h3>By degree</h3>
+    <p class="syn-note">
+      Within orb, and whether the faster body is still closing. The tighter the
+      orb, the louder the tradition considers it.
+    </p>
+    {
+      byDegree.length === 0 ? (
+        <p class="syn-none">Nothing within orb. That is an answer, not a gap.</p>
+      ) : (
+        <ul class="syn-list">
+          {byDegree.map((c) => {
+            const [whoA, bodyA] = named(c.from);
+            const [whoB, bodyB] = named(c.to);
+            return (
+              <li>
+                <span class="syn-pair">
+                  <span class="syn-who">{whoA}</span> {bodyA}
+                  <span class="syn-arrow"> — </span>
+                  <span class="syn-who">{whoB}</span> {bodyB}
+                </span>
+                <span class="syn-aspect">{c.aspect}</span>
+                <span class="syn-orb t-tabular">
+                  {c.orb != null ? `${c.orb.toFixed(2)}°` : ""}
+                  {c.applying && <span class="syn-apply"> applying</span>}
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      )
+    }
+  </section>
+
+  <section class="syn-block">
+    <h3>By sign</h3>
+    <p class="syn-note">
+      Whole-sign, the Hellenistic definition: two bodies are configured if their
+      signs are the right distance apart, and the degrees do not enter into it.
+      A longer list than the one above, by design.
+    </p>
+    {
+      bySign.length === 0 ? (
+        <p class="syn-none">No whole-sign configurations at all, which is rare.</p>
+      ) : (
+        <ul class="syn-list syn-terse">
+          {bySign.map((c) => {
+            const [whoA, bodyA] = named(c.from);
+            const [whoB, bodyB] = named(c.to);
+            return (
+              <li>
+                <span class="syn-pair">
+                  <span class="syn-who">{whoA}</span> {bodyA}
+                  <span class="syn-arrow"> — </span>
+                  <span class="syn-who">{whoB}</span> {bodyB}
+                </span>
+                <span class="syn-aspect">{c.aspect}</span>
+                <span class="syn-orb t-tabular">
+                  {c.separationSigns != null ? `${c.separationSigns} signs` : ""}
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      )
+    }
+  </section>
+</div>
+
+<style>
+  .syn { display: grid; gap: var(--space-6); }
+  .syn-block h3 { font: 600 var(--text-h4) var(--font-display); color: var(--ink); margin: 0 0 6px; }
+  .syn-note { font: 400 var(--text-sm) / 1.7 var(--font-body); color: var(--ink-soft); margin: 0 0 var(--space-4); max-width: 62ch; }
+  .syn-none { font: 400 var(--text-sm) var(--font-body); color: var(--ink-faint); margin: 0; }
+  .syn-undef {
+    font: 400 var(--text-sm) / 1.7 var(--font-body); color: var(--ink); margin: 0;
+    max-width: 64ch; border-left: 2px solid var(--rose); padding-left: var(--space-3);
+  }
+
+  .syn-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+  .syn-list li {
+    display: grid; grid-template-columns: minmax(0, 1fr) auto auto;
+    gap: var(--space-3); align-items: baseline;
+    padding-bottom: 6px; border-bottom: var(--border-w) solid var(--line);
+  }
+  .syn-pair { font: 400 var(--text-sm) var(--font-body); color: var(--ink); }
+  .syn-who { font-weight: 600; }
+  .syn-arrow { color: var(--ink-faint); }
+  .syn-aspect { font: 400 var(--text-sm) var(--font-body); color: var(--ink-soft); }
+  .syn-orb { font: 400 var(--text-xs) var(--font-body); color: var(--ink-faint); white-space: nowrap; }
+  .syn-apply { color: var(--accent); }
+  .syn-terse li { border-bottom-color: transparent; padding-bottom: 2px; }
+
+  @media (max-width: 640px) {
+    .syn-list li { grid-template-columns: 1fr auto; }
+    .syn-orb { grid-column: 1 / -1; }
+  }
+</style>

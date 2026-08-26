@@ -1,0 +1,127 @@
+---
+/* A comparison somebody chose to show you.
+ *
+ * The reading leads, because that is what they made. The configurations are
+ * underneath it, as the working.
+ *
+ * Neither birth place is printed. The same honest limit applies as on a shared
+ * chart — a figure is birth data drawn — and here it applies to TWO people,
+ * only one of whom pressed the share button. That is said on the owner's page
+ * before the link is made rather than buried here.
+ */
+import BaseLayout from "../../../../layouts/BaseLayout.astro";
+import SectionHeader from "../../../../components/brand/SectionHeader.astro";
+import SynastryTable from "../../../../components/chart/SynastryTable.astro";
+import ChartFigure from "../../../../components/chart/ChartFigure.astro";
+import EmptyState from "../../../../components/feedback/EmptyState.astro";
+import Prose from "../../../../components/content/Prose.astro";
+import { site, askAstro } from "../../../../lib/api";
+import { renderMarkdown } from "../../../../lib/markdown";
+
+export const prerender = false;
+
+const token = Astro.params.token ?? "";
+const c = await site<any>(`/api/charts/compare/s/${token}`).catch(() => null);
+
+const moment = (s: any) =>
+  `${s.birthDate}T${s.timeUnknown ? "12:00" : s.birthTime || "12:00"}:00`;
+
+const cross = c
+  ? await askAstro<any>(
+      `/synastry?when_a=${encodeURIComponent(moment(c.left))}&lat_a=${c.left.lat}&lon_a=${c.left.lon}` +
+      `&when_b=${encodeURIComponent(moment(c.right))}&lat_b=${c.right.lat}&lon_b=${c.right.lon}` +
+      `&tradition=${c.tradition}&orb=${c.orb}` +
+      `&time_unknown_a=${c.left.timeUnknown}&time_unknown_b=${c.right.timeUnknown}`,
+    )
+  : null;
+const d = cross?.data ?? null;
+const readingHtml = c?.readingMd ? await renderMarkdown(c.readingMd) : "";
+const leftName = c?.left?.label || "The first";
+const rightName = c?.right?.label || "The second";
+---
+
+<BaseLayout title="A comparison — Shruti" description="Two charts, read against each other." noindex>
+  <div class="page shared-compare">
+    {
+      !c ? (
+        <EmptyState
+          glyph="○"
+          title="There is nothing at this address"
+          body="The link may be mistyped, the person who made it may have taken it back, or one of the two charts may have been deleted."
+        />
+      ) : (
+        <>
+          <SectionHeader as="h1" glyph="✶" eyebrow="Shared with you" title={c.label || "Two charts"} />
+
+          {
+            readingHtml && (
+              <section class="reading">
+                <Prose html={readingHtml} />
+              </section>
+            )
+          }
+
+          <div class="two-up">
+            {[c.left, c.right].map((s: any, i: number) => (
+              <figure class="side">
+                <figcaption>{i === 0 ? leftName : rightName}</figcaption>
+                <ChartFigure
+                  date={s.birthDate} time={s.birthTime} timeUnknown={s.timeUnknown}
+                  lat={s.lat} lon={s.lon} tradition={s.tradition} figure={s.figure}
+                />
+              </figure>
+            ))}
+          </div>
+
+          {d && (
+            <SynastryTable
+              bySign={d.bySign} byDegree={d.byDegree} undefined={d.undefined}
+              leftName={leftName} rightName={rightName}
+            />
+          )}
+
+          <p class="fine">
+            Neither birth place is shown — the person who shared this kept those.
+          </p>
+
+          <section class="yours">
+            <h2>Compare your own</h2>
+            <p class="fine">
+              The same instrument, free, no account needed. It says what it
+              cannot compute rather than guessing — an unknown birth time leaves
+              the angles undefined instead of inventing them.
+            </p>
+            <p>
+              <a class="sh-btn" data-variant="primary" data-size="md"
+                 href="/tools/natal-chart" data-track="chart:from-comparison">
+                <span>Cast a chart</span>
+              </a>
+            </p>
+          </section>
+        </>
+      )
+    }
+  </div>
+</BaseLayout>
+
+<style>
+  .shared-compare { max-width: 860px; display: grid; gap: var(--space-6); }
+  .reading {
+    padding: var(--space-5); background: var(--surface-card);
+    border: var(--border-w) solid var(--line); border-radius: var(--radius-md);
+  }
+  .two-up { display: grid; gap: var(--space-5); grid-template-columns: 1fr 1fr; }
+  .side { margin: 0; display: grid; gap: 10px; justify-items: center; min-width: 0; }
+  .side figcaption {
+    font: 600 var(--text-micro) var(--font-body); letter-spacing: var(--tracking-eyebrow);
+    text-transform: uppercase; color: var(--ink-faint);
+  }
+  .fine { font: 400 var(--text-sm) / 1.7 var(--font-body); color: var(--ink-soft); margin: 0; max-width: 60ch; }
+  .yours {
+    display: grid; gap: var(--space-3); justify-items: start;
+    padding: var(--space-5); background: var(--surface-veil);
+    border: var(--border-w) solid var(--line); border-radius: var(--radius-md);
+  }
+  .yours h2 { font: 600 var(--text-h4) var(--font-display); color: var(--ink); margin: 0; }
+  @media (max-width: 720px) { .two-up { grid-template-columns: 1fr; } }
+</style>

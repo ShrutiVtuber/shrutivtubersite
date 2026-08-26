@@ -345,6 +345,46 @@ class BannedEmail(TimestampMixin, table=True):
     hint: str = ""
 
 
+class Comparison(TimestampMixin, table=True):
+    """
+    Two kept charts, read against each other, and what somebody wrote about it.
+
+    **The reading is the point.** The aspects are arithmetic and this site
+    already computes them; what a person makes here is the paragraph they write
+    underneath. So the reading is a column on this row rather than an
+    afterthought, and it is what a share link is usually for.
+
+    Both sides are references to `SavedChart`, not copies of birth data. That
+    matters when somebody deletes a chart: the comparison should break rather
+    than quietly go on showing a moment its owner asked to be forgotten.
+
+    Two tokens again, for the reason set out on `SavedChart`: one to come back
+    to it, one to hand out, and unsharing must not lock the owner out.
+    """
+
+    __tablename__ = "comparison"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    owner_token: str = Field(index=True, unique=True)
+    share_token: Optional[str] = Field(default=None, index=True, unique=True)
+    user_id: Optional[int] = Field(default=None, foreign_key="site_user.id", index=True)
+
+    # The two charts. Referenced so that deleting one takes its data out of
+    # here too, rather than leaving a copy behind.
+    left_id: int = Field(foreign_key="saved_chart.id", index=True)
+    right_id: int = Field(foreign_key="saved_chart.id", index=True)
+
+    label: str = ""
+    # Theirs. Markdown-ish plain paragraphs, rendered the way a letter is.
+    reading_md: str = ""
+
+    tradition: str = "hellenistic"
+    orb: float = 6.0
+
+    shared_at: Optional[datetime] = Field(default=None, sa_type=UTC_TS)
+    expires_at: Optional[datetime] = Field(default=None, sa_type=UTC_TS)
+
+
 class SavedChart(TimestampMixin, table=True):
     """
     A chart somebody kept, with or without an account.

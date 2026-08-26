@@ -1,0 +1,259 @@
+---
+/* A comparison, and the reading somebody wrote under it.
+ *
+ * The aspects are arithmetic. What a person makes here is the paragraph, so
+ * the writing box is the widest thing on the page rather than a footnote, and
+ * sharing exists mostly to show it.
+ *
+ * Two tokens, as everywhere else in this corner of the site: this address is
+ * theirs, the share link is separate, and taking the share back does not lock
+ * them out of their own work.
+ */
+import BaseLayout from "../../../layouts/BaseLayout.astro";
+import SectionHeader from "../../../components/brand/SectionHeader.astro";
+import SynastryTable from "../../../components/chart/SynastryTable.astro";
+import ChartFigure from "../../../components/chart/ChartFigure.astro";
+import CsrfField from "../../../components/forms/CsrfField.astro";
+import Button from "../../../components/forms/Button.astro";
+import EmptyState from "../../../components/feedback/EmptyState.astro";
+import Prose from "../../../components/content/Prose.astro";
+import { asReader } from "../../../lib/account";
+import { SITE_URL, askAstro } from "../../../lib/api";
+import { verifyCsrf } from "../../../lib/csrf";
+import { renderMarkdown } from "../../../lib/markdown";
+
+export const prerender = false;
+
+const token = Astro.params.token ?? "";
+let notice = "";
+let failed = "";
+
+if (Astro.request.method === "POST") {
+  const form = await Astro.request.formData();
+  if (!verifyCsrf(Astro.cookies, form)) {
+    failed = "That did not save. Reload the page and try again.";
+  } else {
+    const action = String(form.get("action") ?? "");
+    if (action === "write") {
+      const r = await asReader(Astro, `/api/charts/compare/o/${token}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          label: String(form.get("label") ?? ""),
+          reading_md: String(form.get("reading_md") ?? ""),
+        }),
+      });
+      notice = r.ok ? "Saved." : "";
+      failed = r.ok ? "" : "That did not save.";
+    } else if (action === "share") {
+      const r = await asReader(Astro, `/api/charts/compare/o/${token}/share`, { method: "POST" });
+      notice = r.ok ? "There is a link to hand out now." : "";
+      failed = r.ok ? "" : "The link could not be made.";
+    } else if (action === "unshare") {
+      const r = await asReader(Astro, `/api/charts/compare/o/${token}/share`, { method: "DELETE" });
+      notice = r.ok ? "The link has been taken back." : "";
+      failed = r.ok ? "" : "That did not work.";
+    } else if (action === "forget") {
+      const r = await asReader(Astro, `/api/charts/compare/o/${token}`, { method: "DELETE" });
+      if (r.ok) return Astro.redirect("/tools/natal-chart", 303);
+      failed = "That could not be deleted.";
+    }
+  }
+}
+
+const call = await asReader(Astro, `/api/charts/compare/o/${token}`);
+const c = call.ok ? call.body : null;
+const gone = call.status === 404 || call.status === 410;
+
+const moment = (s: any) =>
+  `${s.birthDate}T${s.timeUnknown ? "12:00" : s.birthTime || "12:00"}:00`;
+
+const cross = c
+  ? await askAstro<any>(
+      `/synastry?when_a=${encodeURIComponent(moment(c.left))}&lat_a=${c.left.lat}&lon_a=${c.left.lon}` +
+      `&when_b=${encodeURIComponent(moment(c.right))}&lat_b=${c.right.lat}&lon_b=${c.right.lon}` +
+      `&tradition=${c.tradition}&orb=${c.orb}` +
+      `&time_unknown_a=${c.left.timeUnknown}&time_unknown_b=${c.right.timeUnknown}`,
+    )
+  : null;
+const d = cross?.data ?? null;
+
+const shareUrl = c?.shareToken ? `${SITE_URL}/chart/compare/s/${c.shareToken}` : "";
+const readingHtml = c?.readingMd ? await renderMarkdown(c.readingMd) : "";
+const leftName = c?.left?.label || "The first";
+const rightName = c?.right?.label || "The second";
+---
+
+<BaseLayout title="A comparison — Shruti" description="Two charts, read against each other." noindex>
+  <div class="page compare">
+    {
+      !c ? (
+        <EmptyState
+          glyph="○"
+          title={gone ? "There is nothing at this address" : "That could not be opened"}
+          body={
+            gone
+              ? "The link may be mistyped, or one of the two charts may have been deleted — a comparison does not outlive the charts it was built from."
+              : "Something failed on this side. Try again in a moment."
+          }
+        />
+      ) : (
+        <>
+          <SectionHeader as="h1" glyph="✶" eyebrow="Compared" title={c.label || "Two charts"} />
+
+          {notice && <p class="ok">{notice}</p>}
+          {failed && <p class="bad">{failed}</p>}
+
+          <div class="two-up">
+            {[c.left, c.right].map((s: any, i: number) => (
+              <figure class="side">
+                <figcaption>{i === 0 ? leftName : rightName}</figcaption>
+                <ChartFigure
+                  date={s.birthDate}
+                  time={s.birthTime}
+                  timeUnknown={s.timeUnknown}
+                  lat={s.lat}
+                  lon={s.lon}
+                  tradition={s.tradition}
+                  figure={s.figure}
+                />
+              </figure>
+            ))}
+          </div>
+
+          {
+            d ? (
+              <SynastryTable
+                bySign={d.bySign}
+                byDegree={d.byDegree}
+                undefined={d.undefined}
+                leftName={leftName}
+                rightName={rightName}
+              />
+            ) : (
+              <p class="bad">
+                The comparison could not be computed — the ephemeris did not
+                answer. That is a failure on this side, not a fact about the sky.
+              </p>
+            )
+          }
+
+          <section class="panel">
+            <h2>Your reading</h2>
+            <p class="fine">
+              The lines above are arithmetic and this site will always compute
+              them the same way. What it cannot do is say what any of it means
+              to you — that part is yours, and it is the part worth sharing.
+            </p>
+            <form method="POST" class="write">
+              <CsrfField />
+              <input type="hidden" name="action" value="write" />
+              <label>
+                <span class="lbl">Call it something</span>
+                <input class="in" name="label" value={c.label} maxlength="80" />
+              </label>
+              <label>
+                <span class="lbl">What you make of it</span>
+                <textarea class="area" name="reading_md" rows="12">{c.readingMd}</textarea>
+              </label>
+              <div><Button type="submit">Save it</Button></div>
+            </form>
+            {readingHtml && (
+              <div class="preview">
+                <span class="lbl">As it will read</span>
+                <Prose html={readingHtml} />
+              </div>
+            )}
+          </section>
+
+          <section class="panel">
+            <h2>Hand it to somebody</h2>
+            {
+              c.shared ? (
+                <>
+                  <label class="link-out">
+                    <span class="lbl">The link</span>
+                    <input type="text" readonly value={shareUrl} onclick="this.select()" />
+                  </label>
+                  <form method="POST">
+                    <CsrfField />
+                    <input type="hidden" name="action" value="unshare" />
+                    <Button type="submit" variant="secondary">Take the link back</Button>
+                  </form>
+                </>
+              ) : (
+                <>
+                  <p class="warn">
+                    Whoever holds the link sees both figures, the configurations
+                    and your reading. Neither birth place is printed — but a
+                    chart is birth data drawn, and somebody who reads charts can
+                    get a date and a rough time from one. That is true of both
+                    charts here, including the one that is not yours.
+                  </p>
+                  <form method="POST">
+                    <CsrfField />
+                    <input type="hidden" name="action" value="share" />
+                    <Button type="submit" data-track="comparison:shared">Make a link to share</Button>
+                  </form>
+                </>
+              )
+            }
+          </section>
+
+          <section class="panel">
+            <h2>Take it out of the record</h2>
+            <p class="fine">
+              Deletes this comparison and your reading. The two charts are left
+              alone — each is deleted from its own page.
+            </p>
+            <form method="POST" onsubmit="return confirm('Delete this comparison and the reading?')">
+              <CsrfField />
+              <input type="hidden" name="action" value="forget" />
+              <Button type="submit" variant="secondary">Delete it</Button>
+            </form>
+          </section>
+        </>
+      )
+    }
+  </div>
+</BaseLayout>
+
+<style>
+  .compare { max-width: 900px; display: grid; gap: var(--space-6); }
+  .ok { font: 400 var(--text-sm) var(--font-body); color: var(--accent); margin: 0; }
+  .bad { font: 400 var(--text-sm) var(--font-body); color: var(--live); margin: 0; }
+  .two-up { display: grid; gap: var(--space-5); grid-template-columns: 1fr 1fr; }
+  .side { margin: 0; display: grid; gap: 10px; justify-items: center; min-width: 0; }
+  .side figcaption {
+    font: 600 var(--text-micro) var(--font-body); letter-spacing: var(--tracking-eyebrow);
+    text-transform: uppercase; color: var(--ink-faint);
+  }
+  .panel {
+    display: grid; gap: var(--space-3); justify-items: start;
+    padding: var(--space-5); background: var(--surface-veil);
+    border: var(--border-w) solid var(--line); border-radius: var(--radius-md);
+  }
+  .panel h2 { font: 600 var(--text-h4) var(--font-display); color: var(--ink); margin: 0; }
+  .fine { font: 400 var(--text-sm) / 1.7 var(--font-body); color: var(--ink-soft); margin: 0; max-width: 62ch; }
+  .warn {
+    font: 400 var(--text-sm) / 1.7 var(--font-body); color: var(--ink); margin: 0; max-width: 62ch;
+    border-left: 2px solid var(--rose); padding-left: var(--space-3);
+  }
+  .write { display: grid; gap: var(--space-4); width: 100%; max-width: 70ch; }
+  .write label { display: grid; gap: 6px; }
+  .lbl {
+    font: 600 var(--text-micro) var(--font-body); letter-spacing: var(--tracking-eyebrow);
+    text-transform: uppercase; color: var(--ink-faint);
+  }
+  .in, .area, .link-out input {
+    font: 400 var(--text-sm) var(--font-body); color: var(--ink);
+    background: var(--surface-page); border: var(--border-w) solid var(--line);
+    border-radius: var(--radius-sm); padding: 8px 10px; min-height: 40px;
+    width: 100%; box-sizing: border-box;
+  }
+  .area { font-family: var(--font-display); font-size: var(--text-body); line-height: var(--leading-body); resize: vertical; }
+  .preview { width: 100%; max-width: 70ch; display: grid; gap: 8px; }
+  .link-out { display: grid; gap: 6px; width: 100%; }
+
+  @media (max-width: 720px) { .two-up { grid-template-columns: 1fr; } }
+</style>

@@ -41,7 +41,7 @@ from sqlmodel import select
 from shruti.api.routes.accounts import current_user
 from shruti.core.consents import CONSENT_VERSION, NATIVITY
 from shruti.core.db import get_session
-from shruti.models.accounts import SavedChart, User
+from shruti.models.accounts import Comparison, SavedChart, User
 
 router = APIRouter(prefix="/api/charts", tags=["charts"])
 
@@ -332,3 +332,235 @@ async def open_shared(
     if chart.expires_at and chart.expires_at < _now():
         raise HTTPException(410, "this chart has expired")
     return _shared_view(chart)
+
+
+# ── two charts, read against each other ─────────────────────────────────────
+#
+# The arithmetic is the easy half and the site already does it. What somebody
+# MAKES here is the paragraph they write underneath, which is why the reading
+# is a column rather than an afterthought and why a share link usually exists
+# to show it.
+#
+# Both sides are references to kept charts, never copies of birth data.
+# Deleting a chart cascades, so a moment somebody asked to be forgotten does
+# not survive inside a comparison built on it.
+
+
+class CompareIn(BaseModel):
+    """`right` may be an owner token or a SHARE token — see `_chart_by_any`."""
+
+    left: str = Field(max_length=120)
+    right: str = Field(max_length=120)
+    label: str = Field(default="", max_length=80)
+    tradition: str = "hellenistic"
+    orb: float = Field(default=6.0, ge=1.0, le=10.0)
+    consent: bool = False
+
+
+async def _chart_by_any(token: str, session: AsyncSession) -> SavedChart | None:
+    """
+    A chart by either of its tokens.
+
+    Comparing against a chart somebody shared with you is the whole point of
+    the feature, and they handed you a SHARE token — so that has to work here
+    without turning it into an owner token anywhere else. This returns the row;
+    it never lets the caller act as its owner.
+    """
+    for column in (SavedChart.owner_token, SavedChart.share_token):
+        row = (
+            await session.execute(select(SavedChart).where(column == token))
+        ).scalar_one_or_none()
+        if row is not None:
+            return row
+    return None
+
+
+def _comparison_view(row: Comparison, left: SavedChart, right: SavedChart,
+                     *, owner: bool) -> dict:
+    """
+    What a comparison is, to whoever is looking.
+
+    A viewer gets the two moments because the aspects cannot be drawn without
+    them — the same honest compromise a shared chart makes — but not the place
+    names, which are the one part no reader can recover from the figure.
+    """
+    def side(c: SavedChart) -> dict:
+        out = {
+            "label": c.label,
+            "birthDate": c.birth_date,
+            "birthTime": c.birth_time,
+            "timeUnknown": c.time_unknown,
+            "lat": c.lat,
+            "lon": c.lon,
+            "tradition": c.tradition,
+            "figure": c.figure,
+        }
+        if owner:
+            out["placeName"] = c.place_name
+        return out
+
+    return {
+        "label": row.label,
+        "readingMd": row.reading_md,
+        "tradition": row.tradition,
+        "orb": row.orb,
+        "left": side(left),
+        "right": side(right),
+        "shared": row.share_token is not None,
+        "shareToken": row.share_token if owner else None,
+        "mine": row.user_id is not None,
+    }
+
+
+@router.post("/compare", status_code=201)
+async def compare(
+    body: CompareIn,
+    user: User | None = Depends(current_user),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """
+    Keep a comparison of two charts.
+
+    Consent is asked for exactly as it is for a chart, and for the same reason:
+    this row is a durable pointer at two birth moments.
+    """
+    left = await _chart_by_any(body.left, session)
+    right = await _chart_by_any(body.right, session)
+    if left is None or right is None:
+        raise HTTPException(404, "one of those charts could not be found")
+    if left.id == right.id:
+        raise HTTPException(400, "that is the same chart twice")
+    if body.tradition not in TRADITIONS:
+        raise HTTPException(400, "unknown tradition")
+
+    row = Comparison(
+        owner_token=_token(),
+        user_id=user.id if user else None,
+        left_id=left.id,
+        right_id=right.id,
+        label=body.label.strip(),
+        tradition=body.tradition,
+        orb=body.orb,
+    )
+
+    if user is None:
+        if not body.consent:
+            raise HTTPException(
+                400, "keeping a comparison means keeping a pointer at two birth"
+                     " moments, which needs consent",
+            )
+        row.expires_at = _now() + timedelta(days=ORPHAN_DAYS)
+
+    session.add(row)
+    await session.commit()
+    await session.refresh(row)
+    return {"ownerToken": row.owner_token,
+            "comparison": _comparison_view(row, left, right, owner=True)}
+
+
+async def _load_comparison(row: Comparison, session: AsyncSession):
+    left = await session.get(SavedChart, row.left_id)
+    right = await session.get(SavedChart, row.right_id)
+    if left is None or right is None:
+        # One side was deleted. Say so rather than rendering half a reading.
+        raise HTTPException(410, "one of these charts has been deleted")
+    return left, right
+
+
+@router.get("/compare/o/{token}")
+async def open_comparison(
+    token: str, session: AsyncSession = Depends(get_session)
+) -> dict:
+    row = (
+        await session.execute(select(Comparison).where(Comparison.owner_token == token))
+    ).scalar_one_or_none()
+    if row is None:
+        raise HTTPException(404, "no such comparison")
+    if row.expires_at and row.expires_at < _now():
+        raise HTTPException(410, "this comparison has expired")
+    if row.user_id is None:
+        row.expires_at = _now() + timedelta(days=ORPHAN_DAYS)
+        await session.commit()
+    left, right = await _load_comparison(row, session)
+    return _comparison_view(row, left, right, owner=True)
+
+
+class ReadingIn(BaseModel):
+    label: str = Field(default="", max_length=80)
+    reading_md: str = Field(default="", max_length=20000)
+
+
+@router.put("/compare/o/{token}")
+async def write_reading(
+    token: str, body: ReadingIn, session: AsyncSession = Depends(get_session)
+) -> dict:
+    """What they wrote about it. Editable, unlike a sent letter — nobody has
+    been handed a copy that must keep matching."""
+    row = (
+        await session.execute(select(Comparison).where(Comparison.owner_token == token))
+    ).scalar_one_or_none()
+    if row is None:
+        raise HTTPException(404, "no such comparison")
+    row.label = body.label.strip()
+    row.reading_md = body.reading_md
+    await session.commit()
+    left, right = await _load_comparison(row, session)
+    return _comparison_view(row, left, right, owner=True)
+
+
+@router.post("/compare/o/{token}/share")
+async def share_comparison(
+    token: str, session: AsyncSession = Depends(get_session)
+) -> dict:
+    row = (
+        await session.execute(select(Comparison).where(Comparison.owner_token == token))
+    ).scalar_one_or_none()
+    if row is None:
+        raise HTTPException(404, "no such comparison")
+    if row.share_token is None:
+        row.share_token = _token()
+        row.shared_at = _now()
+        await session.commit()
+    return {"shareToken": row.share_token}
+
+
+@router.delete("/compare/o/{token}/share", status_code=204)
+async def unshare_comparison(
+    token: str, session: AsyncSession = Depends(get_session)
+) -> Response:
+    row = (
+        await session.execute(select(Comparison).where(Comparison.owner_token == token))
+    ).scalar_one_or_none()
+    if row is not None:
+        row.share_token = None
+        row.shared_at = None
+        await session.commit()
+    return Response(status_code=204)
+
+
+@router.delete("/compare/o/{token}", status_code=204)
+async def forget_comparison(
+    token: str, session: AsyncSession = Depends(get_session)
+) -> Response:
+    row = (
+        await session.execute(select(Comparison).where(Comparison.owner_token == token))
+    ).scalar_one_or_none()
+    if row is not None:
+        await session.delete(row)
+        await session.commit()
+    return Response(status_code=204)
+
+
+@router.get("/compare/s/{token}")
+async def open_shared_comparison(
+    token: str, session: AsyncSession = Depends(get_session)
+) -> dict:
+    row = (
+        await session.execute(select(Comparison).where(Comparison.share_token == token))
+    ).scalar_one_or_none()
+    if row is None:
+        raise HTTPException(404, "no such comparison")
+    if row.expires_at and row.expires_at < _now():
+        raise HTTPException(410, "this comparison has expired")
+    left, right = await _load_comparison(row, session)
+    return _comparison_view(row, left, right, owner=False)
