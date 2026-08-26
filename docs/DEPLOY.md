@@ -137,3 +137,33 @@ way through is legible rather than mysterious.
 | `b7d2e91f4a63` | `storage_backend` on media rows |
 | `c9a04e1b78f2` | stored sky for journal entries |
 | `d3f16c8b52a4` | passkeys |
+
+## Stripe went live — 2026-08-26
+
+Live keys installed on production; both membership tiers rebuilt in live mode
+by `backend/scripts/stripe-golive.py --confirm`.
+
+Verified at the time: `charges_enabled` and `payouts_enabled` both true, account
+in GR with EUR default, nothing outstanding in Stripe's requirements, and a real
+`cs_live_…` checkout session created for €5.00 and then expired.
+
+**Test and live are separate worlds.** Anything created against a test key —
+products, prices, coupons, webhook endpoints — does not exist in live mode. The
+tiers' stored ids were rebuilt; **discount codes were not**, and any that are
+wanted live must be made again in the admin.
+
+`shop.sync` treats an id that this Stripe mode does not recognise as "create a
+new one" rather than letting `Product.modify` raise. Without that, the first
+save after a key swap is a 500 on a perfectly good row.
+
+The test-mode banner on /support is driven by the API's `testMode` flag, so it
+took itself down when the keys changed. No deploy was needed for it.
+
+### Still to do by hand
+
+- **Rotate the live secret key and the webhook signing secret.** Both were sent
+  through a chat transcript. Stripe → Developers → API keys → roll; and
+  Developers → Webhooks → the endpoint → roll signing secret. Then the new
+  values go into `.env` the same way and the backend restarts. Rotating the
+  secret key does NOT disturb the prices or products already created.
+- The publishable key needs no rotation — it ships in the page source by design.
