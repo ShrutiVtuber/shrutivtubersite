@@ -1,0 +1,210 @@
+---
+/* Every word on the site, by the page it appears on.
+ *
+ * Built because page blocks were never going to be the whole answer. A block
+ * is a section; most of the words on this site are not sections, and about six
+ * thousand of them lived in templates where she could not touch them. Her
+ * words: "I need to be able to edit absolutely all the copy on the site."
+ *
+ * The organising idea is the PAGE, not the table. Somebody editing marketing
+ * copy is looking at a page and wants to change a sentence on it — so this
+ * groups by page, orders by where the string falls on it, and links straight
+ * out to the live page and to that page's blocks.
+ */
+import AdminLayout from "../../layouts/AdminLayout.astro";
+import CsrfField from "../../components/forms/CsrfField.astro";
+import Button from "../../components/forms/Button.astro";
+import Badge from "../../components/navigation/Badge.astro";
+import { asAdmin } from "../../lib/admin";
+import { verifyCsrf } from "../../lib/csrf";
+
+let notice = "";
+let failed = "";
+
+if (Astro.request.method === "POST") {
+  const form = await Astro.request.formData();
+  if (!verifyCsrf(Astro.cookies, form)) {
+    failed = "That did not save. Reload and try again.";
+  } else {
+    const action = String(form.get("action") ?? "");
+    const id = String(form.get("id") ?? "");
+
+    if (action === "save" && id) {
+      const r = await asAdmin(Astro, `/api/admin/copy/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ value: String(form.get("value") ?? "") }),
+      });
+      notice = r.ok ? "Saved." : "";
+      if (!r.ok) failed = r.body?.detail ?? "That could not be saved.";
+    } else if (action === "revert" && id) {
+      const r = await asAdmin(Astro, `/api/admin/copy/${id}/revert`, { method: "POST" });
+      notice = r.ok ? "Put back the words it was written with." : "";
+      if (!r.ok) failed = "That could not be reverted.";
+    }
+  }
+}
+
+const rows: any[] = (await asAdmin(Astro, "/api/admin/copy")).body ?? [];
+
+const filter = Astro.url.searchParams.get("page") ?? "";
+const shown = filter ? rows.filter((r) => r.page === filter) : rows;
+
+const pages = [...new Set(rows.map((r) => r.page))].sort();
+const byPage: [string, any[]][] = [...new Set(shown.map((r) => r.page))]
+  .sort()
+  .map((pg) => [pg, shown.filter((r) => r.page === pg)]);
+
+/* "/" reads better than "/home" for the landing page, and it is what the link
+   has to be anyway. */
+const href = (pg: string) => `/${pg === "home" ? "" : pg}`;
+const changed = rows.filter((r) => r.changed).length;
+---
+
+<AdminLayout title="Words">
+  <div class="head">
+    <h1 class="adm-h">Words</h1>
+    <p class="adm-note">
+      Every sentence on the site that is not a page block and not a journal
+      entry. Change one here and it changes on the page — no deploy.
+    </p>
+  </div>
+
+  {notice && <p class="adm-ok" role="status">{notice}</p>}
+  {failed && <p class="adm-bad" role="alert">{failed}</p>}
+
+  {rows.length === 0 ? (
+    <div class="adm-card">
+      <h2 class="h2">Nothing registered yet</h2>
+      <p class="adm-note">
+        The pages carry their own words until they are registered here. Run
+        <code>node scripts/seed-copy.mjs</code> after a deploy and they appear —
+        reading what the pages actually use, and never changing anything you
+        have written.
+      </p>
+    </div>
+  ) : (
+    <>
+      <nav class="page-filter" aria-label="Filter by page">
+        <a href="/admin/copy" aria-current={!filter ? "page" : undefined}>
+          Every page <span class="n">{rows.length}</span>
+        </a>
+        {pages.map((pg) => (
+          <a href={`/admin/copy?page=${pg}`} aria-current={filter === pg ? "page" : undefined}>
+            {href(pg)} <span class="n">{rows.filter((r) => r.page === pg).length}</span>
+          </a>
+        ))}
+      </nav>
+
+      {changed > 0 && (
+        <p class="adm-note">
+          {changed} of {rows.length} changed from what the page was written with.
+        </p>
+      )}
+
+      {byPage.map(([pg, group]) => (
+        <section class="page-group">
+          <div class="page-head">
+            <a class="page-name" href={href(pg)}>{href(pg)}</a>
+            <span class="page-count">{group.length} string{group.length === 1 ? "" : "s"}</span>
+            <a class="page-blocks" href={`/admin/blocks?kind=sections&page=${pg}`}>
+              blocks on this page →
+            </a>
+          </div>
+
+          {group.map((r: any) => (
+            <form method="POST" class="adm-card str">
+              <CsrfField />
+              <input type="hidden" name="id" value={r.id} />
+              <div class="str-head">
+                <label class="str-label" for={`v-${r.id}`}>{r.label || r.key}</label>
+                <code class="str-key">{r.key}</code>
+                {r.changed && <Badge tone="rose">changed</Badge>}
+              </div>
+
+              {r.multiline ? (
+                <textarea id={`v-${r.id}`} name="value" rows="3">{r.value}</textarea>
+              ) : (
+                <input id={`v-${r.id}`} name="value" value={r.value} />
+              )}
+
+              {r.changed && (
+                <p class="was">
+                  <span class="was-lbl">Written as</span>
+                  <span class="was-txt">{r.default}</span>
+                </p>
+              )}
+
+              <div class="str-actions">
+                <Button type="submit" name="action" value="save" size="sm">Save</Button>
+                {r.changed && (
+                  <button type="submit" name="action" value="revert" class="revert">
+                    Put it back
+                  </button>
+                )}
+              </div>
+            </form>
+          ))}
+        </section>
+      ))}
+    </>
+  )}
+</AdminLayout>
+
+<style>
+  .head { display: grid; gap: 6px; margin-bottom: var(--space-4); }
+
+  .page-filter { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 var(--space-4); }
+  .page-filter a {
+    font: 500 var(--text-xs) var(--font-mono);
+    padding: 4px 10px;
+    border: var(--border-w) solid var(--line);
+    border-radius: var(--radius-full, 999px);
+    color: var(--ink-soft);
+    text-decoration: none;
+    display: inline-flex; gap: 6px; align-items: baseline;
+  }
+  .page-filter a[aria-current] {
+    background: var(--surface-veil); color: var(--ink); border-color: var(--line-strong);
+  }
+  .page-filter .n { color: var(--ink-faint); }
+
+  .page-group { margin: 0 0 var(--space-6); }
+  .page-head {
+    display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;
+    margin: 0 0 var(--space-3); padding-bottom: 6px;
+    border-bottom: var(--border-w) solid var(--line);
+  }
+  .page-name { font: 600 var(--text-md) var(--font-mono); color: var(--ink); text-decoration: none; }
+  .page-name:hover { text-decoration: underline; }
+  .page-count { font-size: var(--text-xs); color: var(--ink-faint); }
+  .page-blocks { margin-left: auto; font-size: var(--text-xs); color: var(--accent); }
+
+  .str { display: grid; gap: 8px; margin-bottom: var(--space-3); }
+  .str-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  .str-label { font-weight: 600; font-size: var(--text-sm); color: var(--ink); }
+  .str-key { font: 400 var(--text-xs) var(--font-mono); color: var(--ink-faint); }
+
+  .str input, .str textarea {
+    width: 100%; font: 400 var(--text-sm) var(--font-body);
+    padding: 8px 10px;
+    border: var(--border-w) solid var(--line);
+    border-radius: var(--radius-sm);
+    background: var(--surface-page); color: var(--ink);
+  }
+  .str textarea { line-height: 1.6; resize: vertical; }
+
+  /* What it said before she touched it — so a change can be seen and undone
+     without anybody having to remember the original. */
+  .was { margin: 0; display: grid; gap: 2px; font-size: var(--text-xs); }
+  .was-lbl { color: var(--ink-faint); text-transform: uppercase; letter-spacing: .1em; font-weight: 600; }
+  .was-txt { color: var(--ink-soft); font-style: italic; }
+
+  .str-actions { display: flex; gap: 10px; align-items: center; }
+  .revert {
+    background: none; border: 0; padding: 0; cursor: pointer;
+    font: 500 var(--text-xs) var(--font-body); color: var(--ink-faint);
+    text-decoration: underline;
+  }
+  .revert:hover { color: var(--ink); }
+</style>

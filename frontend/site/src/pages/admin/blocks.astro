@@ -85,6 +85,33 @@ if (Astro.request.method === "POST") {
 
 const list = await asAdmin(Astro, `/api/admin/${kind}`);
 const rows: any[] = Array.isArray(list.body) ? list.body : [];
+
+/* Page blocks are the one kind where a flat list is useless: 27 rows, and the
+   only way to tell which page a block was on was a small grey sub-label. Her
+   words — "no way to see to which page they actually belong. It's making
+   editing the marketing copy ridiculously hard."
+   
+   So when a kind has a `page`, the list groups by it and offers a filter.
+   Every other kind is unchanged, because for those a flat list IS the shape of
+   the thing. */
+const hasPages = rows.some((r) => typeof r.page === "string" && r.page);
+const pageFilter = Astro.url.searchParams.get("page") ?? "";
+const shown = hasPages && pageFilter ? rows.filter((r) => r.page === pageFilter) : rows;
+
+const pages = hasPages
+  ? [...new Set(rows.map((r) => r.page).filter(Boolean))].sort()
+  : [];
+
+/* In document order within each page, which is the order they render — so the
+   list reads like the page does rather than like the table. */
+const byPage: [string, any[]][] = hasPages
+  ? [...new Set(shown.map((r) => r.page || "(no page)"))].sort().map((pg) => [
+      pg,
+      shown
+        .filter((r) => (r.page || "(no page)") === pg)
+        .sort((a, b) => (a.position ?? 0) - (b.position ?? 0)),
+    ])
+  : [["", shown]];
 /* Creating and editing are the same form. A new one has no row to read its
    columns off, so its shape comes from the field spec — which is also what
    stops it being created with half its fields missing because the editor could
@@ -277,6 +304,19 @@ const label = (r: any) =>
           <Button href={`/admin/blocks?kind=${kind}&new=1`}>Add a {spec.singular}</Button>
         </div>
 
+        {hasPages && pages.length > 1 && (
+          <nav class="page-filter" aria-label="Filter by page">
+            <a href={`/admin/blocks?kind=${kind}`}
+               aria-current={!pageFilter ? "page" : undefined}>Every page</a>
+            {pages.map((pg) => (
+              <a href={`/admin/blocks?kind=${kind}&page=${pg}`}
+                 aria-current={pageFilter === pg ? "page" : undefined}>
+                /{pg === "home" ? "" : pg}
+              </a>
+            ))}
+          </nav>
+        )}
+
         <div class="rows">
           {
             rows.length === 0 ? (
@@ -284,11 +324,26 @@ const label = (r: any) =>
                 No {spec.label.toLowerCase()} yet — “Add a {spec.singular}” above is where they start.
               </p>
             ) : (
-              rows.map((r) => (
+              byPage.map(([pg, group]) => (
+                <>
+                  {/* The heading a person actually navigates by: the page the
+                      block is on, and how many of them are live there. */}
+                  {pg && (
+                    <div class="page-head">
+                      <a class="page-name" href={`/${pg === "home" ? "" : pg}`}>
+                        /{pg === "home" ? "" : pg}
+                      </a>
+                      <span class="page-count">
+                        {group.length} block{group.length === 1 ? "" : "s"}
+                        {group.some((r: any) => !r.visible) &&
+                          ` · ${group.filter((r: any) => !r.visible).length} hidden`}
+                      </span>
+                    </div>
+                  )}
+                  {group.map((r: any) => (
                 <div class="row" data-hidden={!r.visible || undefined}>
                   <div class="row-main">
                     <span class="row-label">{label(r)}</span>
-                    {r.page && <span class="row-sub">on /{r.page}</span>}
                     {r.eyebrow && <span class="row-sub">{r.eyebrow}</span>}
                   </div>
                   {/* Which two lead the home page, visible from the list —
@@ -321,6 +376,8 @@ const label = (r: any) =>
                     </form>
                   </div>
                 </div>
+                  ))}
+                </>
               ))
             )
           }
@@ -347,6 +404,40 @@ const label = (r: any) =>
 </script>
 
 <style>
+  /* Blocks belong to pages, and until now the list did not say so in a way
+     anybody could navigate. */
+  .page-filter {
+    display: flex; flex-wrap: wrap; gap: 6px;
+    margin: 0 0 var(--space-3);
+  }
+  .page-filter a {
+    font: 500 var(--text-xs) var(--font-mono);
+    padding: 4px 10px;
+    border: var(--border-w) solid var(--line);
+    border-radius: var(--radius-full, 999px);
+    color: var(--ink-soft);
+    text-decoration: none;
+  }
+  .page-filter a[aria-current] {
+    background: var(--surface-veil);
+    color: var(--ink);
+    border-color: var(--line-strong);
+  }
+  .page-head {
+    display: flex; align-items: baseline; gap: 10px;
+    margin: var(--space-4) 0 var(--space-2);
+    padding-bottom: 6px;
+    border-bottom: var(--border-w) solid var(--line);
+  }
+  .page-head:first-child { margin-top: 0; }
+  .page-name {
+    font: 600 var(--text-sm) var(--font-mono);
+    color: var(--ink);
+    text-decoration: none;
+  }
+  .page-name:hover { text-decoration: underline; }
+  .page-count { font-size: var(--text-xs); color: var(--ink-faint); }
+
   .colour { display: flex; gap: 10px; align-items: center; }
   .colour .swatch {
     width: 44px; height: 40px; padding: 0; flex: none; cursor: pointer;

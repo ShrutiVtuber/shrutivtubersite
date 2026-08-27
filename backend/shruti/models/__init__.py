@@ -17,6 +17,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from sqlalchemy import DateTime
+from sqlalchemy import UniqueConstraint
 from sqlmodel import Field, SQLModel
 
 
@@ -112,6 +113,54 @@ class Section(TimestampMixin, table=True):
 
 
 # ── the VTuber profile block (§03 field vocabulary) ─────────────────────────
+class Copy(TimestampMixin, table=True):
+    """
+    One editable string on one page.
+
+    Page blocks were never going to cover this. A block is a section — eyebrow,
+    heading, prose, a link — and most of the words on this site are not
+    sections. They are the sentence under a form, the label on a button, the
+    line that explains why a field is optional. Those lived in the templates,
+    which meant roughly six thousand words she could not touch without a
+    deploy, on a site whose whole premise is that she edits it herself.
+
+    `key` is stable and machine-readable so a template can address one string.
+    `label` is what the admin shows her, because "tiers.note" is not a thing to
+    hand somebody who is writing marketing copy.
+
+    **There is always a default in the code.** A missing row is not a blank
+    page — the template ships the words it was written with, and a row only
+    ever overrides them. That is what makes it safe to seed this table from
+    the templates rather than the other way round, and what makes an empty
+    database render a complete site.
+    """
+
+    __tablename__ = "copy"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+
+    # The route it belongs to: "home", "support", "tools/planetary-hours".
+    page: str = Field(index=True)
+    key: str = Field(index=True)
+
+    # Her words for it, and the words themselves.
+    label: str = ""
+    value: str = ""
+
+    # Where it falls on the page, so the admin reads in the order she sees.
+    position: int = Field(default=0)
+
+    # A textarea rather than a single line. Set from the default's own shape,
+    # because a paragraph typed into an <input> is a bad afternoon.
+    multiline: bool = Field(default=False)
+
+    # What the template would render with no row at all. Kept so the admin can
+    # show what was changed from, and offer to put it back.
+    default_value: str = ""
+
+    __table_args__ = (UniqueConstraint("page", "key", name="uq_copy_page_key"),)
+
+
 class ProfileField(TimestampMixin, table=True):
     """Birthday, height, debut date, fan name, oshi mark, stream tag, fan-art tag."""
 

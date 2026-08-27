@@ -391,3 +391,25 @@ async def site_state(session: AsyncSession = Depends(get_session)) -> dict:
         # gating a section costs no extra round trip on every request.
         "sections": await sections_live(session),
     }
+
+
+# ── editable strings ────────────────────────────────────────────────────────
+
+@router.get("/copy/{page:path}")
+async def page_copy(page: str, session: AsyncSession = Depends(get_session)) -> dict:
+    """
+    Every string she has overridden on one page.
+
+    Only the overrides. The template ships its own words and this replaces
+    them where a row exists, which is what lets an empty table render a
+    complete site and lets pages adopt this one at a time.
+    """
+    from shruti.models import Copy
+
+    rows = (
+        await session.execute(select(Copy).where(Copy.page == page))
+    ).scalars().all()
+    # A row whose value is empty means she cleared the field, and a cleared
+    # field is a deliberate blank — not a fallback to the default. Deleting the
+    # row is how you go back, and the admin offers exactly that.
+    return {"page": page, "copy": {r.key: r.value for r in rows}}

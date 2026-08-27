@@ -1125,6 +1125,138 @@ async def write_settings(
 # rather than trusting the next person to read a comment.
 # ─────────────────────────────────────────────────────────────────────────────
 
+# ── editable strings ────────────────────────────────────────────────────────
+#
+# ABOVE the generic /{kind} collection routes on purpose. Those match any
+# single path segment, so registered after them "copy" is read as a collection
+# name and answered with "unknown collection" — which is what happened, and
+# looked like the new routes simply not existing.
+
+
+class CopySeedItem(BaseModel):
+    key: str
+    label: str = ""
+    default: str = ""
+    position: int = 0
+    multiline: bool = False
+
+
+class CopySeedIn(BaseModel):
+    page: str
+    items: list[CopySeedItem] = Field(default_factory=list)
+
+
+@router.post("/copy/seed")
+async def seed_copy(
+    body: CopySeedIn,
+    session: AsyncSession = Depends(get_session),
+    _: str = Depends(require_admin),
+) -> dict:
+    """
+    Register the strings a page uses, so the admin can list them.
+
+    **This never touches a value she has written.** It records what the
+    template offers — the label, the default, where it falls on the page — and
+    for a row that already exists it updates only those. The seeder reads the
+    templates; the templates are never told what to say.
+
+    Run after a deploy that adds or moves a string. Safe to run repeatedly:
+    the same page seeded twice is the same rows.
+    """
+    from shruti.models import Copy
+
+    known = {
+        r.key: r
+        for r in (await session.execute(
+            select(Copy).where(Copy.page == body.page)
+        )).scalars().all()
+    }
+
+    added = 0
+    for item in body.items:
+        row = known.get(item.key)
+        if row is None:
+            session.add(Copy(
+                page=body.page, key=item.key, label=item.label,
+                # Seeded WITH the default as its value, so the admin shows the
+                # words that are on the site rather than an empty box she has
+                # to fill before the page reads right.
+                value=item.default, default_value=item.default,
+                position=item.position, multiline=item.multiline,
+            ))
+            added += 1
+            continue
+        # Metadata only. Her words are hers.
+        row.label = item.label or row.label
+        row.default_value = item.default
+        row.position = item.position
+        row.multiline = item.multiline
+
+    await session.commit()
+    return {"page": body.page, "seen": len(body.items), "added": added}
+
+
+@router.get("/copy")
+async def list_copy(
+    page: str = "",
+    session: AsyncSession = Depends(get_session),
+    _: str = Depends(require_admin),
+) -> list[dict]:
+    """Every string, or one page's, in the order it appears on the page."""
+    from shruti.models import Copy
+
+    q = select(Copy).order_by(Copy.page, Copy.position, Copy.key)
+    if page:
+        q = q.where(Copy.page == page)
+    rows = (await session.execute(q)).scalars().all()
+    return [{
+        "id": r.id, "page": r.page, "key": r.key, "label": r.label,
+        "value": r.value, "default": r.default_value,
+        "multiline": r.multiline, "position": r.position,
+        # So the admin can show what has been changed and offer it back.
+        "changed": r.value != r.default_value,
+    } for r in rows]
+
+
+class CopyIn(BaseModel):
+    value: str = ""
+
+
+@router.put("/copy/{copy_id}")
+async def set_copy(
+    copy_id: int,
+    body: CopyIn,
+    session: AsyncSession = Depends(get_session),
+    _: str = Depends(require_admin),
+) -> dict:
+    from shruti.models import Copy
+
+    row = await session.get(Copy, copy_id)
+    if row is None:
+        raise HTTPException(404, "no such string")
+    row.value = body.value
+    await session.commit()
+    return {"id": row.id, "value": row.value,
+            "changed": row.value != row.default_value}
+
+
+@router.post("/copy/{copy_id}/revert")
+async def revert_copy(
+    copy_id: int,
+    session: AsyncSession = Depends(get_session),
+    _: str = Depends(require_admin),
+) -> dict:
+    """Put back the words the page was written with."""
+    from shruti.models import Copy
+
+    row = await session.get(Copy, copy_id)
+    if row is None:
+        raise HTTPException(404, "no such string")
+    row.value = row.default_value
+    await session.commit()
+    return {"id": row.id, "value": row.value, "changed": False}
+
+
 @router.get("/{kind}")
 async def list_items(
     kind: str,

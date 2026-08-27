@@ -24,7 +24,12 @@ import { site, type LiveStatus, type LinkGroups, type Project, PATHS } from "../
 import { instruments } from "../lib/instruments";
 import { pageSections } from "../lib/content";
 import { badgeFrom } from "../lib/live";
+import { copy } from "../lib/copy";
 import type { SocialLink } from "../components/brand/SocialLinkRow.astro";
+
+/* Every word on the landing page, editable. The defaults here are what it was
+   written with and what still renders if nothing has been changed. */
+const t = await copy("home");
 
 interface ScheduleRow {
   title: string;
@@ -140,15 +145,15 @@ const INSTRUMENTS = [
 ---
 
 <BaseLayout
-  title="Shruti — instruments for magick"
-  description="Software for astrology, theurgy and divination — built live on stream from Athens."
+  title={t("meta.title", "Shruti — instruments for magick")}
+  description={t("meta.description", "Software for astrology, theurgy and divination — built live on stream from Athens.")}
 >
   {/* Outside `.page` so the sky can reach both edges; the Hero puts its own
       words back into the column. */}
   <Hero
       bleed
       greeting="Welcome · Καλώς ήρθατε · स्वागत"
-      title="I build instruments for magick."
+      title={t("hero.title", "I build instruments for magick.")}
       subtitle="Software for astrology, theurgy and divination — built live on stream from Athens."
       art={AVATAR}
       artWidth={512}
@@ -207,10 +212,10 @@ const INSTRUMENTS = [
       <SectionHeader
         glyph="✶"
         eyebrow="Run them here"
-        title="Instruments, in your browser"
+        title={t("instruments.title", "Instruments, in your browser")}
         body="Working software for practice — no install, no account, and they answer for wherever you are."
       />
-      <Button variant="ghost" href="/today">Day at a glance →</Button>
+      <Button variant="ghost" href="/today">{t("instruments.link", "Day at a glance →")}</Button>
     </div>
     {/* A working wheel, not a screenshot of one. The links below say what the
         instruments answer; this one is already answering, computed by her own
@@ -249,43 +254,40 @@ const INSTRUMENTS = [
     <div class="account-invite">
       <div class="ai-words">
         <span class="t-eyebrow">A free account</span>
-        <h2>Save a nativity, and the instruments start answering about you</h2>
-        <p class="ai-lead">
-          Everything above works without an account and always will. What an account changes is
-          that the tools stop asking where and when, and start knowing.
-        </p>
+        <h2>{t("account.heading", "Save a nativity, and the instruments start answering about you")}</h2>
+        <p class="ai-lead">{t("account.lede", "Everything above works without an account and always will. What an account changes is that the tools stop asking where and when, and start knowing.")}</p>
         <ul class="ai-list">
           <li>
             <span class="t-glyph" aria-hidden="true">✶</span>
             <span>
-              <strong>Your chart, kept.</strong> Cast once and it is there — no re-typing a birth
-              time and a city every time you want to look at it.
+              <strong>{t("account.perk1.title", "Your chart, kept.")}</strong>{" "}
+              {t("account.perk1.body", "Cast once and it is there — no re-typing a birth time and a city every time you want to look at it.")}
             </span>
           </li>
           <li>
             <span class="t-glyph" aria-hidden="true">☾</span>
             <span>
-              <strong>Transits on Day at a glance.</strong> The one block on that page that needs
-              to know where you were born. Nothing else does.
+              <strong>{t("account.perk2.title", "Transits on Day at a glance.")}</strong>{" "}
+              {t("account.perk2.body", "The one block on that page that needs to know where you were born. Nothing else does.")}
             </span>
           </li>
           <li>
             <span class="t-glyph" aria-hidden="true">☉</span>
             <span>
-              <strong>Your place, remembered.</strong> Stations, sunrise and the pañcāṅga answer
-              for where you actually are, without setting it each visit.
+              <strong>{t("account.perk3.title", "Your place, remembered.")}</strong>{" "}
+              {t("account.perk3.body", "Stations, sunrise and the pañcāṅga answer for where you actually are, without setting it each visit.")}
             </span>
           </li>
           <li>
             <span class="t-glyph" aria-hidden="true">◐</span>
             <span>
-              <strong>Your sign first.</strong> The monthly reading opens on yours instead of
-              twelve to choose from.
+              <strong>{t("account.perk4.title", "Your sign first.")}</strong>{" "}
+              {t("account.perk4.body", "The monthly reading opens on yours instead of twelve to choose from.")}
             </span>
           </li>
         </ul>
         <div class="ai-actions">
-          <Button size="lg" href="/signup">Make an account</Button>
+          <Button size="lg" href="/signup">{t("account.button", "Make an account")}</Button>
           <Button variant="ghost" href="/signin">Sign in</Button>
         </div>
         <p class="ai-quiet">
@@ -339,10 +341,10 @@ const INSTRUMENTS = [
       <SectionHeader
         glyph="✶"
         eyebrow="The work"
-        title="A portfolio of instruments"
-        body="The proof behind the brand: real software for real practice."
+        title={t("work.title", "A portfolio of instruments")}
+        body={t("work.body", "The proof behind the brand: real software for real practice.")}
       />
-      <Button variant="ghost" href="/work">About the work →</Button>
+      <Button variant="ghost" href="/work">{t("work.link", "About the work →")}</Button>
     </div>
     {
       leading.length > 0 ? (
@@ -359,7 +361,7 @@ const INSTRUMENTS = [
           ))}
         </div>
       ) : (
-        <p class="quiet-empty">Nothing published here yet.</p>
+        <p class="quiet-empty">{t("journal.empty", "Nothing published here yet.")}</p>
       )
     }
   </section>
