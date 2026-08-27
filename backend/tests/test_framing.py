@@ -52,12 +52,32 @@ def test_the_two_are_separated_by_a_matcher() -> None:
     assert "@admin path /admin /admin/*" in prod
 
 
+def test_the_admin_may_embed_the_site() -> None:
+    """
+    `frame-src` is the OPPOSITE of `frame-ancestors` and the two are easy to
+    confuse: frame-ancestors is who may embed us, frame-src is what we may
+    embed. The preview was blocked for a second round because only the first
+    had been fixed — the admin was allowed to embed YouTube and Twitch and
+    nothing else, including nothing from its own origin.
+    """
+    for rel in ("Caddyfile.internal", "deploy/shrutivtuber.caddy"):
+        conf = _text(rel)
+        assert "frame-src 'self'" in conf, f"{rel} will not let the admin embed the page"
+
+
 def test_production_and_local_agree() -> None:
     """
-    The local proxy had NO site-wide CSP, so the preview worked here and was
-    blocked on the live site. A difference between the two is how that ships.
-    """
-    def ancestors(conf: str) -> set[str]:
-        return set(re.findall(r"frame-ancestors '(\w+)'", conf))
+    The local proxy set NEITHER directive, so the preview worked here and was
+    blocked on the live site — twice, for two different directives, and each
+    time the local check said fine.
 
-    assert ancestors(_text("Caddyfile.internal")) == ancestors(_text("deploy/shrutivtuber.caddy")) == {"self", "none"}
+    Both halves are compared now, not just the one that broke first.
+    """
+    def policy(conf: str) -> tuple[set[str], set[str]]:
+        return (set(re.findall(r"frame-ancestors '([\w-]+)'", conf)),
+                set(re.findall(r"frame-src '([\w-]+)'", conf)))
+
+    local = policy(_text("Caddyfile.internal"))
+    prod = policy(_text("deploy/shrutivtuber.caddy"))
+    assert local == prod, f"local {local} and production {prod} disagree"
+    assert local == ({"self", "none"}, {"self"})
