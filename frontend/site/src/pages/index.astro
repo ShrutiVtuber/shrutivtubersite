@@ -26,6 +26,7 @@ import { pageSections } from "../lib/content";
 import { badgeFrom } from "../lib/live";
 import { copy } from "../lib/copy";
 import type { SocialLink } from "../components/brand/SocialLinkRow.astro";
+import Copy from "../components/content/Copy.astro";
 
 /* Every word on the landing page, editable. The defaults here are what it was
    written with and what still renders if nothing has been changed. */
@@ -290,10 +291,7 @@ const INSTRUMENTS = [
           <Button size="lg" href="/signup">{t("account.button", "Make an account")}</Button>
           <Button variant="ghost" href="/signin">Sign in</Button>
         </div>
-        <p class="ai-quiet">
-          Nothing public — no profile, no avatar, no follower count. Birth data is a separate,
-          optional decision, and withdrawing it deletes it. Free, and staying that way.
-        </p>
+        <p class="ai-quiet">{t("text.1", "Nothing public — no profile, no avatar, no follower count. Birth data is a separate, optional decision, and withdrawing it deletes it. Free, and staying that way.")}</p>
       </div>
     </div>
   </section>
@@ -325,11 +323,7 @@ const INSTRUMENTS = [
         ) : (
           /* No date promised. A month named here and missed reads as an
              abandoned site, which is a worse thing to say than "not yet". */
-          <p class="horo-absent">
-            ○ The first set is not up yet. When it is, twelve go up together — and
-            every past month stays readable in <a href="/horoscopes/archive">the archive</a>
-            rather than being replaced.
-          </p>
+          <p class="horo-absent"><Copy text={t("text.2", "○ The first set is not up yet. When it is, twelve go up together — and every past month stays readable in [the archive](/horoscopes/archive) rather than being replaced.")} /></p>
         )
       }
     </section>

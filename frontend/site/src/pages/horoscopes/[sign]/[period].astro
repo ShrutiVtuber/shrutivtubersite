@@ -16,6 +16,12 @@ import { site } from "../../../lib/api";
 import { account } from "../../../lib/account";
 import { renderMarkdown } from "../../../lib/markdown";
 import { sunSign, SIGNS } from "../../../lib/signs";
+import { copy } from "../../../lib/copy";
+
+/* Every word on this page, editable from the admin. The defaults below are
+   what it was written with and what still renders if nothing was changed. */
+const t = await copy("horoscopes/[sign]/[period]");
+
 
 const sign = String(Astro.params.sign ?? "");
 const period = String(Astro.params.period ?? "monthly");
@@ -74,7 +80,7 @@ const GLYPH: Record<string, string> = {
     }
 
     <p class="back">
-      <a href={`/horoscopes${covers ? `?covers=${covers}` : ""}`}>← All twelve signs</a>
+      <a href={`/horoscopes${covers ? `?covers=${covers}` : ""}`}>{t("text.1", "← All twelve signs")}</a>
       <a href={`/horoscopes/archive?sign=${sign}`}>Every {NAME} reading →</a>
     </p>
   </div>

@@ -23,6 +23,12 @@ import { asReader } from "../../../lib/account";
 import { verifyCsrf } from "../../../lib/csrf";
 import CsrfField from "../../../components/forms/CsrfField.astro";
 import Button from "../../../components/forms/Button.astro";
+import { copy } from "../../../lib/copy";
+
+/* Every word on this page, editable from the admin. The defaults below are
+   what it was written with and what still renders if nothing was changed. */
+const t = await copy("chart/s/[token]");
+
 
 export const prerender = false;
 
@@ -106,60 +112,41 @@ const FIGURE = { wheel: "a wheel", north: "a North Indian square", south: "a Sou
 
           {
             c.timeUnknown && (
-              <p class="undef">
-                ◐ The birth time was not known, so the ascendant, the houses and
-                everything that depends on them are undefined rather than
-                approximate. The planets are drawn for noon.
-              </p>
+              <p class="undef">{t("text.1", "◐ The birth time was not known, so the ascendant, the houses and everything that depends on them are undefined rather than approximate. The planets are drawn for noon.")}</p>
             )
           }
 
           <p class="fine">
-            <a href={`/chart/print/${token}`}>Print it, or save it as a PDF</a>
+            <a href={`/chart/print/${token}`}>{t("text.2", "Print it, or save it as a PDF")}</a>
           </p>
 
-          <p class="fine">
-            This page does not print the date, the time or the place — the
-            person who shared it kept those. What you are looking at was drawn
-            from them.
-          </p>
+          <p class="fine">{t("text.3", "This page does not print the date, the time or the place — the person who shared it kept those. What you are looking at was drawn from them.")}</p>
 
           <section class="yours compare-with">
-            <h2>Compare it with yours</h2>
-            <p class="fine">
-              If you have kept a chart of your own, paste its address and this
-              will read the two against each other — and give you somewhere to
-              write what you make of it.
-            </p>
+            <h2>{t("compare-it-with-yours.1", "Compare it with yours")}</h2>
+            <p class="fine">{t("compare-it-with-yours.2", "If you have kept a chart of your own, paste its address and this will read the two against each other — and give you somewhere to write what you make of it.")}</p>
             {compareFailed && <p class="c-bad">{compareFailed}</p>}
             <form method="POST" class="c-form">
               <CsrfField />
               <label>
-                <span class="c-lbl">The address of your kept chart</span>
+                <span class="c-lbl">{t("compare-it-with-yours.3", "The address of your kept chart")}</span>
                 <input class="c-in" name="mine" placeholder="https://shrutivtuber.com/chart/…" />
               </label>
               <label>
-                <span class="c-lbl">Call the comparison something</span>
+                <span class="c-lbl">{t("compare-it-with-yours.4", "Call the comparison something")}</span>
                 <input class="c-in" name="label" maxlength="80" placeholder="Us" />
               </label>
               <label class="c-consent">
                 <input type="checkbox" name="consent" value="1" />
-                <span>
-                  Keeping a comparison keeps a pointer at both birth moments.
-                  Deleting either chart deletes it.
-                </span>
+                <span>{t("compare-it-with-yours.5", "Keeping a comparison keeps a pointer at both birth moments. Deleting either chart deletes it.")}</span>
               </label>
               <div><Button type="submit" data-track="comparison:made">Compare them</Button></div>
             </form>
           </section>
 
           <section class="yours">
-            <h2>Cast your own</h2>
-            <p class="fine">
-              The same instrument, free, and it works without an account. It
-              says what it cannot compute rather than guessing — an unknown
-              birth time leaves the angles undefined instead of inventing them.
-            </p>
+            <h2>{t("cast-your-own.1", "Cast your own")}</h2>
+            <p class="fine">{t("cast-your-own.2", "The same instrument, free, and it works without an account. It says what it cannot compute rather than guessing — an unknown birth time leaves the angles undefined instead of inventing them.")}</p>
             <p>
               <a class="sh-btn" data-variant="primary" data-size="md" href="/tools/natal-chart" data-track="chart:from-share">
                 <span>Cast a chart</span>
@@ -169,8 +156,7 @@ const FIGURE = { wheel: "a wheel", north: "a North Indian square", south: "a Sou
                 form here would mean a second copy of the consent handling,
                 and that is the part of this site not to have two of. */}
             <p class="fine">
-              There is also <a href="/newsletter" data-track="newsletter:from-share">a monthly
-              letter</a> — what shipped, what the sky is doing, and the occasional paid thing.
+              There is also <a href="/newsletter" data-track="newsletter:from-share">{t("cast-your-own.3", "a monthly letter")}</a> — what shipped, what the sky is doing, and the occasional paid thing.
               One click to leave, from any issue.
             </p>
           </section>

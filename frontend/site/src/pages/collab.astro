@@ -25,6 +25,7 @@ import CsrfField from "../components/forms/CsrfField.astro";
 import { asReader, account } from "../lib/account";
 import { verifyCsrf } from "../lib/csrf";
 import { copy } from "../lib/copy";
+import Copy from "../components/content/Copy.astro";
 
 /* Every word on this page, editable from the admin. The defaults below are
    what it was written with and what still renders if nothing was changed. */
@@ -230,10 +231,7 @@ const COMMON = [
           <input type="date" name="on" value={when} />
         </label>
         <Button type="submit">Work it out</Button>
-        <p class="cb-fine">
-          Their hours are in <strong>their own</strong> local time — “from 16 until 24”
-          means four in the afternoon to midnight where they are.
-        </p>
+        <p class="cb-fine"><Copy text={t("text.1", "Their hours are in **their own** local time — “from 16 until 24” means four in the afternoon to midnight where they are.")} /></p>
       </div>
     </form>
 
@@ -312,12 +310,7 @@ const COMMON = [
           ) : (
             <>
               <h2>{t("keep-this-group.3", "Keep this group")}</h2>
-              <p class="cb-fine">
-                <a href="/signin">Sign in</a> and this set of people stops being
-                something you have to keep a tab open for — it will be here on
-                your phone too. The planner itself never needs an account, and
-                the link above works for everybody either way.
-              </p>
+              <p class="cb-fine"><Copy text={t("text.2", "[Sign in](/signin) and this set of people stops being something you have to keep a tab open for — it will be here on your phone too. The planner itself never needs an account, and the link above works for everybody either way.")} /></p>
             </>
           )}
         </section>

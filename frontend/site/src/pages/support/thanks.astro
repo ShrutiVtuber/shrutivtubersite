@@ -15,6 +15,13 @@ import BaseLayout from "../../layouts/BaseLayout.astro";
 import SectionHeader from "../../components/brand/SectionHeader.astro";
 import Button from "../../components/forms/Button.astro";
 import { account } from "../../lib/account";
+import { copy } from "../../lib/copy";
+import Copy from "../../components/content/Copy.astro";
+
+/* Every word on this page, editable from the admin. The defaults below are
+   what it was written with and what still renders if nothing was changed. */
+const t = await copy("support/thanks");
+
 
 const me = await account(Astro);
 ---
@@ -27,7 +34,7 @@ const me = await account(Astro);
     />
 
     <div class="card">
-      <h2>If it was monthly</h2>
+      <h2>{t("if-it-was-monthly.1", "If it was monthly")}</h2>
       <p>
         {
           me
@@ -43,10 +50,7 @@ const me = await account(Astro);
       </div>
     </div>
 
-    <p class="quiet">
-      A receipt is on its way from Stripe. If your name is to be read on stream, it is the one you
-      gave them — tell me on <a href="/contact">the contact page</a> if it should be something else.
-    </p>
+    <p class="quiet"><Copy text={t("text.1", "A receipt is on its way from Stripe. If your name is to be read on stream, it is the one you gave them — tell me on [the contact page](/contact) if it should be something else.")} /></p>
   </div>
 </BaseLayout>
 

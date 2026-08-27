@@ -19,6 +19,12 @@ import DisagreementControl from "../../components/tools/DisagreementControl.astr
 import CannotCompute from "../../components/tools/CannotCompute.astro";
 import { askAstro } from "../../lib/api";
 import { savedPlace } from "../../lib/account";
+import { copy } from "../../lib/copy";
+
+/* Every word on this page, editable from the admin. The defaults below are
+   what it was written with and what still renders if nothing was changed. */
+const t = await copy("tools/pancanga");
+
 
 const q = Astro.url.searchParams;
 const ATHENS = { lat: 37.9838, lon: 23.7275, label: "Athens · 37.98°N 23.73°E" };
@@ -178,7 +184,7 @@ const limbs = d
         </section>
 
         <section class="almanac">
-          <h2>The day</h2>
+          <h2>{t("the-day.1", "The day")}</h2>
           <dl>
             {
               Object.entries(d.almanac).map(([k, v]) => (
@@ -194,13 +200,10 @@ const limbs = d
         </section>
 
         <section class="windows">
-          <h2>Windows of the day</h2>
+          <h2>{t("windows-of-the-day.1", "Windows of the day")}</h2>
           {/* Reported, not prescribed. These are positions in the day's
               eighths, not instructions about what to do in them. */}
-          <p class="windows-note">
-            These are reported, not prescribed — they say where the Sun stands in the day's
-            divisions, and nothing about what you should do.
-          </p>
+          <p class="windows-note">{t("windows-of-the-day.2", "These are reported, not prescribed — they say where the Sun stands in the day's divisions, and nothing about what you should do.")}</p>
           <ul>
             {
               d.windows.map((w) => (

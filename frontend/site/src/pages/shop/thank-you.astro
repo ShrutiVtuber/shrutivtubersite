@@ -7,6 +7,13 @@
  * been recorded; it points at the email, which is where the actual thing is.
  */
 import BaseLayout from "../../layouts/BaseLayout.astro";
+import { copy } from "../../lib/copy";
+import Copy from "../../components/content/Copy.astro";
+
+/* Every word on this page, editable from the admin. The defaults below are
+   what it was written with and what still renders if nothing was changed. */
+const t = await copy("shop/thank-you");
+
 
 export const prerender = false;
 ---
@@ -14,16 +21,10 @@ export const prerender = false;
 <BaseLayout title="Thank you — Shruti" description="Your order.">
   <div class="page thanks">
     <span class="glyph" aria-hidden="true">✶&#xFE0E;</span>
-    <h1>Thank you</h1>
-    <p>
-      That went through. A receipt is on its way to the address you gave — and
-      if you bought something to download, the link is in it.
-    </p>
-    <p class="quiet">
-      Nothing else is needed from you. If the email has not arrived in a few
-      minutes, check the spam folder, and then write to me and I will sort it out.
-    </p>
-    <p><a class="back" href="/shop">Back to the shop</a></p>
+    <h1>{t("thank-you.1", "Thank you")}</h1>
+    <p>{t("thank-you.2", "That went through. A receipt is on its way to the address you gave — and if you bought something to download, the link is in it.")}</p>
+    <p class="quiet">{t("thank-you.3", "Nothing else is needed from you. If the email has not arrived in a few minutes, check the spam folder, and then write to me and I will sort it out.")}</p>
+    <p><Copy text={t("text.1", "[Back to the shop](/shop)")} /></p>
   </div>
 </BaseLayout>
 

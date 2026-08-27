@@ -3,22 +3,20 @@
 import BaseLayout from "../../layouts/BaseLayout.astro";
 import SectionHeader from "../../components/brand/SectionHeader.astro";
 import Button from "../../components/forms/Button.astro";
+import { copy } from "../../lib/copy";
+
+/* Every word on this page, editable from the admin. The defaults below are
+   what it was written with and what still renders if nothing was changed. */
+const t = await copy("account/deleted");
+
 ---
 
 <BaseLayout title="Account deleted — Shruti" description="Your account has been deleted." noindex>
   <div class="page done">
     <SectionHeader as="h1" glyph="○" eyebrow="Deleted" title="That's done" />
-    <p class="body">
-      The account, your email address, your preferences, your saved nativity and your newsletter
-      subscription are gone. It reached the list as well as the account.
-    </p>
-    <p class="body">
-      What is kept is a record that consent was given and withdrawn, with dates and no birth data.
-      That record is the proof the law asks for, and it no longer names you.
-    </p>
-    <p class="body quiet">
-      Everything on the site that never needed an account still works, and always will.
-    </p>
+    <p class="body">{t("text.1", "The account, your email address, your preferences, your saved nativity and your newsletter subscription are gone. It reached the list as well as the account.")}</p>
+    <p class="body">{t("text.2", "What is kept is a record that consent was given and withdrawn, with dates and no birth data. That record is the proof the law asks for, and it no longer names you.")}</p>
+    <p class="body quiet">{t("text.3", "Everything on the site that never needed an account still works, and always will.")}</p>
     <div class="actions">
       <Button href="/today">Day at a glance</Button>
       <Button variant="secondary" href="/tools/solar-stations">Station tracker</Button>

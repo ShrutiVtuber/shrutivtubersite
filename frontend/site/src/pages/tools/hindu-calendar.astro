@@ -20,6 +20,13 @@ import CannotCompute from "../../components/tools/CannotCompute.astro";
 import { askAstro } from "../../lib/api";
 import { savedPlace } from "../../lib/account";
 import { byMonth, corpus } from "../../lib/festivals";
+import { copy } from "../../lib/copy";
+import Copy from "../../components/content/Copy.astro";
+
+/* Every word on this page, editable from the admin. The defaults below are
+   what it was written with and what still renders if nothing was changed. */
+const t = await copy("tools/hindu-calendar");
+
 
 const q = Astro.url.searchParams;
 const ATHENS = { lat: 37.9838, lon: 23.7275 };
@@ -155,8 +162,8 @@ const RULE_NAME: Record<string, string> = {
       <label>
         <span>Authority</span>
         <select name="authority">
-          <option value="drik" selected={authority === "drik"}>Dṛk gaṇita — modern ephemeris</option>
-          <option value="surya_siddhanta" selected={authority === "surya_siddhanta"}>Sūrya Siddhānta — classical tables</option>
+          <option value="drik" selected={authority === "drik"}>{t("text.1", "Dṛk gaṇita — modern ephemeris")}</option>
+          <option value="surya_siddhanta" selected={authority === "surya_siddhanta"}>{t("text.2", "Sūrya Siddhānta — classical tables")}</option>
         </select>
       </label>
       <button type="submit" data-track="tool:used" data-track-tool="hindu-calendar">Show</button>
@@ -172,7 +179,7 @@ const RULE_NAME: Record<string, string> = {
     ) : (
       <>
         <section class="eras">
-          <h2>The year</h2>
+          <h2>{t("the-year.1", "The year")}</h2>
           <dl>
             <div><dt>Vikrama Saṁvat</dt><dd class="t-tabular">{d.eras.vikrama}</dd></div>
             <div><dt>Śaka Saṁvat</dt><dd class="t-tabular">{d.eras.shaka}</dd></div>
@@ -185,24 +192,17 @@ const RULE_NAME: Record<string, string> = {
 
         {
           d.hasAdhikaMasa && (
-            <p class="note">
-              This year carries an <strong>adhika māsa</strong> — an intercalary month, inserted
-              because a lunar month contained no solar transition. It carries no festivals: they
-              wait for the <em>nija</em> month that follows.
-            </p>
+            <p class="note"><Copy text={t("text.3", "This year carries an **adhika māsa** — an intercalary month, inserted because a lunar month contained no solar transition. It carries no festivals: they wait for the *nija* month that follows.")} /></p>
           )
         }
         {
           d.hasKshayaMasa && (
-            <p class="note">
-              This year carries a <strong>kṣaya māsa</strong>, the rarer opposite — a month removed
-              rather than added.
-            </p>
+            <p class="note"><Copy text={t("text.4", "This year carries a **kṣaya māsa**, the rarer opposite — a month removed rather than added.")} /></p>
           )
         }
 
         <section class="months">
-          <h2>Months</h2>
+          <h2>{t("months.1", "Months")}</h2>
           <div class="table-scroll">
             <table>
             <thead>
@@ -222,7 +222,7 @@ const RULE_NAME: Record<string, string> = {
                     <td class="fest">
                       {
                         m.adhika
-                          ? <span class="fest-none">none — they wait for the nija month</span>
+                          ? <span class="fest-none">{t("months.2", "none — they wait for the nija month")}</span>
                           : (m.festivals ?? []).length > 0
                             ? (m.festivals ?? []).map((f) => <span class="fest-one">{f.name} <span class="t-tabular faint">{f.date.slice(5)}</span></span>)
                             : <span class="fest-none">—</span>
@@ -253,8 +253,7 @@ const RULE_NAME: Record<string, string> = {
         </section>
 
         <p class="note">
-          Amānta and pūrṇimānta <strong>agree through the bright fortnight and diverge in the
-          dark one</strong>. A date in the dark fortnight therefore carries two different month
+          Amānta and pūrṇimānta <strong>{t("months.3", "agree through the bright fortnight and diverge in the dark one")}</strong>. A date in the dark fortnight therefore carries two different month
           names, and neither is a mistake — which is why this page offers both rather than
           picking one.
         </p>

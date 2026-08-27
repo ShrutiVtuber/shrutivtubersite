@@ -25,6 +25,21 @@ SRC = _src()
 BACKEND = Path(__file__).resolve().parents[1]
 
 
+def code_of(path: Path) -> str:
+    """
+    A file's source with its prose removed.
+
+    Same helper as test_overlays, same reason: this test asserts the component
+    never uses set:html, and the comment explaining WHY it never uses set:html
+    tripped it. Rewording the comment to dodge the grep would delete the
+    explanation to protect the test, which is precisely backwards.
+    """
+    text = path.read_text(encoding="utf-8")
+    text = re.sub(r"\{/\*.*?\*/\}", "", text, flags=re.S)
+    text = re.sub(r"/\*.*?\*/", "", text, flags=re.S)
+    return re.sub(r"(?<![:/])//[^\n]*", "", text)
+
+
 def test_the_default_lives_in_the_template_and_always_renders() -> None:
     """
     The rule the whole design rests on. A row only ever OVERRIDES the words the
@@ -117,3 +132,23 @@ def test_a_retrofitted_page_declares_its_own_page_name() -> None:
         expected = "home" if rel == "index" else rel
         assert declared == expected, (
             f"{f.name} asks for copy(\"{declared}\") but is /{expected}")
+
+
+def test_inline_copy_renders_only_four_tags() -> None:
+    """
+    A sentence with a link in it is one string she edits, not two fragments —
+    but the component that renders it must not become a hole. It builds the
+    nodes itself rather than setting HTML, so the only tags that can come out
+    are the four it knows.
+    """
+    comp = code_of(SRC / "components" / "content" / "Copy.astro")
+    assert "set:html" not in comp, "arbitrary markup can reach the page"
+    # Text nodes are escaped, not interpolated raw.
+    assert "set:text" in comp
+
+
+def test_bold_is_not_read_as_two_italics() -> None:
+    comp = code_of(SRC / "components" / "content" / "Copy.astro")
+    tok = comp[comp.index("const TOKEN"):comp.index("function parse")]
+    assert tok.index(r"\*\*") < tok.index(r"|\*(["), (
+        "the italic pattern is tried before the bold one")

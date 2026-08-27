@@ -5,6 +5,12 @@ import SectionHeader from "../../components/brand/SectionHeader.astro";
 import EmptyState from "../../components/feedback/EmptyState.astro";
 import Button from "../../components/forms/Button.astro";
 import { SITE_API } from "../../lib/api";
+import { copy } from "../../lib/copy";
+
+/* Every word on this page, editable from the admin. The defaults below are
+   what it was written with and what still renders if nothing was changed. */
+const t = await copy("newsletter/confirm");
+
 
 const token = Astro.url.searchParams.get("token") ?? "";
 let ok = false;
@@ -32,14 +38,9 @@ if (token) {
             <strong>{email}</strong> will get the letter once a month. The first one goes out at the
             new moon after it is written.
           </p>
-          <p class="body quiet">
-            One click unsubscribes from any issue, with no login. You can also just pause it —
-            pausing deletes nothing and your consent stays exactly as it is.
-          </p>
+          <p class="body quiet">{t("text.1", "One click unsubscribes from any issue, with no login. You can also just pause it — pausing deletes nothing and your consent stays exactly as it is.")}</p>
           <div class="actions">
-            <Button href={`/newsletter/preferences?token=${encodeURIComponent(unsubToken)}`}>
-              Choose what you get
-            </Button>
+            <Button href={`/newsletter/preferences?token=${encodeURIComponent(unsubToken)}`}>{t("text.2", "Choose what you get")}</Button>
             <Button variant="secondary" href="/newsletter">Read past issues</Button>
           </div>
         </>
@@ -49,7 +50,7 @@ if (token) {
           title="That link has already been used"
           body={`${failed} Confirmation links work once — if you have already confirmed, you are on the list and nothing more is needed.`}
         >
-          <Button slot="action" variant="secondary" href="/newsletter">Back to the letter</Button>
+          <Button slot="action" variant="secondary" href="/newsletter">{t("text.3", "Back to the letter")}</Button>
         </EmptyState>
       )
     }

@@ -1,0 +1,58 @@
+---
+/* One editable string that contains a link or a bold run.
+ *
+ * Most copy is a plain string and `t()` is enough. A sentence with a link in
+ * the middle is not: splitting it gives her "Their hours are in" and " local
+ * time" as two separate boxes, which is a worse editing experience than not
+ * being editable at all — she cannot see the sentence, and moving the link
+ * means retyping both halves.
+ *
+ * So these hold INLINE MARKDOWN and this renders it. Deliberately a tiny
+ * subset — links, bold, italic, code — because that is what prose in a
+ * sentence needs, and because a full markdown renderer here would wrap the
+ * result in a <p> and accept block content in a slot that expects a fragment.
+ *
+ * Not `set:html` with arbitrary input: this builds the nodes itself, so the
+ * only tags that can ever come out are the four below. The strings come from
+ * her admin, which is not a threat model, but a component that renders
+ * whatever it is handed becomes one the first time something else feeds it.
+ */
+interface Props {
+  /** Inline markdown: `[text](/href)`, `**bold**`, `*italic*`, `` `code` ``. */
+  text: string;
+}
+const { text } = Astro.props;
+
+type Node =
+  | { t: "text"; v: string }
+  | { t: "link"; v: string; href: string }
+  | { t: "b" | "i" | "code"; v: string };
+
+/* One pass, longest-delimiter-first, so `**bold**` is never read as two
+   italics. */
+const TOKEN = /\[([^\]]+)\]\(([^)\s]+)\)|\*\*([^*]+)\*\*|\*([^*]+)\*|`([^`]+)`/g;
+
+function parse(src: string): Node[] {
+  const out: Node[] = [];
+  let at = 0;
+  for (const m of src.matchAll(TOKEN)) {
+    if (m.index! > at) out.push({ t: "text", v: src.slice(at, m.index) });
+    if (m[1] !== undefined) out.push({ t: "link", v: m[1], href: m[2] });
+    else if (m[3] !== undefined) out.push({ t: "b", v: m[3] });
+    else if (m[4] !== undefined) out.push({ t: "i", v: m[4] });
+    else out.push({ t: "code", v: m[5] });
+    at = m.index! + m[0].length;
+  }
+  if (at < src.length) out.push({ t: "text", v: src.slice(at) });
+  return out;
+}
+
+const nodes = parse(text ?? "");
+---
+{nodes.map((n) =>
+  n.t === "text" ? <Fragment set:text={n.v} />
+  : n.t === "link" ? <a href={n.href}>{n.v}</a>
+  : n.t === "b" ? <strong>{n.v}</strong>
+  : n.t === "i" ? <em>{n.v}</em>
+  : <code>{n.v}</code>
+)}

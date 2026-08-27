@@ -15,6 +15,12 @@
  */
 import ToolLayout from "../../layouts/ToolLayout.astro";
 import { CIPHERS } from "../../lib/ciphers.js";
+import { copy } from "../../lib/copy";
+
+/* Every word on this page, editable from the admin. The defaults below are
+   what it was written with and what still renders if nothing was changed. */
+const t = await copy("tools/isopsephy");
+
 
 const q = Astro.url.searchParams;
 const slug = Object.hasOwn(CIPHERS, q.get("cipher") ?? "") ? q.get("cipher")! : "greek-iso";
@@ -87,15 +93,11 @@ const current = CIPHERS[slug];
   <section class="result" data-iso-result hidden></section>
 
   <noscript>
-    <p class="noscript">
-      This instrument reckons in the browser so that nothing typed into it is transmitted. With
-      scripting off there is nothing to send it to, so it cannot compute — which is the same
-      privacy property, seen from the other side.
-    </p>
+    <p class="noscript">{t("text.1", "This instrument reckons in the browser so that nothing typed into it is transmitted. With scripting off there is nothing to send it to, so it cannot compute — which is the same privacy property, seen from the other side.")}</p>
   </noscript>
 
   <p slot="aside" class="no-cross">
-    <strong>No conversion between systems.</strong> A Greek 598 and a Hebrew 598 are not a
+    <strong>{t("text.2", "No conversion between systems.")}</strong> A Greek 598 and a Hebrew 598 are not a
     correspondence; they are two different questions that happen to have the same answer. Matches
     are only ever sought inside one system.
   </p>
@@ -197,9 +199,9 @@ const current = CIPHERS[slug];
         head =
           `<p class="iso-total"><span class="n">${esc(r.assembled || "—")}</span>` +
           `<span class="lbl">assembled number</span></p>` +
-          `<p class="iso-note">Kaṭapayādi is a <strong>place-value encoding, not a sum</strong>. ` +
+          `<p class="iso-note">Kaṭapayādi is a <strong>{t("text.3", "place-value encoding, not a sum")}</strong>. ` +
           `Only the last consonant of a cluster counts, standalone vowels are zero, and the digits ` +
-          `are read right to left — <em lang="sa">aṅkānāṁ vāmato gatiḥ</em>. ` +
+          `are read right to left — <em lang="sa">{t("text.4", "aṅkānāṁ vāmato gatiḥ")}</em>. ` +
           `No total is offered because the system does not make one.</p>` +
           `<p class="iso-rule" lang="sa">अङ्कानां वामतो गतिः</p>`;
       } else {

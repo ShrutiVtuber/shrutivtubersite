@@ -16,6 +16,13 @@ import PasskeySignIn from "../components/auth/PasskeySignIn.astro";
 import { SITE_API } from "../lib/api";
 import { verifyCsrf } from "../lib/csrf";
 import { redirectWithCookies } from "../lib/redirect";
+import { copy } from "../lib/copy";
+import Copy from "../components/content/Copy.astro";
+
+/* Every word on this page, editable from the admin. The defaults below are
+   what it was written with and what still renders if nothing was changed. */
+const t = await copy("signin");
+
 
 const method = Astro.url.searchParams.get("method") === "password" ? "password" : "link";
 let sent = false;
@@ -64,13 +71,9 @@ if (Astro.request.method === "POST") {
             Sent to <strong>{values.email}</strong>. It works <strong>once</strong> and expires in
             <strong> 20 minutes</strong>.
           </p>
-          <p class="check-body">
-            Nothing yet? It sometimes lands in spam — and if the address has no account here, no
-            mail is sent at all, which is deliberate: whether an address has an account is not
-            something a stranger gets to learn from this form.
-          </p>
+          <p class="check-body">{t("text.1", "Nothing yet? It sometimes lands in spam — and if the address has no account here, no mail is sent at all, which is deliberate: whether an address has an account is not something a stranger gets to learn from this form.")}</p>
           <div class="check-actions">
-            <Button variant="secondary" href="/signin">Use a different address</Button>
+            <Button variant="secondary" href="/signin">{t("text.2", "Use a different address")}</Button>
             <form method="POST" class="inline-form">
               <CsrfField />
               <input type="hidden" name="email" value={values.email} />
@@ -107,11 +110,11 @@ if (Astro.request.method === "POST") {
                 {method === "password" ? "Sign in" : "Send me a link"}
               </Button>
             </div>
-            <p class="auth-alt">No account? <a href="/signup">Make one</a>.</p>
+            <p class="auth-alt"><Copy text={t("text.4", "No account? [Make one](/signup).")} /></p>
             {/* Reader accounts and the site owner's admin are separate systems
                 with separate credentials. Saying so here costs nothing and
                 saves the owner concluding her password is broken. */}
-            <p class="admin-hint">Looking for the site admin? That is <a href="/admin">a separate sign-in</a>.</p>
+            <p class="admin-hint">Looking for the site admin? That is <a href="/admin">{t("text.3", "a separate sign-in")}</a>.</p>
           </form>
         </>
       )

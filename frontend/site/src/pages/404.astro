@@ -3,6 +3,12 @@
    handoff: an error page is still the brand talking. */
 import BaseLayout from "../layouts/BaseLayout.astro";
 import Button from "../components/forms/Button.astro";
+import { copy } from "../lib/copy";
+
+/* Every word on this page, editable from the admin. The defaults below are
+   what it was written with and what still renders if nothing was changed. */
+const t = await copy("404");
+
 
 /* Said explicitly, because this page is REWRITTEN to as well as routed to.
  * Astro sets 404 for an address that matches nothing, but a rewrite keeps the
@@ -16,8 +22,8 @@ Astro.response.status = 404;
 <BaseLayout title="Not found — Shruti" description="This page is in another sky.">
   <div class="page err">
     <span class="err-glyph t-glyph" aria-hidden="true">☾</span>
-    <h1>This page is in another sky.</h1>
-    <p>The address may have moved when the site was rebuilt — the almanac below will get you home.</p>
+    <h1>{t("this-page-is-in-another-.1", "This page is in another sky.")}</h1>
+    <p>{t("this-page-is-in-another-.2", "The address may have moved when the site was rebuilt — the almanac below will get you home.")}</p>
     <div class="err-actions">
       <Button href="/">Back home</Button>
       <Button variant="secondary" href="/journal">Read the journal</Button>

@@ -12,6 +12,12 @@ import LessonList from "../../components/classes/LessonList.astro";
 import { SITE_API } from "../../lib/api";
 import { READER_COOKIE } from "../../lib/account";
 import { renderMarkdown } from "../../lib/markdown";
+import { copy } from "../../lib/copy";
+
+/* Every word on this page, editable from the admin. The defaults below are
+   what it was written with and what still renders if nothing was changed. */
+const t = await copy("classes/[slug]");
+
 
 export const prerender = false;
 
@@ -115,9 +121,7 @@ const grantedBy = course.access.reason.startsWith("tier:")
                 {course.priceCents === 0 ? "Sign up" : `Take this class · ${money}`}
               </Button>
               {firstOpen && (
-                <Button variant="secondary" size="lg" href={`/classes/${slug}/${firstOpen.id}`}>
-                  Watch a lesson first
-                </Button>
+                <Button variant="secondary" size="lg" href={`/classes/${slug}/${firstOpen.id}`}>{t("text.1", "Watch a lesson first")}</Button>
               )}
             </>
           )
@@ -139,7 +143,7 @@ const grantedBy = course.access.reason.startsWith("tier:")
         {html && <Prose html={html} />}
       </div>
       <aside class="outline">
-        <h2 class="outline-head">What is in it</h2>
+        <h2 class="outline-head">{t("what-is-in-it.1", "What is in it")}</h2>
         <LessonList slug={slug} modules={course.modules} />
       </aside>
     </div>

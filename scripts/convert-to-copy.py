@@ -38,14 +38,18 @@ def key_for(section, used):
 
 def convert(path, page):
     src = pathlib.Path(path).read_text(encoding="utf-8")
-    if 'copy("' in src:
-        return None, "already converted"
+    # A page converted once still has prose the first pass would not take —
+    # anything that was wrapped across lines, or sat inside a conditional. So a
+    # second run is allowed; it just must not add the import twice, and must
+    # not reuse a key the first run already claimed.
+    again = 'copy("' in src
     parts = src.split("---", 2)
     if len(parts) < 3:
         return None, "no frontmatter"
     head, tpl = parts[1], parts[2]
 
-    used, count = set(), 0
+    used = set(re.findall(r't\(\s*["\'`]([^"\'`]+?)["\'`]', src))
+    count = 0
 
     section = ""
 
@@ -77,6 +81,9 @@ def convert(path, page):
 
     if count == 0:
         return None, "nothing convertible"
+
+    if again:
+        return f"---{head}---{tpl2}", count
 
     # The helper, declared after the last import so it can be awaited.
     imports = list(re.finditer(r"^import .*?;$", head, re.M))

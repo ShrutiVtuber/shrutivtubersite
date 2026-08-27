@@ -11,6 +11,12 @@ import Button from "../../components/forms/Button.astro";
 import EmptyState from "../../components/feedback/EmptyState.astro";
 import { SITE_API } from "../../lib/api";
 import { verifyCsrf } from "../../lib/csrf";
+import { copy } from "../../lib/copy";
+
+/* Every word on this page, editable from the admin. The defaults below are
+   what it was written with and what still renders if nothing was changed. */
+const t = await copy("newsletter/preferences");
+
 
 const token = Astro.url.searchParams.get("token") ?? "";
 let notice = "";
@@ -67,7 +73,7 @@ const SECTIONS: [keyof Prefs["sections"], string, string][] = [
           title="That link is not valid"
           body="Preference links come from the footer of any issue. If yours has stopped working, the one in the most recent letter will."
         >
-          <Button slot="action" variant="secondary" href="/newsletter">Back to the letter</Button>
+          <Button slot="action" variant="secondary" href="/newsletter">{t("text.1", "Back to the letter")}</Button>
         </EmptyState>
       ) : (
         <>
@@ -101,14 +107,14 @@ const SECTIONS: [keyof Prefs["sections"], string, string][] = [
               <legend>Cadence</legend>
               <label class="row">
                 <input type="radio" name="cadence" value="monthly" checked={prefs.cadence !== "paused"} />
-                <span><strong>Monthly</strong><span class="note">One letter a month.</span></span>
+                <span><strong>Monthly</strong><span class="note">{t("text.2", "One letter a month.")}</span></span>
               </label>
               <label class="row">
                 <input type="radio" name="cadence" value="paused" checked={prefs.cadence === "paused"} />
                 <span>
                   <strong>Paused</strong>
                   <span class="note">
-                    Nothing arrives until you turn it back on. <strong>Nothing is deleted</strong> —
+                    Nothing arrives until you turn it back on. <strong>{t("text.3", "Nothing is deleted")}</strong> —
                     your address, your settings and your consent all stay exactly as they are.
                   </span>
                 </span>
@@ -123,8 +129,7 @@ const SECTIONS: [keyof Prefs["sections"], string, string][] = [
           </form>
 
           <p class="out">
-            Or <a href={`/newsletter/unsubscribed?token=${encodeURIComponent(token)}`}>unsubscribe
-            entirely</a> — one click, and that page does not argue with you.
+            Or <a href={`/newsletter/unsubscribed?token=${encodeURIComponent(token)}`}>{t("text.4", "unsubscribe entirely")}</a> — one click, and that page does not argue with you.
           </p>
         </>
       )

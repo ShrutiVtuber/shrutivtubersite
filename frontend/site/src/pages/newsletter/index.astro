@@ -10,6 +10,12 @@ import SubscribeBlock from "../../components/brand/SubscribeBlock.astro";
 import EmptyState from "../../components/feedback/EmptyState.astro";
 import { site, SITE_API } from "../../lib/api";
 import { verifyCsrf } from "../../lib/csrf";
+import { copy } from "../../lib/copy";
+
+/* Every word on this page, editable from the admin. The defaults below are
+   what it was written with and what still renders if nothing was changed. */
+const t = await copy("newsletter");
+
 
 let state: "idle" | "sent" = "idle";
 let error = "";
@@ -52,11 +58,8 @@ const issues = (await site<Issue[]>("/api/newsletter/archive")) ?? [];
     <SubscribeBlock state={state} email={email} error={error} />
 
     <section class="archive">
-      <h2>Every issue so far</h2>
-      <p class="quiet">
-        Public, on purpose — you should be able to read exactly what you are signing up for before
-        you hand over an address.
-      </p>
+      <h2>{t("every-issue-so-far.1", "Every issue so far")}</h2>
+      <p class="quiet">{t("every-issue-so-far.2", "Public, on purpose — you should be able to read exactly what you are signing up for before you hand over an address.")}</p>
       {
         issues.length > 0 ? (
           <ul>
@@ -83,10 +86,7 @@ const issues = (await site<Issue[]>("/api/newsletter/archive")) ?? [];
 
     <section class="held">
       {/* Held deliberately, per the brief: do not build a shop yet. */}
-      <p class="quiet">
-        Nothing is for sale yet. When courses or services open, they will be offered in the letter —
-        which is why the consent above says so, rather than that arriving as a surprise later.
-      </p>
+      <p class="quiet">{t("every-issue-so-far.3", "Nothing is for sale yet. When courses or services open, they will be offered in the letter — which is why the consent above says so, rather than that arriving as a surprise later.")}</p>
     </section>
   </div>
 </BaseLayout>

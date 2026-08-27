@@ -19,6 +19,7 @@ import { pageSections } from "../lib/content";
 import { site } from "../lib/api";
 import { renderMarkdown } from "../lib/markdown";
 import { copy } from "../lib/copy";
+import Copy from "../components/content/Copy.astro";
 
 /* Every word on this page, editable from the admin. The defaults below are
    what it was written with and what still renders if nothing was changed. */
@@ -65,13 +66,7 @@ const bodyFor = (slug: string) => bodies[all.findIndex((s) => s.slug === slug)] 
       body="The channel costs money to make and these are the people covering it. Everything below is a paid arrangement, and saying so is the point of this page."
     />
 
-    <p class="disclosure">
-      <strong>How this works.</strong> These are sponsorships: money changes
-      hands. What none of them buy is a say in what gets written, what gets
-      computed, or what any instrument on this site says — and no sponsor has
-      ever seen a page before it went up. If that stops being true, this
-      paragraph changes before anything else does.
-    </p>
+    <p class="disclosure"><Copy text={t("text.1", "**How this works.** These are sponsorships: money changes hands. What none of them buy is a say in what gets written, what gets computed, or what any instrument on this site says — and no sponsor has ever seen a page before it went up. If that stops being true, this paragraph changes before anything else does.")} /></p>
 
     {
       all.length === 0 ? (

@@ -39,6 +39,7 @@ import { site, SITE_URL } from "../lib/api";
 import { asReader, account } from "../lib/account";
 import { verifyCsrf } from "../lib/csrf";
 import { copy } from "../lib/copy";
+import Copy from "../components/content/Copy.astro";
 
 /* Every word on this page, editable from the admin. The defaults below are
    what it was written with and what still renders if nothing was changed. */
@@ -276,12 +277,7 @@ const ALMANAC = [
                          aria-label="The link back to your own chart" onclick="this.select()" />
                   <button type="button" class="cx-copy cx-copy-rose" data-copy={ownUrl}>Copy link</button>
                 </div>
-                <p class="cx-keep-body">
-                  This link is the <strong>only</strong> way back to your chart.
-                  We never asked for your email, so there is nothing we could
-                  send you if it goes missing — and no account to recover. Put
-                  it where you keep things.
-                </p>
+                <p class="cx-keep-body"><Copy text={t("text.2", "This link is the **only** way back to your chart. We never asked for your email, so there is nothing we could send you if it goes missing — and no account to recover. Put it where you keep things.")} /></p>
                 <p class="cx-keep-links">
                   <a href={ownUrl}>Open it now</a>
                   <a href={`data:text/plain;charset=utf-8,${encodeURIComponent(ownUrl)}`}
@@ -405,12 +401,7 @@ const ALMANAC = [
       <div class="cx-headblock">
         <p class="t-eyebrow">The five answers</p>
         <h2>{t("the-testimonies-are-weig.1", "The testimonies are weighed. Five things they can add up to.")}</h2>
-        <p class="cx-lead">
-          These are real terms of art, not moods. A <strong>testimony</strong> is
-          how a horary astrologer weighs a question; <strong>sect</strong> is the
-          division of charts into day and night, and it changes which planets
-          help. You always see the count that produced the verdict.
-        </p>
+        <p class="cx-lead"><Copy text={t("text.3", "These are real terms of art, not moods. A **testimony** is how a horary astrologer weighs a question; **sect** is the division of charts into day and night, and it changes which planets help. You always see the count that produced the verdict.")} /></p>
       </div>
 
       <div class="cx-bands">

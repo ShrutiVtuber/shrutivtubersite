@@ -17,6 +17,11 @@ import { site } from "../../lib/api";
 import { account } from "../../lib/account";
 import { renderMarkdown } from "../../lib/markdown";
 import { sunSign } from "../../lib/signs";
+import Copy from "../../components/content/Copy.astro";
+import { copy } from "../../lib/copy";
+
+const t = await copy("horoscopes");
+
 
 const period = Astro.url.searchParams.get("period") ?? "monthly";
 /* Readings do not expire. `covers` opens a past month; without it you get the
@@ -67,10 +72,7 @@ const NAME = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
     }
     {
       !me && (
-        <p class="invite">
-          With a saved nativity your own sign appears here first, without picking it.
-          <a href="/signup"> Make an account</a> — everything else on this page works without one.
-        </p>
+        <p class="invite"><Copy text={t("text.1", "With a saved nativity your own sign appears here first, without picking it. [Make an account](/signup) — everything else on this page works without one.")} /></p>
       )
     }
 

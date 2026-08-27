@@ -6,6 +6,11 @@ import Prose from "../../../components/content/Prose.astro";
 import SubscribeBlock from "../../../components/brand/SubscribeBlock.astro";
 import { site } from "../../../lib/api";
 import { renderMarkdown } from "../../../lib/markdown";
+import Copy from "../../../components/content/Copy.astro";
+import { copy } from "../../../lib/copy";
+
+const t = await copy("newsletter/archive/[slug]");
+
 
 const slug = String(Astro.params.slug ?? "");
 interface Issue { slug: string; subject: string; letterMd: string; sentAt: string | null }
@@ -22,7 +27,7 @@ const html = await renderMarkdown(issue.letterMd);
     {/* The letter signs Shruti; the horoscope readings sign Soror Eu. A. */}
     <Prose html={html} byline="Shruti" />
     <div class="sub"><SubscribeBlock compact /></div>
-    <p class="back"><a href="/newsletter">← Every issue</a></p>
+    <p class="back"><Copy text={t("text.1", "[← Every issue](/newsletter)")} /></p>
   </div>
 </BaseLayout>
 
