@@ -1,0 +1,13 @@
+<!doctype html><meta charset=utf-8><title>frame test</title>
+<p id=out>testing…</p>
+<iframe id=f src="/about" width="400" height="300"></iframe>
+<script>
+  const f = document.getElementById("f"), out = document.getElementById("out");
+  f.addEventListener("load", () => {
+    try {
+      const ok = !!f.contentDocument && !!f.contentDocument.body;
+      out.textContent = ok ? "FRAME OK: " + f.contentDocument.title : "FRAME BLOCKED (no document)";
+    } catch (e) { out.textContent = "FRAME BLOCKED: " + e.message; }
+  });
+  setTimeout(() => { if (out.textContent === "testing…") out.textContent = "FRAME BLOCKED (never loaded)"; }, 4000);
+</script>
