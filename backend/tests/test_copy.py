@@ -259,3 +259,53 @@ def test_components_are_not_offered_for_page_preview() -> None:
     prev = code_of(SRC / "pages" / "admin" / "preview.astro")
     assert "isComponent" in prev
     assert ".filter((p) => !isComponent(p))" in prev
+
+
+def test_the_preview_shows_page_blocks_not_only_strings() -> None:
+    """
+    The bug she found: on /about the visible prose is three blocks totalling
+    1,500 characters, and the panel showed nine strings — of which the first
+    two were the <title> and the meta description, neither on the page at all.
+    "The areas to edit don't actually match up to what is on the page." They
+    did not, because most of the page was not in the panel.
+    """
+    prev = code_of(SRC / "pages" / "admin" / "preview.astro")
+    assert "/api/admin/sections" in prev, "the preview cannot see page blocks"
+    assert "BLOCK_FIELDS" in prev
+    # And a block field saves to its own route, not the copy one.
+    assert "sections/${blockId}" in prev
+
+
+def test_the_panel_is_ordered_by_the_page_not_the_source() -> None:
+    """
+    The stored position is SOURCE order, which is not screen order: a page's
+    title and meta description are declared first and rendered nowhere. The
+    panel asks the rendered document instead, and anything it cannot find is
+    moved to the end under a heading saying so — rather than sitting at the top
+    pretending to be the first thing a reader sees.
+    """
+    prev = code_of(SRC / "pages" / "admin" / "preview.astro")
+    assert "reorderByPage" in prev
+    assert "getBoundingClientRect" in prev
+    assert "not visible on this page" in prev
+
+
+def test_reordering_keeps_a_block_together() -> None:
+    """
+    `:scope >` matters. Without it the selector also matches the fields INSIDE
+    a block and hoists them out, scattering its eyebrow, heading and body down
+    the panel as loose strings — worse than the ordering it was fixing.
+    """
+    prev = code_of(SRC / "pages" / "admin" / "preview.astro")
+    assert ":scope > .str, :scope > .blk" in prev
+
+
+def test_partial_matching_is_one_directional() -> None:
+    """
+    A page node must CONTAIN the whole string. The reverse — a short node
+    inside a longer string — matches almost anything, and put the page <title>
+    halfway down the page.
+    """
+    prev = code_of(SRC / "pages" / "admin" / "preview.astro")
+    assert "have.includes(want)" in prev
+    assert "want.includes(have)" not in prev

@@ -39,6 +39,26 @@ const rows = all
   .filter((r) => r.page === page)
   .sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
 
+/* The page's BLOCKS, which are most of what a reader actually sees.
+ *
+ * Leaving them out was the bug she found: on /about the visible prose is three
+ * blocks totalling 1,500 characters, and the panel showed nine strings of which
+ * the first two were the <title> and the meta description — neither of them on
+ * the page at all. "The areas to edit don't actually match up to what is on the
+ * page." They did not, because most of the page was not in the panel. */
+const allSections: any[] = (await asAdmin(Astro, "/api/admin/sections")).body ?? [];
+const blocks = allSections
+  .filter((b: any) => b.page === page)
+  .sort((a: any, b: any) => (a.position ?? 0) - (b.position ?? 0));
+
+/* The fields of a block a person reads, in the order they render. */
+const BLOCK_FIELDS: [string, string, boolean][] = [
+  ["eyebrow", "Eyebrow", false],
+  ["title", "Heading", false],
+  ["body_md", "Body", true],
+  ["link_label", "Link label", false],
+];
+
 /* The route the iframe loads. "home" is "/". */
 const previewUrl = `/${page === "home" ? "" : page}`;
 const changed = rows.filter((r) => r.changed).length;
@@ -56,6 +76,7 @@ const changed = rows.filter((r) => r.changed).length;
         </select>
       </label>
       <span class="count">
+        {blocks.length > 0 && <>{blocks.length} block{blocks.length === 1 ? "" : "s"} · </>}
         {rows.length} string{rows.length === 1 ? "" : "s"}
         {changed > 0 && <> · <strong>{changed} changed</strong></>}
       </span>
@@ -72,7 +93,30 @@ const changed = rows.filter((r) => r.changed).length;
       </div>
 
       <aside class="panel" id="panel">
-        {rows.length === 0 ? (
+        {blocks.map((b: any) => (
+          <section class="blk">
+            <h3 class="blk-head">
+              {b.key}
+              {!b.visible && <span class="hidden-tag">hidden</span>}
+            </h3>
+            {BLOCK_FIELDS.filter(([f]) => (b[f] ?? "") !== "" || f === "body_md").map(([f, label, multi]) => (
+              <div class="str" data-block={b.id} data-field={f} data-value={b[f] ?? ""}>
+                <div class="head"><label for={`b-${b.id}-${f}`}>{label}</label></div>
+                {multi ? (
+                  <textarea id={`b-${b.id}-${f}`} rows="5" data-orig={b[f] ?? ""}>{b[f] ?? ""}</textarea>
+                ) : (
+                  <input id={`b-${b.id}-${f}`} value={b[f] ?? ""} data-orig={b[f] ?? ""} />
+                )}
+                <div class="foot">
+                  <code>block · {f}</code>
+                  <span class="state" aria-live="polite"></span>
+                </div>
+              </div>
+            ))}
+          </section>
+        ))}
+
+        {rows.length === 0 && blocks.length === 0 ? (
           <p class="empty">
             Nothing registered for this page yet. Run <code>node scripts/seed-copy.mjs</code>.
           </p>
@@ -143,10 +187,12 @@ const changed = rows.filter((r) => r.changed).length;
     for (const t of textNodes(doc)) {
       const have = flat(t.data);
       if (have === want) return t.parentElement;
-      /* A partial match is the fallback for a sentence the page has split
-         around a link or a value — the longest containing node wins, because
-         the shortest is usually a fragment of a bigger one. */
-      if (!best && want.length > 12 && (have.includes(want) || want.includes(have))) {
+      /* The fallback: a node on the page CONTAINS the whole string. Only that
+         direction — the reverse, a short page node inside a longer string,
+         matches almost anything and put the page <title> halfway down the
+         page. A string that genuinely cannot be found is reported as not
+         visible, which is true and useful, rather than placed wrongly. */
+      if (!best && want.length > 16 && have.includes(want)) {
         best = t.parentElement;
       }
     }
@@ -195,6 +241,55 @@ const changed = rows.filter((r) => r.changed).length;
   }
   frame.addEventListener("load", wireFrame);
 
+  /* ── put the panel in the page's own order ───────────────────────────────
+   *
+   * The stored `position` is the order things appear in the SOURCE, which is
+   * not the order they appear on the screen: a page's <title> and meta
+   * description are declared first and rendered nowhere, and a block's prose
+   * can sit anywhere. Sorting by it produced a panel that read nothing like
+   * the page — which is exactly the complaint.
+   *
+   * So the page is asked. Every item is looked up in the rendered document and
+   * sorted by how far down it is. Anything that cannot be found is not on this
+   * page at all — the meta tags, a hidden block, a string behind a condition —
+   * and is moved to the end under a heading that says so, rather than sitting
+   * at the top pretending to be the first thing a reader sees. */
+  function reorderByPage() {
+    const doc = frame.contentDocument;
+    if (!doc) return;
+
+    const items = [...panel.querySelectorAll<HTMLElement>(":scope > .str, :scope > .blk")];
+    const offsets = new Map<HTMLElement, number>();
+
+    for (const item of items) {
+      /* A block is placed by its first field that can be found, so its fields
+         travel together rather than scattering. */
+      const values = item.classList.contains("blk")
+        ? [...item.querySelectorAll<HTMLElement>(".str")].map((s) => s.dataset.value ?? "")
+        : [item.dataset.value ?? ""];
+      let top = Infinity;
+      for (const v of values) {
+        const el = v ? findIn(doc, v) : null;
+        if (el) { top = Math.min(top, el.getBoundingClientRect().top + (doc.documentElement.scrollTop || 0)); }
+      }
+      offsets.set(item, top);
+    }
+
+    const onPage = items.filter((i) => offsets.get(i)! < Infinity)
+                        .sort((a, b) => offsets.get(a)! - offsets.get(b)!);
+    const elsewhere = items.filter((i) => offsets.get(i)! === Infinity);
+
+    for (const i of onPage) panel.appendChild(i);
+    if (elsewhere.length) {
+      const h = document.createElement("p");
+      h.className = "not-here";
+      h.textContent = `${elsewhere.length} not visible on this page — page title, description, and anything behind a condition`;
+      panel.appendChild(h);
+      for (const i of elsewhere) panel.appendChild(i);
+    }
+  }
+  frame.addEventListener("load", reorderByPage);
+
   /* ── panel → page, and saving ─────────────────────────────────────────── */
   for (const box of panel.querySelectorAll<HTMLElement>(".str")) {
     const field = box.querySelector<HTMLInputElement | HTMLTextAreaElement>("input,textarea")!;
@@ -207,11 +302,21 @@ const changed = rows.filter((r) => r.changed).length;
       if (value === field.dataset.orig) return;
       state.textContent = "saving…";
       try {
-        const r = await fetch(`/api/admin/copy/${box.dataset.id}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ value }),
-        });
+        /* Two kinds of thing in one panel: a copy string, and one field of a
+           page block. They save to different routes, and the panel should not
+           make her care which is which. */
+        const blockId = box.dataset.block;
+        const r = blockId
+          ? await fetch(`/api/admin/sections/${blockId}`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ [box.dataset.field!]: value }),
+            })
+          : await fetch(`/api/admin/copy/${box.dataset.id}`, {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ value }),
+            });
         if (!r.ok) throw new Error(String(r.status));
         field.dataset.orig = value;
         box.dataset.value = value;
@@ -242,6 +347,30 @@ const changed = rows.filter((r) => r.changed).length;
 </script>
 
 <style>
+  .blk {
+    display: grid; gap: 8px; padding: 10px;
+    border: var(--border-w) solid var(--line-strong);
+    border-radius: var(--radius-sm);
+    background: var(--surface-veil);
+  }
+  .blk-head {
+    margin: 0; display: flex; align-items: center; gap: 8px;
+    font: 600 10px var(--font-mono); letter-spacing: .1em; text-transform: uppercase;
+    color: var(--ink-faint);
+  }
+  .hidden-tag {
+    font-size: 9px; padding: 1px 5px; border-radius: var(--radius-full, 999px);
+    background: var(--surface-inset); color: var(--ink-faint); letter-spacing: 0;
+  }
+  .blk .str { background: var(--surface-card); }
+  /* Everything below this line is real, and is not on the page. Saying which
+     is which beats letting her hunt for words that were never there. */
+  .not-here {
+    margin: var(--space-3) 0 0; padding-top: var(--space-2);
+    border-top: var(--border-w) dashed var(--line);
+    font-size: var(--text-xs); color: var(--ink-faint); font-style: italic;
+  }
+
   /* The preview is the point, so it gets the room. */
   .cms { display: grid; grid-template-rows: auto 1fr; gap: var(--space-3); height: calc(100vh - 150px); min-height: 520px; }
 
