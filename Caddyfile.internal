@@ -118,7 +118,9 @@
 			# `frame-ancestors 'self'` in the public header block below. Local
 			# had no site-wide CSP at all, so the preview worked here and was
 			# blocked in production — which is how the difference was found.
-			Content-Security-Policy "frame-ancestors 'none'"
+			# frame-src 'self': the admin EMBEDS the site, in /admin/preview.
+			# frame-ancestors 'none': nothing may embed the admin.
+			Content-Security-Policy "frame-src 'self'; frame-ancestors 'none'"
 		}
 	}
 
@@ -151,8 +153,11 @@ Try /api/health
 	# matcher rather than in the block below, because a site-wide header
 	# OVERWRITES the admin handler's own `frame-ancestors 'none'` — checked, and
 	# it did.
+	# Both halves, stated here so local and production say the same thing.
+	# Local previously set NEITHER, which is why the preview worked on a laptop
+	# and was blocked on the site — twice, for two different directives.
 	@framable not path /admin /admin/*
-	header @framable Content-Security-Policy "frame-ancestors 'self'"
+	header @framable Content-Security-Policy "frame-src 'self' https://www.youtube-nocookie.com https://player.twitch.tv; frame-ancestors 'self'"
 
 	header {
 		X-Content-Type-Options "nosniff"

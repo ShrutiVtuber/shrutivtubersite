@@ -45,7 +45,13 @@ shrutivtuber.com {
         # 'unsafe-inline' covers the no-flash theme script and design-system
         # inline styles. img-src allows data: for inlined marks. YouTube/Twitch
         # embeds need frame-src; drop those entries if embeds are removed.
-        Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self'; frame-src https://www.youtube-nocookie.com https://player.twitch.tv; base-uri 'self'; form-action 'self' https://checkout.stripe.com https://billing.stripe.com; frame-ancestors 'self'"
+        #
+        # `frame-src 'self'` is for /admin/preview, which embeds the real page
+        # so she can edit the words with the page in front of her. Note the two
+        # directives are opposites and easy to confuse: `frame-ancestors` is
+        # who may embed US, `frame-src` is what WE may embed. Fixing only the
+        # first left the preview blocked with a message naming the second.
+        Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self'; frame-src 'self' https://www.youtube-nocookie.com https://player.twitch.tv; base-uri 'self'; form-action 'self' https://checkout.stripe.com https://billing.stripe.com; frame-ancestors 'self'"
         -Server
     }
 
@@ -63,7 +69,7 @@ shrutivtuber.com {
     # frame anything here, and a page that could frame this one would already
     # have to be served from this origin.
     @admin path /admin /admin/*
-    header @admin >Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self'; frame-src https://www.youtube-nocookie.com https://player.twitch.tv; base-uri 'self'; form-action 'self' https://checkout.stripe.com https://billing.stripe.com; frame-ancestors 'none'"
+    header @admin >Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self'; frame-src 'self' https://www.youtube-nocookie.com https://player.twitch.tv; base-uri 'self'; form-action 'self' https://checkout.stripe.com https://billing.stripe.com; frame-ancestors 'none'"
 
     reverse_proxy 127.0.0.1:8200 {
         flush_interval -1
