@@ -16,6 +16,7 @@
 import ToolLayout from "../../layouts/ToolLayout.astro";
 import { CIPHERS } from "../../lib/ciphers.js";
 import { copy } from "../../lib/copy";
+import Copy from "../../components/content/Copy.astro";
 
 /* Every word on this page, editable from the admin. The defaults below are
    what it was written with and what still renders if nothing was changed. */
@@ -85,8 +86,8 @@ const current = CIPHERS[slug];
       data-language={current.language}
     ></textarea>
     <p class="never-leaves">
-      <span class="t-glyph" aria-hidden="true">○</span> nothing typed here leaves your device — the
-      tables are in the page and the reckoning runs on your own machine
+      <span class="t-glyph" aria-hidden="true">○</span>{" "}
+      <Copy text={t("privacy.line", "nothing typed here leaves your device — the tables are in the page and the reckoning runs on your own machine")} />
     </p>
   </section>
 

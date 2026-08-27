@@ -152,3 +152,25 @@ def test_bold_is_not_read_as_two_italics() -> None:
     tok = comp[comp.index("const TOKEN"):comp.index("function parse")]
     assert tok.index(r"\*\*") < tok.index(r"|\*(["), (
         "the italic pattern is tried before the bold one")
+
+
+def test_an_untouched_string_follows_the_template() -> None:
+    """
+    If she has never edited a string, its value is still exactly the default it
+    was seeded with — so when the template's words change, the value follows.
+
+    Without this, rewriting a line in a template silently does nothing: the row
+    seeded with the old words wins, the page shows the old words, and nothing
+    says why. Found exactly that way, on /press.
+
+    The moment she edits it the two diverge and seeding stops touching it.
+    """
+    import inspect
+
+    from shruti.api.routes.admin import seed_copy
+
+    src = inspect.getsource(seed_copy)
+    assert "row.value == row.default_value and row.value != item.default" in src
+    # And it must still never overwrite a value she HAS changed.
+    guarded = src.split("if row.value == row.default_value")[1].split("\n\n")[0]
+    assert "row.value = item.default" in guarded

@@ -262,12 +262,18 @@ const consentSent =
 <div class="r"><span>Thelemic</span><i></i><b>{reck.thelemic}</b></div>
 <p class="fine"><Copy text={t("text.7", "[Swiss Ephemeris](https://www.astro.com/swisseph/) · tropical above, sidereal below, neither a correction of the other · amānta reckoning. The finished instruments let you change every one of those.")} /></p>
 <p class="fine">
-  Computed on the server by
-  <a href={source?.sourceUrl ?? "https://github.com/ShrutiVtuber/shruti-astro"} rel="noopener">shruti-astro</a>,
-  {source?.version && <> version {source.version}{source.sha && source.sha !== "dev" ? ` · ${source.sha.slice(0, 7)}` : ""},</>}
-  free software under <a href="https://www.gnu.org/licenses/agpl-3.0.html" rel="noopener">AGPL-3.0</a>.
-  The source of the build that answered you is at that link — that is what the licence asks for,
-  and it is a better answer than a badge.
+  {/* One sentence, with the engine link and its build stamped in by
+      placeholder — so the whole thing stays readable and editable, and the
+      version can be moved or dropped without touching this file. */}
+  <Copy
+    text={t("engine.credit", "Computed on the server by [shruti-astro]({source}){build}, free software under [AGPL-3.0](https://www.gnu.org/licenses/agpl-3.0.html). The source of the build that answered you is at that link — that is what the licence asks for, and it is a better answer than a badge.")}
+    vars={{
+      source: source?.sourceUrl ?? "https://github.com/ShrutiVtuber/shruti-astro",
+      build: source?.version
+        ? `, version ${source.version}${source.sha && source.sha !== "dev" ? ` · ${source.sha.slice(0, 7)}` : ""}`
+        : "",
+    }}
+  />
 </p>
 </div>
 </div>

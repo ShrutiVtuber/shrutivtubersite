@@ -1186,7 +1186,20 @@ async def seed_copy(
             ))
             added += 1
             continue
-        # Metadata only. Her words are hers.
+        # An UNTOUCHED row tracks the template. If she has never edited this
+        # string, its value is still exactly the default it was seeded with —
+        # so when the default changes, the value follows.
+        #
+        # Without this, changing a line in a template silently does nothing:
+        # the row seeded with the old words wins, the page shows the old words,
+        # and nothing anywhere says why. Found exactly that way — a rewritten
+        # sentence on /press rendered as the fragment it used to be.
+        #
+        # The moment she edits it the two diverge and this stops touching it,
+        # which is the whole point: her words are hers.
+        if row.value == row.default_value and row.value != item.default:
+            row.value = item.default
+
         row.label = item.label or row.label
         row.default_value = item.default
         row.position = item.position

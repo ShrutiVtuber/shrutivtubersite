@@ -14,6 +14,7 @@
  */
 import ToolLayout from "../../layouts/ToolLayout.astro";
 import { copy } from "../../lib/copy";
+import Copy from "../../components/content/Copy.astro";
 
 /* Every word on this page, editable from the admin. The defaults below are
    what it was written with and what still renders if nothing was changed. */
@@ -72,14 +73,16 @@ const keepVowels = q.get("vowels") === "keep";
       value={letters ? "" : ""}
     ></textarea>
     <p class="never-leaves">
-      <span class="t-glyph" aria-hidden="true">○</span> nothing typed here leaves your device — the
-      statement is not sent, not put in the link, and not written into the file you export
+      <span class="t-glyph" aria-hidden="true">○</span>{" "}
+      <Copy text={t("privacy.line", "nothing typed here leaves your device — the statement is not sent, not put in the link, and not written into the file you export")} />
     </p>
     {
       letters && (
         <p class="from-link">
-          This link carried the letter set <strong class="t-tabular">{letters}</strong>, not the
-          statement it came from.
+          <Copy
+            text={t("from-link.line", "This link carried the letter set **{letters}**, not the statement it came from.")}
+            vars={{ letters }}
+          />
         </p>
       )
     }

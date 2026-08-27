@@ -19,6 +19,7 @@ import Button from "../components/forms/Button.astro";
 import EmptyState from "../components/feedback/EmptyState.astro";
 import { pageSections } from "../lib/content";
 import { copy } from "../lib/copy";
+import Copy from "../components/content/Copy.astro";
 
 /* Every word on this page, editable from the admin. The defaults below are
    what it was written with and what still renders if nothing was changed. */
@@ -41,8 +42,7 @@ const extra = sections.filter((s) => s.key !== "intro");
       <h2>{t("audience.1", "Audience")}</h2>
       {/* Deliberately no numbers. See the file header. */}
       <p class="press-note">
-        Live numbers on request — <a href="mailto:business@shrutivtuber.com">{t("audience.2", "business@shrutivtuber.com")}</a>.
-        Figures are not published here because a stale or broken figure is worse than none.
+        <Copy text={t("audience.2", "Live numbers on request — [business@shrutivtuber.com](mailto:business@shrutivtuber.com). Figures are not published here because a stale or broken figure is worse than none.")} />
       </p>
     </section>
 
@@ -54,9 +54,7 @@ const extra = sections.filter((s) => s.key !== "intro");
     <section class="press-block">
       <h2>{t("the-name.1", "The name")}</h2>
       <p>
-        <strong>Shruti</strong> — Shruti Swara — is the brand and the real name; use it for titles,
-        credits and copy. <span class="seal">Soror Eu. A.</span> signs magickal writing only and is
-        not a handle or a second logo. <strong>Theourgia</strong> is the software.
+        <Copy text={t("the-name.2", "**Shruti** — Shruti Swara — is the brand and the real name; use it for titles, credits and copy. *Soror Eu. A.* signs magickal writing only and is not a handle or a second logo. **Theourgia** is the software.")} />
       </p>
     </section>
 

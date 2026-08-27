@@ -20,8 +20,23 @@
 interface Props {
   /** Inline markdown: `[text](/href)`, `**bold**`, `*italic*`, `` `code` ``. */
   text: string;
+  /**
+   * Values for `{name}` placeholders in the text.
+   *
+   * The reason these exist: a lot of prose has a value in the middle of it —
+   * "Computed on the server by shruti-astro 1.4." Split around the value it
+   * becomes two fragments she cannot read as a sentence; with a placeholder it
+   * stays one string, and she can move the version to the front of the
+   * sentence or drop it entirely without anybody touching a template.
+   *
+   * Substituted BEFORE the markdown is parsed, so a value may itself carry a
+   * link — and an unknown placeholder is left visible rather than blanked,
+   * because a sentence with `{engine}` in it says what is wrong, and a
+   * sentence with a hole in it does not.
+   */
+  vars?: Record<string, string>;
 }
-const { text } = Astro.props;
+const { text, vars } = Astro.props;
 
 type Node =
   | { t: "text"; v: string }
@@ -47,7 +62,12 @@ function parse(src: string): Node[] {
   return out;
 }
 
-const nodes = parse(text ?? "");
+const filled = vars
+  ? (text ?? "").replace(/\{(\w+)\}/g, (whole, name) =>
+      name in vars ? String(vars[name] ?? "") : whole)
+  : (text ?? "");
+
+const nodes = parse(filled);
 ---
 {nodes.map((n) =>
   n.t === "text" ? <Fragment set:text={n.v} />
