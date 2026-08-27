@@ -113,6 +113,11 @@
 			# controls, and a transparent iframe over a "Delete" button is the
 			# whole clickjacking attack — cheap to close, and there is no
 			# legitimate reason to embed a CMS in another page.
+			#
+			# The SITE is framed, by /admin/preview, and says so with
+			# `frame-ancestors 'self'` in the public header block below. Local
+			# had no site-wide CSP at all, so the preview worked here and was
+			# blocked in production — which is how the difference was found.
 			Content-Security-Policy "frame-ancestors 'none'"
 		}
 	}
@@ -141,6 +146,13 @@ Try /api/health
 ` 200
 		}
 	}
+
+	# The site may be framed by /admin/preview and nothing else. Stated with a
+	# matcher rather than in the block below, because a site-wide header
+	# OVERWRITES the admin handler's own `frame-ancestors 'none'` — checked, and
+	# it did.
+	@framable not path /admin /admin/*
+	header @framable Content-Security-Policy "frame-ancestors 'self'"
 
 	header {
 		X-Content-Type-Options "nosniff"

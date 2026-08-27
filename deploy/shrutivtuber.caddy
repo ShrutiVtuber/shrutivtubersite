@@ -45,9 +45,25 @@ shrutivtuber.com {
         # 'unsafe-inline' covers the no-flash theme script and design-system
         # inline styles. img-src allows data: for inlined marks. YouTube/Twitch
         # embeds need frame-src; drop those entries if embeds are removed.
-        Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self'; frame-src https://www.youtube-nocookie.com https://player.twitch.tv; base-uri 'self'; form-action 'self' https://checkout.stripe.com https://billing.stripe.com; frame-ancestors 'none'"
+        Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self'; frame-src https://www.youtube-nocookie.com https://player.twitch.tv; base-uri 'self'; form-action 'self' https://checkout.stripe.com https://billing.stripe.com; frame-ancestors 'self'"
         -Server
     }
+
+    # The admin is the one thing that must never be framed — it has one-click
+    # destructive controls, and a transparent iframe over "Delete" is the whole
+    # clickjacking attack.
+    #
+    # It needs saying here rather than in the internal Caddyfile: this proxy
+    # SETS the header on the way out, replacing whatever the inner one said, so
+    # the admin's own 'none' never reached a browser. Checked with curl — one
+    # CSP header on /admin, and it was this one.
+    #
+    # Everything else is 'self' so /admin/preview can frame the real page. That
+    # is a narrowing from 'none', not an opening: another site still cannot
+    # frame anything here, and a page that could frame this one would already
+    # have to be served from this origin.
+    @admin path /admin /admin/*
+    header @admin >Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self'; frame-src https://www.youtube-nocookie.com https://player.twitch.tv; base-uri 'self'; form-action 'self' https://checkout.stripe.com https://billing.stripe.com; frame-ancestors 'none'"
 
     reverse_proxy 127.0.0.1:8200 {
         flush_interval -1

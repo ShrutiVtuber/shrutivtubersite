@@ -24,6 +24,9 @@ docker build --quiet --target dev -t shruti-backend-test ./backend >/dev/null
 #   frontend/site/public  the service worker lives there
 #   backend/alembic       the dev stage does not ship it, and some guarantees
 #                         live in a migration rather than in code
+#   the two Caddyfiles    who may frame the site is a proxy fact, and the
+#                         answer differing between local and production is
+#                         exactly how the preview shipped broken
 # A guard that cannot read the file it guards passes on an empty string, which
 # is the way this kind of check usually lies.
 exec docker run --rm \
@@ -32,6 +35,8 @@ exec docker run --rm \
   -v "$PWD/backend/alembic:/app/alembic:ro" \
   -v "$PWD/frontend/site/src:/app/frontend/site/src:ro" \
   -v "$PWD/frontend/site/public:/app/frontend/site/public:ro" \
+  -v "$PWD/Caddyfile.internal:/app/Caddyfile.internal:ro" \
+  -v "$PWD/deploy:/app/deploy:ro" \
   -e SHRUTI_SECRET_KEY=test-only-not-a-real-key \
   shruti-backend-test \
   python -m pytest tests "$@"
