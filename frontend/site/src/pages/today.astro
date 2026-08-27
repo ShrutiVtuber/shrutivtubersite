@@ -151,7 +151,7 @@ const moonProgress = today ? (today.moon.tropical.degree % 30) / 30 : 0;
             <h2>{say("stations.1", "Stations")}</h2>
             {
               noSunrise ? (
-                <NextStation size="compact" undefinedReason="The Sun does not cross the horizon here today, so there are no solar stations to keep." />
+                <NextStation size="compact" undefinedReason={say("text.12", "The Sun does not cross the horizon here today, so there are no solar stations to keep.")} />
               ) : today.stations.sun?.next ? (
                 <NextStation
                   size="compact"

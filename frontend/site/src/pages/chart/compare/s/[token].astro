@@ -60,7 +60,7 @@ const rightName = c?.right?.label || "The second";
     The address is still unguessable and nothing on the site links to one. */}
 <BaseLayout title={`${c?.label || "Two charts"} — compared`}
             description={say("text.2", "Two charts, read against each other.")}
-            ogImage={cardUrl} ogImageAlt="Two charts compared">
+            ogImage={cardUrl} ogImageAlt={say("text.7", "Two charts compared")}>
   <div class="page shared-compare">
     {
       !c ? (

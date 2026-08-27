@@ -1,0 +1,67 @@
+---
+/* Text that changes script mid-sentence, tagged so the browser knows.
+ *
+ * The hero greeting is "Welcome · Καλώς ήρθατε · स्वागत" in one line, inside
+ * an element with `text-transform: uppercase`. The document is `lang="en"`, so
+ * the browser applied English casing rules to the Greek and produced
+ * ΚΑΛΏΣ ΉΡΘΑΤΕ — with the tonos still on it.
+ *
+ * **Greek in capitals does not take the tonos.** It is not a preference; it is
+ * how the language is written, and leaving it in reads to a Greek speaker the
+ * way a random capital in the middle of an English word reads to us. Browsers
+ * get this right on their own — but only when they are told the run is Greek.
+ * Measured, on all three cases:
+ *
+ *     no lang     ΚΑΛΏΣ ΉΡΘΑΤΕ     <- wrong
+ *     lang="el"   ΚΑΛΩΣ ΗΡΘΑΤΕ     <- right
+ *     lang="el"   ΕΥΤΥΧΙΑ · Ϊ      <- dialytika correctly kept
+ *
+ * The last one matters: the rule drops the tonos and KEEPS the diaeresis, and
+ * the browser knows the difference. Stripping accents by hand in the copy
+ * would lose that, and would also mean the words could not be edited in their
+ * proper form in the admin.
+ *
+ * So the string stays whole and readable wherever it is written, and this
+ * splits it into runs by script at render. Tagging also fixes something quieter
+ * than casing: a screen reader now pronounces each part in its own language
+ * rather than reading Greek and Devanagari as though they were English.
+ */
+interface Props {
+  text: string;
+  /** The language of everything that is not Greek or Devanagari. */
+  base?: string;
+  class?: string;
+}
+const { text, base = "en", class: klass } = Astro.props;
+
+/* Only the scripts this site actually mixes. A general script-detection table
+   would be mostly dead code, and the two that matter here are the two she
+   writes in besides English. */
+const RANGES: [RegExp, string][] = [
+  [/[Ͱ-Ͽἀ-῿]/, "el"],   // Greek and Coptic, Extended
+  [/[ऀ-ॿ]/, "hi"],                // Devanagari
+];
+
+function langOf(ch: string): string | null {
+  for (const [re, lang] of RANGES) if (re.test(ch)) return lang;
+  return null;
+}
+
+/* Runs of one script, with the separators and spaces between them carried by
+   whichever run they follow — a punctuation mark has no language of its own,
+   and starting a new run for every "·" would be markup for nothing. */
+const runs: { lang: string; text: string }[] = [];
+for (const ch of text ?? "") {
+  const lang = langOf(ch) ?? (runs.length ? runs[runs.length - 1].lang : base);
+  const known = langOf(ch) !== null;
+  const carry = !known && runs.length > 0;
+  const want = carry ? runs[runs.length - 1].lang : lang;
+  if (runs.length && runs[runs.length - 1].lang === want) runs[runs.length - 1].text += ch;
+  else runs.push({ lang: want, text: ch });
+}
+---
+{runs.map((r) =>
+  r.lang === base
+    ? <Fragment set:text={r.text} />
+    : <span lang={r.lang} class={klass}>{r.text}</span>
+)}

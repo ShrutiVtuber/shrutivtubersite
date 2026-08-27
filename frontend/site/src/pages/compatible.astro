@@ -345,8 +345,8 @@ const ALMANAC = [
                   basis="consent"
                   required
                   label={say("text.9", "I give Shruti my birth date, time and place so that this chart can be cast, kept behind my own link, and compared with charts I invite.")}
-                  explanation="Used for nothing else: no profiling, no advertising, no sale, and nothing shared with anybody except the person you send your invitation to. Kept until you delete it — the delete button is on your chart page and it takes effect the same second."
-                  wording="Never pre-ticked, never bundled with anything else."
+                  explanation={say("text.16", "Used for nothing else: no profiling, no advertising, no sale, and nothing shared with anybody except the person you send your invitation to. Kept until you delete it — the delete button is on your chart page and it takes effect the same second.")}
+                  wording={say("text.17", "Never pre-ticked, never bundled with anything else.")}
                   error={errors.some((e) => e.includes("consent")) ? "This one is required." : undefined}
                 />
               )}

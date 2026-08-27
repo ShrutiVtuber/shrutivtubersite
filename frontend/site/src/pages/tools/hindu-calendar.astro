@@ -135,7 +135,7 @@ const RULE_NAME: Record<string, string> = {
 >
   <div slot="parameters" class="params">
     <DisagreementControl
-      legend="Where the month begins"
+      legend={say("text.7", "Where the month begins")}
       name="reckoning"
       value={reckoning}
       keep={{ lat: String(lat), lon: String(lon), place, authority, year: String(year) }}

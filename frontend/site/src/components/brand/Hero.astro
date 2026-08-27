@@ -9,6 +9,8 @@
  *
  * Slots: `actions` (buttons / live badge) and `footnote`.
  */
+import Scripts from "../content/Scripts.astro";
+
 interface Props {
   greeting?: string;
   title: string;
@@ -39,7 +41,10 @@ const {
   <div class="sh-hero-stars" aria-hidden="true"></div>
   {!art && <div class="sh-hero-moon" aria-hidden="true"></div>}
   <div class="sh-hero-inner">
-    {greeting && <span class="sh-hero-greet">{greeting}</span>}
+    {/* Through Scripts so each script run is tagged with its language. This
+        element is uppercased, and Greek capitals do not take the tonos — the
+        browser gets that right, but only when told the run is Greek. */}
+    {greeting && <span class="sh-hero-greet"><Scripts text={greeting} /></span>}
     <h1 class="sh-hero-title">{title}</h1>
     {subtitle && <p class="sh-hero-sub">{subtitle}</p>}
     <div class="sh-hero-actions"><slot name="actions" /></div>

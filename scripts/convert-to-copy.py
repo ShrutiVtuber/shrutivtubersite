@@ -20,9 +20,21 @@ is worse than an uneditable one.
 import re, sys, pathlib
 
 # Attributes whose value a person reads on the page.
+# Guessed at first, and the guess cost a bug: `subtitle` was missing, so the
+# home page's hero line stayed hardcoded while an identical meta description
+# sat in the panel next to it. Editing the field changed the meta tag, the page
+# kept showing the hardcoded line, and the field then vanished into "not
+# visible" because its new text matched nothing. Both of her symptoms, one
+# omission.
+#
+# So this list was rebuilt by SCANNING for attributes that actually hold
+# sentences, rather than by imagining which ones might.
 PROSE_ATTRS = ("title", "label", "body", "lede", "eyebrow", "placeholder",
                "alt", "aria-label", "description", "cta", "summary", "help",
-               "note", "hint", "caption", "ruleLabel")
+               "note", "hint", "caption", "ruleLabel",
+               "subtitle", "greeting", "why", "legend", "explanation",
+               "wording", "byline", "undefinedReason", "emptyMonthNote",
+               "rule", "ogImageAlt", "content")
 
 def slug(text):
     s = re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")

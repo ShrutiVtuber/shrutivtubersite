@@ -78,7 +78,7 @@ const host = SITE_URL.replace(/^https?:\/\//, "");
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{c?.label || "Chart"} — Shruti</title>
-    <meta name="robots" content="noindex, nofollow" />
+    <meta name="robots" content={say("text.6", "noindex, nofollow")} />
   </head>
   <body class="sheet-body">
     {

@@ -114,7 +114,7 @@ const RULE_NAME: Record<string, string> = {
 >
   <div slot="parameters" class="params">
     <DisagreementControl
-      legend="When the month begins"
+      legend={say("text.6", "When the month begins")}
       name="reckoning"
       value={reckoning}
       keep={{ lat: String(lat), lon: String(lon), place, ...(when ? { when } : {}) }}
@@ -144,7 +144,7 @@ const RULE_NAME: Record<string, string> = {
 
   {
     unreachable ? (
-      <CannotCompute title={say("text.1", "The ephemeris could not be reached")} why="Nothing here can be computed right now. That is a failure on my side, not a fact about the calendar." />
+      <CannotCompute title={say("text.1", "The ephemeris could not be reached")} why={say("text.7", "Nothing here can be computed right now. That is a failure on my side, not a fact about the calendar.")} />
     ) : beforeCycle ? (
       <CannotCompute
         title={say("text.2", "Before the Metonic cycle, this cannot be reckoned")}

@@ -190,7 +190,7 @@ const ASPECT_BASIS: Record<string, string> = {
 >
   <div slot="parameters" class="params">
     <DisagreementControl
-      legend="Which sky, whose houses"
+      legend={say("text.8", "Which sky, whose houses")}
       name="tradition"
       value={tradition}
       keep={{ date, time, lat: String(lat), lon: String(lon), place, house_system: houseSystem, ...(unknownTime ? { unknownTime: "1" } : {}) }}
@@ -261,7 +261,7 @@ const ASPECT_BASIS: Record<string, string> = {
             <CannotCompute
               mark="◐"
               title={say("text.5", "Without a birth time, the angles are undefined")}
-              why="The ascendant moves a degree every four minutes, so an unknown time leaves the ascendant, midheaven, the houses and the sect genuinely undefined — not approximate. They are withheld below rather than filled in from an assumed midnight, because a fabricated ascendant is worse than an absent one. The planets are given for noon, and the Moon as the range it covers across the day."
+              why={say("text.9", "The ascendant moves a degree every four minutes, so an unknown time leaves the ascendant, midheaven, the houses and the sect genuinely undefined — not approximate. They are withheld below rather than filled in from an assumed midnight, because a fabricated ascendant is worse than an absent one. The planets are given for noon, and the Moon as the range it covers across the day.")}
               alternatives={[
                 "Read the planetary positions, which move little across a day — except the Moon, whose range is given.",
                 "Rectify the time from known events with an astrologer, and come back with it.",

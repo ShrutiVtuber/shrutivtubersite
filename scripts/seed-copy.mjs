@@ -50,6 +50,14 @@ function walk(dir) {
 
 /* A key becomes a label by being read as English. "tiers.note" is not a thing
    to hand somebody writing marketing copy. */
+/* The first few words, as a name. Long enough to recognise, short enough to
+   scan a column of them. */
+function preview(text) {
+  const flat = text.replace(/\s+/g, " ").trim();
+  if (flat.length <= 42) return flat;
+  return flat.slice(0, 42).replace(/\s+\S*$/, "") + "…";
+}
+
 const SAY = {
   cta: "button", btn: "button", lede: "lead paragraph", sub: "subheading",
   eyebrow: "eyebrow", body: "body text", note: "note", head: "heading",
@@ -79,7 +87,11 @@ for (const file of walk(ROOT)) {
     const text = m[4];
     items.push({
       key,
-      label: m[6] || labelFor(key),
+      /* A key like "text.9" tells her nothing, and those are exactly the
+         strings that sit outside any heading — the ones hardest to place. When
+         the key is that generic, the label becomes the words themselves, which
+         is what she is actually looking for in the panel. */
+      label: m[6] || (/^text\.?\d*$/.test(key) ? preview(text) : labelFor(key)),
       default: text,
       position: i++,
       multiline: text.length > 90 || text.includes("\n"),

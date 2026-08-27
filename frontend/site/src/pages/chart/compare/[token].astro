@@ -109,7 +109,7 @@ const rightName = c?.right?.label || "The second";
 ---
 
 <BaseLayout title={say("text.2", "A comparison — Shruti")} description={say("text.3", "Two charts, read against each other.")}
-            ogImage={cardUrl} ogImageAlt="Two charts compared" noindex>
+            ogImage={cardUrl} ogImageAlt={say("text.7", "Two charts compared")} noindex>
   <div class="page compare">
     {
       !c ? (

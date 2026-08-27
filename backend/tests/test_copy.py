@@ -23,6 +23,8 @@ def _src() -> Path:
 
 SRC = _src()
 BACKEND = Path(__file__).resolve().parents[1]
+ROOT_SCRIPTS = (Path('/app/scripts') if Path('/app/scripts/convert-to-copy.py').exists()
+                else Path(__file__).resolve().parents[2] / 'scripts')
 
 
 def code_of(path: Path) -> str:
@@ -309,3 +311,39 @@ def test_partial_matching_is_one_directional() -> None:
     prev = code_of(SRC / "pages" / "admin" / "preview.astro")
     assert "have.includes(want)" in prev
     assert "want.includes(have)" not in prev
+
+
+def test_prose_attributes_were_found_by_scanning_not_guessing() -> None:
+    """
+    The first list was imagined, and the omission cost a real bug: `subtitle`
+    was missing, so the home page's hero line stayed hardcoded while an
+    IDENTICAL meta description sat editable in the panel beside it. Editing the
+    field changed the meta tag, the page kept showing the hardcoded line
+    ("changing back to what it was before"), and the field then vanished into
+    "not visible" because its new text matched nothing on the page ("the box is
+    gone"). Both symptoms, one missing attribute name.
+    """
+    conv = (ROOT_SCRIPTS / "convert-to-copy.py").read_text(encoding="utf-8")
+    for attr in ("subtitle", "greeting", "why", "legend", "explanation", "byline"):
+        assert f'"{attr}"' in conv, f"{attr}= holds prose and is not converted"
+
+
+def test_greek_capitals_are_told_they_are_greek() -> None:
+    """
+    Greek in capitals does not take the tonos. Browsers get that right on their
+    own — but only when the run is marked as Greek, and this document is
+    lang="en". Measured before and after:
+
+        no lang     ΚΑΛΏΣ ΉΡΘΑΤΕ     wrong
+        lang="el"   ΚΑΛΩΣ ΗΡΘΑΤΕ     right, and the dialytika survives
+
+    Stripping the accents in the copy itself would be the wrong fix: it loses
+    the dialytika rule, and the words could no longer be edited in their
+    proper form.
+    """
+    comp = code_of(SRC / "components" / "content" / "Scripts.astro")
+    assert '"el"' in comp and '"hi"' in comp
+    assert "lang={r.lang}" in comp
+
+    hero = code_of(SRC / "components" / "brand" / "Hero.astro")
+    assert "<Scripts text={greeting}" in hero, "the greeting is not tagged"

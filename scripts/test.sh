@@ -37,6 +37,7 @@ exec docker run --rm \
   -v "$PWD/frontend/site/public:/app/frontend/site/public:ro" \
   -v "$PWD/Caddyfile.internal:/app/Caddyfile.internal:ro" \
   -v "$PWD/deploy:/app/deploy:ro" \
+  -v "$PWD/scripts:/app/scripts:ro" \
   -e SHRUTI_SECRET_KEY=test-only-not-a-real-key \
   shruti-backend-test \
   python -m pytest tests "$@"

@@ -98,7 +98,7 @@ const GLYPH: Record<string, string> = {
 >
   <div slot="parameters" class="params">
     <DisagreementControl
-      legend="Where sunrise is"
+      legend={say("text.5", "Where sunrise is")}
       name="convention"
       value={convention}
       keep={{ lat: String(lat), lon: String(lon), place }}
@@ -130,12 +130,12 @@ const GLYPH: Record<string, string> = {
     unreachable ? (
       <CannotCompute
         title={say("text.1", "The ephemeris could not be reached")}
-        why="Nothing here can be computed right now. That is a failure on my side, not a fact about the sky."
+        why={say("text.6", "Nothing here can be computed right now. That is a failure on my side, not a fact about the sky.")}
       />
     ) : noSunrise ? (
       <CannotCompute
         title={say("text.2", "The Sun does not rise here today")}
-        why="The hours divide sunrise to sunset. With no sunrise there is nothing to divide, so the answer stays undefined — which is itself the answer, and a truer one than twelve equal clock hours pretending to be planetary."
+        why={say("text.7", "The hours divide sunrise to sunset. With no sunrise there is nothing to divide, so the answer stays undefined — which is itself the answer, and a truer one than twelve equal clock hours pretending to be planetary.")}
         alternatives={[
           "Use equal clock hours instead, understanding that they are a substitution and not the same thing.",
           "Ask for the nearest date on which the Sun clears the horizon here.",

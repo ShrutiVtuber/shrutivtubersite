@@ -119,7 +119,7 @@ const homeLd = isHome
     <title>{title}</title>
     {description && <meta name="description" content={description} />}
     <link rel="canonical" href={new URL(Astro.url.pathname, siteUrl).href} />
-    {noindex && <meta name="robots" content="noindex, nofollow" />}
+    {noindex && <meta name="robots" content={say("text.3", "noindex, nofollow")} />}
 
     {/* A crescent rather than the wordmark: at sixteen pixels a wordmark is a
         smudge, and the brief forbids inventing a seal. Transparent, so it
