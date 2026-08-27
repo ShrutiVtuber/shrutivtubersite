@@ -13,6 +13,12 @@ import BaseLayout from "../../layouts/BaseLayout.astro";
 import SectionHeader from "../../components/brand/SectionHeader.astro";
 import EmptyState from "../../components/feedback/EmptyState.astro";
 import { site, SITE_URL, PATHS, type ShopProduct } from "../../lib/api";
+import { copy } from "../../lib/copy";
+
+/* Every word on this page, editable from the admin. The defaults below are
+   what it was written with and what still renders if nothing was changed. */
+const t = await copy("shop");
+
 
 export const prerender = false;
 
@@ -56,7 +62,7 @@ const money = (p: ShopProduct) =>
     />
 
     <p class="of-note">
-      This is the only shop that is mine. <a href="/official">Everywhere else that is</a>,
+      This is the only shop that is mine. <a href="/official">{t("text.1", "Everywhere else that is")}</a>,
       and anything not on that list is not me.
     </p>
 

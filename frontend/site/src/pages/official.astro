@@ -18,6 +18,12 @@ import Prose from "../components/content/Prose.astro";
 import EmptyState from "../components/feedback/EmptyState.astro";
 import { pageSections } from "../lib/content";
 import { site } from "../lib/api";
+import { copy } from "../lib/copy";
+
+/* Every word on this page, editable from the admin. The defaults below are
+   what it was written with and what still renders if nothing was changed. */
+const t = await copy("official");
+
 
 export const prerender = false;
 
@@ -80,13 +86,8 @@ const host = (url: string) => {
         ))}
 
         <section class="of-warn">
-          <h2>If you find something that is not here</h2>
-          <p>
-            It is not mine, whatever it says about itself. Some of these copy a
-            creator's art, their name and even the word “official” onto a
-            storefront that has nothing to do with them. Nobody is expected to
-            spot that from the page itself — that is why this list exists.
-          </p>
+          <h2>{t("if-you-find-something-th.1", "If you find something that is not here")}</h2>
+          <p>{t("if-you-find-something-th.2", "It is not mine, whatever it says about itself. Some of these copy a creator's art, their name and even the word “official” onto a storefront that has nothing to do with them. Nobody is expected to spot that from the page itself — that is why this list exists.")}</p>
           <p>
             Do not buy from it, and if you have the time,{" "}
             <a href="/contact">tell me</a>. Knowing which ones exist is most of

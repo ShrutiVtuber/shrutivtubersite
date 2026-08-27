@@ -12,6 +12,12 @@ import TimezoneToggle from "../components/tables/TimezoneToggle.astro";
 import EmptyState from "../components/feedback/EmptyState.astro";
 import Button from "../components/forms/Button.astro";
 import { site, PATHS } from "../lib/api";
+import { copy } from "../lib/copy";
+
+/* Every word on this page, editable from the admin. The defaults below are
+   what it was written with and what still renders if nothing was changed. */
+const t = await copy("schedule");
+
 
 interface ScheduleRow {
   title: string; startsAt: string; durationMinutes: number | null;
@@ -104,9 +110,7 @@ const jsonLd = upcoming.length
       )
     }
 
-    <p class="schedule-note">
-      Conversions use your system timezone.
-    </p>
+    <p class="schedule-note">{t("text.1", "Conversions use your system timezone.")}</p>
   </div>
 </BaseLayout>
 

@@ -21,6 +21,12 @@ import EmptyState from "../components/feedback/EmptyState.astro";
 import CsrfField from "../components/forms/CsrfField.astro";
 import { SITE_API } from "../lib/api";
 import { verifyCsrf } from "../lib/csrf";
+import { copy } from "../lib/copy";
+
+/* Every word on this page, editable from the admin. The defaults below are
+   what it was written with and what still renders if nothing was changed. */
+const t = await copy("contact");
+
 
 let sent = false;
 let failed = "";
@@ -138,15 +144,15 @@ const extra = sections.filter((s) => s.key !== "intro");
 
     <div class="grid-2 contact-cards">
       <div class="contact-card">
-        <h2>Business enquiries</h2>
-        <p>Sponsorships, events, press. The brand-safety statement and asset pack are in the press kit.</p>
-        <span class="contact-addr">business@shrutivtuber.com</span>
-        <div><Button variant="ghost" href="/press">Open the press kit</Button></div>
+        <h2>{t("business-enquiries.1", "Business enquiries")}</h2>
+        <p>{t("business-enquiries.2", "Sponsorships, events, press. The brand-safety statement and asset pack are in the press kit.")}</p>
+        <span class="contact-addr">{t("business-enquiries.3", "business@shrutivtuber.com")}</span>
+        <div><Button variant="ghost" href="/press">{t("business-enquiries.4", "Open the press kit")}</Button></div>
       </div>
       <div class="contact-card">
-        <h2>Everything else</h2>
-        <p>Fan works, questions, edge cases, hellos.</p>
-        <span class="contact-addr">hello@shrutivtuber.com</span>
+        <h2>{t("everything-else.1", "Everything else")}</h2>
+        <p>{t("everything-else.2", "Fan works, questions, edge cases, hellos.")}</p>
+        <span class="contact-addr">{t("everything-else.3", "hello@shrutivtuber.com")}</span>
       </div>
     </div>
 
@@ -186,19 +192,16 @@ const extra = sections.filter((s) => s.key !== "intro");
   </div>
 
     <section class="ask">
-      <h2>Ask something</h2>
+      <h2>{t("ask-something.1", "Ask something")}</h2>
       <p class="ask-why">
         Different from the form above. That one reaches an inbox and gets a reply to you; this
         one may be answered here, in public, where the next person with the same question can
-        read it. <strong>Nothing appears until she has approved it</strong>, and you can leave
+        read it. <strong>{t("ask-something.2", "Nothing appears until she has approved it")}</strong>, and you can leave
         the name blank.
       </p>
 
       {asked ? (
-        <p class="ask-ok">
-          Asked. It goes nowhere public until she has read it and answered it — and she may not
-          answer every one.
-        </p>
+        <p class="ask-ok">{t("ask-something.3", "Asked. It goes nowhere public until she has read it and answered it — and she may not answer every one.")}</p>
       ) : (
         <form method="POST" class="ask-form">
           <CsrfField />
@@ -229,7 +232,7 @@ const extra = sections.filter((s) => s.key !== "intro");
       {
         answered.length > 0 && (
           <div class="answers">
-            <h3>Answered</h3>
+            <h3>{t("answered.1", "Answered")}</h3>
             <ul>
               {answered.map((q) => (
                 <li>

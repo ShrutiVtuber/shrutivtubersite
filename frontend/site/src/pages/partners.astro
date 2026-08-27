@@ -18,6 +18,12 @@ import EmptyState from "../components/feedback/EmptyState.astro";
 import { pageSections } from "../lib/content";
 import { site } from "../lib/api";
 import { renderMarkdown } from "../lib/markdown";
+import { copy } from "../lib/copy";
+
+/* Every word on this page, editable from the admin. The defaults below are
+   what it was written with and what still renders if nothing was changed. */
+const t = await copy("partners");
+
 
 export const prerender = false;
 
@@ -112,11 +118,8 @@ const bodyFor = (slug: string) => bodies[all.findIndex((s) => s.slug === slug)] 
           {
             past.length > 0 && (
               <section class="p-past">
-                <h2>Previously</h2>
-                <p class="p-past-lead">
-                  These sponsored the channel and no longer do. They are still
-                  here because they still paid for the lights.
-                </p>
+                <h2>{t("previously.1", "Previously")}</h2>
+                <p class="p-past-lead">{t("previously.2", "These sponsored the channel and no longer do. They are still here because they still paid for the lights.")}</p>
                 <ul>
                   {past.map((s) => (
                     <li>

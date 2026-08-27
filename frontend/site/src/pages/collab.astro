@@ -24,6 +24,12 @@ import ToolCta from "../components/brand/ToolCta.astro";
 import CsrfField from "../components/forms/CsrfField.astro";
 import { asReader, account } from "../lib/account";
 import { verifyCsrf } from "../lib/csrf";
+import { copy } from "../lib/copy";
+
+/* Every word on this page, editable from the admin. The defaults below are
+   what it was written with and what still renders if nothing was changed. */
+const t = await copy("collab");
+
 
 export const prerender = false;
 
@@ -164,7 +170,7 @@ const COMMON = [
 
     {groups.length > 0 && (
       <section class="cb-groups">
-        <h2>Your groups</h2>
+        <h2>{t("your-groups.1", "Your groups")}</h2>
         <ul>
           {groups.map((g: any) => (
             <li>
@@ -258,7 +264,7 @@ const COMMON = [
         </section>
 
         <section class="cb-gridwrap">
-          <h2>Hour by hour</h2>
+          <h2>{t("hour-by-hour.1", "Hour by hour")}</h2>
           <div class="cb-scroll">
             <table class="cb-grid">
               <thead>
@@ -292,10 +298,8 @@ const COMMON = [
         <section class="cb-keep">
           {signedIn ? (
             <>
-              <h2>Keep this group</h2>
-              <p class="cb-fine">
-                So you do not have to type them in again on another machine.
-              </p>
+              <h2>{t("keep-this-group.1", "Keep this group")}</h2>
+              <p class="cb-fine">{t("keep-this-group.2", "So you do not have to type them in again on another machine.")}</p>
               {saveNote && <p class="cb-ok">{saveNote}</p>}
               {saveFailed && <p class="cb-bad">{saveFailed}</p>}
               <form method="POST" class="cb-saveform">
@@ -307,7 +311,7 @@ const COMMON = [
             </>
           ) : (
             <>
-              <h2>Keep this group</h2>
+              <h2>{t("keep-this-group.3", "Keep this group")}</h2>
               <p class="cb-fine">
                 <a href="/signin">Sign in</a> and this set of people stops being
                 something you have to keep a tab open for — it will be here on
@@ -319,10 +323,8 @@ const COMMON = [
         </section>
 
         <section class="cb-share">
-          <h2>Send it to them</h2>
-          <p class="cb-fine">
-            The whole plan is in this link. Nothing about it is stored here.
-          </p>
+          <h2>{t("send-it-to-them.1", "Send it to them")}</h2>
+          <p class="cb-fine">{t("send-it-to-them.2", "The whole plan is in this link. Nothing about it is stored here.")}</p>
           <input class="cb-url" type="text" readonly value={shareUrl}
                  aria-label="A link to this plan" onclick="this.select()" />
         </section>

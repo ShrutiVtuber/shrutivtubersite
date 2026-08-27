@@ -18,6 +18,12 @@ import { CONSENTS } from "../lib/consents";
 import PasskeyList, { type PasskeyRow } from "../components/auth/PasskeyList.astro";
 import { account, asReader } from "../lib/account";
 import { verifyCsrf } from "../lib/csrf";
+import { copy } from "../lib/copy";
+
+/* Every word on this page, editable from the admin. The defaults below are
+   what it was written with and what still renders if nothing was changed. */
+const t = await copy("account");
+
 
 let notice = "";
 let failed = "";
@@ -141,7 +147,7 @@ const TRADITIONS = [
     {failed && <p class="failed" role="alert">{failed}</p>}
 
     <section class="card">
-      <h2>Profile</h2>
+      <h2>{t("profile.1", "Profile")}</h2>
       <form method="POST" class="stack">
         <CsrfField />
         <input type="hidden" name="action" value="profile" />
@@ -155,14 +161,14 @@ const TRADITIONS = [
     </section>
 
     <section class="card">
-      <h2>Nativity</h2>
+      <h2>{t("nativity.1", "Nativity")}</h2>
       {
         me.nativity ? (
           <div class="nativity">
             <p class="nat-line">
               <span class="t-tabular">{me.nativity.birthDate}</span>
               {me.nativity.timeUnknown
-                ? <span class="undef"> · birth time unknown</span>
+                ? <span class="undef">{t("nativity.2", "· birth time unknown")}</span>
                 : <span class="t-tabular"> · {me.nativity.birthTime}</span>}
             </p>
             <p class="nat-place">
@@ -174,26 +180,21 @@ const TRADITIONS = [
           </div>
         ) : state.nativity?.granted ? (
           <div class="stack">
-            <p class="quiet">No nativity saved yet.</p>
+            <p class="quiet">{t("nativity.3", "No nativity saved yet.")}</p>
             <div><Button href="/nativity">Add one</Button></div>
           </div>
         ) : (
-          <p class="quiet">
-            Storing birth data needs its own consent, below. Nothing is kept until it is given.
-          </p>
+          <p class="quiet">{t("nativity.4", "Storing birth data needs its own consent, below. Nothing is kept until it is given.")}</p>
         )
       }
     </section>
 
     <section class="card">
-      <h2>Your charts</h2>
+      <h2>{t("your-charts.1", "Your charts")}</h2>
       {
         charts.length === 0 ? (
           <div class="stack">
-            <p class="quiet">
-              None kept yet. A chart you keep gets its own address, and a separate link you can
-              hand to somebody and take back later without losing your own.
-            </p>
+            <p class="quiet">{t("your-charts.2", "None kept yet. A chart you keep gets its own address, and a separate link you can hand to somebody and take back later without losing your own.")}</p>
             <div><Button variant="secondary" href="/tools/natal-chart">Cast one</Button></div>
           </div>
         ) : (
@@ -215,11 +216,8 @@ const TRADITIONS = [
     </section>
 
     <section class="card">
-      <h2>Consents</h2>
-      <p class="quiet">
-        Three decisions, revisitable. Withdrawing is exactly as easy as giving — one control, here,
-        with no email and no waiting.
-      </p>
+      <h2>{t("consents.1", "Consents")}</h2>
+      <p class="quiet">{t("consents.2", "Three decisions, revisitable. Withdrawing is exactly as easy as giving — one control, here, with no email and no waiting.")}</p>
       {
         CONSENTS.map((c) => {
           const now = state[c.kind];
@@ -267,7 +265,7 @@ const TRADITIONS = [
     {
       support?.supporting && (
         <section class="card">
-          <h2>Your support</h2>
+          <h2>{t("your-support.1", "Your support")}</h2>
           <p class="support-tier">
             <strong>{TIER_NAMES[support.tier] || "Monthly support"}</strong>
             {support.status === "past_due" && <span class="undef"> · payment failed</span>}
@@ -281,11 +279,7 @@ const TRADITIONS = [
                   : "Active."
             }
           </p>
-          <p class="quiet">
-            Cancelling is one button on Stripe's own page, it takes effect at the end of the month
-            you have already paid for rather than the moment you press it, and no message to me is
-            needed or wanted. Thank you either way — genuinely.
-          </p>
+          <p class="quiet">{t("your-support.2", "Cancelling is one button on Stripe's own page, it takes effect at the end of the month you have already paid for rather than the moment you press it, and no message to me is needed or wanted. Thank you either way — genuinely.")}</p>
           <div>
             <form method="POST">
               <CsrfField />
@@ -298,11 +292,10 @@ const TRADITIONS = [
     }
 
     <section class="card">
-      <h2>Passkeys</h2>
+      <h2>{t("passkeys.1", "Passkeys")}</h2>
       <p class="quiet">
         A passkey signs you in with Face ID, a fingerprint or your phone's PIN instead of a
-        password. It is a keypair that lives on your device — <strong>Apple and Google are told
-        nothing</strong>, no request reaches them, and this site never learns anything about you
+        password. It is a keypair that lives on your device — <strong>{t("passkeys.2", "Apple and Google are told nothing")}</strong>, no request reaches them, and this site never learns anything about you
         from them. That is why there is no &ldquo;Sign in with Google&rdquo; button here and
         there never will be: the convenience of one, without the third party.
       </p>
@@ -310,11 +303,8 @@ const TRADITIONS = [
     </section>
 
     <section class="card">
-      <h2>Signing out</h2>
-      <p class="quiet">
-        Ends this session in this browser. Your account and everything in it stay exactly as they
-        are — this is not deleting anything.
-      </p>
+      <h2>{t("signing-out.1", "Signing out")}</h2>
+      <p class="quiet">{t("signing-out.2", "Ends this session in this browser. Your account and everything in it stay exactly as they are — this is not deleting anything.")}</p>
       <form method="POST">
         <CsrfField />
         <input type="hidden" name="action" value="signout" />
@@ -323,50 +313,44 @@ const TRADITIONS = [
     </section>
 
     <section class="card">
-      <h2>Your data</h2>
+      <h2>{t("your-data.1", "Your data")}</h2>
       <div class="rights">
         <div class="right">
-          <h3>Export</h3>
-          <p class="quiet">
-            Everything held about you, as a file, now — profile, nativity, the full consent history
-            with dates, and your newsletter state. No email round-trip and no thirty days.
-          </p>
+          <h3>{t("export.1", "Export")}</h3>
+          <p class="quiet">{t("export.2", "Everything held about you, as a file, now — profile, nativity, the full consent history with dates, and your newsletter state. No email round-trip and no thirty days.")}</p>
           <div><Button variant="secondary" href="/account/export">Download JSON</Button></div>
         </div>
         <div class="right">
-          <h3>Delete</h3>
-          <p class="quiet">
-            Immediate, irreversible, and it reaches the newsletter list too — not just the account.
-          </p>
+          <h3>{t("delete.1", "Delete")}</h3>
+          <p class="quiet">{t("delete.2", "Immediate, irreversible, and it reaches the newsletter list too — not just the account.")}</p>
           <div><Button variant="secondary" data-open-delete>Delete my account</Button></div>
         </div>
       </div>
     </section>
 
     <dialog class="modal" data-delete-modal>
-      <h2>Delete your account</h2>
+      <h2>{t("delete-your-account.1", "Delete your account")}</h2>
       <div class="lists">
         <div>
-          <h3>What goes</h3>
+          <h3>{t("what-goes.1", "What goes")}</h3>
           <ul>
-            <li>Your email address</li>
-            <li>Your name and preferences</li>
-            <li>Your saved nativity</li>
-            <li>Your newsletter subscription</li>
+            <li>{t("what-goes.2", "Your email address")}</li>
+            <li>{t("what-goes.3", "Your name and preferences")}</li>
+            <li>{t("what-goes.4", "Your saved nativity")}</li>
+            <li>{t("what-goes.5", "Your newsletter subscription")}</li>
           </ul>
         </div>
         <div>
-          <h3>What is kept, and why</h3>
+          <h3>{t("what-is-kept-and-why.1", "What is kept, and why")}</h3>
           <ul>
             <li>
-              A record that consent was given and withdrawn, with dates and <strong>no birth
-              data</strong> — that record is the proof the law asks for, and it no longer names you.
+              A record that consent was given and withdrawn, with dates and <strong>{t("what-is-kept-and-why.2", "no birth data")}</strong> — that record is the proof the law asks for, and it no longer names you.
             </li>
-            <li>Invoices, for as long as tax law requires. There are none yet.</li>
+            <li>{t("what-is-kept-and-why.3", "Invoices, for as long as tax law requires. There are none yet.")}</li>
           </ul>
         </div>
       </div>
-      <p class="modal-note">Immediate. Not reversible. No grace period.</p>
+      <p class="modal-note">{t("what-is-kept-and-why.4", "Immediate. Not reversible. No grace period.")}</p>
       <div class="modal-actions">
         <form method="POST">
           <CsrfField />

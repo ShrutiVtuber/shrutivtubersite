@@ -9,6 +9,12 @@ import BaseLayout from "../../layouts/BaseLayout.astro";
 import SectionHeader from "../../components/brand/SectionHeader.astro";
 import EmptyState from "../../components/feedback/EmptyState.astro";
 import { site, SITE_URL } from "../../lib/api";
+import { copy } from "../../lib/copy";
+
+/* Every word on this page, editable from the admin. The defaults below are
+   what it was written with and what still renders if nothing was changed. */
+const t = await copy("classes");
+
 
 export const prerender = false;
 
@@ -85,7 +91,7 @@ const when = (iso: string | null) =>
         <>
           {workshops.length > 0 && (
             <section class="band">
-              <h2 class="band-head">Live</h2>
+              <h2 class="band-head">{t("live.1", "Live")}</h2>
               <div class="grid">
                 {workshops.map((c) => (
                   <a class="card" href={`/classes/${c.slug}`}>
@@ -110,7 +116,7 @@ const when = (iso: string | null) =>
 
           {classes.length > 0 && (
             <section class="band">
-              <h2 class="band-head">At your own pace</h2>
+              <h2 class="band-head">{t("at-your-own-pace.1", "At your own pace")}</h2>
               <div class="grid">
                 {classes.map((c) => (
                   <a class="card" href={`/classes/${c.slug}`}>

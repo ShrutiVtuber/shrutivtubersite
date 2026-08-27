@@ -18,6 +18,12 @@ import SectionHeader from "../components/brand/SectionHeader.astro";
 import Button from "../components/forms/Button.astro";
 import EmptyState from "../components/feedback/EmptyState.astro";
 import { pageSections } from "../lib/content";
+import { copy } from "../lib/copy";
+
+/* Every word on this page, editable from the admin. The defaults below are
+   what it was written with and what still renders if nothing was changed. */
+const t = await copy("press");
+
 
 const sections = await pageSections("press");
 const intro = sections.find((s) => s.key === "intro");
@@ -32,26 +38,21 @@ const extra = sections.filter((s) => s.key !== "intro");
     />
 
     <section class="press-block">
-      <h2>Audience</h2>
+      <h2>{t("audience.1", "Audience")}</h2>
       {/* Deliberately no numbers. See the file header. */}
       <p class="press-note">
-        Live numbers on request — <a href="mailto:business@shrutivtuber.com">business@shrutivtuber.com</a>.
+        Live numbers on request — <a href="mailto:business@shrutivtuber.com">{t("audience.2", "business@shrutivtuber.com")}</a>.
         Figures are not published here because a stale or broken figure is worse than none.
       </p>
     </section>
 
     <section class="press-block">
-      <h2>Brand safety</h2>
-      <p>
-        Content is programming, astrology and magickal practice. No gambling, no crypto promotion,
-        no political campaigning. Streams are bilingual English and Greek. Occult subject matter is
-        treated as scholarship and practice, never as spectacle, and restricted material is named
-        rather than detailed.
-      </p>
+      <h2>{t("brand-safety.1", "Brand safety")}</h2>
+      <p>{t("brand-safety.2", "Content is programming, astrology and magickal practice. No gambling, no crypto promotion, no political campaigning. Streams are bilingual English and Greek. Occult subject matter is treated as scholarship and practice, never as spectacle, and restricted material is named rather than detailed.")}</p>
     </section>
 
     <section class="press-block">
-      <h2>The name</h2>
+      <h2>{t("the-name.1", "The name")}</h2>
       <p>
         <strong>Shruti</strong> — Shruti Swara — is the brand and the real name; use it for titles,
         credits and copy. <span class="seal">Soror Eu. A.</span> signs magickal writing only and is
@@ -60,7 +61,7 @@ const extra = sections.filter((s) => s.key !== "intro");
     </section>
 
     <section class="press-block">
-      <h2>Assets</h2>
+      <h2>{t("assets.1", "Assets")}</h2>
       <EmptyState
         glyph="◐"
         title="Asset pack not published yet"

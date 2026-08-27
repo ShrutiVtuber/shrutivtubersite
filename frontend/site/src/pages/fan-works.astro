@@ -12,6 +12,12 @@ import EmptyState from "../components/feedback/EmptyState.astro";
 import Button from "../components/forms/Button.astro";
 import Pagination from "../components/navigation/Pagination.astro";
 import { site } from "../lib/api";
+import { copy } from "../lib/copy";
+
+/* Every word on this page, editable from the admin. The defaults below are
+   what it was written with and what still renders if nothing was changed. */
+const t = await copy("fan-works");
+
 
 interface Work {
   artist: string; artistUrl: string; platform: string; title: string;
@@ -57,7 +63,7 @@ const works = all.slice((page - 1) * PER_PAGE, page * PER_PAGE);
     >
       <div slot="action" class="fan-actions">
         <Button href="/contact">Submit a piece</Button>
-        <Button variant="secondary" href="/guidelines">Read the guidelines</Button>
+        <Button variant="secondary" href="/guidelines">{t("text.1", "Read the guidelines")}</Button>
       </div>
     </EmptyState>
   </div>

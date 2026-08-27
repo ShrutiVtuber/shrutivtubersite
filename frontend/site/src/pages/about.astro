@@ -21,6 +21,12 @@ import EmptyState from "../components/feedback/EmptyState.astro";
 import Badge from "../components/navigation/Badge.astro";
 import { pageSections, profile } from "../lib/content";
 import { site } from "../lib/api";
+import { copy } from "../lib/copy";
+
+/* Every word on this page, editable from the admin. The defaults below are
+   what it was written with and what still renders if nothing was changed. */
+const t = await copy("about");
+
 
 const [sections, who] = await Promise.all([pageSections("about"), profile()]);
 const fields = who?.fields ?? [];
@@ -71,7 +77,7 @@ const credits = (who?.credits ?? []).map((c) => ({
 
       <div class="about-side">
         <div>
-          <h2 class="side-head">Profile</h2>
+          <h2 class="side-head">{t("profile.1", "Profile")}</h2>
           {
             fields.length > 0 ? (
               <ProfileFieldTable columns={1} fields={fields} />
@@ -90,14 +96,12 @@ const credits = (who?.credits ?? []).map((c) => ({
           }
         </div>
         <div>
-          <h2 class="side-head">Credits</h2>
+          <h2 class="side-head">{t("credits.1", "Credits")}</h2>
           {
             credits.length > 0 ? (
               <CreditList dense credits={credits} />
             ) : (
-              <p class="side-absent">
-                No credits recorded yet — the commissions are still in progress.
-              </p>
+              <p class="side-absent">{t("credits.2", "No credits recorded yet — the commissions are still in progress.")}</p>
             )
           }
         </div>

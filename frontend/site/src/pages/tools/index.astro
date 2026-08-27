@@ -23,6 +23,12 @@ import SectionHeader from "../../components/brand/SectionHeader.astro";
 import Prose from "../../components/content/Prose.astro";
 import { instruments, categories } from "../../lib/instruments";
 import { pageSections } from "../../lib/content";
+import { copy } from "../../lib/copy";
+
+/* Every word on this page, editable from the admin. The defaults below are
+   what it was written with and what still renders if nothing was changed. */
+const t = await copy("tools");
+
 
 export const prerender = false;
 
@@ -114,10 +120,8 @@ const jsonLd = {
     ))}
 
     <section class="inst-note">
-      <h2>What these are, and what they are not</h2>
-      <Prose html={`<p>Every instrument here computes something with a definite answer — where a
-        body was, when a month opened, what a set of letters sums to. That part is arithmetic and
-        it is either right or wrong, so each page shows the rule it used and you can check it.</p>
+      <h2>{t("what-these-are-and-what-.1", "What these are, and what they are not")}</h2>
+      <Prose html={`<p>{t("what-these-are-and-what-.2", "Every instrument here computes something with a definite answer — where a body was, when a month opened, what a set of letters sums to. That part is arithmetic and it is either right or wrong, so each page shows the rule it used and you can check it.")}</p>
         <p>What the numbers <em>mean</em> is a different question, and none of these answer it.
         They will not tell you what to do, and nothing here predicts anything. They are for people
         who already have a practice and want the reckoning done properly.</p>`} />

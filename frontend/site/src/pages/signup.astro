@@ -15,6 +15,12 @@ import EmptyState from "../components/feedback/EmptyState.astro";
 import { CONSENTS } from "../lib/consents";
 import { SITE_API } from "../lib/api";
 import { verifyCsrf } from "../lib/csrf";
+import { copy } from "../lib/copy";
+
+/* Every word on this page, editable from the admin. The defaults below are
+   what it was written with and what still renders if nothing was changed. */
+const t = await copy("signup");
+
 
 let done = false;
 let failed = "";
@@ -98,11 +104,8 @@ if (Astro.request.method === "POST") {
           />
 
           <div class="consents">
-            <h2>Three decisions</h2>
-            <p class="consents-intro">
-              These are separate on purpose. You can say yes to one and no to another, and change
-              any of them later from your account.
-            </p>
+            <h2>{t("three-decisions.1", "Three decisions")}</h2>
+            <p class="consents-intro">{t("three-decisions.2", "These are separate on purpose. You can say yes to one and no to another, and change any of them later from your account.")}</p>
             {
               CONSENTS.map((c) => (
                 <ConsentCheckbox
@@ -118,7 +121,7 @@ if (Astro.request.method === "POST") {
             }
           </div>
 
-          <div><Button type="submit" size="lg">Create the account</Button></div>
+          <div><Button type="submit" size="lg">{t("three-decisions.3", "Create the account")}</Button></div>
           <p class="auth-alt">Already have one? <a href="/signin">Sign in</a>.</p>
         </form>
       )

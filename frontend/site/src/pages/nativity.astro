@@ -20,6 +20,12 @@ import Button from "../components/forms/Button.astro";
 import { account, asReader } from "../lib/account";
 import { verifyCsrf } from "../lib/csrf";
 import { SITE_API } from "../lib/api";
+import { copy } from "../lib/copy";
+
+/* Every word on this page, editable from the admin. The defaults below are
+   what it was written with and what still renders if nothing was changed. */
+const t = await copy("nativity");
+
 
 let notice = "";
 let failed = "";
@@ -94,13 +100,9 @@ const n = me.nativity;
     {
       !allowed ? (
         <div class="card">
-          <h2>This needs its own consent</h2>
-          <p class="quiet">
-            Birth data used to produce an astrological reading arguably reveals philosophical
-            belief, which makes it special-category data. It is never stored without a separate,
-            explicit yes — and withdrawing that later deletes it again.
-          </p>
-          <div><Button href="/account">Give it in your account</Button></div>
+          <h2>{t("this-needs-its-own-conse.1", "This needs its own consent")}</h2>
+          <p class="quiet">{t("this-needs-its-own-conse.2", "Birth data used to produce an astrological reading arguably reveals philosophical belief, which makes it special-category data. It is never stored without a separate, explicit yes — and withdrawing that later deletes it again.")}</p>
+          <div><Button href="/account">{t("this-needs-its-own-conse.3", "Give it in your account")}</Button></div>
         </div>
       ) : (
         <form method="POST" class="card stack">
@@ -112,14 +114,14 @@ const n = me.nativity;
             <TextField label="Birth time" name="birth_time" type="time" value={n?.birthTime ?? ""} optionalLabel />
             <label class="unknown">
               <input type="checkbox" name="time_unknown" value="1" checked={n?.timeUnknown ?? false} data-unknown-time />
-              <span>I don't know my birth time</span>
+              <span>{t("this-needs-its-own-conse.4", "I don't know my birth time")}</span>
             </label>
             {/* Not an error, not a warning. The cost, stated. */}
             <div class="cost">
               <p>
                 If you don't know it, that is a normal answer and the chart still works. What it
                 costs: the ascendant moves a degree every four minutes, so the
-                <strong> ascendant, midheaven, houses and sect become undefined</strong>.
+                <strong>{t("this-needs-its-own-conse.5", "ascendant, midheaven, houses and sect become undefined")}</strong>.
               </p>
               <p class="cost-lists">
                 <strong>You still get:</strong> every planet's sign and degree, their aspects by
@@ -142,12 +144,7 @@ const n = me.nativity;
               label="Birth place"
               wantTimezone
             />
-            <p class="place-why">
-              A chart cast for the wrong city is indistinguishable from a right one — so the
-              resolved place, its coordinates and its timezone stay visible above. The timezone is
-              stored by name, not as an offset, because the offset that applied on your birth date
-              is not a lookup of today's rules.
-            </p>
+            <p class="place-why">{t("this-needs-its-own-conse.6", "A chart cast for the wrong city is indistinguishable from a right one — so the resolved place, its coordinates and its timezone stay visible above. The timezone is stored by name, not as an offset, because the offset that applied on your birth date is not a lookup of today's rules.")}</p>
           </div>
 
           <div><Button type="submit" size="lg">Save</Button></div>

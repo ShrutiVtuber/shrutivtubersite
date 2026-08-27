@@ -20,6 +20,12 @@ import ChartFigure from "../components/chart/ChartFigure.astro";
 import { astro } from "../lib/api";
 import { account } from "../lib/account";
 import { GLYPHS } from "../lib/stations";
+import { copy } from "../lib/copy";
+
+/* Every word on this page, editable from the admin. The defaults below are
+   what it was written with and what still renders if nothing was changed. */
+const t = await copy("today");
+
 
 const q = Astro.url.searchParams;
 const ATHENS = { lat: 37.9838, lon: 23.7275, label: "Athens, Greece" };
@@ -109,13 +115,13 @@ const moonProgress = today ? (today.moon.tropical.degree % 30) / 30 : 0;
     {
       !today ? (
         <div class="block">
-          <p class="t-eyebrow rose">○ Cannot be reckoned</p>
-          <p class="why">The ephemeris could not be reached, so nothing on this page can be computed right now. This is a failure on my side, not a fact about the sky.</p>
+          <p class="t-eyebrow rose">{t("text.1", "○ Cannot be reckoned")}</p>
+          <p class="why">{t("text.2", "The ephemeris could not be reached, so nothing on this page can be computed right now. This is a failure on my side, not a fact about the sky.")}</p>
         </div>
       ) : (
         <div class="today-grid">
           <section class="block span2">
-            <h2>Sun and Moon</h2>
+            <h2>{t("sun-and-moon.1", "Sun and Moon")}</h2>
             <div class="lum-row">
               <div class="lum">
                 <span class="lum-glyph t-glyph" aria-hidden="true">☉</span>
@@ -138,11 +144,11 @@ const moonProgress = today ? (today.moon.tropical.degree % 30) / 30 : 0;
                 </div>
               </div>
             </div>
-            <p class="both-zodiacs">Both zodiacs, unranked — tropical above, sidereal below. Neither is a correction of the other.</p>
+            <p class="both-zodiacs">{t("sun-and-moon.2", "Both zodiacs, unranked — tropical above, sidereal below. Neither is a correction of the other.")}</p>
           </section>
 
           <section class="block">
-            <h2>Stations</h2>
+            <h2>{t("stations.1", "Stations")}</h2>
             {
               noSunrise ? (
                 <NextStation size="compact" undefinedReason="The Sun does not cross the horizon here today, so there are no solar stations to keep." />
@@ -175,13 +181,10 @@ const moonProgress = today ? (today.moon.tropical.degree % 30) / 30 : 0;
           </section>
 
           <section class="block">
-            <h2>Planetary hour</h2>
+            <h2>{t("planetary-hour.1", "Planetary hour")}</h2>
             {
               noSunrise || !today.planetaryHours.current ? (
-                <p class="why">
-                  ○ The hours divide sunrise to sunset, and with no sunrise there is nothing to
-                  divide. Undefined here, which is itself the answer.
-                </p>
+                <p class="why">{t("planetary-hour.2", "○ The hours divide sunrise to sunset, and with no sunrise there is nothing to divide. Undefined here, which is itself the answer.")}</p>
               ) : (
                 <div class="hours">
                   <div class="hour">
@@ -229,15 +232,11 @@ const moonProgress = today ? (today.moon.tropical.degree % 30) / 30 : 0;
           </section>
 
           <section class="block span2">
-            <h2>Transits</h2>
+            <h2>{t("transits.1", "Transits")}</h2>
             {
               signedIn && nat && byBody.length > 0 ? (
                 <>
-                  <p class="why">
-                    Where the sky is now, against where it was when you were born.
-                    Whole-sign, the same rule the natal instrument uses — no orbs,
-                    so a configuration either holds or it does not.
-                  </p>
+                  <p class="why">{t("transits.2", "Where the sky is now, against where it was when you were born. Whole-sign, the same rule the natal instrument uses — no orbs, so a configuration either holds or it does not.")}</p>
                   <ul class="transits">
                     {byBody.map((g) => (
                       <li>
@@ -256,14 +255,7 @@ const moonProgress = today ? (today.moon.tropical.degree % 30) / 30 : 0;
                   </ul>
                   {
                     nat.timeUnknown ? (
-                      <p class="tr-undef">
-                        ◐ Your birth time is not known, so transits to the
-                        ascendant, the midheaven and the houses are undefined and
-                        are not shown. The ascendant moves a degree every four
-                        minutes; one computed from an assumed noon would be
-                        invented, not approximate. The planetary transits above
-                        do not depend on it.
-                      </p>
+                      <p class="tr-undef">{t("transits.3", "◐ Your birth time is not known, so transits to the ascendant, the midheaven and the houses are undefined and are not shown. The ascendant moves a degree every four minutes; one computed from an assumed noon would be invented, not approximate. The planetary transits above do not depend on it.")}</p>
                     ) : (
                       <p class="tr-angles t-tabular">
                         natal asc {today.transits.natalAngles.ascendant.toFixed(2)}° ·
@@ -273,22 +265,13 @@ const moonProgress = today ? (today.moon.tropical.degree % 30) / 30 : 0;
                   }
                 </>
               ) : signedIn && nat ? (
-                <p class="why">
-                  Nothing in the sky is making a whole-sign configuration to your
-                  chart right now. That is an answer, not a gap — with no orbs, a
-                  configuration either holds or it does not.
-                </p>
+                <p class="why">{t("transits.4", "Nothing in the sky is making a whole-sign configuration to your chart right now. That is an answer, not a gap — with no orbs, a configuration either holds or it does not.")}</p>
               ) : (
                 /* Invitation, not a wall. No blur, no lock, no fake preview,
                    no count of what is missing. */
                 <div class="invite">
-                  <p>
-                    Everything else on this page works without an account, and always will. This one
-                    block needs to know where you were born — nothing else does.
-                  </p>
-                  <p class="invite-quiet">
-                    No account? The page above is the whole page. This is an invitation, not a wall.
-                  </p>
+                  <p>{t("transits.5", "Everything else on this page works without an account, and always will. This one block needs to know where you were born — nothing else does.")}</p>
+                  <p class="invite-quiet">{t("transits.6", "No account? The page above is the whole page. This is an invitation, not a wall.")}</p>
                   <div>
                     <Button variant="secondary" href={signedIn ? "/nativity" : "/signup?next=/today"}>
                       {signedIn ? "Add your nativity" : "Save a nativity"}
@@ -300,12 +283,12 @@ const moonProgress = today ? (today.moon.tropical.degree % 30) / 30 : 0;
           </section>
 
           <section class="block span2">
-            <h2>Today in every reckoning kept</h2>
+            <h2>{t("today-in-every-reckoning.1", "Today in every reckoning kept")}</h2>
             <ul class="reckonings">
               <li>
                 <span class="r-name">Gregorian</span>
                 <span class="t-tabular r-val">{today.reckonings.gregorian}</span>
-                <span class="r-rule">civil, by the clock</span>
+                <span class="r-rule">{t("today-in-every-reckoning.2", "civil, by the clock")}</span>
               </li>
               {today.reckonings.hindu && (
                 <li>
@@ -325,7 +308,7 @@ const moonProgress = today ? (today.moon.tropical.degree % 30) / 30 : 0;
                 <li>
                   <span class="r-name">Thelemic</span>
                   <span class="r-val">{today.reckonings.thelemic.formatted}</span>
-                  <span class="r-rule">year turns at the March equinox</span>
+                  <span class="r-rule">{t("today-in-every-reckoning.3", "year turns at the March equinox")}</span>
                 </li>
               )}
             </ul>
@@ -337,7 +320,7 @@ const moonProgress = today ? (today.moon.tropical.degree % 30) / 30 : 0;
     {
       undef.length > 0 && (
         <div class="block">
-          <p class="t-eyebrow rose">◐ Partly reckonable</p>
+          <p class="t-eyebrow rose">{t("today-in-every-reckoning.4", "◐ Partly reckonable")}</p>
           <ul class="undef">{undef.map((u) => <li>{u}</li>)}</ul>
         </div>
       )

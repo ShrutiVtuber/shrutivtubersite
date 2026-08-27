@@ -17,6 +17,12 @@ import ProjectCard from "../components/cards/ProjectCard.astro";
 import EmptyState from "../components/feedback/EmptyState.astro";
 import Button from "../components/forms/Button.astro";
 import { site, PATHS, type Project } from "../lib/api";
+import { copy } from "../lib/copy";
+
+/* Every word on this page, editable from the admin. The defaults below are
+   what it was written with and what still renders if nothing was changed. */
+const t = await copy("work");
+
 
 interface FullProject extends Project {
   role: string;
@@ -81,7 +87,7 @@ const INSTRUMENTS: [string, string, string, string][] = [
                   meta={[p.licence, p.stack].filter(Boolean).join(" · ") || undefined}
                 />
                 <div>
-                  <h3 class="work-credits-head">Credits</h3>
+                  <h3 class="work-credits-head">{t("credits.1", "Credits")}</h3>
                   <dl class="sh-pft" data-cols="1">
                     {rows.map(([label, value]) => (
                       <div class="sh-pft-row">

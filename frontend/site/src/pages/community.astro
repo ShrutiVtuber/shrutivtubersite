@@ -20,6 +20,12 @@ import Button from "../components/forms/Button.astro";
 import { site, PATHS, type LiveStatus } from "../lib/api";
 import { verifyCsrf } from "../lib/csrf";
 import { SITE_API } from "../lib/api";
+import { copy } from "../lib/copy";
+
+/* Every word on this page, editable from the admin. The defaults below are
+   what it was written with and what still renders if nothing was changed. */
+const t = await copy("community");
+
 
 export const prerender = false;
 
@@ -91,10 +97,7 @@ const closed = (polls ?? []).filter((p: any) => p.closed).slice(0, 2);
             ? <><strong>{room.online}</strong> here now</>
             : <>Discord</>}
         </p>
-        <p class="c-note">
-          Where things get talked about between streams. This number is fetched
-          by the server, not your browser — Discord is not told you were here.
-        </p>
+        <p class="c-note">{t("text.1", "Where things get talked about between streams. This number is fetched by the server, not your browser — Discord is not told you were here.")}</p>
         {
           room?.invite && (
             <div class="c-acts">
@@ -109,7 +112,7 @@ const closed = (polls ?? []).filter((p: any) => p.closed).slice(0, 2);
       </section>
 
       <section class="c-card c-notify">
-        <span class="t-eyebrow">When she goes live</span>
+        <span class="t-eyebrow">{t("text.2", "When she goes live")}</span>
         <NotifyButton />
       </section>
     </div>
@@ -119,12 +122,8 @@ const closed = (polls ?? []).filter((p: any) => p.closed).slice(0, 2);
     <section class="c-block c-compat">
       <div class="cc-words">
         <span class="t-eyebrow">For fun</span>
-        <h2>Are we compatible?</h2>
-        <p class="c-note">
-          Put your chart beside somebody else's and see what the tradition
-          makes of the pair. Twenty seconds, no account, and it gives you a
-          card worth posting. It says what it cannot know, which is most of it.
-        </p>
+        <h2>{t("are-we-compatible.1", "Are we compatible?")}</h2>
+        <p class="c-note">{t("are-we-compatible.2", "Put your chart beside somebody else's and see what the tradition makes of the pair. Twenty seconds, no account, and it gives you a card worth posting. It says what it cannot know, which is most of it.")}</p>
         <div class="c-acts">
           <Button href="/compatible" data-track="compare:from-community">Compare charts →</Button>
         </div>
@@ -139,25 +138,18 @@ const closed = (polls ?? []).filter((p: any) => p.closed).slice(0, 2);
         whole reason they exist. */}
     <section class="c-block c-tool" id="collab">
       <span class="t-eyebrow">For creators</span>
-      <h2>When can all of us be live?</h2>
-      <p class="c-note">
-        Put everybody in, get the hours that work for all of them, and send the
-        link. Nothing is stored — the whole plan lives in the address — so it
-        still works in six months and there is no account to lose.
-      </p>
+      <h2>{t("when-can-all-of-us-be-li.1", "When can all of us be live?")}</h2>
+      <p class="c-note">{t("when-can-all-of-us-be-li.2", "Put everybody in, get the hours that work for all of them, and send the link. Nothing is stored — the whole plan lives in the address — so it still works in six months and there is no account to lose.")}</p>
       <div class="c-acts">
         <Button href="/collab" variant="secondary">Plan a collab →</Button>
       </div>
     </section>
 
     <section class="c-block" id="polls">
-      <h2>Have a say</h2>
+      <h2>{t("have-a-say.1", "Have a say")}</h2>
       {
         open.length === 0 && closed.length === 0 ? (
-          <p class="c-note">
-            Nothing open at the moment. When there is a decision worth putting
-            to people, it appears here — and on the home page.
-          </p>
+          <p class="c-note">{t("have-a-say.2", "Nothing open at the moment. When there is a decision worth putting to people, it appears here — and on the home page.")}</p>
         ) : (
           <div class="c-polls">
             {open.map((p: any) => <PollCard poll={p} />)}
@@ -168,18 +160,15 @@ const closed = (polls ?? []).filter((p: any) => p.closed).slice(0, 2);
     </section>
 
     <section class="c-block">
-      <h2>Ask her something</h2>
-      <p class="c-note">
-        Questions get answered in public, where the next person with the same
-        one can read the answer. Nothing appears until she has approved it.
-      </p>
+      <h2>{t("ask-her-something.1", "Ask her something")}</h2>
+      <p class="c-note">{t("ask-her-something.2", "Questions get answered in public, where the next person with the same one can read the answer. Nothing appears until she has approved it.")}</p>
       <div class="c-acts">
         <Button variant="secondary" href="/contact#ask">Ask a question →</Button>
       </div>
     </section>
 
     <section class="c-block">
-      <h2>While you are here</h2>
+      <h2>{t("while-you-are-here.1", "While you are here")}</h2>
       <GlyphGame />
     </section>
   </div>
