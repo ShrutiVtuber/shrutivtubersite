@@ -75,9 +75,23 @@ them; a `copy` row only ever overrides one. An empty table renders a complete
 site. So a new page needs no migration — write it with `t("key", "the words")`,
 then run `node scripts/seed-copy.mjs` and it appears in Words.
 
-`scripts/convert-to-copy.py <file> <page>` routes an existing page's prose
-through the helper. It converts only unambiguous text nodes and says "nothing
-convertible" rather than guessing.
+Two converters, both of which refuse rather than guess:
+
+- `scripts/convert-to-copy.py <file> <page>` — plain text nodes.
+- `scripts/convert-inline-copy.py <file> <page>` — a paragraph carrying a link
+  or a bold run becomes ONE string holding inline markdown, rendered by
+  `components/content/Copy.astro`. Splitting those instead would give her
+  "Their hours are in" as a box to edit.
+
+`<Copy vars={{...}} />` fills `{name}` placeholders, for a sentence built
+around a value.
+
+**Reseeding is safe and necessary.** A row whose value still equals its seeded
+default has never been edited, so a changed template updates it. Once she edits
+it the two diverge and seeding leaves it alone. Without that rule, rewriting a
+line in a template silently does nothing — which happened, on /press.
+
+414 words remain in templates, all sentences wrapping an expression.
 
 ---
 
