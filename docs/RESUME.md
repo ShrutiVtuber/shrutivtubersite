@@ -61,6 +61,26 @@ database, by design. Each URL is one OBS Browser Source at 1920 × 1080.
 Nothing from the handoff is outstanding. What is left is hers, not mine — see
 the list below.
 
+## Editing copy — where things live now
+
+| What | Where |
+|---|---|
+| Sections on a page (eyebrow, heading, prose, link, art) | `/admin/blocks?kind=sections`, grouped by page |
+| Every other string on a page | `/admin/copy` — the **Words** screen, grouped by page |
+| Instrument name, summary, body, FAQ, reckoning | `/admin/blocks?kind=tools` |
+| Journal entries | BeeRanked, not here |
+
+**The rule.** A page ships its own words as the default and always renders
+them; a `copy` row only ever overrides one. An empty table renders a complete
+site. So a new page needs no migration — write it with `t("key", "the words")`,
+then run `node scripts/seed-copy.mjs` and it appears in Words.
+
+`scripts/convert-to-copy.py <file> <page>` routes an existing page's prose
+through the helper. It converts only unambiguous text nodes and says "nothing
+convertible" rather than guessing.
+
+---
+
 ## Next session: the commission progress tracker
 
 Agreed 2026-08-27. The thing from the tweet she saved — clients having to beg
