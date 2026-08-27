@@ -9,7 +9,7 @@ import { copy } from "../../lib/copy";
 
 /* Every word on this page, editable from the admin. The defaults below are
    what it was written with and what still renders if nothing was changed. */
-const t = await copy("newsletter/confirm");
+const say = await copy("newsletter/confirm");
 
 
 const token = Astro.url.searchParams.get("token") ?? "";
@@ -28,29 +28,29 @@ if (token) {
 }
 ---
 
-<BaseLayout title="Confirmed — Shruti" description="Your subscription to the monthly letter." noindex>
+<BaseLayout title={say("text.4", "Confirmed — Shruti")} description={say("text.5", "Your subscription to the monthly letter.")} noindex>
   <div class="page confirm">
     {
       ok ? (
         <>
-          <SectionHeader as="h1" glyph="☾" eyebrow="Confirmed" title="You're on the list" />
+          <SectionHeader as="h1" glyph="☾" eyebrow="Confirmed" title={say("text.6", "You're on the list")} />
           <p class="body">
             <strong>{email}</strong> will get the letter once a month. The first one goes out at the
             new moon after it is written.
           </p>
-          <p class="body quiet">{t("text.1", "One click unsubscribes from any issue, with no login. You can also just pause it — pausing deletes nothing and your consent stays exactly as it is.")}</p>
+          <p class="body quiet">{say("text.1", "One click unsubscribes from any issue, with no login. You can also just pause it — pausing deletes nothing and your consent stays exactly as it is.")}</p>
           <div class="actions">
-            <Button href={`/newsletter/preferences?token=${encodeURIComponent(unsubToken)}`}>{t("text.2", "Choose what you get")}</Button>
-            <Button variant="secondary" href="/newsletter">Read past issues</Button>
+            <Button href={`/newsletter/preferences?token=${encodeURIComponent(unsubToken)}`}>{say("text.2", "Choose what you get")}</Button>
+            <Button variant="secondary" href="/newsletter">{say("text.8", "Read past issues")}</Button>
           </div>
         </>
       ) : (
         <EmptyState
           glyph="◐"
-          title="That link has already been used"
+          title={say("text.7", "That link has already been used")}
           body={`${failed} Confirmation links work once — if you have already confirmed, you are on the list and nothing more is needed.`}
         >
-          <Button slot="action" variant="secondary" href="/newsletter">{t("text.3", "Back to the letter")}</Button>
+          <Button slot="action" variant="secondary" href="/newsletter">{say("text.3", "Back to the letter")}</Button>
         </EmptyState>
       )
     }

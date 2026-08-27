@@ -1,4 +1,10 @@
 ---
+import { copy } from "../../lib/copy";
+
+/* Every word here, editable from the admin. The defaults below are what
+   it was written with and what still renders if nothing was changed. */
+const say = await copy("component:MediaField");
+
 /* An image field you can actually fill in.
  *
  * The old way was: leave the page, go to Media, upload, copy the id, come
@@ -35,19 +41,17 @@ const current = value === null || value === "" ? "" : String(value);
   <div class="mf-row">
     <figure class="mf-preview" data-mf-preview data-empty={current ? undefined : "true"}>
       <img data-mf-img alt="" hidden />
-      <figcaption data-mf-caption>Nothing chosen</figcaption>
+      <figcaption data-mf-caption>{say("text.4", "Nothing chosen")}</figcaption>
     </figure>
 
     <div class="mf-controls">
       <div class="mf-actions">
         <label class="mf-btn">
-          <span>Upload a file</span>
+          <span>{say("text.5", "Upload a file")}</span>
           <input type="file" data-mf-file
                  accept="image/png,image/jpeg,image/webp,image/avif,image/svg+xml" />
         </label>
-        <button type="button" class="mf-btn mf-btn--quiet" data-mf-browse>
-          Choose existing
-        </button>
+        <button type="button" class="mf-btn mf-btn--quiet" data-mf-browse>{say("text.6", "Choose existing")}</button>
         <button type="button" class="mf-btn mf-btn--quiet" data-mf-clear hidden>
           Remove
         </button>
@@ -55,9 +59,9 @@ const current = value === null || value === "" ? "" : String(value);
 
       <div class="mf-naming">
         <input class="adm-input" type="text" data-mf-title
-               placeholder="Name it — “Stream overlay, corner frame”" />
+               placeholder={say("text.1", "Name it — “Stream overlay, corner frame”")} />
         <input class="adm-input" type="text" data-mf-tags
-               placeholder="Tags, comma separated" />
+               placeholder={say("text.2", "Tags, comma separated")} />
       </div>
 
       <p class="mf-status" data-mf-status role="status"></p>
@@ -66,15 +70,12 @@ const current = value === null || value === "" ? "" : String(value);
 
   <div class="mf-library" data-mf-library hidden>
     <input class="adm-input mf-search" type="search" data-mf-search
-           placeholder="Search the library…" />
+           placeholder={say("text.3", "Search the library…")} />
     <div class="mf-grid" data-mf-grid></div>
   </div>
 
   <noscript>
-    <p class="adm-note">
-      Uploading in place needs JavaScript. Without it, upload on the Media page
-      and put the id here:
-    </p>
+    <p class="adm-note">{say("text.7", "Uploading in place needs JavaScript. Without it, upload on the Media page and put the id here:")}</p>
     <input class="adm-input" type="text" name={name} value={current} />
   </noscript>
 </div>

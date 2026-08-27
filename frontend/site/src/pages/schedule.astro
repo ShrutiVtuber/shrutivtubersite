@@ -16,7 +16,7 @@ import { copy } from "../lib/copy";
 
 /* Every word on this page, editable from the admin. The defaults below are
    what it was written with and what still renders if nothing was changed. */
-const t = await copy("schedule");
+const say = await copy("schedule");
 
 
 interface ScheduleRow {
@@ -71,14 +71,14 @@ const jsonLd = upcoming.length
 ---
 
 <BaseLayout
-  title="Schedule — Shruti"
-  description="When Shruti is live: upcoming streams of programming, astrology and magickal practice, authored in Athens and shown in your own timezone."
+  title={say("text.2", "Schedule — Shruti")}
+  description={say("text.3", "When Shruti is live: upcoming streams of programming, astrology and magickal practice, authored in Athens and shown in your own timezone.")}
   jsonLd={jsonLd}
 >
   <div class="page">
     <div class="section-head">
       <SectionHeader
-        as="h1" glyph="☾" eyebrow="Schedule" title="Upcoming streams"
+        as="h1" glyph="☾" eyebrow="Schedule" title={say("text.4", "Upcoming streams")}
         body="Authored in Athens (GMT+3); times shown in your zone."
       />
       {rows.length > 0 && <TimezoneToggle value="athens" />}
@@ -89,10 +89,10 @@ const jsonLd = upcoming.length
         <EmptyState
           as="h2"
           glyph="○"
-          title="The sky is quiet"
-          body="Nothing scheduled yet — streams are announced on Discord first, and the calendar fills at the new moon."
+          title={say("text.5", "The sky is quiet")}
+          body={say("text.6", "Nothing scheduled yet — streams are announced on Discord first, and the calendar fills at the new moon.")}
         >
-          <Button slot="action" variant="secondary" href="/contact">Get in touch</Button>
+          <Button slot="action" variant="secondary" href="/contact">{say("text.7", "Get in touch")}</Button>
         </EmptyState>
       ) : (
         <div class="schedule-rows">
@@ -110,7 +110,7 @@ const jsonLd = upcoming.length
       )
     }
 
-    <p class="schedule-note">{t("text.1", "Conversions use your system timezone.")}</p>
+    <p class="schedule-note">{say("text.1", "Conversions use your system timezone.")}</p>
   </div>
 </BaseLayout>
 

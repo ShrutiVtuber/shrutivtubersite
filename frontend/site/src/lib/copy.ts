@@ -15,8 +15,8 @@
  *
  * So a page reads:
  *
- *   const t = await copy("support");
- *   <p>{t("tiers.note", "Every tier is monthly and cancels in one click.")}</p>
+ *   const say = await copy("support");
+ *   <p>{say("tiers.note", "Every tier is monthly and cancels in one click.")}</p>
  *
  * and `npm run copy:seed` (scripts/seed-copy.mjs) reads those same calls back
  * out of the source to register them in the admin. The template is the source

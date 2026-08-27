@@ -1,4 +1,10 @@
 ---
+import { copy } from "../../lib/copy";
+
+/* Every word here, editable from the admin. The defaults below are what
+   it was written with and what still renders if nothing was changed. */
+const say = await copy("component:LiveBadge");
+
 /* The stream-status moment. Ported from `components/brand/LiveBadge.jsx`;
  * contract in `LiveBadge.d.ts`.
  *
@@ -67,7 +73,7 @@ const count = viewers != null ? new Intl.NumberFormat("en").format(viewers) : nu
       </span>
     )
   }
-  {!compact && status === "unknown" && <span class="sh-meta">check Twitch directly</span>}
+  {!compact && status === "unknown" && <span class="sh-meta">{say("text.1", "check Twitch directly")}</span>}
 </Tag>
 
 <style>

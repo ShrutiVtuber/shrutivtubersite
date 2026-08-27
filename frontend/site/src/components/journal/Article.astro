@@ -15,6 +15,12 @@ import Card from "./Card.astro";
 import SkyRecordBlock from "./SkyRecord.astro";
 import { GLYPH, KIND_LABEL, type JournalPage } from "../../lib/journal/types";
 import { longDate, shortDate } from "../../lib/journal/format";
+import { copy } from "../../lib/copy";
+
+/* Every word here, editable from the admin. The defaults below are what
+   it was written with and what still renders if nothing was changed. */
+const say = await copy("component:Article");
+
 
 interface Props { page: JournalPage; related: JournalPage["entries"] }
 const { page, related } = Astro.props;
@@ -47,7 +53,7 @@ const hasToc = page.toc.length >= 3;
           /* The art-absent state, designed rather than left blank: most entries
              have no cover and the plate has to look deliberate. */
           <div class="j-plate j-plate--entry" role="img"
-               aria-label="Sky plate — this entry has no cover art">
+               aria-label={say("text.1", "Sky plate — this entry has no cover art")}>
             <Glyph mark={GLYPH[page.kind]} />
             <span class="j-plate-note">{KIND_LABEL[page.kind].toLowerCase()} · no cover art</span>
             <span class="j-plate-note">{shortDate(page.date)}</span>
@@ -87,7 +93,7 @@ const hasToc = page.toc.length >= 3;
       {
         related.length > 0 && (
           <section class="j-next">
-            <p class="j-eyebrow">Continue reading</p>
+            <p class="j-eyebrow">{say("text.2", "Continue reading")}</p>
             <div class="j-next-grid">
               {related.slice(0, 3).map((e) => <Card entry={e} variant="next" />)}
             </div>
@@ -102,7 +108,7 @@ const hasToc = page.toc.length >= 3;
         {
           hasToc ? (
             <>
-              <p class="j-eyebrow">On this page</p>
+              <p class="j-eyebrow">{say("text.3", "On this page")}</p>
               {page.toc.map((t) => (
                 <a class={`j-toc-link${t.level > 2 ? " j-toc-link--sub" : ""}`} href={`#${t.id}`}>
                   {t.text}

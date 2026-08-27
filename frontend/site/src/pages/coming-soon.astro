@@ -178,7 +178,7 @@ import Copy from "../components/content/Copy.astro";
 
 /* Every word on this page, editable from the admin. The defaults below are
    what it was written with and what still renders if nothing was changed. */
-const t = await copy("coming-soon");
+const say = await copy("coming-soon");
 
 
 const csrf = Astro.locals.csrf;
@@ -196,7 +196,7 @@ const consentSent =
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>{t("text.1", "Shruti — instruments for magick")}</title>
+<title>{say("text.1", "Shruti — instruments for magick")}</title>
 <meta name="description" content="Instruments for magick — an ephemeris, four calendars, planetary hours and letter-reckoning. The site is being built; the sky is not waiting." />
 {/* Stays until the full site launches — handoff §4. */}
 <meta name="robots" content="noindex" />
@@ -219,9 +219,9 @@ const consentSent =
 <main>
 <div class="panel veil">
 <div style="display:grid;gap:12px">
-<p class="eyebrow">{t("text.2", "shrutivtuber.com · in construction")}</p>
-<h1>The site is being built.<br />{t("text.3", "The sky is not waiting.")}</h1>
-<p class="lede">{t("text.4", "Instruments for magick — an ephemeris, four calendars, planetary hours, letter-reckoning — built in the open and given away. The pages are still going up. Below is the sky over Athens as of this moment, which is the only part that was never going to wait for a launch date.")}</p>
+<p class="eyebrow">{say("text.2", "shrutivtuber.com · in construction")}</p>
+<h1>The site is being built.<br />{say("text.3", "The sky is not waiting.")}</h1>
+<p class="lede">{say("text.4", "Instruments for magick — an ephemeris, four calendars, planetary hours, letter-reckoning — built in the open and given away. The pages are still going up. Below is the sky over Athens as of this moment, which is the only part that was never going to wait for a launch date.")}</p>
 </div>
 <div class="card">
 <div style="display:flex;align-items:baseline;gap:8px 12px;flex-wrap:wrap">
@@ -251,22 +251,22 @@ const consentSent =
       </div>
     </>
   ) : (
-    <p class="fine">{t("text.5", "The ephemeris could not be reached just now. It is usually a moment.")}</p>
+    <p class="fine">{say("text.5", "The ephemeris could not be reached just now. It is usually a moment.")}</p>
   )
 }
 <div class="reck">
-<p class="eyebrow" style="margin-bottom:3px">{t("text.6", "Today, in every reckoning kept here")}</p>
+<p class="eyebrow" style="margin-bottom:3px">{say("text.6", "Today, in every reckoning kept here")}</p>
 <div class="r"><span>Gregorian</span><i></i><b class="tab" id="greg">—</b></div>
 <div class="r"><span>Attic</span><i></i><b>{reck.attic}</b></div>
-<div class="r"><span>Hindu · amānta</span><i></i><b>{reck.hindu}</b></div>
+<div class="r"><span>{say("text.9", "Hindu · amānta")}</span><i></i><b>{reck.hindu}</b></div>
 <div class="r"><span>Thelemic</span><i></i><b>{reck.thelemic}</b></div>
-<p class="fine"><Copy text={t("text.7", "[Swiss Ephemeris](https://www.astro.com/swisseph/) · tropical above, sidereal below, neither a correction of the other · amānta reckoning. The finished instruments let you change every one of those.")} /></p>
+<p class="fine"><Copy text={say("text.7", "[Swiss Ephemeris](https://www.astro.com/swisseph/) · tropical above, sidereal below, neither a correction of the other · amānta reckoning. The finished instruments let you change every one of those.")} /></p>
 <p class="fine">
   {/* One sentence, with the engine link and its build stamped in by
       placeholder — so the whole thing stays readable and editable, and the
       version can be moved or dropped without touching this file. */}
   <Copy
-    text={t("engine.credit", "Computed on the server by [shruti-astro]({source}){build}, free software under [AGPL-3.0](https://www.gnu.org/licenses/agpl-3.0.html). The source of the build that answered you is at that link — that is what the licence asks for, and it is a better answer than a badge.")}
+    text={say("engine.credit", "Computed on the server by [shruti-astro]({source}){build}, free software under [AGPL-3.0](https://www.gnu.org/licenses/agpl-3.0.html). The source of the build that answered you is at that link — that is what the licence asks for, and it is a better answer than a badge.")}
     vars={{
       source: source?.sourceUrl ?? "https://github.com/ShrutiVtuber/shruti-astro",
       build: source?.version
@@ -279,23 +279,23 @@ const consentSent =
 </div>
 <div style="display:grid;gap:12px">
 <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap">
-<h2 style="margin:0;font-family:var(--font-display);font-size:var(--text-h4);font-weight:600">{t("hear-when-it-opens.1", "Hear when it opens")}</h2>
-<span style="font-family:var(--font-mono);font-size:.625rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--rose)">{t("hear-when-it-opens.2", "one letter a month")}</span>
+<h2 style="margin:0;font-family:var(--font-display);font-size:var(--text-h4);font-weight:600">{say("hear-when-it-opens.1", "Hear when it opens")}</h2>
+<span style="font-family:var(--font-mono);font-size:.625rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--rose)">{say("hear-when-it-opens.2", "one letter a month")}</span>
 </div>
 <form id="sub" method="POST">
 <input type="hidden" name="_csrf" value={csrf} />
-<label><span>Email address</span><input type="email" name="email" required placeholder="you@example.com" autocomplete="email" /></label>
+<label><span>{say("text.10", "Email address")}</span><input type="email" name="email" required placeholder="you@example.com" autocomplete="email" /></label>
 <button type="submit" id="subbtn">{sent ? "Check your email" : "Send me the letter"}</button>
 </form>
 <p class="consent" id="consent">{sent ? consentSent : failed ? failed : consentDefault}</p>
 </div>
 <div class="where">
-<p class="eyebrow">{t("hear-when-it-opens.3", "Until then, she is here")}</p>
+<p class="eyebrow">{say("hear-when-it-opens.3", "Until then, she is here")}</p>
 {/* Real links only — a pill with nowhere to go is worse than one fewer. */}
 {pills.length > 0 && (
   <div class="pills">{pills.map((p) => <a href={p.url} rel="me noopener">{p.label}</a>)}</div>
 )}
-<p style="margin:0;font-size:var(--text-xs);line-height:1.6;color:var(--ink-faint)">{t("hear-when-it-opens.4", "Streams run most weeks from Athens. The repositories are public already — the instruments exist before the pages that will explain them.")}</p>
+<p style="margin:0;font-size:var(--text-xs);line-height:1.6;color:var(--ink-faint)">{say("hear-when-it-opens.4", "Streams run most weeks from Athens. The repositories are public already — the instruments exist before the pages that will explain them.")}</p>
 </div>
 </div>
 </main>
@@ -304,7 +304,7 @@ const consentSent =
 <div class="foot">
 <p class="imprint" set:html={imprintHtml}></p>
 <p>© <span id="yr">{year}</span> {holder} · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a></p>
-<span class="seal" title="Soror Eu. A.">S∴E.A.</span>
+<span class="seal" title={say("text.8", "Soror Eu. A.")}>S∴E.A.</span>
 </div>
 </footer>
 </div>

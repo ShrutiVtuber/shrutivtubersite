@@ -1,4 +1,10 @@
 ---
+import { copy } from "../../lib/copy";
+
+/* Every word here, editable from the admin. The defaults below are what
+   it was written with and what still renders if nothing was changed. */
+const say = await copy("component:HappeningNow");
+
 /* One band answering "what is going on with Shruti".
  *
  * Two cards, not three. The next stream was a card here and is not any more:
@@ -24,9 +30,9 @@ const isLive = live?.status === "live";
   <div class="h-head">
     <div>
       <span class="t-eyebrow">Right now</span>
-      <h2>What is going on</h2>
+      <h2>{say("what-is-going-on.1", "What is going on")}</h2>
     </div>
-    <a class="h-all" href="/community">Everything happening →</a>
+    <a class="h-all" href="/community">{say("what-is-going-on.2", "Everything happening →")}</a>
   </div>
 
   <div class="h-cards">
@@ -37,11 +43,8 @@ const isLive = live?.status === "live";
       </p>
       {
         isLive
-          ? <p class="h-note">She is on. The chat is the fastest way to say something to her.</p>
-          : <p class="h-note">
-              The schedule says when next — streams are announced on Discord
-              first.
-            </p>
+          ? <p class="h-note">{say("what-is-going-on.3", "She is on. The chat is the fastest way to say something to her.")}</p>
+          : <p class="h-note">{say("what-is-going-on.4", "The schedule says when next — streams are announced on Discord first.")}</p>
       }
       <a class="h-go" href={isLive ? "/videos" : "/schedule"}>
         {isLive ? "Watch →" : "The schedule →"}
@@ -53,14 +56,11 @@ const isLive = live?.status === "live";
       <p class="h-big">
         {room?.online != null ? <>{room.online} <span class="h-unit">here now</span></> : "Discord"}
       </p>
-      <p class="h-note">
-        Where things get talked about between streams, and where a stream is
-        announced first.
-      </p>
+      <p class="h-note">{say("what-is-going-on.5", "Where things get talked about between streams, and where a stream is announced first.")}</p>
       {
         room?.invite && (
           <a class="h-go" href={room.invite} rel="noopener" target="_blank"
-             data-track="discord:joined">Join the Discord →</a>
+             data-track="discord:joined">{say("what-is-going-on.6", "Join the Discord →")}</a>
         )
       }
     </div>

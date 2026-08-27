@@ -8,6 +8,12 @@
  */
 import { type JournalPage } from "../../lib/journal/types";
 import { shortDate } from "../../lib/journal/format";
+import { copy } from "../../lib/copy";
+
+/* Every word here, editable from the admin. The defaults below are what
+   it was written with and what still renders if nothing was changed. */
+const say = await copy("component:DocsPage");
+
 
 interface Props { page: JournalPage }
 const { page } = Astro.props;
@@ -55,7 +61,7 @@ const hasToc = page.toc.length >= 3;
         {
           hasToc ? (
             <>
-              <p class="j-eyebrow">On this page</p>
+              <p class="j-eyebrow">{say("text.1", "On this page")}</p>
               {page.toc.map((t) => (
                 <a class={`j-toc-link${t.level > 2 ? " j-toc-link--sub" : ""}`} href={`#${t.id}`}>
                   {t.text}
@@ -64,7 +70,7 @@ const hasToc = page.toc.length >= 3;
             </>
           ) : (
             <>
-              <p class="j-eyebrow">Last reviewed</p>
+              <p class="j-eyebrow">{say("text.2", "Last reviewed")}</p>
               <p class="j-rail-note j-mono">{shortDate(page.date)}</p>
               <p class="j-eyebrow">Source</p>
               <p class="j-rail-note">

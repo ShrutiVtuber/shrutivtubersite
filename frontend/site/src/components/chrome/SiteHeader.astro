@@ -7,6 +7,12 @@
  */
 import LiveBadge from "../brand/LiveBadge.astro";
 import type { BadgeState } from "../../lib/live";
+import { copy } from "../../lib/copy";
+
+/* Every word here, editable from the admin. The defaults below are what
+   it was written with and what still renders if nothing was changed. */
+const say = await copy("component:SiteHeader");
+
 
 interface Props {
   live: BadgeState;
@@ -47,7 +53,7 @@ const current = (href: string) => (href === "/" ? here === "/" : here.startsWith
 <header class="site-header" data-scrolled="false">
   <div class="page">
     <div class="bar">
-      <a class="brand" href="/" aria-label="Shruti — home">
+      <a class="brand" href="/" aria-label={say("text.1", "Shruti — home")}>
         {
           withArt ? (
             <img src="/brand/wordmark-small.png" alt="Shruti" />
@@ -81,7 +87,7 @@ const current = (href: string) => (href === "/" ? here === "/" : here.startsWith
         </button>
       </div>
     </div>
-    <nav id="site-menu" class="site-menu" aria-label="Primary, mobile" hidden>
+    <nav id="site-menu" class="site-menu" aria-label={say("text.2", "Primary, mobile")} hidden>
       {
         NAV.filter(([href]) => visible(href)).map(([href, label]) => (
           <a href={href} aria-current={current(href) ? "page" : undefined}>
@@ -95,9 +101,9 @@ const current = (href: string) => (href === "/" ? here === "/" : here.startsWith
           other way in — and left the other seven reachable only from the
           landing page. The hub covers all of them and is one item shorter. */}
       <a href="/tools">Instruments</a>
-      <a href="/newsletter">The monthly letter</a>
+      <a href="/newsletter">{say("text.3", "The monthly letter")}</a>
       <a href={signedIn ? "/account" : "/signin"}>{signedIn ? "Account" : "Sign in"}</a>
-      <a href="/support">Support the work</a>
+      <a href="/support">{say("text.4", "Support the work")}</a>
       <a href="/contact">Contact</a>
     </nav>
   </div>

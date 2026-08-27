@@ -24,7 +24,7 @@ import { copy } from "../../../lib/copy";
 
 /* Every word on this page, editable from the admin. The defaults below are
    what it was written with and what still renders if nothing was changed. */
-const t = await copy("classes/[slug]/[lesson]");
+const say = await copy("classes/[slug]/[lesson]");
 
 
 export const prerender = false;
@@ -108,7 +108,7 @@ const done = here >= 0 ? all[here].done : false;
           <div class="acts">
             {lesson.status === 401 && <Button href="/signin">Sign in</Button>}
             <Button variant={lesson.status === 401 ? "secondary" : "primary"}
-                    href={`/classes/${slug}`}>About this class</Button>
+                    href={`/classes/${slug}`}>{say("text.3", "About this class")}</Button>
           </div>
         </div>
       )}
@@ -143,14 +143,14 @@ const done = here >= 0 ? all[here].done : false;
         </p>
       )}
       {!locked && (it.kind === "pdf" || it.kind === "audio") && !it.file && (
-        <p class="absent">{t("text.1", "Nothing attached to this lesson yet.")}</p>
+        <p class="absent">{say("text.1", "Nothing attached to this lesson yet.")}</p>
       )}
 
       {!locked && it.kind === "quiz" && it.questions?.length > 0 && (
         <Quiz questions={it.questions} />
       )}
       {!locked && it.kind === "quiz" && !it.questions?.length && (
-        <p class="absent">{t("text.2", "No questions on this one yet.")}</p>
+        <p class="absent">{say("text.2", "No questions on this one yet.")}</p>
       )}
 
       {!locked && html && <Prose html={html} />}
@@ -161,9 +161,9 @@ const done = here >= 0 ? all[here].done : false;
           <input type="hidden" name="done" value={done ? "0" : "1"} />
           <input type="hidden" name="next" value={next ? `/classes/${slug}/${next.id}` : ""} />
           {done && <span class="already">✓ Finished</span>}
-          {done && <Button type="submit" variant="ghost" size="sm">Mark unfinished</Button>}
+          {done && <Button type="submit" variant="ghost" size="sm">{say("text.4", "Mark unfinished")}</Button>}
           {done && next && (
-            <Button href={`/classes/${slug}/${next.id}`} variant="secondary">Next lesson →</Button>
+            <Button href={`/classes/${slug}/${next.id}`} variant="secondary">{say("text.5", "Next lesson →")}</Button>
           )}
           {!done && (
             <Button type="submit" size="lg">

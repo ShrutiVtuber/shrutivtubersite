@@ -1,4 +1,10 @@
 ---
+import { copy } from "../../lib/copy";
+
+/* Every word here, editable from the admin. The defaults below are what
+   it was written with and what still renders if nothing was changed. */
+const say = await copy("component:GlyphGame");
+
 /* Learn the glyphs.
  *
  * The brief for a VTuber site says "interactive mini-games, lore-themed". The
@@ -20,12 +26,9 @@
 
 <section class="game" data-glyph-game>
   <div class="g-head">
-    <span class="t-eyebrow">Learn the glyphs</span>
-    <h3>Twenty-one symbols, and every chart here becomes readable</h3>
-    <p class="g-lead">
-      The signs, the planets and the nodes. Nothing is sent anywhere and no
-      account is asked for — the streak lives in this browser and nowhere else.
-    </p>
+    <span class="t-eyebrow">{say("text.1", "Learn the glyphs")}</span>
+    <h3>{say("twenty-one-symbols-and-e.1", "Twenty-one symbols, and every chart here becomes readable")}</h3>
+    <p class="g-lead">{say("twenty-one-symbols-and-e.2", "The signs, the planets and the nodes. Nothing is sent anywhere and no account is asked for — the streak lives in this browser and nowhere else.")}</p>
   </div>
 
   <div class="g-board">
@@ -45,7 +48,7 @@
   </div>
 
   <noscript>
-    <p class="g-lead">This one needs scripting. Everything else on the site does not.</p>
+    <p class="g-lead">{say("twenty-one-symbols-and-e.3", "This one needs scripting. Everything else on the site does not.")}</p>
   </noscript>
 </section>
 

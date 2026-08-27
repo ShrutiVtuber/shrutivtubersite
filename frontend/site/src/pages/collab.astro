@@ -29,7 +29,7 @@ import Copy from "../components/content/Copy.astro";
 
 /* Every word on this page, editable from the admin. The defaults below are
    what it was written with and what still renders if nothing was changed. */
-const t = await copy("collab");
+const say = await copy("collab");
 
 
 export const prerender = false;
@@ -159,19 +159,19 @@ const COMMON = [
 ---
 
 <BaseLayout
-  title="Collab planner — Shruti"
-  description="Find an hour that works for everybody, across any number of timezones. Free, no account, nothing stored — the whole plan lives in the link."
+  title={say("text.3", "Collab planner — Shruti")}
+  description={say("text.4", "Find an hour that works for everybody, across any number of timezones. Free, no account, nothing stored — the whole plan lives in the link.")}
 >
   <div class="page collab">
     <SectionHeader
-      as="h1" glyph="☾" eyebrow="A tool for creators"
-      title="When can all of us be live?"
-      body="Put everybody in, get the hours that work for all of them, and send the link. Nothing is stored — the whole plan is in the address bar, so it still works in six months and there is no account to lose."
+      as="h1" glyph="☾" eyebrow={say("text.5", "A tool for creators")}
+      title={say("text.6", "When can all of us be live?")}
+      body={say("text.7", "Put everybody in, get the hours that work for all of them, and send the link. Nothing is stored — the whole plan is in the address bar, so it still works in six months and there is no account to lose.")}
     />
 
     {groups.length > 0 && (
       <section class="cb-groups">
-        <h2>{t("your-groups.1", "Your groups")}</h2>
+        <h2>{say("your-groups.1", "Your groups")}</h2>
         <ul>
           {groups.map((g: any) => (
             <li>
@@ -200,7 +200,7 @@ const COMMON = [
             <legend>{p ? p.name : "Add somebody"}</legend>
             <label>
               <span>Name</span>
-              <input name={`n${i}`} maxlength="40" value={p?.name ?? ""} placeholder="Their handle" />
+              <input name={`n${i}`} maxlength="40" value={p?.name ?? ""} placeholder={say("text.8", "Their handle")} />
             </label>
             <label>
               <span>Timezone</span>
@@ -208,7 +208,7 @@ const COMMON = [
             </label>
             <div class="cb-window">
               <label>
-                <span>Streams from</span>
+                <span>{say("text.11", "Streams from")}</span>
                 <input name={`f${i}`} type="number" min="0" max="23" value={p?.from ?? 16} />
               </label>
               <label>
@@ -231,7 +231,7 @@ const COMMON = [
           <input type="date" name="on" value={when} />
         </label>
         <Button type="submit">Work it out</Button>
-        <p class="cb-fine"><Copy text={t("text.1", "Their hours are in **their own** local time — “from 16 until 24” means four in the afternoon to midnight where they are.")} /></p>
+        <p class="cb-fine"><Copy text={say("text.1", "Their hours are in **their own** local time — “from 16 until 24” means four in the afternoon to midnight where they are.")} /></p>
       </div>
     </form>
 
@@ -262,7 +262,7 @@ const COMMON = [
         </section>
 
         <section class="cb-gridwrap">
-          <h2>{t("hour-by-hour.1", "Hour by hour")}</h2>
+          <h2>{say("hour-by-hour.1", "Hour by hour")}</h2>
           <div class="cb-scroll">
             <table class="cb-grid">
               <thead>
@@ -296,30 +296,30 @@ const COMMON = [
         <section class="cb-keep">
           {signedIn ? (
             <>
-              <h2>{t("keep-this-group.1", "Keep this group")}</h2>
-              <p class="cb-fine">{t("keep-this-group.2", "So you do not have to type them in again on another machine.")}</p>
+              <h2>{say("keep-this-group.1", "Keep this group")}</h2>
+              <p class="cb-fine">{say("keep-this-group.2", "So you do not have to type them in again on another machine.")}</p>
               {saveNote && <p class="cb-ok">{saveNote}</p>}
               {saveFailed && <p class="cb-bad">{saveFailed}</p>}
               <form method="POST" class="cb-saveform">
                 <CsrfField />
                 <input type="hidden" name="action" value="save" />
-                <input name="name" maxlength="80" placeholder="What to call it — “Tuesday crew”" />
+                <input name="name" maxlength="80" placeholder={say("text.9", "What to call it — “Tuesday crew”")} />
                 <Button type="submit">Keep it</Button>
               </form>
             </>
           ) : (
             <>
-              <h2>{t("keep-this-group.3", "Keep this group")}</h2>
-              <p class="cb-fine"><Copy text={t("text.2", "[Sign in](/signin) and this set of people stops being something you have to keep a tab open for — it will be here on your phone too. The planner itself never needs an account, and the link above works for everybody either way.")} /></p>
+              <h2>{say("keep-this-group.3", "Keep this group")}</h2>
+              <p class="cb-fine"><Copy text={say("text.2", "[Sign in](/signin) and this set of people stops being something you have to keep a tab open for — it will be here on your phone too. The planner itself never needs an account, and the link above works for everybody either way.")} /></p>
             </>
           )}
         </section>
 
         <section class="cb-share">
-          <h2>{t("send-it-to-them.1", "Send it to them")}</h2>
-          <p class="cb-fine">{t("send-it-to-them.2", "The whole plan is in this link. Nothing about it is stored here.")}</p>
+          <h2>{say("send-it-to-them.1", "Send it to them")}</h2>
+          <p class="cb-fine">{say("send-it-to-them.2", "The whole plan is in this link. Nothing about it is stored here.")}</p>
           <input class="cb-url" type="text" readonly value={shareUrl}
-                 aria-label="A link to this plan" onclick="this.select()" />
+                 aria-label={say("text.10", "A link to this plan")} onclick="this.select()" />
         </section>
       </>
     )}

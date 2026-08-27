@@ -21,6 +21,12 @@ import { askAstro } from "../../lib/api";
 import { savedPlace } from "../../lib/account";
 import FestivalMonths from "../../components/tools/FestivalMonths.astro";
 import { byMonth, corpus } from "../../lib/festivals";
+import { copy } from "../../lib/copy";
+
+/* Every word here, editable from the admin. The defaults below are what
+   it was written with and what still renders if nothing was changed. */
+const say = await copy("tools/attic-calendar");
+
 
 const q = Astro.url.searchParams;
 const ATHENS = { lat: 37.9838, lon: 23.7275, label: "Athens · 37.98°N 23.73°E" };
@@ -138,10 +144,10 @@ const RULE_NAME: Record<string, string> = {
 
   {
     unreachable ? (
-      <CannotCompute title="The ephemeris could not be reached" why="Nothing here can be computed right now. That is a failure on my side, not a fact about the calendar." />
+      <CannotCompute title={say("text.1", "The ephemeris could not be reached")} why="Nothing here can be computed right now. That is a failure on my side, not a fact about the calendar." />
     ) : beforeCycle ? (
       <CannotCompute
-        title="Before the Metonic cycle, this cannot be reckoned"
+        title={say("text.2", "Before the Metonic cycle, this cannot be reckoned")}
         why={answer.detail || "Before 432 BCE the Metonic cycle was not in use at Athens, and the actual intercalations were magistrates' decisions — argued about at the time and not recoverable now."}
         alternatives={[
           "Take the astronomical lunation alone, without an Attic month name on it.",
@@ -159,9 +165,9 @@ const RULE_NAME: Record<string, string> = {
           <dl class="facts">
             <div><dt>Decad</dt><dd lang="el">{d.day.decad}</dd></div>
             <div><dt>Month</dt><dd>{d.month.full ? "full — 30 days" : "hollow — 29 days"}</dd></div>
-            <div><dt>Days remaining</dt><dd class="t-tabular">{d.day.remaining}</dd></div>
+            <div><dt>{say("text.4", "Days remaining")}</dt><dd class="t-tabular">{d.day.remaining}</dd></div>
             <div><dt>Moon age</dt><dd class="t-tabular">{d.moonAgeDays} days</dd></div>
-            <div><dt>Next noumenia</dt><dd class="t-tabular">{d.nextNoumenia}</dd></div>
+            <div><dt>{say("text.5", "Next noumenia")}</dt><dd class="t-tabular">{d.nextNoumenia}</dd></div>
             <div><dt>Year</dt><dd>{d.year.months} months{d.year.intercalary ? " — intercalary" : ""}</dd></div>
           </dl>
         </section>
@@ -180,7 +186,7 @@ const RULE_NAME: Record<string, string> = {
           d.reckoning.note && (
             <CannotCompute
               mark="◐"
-              title="The crescent could not be caught here"
+              title={say("text.3", "The crescent could not be caught here")}
               why={d.reckoning.note}
             />
           )

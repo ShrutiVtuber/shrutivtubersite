@@ -20,6 +20,12 @@ import Button from "../forms/Button.astro";
 import Prose from "../content/Prose.astro";
 import { pageSections } from "../../lib/content";
 import { account } from "../../lib/account";
+import { copy } from "../../lib/copy";
+
+/* Every word here, editable from the admin. The defaults below are what
+   it was written with and what still renders if nothing was changed. */
+const say = await copy("component:ToolCta");
+
 
 const me = await account(Astro);
 /* Somebody who already has an account is not the audience, and showing them a
@@ -38,7 +44,7 @@ const block = me ? null : (await pageSections("tools-cta"))[0] ?? null;
       {block.linkUrl && (
         <Button href={block.linkUrl}>{block.linkLabel || "Make an account"}</Button>
       )}
-      <a class="cta-second" href="/newsletter">or just the monthly letter</a>
+      <a class="cta-second" href="/newsletter">{say("text.1", "or just the monthly letter")}</a>
     </div>
   </aside>
 )}

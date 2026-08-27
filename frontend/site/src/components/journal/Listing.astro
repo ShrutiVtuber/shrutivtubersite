@@ -10,6 +10,12 @@ import Glyph from "./Glyph.astro";
 import Masthead from "./Masthead.astro";
 import { GLYPH, KIND_LABEL, type Entry } from "../../lib/journal/types";
 import { byMonth, shortDate } from "../../lib/journal/format";
+import { copy } from "../../lib/copy";
+
+/* Every word here, editable from the admin. The defaults below are what
+   it was written with and what still renders if nothing was changed. */
+const say = await copy("component:Listing");
+
 
 interface Props {
   eyebrow: string;
@@ -46,7 +52,7 @@ const gridItems = feature ? rest : entries;
         <Glyph mark="☾" />
         <p class="j-empty-title">{emptyTitle}</p>
         <p class="j-empty-body">{emptyBody}</p>
-        <a class="j-more" href="https://shrutivtuber.com/today">Day at a glance →</a>
+        <a class="j-more" href="https://shrutivtuber.com/today">{say("text.1", "Day at a glance →")}</a>
       </div>
     )
   }
@@ -87,8 +93,8 @@ const gridItems = feature ? rest : entries;
           <>
             {feature && (
               <div class="j-section-head">
-                <h2>Recently</h2>
-                <a class="j-more" href="/journal/all/">All content →</a>
+                <h2>{say("recently.1", "Recently")}</h2>
+                <a class="j-more" href="/journal/all/">{say("recently.2", "All content →")}</a>
               </div>
             )}
             <div class="j-grid">{gridItems.map((e) => <Card entry={e} />)}</div>

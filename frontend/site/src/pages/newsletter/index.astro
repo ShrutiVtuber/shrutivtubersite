@@ -14,7 +14,7 @@ import { copy } from "../../lib/copy";
 
 /* Every word on this page, editable from the admin. The defaults below are
    what it was written with and what still renders if nothing was changed. */
-const t = await copy("newsletter");
+const say = await copy("newsletter");
 
 
 let state: "idle" | "sent" = "idle";
@@ -48,18 +48,18 @@ interface Issue { slug: string; subject: string; sentAt: string | null }
 const issues = (await site<Issue[]>("/api/newsletter/archive")) ?? [];
 ---
 
-<BaseLayout title="The monthly letter — Shruti" description="One letter a month on magick, astrology and what got built, plus the full archive. No tracking pixels, and one click to leave whenever you like.">
+<BaseLayout title={say("text.1", "The monthly letter — Shruti")} description={say("text.2", "One letter a month on magick, astrology and what got built, plus the full archive. No tracking pixels, and one click to leave whenever you like.")}>
   <div class="page letter">
     <SectionHeader
-      as="h1" glyph="⁂" eyebrow="The monthly letter" title="Once a month"
-      body="Your horoscope if you have a saved nativity, what went up since last time, and a letter written by hand."
+      as="h1" glyph="⁂" eyebrow={say("text.3", "The monthly letter")} title={say("text.4", "Once a month")}
+      body={say("text.5", "Your horoscope if you have a saved nativity, what went up since last time, and a letter written by hand.")}
     />
 
     <SubscribeBlock state={state} email={email} error={error} />
 
     <section class="archive">
-      <h2>{t("every-issue-so-far.1", "Every issue so far")}</h2>
-      <p class="quiet">{t("every-issue-so-far.2", "Public, on purpose — you should be able to read exactly what you are signing up for before you hand over an address.")}</p>
+      <h2>{say("every-issue-so-far.1", "Every issue so far")}</h2>
+      <p class="quiet">{say("every-issue-so-far.2", "Public, on purpose — you should be able to read exactly what you are signing up for before you hand over an address.")}</p>
       {
         issues.length > 0 ? (
           <ul>
@@ -77,8 +77,8 @@ const issues = (await site<Issue[]>("/api/newsletter/archive")) ?? [];
         ) : (
           <EmptyState
             glyph="○"
-            title="No issues yet"
-            body="The first one has not gone out. When it does it appears here, in full, without a subscription."
+            title={say("text.6", "No issues yet")}
+            body={say("text.7", "The first one has not gone out. When it does it appears here, in full, without a subscription.")}
           />
         )
       }
@@ -86,7 +86,7 @@ const issues = (await site<Issue[]>("/api/newsletter/archive")) ?? [];
 
     <section class="held">
       {/* Held deliberately, per the brief: do not build a shop yet. */}
-      <p class="quiet">{t("every-issue-so-far.3", "Nothing is for sale yet. When courses or services open, they will be offered in the letter — which is why the consent above says so, rather than that arriving as a surprise later.")}</p>
+      <p class="quiet">{say("every-issue-so-far.3", "Nothing is for sale yet. When courses or services open, they will be offered in the letter — which is why the consent above says so, rather than that arriving as a surprise later.")}</p>
     </section>
   </div>
 </BaseLayout>

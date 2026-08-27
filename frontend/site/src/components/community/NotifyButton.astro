@@ -1,4 +1,10 @@
 ---
+import { copy } from "../../lib/copy";
+
+/* Every word here, editable from the admin. The defaults below are what
+   it was written with and what still renders if nothing was changed. */
+const say = await copy("component:NotifyButton");
+
 /* "Tell me when she goes live."
  *
  * **No account, and no email.** A browser notification needs neither, which is
@@ -22,7 +28,7 @@
 
 <noscript>
   <p class="n-fine">
-    Notifications need scripting. <a href="/newsletter">The monthly letter</a>
+    Notifications need scripting. <a href="/newsletter">{say("text.1", "The monthly letter")}</a>
     does not, and neither does the schedule.
   </p>
 </noscript>

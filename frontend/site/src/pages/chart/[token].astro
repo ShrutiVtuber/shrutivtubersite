@@ -24,7 +24,7 @@ import { copy } from "../../lib/copy";
 
 /* Every word on this page, editable from the admin. The defaults below are
    what it was written with and what still renders if nothing was changed. */
-const t = await copy("chart/[token]");
+const say = await copy("chart/[token]");
 
 
 export const prerender = false;
@@ -80,7 +80,7 @@ const readable = (iso: string | null) =>
   iso ? new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" }) : "";
 ---
 
-<BaseLayout title="Your chart — Shruti" description="A chart you kept." noindex>
+<BaseLayout title={say("text.1", "Your chart — Shruti")} description={say("text.2", "A chart you kept.")} noindex>
   <div class="page chart-page">
     {
       !c ? (
@@ -113,7 +113,7 @@ const readable = (iso: string | null) =>
             />
 
             <div class="chart-facts">
-              <h2>{t("the-moment.1", "The moment")}</h2>
+              <h2>{say("the-moment.1", "The moment")}</h2>
               <dl>
                 <div><dt>Date</dt><dd>{c.birthDate}</dd></div>
                 <div>
@@ -124,12 +124,12 @@ const readable = (iso: string | null) =>
                 <div><dt>Sky</dt><dd>{TRADITION[c.tradition] ?? c.tradition}</dd></div>
                 <div><dt>Figure</dt><dd>{FIGURE[c.figure] ?? c.figure}</dd></div>
               </dl>
-              <p class="fine">{t("the-moment.2", "Only you see this part. Whoever holds a share link sees the drawing, not these words.")}</p>
+              <p class="fine">{say("the-moment.2", "Only you see this part. Whoever holds a share link sees the drawing, not these words.")}</p>
               <p class="more">
-                <a href={`/chart/print/${token}`}>{t("the-moment.3", "Print it, or save it as a PDF")}</a>
+                <a href={`/chart/print/${token}`}>{say("the-moment.3", "Print it, or save it as a PDF")}</a>
               </p>
               <p class="more">
-                <a href={`/tools/natal-chart?date=${c.birthDate}&time=${c.birthTime ?? ""}&lat=${c.lat}&lon=${c.lon}&place=${encodeURIComponent(c.placeName ?? "")}&tradition=${c.tradition}&house_system=${c.houseSystem}&vedic_style=${c.figure === "south" ? "south" : "north"}${c.timeUnknown ? "&unknownTime=1" : ""}`}>{t("the-moment.4", "Open the full reading")}</a>
+                <a href={`/tools/natal-chart?date=${c.birthDate}&time=${c.birthTime ?? ""}&lat=${c.lat}&lon=${c.lon}&place=${encodeURIComponent(c.placeName ?? "")}&tradition=${c.tradition}&house_system=${c.houseSystem}&vedic_style=${c.figure === "south" ? "south" : "north"}${c.timeUnknown ? "&unknownTime=1" : ""}`}>{say("the-moment.4", "Open the full reading")}</a>
               </p>
             </div>
           </div>
@@ -139,26 +139,26 @@ const readable = (iso: string | null) =>
               must first generate a share link" — so this mints the token
               itself when there isn't one. */}
           <section class="panel invite-panel">
-            <h2>{t("invite-someone-to-compar.1", "Invite someone to compare")}</h2>
-            <p class="fine">{t("invite-someone-to-compar.2", "They give their birth details on one page and land straight on the comparison. No account, nothing to copy between tabs.")}</p>
+            <h2>{say("invite-someone-to-compar.1", "Invite someone to compare")}</h2>
+            <p class="fine">{say("invite-someone-to-compar.2", "They give their birth details on one page and land straight on the comparison. No account, nothing to copy between tabs.")}</p>
             {
               c.shared ? (
                 <>
                   <label class="link-out">
-                    <span>The invitation</span>
+                    <span>{say("text.3", "The invitation")}</span>
                     <input type="text" readonly value={`${SITE_URL}/chart/invite/${c.shareToken}`} onclick="this.select()" />
                   </label>
                   <label class="link-out">
-                    <span>{t("invite-someone-to-compar.3", "Something to post with it")}</span>
+                    <span>{say("invite-someone-to-compar.3", "Something to post with it")}</span>
                     <textarea readonly rows="2" onclick="this.select()">{`Compare charts with me — ${SITE_URL}/chart/invite/${c.shareToken}`}</textarea>
                   </label>
-                  <p class="fine">{t("invite-someone-to-compar.4", "Taking the share link back below cancels every invitation made from it — they are the same token.")}</p>
+                  <p class="fine">{say("invite-someone-to-compar.4", "Taking the share link back below cancels every invitation made from it — they are the same token.")}</p>
                 </>
               ) : (
                 <form method="POST">
                   <CsrfField />
                   <input type="hidden" name="action" value="invite" />
-                  <Button type="submit" data-track="invite:made">{t("invite-someone-to-compar.5", "Make an invitation")}</Button>
+                  <Button type="submit" data-track="invite:made">{say("invite-someone-to-compar.5", "Make an invitation")}</Button>
                 </form>
               )
             }
@@ -166,7 +166,7 @@ const readable = (iso: string | null) =>
 
 
           <section class="panel">
-            <h2>{t("hand-it-to-somebody.1", "Hand it to somebody")}</h2>
+            <h2>{say("hand-it-to-somebody.1", "Hand it to somebody")}</h2>
             {
               c.shared ? (
                 <>
@@ -178,18 +178,18 @@ const readable = (iso: string | null) =>
                   <form method="POST">
                     <CsrfField />
                     <input type="hidden" name="action" value="unshare" />
-                    <Button type="submit" variant="secondary">{t("hand-it-to-somebody.2", "Take the link back")}</Button>
+                    <Button type="submit" variant="secondary">{say("hand-it-to-somebody.2", "Take the link back")}</Button>
                   </form>
-                  <p class="fine">{t("hand-it-to-somebody.3", "Taking it back stops the link working. It cannot un-send it, and it cannot un-see what has been seen.")}</p>
+                  <p class="fine">{say("hand-it-to-somebody.3", "Taking it back stops the link working. It cannot un-send it, and it cannot un-see what has been seen.")}</p>
                 </>
               ) : (
                 <>
-                  <p class="fine">{t("hand-it-to-somebody.4", "This makes a second link, separate from the one you are on. Yours keeps working whatever you do to theirs.")}</p>
-                  <p class="warn">{t("hand-it-to-somebody.5", "Before you do: the page they land on will not print your birth date, time or place. It will show the chart — and a chart is your birth data, drawn. Somebody who reads charts can get the time to within a few minutes from the ascendant and the date from the planets. Share it with people you would tell.")}</p>
+                  <p class="fine">{say("hand-it-to-somebody.4", "This makes a second link, separate from the one you are on. Yours keeps working whatever you do to theirs.")}</p>
+                  <p class="warn">{say("hand-it-to-somebody.5", "Before you do: the page they land on will not print your birth date, time or place. It will show the chart — and a chart is your birth data, drawn. Somebody who reads charts can get the time to within a few minutes from the ascendant and the date from the planets. Share it with people you would tell.")}</p>
                   <form method="POST">
                     <CsrfField />
                     <input type="hidden" name="action" value="share" />
-                    <Button type="submit" data-track="chart:shared">{t("hand-it-to-somebody.6", "Make a link to share")}</Button>
+                    <Button type="submit" data-track="chart:shared">{say("hand-it-to-somebody.6", "Make a link to share")}</Button>
                   </form>
                 </>
               )
@@ -203,11 +203,11 @@ const readable = (iso: string | null) =>
                 {
                   reader ? (
                     <>
-                      <p class="fine">{t("hand-it-to-somebody.7", "You are signed in. Adding this chart to your account puts it in a list you can find without this link, and lifts the expiry — there is somebody to ask, so it does not need to lapse.")}</p>
+                      <p class="fine">{say("hand-it-to-somebody.7", "You are signed in. Adding this chart to your account puts it in a list you can find without this link, and lifts the expiry — there is somebody to ask, so it does not need to lapse.")}</p>
                       <form method="POST">
                         <CsrfField />
                         <input type="hidden" name="action" value="claim" />
-                        <Button type="submit" data-track="chart:claimed">Add to my account</Button>
+                        <Button type="submit" data-track="chart:claimed">{say("text.4", "Add to my account")}</Button>
                       </form>
                     </>
                   ) : (
@@ -217,14 +217,14 @@ const readable = (iso: string | null) =>
                         goes back a year every time you open it. Bookmark this
                         page — it is the only way back.
                       </p>
-                      <p class="fine">{t("hand-it-to-somebody.8", "With an account it sits in a list instead, with nothing to mind and no expiry, and you can come back to it from any device.")}</p>
+                      <p class="fine">{say("hand-it-to-somebody.8", "With an account it sits in a list instead, with nothing to mind and no expiry, and you can come back to it from any device.")}</p>
                       <p>
                         <a class="sh-btn" data-variant="secondary" data-size="md" href={`/signup?next=${encodeURIComponent(Astro.url.pathname)}`}>
-                          <span>Make an account</span>
+                          <span>{say("text.5", "Make an account")}</span>
                         </a>
                       </p>
                       <p class="fine">
-                        Or just <a href="/newsletter" data-track="newsletter:from-chart">{t("hand-it-to-somebody.9", "take the monthly letter")}</a>, which needs no account at all.
+                        Or just <a href="/newsletter" data-track="newsletter:from-chart">{say("hand-it-to-somebody.9", "take the monthly letter")}</a>, which needs no account at all.
                       </p>
                     </>
                   )
@@ -234,12 +234,12 @@ const readable = (iso: string | null) =>
           }
 
           <section class="panel">
-            <h2>{t("take-it-out-of-the-recor.1", "Take it out of the record")}</h2>
-            <p class="fine">{t("take-it-out-of-the-recor.2", "Deletes this chart and the birth data with it, now, without asking anybody. There is no undo.")}</p>
+            <h2>{say("take-it-out-of-the-recor.1", "Take it out of the record")}</h2>
+            <p class="fine">{say("take-it-out-of-the-recor.2", "Deletes this chart and the birth data with it, now, without asking anybody. There is no undo.")}</p>
             <form method="POST" onsubmit="return confirm('Delete this chart and its birth data?')">
               <CsrfField />
               <input type="hidden" name="action" value="forget" />
-              <Button type="submit" variant="secondary">Delete this chart</Button>
+              <Button type="submit" variant="secondary">{say("text.6", "Delete this chart")}</Button>
             </form>
           </section>
         </>

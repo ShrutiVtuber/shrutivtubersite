@@ -21,7 +21,7 @@ import { copy } from "../lib/copy";
 
 /* Every word on this page, editable from the admin. The defaults below are
    what it was written with and what still renders if nothing was changed. */
-const t = await copy("work");
+const say = await copy("work");
 
 
 interface FullProject extends Project {
@@ -51,16 +51,16 @@ const INSTRUMENTS: [string, string, string, string][] = [
 ---
 
 <BaseLayout
-  title="Work — Shruti"
-  description="A portfolio of instruments: working software for magickal and astrological practice."
+  title={say("text.1", "Work — Shruti")}
+  description={say("text.2", "A portfolio of instruments: working software for magickal and astrological practice.")}
 >
   <div class="page work-page">
     <SectionHeader
       as="h1"
       glyph="✶"
       eyebrow="The work"
-      title="A portfolio of instruments"
-      body="Not an app-store listing. Each of these is a working tool, shipped and maintained — most of it built live on stream. Every entry carries its role, stack, licence and status, because that is what another engineer wants to know."
+      title={say("text.3", "A portfolio of instruments")}
+      body={say("text.4", "Not an app-store listing. Each of these is a working tool, shipped and maintained — most of it built live on stream. Every entry carries its role, stack, licence and status, because that is what another engineer wants to know.")}
     />
 
     {
@@ -87,7 +87,7 @@ const INSTRUMENTS: [string, string, string, string][] = [
                   meta={[p.licence, p.stack].filter(Boolean).join(" · ") || undefined}
                 />
                 <div>
-                  <h3 class="work-credits-head">{t("credits.1", "Credits")}</h3>
+                  <h3 class="work-credits-head">{say("credits.1", "Credits")}</h3>
                   <dl class="sh-pft" data-cols="1">
                     {rows.map(([label, value]) => (
                       <div class="sh-pft-row">
@@ -110,8 +110,8 @@ const INSTRUMENTS: [string, string, string, string][] = [
       ) : (
         <EmptyState
           glyph="○"
-          title="Nothing published here yet"
-          body="Nothing listed here yet. The instruments themselves are live and free to use in the meantime."
+          title={say("text.5", "Nothing published here yet")}
+          body={say("text.6", "Nothing listed here yet. The instruments themselves are live and free to use in the meantime.")}
         />
       )
     }
@@ -119,8 +119,8 @@ const INSTRUMENTS: [string, string, string, string][] = [
     <SectionHeader
       as="h2"
       glyph="☿"
-      title="Instruments you can run here"
-      body="Seven of Theourgia's tools run on their own pages — the software demonstrating itself, no install."
+      title={say("text.7", "Instruments you can run here")}
+      body={say("text.8", "Seven of Theourgia's tools run on their own pages — the software demonstrating itself, no install.")}
     />
     <div class="instrument-grid">
       {
@@ -136,10 +136,10 @@ const INSTRUMENTS: [string, string, string, string][] = [
 
     <EmptyState
       glyph="◐"
-      title="What follows"
-      body="The next instrument is chosen on stream. Suggestions land in the Discord's #workbench channel."
+      title={say("text.9", "What follows")}
+      body={say("text.10", "The next instrument is chosen on stream. Suggestions land in the Discord's #workbench channel.")}
     >
-      <Button slot="action" variant="secondary" href="/contact">Get in touch</Button>
+      <Button slot="action" variant="secondary" href="/contact">{say("text.11", "Get in touch")}</Button>
     </EmptyState>
   </div>
 </BaseLayout>

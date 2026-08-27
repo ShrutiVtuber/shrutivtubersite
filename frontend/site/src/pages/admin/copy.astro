@@ -50,14 +50,31 @@ const rows: any[] = (await asAdmin(Astro, "/api/admin/copy")).body ?? [];
 const filter = Astro.url.searchParams.get("page") ?? "";
 const shown = filter ? rows.filter((r) => r.page === filter) : rows;
 
-const pages = [...new Set(rows.map((r) => r.page))].sort();
+/* Two kinds of namespace, and they want different treatment.
+   A page's words belong to that page. A COMPONENT's words are shared by every
+   page that shows it — the subscribe block, the footer, the cookie notice —
+   so editing one changes them everywhere, which is right, and the admin has
+   to say so rather than listing it as if it were a page. */
+const isComponent = (pg: string) => pg.startsWith("component:");
+const prettyName = (pg: string) =>
+  isComponent(pg) ? pg.slice("component:".length) : `/${pg === "home" ? "" : pg}`;
+
+const pages = [...new Set(rows.map((r) => r.page))]
+  .sort((a, b) =>
+    /* Pages first, then components; alphabetical within each. */
+    Number(isComponent(a)) - Number(isComponent(b)) ||
+    prettyName(a).localeCompare(prettyName(b)));
+
 const byPage: [string, any[]][] = [...new Set(shown.map((r) => r.page))]
-  .sort()
+  .sort((a, b) =>
+    Number(isComponent(a)) - Number(isComponent(b)) ||
+    prettyName(a).localeCompare(prettyName(b)))
   .map((pg) => [pg, shown.filter((r) => r.page === pg)]);
 
 /* "/" reads better than "/home" for the landing page, and it is what the link
    has to be anyway. */
-const href = (pg: string) => `/${pg === "home" ? "" : pg}`;
+/* A component has no page of its own to open. */
+const href = (pg: string) => (isComponent(pg) ? "" : `/${pg === "home" ? "" : pg}`);
 const changed = rows.filter((r) => r.changed).length;
 ---
 
@@ -90,8 +107,10 @@ const changed = rows.filter((r) => r.changed).length;
           Every page <span class="n">{rows.length}</span>
         </a>
         {pages.map((pg) => (
-          <a href={`/admin/copy?page=${pg}`} aria-current={filter === pg ? "page" : undefined}>
-            {href(pg)} <span class="n">{rows.filter((r) => r.page === pg).length}</span>
+          <a href={`/admin/copy?page=${encodeURIComponent(pg)}`}
+             data-shared={isComponent(pg) ? "" : undefined}
+             aria-current={filter === pg ? "page" : undefined}>
+            {prettyName(pg)} <span class="n">{rows.filter((r) => r.page === pg).length}</span>
           </a>
         ))}
       </nav>
@@ -105,11 +124,19 @@ const changed = rows.filter((r) => r.changed).length;
       {byPage.map(([pg, group]) => (
         <section class="page-group">
           <div class="page-head">
-            <a class="page-name" href={href(pg)}>{href(pg)}</a>
+            {isComponent(pg) ? (
+              <span class="page-name">{prettyName(pg)}</span>
+            ) : (
+              <a class="page-name" href={href(pg)}>{prettyName(pg)}</a>
+            )}
             <span class="page-count">{group.length} string{group.length === 1 ? "" : "s"}</span>
-            <a class="page-blocks" href={`/admin/blocks?kind=sections&page=${pg}`}>
-              blocks on this page →
-            </a>
+            {isComponent(pg) ? (
+              <span class="shared-note">shared — changing this changes it on every page</span>
+            ) : (
+              <a class="page-blocks" href={`/admin/blocks?kind=sections&page=${pg}`}>
+                blocks on this page →
+              </a>
+            )}
           </div>
 
           {group.map((r: any) => (
@@ -179,6 +206,10 @@ const changed = rows.filter((r) => r.changed).length;
   .page-name:hover { text-decoration: underline; }
   .page-count { font-size: var(--text-xs); color: var(--ink-faint); }
   .page-blocks { margin-left: auto; font-size: var(--text-xs); color: var(--accent); }
+  .shared-note { margin-left: auto; font-size: var(--text-xs); color: var(--ink-faint); font-style: italic; }
+  /* Components read differently from pages in the filter row, because editing
+     one of them is a different kind of act. */
+  .page-filter a[data-shared] { border-style: dashed; }
 
   .str { display: grid; gap: 8px; margin-bottom: var(--space-3); }
   .str-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }

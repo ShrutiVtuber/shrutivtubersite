@@ -1,4 +1,10 @@
 ---
+import { copy } from "../../lib/copy";
+
+/* Every word here, editable from the admin. The defaults below are what
+   it was written with and what still renders if nothing was changed. */
+const say = await copy("component:CountingChoice");
+
 /* The switch the privacy page promises.
  *
  * It writes one word into this browser's own storage and never talks to the
@@ -22,10 +28,7 @@
 </div>
 
 <noscript>
-  <p class="fine">
-    Scripting is off in this browser, so nothing on this page has been counted —
-    the counting needs scripting to happen at all.
-  </p>
+  <p class="fine">{say("text.1", "Scripting is off in this browser, so nothing on this page has been counted — the counting needs scripting to happen at all.")}</p>
 </noscript>
 
 <script>

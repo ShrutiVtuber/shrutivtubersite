@@ -23,7 +23,7 @@ import { copy } from "../../lib/copy";
 
 /* Every word on this page, editable from the admin. The defaults below are
    what it was written with and what still renders if nothing was changed. */
-const t = await copy("tools/pancanga");
+const say = await copy("tools/pancanga");
 
 
 const q = Astro.url.searchParams;
@@ -141,14 +141,14 @@ const limbs = d
 
   {
     unreachable ? (
-      <CannotCompute title="The ephemeris could not be reached" why="Nothing here can be computed right now. That is a failure on my side, not a fact about the sky." />
+      <CannotCompute title={say("text.1", "The ephemeris could not be reached")} why="Nothing here can be computed right now. That is a failure on my side, not a fact about the sky." />
     ) : d ? (
       <>
         {
           noSunrise && (
             <CannotCompute
               mark="◐"
-              title="The Sun does not rise here today, so the day has no beginning"
+              title={say("text.2", "The Sun does not rise here today, so the day has no beginning")}
               why="The vāra runs sunrise to sunrise. With no sunrise there is nothing to start it, so the vāra is undefined — but the other four limbs are measured from the Sun and Moon alone and are given below, unaffected."
               alternatives={[
                 "Read the four Moon-and-Sun limbs, which are as true here as anywhere.",
@@ -184,7 +184,7 @@ const limbs = d
         </section>
 
         <section class="almanac">
-          <h2>{t("the-day.1", "The day")}</h2>
+          <h2>{say("the-day.1", "The day")}</h2>
           <dl>
             {
               Object.entries(d.almanac).map(([k, v]) => (
@@ -200,10 +200,10 @@ const limbs = d
         </section>
 
         <section class="windows">
-          <h2>{t("windows-of-the-day.1", "Windows of the day")}</h2>
+          <h2>{say("windows-of-the-day.1", "Windows of the day")}</h2>
           {/* Reported, not prescribed. These are positions in the day's
               eighths, not instructions about what to do in them. */}
-          <p class="windows-note">{t("windows-of-the-day.2", "These are reported, not prescribed — they say where the Sun stands in the day's divisions, and nothing about what you should do.")}</p>
+          <p class="windows-note">{say("windows-of-the-day.2", "These are reported, not prescribed — they say where the Sun stands in the day's divisions, and nothing about what you should do.")}</p>
           <ul>
             {
               d.windows.map((w) => (

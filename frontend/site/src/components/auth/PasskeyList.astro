@@ -1,4 +1,10 @@
 ---
+import { copy } from "../../lib/copy";
+
+/* Every word here, editable from the admin. The defaults below are what
+   it was written with and what still renders if nothing was changed. */
+const say = await copy("component:PasskeyList");
+
 /* The passkeys someone has registered, and the control that adds another.
  *
  * A list rather than a single on/off, because a person reasonably has several:
@@ -48,31 +54,26 @@ const day = (iso: string | null) =>
         ))}
       </ul>
     ) : (
-      <p class="pk-empty">No passkeys yet.</p>
+      <p class="pk-empty">{say("text.1", "No passkeys yet.")}</p>
     )
   }
 
   <div class="pk-add">
     <label class="pk-field">
-      <span class="pk-lbl">Name this one</span>
+      <span class="pk-lbl">{say("text.2", "Name this one")}</span>
       <input class="pk-input" id="pk-label" placeholder="My phone" maxlength="60" />
-      <span class="pk-hint">Only so you can tell it from the others later.</span>
+      <span class="pk-hint">{say("text.3", "Only so you can tell it from the others later.")}</span>
     </label>
     <button
       type="button" class="pk-btn"
       data-passkey-add data-passkey-prefix={prefix}
-    >
-      Add a passkey
-    </button>
+    >{say("text.4", "Add a passkey")}</button>
   </div>
   <p class="pk-msg" id="pk-status" role="alert" hidden></p>
 </div>
 
 <noscript>
-  <p class="pk-empty">
-    Passkeys need JavaScript — the browser API has no form equivalent. Everything else on this
-    page works without it.
-  </p>
+  <p class="pk-empty">{say("text.5", "Passkeys need JavaScript — the browser API has no form equivalent. Everything else on this page works without it.")}</p>
 </noscript>
 
 <script is:inline src="/passkeys.js"></script>

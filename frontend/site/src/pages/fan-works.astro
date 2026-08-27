@@ -16,7 +16,7 @@ import { copy } from "../lib/copy";
 
 /* Every word on this page, editable from the admin. The defaults below are
    what it was written with and what still renders if nothing was changed. */
-const t = await copy("fan-works");
+const say = await copy("fan-works");
 
 
 interface Work {
@@ -31,11 +31,11 @@ const pageCount = Math.max(1, Math.ceil(all.length / PER_PAGE));
 const works = all.slice((page - 1) * PER_PAGE, page * PER_PAGE);
 ---
 
-<BaseLayout title="Fan works — Shruti" description="Fan art and derivative work, curated and credited loudly with a link back to the artist. What you may make, and how to have yours shown here.">
+<BaseLayout title={say("text.2", "Fan works — Shruti")} description={say("text.3", "Fan art and derivative work, curated and credited loudly with a link back to the artist. What you may make, and how to have yours shown here.")}>
   <div class="page">
     <SectionHeader
       as="h1" glyph="✶" eyebrow="Fan works" title="Made by you"
-      body="Curated fan art and derivative work, credited loudly and linked back. Everything here appears with the artist's permission — the tiles fill in as pieces arrive."
+      body={say("text.4", "Curated fan art and derivative work, credited loudly and linked back. Everything here appears with the artist's permission — the tiles fill in as pieces arrive.")}
     />
 
     {
@@ -58,12 +58,12 @@ const works = all.slice((page - 1) * PER_PAGE, page * PER_PAGE);
     <EmptyState
       as="h2"
       glyph="◐"
-      title="Made something?"
-      body="Tag it #ShrutiArts so it can be found, or send it through the contact form with the credit you want shown. Read the derivative work guidelines first — they're short."
+      title={say("text.5", "Made something?")}
+      body={say("text.6", "Tag it #ShrutiArts so it can be found, or send it through the contact form with the credit you want shown. Read the derivative work guidelines first — they're short.")}
     >
       <div slot="action" class="fan-actions">
-        <Button href="/contact">Submit a piece</Button>
-        <Button variant="secondary" href="/guidelines">{t("text.1", "Read the guidelines")}</Button>
+        <Button href="/contact">{say("text.7", "Submit a piece")}</Button>
+        <Button variant="secondary" href="/guidelines">{say("text.1", "Read the guidelines")}</Button>
       </div>
     </EmptyState>
   </div>

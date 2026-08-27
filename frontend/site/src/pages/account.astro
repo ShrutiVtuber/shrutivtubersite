@@ -22,7 +22,7 @@ import { copy } from "../lib/copy";
 
 /* Every word on this page, editable from the admin. The defaults below are
    what it was written with and what still renders if nothing was changed. */
-const t = await copy("account");
+const say = await copy("account");
 
 
 let notice = "";
@@ -136,39 +136,39 @@ const TRADITIONS = [
 ];
 ---
 
-<BaseLayout title="Your account — Shruti" description="Profile, consents and your data." noindex>
+<BaseLayout title={say("text.1", "Your account — Shruti")} description={say("text.2", "Profile, consents and your data.")} noindex>
   <div class="page account">
     <SectionHeader
       as="h1" glyph="☾" eyebrow="Account" title={me.displayName || me.email}
-      body="Nothing here is public. There is no profile page, no avatar and no follower count — this site is not that, and saying so is what keeps it that way."
+      body={say("text.3", "Nothing here is public. There is no profile page, no avatar and no follower count — this site is not that, and saying so is what keeps it that way.")}
     />
 
     {notice && <p class="notice" role="status">{notice}</p>}
     {failed && <p class="failed" role="alert">{failed}</p>}
 
     <section class="card">
-      <h2>{t("profile.1", "Profile")}</h2>
+      <h2>{say("profile.1", "Profile")}</h2>
       <form method="POST" class="stack">
         <CsrfField />
         <input type="hidden" name="action" value="profile" />
-        <TextField label="Display name" name="display_name" value={me.displayName} optionalLabel hint="Only ever shown back to you." />
-        <TextField label="Timezone" name="timezone" value={me.timezone} optionalLabel hint="IANA name, e.g. Europe/Athens." />
-        <SelectField label="Preferred tradition" name="preferred_tradition" value={me.preferredTradition} options={TRADITIONS} />
-        <TextField label="House system" name="house_system" value={me.houseSystem} optionalLabel />
+        <TextField label={say("text.4", "Display name")} name="display_name" value={me.displayName} optionalLabel hint={say("text.5", "Only ever shown back to you.")} />
+        <TextField label="Timezone" name="timezone" value={me.timezone} optionalLabel hint={say("text.6", "IANA name, e.g. Europe/Athens.")} />
+        <SelectField label={say("text.7", "Preferred tradition")} name="preferred_tradition" value={me.preferredTradition} options={TRADITIONS} />
+        <TextField label={say("text.8", "House system")} name="house_system" value={me.houseSystem} optionalLabel />
         <TextField label="Ayanāṁśa" name="ayanamsa" value={me.ayanamsa} optionalLabel />
         <div><Button type="submit">Save</Button></div>
       </form>
     </section>
 
     <section class="card">
-      <h2>{t("nativity.1", "Nativity")}</h2>
+      <h2>{say("nativity.1", "Nativity")}</h2>
       {
         me.nativity ? (
           <div class="nativity">
             <p class="nat-line">
               <span class="t-tabular">{me.nativity.birthDate}</span>
               {me.nativity.timeUnknown
-                ? <span class="undef">{t("nativity.2", "· birth time unknown")}</span>
+                ? <span class="undef">{say("nativity.2", "· birth time unknown")}</span>
                 : <span class="t-tabular"> · {me.nativity.birthTime}</span>}
             </p>
             <p class="nat-place">
@@ -180,21 +180,21 @@ const TRADITIONS = [
           </div>
         ) : state.nativity?.granted ? (
           <div class="stack">
-            <p class="quiet">{t("nativity.3", "No nativity saved yet.")}</p>
+            <p class="quiet">{say("nativity.3", "No nativity saved yet.")}</p>
             <div><Button href="/nativity">Add one</Button></div>
           </div>
         ) : (
-          <p class="quiet">{t("nativity.4", "Storing birth data needs its own consent, below. Nothing is kept until it is given.")}</p>
+          <p class="quiet">{say("nativity.4", "Storing birth data needs its own consent, below. Nothing is kept until it is given.")}</p>
         )
       }
     </section>
 
     <section class="card">
-      <h2>{t("your-charts.1", "Your charts")}</h2>
+      <h2>{say("your-charts.1", "Your charts")}</h2>
       {
         charts.length === 0 ? (
           <div class="stack">
-            <p class="quiet">{t("your-charts.2", "None kept yet. A chart you keep gets its own address, and a separate link you can hand to somebody and take back later without losing your own.")}</p>
+            <p class="quiet">{say("your-charts.2", "None kept yet. A chart you keep gets its own address, and a separate link you can hand to somebody and take back later without losing your own.")}</p>
             <div><Button variant="secondary" href="/tools/natal-chart">Cast one</Button></div>
           </div>
         ) : (
@@ -216,8 +216,8 @@ const TRADITIONS = [
     </section>
 
     <section class="card">
-      <h2>{t("consents.1", "Consents")}</h2>
-      <p class="quiet">{t("consents.2", "Three decisions, revisitable. Withdrawing is exactly as easy as giving — one control, here, with no email and no waiting.")}</p>
+      <h2>{say("consents.1", "Consents")}</h2>
+      <p class="quiet">{say("consents.2", "Three decisions, revisitable. Withdrawing is exactly as easy as giving — one control, here, with no email and no waiting.")}</p>
       {
         CONSENTS.map((c) => {
           const now = state[c.kind];
@@ -265,10 +265,10 @@ const TRADITIONS = [
     {
       support?.supporting && (
         <section class="card">
-          <h2>{t("your-support.1", "Your support")}</h2>
+          <h2>{say("your-support.1", "Your support")}</h2>
           <p class="support-tier">
             <strong>{TIER_NAMES[support.tier] || "Monthly support"}</strong>
-            {support.status === "past_due" && <span class="undef"> · payment failed</span>}
+            {support.status === "past_due" && <span class="undef">{say("text.9", "· payment failed")}</span>}
           </p>
           <p class="quiet">
             {
@@ -279,12 +279,12 @@ const TRADITIONS = [
                   : "Active."
             }
           </p>
-          <p class="quiet">{t("your-support.2", "Cancelling is one button on Stripe's own page, it takes effect at the end of the month you have already paid for rather than the moment you press it, and no message to me is needed or wanted. Thank you either way — genuinely.")}</p>
+          <p class="quiet">{say("your-support.2", "Cancelling is one button on Stripe's own page, it takes effect at the end of the month you have already paid for rather than the moment you press it, and no message to me is needed or wanted. Thank you either way — genuinely.")}</p>
           <div>
             <form method="POST">
               <CsrfField />
               <input type="hidden" name="action" value="portal" />
-              <Button type="submit" variant="secondary">Manage or cancel</Button>
+              <Button type="submit" variant="secondary">{say("text.10", "Manage or cancel")}</Button>
             </form>
           </div>
         </section>
@@ -292,10 +292,10 @@ const TRADITIONS = [
     }
 
     <section class="card">
-      <h2>{t("passkeys.1", "Passkeys")}</h2>
+      <h2>{say("passkeys.1", "Passkeys")}</h2>
       <p class="quiet">
         A passkey signs you in with Face ID, a fingerprint or your phone's PIN instead of a
-        password. It is a keypair that lives on your device — <strong>{t("passkeys.2", "Apple and Google are told nothing")}</strong>, no request reaches them, and this site never learns anything about you
+        password. It is a keypair that lives on your device — <strong>{say("passkeys.2", "Apple and Google are told nothing")}</strong>, no request reaches them, and this site never learns anything about you
         from them. That is why there is no &ldquo;Sign in with Google&rdquo; button here and
         there never will be: the convenience of one, without the third party.
       </p>
@@ -303,8 +303,8 @@ const TRADITIONS = [
     </section>
 
     <section class="card">
-      <h2>{t("signing-out.1", "Signing out")}</h2>
-      <p class="quiet">{t("signing-out.2", "Ends this session in this browser. Your account and everything in it stay exactly as they are — this is not deleting anything.")}</p>
+      <h2>{say("signing-out.1", "Signing out")}</h2>
+      <p class="quiet">{say("signing-out.2", "Ends this session in this browser. Your account and everything in it stay exactly as they are — this is not deleting anything.")}</p>
       <form method="POST">
         <CsrfField />
         <input type="hidden" name="action" value="signout" />
@@ -313,51 +313,51 @@ const TRADITIONS = [
     </section>
 
     <section class="card">
-      <h2>{t("your-data.1", "Your data")}</h2>
+      <h2>{say("your-data.1", "Your data")}</h2>
       <div class="rights">
         <div class="right">
-          <h3>{t("export.1", "Export")}</h3>
-          <p class="quiet">{t("export.2", "Everything held about you, as a file, now — profile, nativity, the full consent history with dates, and your newsletter state. No email round-trip and no thirty days.")}</p>
-          <div><Button variant="secondary" href="/account/export">Download JSON</Button></div>
+          <h3>{say("export.1", "Export")}</h3>
+          <p class="quiet">{say("export.2", "Everything held about you, as a file, now — profile, nativity, the full consent history with dates, and your newsletter state. No email round-trip and no thirty days.")}</p>
+          <div><Button variant="secondary" href="/account/export">{say("text.11", "Download JSON")}</Button></div>
         </div>
         <div class="right">
-          <h3>{t("delete.1", "Delete")}</h3>
-          <p class="quiet">{t("delete.2", "Immediate, irreversible, and it reaches the newsletter list too — not just the account.")}</p>
-          <div><Button variant="secondary" data-open-delete>Delete my account</Button></div>
+          <h3>{say("delete.1", "Delete")}</h3>
+          <p class="quiet">{say("delete.2", "Immediate, irreversible, and it reaches the newsletter list too — not just the account.")}</p>
+          <div><Button variant="secondary" data-open-delete>{say("text.12", "Delete my account")}</Button></div>
         </div>
       </div>
     </section>
 
     <dialog class="modal" data-delete-modal>
-      <h2>{t("delete-your-account.1", "Delete your account")}</h2>
+      <h2>{say("delete-your-account.1", "Delete your account")}</h2>
       <div class="lists">
         <div>
-          <h3>{t("what-goes.1", "What goes")}</h3>
+          <h3>{say("what-goes.1", "What goes")}</h3>
           <ul>
-            <li>{t("what-goes.2", "Your email address")}</li>
-            <li>{t("what-goes.3", "Your name and preferences")}</li>
-            <li>{t("what-goes.4", "Your saved nativity")}</li>
-            <li>{t("what-goes.5", "Your newsletter subscription")}</li>
+            <li>{say("what-goes.2", "Your email address")}</li>
+            <li>{say("what-goes.3", "Your name and preferences")}</li>
+            <li>{say("what-goes.4", "Your saved nativity")}</li>
+            <li>{say("what-goes.5", "Your newsletter subscription")}</li>
           </ul>
         </div>
         <div>
-          <h3>{t("what-is-kept-and-why.1", "What is kept, and why")}</h3>
+          <h3>{say("what-is-kept-and-why.1", "What is kept, and why")}</h3>
           <ul>
             <li>
-              A record that consent was given and withdrawn, with dates and <strong>{t("what-is-kept-and-why.2", "no birth data")}</strong> — that record is the proof the law asks for, and it no longer names you.
+              A record that consent was given and withdrawn, with dates and <strong>{say("what-is-kept-and-why.2", "no birth data")}</strong> — that record is the proof the law asks for, and it no longer names you.
             </li>
-            <li>{t("what-is-kept-and-why.3", "Invoices, for as long as tax law requires. There are none yet.")}</li>
+            <li>{say("what-is-kept-and-why.3", "Invoices, for as long as tax law requires. There are none yet.")}</li>
           </ul>
         </div>
       </div>
-      <p class="modal-note">{t("what-is-kept-and-why.4", "Immediate. Not reversible. No grace period.")}</p>
+      <p class="modal-note">{say("what-is-kept-and-why.4", "Immediate. Not reversible. No grace period.")}</p>
       <div class="modal-actions">
         <form method="POST">
           <CsrfField />
           <input type="hidden" name="action" value="delete" />
           <Button type="submit">Delete it</Button>
         </form>
-        <Button variant="ghost" data-close-delete>Keep my account</Button>
+        <Button variant="ghost" data-close-delete>{say("text.13", "Keep my account")}</Button>
       </div>
     </dialog>
   </div>

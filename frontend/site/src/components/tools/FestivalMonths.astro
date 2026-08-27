@@ -9,6 +9,12 @@
  */
 import type { Festival, Undated } from "../../lib/festivals";
 import { CONFIDENCE_NOTE } from "../../lib/festivals";
+import { copy } from "../../lib/copy";
+
+/* Every word here, editable from the admin. The defaults below are what
+   it was written with and what still renders if nothing was changed. */
+const say = await copy("component:FestivalMonths");
+
 
 export interface MonthRow {
   name: string;
@@ -74,7 +80,7 @@ const rows = months.map((m, i) => {
 
 <section class="fmonths">
   <div class="fm-head">
-    <h2>The year, month by month</h2>
+    <h2>{say("the-year-month-by-month.1", "The year, month by month")}</h2>
     {
       counts && (
         <p class="fm-count t-tabular">
@@ -106,7 +112,7 @@ const rows = months.map((m, i) => {
               row.barren ? (
                 <p class="fm-none">{emptyMonthNote || "This month carries no festivals."}</p>
               ) : row.festivals.length === 0 ? (
-                <p class="fm-none">Nothing dated to this month.</p>
+                <p class="fm-none">{say("the-year-month-by-month.2", "Nothing dated to this month.")}</p>
               ) : (
                 <ul class="fm-fests">
                   {row.festivals.map((f) => (
@@ -139,12 +145,8 @@ const rows = months.map((m, i) => {
   {
     undated.length > 0 && (
       <div class="fm-undated">
-        <h3>Kept, and deliberately not dated</h3>
-        <p class="fm-undated-why">
-          These are real festivals with no day any source gives. A plausible date would make
-          the table look complete and make the tool wrong, so the entry stays and the gap is
-          shown instead.
-        </p>
+        <h3>{say("kept-and-deliberately-no.1", "Kept, and deliberately not dated")}</h3>
+        <p class="fm-undated-why">{say("kept-and-deliberately-no.2", "These are real festivals with no day any source gives. A plausible date would make the table look complete and make the tool wrong, so the entry stays and the gap is shown instead.")}</p>
         <ul>
           {undated.map((u) => (
             <li>

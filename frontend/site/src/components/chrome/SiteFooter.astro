@@ -18,6 +18,12 @@ const { socials = [] } = Astro.props;
    switched on from the admin. Publishing a registry number that is not one
    would be a claim rather than a placeholder. */
 import { site } from "../../lib/api";
+import { copy } from "../../lib/copy";
+
+/* Every word here, editable from the admin. The defaults below are what
+   it was written with and what still renders if nothing was changed. */
+const say = await copy("component:SiteFooter");
+
 interface Imprint {
   visible: boolean;
   entity?: string; street?: string; postcode?: string; city?: string;
@@ -81,15 +87,15 @@ const year = new Date().getUTCFullYear();
     <div class="cols">
       <div>
         <span class="brand-word footer-brand">Shruti</span>
-        <p class="footer-thesis">Instruments for magick, built live from Athens.</p>
+        <p class="footer-thesis">{say("text.2", "Instruments for magick, built live from Athens.")}</p>
         <SocialLinkRow links={socials} size={16} />
       </div>
       <div>
-        <h2 class="col-head">Site</h2>
+        <h2 class="col-head">{say("site.1", "Site")}</h2>
         <ul>{SITE.filter(([href]) => shown(href)).map(([href, label]) => <li><a href={href}>{label}</a></li>)}</ul>
       </div>
       <div>
-        <h2 class="col-head">Elsewhere</h2>
+        <h2 class="col-head">{say("elsewhere.1", "Elsewhere")}</h2>
         <ul>{ELSEWHERE.map(([href, label]) => <li><a href={href}>{label}</a></li>)}</ul>
       </div>
     </div>
@@ -125,11 +131,11 @@ const year = new Date().getUTCFullYear();
         {/* The page somebody checks when they are unsure whether a shop is
             really hers. It has to be findable from every page, because the
             moment they need it is not a moment they will go looking. */}
-        · <a href="/official">Official places</a>
+        · <a href="/official">{say("elsewhere.2", "Official places")}</a>
         · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a>
         · <a href="/admin" class="admin-link">Admin</a>
       </p>
-      <span class="seal seal-ring" title="Soror Eu. A.">S∴E.A.</span>
+      <span class="seal seal-ring" title={say("text.1", "Soror Eu. A.")}>S∴E.A.</span>
     </div>
   </div>
 </footer>

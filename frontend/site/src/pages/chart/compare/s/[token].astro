@@ -22,7 +22,7 @@ import { copy } from "../../../../lib/copy";
 
 /* Every word on this page, editable from the admin. The defaults below are
    what it was written with and what still renders if nothing was changed. */
-const t = await copy("chart/compare/s/[token]");
+const say = await copy("chart/compare/s/[token]");
 
 
 export const prerender = false;
@@ -59,19 +59,19 @@ const rightName = c?.right?.label || "The second";
     that search engines and social scrapers refuse to fetch is a grey box.
     The address is still unguessable and nothing on the site links to one. */}
 <BaseLayout title={`${c?.label || "Two charts"} — compared`}
-            description="Two charts, read against each other."
+            description={say("text.2", "Two charts, read against each other.")}
             ogImage={cardUrl} ogImageAlt="Two charts compared">
   <div class="page shared-compare">
     {
       !c ? (
         <EmptyState
           glyph="○"
-          title="There is nothing at this address"
-          body="The link may be mistyped, the person who made it may have taken it back, or one of the two charts may have been deleted."
+          title={say("text.3", "There is nothing at this address")}
+          body={say("text.4", "The link may be mistyped, the person who made it may have taken it back, or one of the two charts may have been deleted.")}
         />
       ) : (
         <>
-          <SectionHeader as="h1" glyph="✶" eyebrow="Shared with you" title={c.label || "Two charts"} />
+          <SectionHeader as="h1" glyph="✶" eyebrow={say("text.5", "Shared with you")} title={c.label || "Two charts"} />
 
           {
             readingHtml && (
@@ -107,15 +107,15 @@ const rightName = c?.right?.label || "The second";
             />
           )}
 
-          <p class="fine">{t("text.1", "Neither birth place is shown — the person who shared this kept those.")}</p>
+          <p class="fine">{say("text.1", "Neither birth place is shown — the person who shared this kept those.")}</p>
 
           <section class="yours">
-            <h2>{t("compare-your-own.1", "Compare your own")}</h2>
-            <p class="fine">{t("compare-your-own.2", "The same instrument, free, no account needed. It says what it cannot compute rather than guessing — an unknown birth time leaves the angles undefined instead of inventing them.")}</p>
+            <h2>{say("compare-your-own.1", "Compare your own")}</h2>
+            <p class="fine">{say("compare-your-own.2", "The same instrument, free, no account needed. It says what it cannot compute rather than guessing — an unknown birth time leaves the angles undefined instead of inventing them.")}</p>
             <p>
               <a class="sh-btn" data-variant="primary" data-size="md"
                  href="/tools/natal-chart" data-track="chart:from-comparison">
-                <span>Cast a chart</span>
+                <span>{say("text.6", "Cast a chart")}</span>
               </a>
             </p>
           </section>

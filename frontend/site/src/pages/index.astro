@@ -30,7 +30,7 @@ import Copy from "../components/content/Copy.astro";
 
 /* Every word on the landing page, editable. The defaults here are what it was
    written with and what still renders if nothing has been changed. */
-const t = await copy("home");
+const say = await copy("home");
 
 interface ScheduleRow {
   title: string;
@@ -146,15 +146,15 @@ const INSTRUMENTS = [
 ---
 
 <BaseLayout
-  title={t("meta.title", "Shruti — instruments for magick")}
-  description={t("meta.description", "Software for astrology, theurgy and divination — built live on stream from Athens.")}
+  title={say("meta.title", "Shruti — instruments for magick")}
+  description={say("meta.description", "Software for astrology, theurgy and divination — built live on stream from Athens.")}
 >
   {/* Outside `.page` so the sky can reach both edges; the Hero puts its own
       words back into the column. */}
   <Hero
       bleed
       greeting="Welcome · Καλώς ήρθατε · स्वागत"
-      title={t("hero.title", "I build instruments for magick.")}
+      title={say("hero.title", "I build instruments for magick.")}
       subtitle="Software for astrology, theurgy and divination — built live on stream from Athens."
       art={AVATAR}
       artWidth={512}
@@ -169,7 +169,7 @@ const INSTRUMENTS = [
             <Button size="lg" href="/schedule">Next stream</Button>
           )
         }
-        <Button variant="secondary" size="lg" href="/work">See the work</Button>
+        <Button variant="secondary" size="lg" href="/work">{say("text.6", "See the work")}</Button>
       </Fragment>
       <Fragment slot="footnote">
         <div class="hero-foot-row">
@@ -212,11 +212,11 @@ const INSTRUMENTS = [
     <div class="section-head">
       <SectionHeader
         glyph="✶"
-        eyebrow="Run them here"
-        title={t("instruments.title", "Instruments, in your browser")}
-        body="Working software for practice — no install, no account, and they answer for wherever you are."
+        eyebrow={say("text.3", "Run them here")}
+        title={say("instruments.title", "Instruments, in your browser")}
+        body={say("text.4", "Working software for practice — no install, no account, and they answer for wherever you are.")}
       />
-      <Button variant="ghost" href="/today">{t("instruments.link", "Day at a glance →")}</Button>
+      <Button variant="ghost" href="/today">{say("instruments.link", "Day at a glance →")}</Button>
     </div>
     {/* A working wheel, not a screenshot of one. The links below say what the
         instruments answer; this one is already answering, computed by her own
@@ -254,44 +254,44 @@ const INSTRUMENTS = [
   <section class="section page">
     <div class="account-invite">
       <div class="ai-words">
-        <span class="t-eyebrow">A free account</span>
-        <h2>{t("account.heading", "Save a nativity, and the instruments start answering about you")}</h2>
-        <p class="ai-lead">{t("account.lede", "Everything above works without an account and always will. What an account changes is that the tools stop asking where and when, and start knowing.")}</p>
+        <span class="t-eyebrow">{say("text.7", "A free account")}</span>
+        <h2>{say("account.heading", "Save a nativity, and the instruments start answering about you")}</h2>
+        <p class="ai-lead">{say("account.lede", "Everything above works without an account and always will. What an account changes is that the tools stop asking where and when, and start knowing.")}</p>
         <ul class="ai-list">
           <li>
             <span class="t-glyph" aria-hidden="true">✶</span>
             <span>
-              <strong>{t("account.perk1.title", "Your chart, kept.")}</strong>{" "}
-              {t("account.perk1.body", "Cast once and it is there — no re-typing a birth time and a city every time you want to look at it.")}
+              <strong>{say("account.perk1.title", "Your chart, kept.")}</strong>{" "}
+              {say("account.perk1.body", "Cast once and it is there — no re-typing a birth time and a city every time you want to look at it.")}
             </span>
           </li>
           <li>
             <span class="t-glyph" aria-hidden="true">☾</span>
             <span>
-              <strong>{t("account.perk2.title", "Transits on Day at a glance.")}</strong>{" "}
-              {t("account.perk2.body", "The one block on that page that needs to know where you were born. Nothing else does.")}
+              <strong>{say("account.perk2.title", "Transits on Day at a glance.")}</strong>{" "}
+              {say("account.perk2.body", "The one block on that page that needs to know where you were born. Nothing else does.")}
             </span>
           </li>
           <li>
             <span class="t-glyph" aria-hidden="true">☉</span>
             <span>
-              <strong>{t("account.perk3.title", "Your place, remembered.")}</strong>{" "}
-              {t("account.perk3.body", "Stations, sunrise and the pañcāṅga answer for where you actually are, without setting it each visit.")}
+              <strong>{say("account.perk3.title", "Your place, remembered.")}</strong>{" "}
+              {say("account.perk3.body", "Stations, sunrise and the pañcāṅga answer for where you actually are, without setting it each visit.")}
             </span>
           </li>
           <li>
             <span class="t-glyph" aria-hidden="true">◐</span>
             <span>
-              <strong>{t("account.perk4.title", "Your sign first.")}</strong>{" "}
-              {t("account.perk4.body", "The monthly reading opens on yours instead of twelve to choose from.")}
+              <strong>{say("account.perk4.title", "Your sign first.")}</strong>{" "}
+              {say("account.perk4.body", "The monthly reading opens on yours instead of twelve to choose from.")}
             </span>
           </li>
         </ul>
         <div class="ai-actions">
-          <Button size="lg" href="/signup">{t("account.button", "Make an account")}</Button>
+          <Button size="lg" href="/signup">{say("account.button", "Make an account")}</Button>
           <Button variant="ghost" href="/signin">Sign in</Button>
         </div>
-        <p class="ai-quiet">{t("text.1", "Nothing public — no profile, no avatar, no follower count. Birth data is a separate, optional decision, and withdrawing it deletes it. Free, and staying that way.")}</p>
+        <p class="ai-quiet">{say("text.1", "Nothing public — no profile, no avatar, no follower count. Birth data is a separate, optional decision, and withdrawing it deletes it. Free, and staying that way.")}</p>
       </div>
     </div>
   </section>
@@ -308,7 +308,7 @@ const INSTRUMENTS = [
           glyph="☾"
           eyebrow="Horoscopes"
           title={monthName ? `${monthName}, one per sign` : "This month, one per sign"}
-          body="Twelve readings a month, written by hand and signed Soror Eu. A. Pick a sign — or save a nativity and yours comes up first."
+          body={say("text.5", "Twelve readings a month, written by hand and signed Soror Eu. A. Pick a sign — or save a nativity and yours comes up first.")}
         />
         <Button variant="ghost" href="/horoscopes">
           {anyReading ? "All twelve →" : "How they work →"}
@@ -323,7 +323,7 @@ const INSTRUMENTS = [
         ) : (
           /* No date promised. A month named here and missed reads as an
              abandoned site, which is a worse thing to say than "not yet". */
-          <p class="horo-absent"><Copy text={t("text.2", "○ The first set is not up yet. When it is, twelve go up together — and every past month stays readable in [the archive](/horoscopes/archive) rather than being replaced.")} /></p>
+          <p class="horo-absent"><Copy text={say("text.2", "○ The first set is not up yet. When it is, twelve go up together — and every past month stays readable in [the archive](/horoscopes/archive) rather than being replaced.")} /></p>
         )
       }
     </section>
@@ -335,10 +335,10 @@ const INSTRUMENTS = [
       <SectionHeader
         glyph="✶"
         eyebrow="The work"
-        title={t("work.title", "A portfolio of instruments")}
-        body={t("work.body", "The proof behind the brand: real software for real practice.")}
+        title={say("work.title", "A portfolio of instruments")}
+        body={say("work.body", "The proof behind the brand: real software for real practice.")}
       />
-      <Button variant="ghost" href="/work">{t("work.link", "About the work →")}</Button>
+      <Button variant="ghost" href="/work">{say("work.link", "About the work →")}</Button>
     </div>
     {
       leading.length > 0 ? (
@@ -355,7 +355,7 @@ const INSTRUMENTS = [
           ))}
         </div>
       ) : (
-        <p class="quiet-empty">{t("journal.empty", "Nothing published here yet.")}</p>
+        <p class="quiet-empty">{say("journal.empty", "Nothing published here yet.")}</p>
       )
     }
   </section>

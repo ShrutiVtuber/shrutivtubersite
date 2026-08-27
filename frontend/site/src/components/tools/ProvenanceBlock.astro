@@ -28,16 +28,20 @@ interface Version {
   service: string; version: string; licence: string; sha: string; sourceUrl: string;
 }
 import { astro } from "../../lib/api";
+import { copy } from "../../lib/copy";
+
+/* Every word here, editable from the admin. The defaults below are what
+   it was written with and what still renders if nothing was changed. */
+const say = await copy("component:ProvenanceBlock");
+
 const v = await astro<Version>("/version");
 ---
 
 <section class="prov">
-  <h2 class="prov-head">Provenance</h2>
-  <p class="prov-intro">
-    The astrology is only as good as the engineering behind it, so the engineering is on the table.
-  </p>
+  <h2 class="prov-head">{say("provenance.1", "Provenance")}</h2>
+  <p class="prov-intro">{say("provenance.2", "The astrology is only as good as the engineering behind it, so the engineering is on the table.")}</p>
   <div class="prov-rows">
-    <div><span>engine</span><span>Swiss Ephemeris 2.10.03</span></div>
+    <div><span>engine</span><span>{say("provenance.3", "Swiss Ephemeris 2.10.03")}</span></div>
     {rule && <div><span>{ruleLabel}</span><span>{rule}</span></div>}
     <div>
       <span>computed</span>

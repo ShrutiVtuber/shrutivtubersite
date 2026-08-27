@@ -27,7 +27,7 @@ import Copy from "../../../components/content/Copy.astro";
 
 /* Every word on this page, editable from the admin. The defaults below are
    what it was written with and what still renders if nothing was changed. */
-const t = await copy("chart/print/[token]");
+const say = await copy("chart/print/[token]");
 
 
 export const prerender = false;
@@ -86,16 +86,16 @@ const host = SITE_URL.replace(/^https?:\/\//, "");
         <div class="page">
           <EmptyState
             glyph="○"
-            title="There is nothing at this address"
-            body="The link may be mistyped, or the chart may have been deleted or its share taken back."
+            title={say("text.3", "There is nothing at this address")}
+            body={say("text.4", "The link may be mistyped, or the chart may have been deleted or its share taken back.")}
           />
         </div>
       ) : (
         <>
           <div class="bar no-print">
-            <p><Copy text={t("text.2", "This page is laid out for A4. Print it, and choose **Save as PDF** as the destination.")} /></p>
-            <button type="button" id="go" data-track="chart:printed">{t("text.1", "Print or save as PDF")}</button>
-            <a href={asOwner ? `/chart/${token}` : `/chart/s/${token}`}>Back to the chart</a>
+            <p><Copy text={say("text.2", "This page is laid out for A4. Print it, and choose **Save as PDF** as the destination.")} /></p>
+            <button type="button" id="go" data-track="chart:printed">{say("text.1", "Print or save as PDF")}</button>
+            <a href={asOwner ? `/chart/${token}` : `/chart/s/${token}`}>{say("text.5", "Back to the chart")}</a>
           </div>
 
           <article class="sheet">
@@ -129,11 +129,11 @@ const host = SITE_URL.replace(/^https?:\/\//, "");
             {
               asOwner && (
                 <section class="moment">
-                  <h2>{t("the-moment.1", "The moment")}</h2>
+                  <h2>{say("the-moment.1", "The moment")}</h2>
                   <p>
                     <span class="t-tabular">{c.birthDate}</span>
                     {c.timeUnknown
-                      ? <span>{t("the-moment.2", "· birth time unknown")}</span>
+                      ? <span>{say("the-moment.2", "· birth time unknown")}</span>
                       : <span class="t-tabular"> · {c.birthTime}</span>}
                     {c.placeName && <span> · {c.placeName}</span>}
                   </p>
@@ -143,14 +143,14 @@ const host = SITE_URL.replace(/^https?:\/\//, "");
 
             {
               c.timeUnknown && (
-                <p class="undef">{t("the-moment.3", "◐ The birth time was not known. The ascendant, the houses and everything resting on them are undefined rather than approximate, and are not printed. The planets are given for noon.")}</p>
+                <p class="undef">{say("the-moment.3", "◐ The birth time was not known. The ascendant, the houses and everything resting on them are undefined rather than approximate, and are not printed. The planets are given for noon.")}</p>
               )
             }
 
             {
               bodies.length > 0 && (
                 <section class="places">
-                  <h2>{t("positions.1", "Positions")}</h2>
+                  <h2>{say("positions.1", "Positions")}</h2>
                   <table>
                     <thead>
                       <tr><th>Body</th><th>Sign</th><th>Degree</th></tr>
@@ -173,7 +173,7 @@ const host = SITE_URL.replace(/^https?:\/\//, "");
             <footer class="sheet-foot">
               <span>{host}</span>
               <span>Printed {printed}</span>
-              <span>{t("positions.2", "Not advice. Nothing here is medical, legal or financial.")}</span>
+              <span>{say("positions.2", "Not advice. Nothing here is medical, legal or financial.")}</span>
             </footer>
           </article>
         </>

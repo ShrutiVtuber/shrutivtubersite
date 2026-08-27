@@ -25,7 +25,7 @@ import { copy } from "../lib/copy";
 
 /* Every word on this page, editable from the admin. The defaults below are
    what it was written with and what still renders if nothing was changed. */
-const t = await copy("about");
+const say = await copy("about");
 
 
 const [sections, who] = await Promise.all([pageSections("about"), profile()]);
@@ -38,8 +38,8 @@ const credits = (who?.credits ?? []).map((c) => ({
 ---
 
 <BaseLayout
-  title="About — Shruti"
-  description="VTuber, theurgist and toolmaker. Three initiatory lineages, held at once."
+  title={say("text.1", "About — Shruti")}
+  description={say("text.2", "VTuber, theurgist and toolmaker. Three initiatory lineages, held at once.")}
 >
   <div class="page">
     <SectionHeader
@@ -47,7 +47,7 @@ const credits = (who?.credits ?? []).map((c) => ({
       glyph="☾"
       eyebrow="About"
       title="Shruti"
-      body="VTuber · theurgist · toolmaker. Athens, GMT+3."
+      body={say("text.3", "VTuber · theurgist · toolmaker. Athens, GMT+3.")}
     />
 
     <div class="about-cols">
@@ -68,8 +68,8 @@ const credits = (who?.credits ?? []).map((c) => ({
           ) : (
             <EmptyState
               glyph="○"
-              title="Nothing written here yet"
-              body="Not written up yet. The instruments are, though — they are on the work page and they all run without an account."
+              title={say("text.4", "Nothing written here yet")}
+              body={say("text.5", "Not written up yet. The instruments are, though — they are on the work page and they all run without an account.")}
             />
           )
         }
@@ -77,7 +77,7 @@ const credits = (who?.credits ?? []).map((c) => ({
 
       <div class="about-side">
         <div>
-          <h2 class="side-head">{t("profile.1", "Profile")}</h2>
+          <h2 class="side-head">{say("profile.1", "Profile")}</h2>
           {
             fields.length > 0 ? (
               <ProfileFieldTable columns={1} fields={fields} />
@@ -96,12 +96,12 @@ const credits = (who?.credits ?? []).map((c) => ({
           }
         </div>
         <div>
-          <h2 class="side-head">{t("credits.1", "Credits")}</h2>
+          <h2 class="side-head">{say("credits.1", "Credits")}</h2>
           {
             credits.length > 0 ? (
               <CreditList dense credits={credits} />
             ) : (
-              <p class="side-absent">{t("credits.2", "No credits recorded yet — the commissions are still in progress.")}</p>
+              <p class="side-absent">{say("credits.2", "No credits recorded yet — the commissions are still in progress.")}</p>
             )
           }
         </div>
@@ -123,7 +123,7 @@ const credits = (who?.credits ?? []).map((c) => ({
                 glyph="✶"
                 eyebrow="Costumes"
                 title="Outfits"
-                body="Commissioned work. Every one names the artist who drew it."
+                body={say("text.6", "Commissioned work. Every one names the artist who drew it.")}
               />
             </div>
             <div class="grid-3">

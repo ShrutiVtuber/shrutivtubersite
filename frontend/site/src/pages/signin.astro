@@ -21,7 +21,7 @@ import Copy from "../components/content/Copy.astro";
 
 /* Every word on this page, editable from the admin. The defaults below are
    what it was written with and what still renders if nothing was changed. */
-const t = await copy("signin");
+const say = await copy("signin");
 
 
 const method = Astro.url.searchParams.get("method") === "password" ? "password" : "link";
@@ -60,40 +60,40 @@ if (Astro.request.method === "POST") {
 }
 ---
 
-<BaseLayout title="Sign in — Shruti" description="Sign in by emailed link, or with a password." noindex>
+<BaseLayout title={say("text.5", "Sign in — Shruti")} description={say("text.6", "Sign in by emailed link, or with a password.")} noindex>
   <div class="page auth">
     {
       sent ? (
         /* The state where people get lost, designed rather than implied. */
         <div class="check">
-          <SectionHeader as="h1" glyph="☾" eyebrow="Check your email" title="The link is on its way" />
+          <SectionHeader as="h1" glyph="☾" eyebrow={say("text.7", "Check your email")} title={say("text.8", "The link is on its way")} />
           <p class="check-body">
             Sent to <strong>{values.email}</strong>. It works <strong>once</strong> and expires in
             <strong> 20 minutes</strong>.
           </p>
-          <p class="check-body">{t("text.1", "Nothing yet? It sometimes lands in spam — and if the address has no account here, no mail is sent at all, which is deliberate: whether an address has an account is not something a stranger gets to learn from this form.")}</p>
+          <p class="check-body">{say("text.1", "Nothing yet? It sometimes lands in spam — and if the address has no account here, no mail is sent at all, which is deliberate: whether an address has an account is not something a stranger gets to learn from this form.")}</p>
           <div class="check-actions">
-            <Button variant="secondary" href="/signin">{t("text.2", "Use a different address")}</Button>
+            <Button variant="secondary" href="/signin">{say("text.2", "Use a different address")}</Button>
             <form method="POST" class="inline-form">
               <CsrfField />
               <input type="hidden" name="email" value={values.email} />
-              <Button type="submit" variant="ghost">Send it again</Button>
+              <Button type="submit" variant="ghost">{say("text.13", "Send it again")}</Button>
             </form>
           </div>
         </div>
       ) : (
         <>
           <SectionHeader
-            as="h1" glyph="☾" eyebrow="Sign in" title="Welcome back"
-            body="By emailed link, or with a password if you set one."
+            as="h1" glyph="☾" eyebrow="Sign in" title={say("text.9", "Welcome back")}
+            body={say("text.10", "By emailed link, or with a password if you set one.")}
           />
           {/* Above the email field, because for anyone who has one it is the
               shortest path in — and it is the only method here that never
               involves waiting for a message to arrive. */}
-          <PasskeySignIn next="/account" label="Sign in with a passkey" />
+          <PasskeySignIn next="/account" label={say("text.11", "Sign in with a passkey")} />
           <p class="or">or</p>
-          <nav class="method-switch" aria-label="Sign-in method">
-            <a href="/signin" aria-current={method === "link" ? "page" : undefined}>Emailed link</a>
+          <nav class="method-switch" aria-label={say("text.12", "Sign-in method")}>
+            <a href="/signin" aria-current={method === "link" ? "page" : undefined}>{say("text.14", "Emailed link")}</a>
             <a href="/signin?method=password" aria-current={method === "password" ? "page" : undefined}>Password</a>
           </nav>
           <form method="POST" novalidate class="auth-form">
@@ -110,11 +110,11 @@ if (Astro.request.method === "POST") {
                 {method === "password" ? "Sign in" : "Send me a link"}
               </Button>
             </div>
-            <p class="auth-alt"><Copy text={t("text.4", "No account? [Make one](/signup).")} /></p>
+            <p class="auth-alt"><Copy text={say("text.4", "No account? [Make one](/signup).")} /></p>
             {/* Reader accounts and the site owner's admin are separate systems
                 with separate credentials. Saying so here costs nothing and
                 saves the owner concluding her password is broken. */}
-            <p class="admin-hint">Looking for the site admin? That is <a href="/admin">{t("text.3", "a separate sign-in")}</a>.</p>
+            <p class="admin-hint">Looking for the site admin? That is <a href="/admin">{say("text.3", "a separate sign-in")}</a>.</p>
           </form>
         </>
       )

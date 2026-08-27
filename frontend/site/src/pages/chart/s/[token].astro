@@ -27,7 +27,7 @@ import { copy } from "../../../lib/copy";
 
 /* Every word on this page, editable from the admin. The defaults below are
    what it was written with and what still renders if nothing was changed. */
-const t = await copy("chart/s/[token]");
+const say = await copy("chart/s/[token]");
 
 
 export const prerender = false;
@@ -77,8 +77,8 @@ const FIGURE = { wheel: "a wheel", north: "a North Indian square", south: "a Sou
 ---
 
 <BaseLayout
-  title="A shared chart — Shruti"
-  description="A chart somebody chose to show you."
+  title={say("text.4", "A shared chart — Shruti")}
+  description={say("text.5", "A chart somebody chose to show you.")}
   noindex
 >
   <div class="page shared">
@@ -86,15 +86,15 @@ const FIGURE = { wheel: "a wheel", north: "a North Indian square", south: "a Sou
       !c ? (
         <EmptyState
           glyph="○"
-          title="There is nothing at this address"
-          body="The link may be mistyped, or the person who made it may have taken it back. A shared chart stops working the moment they decide it should."
+          title={say("text.6", "There is nothing at this address")}
+          body={say("text.7", "The link may be mistyped, or the person who made it may have taken it back. A shared chart stops working the moment they decide it should.")}
         />
       ) : (
         <>
           <SectionHeader
             as="h1"
             glyph="✶"
-            eyebrow="Shared with you"
+            eyebrow={say("text.8", "Shared with you")}
             title={c.label || "A chart"}
           />
 
@@ -112,51 +112,51 @@ const FIGURE = { wheel: "a wheel", north: "a North Indian square", south: "a Sou
 
           {
             c.timeUnknown && (
-              <p class="undef">{t("text.1", "◐ The birth time was not known, so the ascendant, the houses and everything that depends on them are undefined rather than approximate. The planets are drawn for noon.")}</p>
+              <p class="undef">{say("text.1", "◐ The birth time was not known, so the ascendant, the houses and everything that depends on them are undefined rather than approximate. The planets are drawn for noon.")}</p>
             )
           }
 
           <p class="fine">
-            <a href={`/chart/print/${token}`}>{t("text.2", "Print it, or save it as a PDF")}</a>
+            <a href={`/chart/print/${token}`}>{say("text.2", "Print it, or save it as a PDF")}</a>
           </p>
 
-          <p class="fine">{t("text.3", "This page does not print the date, the time or the place — the person who shared it kept those. What you are looking at was drawn from them.")}</p>
+          <p class="fine">{say("text.3", "This page does not print the date, the time or the place — the person who shared it kept those. What you are looking at was drawn from them.")}</p>
 
           <section class="yours compare-with">
-            <h2>{t("compare-it-with-yours.1", "Compare it with yours")}</h2>
-            <p class="fine">{t("compare-it-with-yours.2", "If you have kept a chart of your own, paste its address and this will read the two against each other — and give you somewhere to write what you make of it.")}</p>
+            <h2>{say("compare-it-with-yours.1", "Compare it with yours")}</h2>
+            <p class="fine">{say("compare-it-with-yours.2", "If you have kept a chart of your own, paste its address and this will read the two against each other — and give you somewhere to write what you make of it.")}</p>
             {compareFailed && <p class="c-bad">{compareFailed}</p>}
             <form method="POST" class="c-form">
               <CsrfField />
               <label>
-                <span class="c-lbl">{t("compare-it-with-yours.3", "The address of your kept chart")}</span>
+                <span class="c-lbl">{say("compare-it-with-yours.3", "The address of your kept chart")}</span>
                 <input class="c-in" name="mine" placeholder="https://shrutivtuber.com/chart/…" />
               </label>
               <label>
-                <span class="c-lbl">{t("compare-it-with-yours.4", "Call the comparison something")}</span>
+                <span class="c-lbl">{say("compare-it-with-yours.4", "Call the comparison something")}</span>
                 <input class="c-in" name="label" maxlength="80" placeholder="Us" />
               </label>
               <label class="c-consent">
                 <input type="checkbox" name="consent" value="1" />
-                <span>{t("compare-it-with-yours.5", "Keeping a comparison keeps a pointer at both birth moments. Deleting either chart deletes it.")}</span>
+                <span>{say("compare-it-with-yours.5", "Keeping a comparison keeps a pointer at both birth moments. Deleting either chart deletes it.")}</span>
               </label>
-              <div><Button type="submit" data-track="comparison:made">Compare them</Button></div>
+              <div><Button type="submit" data-track="comparison:made">{say("text.9", "Compare them")}</Button></div>
             </form>
           </section>
 
           <section class="yours">
-            <h2>{t("cast-your-own.1", "Cast your own")}</h2>
-            <p class="fine">{t("cast-your-own.2", "The same instrument, free, and it works without an account. It says what it cannot compute rather than guessing — an unknown birth time leaves the angles undefined instead of inventing them.")}</p>
+            <h2>{say("cast-your-own.1", "Cast your own")}</h2>
+            <p class="fine">{say("cast-your-own.2", "The same instrument, free, and it works without an account. It says what it cannot compute rather than guessing — an unknown birth time leaves the angles undefined instead of inventing them.")}</p>
             <p>
               <a class="sh-btn" data-variant="primary" data-size="md" href="/tools/natal-chart" data-track="chart:from-share">
-                <span>Cast a chart</span>
+                <span>{say("text.10", "Cast a chart")}</span>
               </a>
             </p>
             {/* The letter, mentioned rather than formed. A second subscribe
                 form here would mean a second copy of the consent handling,
                 and that is the part of this site not to have two of. */}
             <p class="fine">
-              There is also <a href="/newsletter" data-track="newsletter:from-share">{t("cast-your-own.3", "a monthly letter")}</a> — what shipped, what the sky is doing, and the occasional paid thing.
+              There is also <a href="/newsletter" data-track="newsletter:from-share">{say("cast-your-own.3", "a monthly letter")}</a> — what shipped, what the sky is doing, and the occasional paid thing.
               One click to leave, from any issue.
             </p>
           </section>

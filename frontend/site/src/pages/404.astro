@@ -7,7 +7,7 @@ import { copy } from "../lib/copy";
 
 /* Every word on this page, editable from the admin. The defaults below are
    what it was written with and what still renders if nothing was changed. */
-const t = await copy("404");
+const say = await copy("404");
 
 
 /* Said explicitly, because this page is REWRITTEN to as well as routed to.
@@ -19,14 +19,14 @@ const t = await copy("404");
 Astro.response.status = 404;
 ---
 
-<BaseLayout title="Not found — Shruti" description="This page is in another sky.">
+<BaseLayout title={say("text.1", "Not found — Shruti")} description={say("text.2", "This page is in another sky.")}>
   <div class="page err">
     <span class="err-glyph t-glyph" aria-hidden="true">☾</span>
-    <h1>{t("this-page-is-in-another-.1", "This page is in another sky.")}</h1>
-    <p>{t("this-page-is-in-another-.2", "The address may have moved when the site was rebuilt — the almanac below will get you home.")}</p>
+    <h1>{say("this-page-is-in-another-.1", "This page is in another sky.")}</h1>
+    <p>{say("this-page-is-in-another-.2", "The address may have moved when the site was rebuilt — the almanac below will get you home.")}</p>
     <div class="err-actions">
       <Button href="/">Back home</Button>
-      <Button variant="secondary" href="/journal">Read the journal</Button>
+      <Button variant="secondary" href="/journal">{say("text.3", "Read the journal")}</Button>
     </div>
   </div>
 </BaseLayout>

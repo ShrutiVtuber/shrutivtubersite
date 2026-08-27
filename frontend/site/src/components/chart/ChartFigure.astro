@@ -11,6 +11,12 @@
  * a way of seeing what a table already says.
  */
 import { askAstro } from "../../lib/api";
+import { copy } from "../../lib/copy";
+
+/* Every word here, editable from the admin. The defaults below are what
+   it was written with and what still renders if nothing was changed. */
+const say = await copy("component:ChartFigure");
+
 
 interface Props {
   date: string;
@@ -76,10 +82,7 @@ const svg = raw.includes("<title")
       {caption && <figcaption>{caption}</figcaption>}
     </figure>
   ) : (
-    <p class="chart-missing">
-      The figure could not be drawn — the ephemeris did not answer. That is a
-      failure on this side, not a fact about the sky.
-    </p>
+    <p class="chart-missing">{say("text.1", "The figure could not be drawn — the ephemeris did not answer. That is a failure on this side, not a fact about the sky.")}</p>
   )
 }
 

@@ -15,6 +15,12 @@ import LegalImprint from "../components/brand/LegalImprint.astro";
 import EmptyState from "../components/feedback/EmptyState.astro";
 import { pageSections } from "../lib/content";
 import { site } from "../lib/api";
+import { copy } from "../lib/copy";
+
+/* Every word here, editable from the admin. The defaults below are what
+   it was written with and what still renders if nothing was changed. */
+const say = await copy("terms");
+
 
 interface Imprint {
   visible: boolean;
@@ -25,7 +31,7 @@ const imprint = await site<Imprint>("/api/content/imprint");
 const sections = await pageSections("terms");
 ---
 
-<BaseLayout title="Terms — Shruti" description="The terms this site is used under.">
+<BaseLayout title={say("text.1", "Terms — Shruti")} description={say("text.2", "The terms this site is used under.")}>
   <div class="page legal-page">
     <SectionHeader as="h1" glyph="○" eyebrow="Legal" title="Terms" />
     {
@@ -42,8 +48,8 @@ const sections = await pageSections("terms");
       ) : (
         <EmptyState
           glyph="○"
-          title="Not written yet"
-          body="These terms are not up yet. Nothing here is being sold in the meantime — if you have a question, the contact page reaches a person."
+          title={say("text.3", "Not written yet")}
+          body={say("text.4", "These terms are not up yet. Nothing here is being sold in the meantime — if you have a question, the contact page reaches a person.")}
         />
       )
     }

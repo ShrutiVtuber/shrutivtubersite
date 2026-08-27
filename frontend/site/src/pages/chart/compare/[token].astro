@@ -26,7 +26,7 @@ import { copy } from "../../../lib/copy";
 
 /* Every word on this page, editable from the admin. The defaults below are
    what it was written with and what still renders if nothing was changed. */
-const t = await copy("chart/compare/[token]");
+const say = await copy("chart/compare/[token]");
 
 
 export const prerender = false;
@@ -108,7 +108,7 @@ const leftName = c?.left?.label || "The first";
 const rightName = c?.right?.label || "The second";
 ---
 
-<BaseLayout title="A comparison — Shruti" description="Two charts, read against each other."
+<BaseLayout title={say("text.2", "A comparison — Shruti")} description={say("text.3", "Two charts, read against each other.")}
             ogImage={cardUrl} ogImageAlt="Two charts compared" noindex>
   <div class="page compare">
     {
@@ -163,39 +163,39 @@ const rightName = c?.right?.label || "The second";
                 rightName={rightName}
               />
             ) : (
-              <p class="bad">{t("text.1", "The comparison could not be computed — the ephemeris did not answer. That is a failure on this side, not a fact about the sky.")}</p>
+              <p class="bad">{say("text.1", "The comparison could not be computed — the ephemeris did not answer. That is a failure on this side, not a fact about the sky.")}</p>
             )
           }
 
           <section class="panel">
-            <h2>{t("your-reading.1", "Your reading")}</h2>
-            <p class="fine">{t("your-reading.2", "The lines above are arithmetic and this site will always compute them the same way. What it cannot do is say what any of it means to you — that part is yours, and it is the part worth sharing.")}</p>
+            <h2>{say("your-reading.1", "Your reading")}</h2>
+            <p class="fine">{say("your-reading.2", "The lines above are arithmetic and this site will always compute them the same way. What it cannot do is say what any of it means to you — that part is yours, and it is the part worth sharing.")}</p>
             <form method="POST" class="write">
               <CsrfField />
               <input type="hidden" name="action" value="write" />
               <label>
-                <span class="lbl">Call it something</span>
+                <span class="lbl">{say("text.5", "Call it something")}</span>
                 <input class="in" name="label" value={c.label} maxlength="80" />
               </label>
               <label>
-                <span class="lbl">{t("your-reading.3", "What you make of it")}</span>
+                <span class="lbl">{say("your-reading.3", "What you make of it")}</span>
                 <textarea class="area" name="reading_md" rows="12">{c.readingMd}</textarea>
               </label>
               <div><Button type="submit">Save it</Button></div>
             </form>
             {readingHtml && (
               <div class="preview">
-                <span class="lbl">As it will read</span>
+                <span class="lbl">{say("text.6", "As it will read")}</span>
                 <Prose html={readingHtml} />
               </div>
             )}
           </section>
 
           <section class="panel">
-            <h2>{t("how-the-card-looks.1", "How the card looks")}</h2>
-            <p class="fine">{t("how-the-card-looks.2", "This is the image a link turns into when it is posted. Pick whichever suits where you are posting it — a light card on a dark timeline is a lightbulb.")}</p>
+            <h2>{say("how-the-card-looks.1", "How the card looks")}</h2>
+            <p class="fine">{say("how-the-card-looks.2", "This is the image a link turns into when it is posted. Pick whichever suits where you are posting it — a light card on a dark timeline is a lightbulb.")}</p>
             <img class="card-preview" src={`/api/charts/compare/o/${token}/card.png`}
-                 width="1200" height="630" alt="The share card for this comparison" />
+                 width="1200" height="630" alt={say("text.4", "The share card for this comparison")} />
             {
               designs.length > 1 && (
                 <form method="POST" class="designs">
@@ -214,7 +214,7 @@ const rightName = c?.right?.label || "The second";
           </section>
 
           <section class="panel">
-            <h2>{t("hand-it-to-somebody.1", "Hand it to somebody")}</h2>
+            <h2>{say("hand-it-to-somebody.1", "Hand it to somebody")}</h2>
             {
               c.shared ? (
                 <>
@@ -225,16 +225,16 @@ const rightName = c?.right?.label || "The second";
                   <form method="POST">
                     <CsrfField />
                     <input type="hidden" name="action" value="unshare" />
-                    <Button type="submit" variant="secondary">{t("hand-it-to-somebody.2", "Take the link back")}</Button>
+                    <Button type="submit" variant="secondary">{say("hand-it-to-somebody.2", "Take the link back")}</Button>
                   </form>
                 </>
               ) : (
                 <>
-                  <p class="warn">{t("hand-it-to-somebody.3", "Whoever holds the link sees both figures, the configurations and your reading. Neither birth place is printed — but a chart is birth data drawn, and somebody who reads charts can get a date and a rough time from one. That is true of both charts here, including the one that is not yours.")}</p>
+                  <p class="warn">{say("hand-it-to-somebody.3", "Whoever holds the link sees both figures, the configurations and your reading. Neither birth place is printed — but a chart is birth data drawn, and somebody who reads charts can get a date and a rough time from one. That is true of both charts here, including the one that is not yours.")}</p>
                   <form method="POST">
                     <CsrfField />
                     <input type="hidden" name="action" value="share" />
-                    <Button type="submit" data-track="comparison:shared">{t("hand-it-to-somebody.4", "Make a link to share")}</Button>
+                    <Button type="submit" data-track="comparison:shared">{say("hand-it-to-somebody.4", "Make a link to share")}</Button>
                   </form>
                 </>
               )
@@ -242,8 +242,8 @@ const rightName = c?.right?.label || "The second";
           </section>
 
           <section class="panel">
-            <h2>{t("take-it-out-of-the-recor.1", "Take it out of the record")}</h2>
-            <p class="fine">{t("take-it-out-of-the-recor.2", "Deletes this comparison and your reading. The two charts are left alone — each is deleted from its own page.")}</p>
+            <h2>{say("take-it-out-of-the-recor.1", "Take it out of the record")}</h2>
+            <p class="fine">{say("take-it-out-of-the-recor.2", "Deletes this comparison and your reading. The two charts are left alone — each is deleted from its own page.")}</p>
             <form method="POST" onsubmit="return confirm('Delete this comparison and the reading?')">
               <CsrfField />
               <input type="hidden" name="action" value="forget" />

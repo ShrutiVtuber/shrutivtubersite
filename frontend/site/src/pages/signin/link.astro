@@ -5,6 +5,12 @@ import EmptyState from "../../components/feedback/EmptyState.astro";
 import Button from "../../components/forms/Button.astro";
 import { SITE_API } from "../../lib/api";
 import { redirectWithCookies } from "../../lib/redirect";
+import { copy } from "../../lib/copy";
+
+/* Every word here, editable from the admin. The defaults below are what
+   it was written with and what still renders if nothing was changed. */
+const say = await copy("signin/link");
+
 
 const token = Astro.url.searchParams.get("token") ?? "";
 let failed = "";
@@ -23,15 +29,15 @@ if (token) {
 }
 ---
 
-<BaseLayout title="Sign in — Shruti" description="Signing you in." noindex>
+<BaseLayout title={say("text.1", "Sign in — Shruti")} description={say("text.2", "Signing you in.")} noindex>
   <div class="page">
     <EmptyState
       glyph="◐"
       as="h1"
-      title="That link has expired"
+      title={say("text.3", "That link has expired")}
       body={`${failed} Links work once and last twenty minutes, which is short on purpose — a forwarded email should not be a standing key.`}
     >
-      <Button slot="action" variant="secondary" href="/signin">Send a new one</Button>
+      <Button slot="action" variant="secondary" href="/signin">{say("text.4", "Send a new one")}</Button>
     </EmptyState>
   </div>
 </BaseLayout>

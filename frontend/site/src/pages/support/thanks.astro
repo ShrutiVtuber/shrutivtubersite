@@ -20,21 +20,21 @@ import Copy from "../../components/content/Copy.astro";
 
 /* Every word on this page, editable from the admin. The defaults below are
    what it was written with and what still renders if nothing was changed. */
-const t = await copy("support/thanks");
+const say = await copy("support/thanks");
 
 
 const me = await account(Astro);
 ---
 
-<BaseLayout title="Thank you — Shruti" description="Your support keeps the bench lit." noindex>
+<BaseLayout title={say("text.2", "Thank you — Shruti")} description={say("text.3", "Your support keeps the bench lit.")} noindex>
   <div class="page thanks">
     <SectionHeader
       as="h1" glyph="♄" eyebrow="Support" title="Thank you"
-      body="That goes to the ephemeris server, art commissions, and the hours the software takes. It is not a small thing and I know it."
+      body={say("text.4", "That goes to the ephemeris server, art commissions, and the hours the software takes. It is not a small thing and I know it.")}
     />
 
     <div class="card">
-      <h2>{t("if-it-was-monthly.1", "If it was monthly")}</h2>
+      <h2>{say("if-it-was-monthly.1", "If it was monthly")}</h2>
       <p>
         {
           me
@@ -44,13 +44,13 @@ const me = await account(Astro);
       </p>
       <div class="row">
         {me
-          ? <Button href="/account">Your account</Button>
-          : <Button href="/signup">Make an account</Button>}
-        <Button variant="ghost" href="/">Back to the site</Button>
+          ? <Button href="/account">{say("text.5", "Your account")}</Button>
+          : <Button href="/signup">{say("text.6", "Make an account")}</Button>}
+        <Button variant="ghost" href="/">{say("text.7", "Back to the site")}</Button>
       </div>
     </div>
 
-    <p class="quiet"><Copy text={t("text.1", "A receipt is on its way from Stripe. If your name is to be read on stream, it is the one you gave them — tell me on [the contact page](/contact) if it should be something else.")} /></p>
+    <p class="quiet"><Copy text={say("text.1", "A receipt is on its way from Stripe. If your name is to be read on stream, it is the one you gave them — tell me on [the contact page](/contact) if it should be something else.")} /></p>
   </div>
 </BaseLayout>
 

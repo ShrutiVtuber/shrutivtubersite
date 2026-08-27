@@ -23,7 +23,7 @@ import Copy from "../components/content/Copy.astro";
 
 /* Every word on this page, editable from the admin. The defaults below are
    what it was written with and what still renders if nothing was changed. */
-const t = await copy("press");
+const say = await copy("press");
 
 
 const sections = await pageSections("press");
@@ -31,41 +31,41 @@ const intro = sections.find((s) => s.key === "intro");
 const extra = sections.filter((s) => s.key !== "intro");
 ---
 
-<BaseLayout title="Press & media kit — Shruti" description="Press and media kit: brand-safety statement, logo and portrait pack, what Shruti will and will not cover, and the route for business enquiries.">
+<BaseLayout title={say("text.1", "Press & media kit — Shruti")} description={say("text.2", "Press and media kit: brand-safety statement, logo and portrait pack, what Shruti will and will not cover, and the route for business enquiries.")}>
   <div class="page">
     <SectionHeader
       as="h1" glyph="☿" eyebrow="Press" title={intro?.title || "Media kit"}
-      body="Everything a collaborator or journalist needs, in one place."
+      body={say("text.3", "Everything a collaborator or journalist needs, in one place.")}
     />
 
     <section class="press-block">
-      <h2>{t("audience.1", "Audience")}</h2>
+      <h2>{say("audience.1", "Audience")}</h2>
       {/* Deliberately no numbers. See the file header. */}
       <p class="press-note">
-        <Copy text={t("audience.2", "Live numbers on request — [business@shrutivtuber.com](mailto:business@shrutivtuber.com). Figures are not published here because a stale or broken figure is worse than none.")} />
+        <Copy text={say("audience.2", "Live numbers on request — [business@shrutivtuber.com](mailto:business@shrutivtuber.com). Figures are not published here because a stale or broken figure is worse than none.")} />
       </p>
     </section>
 
     <section class="press-block">
-      <h2>{t("brand-safety.1", "Brand safety")}</h2>
-      <p>{t("brand-safety.2", "Content is programming, astrology and magickal practice. No gambling, no crypto promotion, no political campaigning. Streams are bilingual English and Greek. Occult subject matter is treated as scholarship and practice, never as spectacle, and restricted material is named rather than detailed.")}</p>
+      <h2>{say("brand-safety.1", "Brand safety")}</h2>
+      <p>{say("brand-safety.2", "Content is programming, astrology and magickal practice. No gambling, no crypto promotion, no political campaigning. Streams are bilingual English and Greek. Occult subject matter is treated as scholarship and practice, never as spectacle, and restricted material is named rather than detailed.")}</p>
     </section>
 
     <section class="press-block">
-      <h2>{t("the-name.1", "The name")}</h2>
+      <h2>{say("the-name.1", "The name")}</h2>
       <p>
-        <Copy text={t("the-name.2", "**Shruti** — Shruti Swara — is the brand and the real name; use it for titles, credits and copy. *Soror Eu. A.* signs magickal writing only and is not a handle or a second logo. **Theourgia** is the software.")} />
+        <Copy text={say("the-name.2", "**Shruti** — Shruti Swara — is the brand and the real name; use it for titles, credits and copy. *Soror Eu. A.* signs magickal writing only and is not a handle or a second logo. **Theourgia** is the software.")} />
       </p>
     </section>
 
     <section class="press-block">
-      <h2>{t("assets.1", "Assets")}</h2>
+      <h2>{say("assets.1", "Assets")}</h2>
       <EmptyState
         glyph="◐"
-        title="Asset pack not published yet"
-        body="The wordmark, clear-space rules and hex codes are packaged on request until the download is ready."
+        title={say("text.4", "Asset pack not published yet")}
+        body={say("text.5", "The wordmark, clear-space rules and hex codes are packaged on request until the download is ready.")}
       >
-        <Button slot="action" variant="secondary" href="/contact">Request the pack</Button>
+        <Button slot="action" variant="secondary" href="/contact">{say("text.6", "Request the pack")}</Button>
       </EmptyState>
     </section>
   </div>

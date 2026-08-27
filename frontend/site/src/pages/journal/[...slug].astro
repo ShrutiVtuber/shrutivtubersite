@@ -23,6 +23,12 @@ import { read } from "../../lib/journal/parse";
 import { SITE_URL } from "../../lib/api";
 import { KIND_LABEL } from "../../lib/journal/types";
 import "../../styles/journal.css";
+import { copy } from "../../lib/copy";
+
+/* Every word here, editable from the admin. The defaults below are what
+   it was written with and what still renders if nothing was changed. */
+const say = await copy("journal/[...slug]");
+
 
 export const prerender = false;
 
@@ -118,7 +124,7 @@ const LEDE: Record<string, string> = {
                       </main>
                     )
                   : page.type === "hub"
-                    ? <Listing eyebrow="Journal" title="Writing, documentation, and what changed"
+                    ? <Listing eyebrow="Journal" title={say("text.1", "Writing, documentation, and what changed")}
                                lede={LEDE.hub} entries={page.entries} feature />
                     : page.type === "all"
                       ? <Listing eyebrow="Everything" title="All content"

@@ -20,7 +20,7 @@ import { copy } from "../../../lib/copy";
 
 /* Every word on this page, editable from the admin. The defaults below are
    what it was written with and what still renders if nothing was changed. */
-const t = await copy("horoscopes/[sign]/[period]");
+const say = await copy("horoscopes/[sign]/[period]");
 
 
 const sign = String(Astro.params.sign ?? "");
@@ -71,16 +71,16 @@ const GLYPH: Record<string, string> = {
       ) : (
         <EmptyState
           glyph="○"
-          title="Not written yet"
-          body="This one is not up. Twelve go together — an empty reading is worse than a late one."
+          title={say("text.2", "Not written yet")}
+          body={say("text.3", "This one is not up. Twelve go together — an empty reading is worse than a late one.")}
         >
-          <Button slot="action" variant="secondary" href="/horoscopes">All twelve signs</Button>
+          <Button slot="action" variant="secondary" href="/horoscopes">{say("text.4", "All twelve signs")}</Button>
         </EmptyState>
       )
     }
 
     <p class="back">
-      <a href={`/horoscopes${covers ? `?covers=${covers}` : ""}`}>{t("text.1", "← All twelve signs")}</a>
+      <a href={`/horoscopes${covers ? `?covers=${covers}` : ""}`}>{say("text.1", "← All twelve signs")}</a>
       <a href={`/horoscopes/archive?sign=${sign}`}>Every {NAME} reading →</a>
     </p>
   </div>

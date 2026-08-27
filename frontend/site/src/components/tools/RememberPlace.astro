@@ -9,6 +9,12 @@
  */
 import CsrfField from "../forms/CsrfField.astro";
 import { account, savedPlace } from "../../lib/account";
+import { copy } from "../../lib/copy";
+
+/* Every word here, editable from the admin. The defaults below are what
+   it was written with and what still renders if nothing was changed. */
+const say = await copy("component:RememberPlace");
+
 
 interface Props { place: string; lat: number; lon: number }
 const { place, lat, lon } = Astro.props;
@@ -35,7 +41,7 @@ const same = saved
     <input type="hidden" name="lon" value={lon} />
     <input type="hidden" name="next" value={here} />
     <button type="submit">Keep {place} as my place</button>
-    <span>so every instrument opens here</span>
+    <span>{say("text.1", "so every instrument opens here")}</span>
   </form>
 )}
 

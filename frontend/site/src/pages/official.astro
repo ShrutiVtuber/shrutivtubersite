@@ -22,7 +22,7 @@ import { copy } from "../lib/copy";
 
 /* Every word on this page, editable from the admin. The defaults below are
    what it was written with and what still renders if nothing was changed. */
-const t = await copy("official");
+const say = await copy("official");
 
 
 export const prerender = false;
@@ -48,22 +48,22 @@ const host = (url: string) => {
 ---
 
 <BaseLayout
-  title="Official places — Shruti"
-  description="Every shop, profile and community that is genuinely Shruti's, listed in one place — so anything not on this list can be recognised for what it is."
+  title={say("text.1", "Official places — Shruti")}
+  description={say("text.2", "Every shop, profile and community that is genuinely Shruti's, listed in one place — so anything not on this list can be recognised for what it is.")}
 >
   <div class="page official">
     <SectionHeader
       as="h1" glyph="✦" eyebrow="Authenticity"
-      title="The places that are actually mine"
-      body="If it is not on this list, it is not me. That is the whole point of the page — there are shops using creators' names and art without asking, and the only useful answer is a list you can check on a domain I control."
+      title={say("text.3", "The places that are actually mine")}
+      body={say("text.4", "If it is not on this list, it is not me. That is the whole point of the page — there are shops using creators' names and art without asking, and the only useful answer is a list you can check on a domain I control.")}
     />
 
     {places.length === 0 ? (
       <EmptyState
         as="h2"
         glyph="○"
-        title="Nothing listed yet"
-        body="This page is up before the list is, which is the wrong way round and will not last long. Until it is filled in, treat it as saying nothing rather than as saying everything is fine."
+        title={say("text.5", "Nothing listed yet")}
+        body={say("text.6", "This page is up before the list is, which is the wrong way round and will not last long. Until it is filled in, treat it as saying nothing rather than as saying everything is fine.")}
       />
     ) : (
       <>
@@ -86,8 +86,8 @@ const host = (url: string) => {
         ))}
 
         <section class="of-warn">
-          <h2>{t("if-you-find-something-th.1", "If you find something that is not here")}</h2>
-          <p>{t("if-you-find-something-th.2", "It is not mine, whatever it says about itself. Some of these copy a creator's art, their name and even the word “official” onto a storefront that has nothing to do with them. Nobody is expected to spot that from the page itself — that is why this list exists.")}</p>
+          <h2>{say("if-you-find-something-th.1", "If you find something that is not here")}</h2>
+          <p>{say("if-you-find-something-th.2", "It is not mine, whatever it says about itself. Some of these copy a creator's art, their name and even the word “official” onto a storefront that has nothing to do with them. Nobody is expected to spot that from the page itself — that is why this list exists.")}</p>
           <p>
             Do not buy from it, and if you have the time,{" "}
             <a href="/contact">tell me</a>. Knowing which ones exist is most of

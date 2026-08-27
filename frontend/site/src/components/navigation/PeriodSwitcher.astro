@@ -1,4 +1,10 @@
 ---
+import { copy } from "../../lib/copy";
+
+/* Every word here, editable from the admin. The defaults below are what
+   it was written with and what still renders if nothing was changed. */
+const say = await copy("component:PeriodSwitcher");
+
 /* Ported from `components/navigation/PeriodSwitcher.jsx`; contract in
  * `PeriodSwitcher.d.ts`.
  *
@@ -19,7 +25,7 @@ const LABEL: Record<string, string> = {
 
 {
   available.length > 1 && (
-    <nav class="periods" aria-label="Reading period">
+    <nav class="periods" aria-label={say("text.1", "Reading period")}>
       {
         available.map((p) => (
           <a href={hrefFor(p)} aria-current={p === current ? "page" : undefined}>{LABEL[p] ?? p}</a>

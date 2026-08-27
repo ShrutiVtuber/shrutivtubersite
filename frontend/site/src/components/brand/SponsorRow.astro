@@ -1,4 +1,10 @@
 ---
+import { copy } from "../../lib/copy";
+
+/* Every word here, editable from the admin. The defaults below are what
+   it was written with and what still renders if nothing was changed. */
+const say = await copy("component:SponsorRow");
+
 /* The people paying for the lights.
  *
  * **Their colours, not the site's.** A sponsor arrives with a brand and the
@@ -47,15 +53,11 @@ const { sponsors, bare = false } = Astro.props;
     <section class="section page sponsors">
       <div class="s-head">
         <div>
-          <span class="t-eyebrow">With thanks to</span>
-          <h2>Who keeps this running</h2>
-          <p class="s-lead">
-            The channel is paid for by these. Nothing on this site is behind
-            them, and none of them chose what is written here — but the lights
-            are on because of them.
-          </p>
+          <span class="t-eyebrow">{say("text.1", "With thanks to")}</span>
+          <h2>{say("who-keeps-this-running.1", "Who keeps this running")}</h2>
+          <p class="s-lead">{say("who-keeps-this-running.2", "The channel is paid for by these. Nothing on this site is behind them, and none of them chose what is written here — but the lights are on because of them.")}</p>
         </div>
-        {!bare && <a class="s-all" href="/partners">All partners →</a>}
+        {!bare && <a class="s-all" href="/partners">{say("who-keeps-this-running.3", "All partners →")}</a>}
       </div>
 
       <ul class="s-list" data-count={sponsors.length}>

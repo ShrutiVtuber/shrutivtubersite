@@ -28,7 +28,7 @@ import Copy from "../../components/content/Copy.astro";
 
 /* Every word on this page, editable from the admin. The defaults below are
    what it was written with and what still renders if nothing was changed. */
-const t = await copy("tools");
+const say = await copy("tools");
 
 
 export const prerender = false;
@@ -82,15 +82,15 @@ const jsonLd = {
 ---
 
 <BaseLayout
-  title="Instruments — Shruti"
-  description="Nine free instruments for magickal and astrological practice: planetary hours, the pañcāṅga, three calendars, natal charts and letter-reckoning. No account, no advertising."
+  title={say("text.2", "Instruments — Shruti")}
+  description={say("text.3", "Nine free instruments for magickal and astrological practice: planetary hours, the pañcāṅga, three calendars, natal charts and letter-reckoning. No account, no advertising.")}
   jsonLd={jsonLd}
 >
   <div class="page instruments">
     <SectionHeader
       as="h1" glyph="✶" eyebrow="Theourgia"
-      title="The instruments"
-      body="Nine of them, all free, none of them asking for an account. They are built on stream and the working is shown — every one says which rule it followed and where the numbers came from, because a figure you cannot check is a figure you have to take on faith."
+      title={say("text.4", "The instruments")}
+      body={say("text.5", "Nine of them, all free, none of them asking for an account. They are built on stream and the working is shown — every one says which rule it followed and where the numbers came from, because a figure you cannot check is a figure you have to take on faith.")}
     />
 
     {GROUPS.map((group) => {
@@ -121,9 +121,9 @@ const jsonLd = {
     ))}
 
     <section class="inst-note">
-      <h2>{t("what-these-are-and-what-.1", "What these are, and what they are not")}</h2>
-      <Prose html={`<p>{t("what-these-are-and-what-.2", "Every instrument here computes something with a definite answer — where a body was, when a month opened, what a set of letters sums to. That part is arithmetic and it is either right or wrong, so each page shows the rule it used and you can check it.")}</p>
-        <p><Copy text={t("text.1", "What the numbers *mean* is a different question, and none of these answer it. They will not tell you what to do, and nothing here predicts anything. They are for people who already have a practice and want the reckoning done properly.")} /></p>`} />
+      <h2>{say("what-these-are-and-what-.1", "What these are, and what they are not")}</h2>
+      <Prose html={`<p>{say("what-these-are-and-what-.2", "Every instrument here computes something with a definite answer — where a body was, when a month opened, what a set of letters sums to. That part is arithmetic and it is either right or wrong, so each page shows the rule it used and you can check it.")}</p>
+        <p><Copy text={say("text.1", "What the numbers *mean* is a different question, and none of these answer it. They will not tell you what to do, and nothing here predicts anything. They are for people who already have a practice and want the reckoning done properly.")} /></p>`} />
     </section>
   </div>
 </BaseLayout>

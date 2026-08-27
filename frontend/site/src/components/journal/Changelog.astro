@@ -9,6 +9,12 @@ import Glyph from "./Glyph.astro";
 import Masthead from "./Masthead.astro";
 import { GLYPH, type Release } from "../../lib/journal/types";
 import { shortDate } from "../../lib/journal/format";
+import { copy } from "../../lib/copy";
+
+/* Every word here, editable from the admin. The defaults below are what
+   it was written with and what still renders if nothing was changed. */
+const say = await copy("component:Changelog");
+
 
 interface Props { title: string; lede?: string; releases: Release[] }
 const { title, lede, releases } = Astro.props;
@@ -20,11 +26,8 @@ const { title, lede, releases } = Astro.props;
     releases.length === 0 ? (
       <div class="j-empty j-empty--sky">
         <Glyph mark={GLYPH.changelog} />
-        <h2>No releases yet</h2>
-        <p>
-          Releases are pulled from the repositories when they are tagged. Nothing
-          has been tagged since the section went up.
-        </p>
+        <h2>{say("no-releases-yet.1", "No releases yet")}</h2>
+        <p>{say("no-releases-yet.2", "Releases are pulled from the repositories when they are tagged. Nothing has been tagged since the section went up.")}</p>
       </div>
     ) : (
       <div class="j-log">

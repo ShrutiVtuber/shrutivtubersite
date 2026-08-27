@@ -23,7 +23,7 @@ import Copy from "../components/content/Copy.astro";
 
 /* Every word on this page, editable from the admin. The defaults below are
    what it was written with and what still renders if nothing was changed. */
-const t = await copy("partners");
+const say = await copy("partners");
 
 
 export const prerender = false;
@@ -56,24 +56,24 @@ const bodyFor = (slug: string) => bodies[all.findIndex((s) => s.slug === slug)] 
 ---
 
 <BaseLayout
-  title="Partners — Shruti"
-  description="The sponsors who pay for the channel, who they are, and what they make."
+  title={say("text.2", "Partners — Shruti")}
+  description={say("text.3", "The sponsors who pay for the channel, who they are, and what they make.")}
 >
   <div class="page partners">
     <SectionHeader
       as="h1" glyph="✦" eyebrow="Partners"
-      title="Who keeps this running"
-      body="The channel costs money to make and these are the people covering it. Everything below is a paid arrangement, and saying so is the point of this page."
+      title={say("text.4", "Who keeps this running")}
+      body={say("text.5", "The channel costs money to make and these are the people covering it. Everything below is a paid arrangement, and saying so is the point of this page.")}
     />
 
-    <p class="disclosure"><Copy text={t("text.1", "**How this works.** These are sponsorships: money changes hands. What none of them buy is a say in what gets written, what gets computed, or what any instrument on this site says — and no sponsor has ever seen a page before it went up. If that stops being true, this paragraph changes before anything else does.")} /></p>
+    <p class="disclosure"><Copy text={say("text.1", "**How this works.** These are sponsorships: money changes hands. What none of them buy is a say in what gets written, what gets computed, or what any instrument on this site says — and no sponsor has ever seen a page before it went up. If that stops being true, this paragraph changes before anything else does.")} /></p>
 
     {
       all.length === 0 ? (
         <EmptyState
           glyph="○"
-          title="No sponsors yet"
-          body="When somebody sponsors the channel they appear here, with a proper introduction rather than a logo on its own."
+          title={say("text.6", "No sponsors yet")}
+          body={say("text.7", "When somebody sponsors the channel they appear here, with a proper introduction rather than a logo on its own.")}
         />
       ) : (
         <>
@@ -113,8 +113,8 @@ const bodyFor = (slug: string) => bodies[all.findIndex((s) => s.slug === slug)] 
           {
             past.length > 0 && (
               <section class="p-past">
-                <h2>{t("previously.1", "Previously")}</h2>
-                <p class="p-past-lead">{t("previously.2", "These sponsored the channel and no longer do. They are still here because they still paid for the lights.")}</p>
+                <h2>{say("previously.1", "Previously")}</h2>
+                <p class="p-past-lead">{say("previously.2", "These sponsored the channel and no longer do. They are still here because they still paid for the lights.")}</p>
                 <ul>
                   {past.map((s) => (
                     <li>

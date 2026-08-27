@@ -43,7 +43,7 @@ import Copy from "../components/content/Copy.astro";
 
 /* Every word on this page, editable from the admin. The defaults below are
    what it was written with and what still renders if nothing was changed. */
-const t = await copy("compatible");
+const say = await copy("compatible");
 
 
 export const prerender = false;
@@ -164,8 +164,8 @@ const ALMANAC = [
 ---
 
 <BaseLayout
-  title="Are we compatible? — Shruti"
-  description="Compare two birth charts and see what the tradition makes of the pair. Free, no account, about forty seconds — and it says what it cannot know."
+  title={say("text.4", "Are we compatible? — Shruti")}
+  description={say("text.5", "Compare two birth charts and see what the tradition makes of the pair. Free, no account, about forty seconds — and it says what it cannot know.")}
   bare
 >
   {/* id="main" is the skip link's target. The layout renders that
@@ -178,18 +178,18 @@ const ALMANAC = [
       <span class="sky-stars" aria-hidden="true"></span>
       <div class="cx-in cx-hero-grid">
         <div class="sky-veil cx-cap">
-          <p class="t-eyebrow">{t("text.1", "Free · no account · about forty seconds")}</p>
-          <h1>{t("see-what-the-sky-makes-o.1", "See what the sky makes of you two.")}</h1>
+          <p class="t-eyebrow">{say("text.1", "Free · no account · about forty seconds")}</p>
+          <h1>{say("see-what-the-sky-makes-o.1", "See what the sky makes of you two.")}</h1>
           <p class="cx-cycle">
-            <span class="cx-cycle-lbl t-tabular">{t("see-what-the-sky-makes-o.2", "Five possible answers ·")}</span>{" "}
+            <span class="cx-cycle-lbl t-tabular">{say("see-what-the-sky-makes-o.2", "Five possible answers ·")}</span>{" "}
             <span class="cx-cycle-word" data-cycle>{BANDS[0].name}</span>
           </p>
-          <p class="cx-sub">{t("see-what-the-sky-makes-o.3", "Two birth charts weighed against each other by rules older than the telescope — and an image worth posting at the end of it.")}</p>
+          <p class="cx-sub">{say("see-what-the-sky-makes-o.3", "Two birth charts weighed against each other by rules older than the telescope — and an image worth posting at the end of it.")}</p>
           <div class="cx-cta">
-            <Button size="lg" href="#start">{t("see-what-the-sky-makes-o.4", "Compare two charts")}</Button>
-            <Button size="lg" variant="ghost" href="#answers">{t("see-what-the-sky-makes-o.5", "What the answers mean")}</Button>
+            <Button size="lg" href="#start">{say("see-what-the-sky-makes-o.4", "Compare two charts")}</Button>
+            <Button size="lg" variant="ghost" href="#answers">{say("see-what-the-sky-makes-o.5", "What the answers mean")}</Button>
           </div>
-          <p class="cx-foot">{t("see-what-the-sky-makes-o.6", "Nothing kept but the two charts. Only the person on a face can put that face on a card.")}</p>
+          <p class="cx-foot">{say("see-what-the-sky-makes-o.6", "Nothing kept but the two charts. Only the person on a face can put that face on a card.")}</p>
         </div>
 
         <figure class="cx-hero-card">
@@ -199,10 +199,10 @@ const ALMANAC = [
                    width="1200" height="630" loading="eager"
                    alt={`An example share card in the ${heroDesign.name} design`} />
             ) : (
-              <span class="cx-art-absent">{t("see-what-the-sky-makes-o.7", "The card is drawn when the first comparison is made.")}</span>
+              <span class="cx-art-absent">{say("see-what-the-sky-makes-o.7", "The card is drawn when the first comparison is made.")}</span>
             )}
           </a>
-          <figcaption>{t("see-what-the-sky-makes-o.8", "This is the thing you get. 1200×630, drawn on our own server, carrying its own disclaimer so it can travel without this page.")}</figcaption>
+          <figcaption>{say("see-what-the-sky-makes-o.8", "This is the thing you get. 1200×630, drawn on our own server, carrying its own disclaimer so it can travel without this page.")}</figcaption>
         </figure>
       </div>
       <span class="sky-horizon" aria-hidden="true"></span>
@@ -212,23 +212,23 @@ const ALMANAC = [
     <section class="cx-in cx-sec" id="start">
       <div class="cx-two">
         <div class="cx-explain">
-          <p class="t-eyebrow">Your half of it</p>
-          <h2>{t("one-submit-does-all-thre.1", "One submit does all three.")}</h2>
+          <p class="t-eyebrow">{say("text.10", "Your half of it")}</p>
+          <h2>{say("one-submit-does-all-thre.1", "One submit does all three.")}</h2>
           <ol class="cx-roman">
-            <li><span class="cx-num t-tabular">i</span><span>{t("one-submit-does-all-thre.2", "Casts your chart from the Swiss Ephemeris — the same engine as the natal instrument.")}</span></li>
-            <li><span class="cx-num t-tabular">ii</span><span>{t("one-submit-does-all-thre.3", "Keeps it behind a link that only you have.")}</span></li>
-            <li><span class="cx-num t-tabular">iii</span><span>{t("one-submit-does-all-thre.4", "Makes one invitation to hand to anybody. They fill in their half; the comparison appears for both of you.")}</span></li>
+            <li><span class="cx-num t-tabular">i</span><span>{say("one-submit-does-all-thre.2", "Casts your chart from the Swiss Ephemeris — the same engine as the natal instrument.")}</span></li>
+            <li><span class="cx-num t-tabular">ii</span><span>{say("one-submit-does-all-thre.3", "Keeps it behind a link that only you have.")}</span></li>
+            <li><span class="cx-num t-tabular">iii</span><span>{say("one-submit-does-all-thre.4", "Makes one invitation to hand to anybody. They fill in their half; the comparison appears for both of you.")}</span></li>
           </ol>
 
           <div class="cx-branch">
             <p class="t-eyebrow"><span class="t-glyph" aria-hidden="true">{MOON}</span> Without a time</p>
-            <p class="cx-branch-lead">{t("one-submit-does-all-thre.5", "Then it says so, instead of guessing at it.")}</p>
-            <p class="cx-branch-body">{t("one-submit-does-all-thre.6", "Four minutes of clock error is a whole degree of Ascendant, so a chart with no time has no angles at all — and every contact that needs one drops out of the count. The result names them rather than quietly leaving them off.")}</p>
+            <p class="cx-branch-lead">{say("one-submit-does-all-thre.5", "Then it says so, instead of guessing at it.")}</p>
+            <p class="cx-branch-body">{say("one-submit-does-all-thre.6", "Four minutes of clock error is a whole degree of Ascendant, so a chart with no time has no angles at all — and every contact that needs one drops out of the count. The result names them rather than quietly leaving them off.")}</p>
             <div class="cx-plates">
-              <p class="cx-plate cx-plate-good"><span>{t("one-submit-does-all-thre.7", "Sun, Moon, Mercury, Venus, Mars, Jupiter, Saturn")}</span><em>weighed</em></p>
-              <p class="cx-plate cx-plate-no"><span>{t("one-submit-does-all-thre.8", "Ascendant and Midheaven")}</span><em>cannot be weighed</em></p>
+              <p class="cx-plate cx-plate-good"><span>{say("one-submit-does-all-thre.7", "Sun, Moon, Mercury, Venus, Mars, Jupiter, Saturn")}</span><em>weighed</em></p>
+              <p class="cx-plate cx-plate-no"><span>{say("one-submit-does-all-thre.8", "Ascendant and Midheaven")}</span><em>{say("text.11", "cannot be weighed")}</em></p>
             </div>
-            <p class="cx-branch-foot">{t("one-submit-does-all-thre.9", "Find the time later and the chart takes it and recounts. Nothing has to be cast again.")}</p>
+            <p class="cx-branch-foot">{say("one-submit-does-all-thre.9", "Find the time later and the chart takes it and recounts. Nothing has to be cast again.")}</p>
           </div>
         </div>
 
@@ -236,18 +236,18 @@ const ALMANAC = [
           {made ? (
             <div class="cx-done">
               <div class="cx-card">
-                <p class="t-eyebrow cx-rose">{t("one-submit-does-all-thre.10", "Cast · kept · ready")}</p>
-                <h3>{t("now-hand-it-to-somebody.1", "Now hand it to somebody.")}</h3>
+                <p class="t-eyebrow cx-rose">{say("one-submit-does-all-thre.10", "Cast · kept · ready")}</p>
+                <h3>{say("now-hand-it-to-somebody.1", "Now hand it to somebody.")}</h3>
                 <p class="cx-done-line">
                   {noTime
                     ? `${who}'s chart is cast without a time, so the contacts that need an Ascendant are set aside and named on the result. It is kept behind the link below.`
                     : `${who}'s chart is cast and kept behind the link below. Nothing else was stored.`}
                 </p>
 
-                <p class="cx-lbl">{t("now-hand-it-to-somebody.2", "The invitation — send this out")}</p>
+                <p class="cx-lbl">{say("now-hand-it-to-somebody.2", "The invitation — send this out")}</p>
                 <div class="cx-copyrow">
                   <input class="cx-code" type="text" readonly value={inviteUrl}
-                         aria-label="Your invitation link" onclick="this.select()" />
+                         aria-label={say("text.6", "Your invitation link")} onclick="this.select()" />
                   <button type="button" class="cx-copy" data-copy={inviteUrl}>Copy link</button>
                 </div>
 
@@ -255,17 +255,17 @@ const ALMANAC = [
                   <a href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(SUGGESTED)}&url=${encodeURIComponent(inviteUrl)}`}
                      rel="noopener noreferrer" target="_blank">Post on X</a>
                   <a href={`https://bsky.app/intent/compose?text=${encodeURIComponent(`${SUGGESTED} ${inviteUrl}`)}`}
-                     rel="noopener noreferrer" target="_blank">Post on Bluesky</a>
-                  <a href={`/chart/invite/${made.shareToken}`}>{t("now-hand-it-to-somebody.3", "See what they will see →")}</a>
+                     rel="noopener noreferrer" target="_blank">{say("text.12", "Post on Bluesky")}</a>
+                  <a href={`/chart/invite/${made.shareToken}`}>{say("now-hand-it-to-somebody.3", "See what they will see →")}</a>
                 </div>
-                <p class="cx-fine">{t("now-hand-it-to-somebody.4", "Plain links, the way every other page here works — no SDK, no button script, no pixel. Nothing loads from those sites until you click.")}</p>
+                <p class="cx-fine">{say("now-hand-it-to-somebody.4", "Plain links, the way every other page here works — no SDK, no button script, no pixel. Nothing loads from those sites until you click.")}</p>
 
-                <p class="cx-lbl">{t("now-hand-it-to-somebody.5", "Something to post with it")}</p>
+                <p class="cx-lbl">{say("now-hand-it-to-somebody.5", "Something to post with it")}</p>
                 <div class="cx-copyrow">
-                  <textarea class="cx-code" rows="3" aria-label="Suggested post text">{SUGGESTED}</textarea>
+                  <textarea class="cx-code" rows="3" aria-label={say("text.7", "Suggested post text")}>{SUGGESTED}</textarea>
                   <button type="button" class="cx-copy" data-copy={SUGGESTED}>Copy text</button>
                 </div>
-                <p class="cx-fine">{t("now-hand-it-to-somebody.6", "Edit it. It is only a suggestion.")}</p>
+                <p class="cx-fine">{say("now-hand-it-to-somebody.6", "Edit it. It is only a suggestion.")}</p>
               </div>
 
               <div class="cx-keep">
@@ -274,19 +274,19 @@ const ALMANAC = [
                 </p>
                 <div class="cx-copyrow">
                   <input class="cx-code" type="text" readonly value={ownUrl}
-                         aria-label="The link back to your own chart" onclick="this.select()" />
+                         aria-label={say("text.8", "The link back to your own chart")} onclick="this.select()" />
                   <button type="button" class="cx-copy cx-copy-rose" data-copy={ownUrl}>Copy link</button>
                 </div>
-                <p class="cx-keep-body"><Copy text={t("text.2", "This link is the **only** way back to your chart. We never asked for your email, so there is nothing we could send you if it goes missing — and no account to recover. Put it where you keep things.")} /></p>
+                <p class="cx-keep-body"><Copy text={say("text.2", "This link is the **only** way back to your chart. We never asked for your email, so there is nothing we could send you if it goes missing — and no account to recover. Put it where you keep things.")} /></p>
                 <p class="cx-keep-links">
                   <a href={ownUrl}>Open it now</a>
                   <a href={`data:text/plain;charset=utf-8,${encodeURIComponent(ownUrl)}`}
-                     download="my-chart-link.txt">{t("now-hand-it-to-somebody.7", "Download it as a text file")}</a>
-                  <a href="/signup">{t("now-hand-it-to-somebody.8", "Attach it to an account later")}</a>
+                     download="my-chart-link.txt">{say("now-hand-it-to-somebody.7", "Download it as a text file")}</a>
+                  <a href="/signup">{say("now-hand-it-to-somebody.8", "Attach it to an account later")}</a>
                 </p>
               </div>
 
-              <p class="cx-again"><a href="/compatible">{t("now-hand-it-to-somebody.9", "Cast another chart")}</a></p>
+              <p class="cx-again"><a href="/compatible">{say("now-hand-it-to-somebody.9", "Cast another chart")}</a></p>
             </div>
           ) : (
             <form method="POST" class="cx-card cx-form" novalidate>
@@ -304,7 +304,7 @@ const ALMANAC = [
               <label class="cx-field">
                 <span class="cx-flabel">Name or handle <em class="cx-opt">optional</em></span>
                 <input class="cx-input" name="label" maxlength="80" placeholder="Someone" value={name} />
-                <span class="cx-help">{t("now-hand-it-to-somebody.10", "Whatever should sit under your face on the card. Leave it and you are “Someone”.")}</span>
+                <span class="cx-help">{say("now-hand-it-to-somebody.10", "Whatever should sit under your face on the card. Leave it and you are “Someone”.")}</span>
               </label>
 
               <div class="cx-row">
@@ -322,28 +322,28 @@ const ALMANAC = [
                 <input type="checkbox" name="unknownTime" value="1" checked={noTime} data-no-time />
                 <span>
                   I don’t know my birth time
-                  <em>{t("now-hand-it-to-somebody.11", "The angles get left out of the count — and named.")}</em>
+                  <em>{say("now-hand-it-to-somebody.11", "The angles get left out of the count — and named.")}</em>
                 </span>
               </label>
 
               <div class="cx-field">
                 <span class="cx-flabel">Birth place <em class="cx-req">required</em></span>
                 <PlaceField lat={37.9838} lon={23.7275} place="" />
-                <span class="cx-help">{t("now-hand-it-to-somebody.12", "The gazetteer is on our own server; typing here reaches nobody else.")}</span>
+                <span class="cx-help">{say("now-hand-it-to-somebody.12", "The gazetteer is on our own server; typing here reaches nobody else.")}</span>
               </div>
 
               {signedIn ? (
                 <div class="cx-signed">
                   <p class="t-eyebrow">Signed in</p>
-                  <p>{t("now-hand-it-to-somebody.13", "Your account already carries this consent.")}</p>
-                  <p><a href="/account">{t("now-hand-it-to-somebody.14", "Review or withdraw")}</a></p>
+                  <p>{say("now-hand-it-to-somebody.13", "Your account already carries this consent.")}</p>
+                  <p><a href="/account">{say("now-hand-it-to-somebody.14", "Review or withdraw")}</a></p>
                 </div>
               ) : (
                 <ConsentCheckbox
                   name="consent"
                   basis="consent"
                   required
-                  label="I give Shruti my birth date, time and place so that this chart can be cast, kept behind my own link, and compared with charts I invite."
+                  label={say("text.9", "I give Shruti my birth date, time and place so that this chart can be cast, kept behind my own link, and compared with charts I invite.")}
                   explanation="Used for nothing else: no profiling, no advertising, no sale, and nothing shared with anybody except the person you send your invitation to. Kept until you delete it — the delete button is on your chart page and it takes effect the same second."
                   wording="Never pre-ticked, never bundled with anything else."
                   error={errors.some((e) => e.includes("consent")) ? "This one is required." : undefined}
@@ -351,8 +351,8 @@ const ALMANAC = [
               )}
 
               <div class="cx-submit">
-                <Button size="lg" type="submit" data-track="compare:started">{t("now-hand-it-to-somebody.15", "Cast it and make an invitation")}</Button>
-                <p class="cx-fine t-tabular">{t("now-hand-it-to-somebody.16", "One request. No account, no email, no confirmation step.")}</p>
+                <Button size="lg" type="submit" data-track="compare:started">{say("now-hand-it-to-somebody.15", "Cast it and make an invitation")}</Button>
+                <p class="cx-fine t-tabular">{say("now-hand-it-to-somebody.16", "One request. No account, no email, no confirmation step.")}</p>
               </div>
             </form>
           )}
@@ -364,9 +364,9 @@ const ALMANAC = [
     <section class="cx-in cx-sec" id="showcase">
       <div class="cx-head">
         <div>
-          <p class="t-eyebrow">The image you get</p>
-          <h2>{t("pick-a-card-or-let-it-pi.1", "Pick a card, or let it pick one.")}</h2>
-          <p class="cx-lead">{t("pick-a-card-or-let-it-pi.2", "Every comparison is drawn as an image on our own server. The designs are rows in a table — Shruti adds one and it appears here.")}</p>
+          <p class="t-eyebrow">{say("text.13", "The image you get")}</p>
+          <h2>{say("pick-a-card-or-let-it-pi.1", "Pick a card, or let it pick one.")}</h2>
+          <p class="cx-lead">{say("pick-a-card-or-let-it-pi.2", "Every comparison is drawn as an image on our own server. The designs are rows in a table — Shruti adds one and it appears here.")}</p>
         </div>
         <p class="cx-count t-tabular">
           {designs.length === 1 ? "1 design" : `${designs.length} designs`} · more get added
@@ -389,7 +389,7 @@ const ALMANAC = [
         {designs.length === 0 && (
           <div class="sky cx-absent">
             <span class="sky-stars" aria-hidden="true"></span>
-            <p>{t("pick-a-card-or-let-it-pi.3", "Design added, no sample drawn yet. The first comparison to use it makes one.")}</p>
+            <p>{say("pick-a-card-or-let-it-pi.3", "Design added, no sample drawn yet. The first comparison to use it makes one.")}</p>
             <span class="sky-horizon" aria-hidden="true"></span>
           </div>
         )}
@@ -399,9 +399,9 @@ const ALMANAC = [
     {/* ── 4. The five answers ─────────────────────────────────────────── */}
     <section class="cx-in cx-sec" id="answers">
       <div class="cx-headblock">
-        <p class="t-eyebrow">The five answers</p>
-        <h2>{t("the-testimonies-are-weig.1", "The testimonies are weighed. Five things they can add up to.")}</h2>
-        <p class="cx-lead"><Copy text={t("text.3", "These are real terms of art, not moods. A **testimony** is how a horary astrologer weighs a question; **sect** is the division of charts into day and night, and it changes which planets help. You always see the count that produced the verdict.")} /></p>
+        <p class="t-eyebrow">{say("text.14", "The five answers")}</p>
+        <h2>{say("the-testimonies-are-weig.1", "The testimonies are weighed. Five things they can add up to.")}</h2>
+        <p class="cx-lead"><Copy text={say("text.3", "These are real terms of art, not moods. A **testimony** is how a horary astrologer weighs a question; **sect** is the division of charts into day and night, and it changes which planets help. You always see the count that produced the verdict.")} /></p>
       </div>
 
       <div class="cx-bands">
@@ -426,10 +426,10 @@ const ALMANAC = [
       <div class="cx-honest">
         <div class="cx-honest-l">
           <p class="t-eyebrow"><span class="t-glyph" aria-hidden="true">{OPEN}</span> The honest part</p>
-          <h2>{t("it-is-a-reading-not-a-re.1", "It is a reading, not a result.")}</h2>
-          <p class="cx-lead">{t("it-is-a-reading-not-a-re.2", "Astrologers have argued about these rules for two thousand years and have not finished. I am not going to pretend a share card settles it — and the disagreement is the interesting part, not an embarrassment.")}</p>
+          <h2>{say("it-is-a-reading-not-a-re.1", "It is a reading, not a result.")}</h2>
+          <p class="cx-lead">{say("it-is-a-reading-not-a-re.2", "Astrologers have argued about these rules for two thousand years and have not finished. I am not going to pretend a share card settles it — and the disagreement is the interesting part, not an embarrassment.")}</p>
           <p class="cx-lead">
-            <strong>{t("it-is-a-reading-not-a-re.3", "It does not predict anything")}</strong>, and there is no
+            <strong>{say("it-is-a-reading-not-a-re.3", "It does not predict anything")}</strong>, and there is no
             percentage in it anywhere. It reads the contacts between two charts
             and tells you what classical practice attaches to them. Post it
             because it is fun, not because it is a verdict.
@@ -451,7 +451,7 @@ const ALMANAC = [
     {/* ── 6. Admin blocks ─────────────────────────────────────────────── */}
     {sections.length > 0 && (
       <section class="cx-in cx-sec cx-more">
-        <p class="t-eyebrow">More from Shruti</p>
+        <p class="t-eyebrow">{say("text.15", "More from Shruti")}</p>
         <div class="cx-blocks">
           {sections.map((s) => (
             <div class="cx-block">

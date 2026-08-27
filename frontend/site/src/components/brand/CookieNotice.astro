@@ -1,4 +1,10 @@
 ---
+import { copy } from "../../lib/copy";
+
+/* Every word here, editable from the admin. The defaults below are what
+   it was written with and what still renders if nothing was changed. */
+const say = await copy("component:CookieNotice");
+
 /* The cookie notice — and it is a NOTICE, not a consent banner.
  *
  * The design says do not build a cookie banner, and it is right: under
@@ -27,8 +33,8 @@
     This site sets only the cookies it needs to work — a sign-in session and a
     form-security token. No advertising and no third parties. It counts its own pages without
     a cookie and without knowing who you are, and you can
-    <a href="/privacy#counting">turn that off</a> or read
-    <a href="/privacy#cookies">what is set, and why</a>.
+    <a href="/privacy#counting">{say("text.1", "turn that off")}</a> or read
+    <a href="/privacy#cookies">{say("text.2", "what is set, and why")}</a>.
   </p>
   <button type="button" data-cookie-dismiss>Got it</button>
 </div>

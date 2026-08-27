@@ -1,4 +1,10 @@
 ---
+import { copy } from "../../lib/copy";
+
+/* Every word here, editable from the admin. The defaults below are what
+   it was written with and what still renders if nothing was changed. */
+const say = await copy("component:PlaceField");
+
 /* One place control, used everywhere a surface needs a location.
  *
  * NOBODY SHOULD TYPE COORDINATES. You know your city; the tool should know the
@@ -43,7 +49,7 @@ const {
       type="text"
       name="place"
       value={place}
-      placeholder="City, or country"
+      placeholder={say("text.1", "City, or country")}
       autocomplete="off"
       data-place-input
     />
@@ -57,7 +63,7 @@ const {
     {elevation ? <span class="t-tabular" data-place-elev>· {elevation} m</span> : <span data-place-elev></span>}
     {timezone && <span data-place-tz>· {timezone}</span>}
     {!timezone && <span data-place-tz></span>}
-    <button type="button" class="place-reset" data-place-reset>Not this place?</button>
+    <button type="button" class="place-reset" data-place-reset>{say("text.2", "Not this place?")}</button>
   </p>
 
   {/* The fallback, and what actually gets submitted. */}
@@ -210,7 +216,7 @@ const {
         if (!r.ok) { hide(); return; }
         const { places } = await r.json();
         if (!places || places.length === 0) {
-          list.innerHTML = `<li class="r-none"><span class="r-where">No place of that name found. The coordinate boxes still work.</span></li>`;
+          list.innerHTML = `<li class="r-none"><span class="r-where">{say("text.3", "No place of that name found. The coordinate boxes still work.")}</span></li>`;
           list.hidden = false;
           return;
         }

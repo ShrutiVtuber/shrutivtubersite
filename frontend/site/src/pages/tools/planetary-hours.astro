@@ -18,6 +18,12 @@ import DisagreementControl from "../../components/tools/DisagreementControl.astr
 import CannotCompute from "../../components/tools/CannotCompute.astro";
 import { askAstro } from "../../lib/api";
 import { savedPlace } from "../../lib/account";
+import { copy } from "../../lib/copy";
+
+/* Every word here, editable from the admin. The defaults below are what
+   it was written with and what still renders if nothing was changed. */
+const say = await copy("tools/planetary-hours");
+
 
 const q = Astro.url.searchParams;
 const ATHENS = { lat: 37.9838, lon: 23.7275, label: "Athens · 37.98°N 23.73°E" };
@@ -123,12 +129,12 @@ const GLYPH: Record<string, string> = {
   {
     unreachable ? (
       <CannotCompute
-        title="The ephemeris could not be reached"
+        title={say("text.1", "The ephemeris could not be reached")}
         why="Nothing here can be computed right now. That is a failure on my side, not a fact about the sky."
       />
     ) : noSunrise ? (
       <CannotCompute
-        title="The Sun does not rise here today"
+        title={say("text.2", "The Sun does not rise here today")}
         why="The hours divide sunrise to sunset. With no sunrise there is nothing to divide, so the answer stays undefined — which is itself the answer, and a truer one than twelve equal clock hours pretending to be planetary."
         alternatives={[
           "Use equal clock hours instead, understanding that they are a substitution and not the same thing.",
@@ -139,7 +145,7 @@ const GLYPH: Record<string, string> = {
     ) : (
       <>
         <div class="ruler-line">
-          <span class="t-eyebrow">Ruler of the day</span>
+          <span class="t-eyebrow">{say("text.3", "Ruler of the day")}</span>
           <span class="ruler"><span class="t-glyph" aria-hidden="true">{GLYPH[data.dayRuler]}</span> {data.dayRuler}</span>
         </div>
 
@@ -177,7 +183,7 @@ const GLYPH: Record<string, string> = {
         </div>
 
         <p class="share">
-          <span class="t-eyebrow">This reckoning</span>
+          <span class="t-eyebrow">{say("text.4", "This reckoning")}</span>
           <code class="t-tabular">{Astro.url.pathname}?{new URLSearchParams({ lat: String(lat), lon: String(lon), place, convention }).toString()}</code>
         </p>
       </>

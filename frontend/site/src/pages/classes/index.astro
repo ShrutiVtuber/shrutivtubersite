@@ -13,7 +13,7 @@ import { copy } from "../../lib/copy";
 
 /* Every word on this page, editable from the admin. The defaults below are
    what it was written with and what still renders if nothing was changed. */
-const t = await copy("classes");
+const say = await copy("classes");
 
 
 export const prerender = false;
@@ -69,14 +69,14 @@ const when = (iso: string | null) =>
 
 <BaseLayout
   jsonLd={listLd}
-  title="Classes — Shruti"
-  description="Recorded classes and live workshops on astrology, theurgy and the software of practice."
+  title={say("text.1", "Classes — Shruti")}
+  description={say("text.2", "Recorded classes and live workshops on astrology, theurgy and the software of practice.")}
 >
   <div class="page">
     <SectionHeader
       as="h1" glyph="♄" eyebrow="Classes"
-      title="What there is to learn"
-      body="Recorded classes you take at your own pace, and workshops held live. Prices include tax."
+      title={say("text.3", "What there is to learn")}
+      body={say("text.4", "Recorded classes you take at your own pace, and workshops held live. Prices include tax.")}
     />
 
     {
@@ -84,14 +84,14 @@ const when = (iso: string | null) =>
         <EmptyState
           as="h2"
           glyph="○"
-          title="Nothing open yet"
-          body="Classes are being written. The instruments are free in the meantime, and always will be."
+          title={say("text.5", "Nothing open yet")}
+          body={say("text.6", "Classes are being written. The instruments are free in the meantime, and always will be.")}
         />
       ) : (
         <>
           {workshops.length > 0 && (
             <section class="band">
-              <h2 class="band-head">{t("live.1", "Live")}</h2>
+              <h2 class="band-head">{say("live.1", "Live")}</h2>
               <div class="grid">
                 {workshops.map((c) => (
                   <a class="card" href={`/classes/${c.slug}`}>
@@ -116,7 +116,7 @@ const when = (iso: string | null) =>
 
           {classes.length > 0 && (
             <section class="band">
-              <h2 class="band-head">{t("at-your-own-pace.1", "At your own pace")}</h2>
+              <h2 class="band-head">{say("at-your-own-pace.1", "At your own pace")}</h2>
               <div class="grid">
                 {classes.map((c) => (
                   <a class="card" href={`/classes/${c.slug}`}>

@@ -25,7 +25,7 @@ import Copy from "../../components/content/Copy.astro";
 
 /* Every word on this page, editable from the admin. The defaults below are
    what it was written with and what still renders if nothing was changed. */
-const t = await copy("tools/hindu-calendar");
+const say = await copy("tools/hindu-calendar");
 
 
 const q = Astro.url.searchParams;
@@ -162,8 +162,8 @@ const RULE_NAME: Record<string, string> = {
       <label>
         <span>Authority</span>
         <select name="authority">
-          <option value="drik" selected={authority === "drik"}>{t("text.1", "Dṛk gaṇita — modern ephemeris")}</option>
-          <option value="surya_siddhanta" selected={authority === "surya_siddhanta"}>{t("text.2", "Sūrya Siddhānta — classical tables")}</option>
+          <option value="drik" selected={authority === "drik"}>{say("text.1", "Dṛk gaṇita — modern ephemeris")}</option>
+          <option value="surya_siddhanta" selected={authority === "surya_siddhanta"}>{say("text.2", "Sūrya Siddhānta — classical tables")}</option>
         </select>
       </label>
       <button type="submit" data-track="tool:used" data-track-tool="hindu-calendar">Show</button>
@@ -173,15 +173,15 @@ const RULE_NAME: Record<string, string> = {
   {
     !d ? (
       <CannotCompute
-        title="The calendar could not be computed"
+        title={say("text.5", "The calendar could not be computed")}
         why={answer.detail || "The ephemeris could not be reached, so this year cannot be laid out right now."}
       />
     ) : (
       <>
         <section class="eras">
-          <h2>{t("the-year.1", "The year")}</h2>
+          <h2>{say("the-year.1", "The year")}</h2>
           <dl>
-            <div><dt>Vikrama Saṁvat</dt><dd class="t-tabular">{d.eras.vikrama}</dd></div>
+            <div><dt>{say("text.6", "Vikrama Saṁvat")}</dt><dd class="t-tabular">{d.eras.vikrama}</dd></div>
             <div><dt>Śaka Saṁvat</dt><dd class="t-tabular">{d.eras.shaka}</dd></div>
             <div><dt>Kali Yuga</dt><dd class="t-tabular">{d.eras.kali}</dd></div>
             <div><dt>Bengali San</dt><dd class="t-tabular">{d.eras.bengali}</dd></div>
@@ -192,17 +192,17 @@ const RULE_NAME: Record<string, string> = {
 
         {
           d.hasAdhikaMasa && (
-            <p class="note"><Copy text={t("text.3", "This year carries an **adhika māsa** — an intercalary month, inserted because a lunar month contained no solar transition. It carries no festivals: they wait for the *nija* month that follows.")} /></p>
+            <p class="note"><Copy text={say("text.3", "This year carries an **adhika māsa** — an intercalary month, inserted because a lunar month contained no solar transition. It carries no festivals: they wait for the *nija* month that follows.")} /></p>
           )
         }
         {
           d.hasKshayaMasa && (
-            <p class="note"><Copy text={t("text.4", "This year carries a **kṣaya māsa**, the rarer opposite — a month removed rather than added.")} /></p>
+            <p class="note"><Copy text={say("text.4", "This year carries a **kṣaya māsa**, the rarer opposite — a month removed rather than added.")} /></p>
           )
         }
 
         <section class="months">
-          <h2>{t("months.1", "Months")}</h2>
+          <h2>{say("months.1", "Months")}</h2>
           <div class="table-scroll">
             <table>
             <thead>
@@ -222,7 +222,7 @@ const RULE_NAME: Record<string, string> = {
                     <td class="fest">
                       {
                         m.adhika
-                          ? <span class="fest-none">{t("months.2", "none — they wait for the nija month")}</span>
+                          ? <span class="fest-none">{say("months.2", "none — they wait for the nija month")}</span>
                           : (m.festivals ?? []).length > 0
                             ? (m.festivals ?? []).map((f) => <span class="fest-one">{f.name} <span class="t-tabular faint">{f.date.slice(5)}</span></span>)
                             : <span class="fest-none">—</span>
@@ -253,7 +253,7 @@ const RULE_NAME: Record<string, string> = {
         </section>
 
         <p class="note">
-          Amānta and pūrṇimānta <strong>{t("months.3", "agree through the bright fortnight and diverge in the dark one")}</strong>. A date in the dark fortnight therefore carries two different month
+          Amānta and pūrṇimānta <strong>{say("months.3", "agree through the bright fortnight and diverge in the dark one")}</strong>. A date in the dark fortnight therefore carries two different month
           names, and neither is a mistake — which is why this page offers both rather than
           picking one.
         </p>

@@ -1,4 +1,10 @@
 ---
+import { copy } from "../../lib/copy";
+
+/* Every word here, editable from the admin. The defaults below are what
+   it was written with and what still renders if nothing was changed. */
+const say = await copy("component:Pagination");
+
 /* Ported from `components/navigation/Pagination.jsx`; contract in
  * `Pagination.d.ts`. Link-based rather than callback-based: pagination that
  * needs JavaScript to change page is pagination search engines cannot follow
@@ -24,7 +30,7 @@ const items = windowed(page, pageCount);
 ---
 
 <nav class="sh-pag" aria-label={label}>
-  <a data-p href={hrefFor(page - 1)} aria-disabled={page <= 1 || undefined} aria-label="Previous page">‹</a>
+  <a data-p href={hrefFor(page - 1)} aria-disabled={page <= 1 || undefined} aria-label={say("text.1", "Previous page")}>‹</a>
   {
     items.map((p) =>
       p === "…" ? (

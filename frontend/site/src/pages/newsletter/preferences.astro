@@ -15,7 +15,7 @@ import { copy } from "../../lib/copy";
 
 /* Every word on this page, editable from the admin. The defaults below are
    what it was written with and what still renders if nothing was changed. */
-const t = await copy("newsletter/preferences");
+const say = await copy("newsletter/preferences");
 
 
 const token = Astro.url.searchParams.get("token") ?? "";
@@ -64,21 +64,21 @@ const SECTIONS: [keyof Prefs["sections"], string, string][] = [
 ];
 ---
 
-<BaseLayout title="Letter preferences — Shruti" description="Choose what the monthly letter carries, or pause it." noindex>
+<BaseLayout title={say("text.5", "Letter preferences — Shruti")} description={say("text.6", "Choose what the monthly letter carries, or pause it.")} noindex>
   <div class="page prefs">
     {
       !prefs ? (
         <EmptyState
           glyph="◐"
-          title="That link is not valid"
-          body="Preference links come from the footer of any issue. If yours has stopped working, the one in the most recent letter will."
+          title={say("text.7", "That link is not valid")}
+          body={say("text.8", "Preference links come from the footer of any issue. If yours has stopped working, the one in the most recent letter will.")}
         >
-          <Button slot="action" variant="secondary" href="/newsletter">{t("text.1", "Back to the letter")}</Button>
+          <Button slot="action" variant="secondary" href="/newsletter">{say("text.1", "Back to the letter")}</Button>
         </EmptyState>
       ) : (
         <>
           <SectionHeader
-            as="h1" glyph="⁂" eyebrow="Preferences" title="What you get"
+            as="h1" glyph="⁂" eyebrow="Preferences" title={say("text.9", "What you get")}
             body={`Settings for ${prefs.email}.`}
           />
           {notice && <p class="notice" role="status">{notice}</p>}
@@ -107,14 +107,14 @@ const SECTIONS: [keyof Prefs["sections"], string, string][] = [
               <legend>Cadence</legend>
               <label class="row">
                 <input type="radio" name="cadence" value="monthly" checked={prefs.cadence !== "paused"} />
-                <span><strong>Monthly</strong><span class="note">{t("text.2", "One letter a month.")}</span></span>
+                <span><strong>Monthly</strong><span class="note">{say("text.2", "One letter a month.")}</span></span>
               </label>
               <label class="row">
                 <input type="radio" name="cadence" value="paused" checked={prefs.cadence === "paused"} />
                 <span>
                   <strong>Paused</strong>
                   <span class="note">
-                    Nothing arrives until you turn it back on. <strong>{t("text.3", "Nothing is deleted")}</strong> —
+                    Nothing arrives until you turn it back on. <strong>{say("text.3", "Nothing is deleted")}</strong> —
                     your address, your settings and your consent all stay exactly as they are.
                   </span>
                 </span>
@@ -129,7 +129,7 @@ const SECTIONS: [keyof Prefs["sections"], string, string][] = [
           </form>
 
           <p class="out">
-            Or <a href={`/newsletter/unsubscribed?token=${encodeURIComponent(token)}`}>{t("text.4", "unsubscribe entirely")}</a> — one click, and that page does not argue with you.
+            Or <a href={`/newsletter/unsubscribed?token=${encodeURIComponent(token)}`}>{say("text.4", "unsubscribe entirely")}</a> — one click, and that page does not argue with you.
           </p>
         </>
       )

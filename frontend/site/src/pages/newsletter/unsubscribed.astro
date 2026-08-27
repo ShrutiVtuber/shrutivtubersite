@@ -9,6 +9,12 @@ import BaseLayout from "../../layouts/BaseLayout.astro";
 import SectionHeader from "../../components/brand/SectionHeader.astro";
 import Button from "../../components/forms/Button.astro";
 import { SITE_API } from "../../lib/api";
+import { copy } from "../../lib/copy";
+
+/* Every word here, editable from the admin. The defaults below are what
+   it was written with and what still renders if nothing was changed. */
+const say = await copy("newsletter/unsubscribed");
+
 
 const token = Astro.url.searchParams.get("token") ?? "";
 let ok = false;
@@ -21,7 +27,7 @@ if (token) {
 }
 ---
 
-<BaseLayout title="Unsubscribed — Shruti" description="You have been removed from the monthly letter." noindex>
+<BaseLayout title={say("text.1", "Unsubscribed — Shruti")} description={say("text.2", "You have been removed from the monthly letter.")} noindex>
   <div class="page out">
     <SectionHeader as="h1" glyph="○" eyebrow="Unsubscribed" title="Done" />
     <p class="body">
@@ -38,7 +44,7 @@ if (token) {
         </p>
       )
     }
-    <div class="actions"><Button variant="secondary" href="/">Back to the site</Button></div>
+    <div class="actions"><Button variant="secondary" href="/">{say("text.3", "Back to the site")}</Button></div>
   </div>
 </BaseLayout>
 

@@ -16,6 +16,12 @@ import EmptyState from "../components/feedback/EmptyState.astro";
 import CountingChoice from "../components/insight/CountingChoice.astro";
 import { pageSections } from "../lib/content";
 import { site } from "../lib/api";
+import { copy } from "../lib/copy";
+
+/* Every word here, editable from the admin. The defaults below are what
+   it was written with and what still renders if nothing was changed. */
+const say = await copy("privacy");
+
 
 interface Imprint {
   visible: boolean;
@@ -26,7 +32,7 @@ const imprint = await site<Imprint>("/api/content/imprint");
 const sections = await pageSections("privacy");
 ---
 
-<BaseLayout title="Privacy — Shruti" description="What is collected, why, and how to get it back or delete it.">
+<BaseLayout title={say("text.1", "Privacy — Shruti")} description={say("text.2", "What is collected, why, and how to get it back or delete it.")}>
   <div class="page legal-page">
     <SectionHeader as="h1" glyph="◐" eyebrow="Legal" title="Privacy" />
     {
@@ -44,8 +50,8 @@ const sections = await pageSections("privacy");
       ) : (
         <EmptyState
           glyph="○"
-          title="Not written yet"
-          body="This policy is not up yet, and until it is, nothing on this site asks you for anything. If you have a question in the meantime, the contact page reaches a person."
+          title={say("text.3", "Not written yet")}
+          body={say("text.4", "This policy is not up yet, and until it is, nothing on this site asks you for anything. If you have a question in the meantime, the contact page reaches a person.")}
         />
       )
     }

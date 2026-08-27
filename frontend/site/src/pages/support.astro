@@ -112,20 +112,20 @@ const money = (cents: number | null | undefined, currency = "EUR") =>
    not configured — so it is written here and the rest come from the database. */
 /* Every word on this page, editable. The defaults below are what it was
    written with and what still renders if nothing has been changed. */
-const t = await copy("support");
+const say = await copy("support");
 
 const ONE_OFF = {
   key: "one-off",
-  name: t("oneoff.name", "One-off"),
+  name: say("oneoff.name", "One-off"),
   price: money(oneOff?.default ?? 300),
-  note: t("oneoff.note", "once, or any amount"),
+  note: say("oneoff.note", "once, or any amount"),
   primary: false,
   badge: "",
-  cta: t("oneoff.cta", "Give once"),
+  cta: say("oneoff.cta", "Give once"),
   items: [
-    t("oneoff.perk1", "A coffee for the bench"),
-    t("oneoff.perk2", "Name read on stream if you leave one"),
-    t("oneoff.perk3", "No account needed"),
+    say("oneoff.perk1", "A coffee for the bench"),
+    say("oneoff.perk2", "Name read on stream if you leave one"),
+    say("oneoff.perk3", "No account needed"),
   ],
 };
 
@@ -162,13 +162,13 @@ try {
 /* Every block the admin has added to /support. */
 ---
 
-<BaseLayout title="Support the work — Shruti" description="Streams are free and the tools are open source. Support keeps the bench lit.">
+<BaseLayout title={say("text.1", "Support the work — Shruti")} description={say("text.2", "Streams are free and the tools are open source. Support keeps the bench lit.")}>
   <div class="page">
     <SectionHeader
       as="h1" glyph="♄"
-      eyebrow={t("header.eyebrow", "Support the work")}
-      title={intro?.title || t("header.title", "Keep the bench lit")}
-      body={t("header.body", "Streams are free and the tools are open source. Support pays for the ephemeris server, art commissions, and the hours the software takes.")}
+      eyebrow={say("header.eyebrow", "Support the work")}
+      title={intro?.title || say("header.title", "Keep the bench lit")}
+      body={say("header.body", "Streams are free and the tools are open source. Support pays for the ephemeris server, art commissions, and the hours the software takes.")}
     />
 
     {failed && <p class="pay-failed" role="alert">{failed}</p>}
@@ -176,15 +176,15 @@ try {
     {
       billing?.testMode && (
         <p class="testmode" role="status">
-          <strong>{t("testmode.lead", "Test mode.")}</strong>{" "}
-          {t("testmode.body", "Cards are accepted and nothing is charged. Nobody can actually support the work until the live keys are in.")}
+          <strong>{say("testmode.lead", "Test mode.")}</strong>{" "}
+          {say("testmode.body", "Cards are accepted and nothing is charged. Nobody can actually support the work until the live keys are in.")}
         </p>
       )
     }
 
     {goals.length > 0 && (
       <section class="goals">
-        <h2>{t("goals.heading", "What it is going towards")}</h2>
+        <h2>{say("goals.heading", "What it is going towards")}</h2>
         <div class="goal-list">
           {goals.map((g: any) => <CounterCard counter={g} level={3} />)}
         </div>
@@ -221,7 +221,7 @@ try {
                               value={(oneOff.default / 100).toFixed(0)}
                               min={(oneOff.min / 100).toFixed(2)}
                               max={(oneOff.max / 100).toFixed(0)}
-                              step="1" aria-label="Amount in euro"
+                              step="1" aria-label={say("text.3", "Amount in euro")}
                             />
                           </span>
                         </label>
@@ -251,13 +251,13 @@ try {
           <>
             {/* Split around the link rather than flattened into one string:
                 the sentence stays editable and the link stays a link. */}
-            {t("footnote.open.before", "Payment happens on Stripe — card details never reach this site. Monthly support can be cancelled from ")}
-            <a href="/account">{t("footnote.open.link", "your account")}</a>
-            {t("footnote.open.after", " in one click, it stops at the end of the month you have already paid for rather than the moment you press it, and no email to me is required or wanted.")}
+            {say("footnote.open.before", "Payment happens on Stripe — card details never reach this site. Monthly support can be cancelled from ")}
+            <a href="/account">{say("footnote.open.link", "your account")}</a>
+            {say("footnote.open.after", " in one click, it stops at the end of the month you have already paid for rather than the moment you press it, and no email to me is required or wanted.")}
           </>
         ) : (
           <>
-            {t("footnote.closed", "Support is not open yet. When it is, payment will happen on Stripe, card details will never reach this site, and cancelling monthly support will be one button on your own account page.")}
+            {say("footnote.closed", "Support is not open yet. When it is, payment will happen on Stripe, card details will never reach this site, and cancelling monthly support will be one button on your own account page.")}
           </>
         )
       }

@@ -12,6 +12,12 @@ import { instruments, parseFaq, faqPageNode } from "../lib/instruments";
 import InstrumentNotes from "../components/tools/InstrumentNotes.astro";
 import ToolCta from "../components/brand/ToolCta.astro";
 import RememberPlace from "../components/tools/RememberPlace.astro";
+import { copy } from "../lib/copy";
+
+/* Every word here, editable from the admin. The defaults below are what
+   it was written with and what still renders if nothing was changed. */
+const say = await copy("component:ToolLayout");
+
 
 interface Props {
   /* Name, subtitle, description, glyph and the "how it is reckoned" passage all
@@ -120,7 +126,7 @@ const jsonLd = {
   <div class="page tool">
     <section class="tool-hero">
       <div class="tool-hero-inner">
-        <span class="t-eyebrow">Theourgia · instrument</span>
+        <span class="t-eyebrow">{say("text.2", "Theourgia · instrument")}</span>
         <h1>
           {title}
           {native && <span class="tool-native" lang="sa">{native}</span>}
@@ -137,7 +143,7 @@ const jsonLd = {
       {place && <span aria-hidden="true">·</span>}
       {rule && <span>{rule}</span>}
       {rule && <span aria-hidden="true">·</span>}
-      <span>shown in your local time</span>
+      <span>{say("text.3", "shown in your local time")}</span>
       <span class="meta-disclosure" title={DISCLOSURE_WORD[disclosure]}>
         <span class="t-glyph" aria-hidden="true">{disclosure}</span> {DISCLOSURE_WORD[disclosure]}
       </span>
@@ -151,7 +157,7 @@ const jsonLd = {
         {
           reckoned && (
             <section class="reckoned">
-              <h2>How it is reckoned</h2>
+              <h2>{say("how-it-is-reckoned.1", "How it is reckoned")}</h2>
               {/* Split on blank lines. It was one <p> holding the whole passage, so
           anything she wrote as two paragraphs rendered as one wall — which
           quietly taught the editor that paragraphs do not work here. Not
@@ -177,8 +183,8 @@ const jsonLd = {
 
     <ToolCta />
 
-    <nav class="others" aria-label="Other instruments">
-      <span class="t-eyebrow">Other instruments</span>
+    <nav class="others" aria-label={say("text.1", "Other instruments")}>
+      <span class="t-eyebrow">{say("how-it-is-reckoned.2", "Other instruments")}</span>
       <div class="others-row">
         {
           all.filter((i) => i.href !== here).map(({ glyph: g, name, href }) => (

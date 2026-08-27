@@ -1,4 +1,10 @@
 ---
+import { copy } from "../../lib/copy";
+
+/* Every word here, editable from the admin. The defaults below are what
+   it was written with and what still renders if nothing was changed. */
+const say = await copy("component:LessonList");
+
 /* The sidebar: parts, and the lessons in them.
  *
  * Every lesson is listed whether or not the reader may open it. That is the
@@ -57,7 +63,7 @@ const WORD: Record<string, string> = {
                     {l.freePreview && !l.open ? " · free" : ""}
                   </span>
                 </span>
-                {!l.open && <span class="ll-lock" aria-label="not yours yet">🔒&#xFE0E;</span>}
+                {!l.open && <span class="ll-lock" aria-label={say("text.1", "not yours yet")}>🔒&#xFE0E;</span>}
               </a>
             </li>
           ))}

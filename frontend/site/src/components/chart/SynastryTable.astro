@@ -1,4 +1,10 @@
 ---
+import { copy } from "../../lib/copy";
+
+/* Every word here, editable from the admin. The defaults below are what
+   it was written with and what still renders if nothing was changed. */
+const say = await copy("component:SynastryTable");
+
 /* What two charts do to each other.
  *
  * **Only cross-chart configurations.** Each chart's own internal aspects are
@@ -41,14 +47,11 @@ const named = (raw: string) =>
   }
 
   <section class="syn-block">
-    <h3>By degree</h3>
-    <p class="syn-note">
-      Within orb, and whether the faster body is still closing. The tighter the
-      orb, the louder the tradition considers it.
-    </p>
+    <h3>{say("by-degree.1", "By degree")}</h3>
+    <p class="syn-note">{say("by-degree.2", "Within orb, and whether the faster body is still closing. The tighter the orb, the louder the tradition considers it.")}</p>
     {
       byDegree.length === 0 ? (
-        <p class="syn-none">Nothing within orb. That is an answer, not a gap.</p>
+        <p class="syn-none">{say("by-degree.3", "Nothing within orb. That is an answer, not a gap.")}</p>
       ) : (
         <ul class="syn-list">
           {byDegree.map((c) => {
@@ -75,15 +78,11 @@ const named = (raw: string) =>
   </section>
 
   <section class="syn-block">
-    <h3>By sign</h3>
-    <p class="syn-note">
-      Whole-sign, the Hellenistic definition: two bodies are configured if their
-      signs are the right distance apart, and the degrees do not enter into it.
-      A longer list than the one above, by design.
-    </p>
+    <h3>{say("by-sign.1", "By sign")}</h3>
+    <p class="syn-note">{say("by-sign.2", "Whole-sign, the Hellenistic definition: two bodies are configured if their signs are the right distance apart, and the degrees do not enter into it. A longer list than the one above, by design.")}</p>
     {
       bySign.length === 0 ? (
-        <p class="syn-none">No whole-sign configurations at all, which is rare.</p>
+        <p class="syn-none">{say("by-sign.3", "No whole-sign configurations at all, which is rare.")}</p>
       ) : (
         <ul class="syn-list syn-terse">
           {bySign.map((c) => {

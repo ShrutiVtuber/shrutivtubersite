@@ -11,6 +11,12 @@ import EmptyState from "../../components/feedback/EmptyState.astro";
 import Button from "../../components/forms/Button.astro";
 import { site } from "../../lib/api";
 import { SIGNS } from "../../lib/signs";
+import { copy } from "../../lib/copy";
+
+/* Every word here, editable from the admin. The defaults below are what
+   it was written with and what still renders if nothing was changed. */
+const say = await copy("horoscopes/archive");
+
 
 const sign = SIGNS.includes(Astro.url.searchParams.get("sign") ?? "")
   ? Astro.url.searchParams.get("sign")!
@@ -36,16 +42,16 @@ const monthName = (covers: string) => {
 
 <BaseLayout
   title={sign ? `Every ${NAME(sign)} reading — Shruti` : "Past readings — Shruti"}
-  description="Every horoscope published so far. They do not expire."
+  description={say("text.1", "Every horoscope published so far. They do not expire.")}
 >
   <div class="page archive">
     <SectionHeader
       as="h1" glyph="⁂" eyebrow="Archive"
       title={sign ? `Every ${NAME(sign)} reading` : "Past readings"}
-      body="Readings stay up. Nothing here expires."
+      body={say("text.2", "Readings stay up. Nothing here expires.")}
     />
 
-    <nav class="filter" aria-label="Filter by sign">
+    <nav class="filter" aria-label={say("text.3", "Filter by sign")}>
       <a href="/horoscopes/archive" aria-current={!sign ? "page" : undefined}>All signs</a>
       {
         SIGNS.map((s) => (
@@ -60,8 +66,8 @@ const monthName = (covers: string) => {
       periods.length === 0 ? (
         <EmptyState
           glyph="○"
-          title="Nothing published yet"
-          body="Once a month's twelve readings go up they stay here, and this fills in behind them."
+          title={say("text.4", "Nothing published yet")}
+          body={say("text.5", "Once a month's twelve readings go up they stay here, and this fills in behind them.")}
         >
           <Button slot="action" variant="secondary" href="/horoscopes">This month</Button>
         </EmptyState>

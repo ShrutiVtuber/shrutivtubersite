@@ -32,7 +32,7 @@ import { copy } from "../../lib/copy";
 
 /* Every word on this page, editable from the admin. The defaults below are
    what it was written with and what still renders if nothing was changed. */
-const t = await copy("tools/[kind]-stations");
+const say = await copy("tools/[kind]-stations");
 
 
 /* SSR, so no getStaticPaths — params come off the URL. Anything that is not
@@ -172,7 +172,7 @@ const polarReason = noRiseOrSet
     <SectionHeader
       as="h1"
       glyph={self?.glyph || (kind === "lunar" ? "☾" : "☉")}
-      eyebrow="Theourgia · instrument"
+      eyebrow={say("text.5", "Theourgia · instrument")}
       title={title}
       body={self?.summary ?? ""}
     />
@@ -181,9 +181,9 @@ const polarReason = noRiseOrSet
       <span>{place || `${lat.toFixed(4)}, ${lon.toFixed(4)}`}</span>
       <span>·</span><span>{lat.toFixed(4)}, {lon.toFixed(4)}</span>
       <span>·</span><span>{days} {days === 1 ? "day" : "days"}</span>
-      <span>·</span><span>{t("text.1", "shown in your local time")}</span>
+      <span>·</span><span>{say("text.1", "shown in your local time")}</span>
     </div>
-    <p class="place-why">{t("text.2", "A station table for the wrong city is indistinguishable from a right one until someone misses a dawn — so the coordinates in use are shown above.")}</p>
+    <p class="place-why">{say("text.2", "A station table for the wrong city is indistinguishable from a right one until someone misses a dawn — so the coordinates in use are shown above.")}</p>
 
     <form class="controls" method="GET">
       <PlaceField lat={lat} lon={lon} place={place} />
@@ -205,7 +205,7 @@ const polarReason = noRiseOrSet
         </p>
       )
     }
-    <p class="cap-note">{t("text.3", "One month is the cap — ask for more and it is refused, not quietly trimmed.")}</p>
+    <p class="cap-note">{say("text.3", "One month is the cap — ask for more and it is refused, not quietly trimmed.")}</p>
 
     {
       next && !polarReason ? (
@@ -233,7 +233,7 @@ const polarReason = noRiseOrSet
 
     {
       kind === "lunar" && !polarReason && (
-        <p class="table-why">{t("text.4", "The Moon does not rise every day. It rises roughly fifty minutes later each day and occasionally skips a civil day entirely; at high latitude whole weeks can lack a moonrise or a moonset. An empty cell here is the sky, not missing data.")}</p>
+        <p class="table-why">{say("text.4", "The Moon does not rise every day. It rises roughly fifty minutes later each day and occasionally skips a civil day entirely; at high latitude whole weeks can lack a moonrise or a moonset. An empty cell here is the sky, not missing data.")}</p>
       )
     }
 
@@ -258,7 +258,7 @@ const polarReason = noRiseOrSet
         that survives a sweep, because both halves look finished on their own. */}
     {self?.reckoned && (
       <section class="reckoned">
-        <h2>{t("how-it-is-reckoned.1", "How it is reckoned")}</h2>
+        <h2>{say("how-it-is-reckoned.1", "How it is reckoned")}</h2>
         {self.reckoned.split(/\n\s*\n/).map((para: string) => <p>{para.trim()}</p>)}
       </section>
     )}

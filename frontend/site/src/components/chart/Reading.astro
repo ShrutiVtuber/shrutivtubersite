@@ -1,4 +1,10 @@
 ---
+import { copy } from "../../lib/copy";
+
+/* Every word here, editable from the admin. The defaults below are what
+   it was written with and what still renders if nothing was changed. */
+const say = await copy("component:Reading");
+
 /* What the tradition says about what is there.
  *
  * **A tally, never a score.** A percentage would look like a measurement of a
@@ -25,7 +31,7 @@ const { tally, markers, headline, caveats, band } = Astro.props;
 
 <section class="reading">
   <div class="r-head">
-    <span class="t-eyebrow">What the tradition says</span>
+    <span class="t-eyebrow">{say("text.1", "What the tradition says")}</span>
     {
       band && (
         <>
@@ -39,7 +45,7 @@ const { tally, markers, headline, caveats, band } = Astro.props;
             <span class="r-sep">·</span>
             <strong>{tally.hard}</strong> hard
             {band.sample > 0 && band.sample < 8 && (
-              <span class="r-small"> · a small sample, so the extremes are not claimed</span>
+              <span class="r-small">{say("text.2", "· a small sample, so the extremes are not claimed")}</span>
             )}
           </p>
           <p class="r-says">{band.says}</p>

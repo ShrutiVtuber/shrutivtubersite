@@ -1,4 +1,10 @@
 ---
+import { copy } from "../../lib/copy";
+
+/* Every word here, editable from the admin. The defaults below are what
+   it was written with and what still renders if nothing was changed. */
+const say = await copy("component:StationTable");
+
 /* Ported from `components/tables/StationTable.jsx`; contract in
  * `StationTable.d.ts`.
  *
@@ -57,7 +63,7 @@ const utc = (iso: string) =>
 {
   undefinedReason ? (
     <div class="st-undefined">
-      <p class="t-eyebrow st-mark">○ Cannot be reckoned</p>
+      <p class="t-eyebrow st-mark">{say("text.1", "○ Cannot be reckoned")}</p>
       <div class="st-why">{undefinedReason}</div>
     </div>
   ) : (

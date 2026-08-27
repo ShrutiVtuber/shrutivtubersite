@@ -24,7 +24,7 @@ import { copy } from "../lib/copy";
 
 /* Every word on this page, editable from the admin. The defaults below are
    what it was written with and what still renders if nothing was changed. */
-const t = await copy("community");
+const say = await copy("community");
 
 
 export const prerender = false;
@@ -66,14 +66,14 @@ const closed = (polls ?? []).filter((p: any) => p.closed).slice(0, 2);
 ---
 
 <BaseLayout
-  title="Community — Shruti"
-  description="What is happening: live status, what is next, what is open to vote on, and the room."
+  title={say("text.3", "Community — Shruti")}
+  description={say("text.4", "What is happening: live status, what is next, what is open to vote on, and the room.")}
 >
   <div class="page community">
     <SectionHeader
       as="h1" glyph="◈" eyebrow="Community"
-      title="What is going on"
-      body="The site is the hub — everything here is first, and the platforms are extra ways in rather than the only ones."
+      title={say("text.5", "What is going on")}
+      body={say("text.6", "The site is the hub — everything here is first, and the platforms are extra ways in rather than the only ones.")}
     />
 
     <div class="c-top">
@@ -86,7 +86,7 @@ const closed = (polls ?? []).filter((p: any) => p.closed).slice(0, 2);
             : "Not live at the moment. The schedule below says when next."}
         </p>
         <div class="c-acts">
-          <Button variant="secondary" href="/schedule">The schedule →</Button>
+          <Button variant="secondary" href="/schedule">{say("text.8", "The schedule →")}</Button>
         </div>
       </section>
 
@@ -97,14 +97,14 @@ const closed = (polls ?? []).filter((p: any) => p.closed).slice(0, 2);
             ? <><strong>{room.online}</strong> here now</>
             : <>Discord</>}
         </p>
-        <p class="c-note">{t("text.1", "Where things get talked about between streams. This number is fetched by the server, not your browser — Discord is not told you were here.")}</p>
+        <p class="c-note">{say("text.1", "Where things get talked about between streams. This number is fetched by the server, not your browser — Discord is not told you were here.")}</p>
         {
           room?.invite && (
             <div class="c-acts">
               <a class="sh-btn" data-variant="secondary" data-size="md"
                  href={room.invite} rel="noopener" target="_blank"
                  data-track="discord:joined">
-                <span>Join the Discord</span>
+                <span>{say("text.9", "Join the Discord")}</span>
               </a>
             </div>
           )
@@ -112,7 +112,7 @@ const closed = (polls ?? []).filter((p: any) => p.closed).slice(0, 2);
       </section>
 
       <section class="c-card c-notify">
-        <span class="t-eyebrow">{t("text.2", "When she goes live")}</span>
+        <span class="t-eyebrow">{say("text.2", "When she goes live")}</span>
         <NotifyButton />
       </section>
     </div>
@@ -122,34 +122,34 @@ const closed = (polls ?? []).filter((p: any) => p.closed).slice(0, 2);
     <section class="c-block c-compat">
       <div class="cc-words">
         <span class="t-eyebrow">For fun</span>
-        <h2>{t("are-we-compatible.1", "Are we compatible?")}</h2>
-        <p class="c-note">{t("are-we-compatible.2", "Put your chart beside somebody else's and see what the tradition makes of the pair. Twenty seconds, no account, and it gives you a card worth posting. It says what it cannot know, which is most of it.")}</p>
+        <h2>{say("are-we-compatible.1", "Are we compatible?")}</h2>
+        <p class="c-note">{say("are-we-compatible.2", "Put your chart beside somebody else's and see what the tradition makes of the pair. Twenty seconds, no account, and it gives you a card worth posting. It says what it cannot know, which is most of it.")}</p>
         <div class="c-acts">
-          <Button href="/compatible" data-track="compare:from-community">Compare charts →</Button>
+          <Button href="/compatible" data-track="compare:from-community">{say("text.10", "Compare charts →")}</Button>
         </div>
       </div>
       <img class="cc-card" src="/api/charts/card-sample.png?design=dark"
            width="1200" height="630" loading="lazy"
-           alt="An example of the card a comparison produces" />
+           alt={say("text.7", "An example of the card a comparison produces")} />
     </section>
 
     {/* The other creator-facing tool. It sits beside the comparison because
         both are things another VTuber uses and links back from — which is the
         whole reason they exist. */}
     <section class="c-block c-tool" id="collab">
-      <span class="t-eyebrow">For creators</span>
-      <h2>{t("when-can-all-of-us-be-li.1", "When can all of us be live?")}</h2>
-      <p class="c-note">{t("when-can-all-of-us-be-li.2", "Put everybody in, get the hours that work for all of them, and send the link. Nothing is stored — the whole plan lives in the address — so it still works in six months and there is no account to lose.")}</p>
+      <span class="t-eyebrow">{say("text.11", "For creators")}</span>
+      <h2>{say("when-can-all-of-us-be-li.1", "When can all of us be live?")}</h2>
+      <p class="c-note">{say("when-can-all-of-us-be-li.2", "Put everybody in, get the hours that work for all of them, and send the link. Nothing is stored — the whole plan lives in the address — so it still works in six months and there is no account to lose.")}</p>
       <div class="c-acts">
-        <Button href="/collab" variant="secondary">Plan a collab →</Button>
+        <Button href="/collab" variant="secondary">{say("text.12", "Plan a collab →")}</Button>
       </div>
     </section>
 
     <section class="c-block" id="polls">
-      <h2>{t("have-a-say.1", "Have a say")}</h2>
+      <h2>{say("have-a-say.1", "Have a say")}</h2>
       {
         open.length === 0 && closed.length === 0 ? (
-          <p class="c-note">{t("have-a-say.2", "Nothing open at the moment. When there is a decision worth putting to people, it appears here — and on the home page.")}</p>
+          <p class="c-note">{say("have-a-say.2", "Nothing open at the moment. When there is a decision worth putting to people, it appears here — and on the home page.")}</p>
         ) : (
           <div class="c-polls">
             {open.map((p: any) => <PollCard poll={p} />)}
@@ -160,15 +160,15 @@ const closed = (polls ?? []).filter((p: any) => p.closed).slice(0, 2);
     </section>
 
     <section class="c-block">
-      <h2>{t("ask-her-something.1", "Ask her something")}</h2>
-      <p class="c-note">{t("ask-her-something.2", "Questions get answered in public, where the next person with the same one can read the answer. Nothing appears until she has approved it.")}</p>
+      <h2>{say("ask-her-something.1", "Ask her something")}</h2>
+      <p class="c-note">{say("ask-her-something.2", "Questions get answered in public, where the next person with the same one can read the answer. Nothing appears until she has approved it.")}</p>
       <div class="c-acts">
-        <Button variant="secondary" href="/contact#ask">Ask a question →</Button>
+        <Button variant="secondary" href="/contact#ask">{say("text.13", "Ask a question →")}</Button>
       </div>
     </section>
 
     <section class="c-block">
-      <h2>{t("while-you-are-here.1", "While you are here")}</h2>
+      <h2>{say("while-you-are-here.1", "While you are here")}</h2>
       <GlyphGame />
     </section>
   </div>

@@ -12,6 +12,12 @@
  * is no honest way to know in advance server-side.
  */
 import Button from "../forms/Button.astro";
+import { copy } from "../../lib/copy";
+
+/* Every word here, editable from the admin. The defaults below are what
+   it was written with and what still renders if nothing was changed. */
+const say = await copy("component:PasskeySignIn");
+
 
 interface Props {
   /** `/api/passkeys` for readers, `/api/passkeys/admin` for the operator. */
@@ -47,10 +53,7 @@ const {
       </Button>
     )
   }
-  <p class="pk-why">
-    Face ID, a fingerprint, or your phone. Nothing is sent to Apple or Google — a passkey
-    lives on your device, not with them.
-  </p>
+  <p class="pk-why">{say("text.1", "Face ID, a fingerprint, or your phone. Nothing is sent to Apple or Google — a passkey lives on your device, not with them.")}</p>
   <p class="pk-msg" id="pk-status" role="alert" hidden></p>
 </div>
 

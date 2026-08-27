@@ -23,7 +23,7 @@ import { copy } from "../../../lib/copy";
 
 /* Every word on this page, editable from the admin. The defaults below are
    what it was written with and what still renders if nothing was changed. */
-const t = await copy("chart/invite/[token]");
+const say = await copy("chart/invite/[token]");
 
 
 export const prerender = false;
@@ -72,7 +72,7 @@ const who = await site<any>(`/api/charts/invite/${token}`).catch(() => null);
 
 <BaseLayout
   title={who ? `${who.label} wants to compare charts` : "An invitation — Shruti"}
-  description="Cast your chart and see what the tradition says about the two of you."
+  description={say("text.6", "Cast your chart and see what the tradition says about the two of you.")}
   ogImage={inviteCard}
   ogImageAlt={who ? `${who.label} wants to compare charts with you` : "An invitation to compare charts"}
 >
@@ -81,15 +81,15 @@ const who = await site<any>(`/api/charts/invite/${token}`).catch(() => null);
       !who ? (
         <EmptyState
           glyph="○"
-          title="That invitation is not valid any more"
-          body="The person who sent it may have taken the link back, or it may have passed its year. They can send you another."
+          title={say("text.7", "That invitation is not valid any more")}
+          body={say("text.8", "The person who sent it may have taken the link back, or it may have passed its year. They can send you another.")}
         />
       ) : (
         <>
           <SectionHeader
-            as="h1" glyph="✶" eyebrow="An invitation"
+            as="h1" glyph="✶" eyebrow={say("text.9", "An invitation")}
             title={`${who.label} wants to compare charts`}
-            body="Give your birth details and this will read the two charts against each other — what the tradition attaches to the contacts between them. It takes about twenty seconds."
+            body={say("text.10", "Give your birth details and this will read the two charts against each other — what the tradition attaches to the contacts between them. It takes about twenty seconds.")}
           />
 
           {failed && <p class="bad">{failed}</p>}
@@ -97,8 +97,8 @@ const who = await site<any>(`/api/charts/invite/${token}`).catch(() => null);
           <form method="POST" class="i-form">
             <CsrfField />
             <label>
-              <span class="lbl">What to call you</span>
-              <input class="in" name="label" maxlength="80" placeholder="Your name or handle" />
+              <span class="lbl">{say("text.12", "What to call you")}</span>
+              <input class="in" name="label" maxlength="80" placeholder={say("text.11", "Your name or handle")} />
             </label>
             <div class="two">
               <label>
@@ -112,21 +112,21 @@ const who = await site<any>(`/api/charts/invite/${token}`).catch(() => null);
             </div>
             <label class="check">
               <input type="checkbox" name="unknownTime" value="1" />
-              <span>{t("text.1", "I don't know my birth time")}</span>
+              <span>{say("text.1", "I don't know my birth time")}</span>
             </label>
-            <p class="hint">{t("text.2", "Without a time the planets still work — the angles do not, and the reading says which parts it has left out rather than guessing them.")}</p>
+            <p class="hint">{say("text.2", "Without a time the planets still work — the angles do not, and the reading says which parts it has left out rather than guessing them.")}</p>
 
             <PlaceField lat={37.9838} lon={23.7275} place="" />
 
             <label class="check">
               <input type="checkbox" name="consent" value="1" required />
-              <span>{t("text.3", "I agree to my birth date, time and place being stored so this comparison can be kept. I can delete it at any time, from its own page, and it goes on its own after a year.")}</span>
+              <span>{say("text.3", "I agree to my birth date, time and place being stored so this comparison can be kept. I can delete it at any time, from its own page, and it goes on its own after a year.")}</span>
             </label>
 
             <div>
-              <Button type="submit" data-track="invite:accepted">{t("text.4", "Compare our charts")}</Button>
+              <Button type="submit" data-track="invite:accepted">{say("text.4", "Compare our charts")}</Button>
             </div>
-            <p class="hint">{t("text.5", "No account needed. You will get your own address for your chart, and deleting it takes the comparison with it.")}</p>
+            <p class="hint">{say("text.5", "No account needed. You will get your own address for your chart, and deleting it takes the comparison with it.")}</p>
           </form>
         </>
       )

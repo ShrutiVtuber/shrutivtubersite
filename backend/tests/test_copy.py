@@ -174,3 +174,43 @@ def test_an_untouched_string_follows_the_template() -> None:
     # And it must still never overwrite a value she HAS changed.
     guarded = src.split("if row.value == row.default_value")[1].split("\n\n")[0]
     assert "row.value = item.default" in guarded
+
+
+def test_the_helper_is_not_called_t() -> None:
+    """
+    `t` is the likeliest identifier in the codebase to be a map or filter
+    callback parameter, and a shadowed helper fails at RUNTIME —
+    "t2 is not a function", on one page, in production, long after the change
+    looked fine everywhere else.
+
+    It happened: /support has `TIERS.map((t) => ...)` and a converted string
+    landed inside it. The whole page 500'd while every other page was fine.
+
+    So the helper is `say`, which nothing shadows.
+    """
+    pages = SRC / "pages"
+    for f in list(pages.rglob("*.astro")) + list((SRC / "components").rglob("*.astro")):
+        if "admin" in str(f) or "overlay" in str(f):
+            continue
+        text = f.read_text(encoding="utf-8")
+        assert "const t = await copy(" not in text, f"{f.name} names the helper `t`"
+        assert not re.search(r'\bt\(\s*["\'`][\w.]+["\'`]\s*,', text), (
+            f"{f.name} still calls t(...) — it will break if `t` is shadowed")
+
+
+def test_a_component_declares_a_shared_namespace() -> None:
+    """
+    A component does not know what page it is on, and its words are shared by
+    every page that shows it — so it gets a namespace of its own, and the admin
+    says out loud that editing one changes it everywhere.
+    """
+    comps = [f for f in (SRC / "components").rglob("*.astro")
+             if "await copy(" in f.read_text(encoding="utf-8")]
+    assert comps, "no component uses the copy helper"
+    for f in comps:
+        m = re.search(r'copy\(\s*["\']([^"\']+)["\']', f.read_text(encoding="utf-8"))
+        assert m and m.group(1).startswith("component:"), (
+            f"{f.name} asks for a page namespace, not a component one")
+
+    admin = (SRC / "pages" / "admin" / "copy.astro").read_text(encoding="utf-8")
+    assert "shared — changing this changes it on every page" in admin

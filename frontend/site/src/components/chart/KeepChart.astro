@@ -18,6 +18,12 @@
 import CsrfField from "../forms/CsrfField.astro";
 import Button from "../forms/Button.astro";
 import { CONSENTS } from "../../lib/consents";
+import { copy } from "../../lib/copy";
+
+/* Every word here, editable from the admin. The defaults below are what
+   it was written with and what still renders if nothing was changed. */
+const say = await copy("component:KeepChart");
+
 
 interface Props {
   signedIn: boolean;
@@ -31,12 +37,8 @@ const asks = !signedIn || !hasNativityConsent;
 ---
 
 <section class="keep">
-  <h2>Keep this chart</h2>
-  <p class="keep-why">
-    Kept, it gets its own address you can come back to — and a separate link
-    you can hand to somebody, which you can take back later without losing your
-    own.
-  </p>
+  <h2>{say("keep-this-chart.1", "Keep this chart")}</h2>
+  <p class="keep-why">{say("keep-this-chart.2", "Kept, it gets its own address you can come back to — and a separate link you can hand to somebody, which you can take back later without losing your own.")}</p>
 
   {failed && <p class="keep-bad">{failed}</p>}
 
@@ -44,7 +46,7 @@ const asks = !signedIn || !hasNativityConsent;
     <CsrfField />
     <input type="hidden" name="action" value="keep" />
     <label class="keep-name">
-      <span>Call it something</span>
+      <span>{say("keep-this-chart.3", "Call it something")}</span>
       <input type="text" name="label" maxlength="80" placeholder="Mine" autocomplete="off" />
     </label>
 
@@ -55,11 +57,7 @@ const asks = !signedIn || !hasNativityConsent;
           <span>{nativity.wording}</span>
         </label>
       ) : (
-        <p class="keep-note">
-          Your account already carries this consent, so you are not being asked
-          again. You can withdraw it from your account at any time, which
-          deletes the birth data.
-        </p>
+        <p class="keep-note">{say("keep-this-chart.4", "Your account already carries this consent, so you are not being asked again. You can withdraw it from your account at any time, which deletes the birth data.")}</p>
       )
     }
 
@@ -68,7 +66,7 @@ const asks = !signedIn || !hasNativityConsent;
       {
         !signedIn && (
           <span class="keep-alt">
-            or <a href="/signup?next=/tools/natal-chart">make an account</a> and
+            or <a href="/signup?next=/tools/natal-chart">{say("keep-this-chart.5", "make an account")}</a> and
             it is kept for you, in a list, with nothing to mind
           </span>
         )
@@ -77,11 +75,7 @@ const asks = !signedIn || !hasNativityConsent;
 
     {
       !signedIn && (
-        <p class="keep-fine">
-          Kept without an account, a chart is held for a year and the clock goes
-          back every time you open it. That is not tidying up: the consent behind it
-          cannot be renewed by asking somebody there is no way to reach.
-        </p>
+        <p class="keep-fine">{say("keep-this-chart.6", "Kept without an account, a chart is held for a year and the clock goes back every time you open it. That is not tidying up: the consent behind it cannot be renewed by asking somebody there is no way to reach.")}</p>
       )
     }
   </form>

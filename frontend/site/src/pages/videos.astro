@@ -16,6 +16,12 @@ import EmptyState from "../components/feedback/EmptyState.astro";
 import Button from "../components/forms/Button.astro";
 import { site, PATHS, type LiveStatus } from "../lib/api";
 import { badgeFrom } from "../lib/live";
+import { copy } from "../lib/copy";
+
+/* Every word here, editable from the admin. The defaults below are what
+   it was written with and what still renders if nothing was changed. */
+const say = await copy("videos");
+
 
 interface Video {
   id: string; title: string; platform: "twitch" | "youtube"; duration?: string;
@@ -73,12 +79,12 @@ const jsonLd = videos.length > 0
   : null;
 ---
 
-<BaseLayout title="Videos — Shruti" description="Past streams and VODs from Twitch and YouTube — programming, astrology, and the building of the instruments on this site, collected in one place.">
+<BaseLayout title={say("text.1", "Videos — Shruti")} description={say("text.2", "Past streams and VODs from Twitch and YouTube — programming, astrology, and the building of the instruments on this site, collected in one place.")}>
   <div class="page">
     <div class="section-head">
       <SectionHeader
-        as="h1" glyph="▶" eyebrow="Videos" title="Streams & VODs"
-        body="Auto-pulled from Twitch and YouTube."
+        as="h1" glyph="▶" eyebrow="Videos" title={say("text.3", "Streams & VODs")}
+        body={say("text.4", "Auto-pulled from Twitch and YouTube.")}
       />
       {
         feed && (feed.counts.youtube > 0 || feed.counts.twitch > 0) && (
@@ -105,7 +111,7 @@ const jsonLd = videos.length > 0
         <EmptyState
           as="h2"
           glyph="◐"
-          title="Nothing pulled through yet"
+          title={say("text.5", "Nothing pulled through yet")}
           body={
             live.status === "live"
               ? "The stream is live now — past VODs will appear here once the platform connections are in place."
@@ -116,7 +122,7 @@ const jsonLd = videos.length > 0
             {live.status === "live" && live.href && (
               <Button variant="live" href={live.href}>Watch live</Button>
             )}
-            <Button variant="secondary" href="/schedule">See the schedule</Button>
+            <Button variant="secondary" href="/schedule">{say("text.6", "See the schedule")}</Button>
           </div>
         </EmptyState>
       )

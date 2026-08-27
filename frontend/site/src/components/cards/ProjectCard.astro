@@ -7,6 +7,12 @@
  * a placeholder to be replaced by a grey box.
  */
 import Picture from "../blocks/Picture.astro";
+import { copy } from "../../lib/copy";
+
+/* Every word here, editable from the admin. The defaults below are what
+   it was written with and what still renders if nothing was changed. */
+const say = await copy("component:ProjectCard");
+
 
 interface Props {
   name: string;
@@ -43,7 +49,7 @@ const st = STATUS[status] ?? STATUS.active;
         <Picture media={screenshot} alt={`${name} screenshot`} />
       ) : (
         <Fragment>
-          <span data-plate>screenshot pending</span>
+          <span data-plate>{say("text.1", "screenshot pending")}</span>
           <span data-horizon aria-hidden="true" />
         </Fragment>
       )

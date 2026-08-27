@@ -17,7 +17,7 @@ import { copy } from "../../lib/copy";
 
 /* Every word on this page, editable from the admin. The defaults below are
    what it was written with and what still renders if nothing was changed. */
-const t = await copy("shop");
+const say = await copy("shop");
 
 
 export const prerender = false;
@@ -51,18 +51,18 @@ const money = (p: ShopProduct) =>
   `${(p.priceCents / 100).toFixed(2)} ${p.currency.toUpperCase()}`;
 ---
 
-<BaseLayout jsonLd={listLd} title="Shop — Shruti" description="Printed matter, files and the odd object. The instruments on this site are free and always will be — this is for the things that cost something to make.">
+<BaseLayout jsonLd={listLd} title={say("text.2", "Shop — Shruti")} description={say("text.3", "Printed matter, files and the odd object. The instruments on this site are free and always will be — this is for the things that cost something to make.")}>
   <div class="page">
     <SectionHeader
       glyph="✶"
       eyebrow="Shop"
       as="h1"
-      title="Things you can have"
-      body="Printed matter, files, and the odd object. Prices include tax."
+      title={say("text.4", "Things you can have")}
+      body={say("text.5", "Printed matter, files, and the odd object. Prices include tax.")}
     />
 
     <p class="of-note">
-      This is the only shop that is mine. <a href="/official">{t("text.1", "Everywhere else that is")}</a>,
+      This is the only shop that is mine. <a href="/official">{say("text.1", "Everywhere else that is")}</a>,
       and anything not on that list is not me.
     </p>
 
@@ -71,7 +71,7 @@ const money = (p: ShopProduct) =>
         <EmptyState
           as="h2"
           glyph="○"
-          title="Nothing for sale yet"
+          title={say("text.6", "Nothing for sale yet")}
           body="There will be. The instruments are free and always will be; this is for the things that cost something to make."
         />
       ) : (
@@ -83,7 +83,7 @@ const money = (p: ShopProduct) =>
               <div class="shot" data-empty={!p.media}>
                 {p.media
                   ? <img src={p.media.url} alt={p.media.alt || p.name} loading="lazy" />
-                  : <span class="plate">no photograph yet</span>}
+                  : <span class="plate">{say("text.7", "no photograph yet")}</span>}
               </div>
               <div class="body">
                 <span class="name">{p.name}</span>

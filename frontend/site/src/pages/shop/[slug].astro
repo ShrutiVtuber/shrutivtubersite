@@ -12,6 +12,12 @@ import CsrfField from "../../components/forms/CsrfField.astro";
 import { site, PATHS, SITE_API, type ShopProduct } from "../../lib/api";
 import { renderMarkdown } from "../../lib/markdown";
 import { verifyCsrf } from "../../lib/csrf";
+import { copy } from "../../lib/copy";
+
+/* Every word here, editable from the admin. The defaults below are what
+   it was written with and what still renders if nothing was changed. */
+const say = await copy("shop/[slug]");
+
 
 export const prerender = false;
 
@@ -99,7 +105,7 @@ const jsonLd = {
     <div class="shots">
       <div class="shot" data-empty={!lead}>
         {lead && <img src={lead.url} alt={lead.alt || product.name} />}
-        {!lead && <span class="plate">no photograph yet</span>}
+        {!lead && <span class="plate">{say("text.1", "no photograph yet")}</span>}
       </div>
       {rest.length > 0 && (
         <ol class="more">

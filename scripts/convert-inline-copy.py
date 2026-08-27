@@ -53,7 +53,7 @@ def convert(path, page):
     parts = src.split("---", 2)
     if len(parts) < 3: return None, 0
     head, tpl = parts[1], parts[2]
-    used = set(re.findall(r't\(\s*["\'`]([^"\'`]+?)["\'`]', src))
+    used = set(re.findall(r'say\(\s*["\'`]([^"\'`]+?)["\'`]', src))
     section, count = "", 0
 
     def repl(m):
@@ -70,7 +70,7 @@ def convert(path, page):
         used.add(key)
         count += 1
         esc = md.replace("\\", "\\\\").replace('"', '\\"')
-        return f'{open_tag}<Copy text={{t("{key}", "{esc}")}} />{close}'
+        return f'{open_tag}<Copy text={{say("{key}", "{esc}")}} />{close}'
 
     tpl2 = re.sub(r"(<(?:p|li|figcaption|dd|blockquote)(?:\s[^<>]*)?>)([\s\S]*?)(</(?:p|li|figcaption|dd|blockquote)>)",
                   repl, tpl)
@@ -83,11 +83,12 @@ def convert(path, page):
         at = imports[-1].end() if imports else 0
         head = head[:at] + "\n" + imp + head[at:]
     if 'copy("' not in src:
-        depth = len(pathlib.Path(path).relative_to("frontend/site/src/pages").parts) - 1
+        rel = pathlib.Path(path).relative_to("frontend/site/src")
+        up = "../" * (len(rel.parts) - 1)
         imports = list(re.finditer(r"^import .*?;$", head, re.M))
         at = imports[-1].end() if imports else 0
-        head = (head[:at] + f'\nimport {{ copy }} from "{"../" * depth}../lib/copy";'
-                + f'\n\nconst t = await copy("{page}");\n' + head[at:])
+        head = (head[:at] + f'\nimport {{ copy }} from "{up}lib/copy";'
+                + f'\n\nconst say = await copy("{page}");\n' + head[at:])
     return f"---{head}---{tpl2}", count
 
 if __name__ == "__main__":

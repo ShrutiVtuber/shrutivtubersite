@@ -18,7 +18,7 @@ import Copy from "../../components/content/Copy.astro";
 
 /* Every word on this page, editable from the admin. The defaults below are
    what it was written with and what still renders if nothing was changed. */
-const t = await copy("tools/sigil-generator");
+const say = await copy("tools/sigil-generator");
 
 
 const q = Astro.url.searchParams;
@@ -64,23 +64,23 @@ const keepVowels = q.get("vowels") === "keep";
   </div>
 
   <section class="entry">
-    <label class="entry-label" for="sigil-input">{t("text.1", "Statement of intent")}</label>
+    <label class="entry-label" for="sigil-input">{say("text.1", "Statement of intent")}</label>
     <textarea
       id="sigil-input"
       rows="2"
-      placeholder="My will is to finish the work"
+      placeholder={say("text.4", "My will is to finish the work")}
       data-sigil-input
       value={letters ? "" : ""}
     ></textarea>
     <p class="never-leaves">
       <span class="t-glyph" aria-hidden="true">○</span>{" "}
-      <Copy text={t("privacy.line", "nothing typed here leaves your device — the statement is not sent, not put in the link, and not written into the file you export")} />
+      <Copy text={say("privacy.line", "nothing typed here leaves your device — the statement is not sent, not put in the link, and not written into the file you export")} />
     </p>
     {
       letters && (
         <p class="from-link">
           <Copy
-            text={t("from-link.line", "This link carried the letter set **{letters}**, not the statement it came from.")}
+            text={say("from-link.line", "This link carried the letter set **{letters}**, not the statement it came from.")}
             vars={{ letters }}
           />
         </p>
@@ -92,10 +92,10 @@ const keepVowels = q.get("vowels") === "keep";
   <section class="figure" data-sigil-figure hidden></section>
 
   <noscript>
-    <p class="noscript">{t("text.2", "This instrument draws in the browser so that the statement is never transmitted. With scripting off there is nothing to send it to, so it cannot draw — which is the same privacy property from the other side. The method is written out under “How it is reckoned”, and it works perfectly well with a pen.")}</p>
+    <p class="noscript">{say("text.2", "This instrument draws in the browser so that the statement is never transmitted. With scripting off there is nothing to send it to, so it cannot draw — which is the same privacy property from the other side. The method is written out under “How it is reckoned”, and it works perfectly well with a pen.")}</p>
   </noscript>
 
-  <p slot="aside" class="convenience">{t("text.3", "The tool is a convenience, never a requirement. Every step is shown so the same figure can be drawn by hand, and a sigil drawn by hand is not a lesser one.")}</p>
+  <p slot="aside" class="convenience">{say("text.3", "The tool is a convenience, never a requirement. Every step is shown so the same figure can be drawn by hand, and a sigil drawn by hand is not a lesser one.")}</p>
 </ToolLayout>
 
 <style>
@@ -178,16 +178,16 @@ const keepVowels = q.get("vowels") === "keep";
       const repeats = r.afterVowels.length - r.unique.length;
 
       stepsOut.innerHTML =
-        `<h2>{t("the-reduction.1", "The reduction")}</h2><dl>` +
+        `<h2>{say("the-reduction.1", "The reduction")}</h2><dl>` +
         `<div class="sig-step"><dt>Statement</dt><dd>${esc(r.statement)}</dd></div>` +
         `<div class="sig-step"><dt>Upper case</dt><dd>${esc(r.upper)}</dd></div>` +
-        `<div class="sig-step"><dt>Letters only</dt><dd>${esc(r.lettersOnly.join(""))}</dd></div>` +
+        `<div class="sig-step"><dt>{say("text.5", "Letters only")}</dt><dd>${esc(r.lettersOnly.join(""))}</dd></div>` +
         `<div class="sig-step"><dt>${o.keepVowels ? "Vowels kept" : "Vowels struck"}</dt>` +
         `<dd>${esc(r.afterVowels.join(""))}` +
         (struck.length ? ` <span class="sig-struck">${esc(struck.join(""))}</span>` : "") + `</dd></div>` +
-        `<div class="sig-step"><dt>Repeats struck</dt><dd>${esc(r.unique.join(""))}` +
+        `<div class="sig-step"><dt>{say("text.6", "Repeats struck")}</dt><dd>${esc(r.unique.join(""))}` +
         (repeats > 0 ? ` <span class="sig-struck">${repeats} removed</span>` : "") + `</dd></div>` +
-        `<div class="sig-step"><dt>The letter set</dt><dd><strong>${esc(r.unique.join(" "))}</strong></dd></div>` +
+        `<div class="sig-step"><dt>{say("text.7", "The letter set")}</dt><dd><strong>${esc(r.unique.join(" "))}</strong></dd></div>` +
         `</dl>`;
       stepsOut.hidden = false;
 
@@ -195,27 +195,27 @@ const keepVowels = q.get("vowels") === "keep";
         /* The reduction consumed the sentence. A real outcome with a designed
            state — never an error, and never a figure invented to fill it. */
         figureOut.innerHTML =
-          `<div class="sig-cc"><p class="mark">{t("the-reduction.2", "◐ Nothing left to draw")}</p>` +
-          `<h3>{t("the-reduction-consumed-t.1", "The reduction consumed the sentence")}</h3>` +
+          `<div class="sig-cc"><p class="mark">{say("the-reduction.2", "◐ Nothing left to draw")}</p>` +
+          `<h3>{say("the-reduction-consumed-t.1", "The reduction consumed the sentence")}</h3>` +
           `<p>${r.exhausted
             ? "Every letter was a vowel or a repeat, so no letters remain and there is no figure to draw. That is a fact about the sentence, not a failure of the tool."
             : "Only one letter remains, and a single point is not a figure."}</p>` +
-          `<ol><li>{t("the-reduction-consumed-t.2", "Keep the vowels, using the option above — the set will be longer.")}</li>` +
-          `<li>{t("the-reduction-consumed-t.3", "Write a longer statement, or one with more distinct consonants.")}</li>` +
-          `<li>{t("the-reduction-consumed-t.4", "Draw it by hand. The tool is a convenience, never a requirement.")}</li></ol></div>`;
+          `<ol><li>{say("the-reduction-consumed-t.2", "Keep the vowels, using the option above — the set will be longer.")}</li>` +
+          `<li>{say("the-reduction-consumed-t.3", "Write a longer statement, or one with more distinct consonants.")}</li>` +
+          `<li>{say("the-reduction-consumed-t.4", "Draw it by hand. The tool is a convenience, never a requirement.")}</li></ol></div>`;
         figureOut.hidden = false;
         return;
       }
 
       const svg = draw(r.unique, { weight: o.weight, enclosure: o.enclosure, size: 512 });
       figureOut.innerHTML =
-        `<h2>{t("the-figure.1", "The figure")}</h2><div class="sig-figure-frame" data-svg>${svg}</div>` +
+        `<h2>{say("the-figure.1", "The figure")}</h2><div class="sig-figure-frame" data-svg>${svg}</div>` +
         `<div class="sig-actions">` +
-        `<button type="button" data-download="svg" data-track="tool:used" data-track-tool="sigil-generator">Download SVG</button>` +
-        `<button type="button" data-download="png" data-track="tool:used" data-track-tool="sigil-generator">{t("the-figure.2", "Download PNG · 2048px")}</button>` +
-        `<a href="?letters=${encodeURIComponent(r.unique.join(""))}&weight=${o.weight}&enclosure=${o.enclosure}${o.keepVowels ? "&vowels=keep" : ""}">{t("the-figure.3", "Link to this figure")}</a>` +
+        `<button type="button" data-download="svg" data-track="tool:used" data-track-tool="sigil-generator">{say("text.8", "Download SVG")}</button>` +
+        `<button type="button" data-download="png" data-track="tool:used" data-track-tool="sigil-generator">{say("the-figure.2", "Download PNG · 2048px")}</button>` +
+        `<a href="?letters=${encodeURIComponent(r.unique.join(""))}&weight=${o.weight}&enclosure=${o.enclosure}${o.keepVowels ? "&vowels=keep" : ""}">{say("the-figure.3", "Link to this figure")}</a>` +
         `</div>` +
-        `<p class="never-leaves">{t("the-figure.4", "The link carries the letter set, never the statement.")}</p>`;
+        `<p class="never-leaves">{say("the-figure.4", "The link carries the letter set, never the statement.")}</p>`;
       figureOut.hidden = false;
 
       figureOut.querySelectorAll("[data-download]").forEach((button) => {

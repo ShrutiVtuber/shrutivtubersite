@@ -14,7 +14,7 @@ import { copy } from "../lib/copy";
 
 /* Every word on this page, editable from the admin. The defaults below are
    what it was written with and what still renders if nothing was changed. */
-const t = await copy("guidelines");
+const say = await copy("guidelines");
 
 
 /* Every block the admin has added to /guidelines. */
@@ -23,13 +23,13 @@ const extra = sections.filter((s) => s.key !== "intro");
 ---
 
 <BaseLayout
-  title="Derivative work guidelines — Shruti"
-  description="What you may make: fan art, commercial use, AI, clips, voice and likeness."
+  title={say("text.1", "Derivative work guidelines — Shruti")}
+  description={say("text.2", "What you may make: fan art, commercial use, AI, clips, voice and likeness.")}
 >
   <div class="page guidelines">
     <SectionHeader
-      as="h1" glyph="◐" eyebrow="Derivative work guidelines" title="What you may make"
-      body="Fan works are welcome — this page exists so nobody has to guess. The short version: make things, credit yourself, don't sell the character, and keep machines from learning her."
+      as="h1" glyph="◐" eyebrow={say("text.3", "Derivative work guidelines")} title={say("text.4", "What you may make")}
+      body={say("text.5", "Fan works are welcome — this page exists so nobody has to guess. The short version: make things, credit yourself, don't sell the character, and keep machines from learning her.")}
     />
 
     <p class="legend">
@@ -39,51 +39,51 @@ const extra = sections.filter((s) => s.key !== "intro");
     </p>
 
     <section>
-      <h2>{t("fan-art.1", "Fan art")}</h2>
+      <h2>{say("fan-art.1", "Fan art")}</h2>
       <ul>
-        <DisclosureRule mark="○">{t("fan-art.2", "Drawing, writing, music, cosplay and edits of Shruti, posted anywhere, with your own credit. Tag #ShrutiArts so it can be found and featured.")}</DisclosureRule>
-        <DisclosureRule mark="◐">{t("fan-art.3", "NSFW work — allowed for adults, clearly marked, and kept out of the main tag. Never present it as official.")}</DisclosureRule>
-        <DisclosureRule mark="●">{t("fan-art.4", "Passing fan work off as official art, or removing another artist's credit.")}</DisclosureRule>
+        <DisclosureRule mark="○">{say("fan-art.2", "Drawing, writing, music, cosplay and edits of Shruti, posted anywhere, with your own credit. Tag #ShrutiArts so it can be found and featured.")}</DisclosureRule>
+        <DisclosureRule mark="◐">{say("fan-art.3", "NSFW work — allowed for adults, clearly marked, and kept out of the main tag. Never present it as official.")}</DisclosureRule>
+        <DisclosureRule mark="●">{say("fan-art.4", "Passing fan work off as official art, or removing another artist's credit.")}</DisclosureRule>
       </ul>
     </section>
 
     <section>
-      <h2>{t("commercial-use.1", "Commercial use")}</h2>
+      <h2>{say("commercial-use.1", "Commercial use")}</h2>
       <ul>
-        <DisclosureRule mark="○">{t("commercial-use.2", "Monetised platforms carrying your fan work — ad revenue on your own speedpaint or cover is yours.")}</DisclosureRule>
-        <DisclosureRule mark="◐">{t("commercial-use.3", "Small-batch prints or con merch of your own fan art — write first; the answer is usually yes.")}</DisclosureRule>
-        <DisclosureRule mark="●">{t("commercial-use.4", "Mass-produced merchandise of the character, or commercial use of the wordmark and official art, without a written agreement.")}</DisclosureRule>
+        <DisclosureRule mark="○">{say("commercial-use.2", "Monetised platforms carrying your fan work — ad revenue on your own speedpaint or cover is yours.")}</DisclosureRule>
+        <DisclosureRule mark="◐">{say("commercial-use.3", "Small-batch prints or con merch of your own fan art — write first; the answer is usually yes.")}</DisclosureRule>
+        <DisclosureRule mark="●">{say("commercial-use.4", "Mass-produced merchandise of the character, or commercial use of the wordmark and official art, without a written agreement.")}</DisclosureRule>
       </ul>
     </section>
 
     <section>
       <h2>AI</h2>
       <ul>
-        <DisclosureRule mark="●">{t("ai.1", "Training generative models on her art, voice, streams or writing — including LoRAs and voice clones.")}</DisclosureRule>
-        <DisclosureRule mark="●">{t("ai.2", "AI-generated images in the fan tags. The gallery is for made things.")}</DisclosureRule>
+        <DisclosureRule mark="●">{say("ai.1", "Training generative models on her art, voice, streams or writing — including LoRAs and voice clones.")}</DisclosureRule>
+        <DisclosureRule mark="●">{say("ai.2", "AI-generated images in the fan tags. The gallery is for made things.")}</DisclosureRule>
       </ul>
     </section>
 
     <section>
-      <h2>{t("clips-amp-streams.1", "Clips &amp; streams")}</h2>
+      <h2>{say("clips-amp-streams.1", "Clips &amp; streams")}</h2>
       <ul>
-        <DisclosureRule mark="○">{t("clips-amp-streams.2", "Clips, edits, translations and reaction content, with a link back to the stream or VOD.")}</DisclosureRule>
-        <DisclosureRule mark="●">{t("clips-amp-streams.3", "Re-uploading full VODs or streams without permission.")}</DisclosureRule>
+        <DisclosureRule mark="○">{say("clips-amp-streams.2", "Clips, edits, translations and reaction content, with a link back to the stream or VOD.")}</DisclosureRule>
+        <DisclosureRule mark="●">{say("clips-amp-streams.3", "Re-uploading full VODs or streams without permission.")}</DisclosureRule>
       </ul>
     </section>
 
     <section>
-      <h2>{t("voice-amp-likeness.1", "Voice &amp; likeness")}</h2>
+      <h2>{say("voice-amp-likeness.1", "Voice &amp; likeness")}</h2>
       <ul>
-        <DisclosureRule mark="◐">{t("voice-amp-likeness.2", "Soundboards and voice compilations — ask, with the clips you intend to use.")}</DisclosureRule>
-        <DisclosureRule mark="●">{t("voice-amp-likeness.3", "Impersonation: accounts, bots or content presenting themselves as Shruti.")}</DisclosureRule>
+        <DisclosureRule mark="◐">{say("voice-amp-likeness.2", "Soundboards and voice compilations — ask, with the clips you intend to use.")}</DisclosureRule>
+        <DisclosureRule mark="●">{say("voice-amp-likeness.3", "Impersonation: accounts, bots or content presenting themselves as Shruti.")}</DisclosureRule>
       </ul>
     </section>
 
-    <p class="signed">{t("voice-amp-likeness.4", "Questions live in the contact form. Last updated 2026-08 · signed, Shruti")}</p>
+    <p class="signed">{say("voice-amp-likeness.4", "Questions live in the contact form. Last updated 2026-08 · signed, Shruti")}</p>
     <div class="actions">
-      <Button variant="secondary" href="/contact">{t("voice-amp-likeness.5", "Ask about an edge case")}</Button>
-      <Button variant="ghost" href="/fan-works">See fan works</Button>
+      <Button variant="secondary" href="/contact">{say("voice-amp-likeness.5", "Ask about an edge case")}</Button>
+      <Button variant="ghost" href="/fan-works">{say("ai.3", "See fan works")}</Button>
     </div>
   </div>
 

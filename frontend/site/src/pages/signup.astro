@@ -20,7 +20,7 @@ import Copy from "../components/content/Copy.astro";
 
 /* Every word on this page, editable from the admin. The defaults below are
    what it was written with and what still renders if nothing was changed. */
-const t = await copy("signup");
+const say = await copy("signup");
 
 
 let done = false;
@@ -76,18 +76,18 @@ if (Astro.request.method === "POST") {
 }
 ---
 
-<BaseLayout title="Sign up — Shruti" description="An account for your own chart and your own reading. Nothing public." noindex>
+<BaseLayout title={say("text.2", "Sign up — Shruti")} description={say("text.3", "An account for your own chart and your own reading. Nothing public.")} noindex>
   <div class="page auth">
     <SectionHeader
       as="h1" glyph="☾" eyebrow="Sign up" title="An account"
-      body="For keeping your own chart and reading your own horoscope. Nothing here is public — no profile, no avatar, no follower count."
+      body={say("text.4", "For keeping your own chart and reading your own horoscope. Nothing here is public — no profile, no avatar, no follower count.")}
     />
 
     {
       done ? (
-        <EmptyState glyph="☾" title="You're in" body="The account is made. Where would you like to start?">
+        <EmptyState glyph="☾" title="You're in" body={say("text.5", "The account is made. Where would you like to start?")}>
           <div slot="action" class="auth-actions">
-            <Button href="/nativity">Add a nativity</Button>
+            <Button href="/nativity">{say("text.8", "Add a nativity")}</Button>
             <Button variant="secondary" href="/today">See today</Button>
           </div>
         </EmptyState>
@@ -97,16 +97,16 @@ if (Astro.request.method === "POST") {
           {failed && <p class="auth-failed" role="alert">{failed}</p>}
 
           <TextField label="Email" name="email" type="email" required value={values.email} error={errors.email} autocomplete="email" />
-          <TextField label="Name" name="name" optionalLabel value={values.name} hint="Only ever shown back to you." autocomplete="name" />
+          <TextField label="Name" name="name" optionalLabel value={values.name} hint={say("text.6", "Only ever shown back to you.")} autocomplete="name" />
           <TextField
             label="Password" name="password" type="password" optionalLabel
             value="" error={errors.password} autocomplete="new-password"
-            hint="Leave it blank to sign in by emailed link instead."
+            hint={say("text.7", "Leave it blank to sign in by emailed link instead.")}
           />
 
           <div class="consents">
-            <h2>{t("three-decisions.1", "Three decisions")}</h2>
-            <p class="consents-intro">{t("three-decisions.2", "These are separate on purpose. You can say yes to one and no to another, and change any of them later from your account.")}</p>
+            <h2>{say("three-decisions.1", "Three decisions")}</h2>
+            <p class="consents-intro">{say("three-decisions.2", "These are separate on purpose. You can say yes to one and no to another, and change any of them later from your account.")}</p>
             {
               CONSENTS.map((c) => (
                 <ConsentCheckbox
@@ -122,8 +122,8 @@ if (Astro.request.method === "POST") {
             }
           </div>
 
-          <div><Button type="submit" size="lg">{t("three-decisions.3", "Create the account")}</Button></div>
-          <p class="auth-alt"><Copy text={t("text.1", "Already have one? [Sign in](/signin).")} /></p>
+          <div><Button type="submit" size="lg">{say("three-decisions.3", "Create the account")}</Button></div>
+          <p class="auth-alt"><Copy text={say("text.1", "Already have one? [Sign in](/signin).")} /></p>
         </form>
       )
     }

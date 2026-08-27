@@ -29,7 +29,7 @@ import { copy } from "../../lib/copy";
 
 /* Every word on this page, editable from the admin. The defaults below are
    what it was written with and what still renders if nothing was changed. */
-const t = await copy("tools/natal-chart");
+const say = await copy("tools/natal-chart");
 
 
 export const prerender = false;
@@ -216,7 +216,7 @@ const ASPECT_BASIS: Record<string, string> = {
       <label><span>Birth time</span><input type="time" name="time" value={time} disabled={unknownTime} /></label>
       <label class="check">
         <input type="checkbox" name="unknownTime" value="1" checked={unknownTime} />
-        <span class="check-label">{t("text.1", "I don't know my birth time")}</span>
+        <span class="check-label">{say("text.1", "I don't know my birth time")}</span>
       </label>
       <PlaceField lat={lat} lon={lon} place={place} />
       <label>
@@ -233,8 +233,8 @@ const ASPECT_BASIS: Record<string, string> = {
           <label>
             <span>Figure</span>
             <select name="vedic_style">
-              <option value="north" selected={vedicStyle === "north"}>North Indian</option>
-              <option value="south" selected={vedicStyle === "south"}>South Indian</option>
+              <option value="north" selected={vedicStyle === "north"}>{say("text.6", "North Indian")}</option>
+              <option value="south" selected={vedicStyle === "south"}>{say("text.7", "South Indian")}</option>
             </select>
           </label>
         ) : (
@@ -243,15 +243,15 @@ const ASPECT_BASIS: Record<string, string> = {
       }
       <button type="submit" data-track="tool:used" data-track-tool="natal-chart">Cast</button>
     </form>
-    <p class="privacy">{t("text.2", "Birth data in a link is birth data in a browser history. This page puts the date, time and place in the URL so a reckoning can be shared or re-opened — bear that in mind before sending one on.")}</p>
+    <p class="privacy">{say("text.2", "Birth data in a link is birth data in a browser history. This page puts the date, time and place in the URL so a reckoning can be shared or re-opened — bear that in mind before sending one on.")}</p>
   </div>
 
   {
     !date ? (
-      <p class="prompt">{t("text.3", "Give a date, a place, and a time if you know it.")}</p>
+      <p class="prompt">{say("text.3", "Give a date, a place, and a time if you know it.")}</p>
     ) : !d ? (
       <CannotCompute
-        title="The chart could not be cast"
+        title={say("text.4", "The chart could not be cast")}
         why={answer?.detail || "The ephemeris could not be reached. That is a failure on my side, not a fact about the sky."}
       />
     ) : (
@@ -260,7 +260,7 @@ const ASPECT_BASIS: Record<string, string> = {
           unknownTime && (
             <CannotCompute
               mark="◐"
-              title="Without a birth time, the angles are undefined"
+              title={say("text.5", "Without a birth time, the angles are undefined")}
               why="The ascendant moves a degree every four minutes, so an unknown time leaves the ascendant, midheaven, the houses and the sect genuinely undefined — not approximate. They are withheld below rather than filled in from an assumed midnight, because a fabricated ascendant is worse than an absent one. The planets are given for noon, and the Moon as the range it covers across the day."
               alternatives={[
                 "Read the planetary positions, which move little across a day — except the Moon, whose range is given.",
@@ -272,7 +272,7 @@ const ASPECT_BASIS: Record<string, string> = {
         }
 
         <section class="positions">
-          <h2>{t("positions.1", "Positions")}</h2>
+          <h2>{say("positions.1", "Positions")}</h2>
           <div class="table-scroll">
             <table>
             <thead>
@@ -301,7 +301,7 @@ const ASPECT_BASIS: Record<string, string> = {
           {
             unknownTime && moonRange && (
               <p class="moon-range">
-                <strong>{t("positions.2", "Moon across the day:")}</strong>{" "}
+                <strong>{say("positions.2", "Moon across the day:")}</strong>{" "}
                 <span class="t-tabular">{moonRange.start}</span> at midnight to{" "}
                 <span class="t-tabular">{moonRange.end}</span> at the day's end.
               </p>
@@ -310,10 +310,10 @@ const ASPECT_BASIS: Record<string, string> = {
         </section>
 
         <section class="angles">
-          <h2>{t("angles.1", "Angles")}</h2>
+          <h2>{say("angles.1", "Angles")}</h2>
           {
             unknownTime ? (
-              <p class="undef-block">{t("angles.2", "◐ Ascendant, midheaven, descendant and imum coeli are undefined without a birth time. Nothing is shown here because there is nothing true to show.")}</p>
+              <p class="undef-block">{say("angles.2", "◐ Ascendant, midheaven, descendant and imum coeli are undefined without a birth time. Nothing is shown here because there is nothing true to show.")}</p>
             ) : (
               <dl>
                 <div><dt>Ascendant</dt><dd class="t-tabular">{d.angles.ascendant}°</dd></div>
@@ -328,7 +328,7 @@ const ASPECT_BASIS: Record<string, string> = {
         {
           d.sect && !unknownTime && (
             <section class="sect">
-              <h2>{t("sect.1", "Sect")}</h2>
+              <h2>{say("sect.1", "Sect")}</h2>
               <p>
                 A <strong>{d.sect.isDay ? "day" : "night"}</strong> chart. Luminary of the sect:
                 {" "}{d.sect.luminary}. Benefic of the sect: {d.sect.benefic}. Malefic:
@@ -340,8 +340,8 @@ const ASPECT_BASIS: Record<string, string> = {
         {
           d.sect && unknownTime && (
             <section class="sect">
-              <h2>{t("sect.2", "Sect")}</h2>
-              <p class="undef-block">{t("sect.3", "◐ Sect depends on whether the Sun was above or below the horizon, which needs the time. Undefined.")}</p>
+              <h2>{say("sect.2", "Sect")}</h2>
+              <p class="undef-block">{say("sect.3", "◐ Sect depends on whether the Sun was above or below the horizon, which needs the time. Undefined.")}</p>
             </section>
           )
         }
@@ -361,15 +361,15 @@ const ASPECT_BASIS: Record<string, string> = {
               ))
             }
           </ul>
-          {looks.length === 0 && <p class="faint">{t("sect.4", "No configurations by this rule.")}</p>}
+          {looks.length === 0 && <p class="faint">{say("sect.4", "No configurations by this rule.")}</p>}
         </section>
 
         {
           d.diagram?.svg && (
             <section class="wheel">
-              <h2>{t("the-figure.1", "The figure")}</h2>
+              <h2>{say("the-figure.1", "The figure")}</h2>
               <div class="wheel-frame" set:html={d.diagram.svg} />
-              <p class="wheel-note">{t("the-figure.2", "Drawn from the same numbers as the tables above. The tables remain the reading.")}</p>
+              <p class="wheel-note">{say("the-figure.2", "Drawn from the same numbers as the tables above. The tables remain the reading.")}</p>
             </section>
           )
         }

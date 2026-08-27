@@ -1,4 +1,10 @@
 ---
+import { copy } from "../../lib/copy";
+
+/* Every word here, editable from the admin. The defaults below are what
+   it was written with and what still renders if nothing was changed. */
+const say = await copy("component:NextStation");
+
 /* Ported from `components/tables/NextStation.jsx`; contract in
  * `NextStation.d.ts`.
  *
@@ -44,7 +50,7 @@ const pct = Math.max(0, Math.min(1, progress)) * 100;
 {
   undefinedReason ? (
     <div class="ns ns-undefined" data-hero={hero}>
-      <span class="t-eyebrow ns-mark">○ No station to count to</span>
+      <span class="t-eyebrow ns-mark">{say("text.1", "○ No station to count to")}</span>
       <p class="ns-why">{undefinedReason}</p>
     </div>
   ) : (

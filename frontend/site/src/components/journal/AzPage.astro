@@ -9,6 +9,12 @@
 import Glyph from "./Glyph.astro";
 import { GLYPH, type AzGroup } from "../../lib/journal/types";
 import { rowDate } from "../../lib/journal/format";
+import { copy } from "../../lib/copy";
+
+/* Every word here, editable from the admin. The defaults below are what
+   it was written with and what still renders if nothing was changed. */
+const say = await copy("component:AzPage");
+
 
 interface Props { groups: AzGroup[] }
 const { groups } = Astro.props;
@@ -45,7 +51,7 @@ for (const g of groups) {
                 {r.date && <span class="j-row-date">{rowDate(r.date)}</span>}
               </a>
             ))}
-            {g.more && <a class="j-more" href={g.more}>See them all →</a>}
+            {g.more && <a class="j-more" href={g.more}>{say("text.1", "See them all →")}</a>}
           </>
         ))}
       </div>

@@ -9,6 +9,12 @@
 import Prose from "../content/Prose.astro";
 import { parseFaq, type Instrument } from "../../lib/instruments";
 import { renderMarkdown } from "../../lib/markdown";
+import { copy } from "../../lib/copy";
+
+/* Every word here, editable from the admin. The defaults below are what
+   it was written with and what still renders if nothing was changed. */
+const say = await copy("component:InstrumentNotes");
+
 
 interface Props { instrument: Instrument | null }
 const { instrument } = Astro.props;
@@ -20,14 +26,14 @@ const answers = await Promise.all(faq.map((f) => renderMarkdown(f.a)));
 
 {aboutHtml && (
   <section class="tool-about">
-    <h2>About this instrument</h2>
+    <h2>{say("about-this-instrument.1", "About this instrument")}</h2>
     <Prose html={aboutHtml} />
   </section>
 )}
 
 {faq.length > 0 && (
   <section class="tool-faq">
-    <h2>Questions</h2>
+    <h2>{say("questions.1", "Questions")}</h2>
     <dl>
       {faq.map((f, i) => (
         <div class="qa">

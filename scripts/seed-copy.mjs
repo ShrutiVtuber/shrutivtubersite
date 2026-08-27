@@ -1,6 +1,6 @@
 /* Register every editable string with the admin.
  *
- * Reads the `t("key", "default")` calls back out of the page sources, so the
+ * Reads the `say("key", "default")` calls back out of the page sources, so the
  * template stays the single place a string is declared. Nothing here decides
  * what a string SAYS — it only tells the admin which strings exist, what to
  * call them, and what the page was written with.
@@ -15,7 +15,7 @@
 import fs from "node:fs";
 import path from "node:path";
 
-const ROOT = path.resolve(process.argv[2] ?? "frontend/site/src/pages");
+const ROOT = path.resolve(process.argv[2] ?? "frontend/site/src");
 const BASE = process.env.BASE ?? "http://127.0.0.1:8200";
 const COOKIE = process.env.ADMIN_COOKIE ?? "";
 
@@ -23,13 +23,15 @@ const COOKIE = process.env.ADMIN_COOKIE ?? "";
    Deliberately NOT a general expression parser: a default that is not a plain
    literal cannot be seeded, and should not be — a string assembled at runtime
    is not a string somebody can edit. */
-const CALL = /\bt\(\s*(["'`])([^"'`]+?)\1\s*,\s*(["'`])([\s\S]*?)\3\s*(?:,\s*(["'`])([^"'`]*?)\5\s*)?\)/g;
+const CALL = /\bsay\(\s*(["'`])([^"'`]+?)\1\s*,\s*(["'`])([\s\S]*?)\3\s*(?:,\s*(["'`])([^"'`]*?)\5\s*)?\)/g;
 
-function pageNameFor(file) {
-  let rel = path.relative(ROOT, file).replace(/\.astro$/, "");
-  if (rel.endsWith("/index")) rel = rel.slice(0, -"/index".length);
-  if (rel === "index") rel = "home";
-  return rel;
+/* The file DECLARES its own namespace — `copy("support")`, or
+   `copy("component:SubscribeBlock")` for something shared across pages. Read
+   it back rather than deriving it from the path: the path can be moved and the
+   declaration cannot drift from what the page actually asks for at runtime. */
+function pageNameFor(src) {
+  const m = src.match(/copy\(\s*["'`]([^"'`]+)["'`]\s*\)/);
+  return m ? m[1] : null;
 }
 
 function walk(dir) {
@@ -37,7 +39,9 @@ function walk(dir) {
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
     const p = path.join(dir, e.name);
     if (e.isDirectory()) {
-      if (e.name === "admin") continue;
+      /* The admin edits copy; it does not have copy of its own to edit.
+         Overlays render beside the encoder and must not wait on a fetch. */
+      if (e.name === "admin" || e.name === "overlay" || e.name === "styles") continue;
       out.push(...walk(p));
     } else if (e.name.endsWith(".astro")) out.push(p);
   }
@@ -83,7 +87,12 @@ for (const file of walk(ROOT)) {
   }
   if (items.length === 0) continue;
 
-  const page = pageNameFor(file);
+  const page = pageNameFor(src);
+  if (!page) {
+    console.error(`  ${path.relative(ROOT, file)}: uses t() but never calls copy() — skipped`);
+    process.exitCode = 1;
+    continue;
+  }
   const r = await fetch(`${BASE}/api/admin/copy/seed`, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...(COOKIE ? { Cookie: COOKIE } : {}) },

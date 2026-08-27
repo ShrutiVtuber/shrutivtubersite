@@ -13,6 +13,12 @@
 import CsrfField from "../forms/CsrfField.astro";
 import Button from "../forms/Button.astro";
 import { CONSENTS } from "../../lib/consents";
+import { copy } from "../../lib/copy";
+
+/* Every word here, editable from the admin. The defaults below are what
+   it was written with and what still renders if nothing was changed. */
+const say = await copy("component:SubscribeBlock");
+
 
 interface Props {
   state?: "idle" | "sent";
@@ -28,25 +34,21 @@ const spec = CONSENTS.find((c) => c.kind === "newsletter")!;
   {
     state === "sent" ? (
       <div class="sent">
-        <p class="t-eyebrow">Check your email</p>
-        <h3>Almost — confirm it</h3>
+        <p class="t-eyebrow">{say("text.1", "Check your email")}</p>
+        <h2 class="sb-head">{say("almost-confirm-it.1", "Almost — confirm it")}</h2>
         <p class="body">
           Sent to <strong>{email}</strong>. Click the link in it and you are on the list.
-          <strong> Nothing is sent to an unconfirmed address</strong>, so if you do not confirm,
+          <strong>{say("almost-confirm-it.2", "Nothing is sent to an unconfirmed address")}</strong>, so if you do not confirm,
           nothing arrives — which is how it should work.
         </p>
-        <p class="body quiet">Not there? It sometimes lands in spam.</p>
+        <p class="body quiet">{say("almost-confirm-it.3", "Not there? It sometimes lands in spam.")}</p>
       </div>
     ) : (
       <form method="POST" class="form">
         <CsrfField />
         <input type="hidden" name="action" value="subscribe" />
-        <h3>The monthly letter</h3>
-        <p class="body">
-          One a month: your horoscope if you have a saved nativity, the videos and streams since
-          last time, notes on what was written — and a letter, which is the part people actually
-          subscribe for.
-        </p>
+        <h2 class="sb-head">{say("the-monthly-letter.1", "The monthly letter")}</h2>
+        <p class="body">{say("the-monthly-letter.2", "One a month: your horoscope if you have a saved nativity, the videos and streams since last time, notes on what was written — and a letter, which is the part people actually subscribe for.")}</p>
         <label class="field">
           <span class="lbl">Email</span>
           <input type="email" name="email" value={email} required placeholder="you@example.com" autocomplete="email" />
@@ -56,18 +58,19 @@ const spec = CONSENTS.find((c) => c.kind === "newsletter")!;
           <input type="checkbox" name="consent" value="1" />
           <span>{spec.wording}</span>
         </label>
-        <div><Button type="submit">Send me the letter</Button></div>
-        <p class="body quiet">
-          One click to unsubscribe from any issue, no login. No tracking pixel — the emails carry
-          no open-tracking image, and there is nothing to consent to because the analytics here use
-          no cookies.
-        </p>
+        <div><Button type="submit">{say("the-monthly-letter.3", "Send me the letter")}</Button></div>
+        <p class="body quiet">{say("the-monthly-letter.4", "One click to unsubscribe from any issue, no login. No tracking pixel — the emails carry no open-tracking image, and there is nothing to consent to because the analytics here use no cookies.")}</p>
       </form>
     )
   }
 </section>
 
 <style>
+  /* h2, not h3. On /newsletter this block follows the page's h1 with nothing
+     between, so h3 skipped a level. The class carries the size so the tag
+     could be corrected without the design moving. */
+  .sb-head { font: 600 var(--text-h4) var(--font-display); color: var(--ink); margin: 0 0 8px; }
+
   .subscribe {
     background: var(--surface-card); border: var(--border-w) solid var(--line);
     border-radius: var(--radius-md); box-shadow: var(--shadow-1); padding: var(--space-5);

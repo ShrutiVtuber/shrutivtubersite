@@ -12,6 +12,12 @@
  * posts to renders the result.
  */
 import CsrfField from "../forms/CsrfField.astro";
+import { copy } from "../../lib/copy";
+
+/* Every word here, editable from the admin. The defaults below are what
+   it was written with and what still renders if nothing was changed. */
+const say = await copy("component:PollCard");
+
 
 interface Option { id: number; label: string; votes: number; share: number }
 interface Poll {
@@ -61,8 +67,8 @@ const shown = (share: number) => (voted || poll.closed ? share : 0);
 
   <p class="p-foot">
     <span data-poll-total>{poll.total}</span>{poll.total === 1 ? " answer" : " answers"}
-    {voted && !poll.closed && <span> · yours is counted, and you can change it</span>}
-    {!voted && !poll.closed && <span> · no account needed</span>}
+    {voted && !poll.closed && <span>{say("text.1", "· yours is counted, and you can change it")}</span>}
+    {!voted && !poll.closed && <span>{say("text.2", "· no account needed")}</span>}
   </p>
 </section>
 

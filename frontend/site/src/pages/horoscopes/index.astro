@@ -20,7 +20,7 @@ import { sunSign } from "../../lib/signs";
 import Copy from "../../components/content/Copy.astro";
 import { copy } from "../../lib/copy";
 
-const t = await copy("horoscopes");
+const say = await copy("horoscopes");
 
 
 const period = Astro.url.searchParams.get("period") ?? "monthly";
@@ -44,11 +44,11 @@ const anyPublished = readings.some((r) => r.published);
 const NAME = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 ---
 
-<BaseLayout title="Horoscopes — Shruti" description="Twelve readings a month, one per sign, written by hand from a real ephemeris rather than generated. This month's, and the archive of every one before it.">
+<BaseLayout title={say("text.2", "Horoscopes — Shruti")} description={say("text.3", "Twelve readings a month, one per sign, written by hand from a real ephemeris rather than generated. This month's, and the archive of every one before it.")}>
   <div class="page horoscopes">
     <SectionHeader
       as="h1" glyph="☾" eyebrow="Horoscopes" title={data?.covers && data.covers !== new Date().toISOString().slice(0, 7) ? data.covers : "This month"}
-      body="Twelve a month, one per sign, written by hand."
+      body={say("text.4", "Twelve a month, one per sign, written by hand.")}
     />
 
     <div class="controls">
@@ -57,7 +57,7 @@ const NAME = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
         current={period}
         hrefFor={(p) => `/horoscopes?period=${p}`}
       />
-      <a class="archive-link" href="/horoscopes/archive">Past readings →</a>
+      <a class="archive-link" href="/horoscopes/archive">{say("text.7", "Past readings →")}</a>
     </div>
 
     {
@@ -66,13 +66,13 @@ const NAME = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
           <p class="t-eyebrow">Your sign</p>
           <h2>{NAME(yours)}</h2>
           <Prose html={yourHtml} byline="Soror Eu. A." />
-          <div><Button variant="secondary" href={`/horoscopes/${yours}/${period}${covers ? `?covers=${covers}` : ""}`}>Open the reading</Button></div>
+          <div><Button variant="secondary" href={`/horoscopes/${yours}/${period}${covers ? `?covers=${covers}` : ""}`}>{say("text.8", "Open the reading")}</Button></div>
         </section>
       )
     }
     {
       !me && (
-        <p class="invite"><Copy text={t("text.1", "With a saved nativity your own sign appears here first, without picking it. [Make an account](/signup) — everything else on this page works without one.")} /></p>
+        <p class="invite"><Copy text={say("text.1", "With a saved nativity your own sign appears here first, without picking it. [Make an account](/signup) — everything else on this page works without one.")} /></p>
       )
     }
 
@@ -86,8 +86,8 @@ const NAME = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
       ) : (
         <EmptyState
           glyph="○"
-          title="Nothing written for this month yet"
-          body="Twelve readings go up together — an empty reading is worse than a late one, so none appear until all twelve exist."
+          title={say("text.5", "Nothing written for this month yet")}
+          body={say("text.6", "Twelve readings go up together — an empty reading is worse than a late one, so none appear until all twelve exist.")}
         />
       )
     }

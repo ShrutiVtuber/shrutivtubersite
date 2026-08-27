@@ -1,4 +1,10 @@
 ---
+import { copy } from "../../lib/copy";
+
+/* Every word here, editable from the admin. The defaults below are what
+   it was written with and what still renders if nothing was changed. */
+const say = await copy("component:JournalSky");
+
 /* The sky a journal entry was written under.
  *
  * Theourgia's rule, kept: this is the MACHINE'S HALF of the record. It is
@@ -39,7 +45,7 @@ const deg = (d: number | undefined) => (d == null ? "" : `${d.toFixed(1)}°`);
     sky?.summary ? <span class="sky-line">{sky.summary}</span> : null
   ) : !sky ? null : (
     <aside class="sky-panel">
-      <p class="t-eyebrow">Written under</p>
+      <p class="t-eyebrow">{say("text.1", "Written under")}</p>
       {
         sky.failureReason ? (
           /* Never a blank. The reason is the record. */

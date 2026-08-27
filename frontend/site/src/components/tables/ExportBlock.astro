@@ -1,4 +1,10 @@
 ---
+import { copy } from "../../lib/copy";
+
+/* Every word here, editable from the admin. The defaults below are what
+   it was written with and what still renders if nothing was changed. */
+const say = await copy("component:ExportBlock");
+
 /* Ported from `components/tables/ExportBlock.jsx`; contract in
  * `ExportBlock.d.ts`.
  *
@@ -30,20 +36,17 @@ const {
 ---
 
 <section class="export-block">
-  <p class="t-eyebrow">Take it with you</p>
+  <p class="t-eyebrow">{say("text.1", "Take it with you")}</p>
 
   <div class="eb-feed">
     <div class="eb-feed-head">
-      <h2 class="eb-head">Subscribe to the feed</h2>
-      <span class="eb-tag">stays correct · notifies</span>
+      <h2 class="eb-head">{say("subscribe-to-the-feed.1", "Subscribe to the feed")}</h2>
+      <span class="eb-tag">{say("subscribe-to-the-feed.2", "stays correct · notifies")}</span>
     </div>
-    <p class="eb-body">
-      Your calendar re-reads this as the year turns, so the times keep matching the sky and your
-      reminders keep arriving. This is the one that becomes a habit.
-    </p>
+    <p class="eb-body">{say("subscribe-to-the-feed.3", "Your calendar re-reads this as the year turns, so the times keep matching the sky and your reminders keep arriving. This is the one that becomes a habit.")}</p>
     <div class="eb-actions">
-      <a class="eb-primary" href={feedHref}>Subscribe in my calendar</a>
-      <button type="button" class="eb-secondary" data-copy={feedHref}>Copy feed URL</button>
+      <a class="eb-primary" href={feedHref}>{say("subscribe-to-the-feed.4", "Subscribe in my calendar")}</a>
+      <button type="button" class="eb-secondary" data-copy={feedHref}>{say("subscribe-to-the-feed.5", "Copy feed URL")}</button>
     </div>
     <code class="eb-url">{feedHref}</code>
     {meta && <span class="eb-meta">{meta}</span>}
@@ -51,21 +54,21 @@ const {
 
   <div class="eb-rest">
     <div class="eb-col">
-      <h2 class="eb-sub">Download a snapshot</h2>
+      <h2 class="eb-sub">{say("download-a-snapshot.1", "Download a snapshot")}</h2>
       <p class="eb-body">
         A fixed <code class="eb-inline">.ics</code> file of the range shown. It does not update —
-        <strong>it will go stale</strong>, so take it only if you want exactly these dates and
+        <strong>{say("download-a-snapshot.2", "it will go stale")}</strong>, so take it only if you want exactly these dates and
         nothing more.
       </p>
-      <div><a class="eb-secondary" href={fileHref} download={fileName}>Download .ics</a></div>
+      <div><a class="eb-secondary" href={fileHref} download={fileName}>{say("download-a-snapshot.3", "Download .ics")}</a></div>
       {fileScope && <span class="t-tabular eb-meta">{fileScope}</span>}
     </div>
 
     {
       googleLinks.length > 0 && (
         <div class="eb-col">
-          <h2 class="eb-sub">Add one station to Google</h2>
-          <p class="eb-body">A single event for a single station, if you only keep one of the four.</p>
+          <h2 class="eb-sub">{say("add-one-station-to-googl.1", "Add one station to Google")}</h2>
+          <p class="eb-body">{say("add-one-station-to-googl.2", "A single event for a single station, if you only keep one of the four.")}</p>
           <div class="eb-pills">
             {googleLinks.map((g) => (
               <a class="eb-pill" href={g.href}>
