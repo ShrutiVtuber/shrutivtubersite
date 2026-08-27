@@ -46,7 +46,7 @@ let failed = "";
 if (Astro.request.method === "POST") {
   const form = await Astro.request.formData();
   if (!verifyCsrf(Astro.cookies, form)) {
-    failed = "That did not save. Reload and try again.";
+    failed = say("error.save2", "That did not save. Reload and try again.");
   } else {
     const r = await fetch(
       `${SITE_API}/api/classes/${slug}/lessons/${lessonId}/progress`,
@@ -66,7 +66,7 @@ if (Astro.request.method === "POST") {
       );
     }
     const body = await r.json().catch(() => null);
-    failed = body?.detail ?? "That did not save.";
+    failed = body?.detail ?? say("error.save", "That did not save.");
   }
 }
 

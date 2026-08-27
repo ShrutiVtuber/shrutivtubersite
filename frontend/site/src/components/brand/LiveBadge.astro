@@ -38,7 +38,7 @@ const word = status === "live" ? "Live" : status === "offline" ? "Offline" : "St
    was showing all along; the status role moves inside.
 
    No aria-label: one was tried and it made things worse. The hero badge shows
-   more than the word — "Offline · streams announced on Discord" — and a label
+   more than the word — say("text.offline.streams.announced", "Offline · streams announced on Discord") — and a label
    that does not contain every visible word is its own failure, because a voice
    user saying what they can see then cannot activate it. */
 const linked = Boolean(href);

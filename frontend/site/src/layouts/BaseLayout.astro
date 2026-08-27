@@ -41,7 +41,7 @@ interface Props {
   /**
    * Page-specific structured data, already shaped.
    *
-   * The home page's Person/WebSite is built below and is the site's identity;
+   * The home pagesay("text.person.website.built", 's Person/WebSite is built below and is the site')s identity;
    * this is for what a particular page IS — an instrument, a product, a class.
    * Passed in rather than inferred, because guessing a type from a URL is how
    * a shop page ends up claiming to be a course.
@@ -88,8 +88,8 @@ const homeLd = isHome
           url: siteUrl,
           name: "Shruti",
           description:
-            "Instruments for magickal and astrological practice — an ephemeris, " +
-            "four calendars, planetary hours and letter-reckoning.",
+            say("text.instruments.magickal.astrological", "Instruments for magickal and astrological practice — an ephemeris, ") +
+            say("text.four.calendars.planetary", "four calendars, planetary hours and letter-reckoning."),
           inLanguage: "en",
           publisher: { "@id": `${siteUrl}/#person` },
         },
@@ -100,8 +100,8 @@ const homeLd = isHome
           alternateName: "Soror Eu. A.",
           url: siteUrl,
           description:
-            "VTuber and engineer building open-source instruments for magickal " +
-            "and astrological practice, live on stream.",
+            say("text.vtuber.engineer.building", "VTuber and engineer building open-source instruments for magickal ") +
+            say("text.astrological.practice.live", "and astrological practice, live on stream."),
           /* The links the admin has marked visible, and no others. A sameAs
              pointing at a profile she has hidden would out it. */
           sameAs: socials.map((l) => l.href).filter(Boolean),

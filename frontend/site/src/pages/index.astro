@@ -56,7 +56,7 @@ const [live, links, projects, horoscopes] = await Promise.all([
 /* The two projects that lead the page.
  *
  * Chosen in the admin rather than taken from the top of the portfolio, because
- * "what should a stranger meet first" and "what order does the portfolio run
+ * say("text.what.should.stranger", "what should a stranger meet first") and "what order does the portfolio run
  * in" are different questions — and tying them together meant reordering all
  * of /work to change the front door.
  *
@@ -134,7 +134,7 @@ const openPoll = ((await site<any[]>("/api/community/polls/open")) ?? [])
    mean putting a card on /tools that leaves /tools. */
 const TODAY = {
   glyph: "☾", name: "Day at a glance", href: "/today", wide: true,
-  answers: "What the sky is doing right now, where you are — luminaries, stations, the planetary hour, and today in four reckonings.",
+  answers: say("text.what.doing.right", "What the sky is doing right now, where you are — luminaries, stations, the planetary hour, and today in four reckonings."),
 };
 const INSTRUMENTS = [
   TODAY,

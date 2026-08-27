@@ -8,7 +8,7 @@
  *
  * It is an Astro page rather than a static file for one reason: she needs to
  * toggle it from the admin and to bypass it while signed in. A file on disk
- * can do neither. That is not "rebuilding it in a framework" — there is no
+ * can do neither. That is not say("text.rebuilding.framework", "rebuilding it in a framework") — there is no
  * component tree, no client bundle and no CSS pipeline here; the page ships
  * the same bytes it was given, with real values substituted.
  *
@@ -40,7 +40,7 @@ let failed = "";
 if (Astro.request.method === "POST") {
   const form = await Astro.request.formData();
   if (!verifyCsrf(Astro.cookies, form)) {
-    failed = "That did not send. Reload the page and try again.";
+    failed = say("error.csrf", "That did not send. Reload the page and try again.");
   } else {
     try {
       const r = await fetch(`${SITE_API}/api/newsletter/subscribe`, {
@@ -54,9 +54,9 @@ if (Astro.request.method === "POST") {
         }),
       });
       if (r.ok) sent = true;
-      else failed = (await r.json().catch(() => null))?.detail ?? "That did not work.";
+      else failed = (await r.json().catch(() => null))?.detail ?? say("error.failed2", "That did not work.");
     } catch {
-      failed = "That did not work.";
+      failed = say("error.failed", "That did not work.");
     }
   }
 }
@@ -183,12 +183,12 @@ const say = await copy("coming-soon");
 
 const csrf = Astro.locals.csrf;
 const consentDefault =
-  "One letter a month: what shipped, what the sky is doing, and the occasional paid thing. " +
-  "You will get a confirmation email first and are not subscribed until you click it. " +
-  "Leave in one click, any time.";
+  /* One string, not three joined. Split across concatenations she can only
+     rewrite a third of a sentence at a time, and the joins are invisible in
+     the admin. */
+  say("optin.text", "One letter a month: what shipped, what the sky is doing, and the occasional paid thing. You will get a confirmation email first and are not subscribed until you click it. Leave in one click, any time.");
 const consentSent =
-  "A confirmation link is on its way. The subscription only begins once you click it — " +
-  "nothing is added to a list before then.";
+  say("optin.sent", "A confirmation link is on its way. The subscription only begins once you click it — nothing is added to a list before then.");
 ---
 
 <!doctype html>

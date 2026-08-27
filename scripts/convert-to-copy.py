@@ -46,9 +46,20 @@ def esc(s):
     return " ".join(s.replace("\\", "\\\\").replace('"', '\\"').split())
 
 def is_prose(t):
+    """
+    A sentence, not code that happens to sit between two string literals.
+
+    The tighter checks are here because a naive scan matched from the closing
+    quote of one literal, across `: await renderMarkdown(x ?? `, into the
+    opening quote of the next — and produced a "string" that was really a
+    line of code with quotes at both ends.
+    """
     t = t.strip()
     if len(t) < 12 or len(t.split()) < 2: return False
     if re.search(r"[{}<>=;]|=>|\breturn\b", t): return False
+    # Brackets are allowed ONLY as a markdown link — [text](/href).
+    stripped = re.sub(r"\[[^\]]+\]\([^)\s]+\)", "", t)
+    if re.search(r"[()\[\]]|\?\?|\bawait\b", stripped): return False
     if not re.search(r"[a-z]{3}", t): return False
     return sum(c.isalpha() or c.isspace() for c in t) / len(t) > 0.7
 

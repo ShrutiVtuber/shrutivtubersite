@@ -3,7 +3,7 @@
  *
  * Counterfeit VTuber merch stores are not one-offs, they are networks: two of
  * them share the same four nameservers and one operator, one carries
- * "OFFICIAL" in its page title while its own body says "Fan", and one
+ * "OFFICIALsay("text.page.title.while", " in its page title while its own body says ")Fan", and one
  * misspells the creator's name. A creator cannot get those down quickly. What
  * they can do is own the page that says which ones are real — on a domain they
  * control, which is the thing they can point at.
@@ -34,10 +34,10 @@ const sections = await pageSections("official");
 
 /* Grouped in the order somebody checking a suspicious link would look. */
 const GROUPS: [string, string, string][] = [
-  ["shop", "Shops", "Anywhere you can buy something from her."],
-  ["membership", "Memberships and support", "Where money reaches her directly."],
-  ["community", "Community", "Where she actually talks to people."],
-  ["social", "Profiles", "The accounts that are her."],
+  ["shop", "Shops", say("text.anywhere.something.from", "Anywhere you can buy something from her.")],
+  ["membership", "Memberships and support", say("text.where.money.reaches", "Where money reaches her directly.")],
+  ["community", "Community", say("text.where.actually.talks", "Where she actually talks to people.")],
+  ["social", "Profiles", say("text.accounts.that", "The accounts that are her.")],
   ["other", "Everything else", ""],
 ];
 const present = GROUPS.filter(([k]) => places.some((p) => p.kind === k));

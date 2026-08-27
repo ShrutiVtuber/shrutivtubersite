@@ -46,17 +46,17 @@ const askValues = { body: "", askedBy: "" };
 if (Astro.request.method === "POST" && String((await Astro.request.clone().formData()).get("form") ?? "") === "question") {
   const form = await Astro.request.formData();
   if (!verifyCsrf(Astro.cookies, form)) {
-    askFailed = "That did not send. Reload the page and try again.";
+    askFailed = say("error.csrf", "That did not send. Reload the page and try again.");
   }
   askValues.body = String(form.get("body") ?? "");
   askValues.askedBy = String(form.get("asked_by") ?? "");
   const honeypot = String(form.get("website") ?? "");
 
   if (!askFailed && askValues.body.trim().length < 3) {
-    askErrors.body = "A question needs a few words at least.";
+    askErrors.body = say("error.short", "A question needs a few words at least.");
   }
   if (!askFailed && askValues.body.trim().length > 1000) {
-    askErrors.body = "That is longer than the box takes — a thousand characters.";
+    askErrors.body = say("error.long", "That is longer than the box takes — a thousand characters.");
   }
 
   if (!askFailed && Object.keys(askErrors).length === 0) {
@@ -71,9 +71,9 @@ if (Astro.request.method === "POST" && String((await Astro.request.clone().formD
         }),
       });
       if (response.ok) asked = true;
-      else askFailed = "That did not send. Try the address above instead.";
+      else askFailed = say("error.failed", "That did not send. Try the address above instead.");
     } catch {
-      askFailed = "That did not send. Try the address above instead.";
+      askFailed = say("error.send3", "That did not send. Try the address above instead.");
     }
   }
 } else if (Astro.request.method === "POST") {
@@ -82,7 +82,7 @@ if (Astro.request.method === "POST" && String((await Astro.request.clone().formD
   /* Rejected before anything is read out of the form. A submission without a
      matching token is not a user with a typo, it is a cross-site post. */
   if (!verifyCsrf(Astro.cookies, form)) {
-    failed = "That did not send. Reload the page and try again.";
+    failed = say("error.retry", "That did not send. Reload the page and try again.");
   }
   values.topic = String(form.get("topic") ?? "");
   values.name = String(form.get("name") ?? "");
@@ -92,10 +92,10 @@ if (Astro.request.method === "POST" && String((await Astro.request.clone().formD
 
   /* Error copy is the design's, verbatim — the wording is part of the design. */
   if (!failed) {
-  if (!values.topic) errors.topic = "Pick a route so this lands in the right inbox.";
-  if (!values.name.trim()) errors.name = "Please add a name — a handle is fine.";
-  if (!/^\S+@\S+\.\S+$/.test(values.email)) errors.email = "That address doesn’t look complete.";
-  if (values.msg.trim().length < 10) errors.msg = "A sentence or two helps me reply well.";
+  if (!values.topic) errors.topic = say("error.route", "Pick a route so this lands in the right inbox.");
+  if (!values.name.trim()) errors.name = say("error.name", "Please add a name — a handle is fine.");
+  if (!/^\S+@\S+\.\S+$/.test(values.email)) errors.email = say("error.email", "That address doesn’t look complete.");
+  if (values.msg.trim().length < 10) errors.msg = say("error.body", "A sentence or two helps me reply well.");
   }
 
   if (!failed && Object.keys(errors).length === 0) {
@@ -113,9 +113,9 @@ if (Astro.request.method === "POST" && String((await Astro.request.clone().formD
         }),
       });
       if (response.ok) sent = true;
-      else failed = "That did not send. The address above works, and always will.";
+      else failed = say("error.send", "That did not send. The address above works, and always will.");
     } catch {
-      failed = "That did not send. The address above works, and always will.";
+      failed = say("error.send2", "That did not send. The address above works, and always will.");
     }
   }
 }

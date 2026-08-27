@@ -1,5 +1,6 @@
 ---
 import { copy } from "../../lib/copy";
+import Copy from "../content/Copy.astro";
 
 /* Every word here, editable from the admin. The defaults below are what
    it was written with and what still renders if nothing was changed. */
@@ -29,14 +30,12 @@ const say = await copy("component:CookieNotice");
 ---
 
 <div class="cookie-notice" data-cookie-notice hidden>
+  {/* One string with the links inline, so the whole notice can be rewritten
+      without arriving in five pieces around two anchors. */}
   <p>
-    This site sets only the cookies it needs to work — a sign-in session and a
-    form-security token. No advertising and no third parties. It counts its own pages without
-    a cookie and without knowing who you are, and you can
-    <a href="/privacy#counting">{say("text.1", "turn that off")}</a> or read
-    <a href="/privacy#cookies">{say("text.2", "what is set, and why")}</a>.
+    <Copy text={say("notice", "This site sets only the cookies it needs to work — a sign-in session and a form-security token. No advertising and no third parties. It counts its own pages without a cookie and without knowing who you are, and you can [turn that off](/privacy#counting) or read [what is set, and why](/privacy#cookies).")} />
   </p>
-  <button type="button" data-cookie-dismiss>Got it</button>
+  <button type="button" data-cookie-dismiss>{say("dismiss", "Got it")}</button>
 </div>
 
 <style>

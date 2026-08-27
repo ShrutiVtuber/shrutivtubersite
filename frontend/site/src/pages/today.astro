@@ -1,7 +1,7 @@
 ---
 /* Day at a Glance — ported from `ui_kits/site/Today.jsx`.
  *
- * "The page most likely to be someone's daily open." One screen answering:
+ * say("text.page.most.likely", "The page most likely to be someone's daily open.") One screen answering:
  * what is the sky doing right now, here.
  *
  * THE SIGNED-OUT STATE MATTERS MORE THAN THE SIGNED-IN ONE. Everything except
@@ -76,7 +76,7 @@ const noSunrise = sunToday.length > 0 && !sunToday.find((s) => s.name === "sunri
 
 const signedIn = !!reader;
 
-/* Grouped by the transiting body, because "what is the Moon doing to me"
+/* Grouped by the transiting body, because say("text.what.moon.doing", "what is the Moon doing to me")
    is the question somebody actually has — a flat list of forty-five lines
    sorted by nothing is data rather than an answer. */
 const crossings: { from: string; to: string; aspect: string; separationSigns?: number }[] =

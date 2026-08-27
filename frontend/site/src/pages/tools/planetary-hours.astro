@@ -64,8 +64,8 @@ const hhmm = (iso: string | null) =>
   iso ? new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "UTC" }).format(new Date(iso)) : "—";
 
 const RULE_NAME: Record<string, string> = {
-  visible_disc: "Hellenistic — upper limb, with refraction",
-  hindu: "Vedic — centre of the disc, no refraction",
+  visible_disc: say("text.hellenistic.upper.limb", "Hellenistic — upper limb, with refraction"),
+  hindu: say("text.vedic.centre.disc", "Vedic — centre of the disc, no refraction"),
 };
 const riseFor = (c: string) =>
   c === convention ? data?.sunrise ?? null : otherData?.sunrise ?? null;

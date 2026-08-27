@@ -20,12 +20,12 @@ if (token) {
     const response = await fetch(`${SITE_API}/api/account/link?token=${encodeURIComponent(token)}`);
     if (response.ok) return redirectWithCookies("/account", response);
     const body = await response.json().catch(() => null);
-    failed = body?.detail ?? "That link did not work.";
+    failed = body?.detail ?? say("error.failed2", "That link did not work.");
   } catch {
-    failed = "That link did not work.";
+    failed = say("error.failed", "That link did not work.");
   }
 } else {
-  failed = "That link is missing its token.";
+  failed = say("error.token", "That link is missing its token.");
 }
 ---
 

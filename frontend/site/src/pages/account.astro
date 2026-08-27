@@ -19,6 +19,7 @@ import PasskeyList, { type PasskeyRow } from "../components/auth/PasskeyList.ast
 import { account, asReader } from "../lib/account";
 import { verifyCsrf } from "../lib/csrf";
 import { copy } from "../lib/copy";
+import Copy from "../components/content/Copy.astro";
 
 /* Every word on this page, editable from the admin. The defaults below are
    what it was written with and what still renders if nothing was changed. */
@@ -31,7 +32,7 @@ let failed = "";
 if (Astro.request.method === "POST") {
   const form = await Astro.request.formData();
   if (!verifyCsrf(Astro.cookies, form)) {
-    failed = "That did not save. Reload the page and try again.";
+    failed = say("error.csrf", "That did not save. Reload the page and try again.");
   } else {
     const action = String(form.get("action") ?? "");
 
@@ -62,10 +63,10 @@ if (Astro.request.method === "POST") {
       });
       if (r.ok) {
         notice = r.body?.nativityDeleted
-          ? "Consent withdrawn, and the saved nativity was deleted with it."
+          ? say("notice.withdrawn", "Consent withdrawn, and the saved nativity was deleted with it.")
           : "Consent updated.";
       } else {
-        failed = r.body?.detail ?? "That did not change.";
+        failed = r.body?.detail ?? say("error.nochange", "That did not change.");
       }
     }
 
@@ -75,7 +76,7 @@ if (Astro.request.method === "POST") {
          card details would have to pass through this server to do it. */
       const r = await asReader(Astro, "/api/billing/portal", { method: "POST" });
       if (r.ok && r.body?.url) return Astro.redirect(r.body.url, 303);
-      failed = r.body?.detail ?? "That could not be opened. Try again in a moment.";
+      failed = r.body?.detail ?? say("error.portal", "That could not be opened. Try again in a moment.");
     }
 
     if (action === "signout") {
@@ -95,7 +96,7 @@ if (Astro.request.method === "POST") {
         Astro.cookies.delete("shruti_reader", { path: "/" });
         return Astro.redirect("/account/deleted");
       }
-      failed = r.body?.detail ?? "That did not delete.";
+      failed = r.body?.detail ?? say("error.delete", "That did not delete.");
     }
   }
 }
@@ -130,7 +131,7 @@ const TIER_NAMES: Record<string, string> = {
   almanac: "Almanac",
 };
 const TRADITIONS = [
-  { value: "", label: "No preference — show both" },
+  { value: "", label: say("pref.both", "No preference — show both") },
   { value: "hellenistic", label: "Hellenistic" },
   { value: "vedic", label: "Vedic" },
 ];
@@ -294,10 +295,7 @@ const TRADITIONS = [
     <section class="card">
       <h2>{say("passkeys.1", "Passkeys")}</h2>
       <p class="quiet">
-        A passkey signs you in with Face ID, a fingerprint or your phone's PIN instead of a
-        password. It is a keypair that lives on your device — <strong>{say("passkeys.2", "Apple and Google are told nothing")}</strong>, no request reaches them, and this site never learns anything about you
-        from them. That is why there is no &ldquo;Sign in with Google&rdquo; button here and
-        there never will be: the convenience of one, without the third party.
+        <Copy text={say("passkeys.body", "A passkey signs you in with Face ID, a fingerprint or your phone's PIN instead of a password. It is a keypair that lives on your device — **Apple and Google are told nothing**, no request reaches them, and this site never learns anything about you from them. That is why there is no “Sign in with Google” button here and there never will be: the convenience of one, without the third party.")} />
       </p>
       <PasskeyList passkeys={passkeys} />
     </section>
@@ -344,7 +342,7 @@ const TRADITIONS = [
           <h3>{say("what-is-kept-and-why.1", "What is kept, and why")}</h3>
           <ul>
             <li>
-              A record that consent was given and withdrawn, with dates and <strong>{say("what-is-kept-and-why.2", "no birth data")}</strong> — that record is the proof the law asks for, and it no longer names you.
+              <Copy text={say("kept.consent", "A record that consent was given and withdrawn, with dates and **no birth data** — that record is the proof the law asks for, and it no longer names you.")} />
             </li>
             <li>{say("what-is-kept-and-why.3", "Invoices, for as long as tax law requires. There are none yet.")}</li>
           </ul>

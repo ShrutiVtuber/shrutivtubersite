@@ -70,16 +70,16 @@ if (Astro.request.method === "POST") {
   name = String(form.get("label") ?? "").trim();
 
   if (!verifyCsrf(Astro.cookies, form)) {
-    errors = ["That did not go through. Reload the page and try again."];
+    errors = [say("error.csrf", "That did not go through. Reload the page and try again.")];
   } else {
     /* Server-side validation with the same messages the design gives the
        client, because the client's copy is not the one that has to be right. */
     const date = String(form.get("date") ?? "");
     const place = String(form.get("place") ?? "");
-    if (!date) errors.push("A birth date is needed — without it there is no chart to cast.");
-    if (!place) errors.push("A birth place is needed. Start typing a city and pick one from the list.");
+    if (!date) errors.push(say("error.date", "A birth date is needed — without it there is no chart to cast."));
+    if (!place) errors.push(say("error.place", "A birth place is needed. Start typing a city and pick one from the list."));
     if (!signedIn && form.get("consent") !== "1") {
-      errors.push("The consent below has to be ticked before a chart can be kept.");
+      errors.push(say("error.consent", "The consent below has to be ticked before a chart can be kept."));
     }
 
     if (errors.length === 0) {
@@ -98,7 +98,7 @@ if (Astro.request.method === "POST") {
         }),
       });
       if (r.ok && r.body?.shareToken) made = r.body;
-      else errors.push(r.body?.detail ?? "That did not work. Nothing has been kept.");
+      else errors.push(r.body?.detail ?? say("error.failed", "That did not work. Nothing has been kept."));
     }
   }
 }
@@ -110,9 +110,10 @@ const inviteUrl = made ? `${SITE_URL}/chart/invite/${made.shareToken}` : "";
 const ownUrl = made ? `${SITE_URL}/chart/${made.ownerToken}` : "";
 const who = name || "Someone";
 
-const SUGGESTED =
-  "Two birth charts, five possible answers, no percentages anywhere. " +
-  "Compare with me and let's see which one we get ↓";
+/* The line offered when somebody shares the invite. One string, so she can
+   rewrite the whole pitch without it arriving in two halves. */
+const SUGGESTED = say("share.suggested",
+  "Two birth charts, five possible answers, no percentages anywhere. Compare with me and let's see which one we get ↓");
 
 /* The hero card. Rose horizon reads on a white timeline and a black one, which
    is why the designer chose it — but the row is data, so fall back rather than
@@ -128,38 +129,38 @@ const heroDesign = designs.find((d: any) => d.key === "rose-horizon") ?? designs
  * graphic job — the rise across the row — without inventing a number. */
 const BANDS = [
   {
-    key: "contrary-to-sect", name: "Contrary to sect", share: 0.15,
-    range: "under 30% harmonious",
-    says: "Almost everything in contact is a hard aspect. The tradition would say the two charts are working against each other's grain.",
+    key: "contrary-to-sect", name: say("band.contrary-to-sect.name", "Contrary to sect"), share: 0.15,
+    range: say("band.contrary-to-sect.range", "under 30% harmonious"),
+    says: say("band.contrary-to-sect.says", "Almost everything in contact is a hard aspect. The tradition would say the two charts are working against each other's grain."),
   },
   {
-    key: "hard-going", name: "Hard going", share: 0.36,
-    range: "30–42% harmonious",
-    says: "Squares and oppositions carry most of the testimony. Not hostility — friction. The useful part is that friction is legible: you will be told exactly where it sits.",
+    key: "hard-going", name: say("band.hard-going.name", "Hard going"), share: 0.36,
+    range: say("band.hard-going.range", "30–42% harmonious"),
+    says: say("band.hard-going.says", "Squares and oppositions carry most of the testimony. Not hostility — friction. The useful part is that friction is legible: you will be told exactly where it sits."),
   },
   {
-    key: "mixed-testimony", name: "Mixed testimony", share: 0.5,
-    range: "42–58% harmonious",
-    says: "The witnesses disagree with each other. An astrologer counting this in a horary would say the question is not yet ripe — which is a real answer, and the most honest one here.",
+    key: "mixed-testimony", name: say("band.mixed-testimony.name", "Mixed testimony"), share: 0.5,
+    range: say("band.mixed-testimony.range", "42–58% harmonious"),
+    says: say("band.mixed-testimony.says", "The witnesses disagree with each other. An astrologer counting this in a horary would say the question is not yet ripe — which is a real answer, and the most honest one here."),
   },
   {
-    key: "well-aspected", name: "Well aspected", share: 0.64,
-    range: "58–70% harmonious",
-    says: "Trines and sextiles between the lights, and the malefics keeping out of it. The ordinary good case — and by some distance the most common one.",
+    key: "well-aspected", name: say("band.well-aspected.name", "Well aspected"), share: 0.64,
+    range: say("band.well-aspected.range", "58–70% harmonious"),
+    says: say("band.well-aspected.says", "Trines and sextiles between the lights, and the malefics keeping out of it. The ordinary good case — and by some distance the most common one."),
   },
   {
-    key: "same-sky", name: "Written in the same sky", share: 0.85,
-    range: "70%+ · and at least eight contacts",
-    says: "Overwhelmingly harmonious. It needs a real sample as well as a high share — two contacts that both happen to be trines is a small sample, not a verdict — so this band is genuinely uncommon.",
+    key: "same-sky", name: say("band.same-sky.name", "Written in the same sky"), share: 0.85,
+    range: say("band.same-sky.range", "70%+ · and at least eight contacts"),
+    says: say("band.same-sky.says", "Overwhelmingly harmonious. It needs a real sample as well as a high share — two contacts that both happen to be trines is a small sample, not a verdict — so this band is genuinely uncommon."),
   },
 ];
 
 const ALMANAC = [
-  ["Prediction", "none offered — nothing here says what will happen"],
-  ["Percentage", "never computed — a count, or nothing"],
-  ["Authorities", "disagreeing since Ptolemy — ours is one reading of many"],
-  ["Verdicts", "hand-written by me, not generated"],
-  ["Engine", "Swiss Ephemeris · AGPL · source on request"],
+  [say("almanac.prediction.label", "Prediction"), say("almanac.prediction.value", "none offered — nothing here says what will happen")],
+  [say("almanac.percentage.label", "Percentage"), say("almanac.percentage.value", "never computed — a count, or nothing")],
+  [say("almanac.authorities.label", "Authorities"), say("almanac.authorities.value", "disagreeing since Ptolemy — ours is one reading of many")],
+  ["Verdicts", say("text.hand.written.generated", "hand-written by me, not generated")],
+  ["Engine", say("text.swiss.ephemeris.agpl", "Swiss Ephemeris · AGPL · source on request")],
 ];
 ---
 
@@ -270,7 +271,7 @@ const ALMANAC = [
 
               <div class="cx-keep">
                 <p class="t-eyebrow cx-rose">
-                  <span class="t-glyph" aria-hidden="true">{SEALED}</span> Keep this one for yourself
+                  <span class="t-glyph" aria-hidden="true">{SEALED}</span> {say("keep.label", "Keep this one for yourself")}
                 </p>
                 <div class="cx-copyrow">
                   <input class="cx-code" type="text" readonly value={ownUrl}

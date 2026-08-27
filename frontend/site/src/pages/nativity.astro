@@ -3,7 +3,7 @@
  *
  * THREE THINGS ARE LOAD-BEARING:
  *
- *  - "I don't know my birth time" is a FIRST-CLASS CHOICE, not a validation
+ *  - say("text.know.birth.time", "I don't know my birth time") is a FIRST-CLASS CHOICE, not a validation
  *    error and not a warning triangle. When ticked, the cost is stated plainly.
  *  - Place is a search that resolves to coordinates AND a historical timezone,
  *    and the resolution is shown back. Greece's offset in 1996 is not a lookup
@@ -21,6 +21,7 @@ import { account, asReader } from "../lib/account";
 import { verifyCsrf } from "../lib/csrf";
 import { SITE_API } from "../lib/api";
 import { copy } from "../lib/copy";
+import Copy from "../components/content/Copy.astro";
 
 /* Every word on this page, editable from the admin. The defaults below are
    what it was written with and what still renders if nothing was changed. */
@@ -34,7 +35,7 @@ let offsetNote = "";
 if (Astro.request.method === "POST") {
   const form = await Astro.request.formData();
   if (!verifyCsrf(Astro.cookies, form)) {
-    failed = "That did not save. Reload the page and try again.";
+    failed = say("error.csrf", "That did not save. Reload the page and try again.");
   } else {
     const timeUnknown = form.get("time_unknown") === "1";
     const birthDate = String(form.get("birth_date") ?? "");
@@ -119,13 +120,10 @@ const n = me.nativity;
             {/* Not an error, not a warning. The cost, stated. */}
             <div class="cost">
               <p>
-                If you don't know it, that is a normal answer and the chart still works. What it
-                costs: the ascendant moves a degree every four minutes, so the
-                <strong>{say("this-needs-its-own-conse.5", "ascendant, midheaven, houses and sect become undefined")}</strong>.
+                <Copy text={say("cost.notime", "If you don't know it, that is a normal answer and the chart still works. What it costs: the ascendant moves a degree every four minutes, so the **ascendant, midheaven, houses and sect become undefined**.")} />
               </p>
               <p class="cost-lists">
-                <strong>{say("text.6", "You still get:")}</strong> every planet's sign and degree, their aspects by
-                sign, and the Moon given as the range it covers across the day.
+                <Copy text={say("cost.stillget", "**You still get:** every planet's sign and degree, their aspects by sign, and the Moon given as the range it covers across the day.")} />
                 <br />
                 <strong>{say("text.7", "You do not get:")}</strong> houses, angles, sect, or the lots that depend on
                 the ascendant. They are left undefined rather than guessed — a fabricated ascendant

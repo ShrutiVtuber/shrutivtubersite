@@ -42,7 +42,7 @@ let keepFailed = "";
 if (Astro.request.method === "POST") {
   const form = await Astro.request.formData();
   if (!verifyCsrf(Astro.cookies, form)) {
-    keepFailed = "That did not save. Reload the page and try again.";
+    keepFailed = say("error.retry", "That did not save. Reload the page and try again.");
   } else {
     const p = Astro.url.searchParams;
     const kept = await asReader(Astro, "/api/charts", {
@@ -68,8 +68,8 @@ if (Astro.request.method === "POST") {
       return Astro.redirect(`/chart/${kept.body.ownerToken}`, 303);
     }
     keepFailed = kept.status === 400
-      ? "A chart cannot be kept without agreeing to the birth data being stored."
-      : "That did not save. It is a failure on this side, not something you did.";
+      ? say("text.chart.cannot.kept", "A chart cannot be kept without agreeing to the birth data being stored.")
+      : say("error.save", "That did not save. It is a failure on this side, not something you did.");
   }
 }
 
@@ -176,8 +176,8 @@ const sunSign = (p: Payload) => {
   return s ? `Sun in ${signOf(s)}` : "—";
 };
 const ASPECT_BASIS: Record<string, string> = {
-  whole_sign: "sign-based, then by degree — aspects between non-aspecting signs are not listed however close the degrees",
-  drishti: "graha dṛṣṭi — whole-sign and asymmetric, by rule rather than by orb",
+  whole_sign: say("text.sign.based.then", "sign-based, then by degree — aspects between non-aspecting signs are not listed however close the degrees"),
+  drishti: say("text.graha.whole.sign", "graha dṛṣṭi — whole-sign and asymmetric, by rule rather than by orb"),
 };
 ---
 

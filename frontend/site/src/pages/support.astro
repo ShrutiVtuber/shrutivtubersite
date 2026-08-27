@@ -25,7 +25,7 @@ let failed = "";
 if (Astro.request.method === "POST") {
   const form = await Astro.request.formData();
   if (!verifyCsrf(Astro.cookies, form)) {
-    failed = "That did not start. Reload the page and try again.";
+    failed = say("error.retry", "That did not start. Reload the page and try again.");
   } else {
     const tier = String(form.get("tier") ?? "one-off");
     /* Euros in the box, cents on the wire. The server clamps the range —
@@ -56,9 +56,9 @@ if (Astro.request.method === "POST") {
       });
       const body = await response.json().catch(() => null);
       if (response.ok && body?.url) return Astro.redirect(body.url, 303);
-      failed = body?.detail ?? "That could not be started. Try again in a moment.";
+      failed = body?.detail ?? say("error.failed2", "That could not be started. Try again in a moment.");
     } catch {
-      failed = "That could not be started. Try again in a moment.";
+      failed = say("error.failed", "That could not be started. Try again in a moment.");
     }
   }
 }

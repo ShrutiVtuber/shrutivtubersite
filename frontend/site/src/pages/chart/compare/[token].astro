@@ -38,7 +38,7 @@ let failed = "";
 if (Astro.request.method === "POST") {
   const form = await Astro.request.formData();
   if (!verifyCsrf(Astro.cookies, form)) {
-    failed = "That did not save. Reload the page and try again.";
+    failed = say("error.retry", "That did not save. Reload the page and try again.");
   } else {
     const action = String(form.get("action") ?? "");
     if (action === "write") {
@@ -51,15 +51,15 @@ if (Astro.request.method === "POST") {
         }),
       });
       notice = r.ok ? "Saved." : "";
-      failed = r.ok ? "" : "That did not save.";
+      failed = r.ok ? "" : say("error.save", "That did not save.");
     } else if (action === "share") {
       const r = await asReader(Astro, `/api/charts/compare/o/${token}/share`, { method: "POST" });
-      notice = r.ok ? "There is a link to hand out now." : "";
-      failed = r.ok ? "" : "The link could not be made.";
+      notice = r.ok ? say("notice.link", "There is a link to hand out now.") : "";
+      failed = r.ok ? "" : say("error.failed4", "The link could not be made.");
     } else if (action === "unshare") {
       const r = await asReader(Astro, `/api/charts/compare/o/${token}/share`, { method: "DELETE" });
-      notice = r.ok ? "The link has been taken back." : "";
-      failed = r.ok ? "" : "That did not work.";
+      notice = r.ok ? say("text.link.been.taken", "The link has been taken back.") : "";
+      failed = r.ok ? "" : say("error.failed3", "That did not work.");
     } else if (action === "design") {
       const r = await asReader(Astro, `/api/charts/compare/o/${token}/design`, {
         method: "PUT",
@@ -67,11 +67,11 @@ if (Astro.request.method === "POST") {
         body: JSON.stringify({ design: String(form.get("design") ?? "") }),
       });
       notice = r.ok ? "Card design changed." : "";
-      failed = r.ok ? "" : "That design could not be used.";
+      failed = r.ok ? "" : say("error.failed2", "That design could not be used.");
     } else if (action === "forget") {
       const r = await asReader(Astro, `/api/charts/compare/o/${token}`, { method: "DELETE" });
       if (r.ok) return Astro.redirect("/tools/natal-chart", 303);
-      failed = "That could not be deleted.";
+      failed = say("error.failed", "That could not be deleted.");
     }
   }
 }

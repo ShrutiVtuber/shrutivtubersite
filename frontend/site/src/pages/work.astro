@@ -1,7 +1,7 @@
 ---
 /* Work — ported from `ui_kits/site/Work.jsx`.
  *
- * "The page that makes her different," per the handoff. Its load-bearing
+ * say("text.page.that.makes", "The page that makes her different,") per the handoff. Its load-bearing
  * feature is the per-project credit table — Name · Role · Stack · Licence ·
  * Status — which is what another engineer looks for and what stops the page
  * reading as an app-store listing.
@@ -38,15 +38,15 @@ const STATUS_WORD: Record<string, string> = {
 };
 
 const INSTRUMENTS: [string, string, string, string][] = [
-  ["☉", "Planetary hours", "The day divided by its own light.", "/tools/planetary-hours"],
-  ["◉", "Solar stations", "Sunrise, culmination, sunset and nadir — the adoration hours.", "/tools/solar-stations"],
-  ["☾", "Lunar stations", "Moonrise, culmination, moonset and nadir, with the phase.", "/tools/lunar-stations"],
-  ["☽", "Attic calendar", "The lunisolar month, kept current.", "/tools/attic-calendar"],
-  ["◐", "Pañcāṅga", "The five limbs of the day.", "/tools/pancanga"],
-  ["☾", "Hindu calendar", "The lunisolar year and its festivals.", "/tools/hindu-calendar"],
-  ["Σ", "Isopsephy", "Letter-reckoning in six scripts.", "/tools/isopsephy"],
-  ["✶", "Natal chart", "A figure for a moment and a place.", "/tools/natal-chart"],
-  ["●", "Sigil generator", "Intent, reduced and drawn.", "/tools/sigil-generator"],
+  ["☉", "Planetary hours", say("text.divided.light", "The day divided by its own light."), "/tools/planetary-hours"],
+  ["◉", "Solar stations", say("text.sunrise.culmination.sunset", "Sunrise, culmination, sunset and nadir — the adoration hours."), "/tools/solar-stations"],
+  ["☾", "Lunar stations", say("text.moonrise.culmination.moonset", "Moonrise, culmination, moonset and nadir, with the phase."), "/tools/lunar-stations"],
+  ["☽", "Attic calendar", say("text.lunisolar.month.kept", "The lunisolar month, kept current."), "/tools/attic-calendar"],
+  ["◐", "Pañcāṅga", say("text.five.limbs", "The five limbs of the day."), "/tools/pancanga"],
+  ["☾", "Hindu calendar", say("text.lunisolar.year.festivals", "The lunisolar year and its festivals."), "/tools/hindu-calendar"],
+  ["Σ", "Isopsephy", say("text.letter.reckoning.scripts", "Letter-reckoning in six scripts."), "/tools/isopsephy"],
+  ["✶", "Natal chart", say("text.figure.moment.place", "A figure for a moment and a place."), "/tools/natal-chart"],
+  ["●", "Sigil generator", say("text.intent.reduced.drawn", "Intent, reduced and drawn."), "/tools/sigil-generator"],
 ];
 ---
 

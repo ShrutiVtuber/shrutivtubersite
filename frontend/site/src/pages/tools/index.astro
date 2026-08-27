@@ -11,7 +11,7 @@
  *      every mention split its weight nine ways.
  *   3. The instruments are the part of this site a stranger might search for
  *      without ever having heard of Shruti — and a set of nine has a claim
- *      ("free, no account, no advertising, shown working") that no single
+ *      (say("text.free.account.advertising", "free, no account, no advertising, shown working")) that no single
  *      calculator page can make on its own.
  *
  * Deliberately not a marketing page. The claim it makes is the true one, and
@@ -52,8 +52,8 @@ const jsonLd = {
       name: "Instruments",
       url: `${SITE}/tools`,
       description:
-        "Nine free instruments for magickal and astrological practice: planetary hours, " +
-        "three calendars, natal charts, isopsephy and more. No account, no advertising.",
+        say("text.nine.free.instruments", "Nine free instruments for magickal and astrological practice: planetary hours, ") +
+        say("text.three.calendars.natal", "three calendars, natal charts, isopsephy and more. No account, no advertising."),
       isPartOf: { "@id": `${SITE}/#website` },
       about: { "@id": `${SITE}/#person` },
     },

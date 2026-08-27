@@ -16,6 +16,12 @@
  */
 import Glyph from "./Glyph.astro";
 import type { SkyRecord } from "../../lib/journal/types";
+import { copy } from "../../lib/copy";
+
+/* Shared by every page that shows this, so editing it here changes it
+   everywhere — which is the point. */
+const say = await copy("component:SkyRecord");
+
 
 interface Props {
   sky: SkyRecord;
@@ -29,8 +35,8 @@ const { sky, when, moment = "published", place } = Astro.props;
 
 const HEADING =
   moment === "written"
-    ? "The sky when this was begun"
-    : "The sky when this was published";
+    ? say("heading.written", "The sky when this was begun")
+    : say("heading.published", "The sky when this was published");
 
 const FOOT =
   moment === "written"

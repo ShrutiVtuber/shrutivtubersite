@@ -101,7 +101,7 @@ const columns = Array.from({ length: 24 }, (_, utcHour) => {
 });
 
 /* The runs where everybody is available, longest first. A run is what people
-   actually want — "18:00 to 21:00 UTC", not three separate green cells. */
+   actually want — say("text", "18:00 to 21:00 UTC"), not three separate green cells. */
 const best: { start: number; end: number }[] = [];
 if (people.length > 0) {
   let start: number | null = null;
@@ -116,7 +116,7 @@ if (people.length > 0) {
 if (Astro.request.method === "POST") {
   const form = await Astro.request.formData();
   if (!verifyCsrf(Astro.cookies, form)) {
-    saveFailed = "That did not save. Reload the page and try again.";
+    saveFailed = say("error.retry", "That did not save. Reload the page and try again.");
   } else if (form.get("action") === "save") {
     const r = await asReader(Astro, "/api/collab/groups", {
       method: "POST",
@@ -126,11 +126,11 @@ if (Astro.request.method === "POST") {
         participants: people.map((p) => `${p.name}|${p.zone}|${p.from}|${p.to}`),
       }),
     });
-    saveNote = r.ok ? "Kept. It is in your groups below." : "";
-    if (!r.ok) saveFailed = r.body?.detail ?? "That could not be kept.";
+    saveNote = r.ok ? say("text.kept.your.groups", "Kept. It is in your groups below.") : "";
+    if (!r.ok) saveFailed = r.body?.detail ?? say("error.failed2", "That could not be kept.");
   } else if (form.get("action") === "forget") {
     const r = await asReader(Astro, `/api/collab/groups/${form.get("id")}`, { method: "DELETE" });
-    if (!r.ok) saveFailed = r.body?.detail ?? "That could not be removed.";
+    if (!r.ok) saveFailed = r.body?.detail ?? say("error.failed", "That could not be removed.");
   }
 }
 

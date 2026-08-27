@@ -98,8 +98,8 @@ const unreachable = !answer.ok && !beforeCycle;
 
 const dayLabel = (p: Payload | null) => (p ? `${p.month.name} ${p.day.number}` : "—");
 const RULE_NAME: Record<string, string> = {
-  conjunction: "month opened the day after the conjunction",
-  visibility: "month opened at the first visible crescent",
+  conjunction: say("text.month.opened.after", "month opened the day after the conjunction"),
+  visibility: say("text.month.opened.first", "month opened at the first visible crescent"),
 };
 ---
 

@@ -1,5 +1,5 @@
 ---
-/* "Shruti wants to compare charts with you."
+/* say("text.shruti.wants.compare", "Shruti wants to compare charts with you.")
  *
  * The page somebody lands on from a tweet or a DM. **One form, one press.**
  * Asking a person who arrived from a link to cast a chart, keep it, copy its
@@ -42,7 +42,7 @@ let failed = "";
 if (Astro.request.method === "POST") {
   const form = await Astro.request.formData();
   if (!verifyCsrf(Astro.cookies, form)) {
-    failed = "That did not go through. Reload the page and try again.";
+    failed = say("error.retry", "That did not go through. Reload the page and try again.");
   } else {
     const unknown = form.get("unknownTime") === "1";
     const made = await asReader(Astro, `/api/charts/invite/${token}`, {
@@ -63,7 +63,7 @@ if (Astro.request.method === "POST") {
       return Astro.redirect(`/chart/compare/${made.body.comparisonToken}`, 303);
     }
     failed = made.body?.detail
-      ?? "That did not work. Nothing has been kept.";
+      ?? say("error.failed", "That did not work. Nothing has been kept.");
   }
 }
 

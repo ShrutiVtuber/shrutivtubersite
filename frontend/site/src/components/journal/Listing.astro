@@ -34,7 +34,7 @@ const {
   eyebrow, title, lede, count, entries,
   feature = false, grouped = false,
   emptyTitle = "Nothing published yet",
-  emptyBody = "The writing goes up here as it is finished. Until then the instruments are the thing to look at.",
+  emptyBody = say("text.writing.goes.here", "The writing goes up here as it is finished. Until then the instruments are the thing to look at."),
 } = Astro.props;
 
 const [first, ...rest] = entries;

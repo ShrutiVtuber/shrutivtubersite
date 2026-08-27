@@ -22,9 +22,9 @@ if (token) {
   const r = await fetch(`${SITE_API}/api/newsletter/confirm?token=${encodeURIComponent(token)}`);
   const body = await r.json().catch(() => null);
   if (r.ok) { ok = true; email = body.email; unsubToken = body.unsubscribeToken; }
-  else failed = body?.detail ?? "That link did not work.";
+  else failed = body?.detail ?? say("error.failed", "That link did not work.");
 } else {
-  failed = "That link is missing its token.";
+  failed = say("error.token", "That link is missing its token.");
 }
 ---
 

@@ -32,7 +32,7 @@ const values = { email: "" };
 if (Astro.request.method === "POST") {
   const form = await Astro.request.formData();
   if (!verifyCsrf(Astro.cookies, form)) {
-    failed = "That did not send. Reload the page and try again.";
+    failed = say("error.retry", "That did not send. Reload the page and try again.");
   } else {
     values.email = String(form.get("email") ?? "").trim();
     const password = String(form.get("password") ?? "");
@@ -51,10 +51,10 @@ if (Astro.request.method === "POST") {
         if (cookie) Astro.response.headers.append("set-cookie", cookie);
         sent = true;
       } else {
-        failed = body?.detail ?? "That did not work.";
+        failed = body?.detail ?? say("error.failed2", "That did not work.");
       }
     } catch {
-      failed = "That did not work.";
+      failed = say("error.failed", "That did not work.");
     }
   }
 }

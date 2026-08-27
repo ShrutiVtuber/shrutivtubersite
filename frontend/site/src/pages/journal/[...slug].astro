@@ -2,7 +2,7 @@
 /* The journal.
  *
  * BeeRanked's agent syncs published pages to disk; this route reads them for
- * their DATA and renders the designer's skeleton inside the site's own layout.
+ * their DATA and renders the designersay("text.skeleton.inside.site", 's skeleton inside the site')s own layout.
  * So the section gets the REAL SiteHeader and SiteFooter — live badge, mobile
  * drawer, session state — and the content is the design, not BeeRanked's
  * default wearing a stylesheet.
@@ -37,7 +37,7 @@ const parts = slug.split("/").filter(Boolean);
 
 const page = await read(parts);
 
-/* A miss inside the section gets the section's own 404, not the site's: the
+/* A miss inside the section gets the sectionsay("text.site", 's own 404, not the site')s: the
    reader was looking for an entry, and the two things that can still help are
    in here. The status is still 404 — it looks like a page, but nothing is
    allowed to tell a crawler this address resolved. */
@@ -85,10 +85,10 @@ const journalLd = !isIndex || listed.length === 0 ? null : {
 };
 
 const LEDE: Record<string, string> = {
-  hub: "Notes on practice, and on the software written as practice. Documentation for the instruments, and what changed in them.",
-  all: "Everything in the section, newest first.",
+  hub: say("text.notes.practice.software", "Notes on practice, and on the software written as practice. Documentation for the instruments, and what changed in them."),
+  all: say("text.everything.section.newest", "Everything in the section, newest first."),
   sitemap:
-    "Every page in the section, as the engine knows it. The machine-readable one is at /journal/sitemap.xml.",
+    say("text.every.page.section", "Every page in the section, as the engine knows it. The machine-readable one is at /journal/sitemap.xml."),
 };
 ---
 

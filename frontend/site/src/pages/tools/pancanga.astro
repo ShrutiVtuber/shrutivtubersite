@@ -74,8 +74,8 @@ const unreachable = !answer.ok && !noSunrise;
 const hhmm = (iso: string | null) =>
   iso ? new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "UTC" }).format(new Date(iso)) : "—";
 const RULE_NAME: Record<string, string> = {
-  visible_disc: "Hellenistic — upper limb, with refraction",
-  hindu: "Vedic — centre of the disc, no refraction",
+  visible_disc: say("text.hellenistic.upper.limb", "Hellenistic — upper limb, with refraction"),
+  hindu: say("text.vedic.centre.disc", "Vedic — centre of the disc, no refraction"),
 };
 const varaFor = (c: string) => (c === convention ? d : other);
 
@@ -85,11 +85,11 @@ const isInstant = (v: unknown) => typeof v === "string" && /^\d{4}-\d{2}-\d{2}T/
 
 const limbs = d
   ? ([
-      ["Tithi", d.tithi, "the Moon gaining 12° on the Sun"],
+      ["Tithi", d.tithi, say("text.moon.gaining", "the Moon gaining 12° on the Sun")],
       ["Vāra", { index: 0, name: d.vara?.name ?? "undefined", fraction: 0, endsAt: null }, "sunrise to sunrise"],
-      ["Nakṣatra", d.nakshatra, "one of 27 equal sidereal quarters"],
+      ["Nakṣatra", d.nakshatra, say("text.equal.sidereal.quarters", "one of 27 equal sidereal quarters")],
       ["Yoga", d.yoga, "the summed longitudes"],
-      ["Karaṇa", d.karana, "half a tithi — two often fall in one day"],
+      ["Karaṇa", d.karana, say("text.half.tithi.often", "half a tithi — two often fall in one day")],
     ] as [string, Limb, string][])
   : [];
 ---

@@ -20,7 +20,7 @@ const say = await copy("component:ToolLayout");
 
 
 interface Props {
-  /* Name, subtitle, description, glyph and the "how it is reckoned" passage all
+  /* Name, subtitle, description, glyph and the say("text.reckoned", "how it is reckoned") passage all
      come from the instrument's row now — see lib/instruments.ts. They are not
      props any more, because a prop is a second place to write them and the
      whole point was to have one.
@@ -54,7 +54,7 @@ const all = await instruments();
 const self = all.find((i) => i.slug === slug);
 
 /* No row means the instrument is hidden or the backend is unreachable. The
-   page still computes — that is the daemon's job, not this table's — but it
+   page still computes — that is the daemonsay("text.this.table", 's job, not this table')s — but it
    says so with the slug rather than inventing a title, because a page headed
    with a plausible guess is one nobody notices is broken. */
 const title = self?.name ?? slug.replace(/-/g, " ");
@@ -76,7 +76,7 @@ const DISCLOSURE_WORD = { "○": "public", "◐": "named, not detailed", "●": 
  * Nothing outside the site could previously tell that these nine pages are
  * working instruments rather than articles about instruments. That matters
  * less for a blue link than it used to and more for everything else: an
- * assistant asked "how do I work out the planetary hour right now" picks what
+ * assistant asked say("text.work.planetary.hour", "how do I work out the planetary hour right now") picks what
  * it can identify as a tool, and `WebApplication` plus a zero-price `Offer` is
  * how you say free, works in a browser, no sign-in.
  *

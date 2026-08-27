@@ -55,8 +55,8 @@ const when = course.startsAt
 /* Why they have it, said plainly. Somebody who loses access later should
    already know which door they came through. */
 const REASON: Record<string, string> = {
-  purchase: "Yours — you bought it.",
-  ticket: "Yours — you were there.",
+  purchase: say("text.yours.bought", "Yours — you bought it."),
+  ticket: say("text.yours.were.there", "Yours — you were there."),
   gift: "Yours.",
   free: "Free to anybody.",
 };

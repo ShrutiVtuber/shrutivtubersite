@@ -42,11 +42,11 @@ let compareFailed = "";
 if (Astro.request.method === "POST") {
   const form = await Astro.request.formData();
   if (!verifyCsrf(Astro.cookies, form)) {
-    compareFailed = "That did not go through. Reload and try again.";
+    compareFailed = say("error.failed2", "That did not go through. Reload and try again.");
   } else {
     const mine = String(form.get("mine") ?? "").trim();
     if (!mine) {
-      compareFailed = "Paste the address of one of your own kept charts first.";
+      compareFailed = say("text.paste.address.your", "Paste the address of one of your own kept charts first.");
     } else {
       /* They paste a URL, because that is what they have. Take the last path
          segment and let the API decide whether it is a real token. */
@@ -65,15 +65,15 @@ if (Astro.request.method === "POST") {
         return Astro.redirect(`/chart/compare/${made.body.ownerToken}`, 303);
       }
       compareFailed = made.status === 404
-        ? "That address did not match a chart you have kept."
-        : made.body?.detail ?? "The comparison could not be made.";
+        ? say("text.that.address.match", "That address did not match a chart you have kept.")
+        : made.body?.detail ?? say("error.failed", "The comparison could not be made.");
     }
   }
 }
 const c = await site<any>(`/api/charts/s/${token}`).catch(() => null);
 
 const TRADITION = { hellenistic: "Hellenistic", vedic: "Vedic" };
-const FIGURE = { wheel: "a wheel", north: "a North Indian square", south: "a South Indian square" };
+const FIGURE = { wheel: "a wheel", north: say("text.north.indian.square", "a North Indian square"), south: say("text.south.indian.square", "a South Indian square") };
 ---
 
 <BaseLayout

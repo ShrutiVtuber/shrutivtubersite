@@ -10,6 +10,7 @@ import SectionHeader from "../../components/brand/SectionHeader.astro";
 import Button from "../../components/forms/Button.astro";
 import { SITE_API } from "../../lib/api";
 import { copy } from "../../lib/copy";
+import Copy from "../../components/content/Copy.astro";
 
 /* Every word here, editable from the admin. The defaults below are what
    it was written with and what still renders if nothing was changed. */
@@ -31,8 +32,10 @@ if (token) {
   <div class="page out">
     <SectionHeader as="h1" glyph="○" eyebrow="Unsubscribed" title="Done" />
     <p class="body">
-      {ok ? <><strong>{email}</strong> will not get the letter again.</> : "That address will not get the letter again."}
-      {" "}No further email, and nothing else needed from you.
+      {ok
+        ? <Copy text={say("done.known", "**{email}** will not get the letter again.")} vars={{ email }} />
+        : say("done.unknown", "That address will not get the letter again.")}
+      {" "}{say("done.tail", "No further email, and nothing else needed from you.")}
     </p>
     {/* Mentioned once. Then it stops. */}
     {

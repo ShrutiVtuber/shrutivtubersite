@@ -36,32 +36,32 @@ let failed = "";
 if (Astro.request.method === "POST") {
   const form = await Astro.request.formData();
   if (!verifyCsrf(Astro.cookies, form)) {
-    failed = "That did not go through. Reload the page and try again.";
+    failed = say("error.retry", "That did not go through. Reload the page and try again.");
   } else {
     const action = String(form.get("action") ?? "");
     if (action === "invite") {
       /* The same token a share uses, minted here so that inviting somebody is
          one press rather than a step hidden behind another button. Nobody
-         thinks "to invite a friend I must first generate a share link". */
+         thinks say("text.invite.friend.must", "to invite a friend I must first generate a share link"). */
       const r = await asReader(Astro, `/api/charts/o/${token}/share`, { method: "POST" });
-      notice = r.ok ? "Here is the invitation — send it to whoever you like." : "";
-      if (!r.ok) failed = "The invitation could not be made.";
+      notice = r.ok ? say("text.here.invitation.send", "Here is the invitation — send it to whoever you like.") : "";
+      if (!r.ok) failed = say("error.failed5", "The invitation could not be made.");
     } else if (action === "share") {
       const r = await asReader(Astro, `/api/charts/o/${token}/share`, { method: "POST" });
-      notice = r.ok ? "There is a link to hand out now." : "";
-      if (!r.ok) failed = "The link could not be made.";
+      notice = r.ok ? say("notice.link", "There is a link to hand out now.") : "";
+      if (!r.ok) failed = say("error.failed4", "The link could not be made.");
     } else if (action === "unshare") {
       const r = await asReader(Astro, `/api/charts/o/${token}/share`, { method: "DELETE" });
-      notice = r.ok ? "The link has been taken back. It no longer opens anything." : "";
-      if (!r.ok) failed = "The link could not be taken back.";
+      notice = r.ok ? say("text.link.been.taken", "The link has been taken back. It no longer opens anything.") : "";
+      if (!r.ok) failed = say("error.failed3", "The link could not be taken back.");
     } else if (action === "claim") {
       const r = await asReader(Astro, `/api/charts/o/${token}/claim`, { method: "POST" });
-      notice = r.ok ? "This chart is on your account now, and will not expire." : "";
-      if (!r.ok) failed = "It could not be added to your account.";
+      notice = r.ok ? say("text.this.chart.your", "This chart is on your account now, and will not expire.") : "";
+      if (!r.ok) failed = say("error.failed2", "It could not be added to your account.");
     } else if (action === "forget") {
       const r = await asReader(Astro, `/api/charts/o/${token}`, { method: "DELETE" });
       if (r.ok) return Astro.redirect("/tools/natal-chart", 303);
-      failed = "It could not be deleted.";
+      failed = say("error.failed", "It could not be deleted.");
     }
   }
 }

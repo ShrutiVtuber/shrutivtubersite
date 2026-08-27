@@ -119,8 +119,8 @@ const spanDay = (iso: string) =>
   });
 
 const RULE_NAME: Record<string, string> = {
-  amanta: "month ends at the new moon",
-  purnimanta: "month ends at the full moon",
+  amanta: say("text.month.ends.moon", "month ends at the new moon"),
+  purnimanta: say("text.month.ends.full", "month ends at the full moon"),
 };
 ---
 

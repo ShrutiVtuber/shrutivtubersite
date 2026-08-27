@@ -140,7 +140,7 @@ const jsonLd = {
   ],
 };
 
-/* Polar. The test is NOT "every cell is empty" — at Longyearbyen in December
+/* Polar. The test is NOT say("text.every.cell.empty", "every cell is empty") — at Longyearbyen in December
  * noon and midnight still occur, because a culmination happens whether or not
  * the body is above the horizon. What breaks is the rise and the set, and with
  * them the shape the stations assume: the day has no beginning and no end.
@@ -158,8 +158,8 @@ const noRiseOrSet =
   rows.every((r) => r.times[riseIndex] === null && r.times[setIndex] === null);
 const polarReason = noRiseOrSet
   ? kind === "solar"
-    ? "The Sun does not cross the horizon here on these dates, so there are no solar stations to keep. This is the sky, not a failure to compute — at this latitude the day does not begin or end in the way the stations assume."
-    : "The Moon does not cross the horizon here on these dates. At this latitude whole weeks can pass without a moonrise or a moonset."
+    ? say("text.does.cross.horizon", "The Sun does not cross the horizon here on these dates, so there are no solar stations to keep. This is the sky, not a failure to compute — at this latitude the day does not begin or end in the way the stations assume.")
+    : say("text.moon.does.cross", "The Moon does not cross the horizon here on these dates. At this latitude whole weeks can pass without a moonrise or a moonset.")
   : undefined;
 ---
 

@@ -30,7 +30,7 @@ let failed = "";
 if (Astro.request.method === "POST") {
   const form = await Astro.request.formData();
   if (!verifyCsrf(Astro.cookies, form)) {
-    failed = "That did not go through. Reload the page and try again.";
+    failed = say("error.retry", "That did not go through. Reload the page and try again.");
   } else {
     const r = await fetch(`${SITE_API}/api/shop/checkout`, {
       method: "POST",
@@ -42,7 +42,7 @@ if (Astro.request.method === "POST") {
     });
     const body = await r.json().catch(() => null);
     if (r.ok && body?.url) return Astro.redirect(body.url, 303);
-    failed = body?.detail ?? "Checkout could not be opened. Try again in a moment.";
+    failed = body?.detail ?? say("error.failed", "Checkout could not be opened. Try again in a moment.");
   }
 }
 

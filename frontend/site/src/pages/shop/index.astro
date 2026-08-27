@@ -14,6 +14,7 @@ import SectionHeader from "../../components/brand/SectionHeader.astro";
 import EmptyState from "../../components/feedback/EmptyState.astro";
 import { site, SITE_URL, PATHS, type ShopProduct } from "../../lib/api";
 import { copy } from "../../lib/copy";
+import Copy from "../../components/content/Copy.astro";
 
 /* Every word on this page, editable from the admin. The defaults below are
    what it was written with and what still renders if nothing was changed. */
@@ -62,8 +63,7 @@ const money = (p: ShopProduct) =>
     />
 
     <p class="of-note">
-      This is the only shop that is mine. <a href="/official">{say("text.1", "Everywhere else that is")}</a>,
-      and anything not on that list is not me.
+      <Copy text={say("official.note", "This is the only shop that is mine. [Everywhere else that is](/official), and anything not on that list is not me.")} />
     </p>
 
     {

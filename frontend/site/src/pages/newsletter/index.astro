@@ -24,14 +24,14 @@ let email = "";
 if (Astro.request.method === "POST") {
   const form = await Astro.request.formData();
   if (!verifyCsrf(Astro.cookies, form)) {
-    error = "That did not send. Reload the page and try again.";
+    error = say("error.retry", "That did not send. Reload the page and try again.");
   } else {
     email = String(form.get("email") ?? "").trim();
     const consent = form.get("consent") === "1";
     if (!/^\S+@\S+\.\S+$/.test(email)) {
-      error = "That address doesn’t look complete.";
+      error = say("text.that.address.doesn", "That address doesn’t look complete.");
     } else if (!consent) {
-      error = "The letter needs your agreement before it can be sent.";
+      error = say("text.letter.needs.your", "The letter needs your agreement before it can be sent.");
     } else {
       const r = await fetch(`${SITE_API}/api/newsletter/subscribe`, {
         method: "POST",
@@ -39,7 +39,7 @@ if (Astro.request.method === "POST") {
         body: JSON.stringify({ email, consent: true }),
       });
       if (r.ok) state = "sent";
-      else error = (await r.json().catch(() => null))?.detail ?? "That did not go through.";
+      else error = (await r.json().catch(() => null))?.detail ?? say("error.failed", "That did not go through.");
     }
   }
 }

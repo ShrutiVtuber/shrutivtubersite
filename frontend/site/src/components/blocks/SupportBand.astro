@@ -16,6 +16,12 @@
  */
 import Button from "../forms/Button.astro";
 import type { RenderedSection } from "../../lib/content";
+import { copy } from "../../lib/copy";
+
+/* Shared by every page that shows this, so editing it here changes it
+   everywhere — which is the point. */
+const say = await copy("component:SupportBand");
+
 
 interface Tier { amount: number | null; currency: string; interval: string }
 interface Props {
@@ -37,11 +43,11 @@ const from = cheapest
     }).format((cheapest.amount ?? 0) / 100)
   : "";
 
-const title = block?.title || "Become a Swara";
+const title = block?.title || say("title", "Become a Swara");
 const body =
   block?.bodyMd?.trim() ||
-  "The streams are free and the instruments are open source, and they stay that way. Swaras are the people who keep the bench lit — the ephemeris server, the art, and the hours the software takes.";
-const cta = block?.linkLabel || "Support the work";
+  say("body", "The streams are free and the instruments are open source, and they stay that way. Swaras are the people who keep the bench lit — the ephemeris server, the art, and the hours the software takes.");
+const cta = block?.linkLabel || say("cta", "Support the work");
 const href = block?.linkUrl || "/support";
 ---
 
