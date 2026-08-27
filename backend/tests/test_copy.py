@@ -214,3 +214,48 @@ def test_a_component_declares_a_shared_namespace() -> None:
 
     admin = (SRC / "pages" / "admin" / "copy.astro").read_text(encoding="utf-8")
     assert "shared — changing this changes it on every page" in admin
+
+
+def test_the_preview_reads_the_page_rather_than_marking_it() -> None:
+    """
+    The preview matches on the text the site already renders, and adds nothing
+    to it. Marking every string with a data attribute would make the preview
+    structurally different from what a reader gets — which is the one thing a
+    preview must never be.
+
+    The iframe is same-origin, so the admin can read its DOM directly.
+    """
+    prev = code_of(SRC / "pages" / "admin" / "preview.astro")
+    assert "contentDocument" in prev, "the preview cannot read the page"
+    assert "data-copy" not in prev, "the site is being instrumented for preview"
+    # Both directions: field -> page, and page -> field.
+    assert "markInPage" in prev
+    assert "wireFrame" in prev
+
+
+def test_the_preview_collapses_whitespace_before_matching() -> None:
+    """
+    The source wraps its lines; the browser does not. An exact match would fail
+    on almost every paragraph on the site.
+    """
+    prev = code_of(SRC / "pages" / "admin" / "preview.astro")
+    assert 'replace(/\\s+/g, " ")' in prev
+
+
+def test_the_preview_keeps_its_place_across_a_save() -> None:
+    """
+    Reloading the iframe to the top on every edit is what makes a preview
+    useless for anything below the fold.
+    """
+    prev = code_of(SRC / "pages" / "admin" / "preview.astro")
+    assert "scrollY" in prev and "scrollTo" in prev
+
+
+def test_components_are_not_offered_for_page_preview() -> None:
+    """
+    A component has no page of its own. Its words are shared by every page that
+    shows it, so it stays on the Words screen where that is said out loud.
+    """
+    prev = code_of(SRC / "pages" / "admin" / "preview.astro")
+    assert "isComponent" in prev
+    assert ".filter((p) => !isComponent(p))" in prev

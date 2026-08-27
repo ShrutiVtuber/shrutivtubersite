@@ -1,0 +1,311 @@
+---
+/* Edit the words with the page in front of you.
+ *
+ * The Words screen made every string editable; it did not make editing them
+ * pleasant. Nine hundred rows in a list, with no sense of which sentence is
+ * the one you are looking at on the site, is a database browser rather than a
+ * CMS. Her words: "make the admin panel modern and useable as a CMS that lets
+ * me edit the pages while previewing them."
+ *
+ * So: the real page in an iframe, its strings beside it, and the two wired
+ * together in both directions — click a field and the page scrolls to it and
+ * flashes; click the words in the page and the field takes focus.
+ *
+ * **No instrumentation in the site itself.** The iframe is same-origin, so
+ * this page can read its DOM directly and match on the text it already
+ * renders. That matters: adding preview markers to every page would mean the
+ * preview showed something different from what a reader gets, which is the one
+ * thing a preview must never do.
+ *
+ * The holding page is not in the way either — the gate already lets a signed-in
+ * operator through to the real site, which is how she can work on it in public
+ * without publishing it.
+ */
+import AdminLayout from "../../layouts/AdminLayout.astro";
+import { asAdmin } from "../../lib/admin";
+
+const all: any[] = (await asAdmin(Astro, "/api/admin/copy")).body ?? [];
+
+/* Components have no page of their own to preview — their words are shared by
+   every page that shows them. They stay on the Words screen. */
+const isComponent = (pg: string) => pg.startsWith("component:");
+const pages = [...new Set(all.map((r) => r.page))].filter((p) => !isComponent(p)).sort();
+
+const page = pages.includes(Astro.url.searchParams.get("page") ?? "")
+  ? Astro.url.searchParams.get("page")!
+  : (pages.includes("home") ? "home" : pages[0] ?? "");
+
+const rows = all
+  .filter((r) => r.page === page)
+  .sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+
+/* The route the iframe loads. "home" is "/". */
+const previewUrl = `/${page === "home" ? "" : page}`;
+const changed = rows.filter((r) => r.changed).length;
+---
+
+<AdminLayout title="Preview">
+  <div class="cms" data-page={page}>
+    <header class="bar">
+      <label class="pick">
+        <span class="sr">Page</span>
+        <select id="pagepick">
+          {pages.map((p) => (
+            <option value={p} selected={p === page}>/{p === "home" ? "" : p}</option>
+          ))}
+        </select>
+      </label>
+      <span class="count">
+        {rows.length} string{rows.length === 1 ? "" : "s"}
+        {changed > 0 && <> · <strong>{changed} changed</strong></>}
+      </span>
+      <a class="out" href={previewUrl} target="_blank" rel="noopener">Open the page ↗</a>
+      <a class="out" href={`/admin/blocks?kind=sections&page=${page}`}>Blocks on this page →</a>
+    </header>
+
+    <div class="split">
+      <div class="frame">
+        {/* `key` on the src forces a fresh document when the page changes,
+            rather than a same-document navigation that keeps stale scroll. */}
+        <iframe id="preview" src={previewUrl} title={`Preview of ${previewUrl}`}></iframe>
+        <p class="hint" id="hint">Click any text in the page to jump to it →</p>
+      </div>
+
+      <aside class="panel" id="panel">
+        {rows.length === 0 ? (
+          <p class="empty">
+            Nothing registered for this page yet. Run <code>node scripts/seed-copy.mjs</code>.
+          </p>
+        ) : (
+          rows.map((r: any) => (
+            <div class="str" data-id={r.id} data-value={r.value}>
+              <div class="head">
+                <label for={`f-${r.id}`}>{r.label || r.key}</label>
+                {r.changed && <span class="dot" title="changed from the original"></span>}
+              </div>
+              {r.multiline ? (
+                <textarea id={`f-${r.id}`} rows="3" data-orig={r.value}>{r.value}</textarea>
+              ) : (
+                <input id={`f-${r.id}`} value={r.value} data-orig={r.value} />
+              )}
+              <div class="foot">
+                <code>{r.key}</code>
+                <span class="state" aria-live="polite"></span>
+                {r.changed && <button type="button" class="revert" data-id={r.id}>put it back</button>}
+              </div>
+            </div>
+          ))
+        )}
+      </aside>
+    </div>
+  </div>
+</AdminLayout>
+
+<script>
+  const cms = document.querySelector<HTMLElement>(".cms")!;
+  const frame = document.getElementById("preview") as HTMLIFrameElement;
+  const panel = document.getElementById("panel")!;
+  const hint = document.getElementById("hint")!;
+
+  document.getElementById("pagepick")!.addEventListener("change", (e) => {
+    location.search = `?page=${(e.target as HTMLSelectElement).value}`;
+  });
+
+  /* ── finding a string inside the page ──────────────────────────────────
+   *
+   * Matched on the text the page already renders, because the alternative —
+   * marking every string with a data attribute — would make the preview
+   * structurally different from what a reader gets.
+   *
+   * Whitespace is collapsed on both sides: the source wraps its lines, the
+   * browser does not, and an exact match would fail on almost every
+   * paragraph. */
+  const flat = (s: string) => s.replace(/\s+/g, " ").trim();
+
+  function textNodes(doc: Document) {
+    const walk = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT);
+    const out: Text[] = [];
+    let n: Node | null;
+    while ((n = walk.nextNode())) {
+      const t = n as Text;
+      if (!flat(t.data)) continue;
+      const p = t.parentElement;
+      if (!p || p.closest("script,style,head")) continue;
+      out.push(t);
+    }
+    return out;
+  }
+
+  function findIn(doc: Document, value: string): HTMLElement | null {
+    const want = flat(value);
+    if (want.length < 3) return null;
+    let best: HTMLElement | null = null;
+    for (const t of textNodes(doc)) {
+      const have = flat(t.data);
+      if (have === want) return t.parentElement;
+      /* A partial match is the fallback for a sentence the page has split
+         around a link or a value — the longest containing node wins, because
+         the shortest is usually a fragment of a bigger one. */
+      if (!best && want.length > 12 && (have.includes(want) || want.includes(have))) {
+        best = t.parentElement;
+      }
+    }
+    return best;
+  }
+
+  let marked: HTMLElement | null = null;
+  function markInPage(value: string) {
+    const doc = frame.contentDocument;
+    if (!doc) return;
+    if (marked) marked.style.removeProperty("outline");
+    const el = findIn(doc, value);
+    marked = el;
+    if (!el) { hint.textContent = "That one is not visible on the page right now."; return; }
+    hint.textContent = "";
+    el.style.outline = "2px solid #C86B8B";
+    el.style.outlineOffset = "2px";
+    el.scrollIntoView({ block: "center", behavior: "smooth" });
+  }
+
+  /* ── page → panel ─────────────────────────────────────────────────────── */
+  function wireFrame() {
+    const doc = frame.contentDocument;
+    if (!doc) return;
+    doc.body.addEventListener("click", (ev) => {
+      const target = ev.target as HTMLElement;
+      const text = flat(target.textContent ?? "");
+      if (!text) return;
+      let match: HTMLElement | null = null;
+      let bestLen = Infinity;
+      for (const box of panel.querySelectorAll<HTMLElement>(".str")) {
+        const v = flat(box.dataset.value ?? "");
+        if (!v || v.length < 3) continue;
+        if (text === v || text.includes(v) || v.includes(text)) {
+          /* The closest-sized match, so clicking a paragraph does not land on
+             a two-word label that happens to sit inside it. */
+          const d = Math.abs(v.length - text.length);
+          if (d < bestLen) { bestLen = d; match = box; }
+        }
+      }
+      if (!match) return;
+      ev.preventDefault();
+      match.scrollIntoView({ block: "center", behavior: "smooth" });
+      match.querySelector<HTMLElement>("input,textarea")?.focus();
+    }, true);
+  }
+  frame.addEventListener("load", wireFrame);
+
+  /* ── panel → page, and saving ─────────────────────────────────────────── */
+  for (const box of panel.querySelectorAll<HTMLElement>(".str")) {
+    const field = box.querySelector<HTMLInputElement | HTMLTextAreaElement>("input,textarea")!;
+    const state = box.querySelector<HTMLElement>(".state")!;
+
+    field.addEventListener("focus", () => markInPage(box.dataset.value ?? ""));
+
+    field.addEventListener("blur", async () => {
+      const value = field.value;
+      if (value === field.dataset.orig) return;
+      state.textContent = "saving…";
+      try {
+        const r = await fetch(`/api/admin/copy/${box.dataset.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ value }),
+        });
+        if (!r.ok) throw new Error(String(r.status));
+        field.dataset.orig = value;
+        box.dataset.value = value;
+        state.textContent = "saved";
+        /* Reload so she sees the words in place rather than in a box. The
+           scroll position is restored, because losing it on every keystroke's
+           worth of editing is what makes a preview useless. */
+        const y = frame.contentWindow?.scrollY ?? 0;
+        frame.addEventListener("load", function once() {
+          frame.removeEventListener("load", once);
+          frame.contentWindow?.scrollTo(0, y);
+          wireFrame();
+        });
+        frame.contentWindow?.location.reload();
+      } catch {
+        state.textContent = "did not save";
+      }
+      setTimeout(() => { state.textContent = ""; }, 2500);
+    });
+  }
+
+  for (const b of panel.querySelectorAll<HTMLButtonElement>(".revert")) {
+    b.addEventListener("click", async () => {
+      await fetch(`/api/admin/copy/${b.dataset.id}/revert`, { method: "POST" });
+      location.reload();
+    });
+  }
+</script>
+
+<style>
+  /* The preview is the point, so it gets the room. */
+  .cms { display: grid; grid-template-rows: auto 1fr; gap: var(--space-3); height: calc(100vh - 150px); min-height: 520px; }
+
+  .bar { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
+  .pick select {
+    font: 500 var(--text-sm) var(--font-mono);
+    padding: 6px 10px;
+    border: var(--border-w) solid var(--line);
+    border-radius: var(--radius-sm);
+    background: var(--surface-card); color: var(--ink);
+  }
+  .count { font-size: var(--text-xs); color: var(--ink-faint); }
+  .out { margin-left: auto; font-size: var(--text-xs); color: var(--accent); }
+  .out + .out { margin-left: 0; }
+  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+
+  .split { display: grid; grid-template-columns: 1fr minmax(300px, 380px); gap: var(--space-3); min-height: 0; }
+  @media (max-width: 900px) { .split { grid-template-columns: 1fr; } }
+
+  .frame { position: relative; min-height: 0; }
+  iframe {
+    width: 100%; height: 100%;
+    border: var(--border-w) solid var(--line);
+    border-radius: var(--radius-md);
+    background: var(--surface-page);
+  }
+  .hint {
+    position: absolute; left: 10px; bottom: 10px; margin: 0;
+    font-size: var(--text-xs); color: var(--ink-faint);
+    background: var(--surface-card); padding: 4px 8px;
+    border-radius: var(--radius-sm); border: var(--border-w) solid var(--line);
+  }
+
+  .panel { overflow-y: auto; display: grid; gap: 10px; align-content: start; padding-right: 4px; }
+  .empty { font-size: var(--text-sm); color: var(--ink-soft); }
+
+  .str {
+    display: grid; gap: 5px; padding: 10px;
+    border: var(--border-w) solid var(--line);
+    border-radius: var(--radius-sm);
+    background: var(--surface-card);
+  }
+  .str:focus-within { border-color: var(--accent); }
+  .head { display: flex; align-items: center; gap: 8px; }
+  .head label { font-weight: 600; font-size: var(--text-xs); color: var(--ink); }
+  /* A changed string is marked, so a page she has edited is legible at a
+     glance rather than by reading every field. */
+  .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--rose); flex: none; }
+
+  .str input, .str textarea {
+    width: 100%; font: 400 var(--text-sm) var(--font-body);
+    padding: 6px 8px;
+    border: var(--border-w) solid var(--line);
+    border-radius: var(--radius-sm);
+    background: var(--surface-page); color: var(--ink);
+  }
+  .str textarea { line-height: 1.55; resize: vertical; }
+
+  .foot { display: flex; align-items: baseline; gap: 8px; }
+  .foot code { font: 400 10px var(--font-mono); color: var(--ink-faint); }
+  .state { font-size: var(--text-xs); color: var(--ink-faint); margin-left: auto; }
+  .revert {
+    background: none; border: 0; padding: 0; cursor: pointer;
+    font: 500 10px var(--font-body); color: var(--ink-faint); text-decoration: underline;
+  }
+  .revert:hover { color: var(--ink); }
+</style>
