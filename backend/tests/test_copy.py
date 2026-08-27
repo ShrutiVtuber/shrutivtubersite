@@ -347,3 +347,55 @@ def test_greek_capitals_are_told_they_are_greek() -> None:
 
     hero = code_of(SRC / "components" / "brand" / "Hero.astro")
     assert "<Scripts text={greeting}" in hero, "the greeting is not tagged"
+
+
+def test_a_block_is_placed_by_its_most_distinctive_field() -> None:
+    """
+    Not by the minimum across all of them. The home page's support block has a
+    link label of "Support the work", which is also a header nav item at the
+    very top — so taking the minimum put a block that lives halfway down the
+    page first in the panel.
+
+    Order of preference: an exact heading match, then the body's first
+    paragraph, then the title, then the eyebrow, and the link label last
+    because it is the likeliest to also be navigation.
+    """
+    prev = code_of(SRC / "pages" / "admin" / "preview.astro")
+    assert "findHeadingIn" in prev
+    body = prev[prev.index("const tries"):prev.index("offsets.set(item, top)")]
+    assert body.index("findHeadingIn") < body.index("link_label"), (
+        "a link label is preferred over a heading")
+
+
+def test_a_short_heading_can_still_be_found() -> None:
+    """
+    The general matcher refuses anything under eight characters, rightly —
+    six characters of body text collide with everything. But /about's first
+    block is titled "Shruti", and as an <h2> that is unambiguous. Raising the
+    general minimum without this pushed every block on that page into
+    "not visible".
+    """
+    prev = code_of(SRC / "pages" / "admin" / "preview.astro")
+    head = prev[prev.index("function findHeadingIn"):]
+    assert "want.length < 3" in head[:400], "headings inherit the long minimum"
+    assert 'querySelectorAll<HTMLElement>("h1,h2,h3,h4,h5,h6")' in prev
+
+
+def test_a_block_body_is_matched_by_its_first_paragraph() -> None:
+    """
+    A body is markdown and renders as several paragraphs, so no single text
+    node holds all of it — matching the whole thing always fails.
+    """
+    prev = code_of(SRC / "pages" / "admin" / "preview.astro")
+    assert "firstPara" in prev
+
+
+def test_markdown_is_normalised_on_both_sides_before_matching() -> None:
+    """
+    The page shows rendered markdown; a block stores the source. Comparing
+    "**Shruti** — Shruti Swara" against "Shruti — Shruti Swara" fails on the
+    asterisks alone.
+    """
+    prev = code_of(SRC / "pages" / "admin" / "preview.astro")
+    assert "const plain" in prev
+    assert "plain(t.data)" in prev and "plain(value)" in prev

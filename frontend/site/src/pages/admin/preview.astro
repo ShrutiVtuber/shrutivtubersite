@@ -166,6 +166,13 @@ const changed = rows.filter((r) => r.changed).length;
    * paragraph. */
   const flat = (s: string) => s.replace(/\s+/g, " ").trim();
 
+  /* The page shows RENDERED markdown; a block stores the source. Comparing
+     "**Shruti** — Shruti Swara" against "Shruti — Shruti Swara" fails on the
+     asterisks alone, so the markers come off both sides before matching. */
+  const plain = (s: string) =>
+    flat(s.replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
+          .replace(/[*_`#>]/g, ""));
+
   function textNodes(doc: Document) {
     const walk = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT);
     const out: Text[] = [];
@@ -181,11 +188,13 @@ const changed = rows.filter((r) => r.changed).length;
   }
 
   function findIn(doc: Document, value: string): HTMLElement | null {
-    const want = flat(value);
-    if (want.length < 3) return null;
+    const want = plain(value);
+    /* Short strings collide — a nav label, a button, a heading that repeats.
+       Below this length a match says more about coincidence than location. */
+    if (want.length < 8) return null;
     let best: HTMLElement | null = null;
     for (const t of textNodes(doc)) {
-      const have = flat(t.data);
+      const have = plain(t.data);
       if (have === want) return t.parentElement;
       /* The fallback: a node on the page CONTAINS the whole string. Only that
          direction — the reverse, a short page node inside a longer string,
@@ -198,6 +207,25 @@ const changed = rows.filter((r) => r.changed).length;
     }
     return best;
   }
+
+  /* A heading is a reliable place to match a SHORT string. "Shruti" is six
+     characters and would be refused by the general matcher — rightly, because
+     six characters of body text collide with everything — but as an <h2> it is
+     unambiguous. Raising the general minimum to eight had pushed /about's
+     blocks into "not visible" for exactly this reason. */
+  function findHeadingIn(doc: Document, value: string): HTMLElement | null {
+    const want = plain(value);
+    if (want.length < 3) return null;
+    for (const h of doc.querySelectorAll<HTMLElement>("h1,h2,h3,h4,h5,h6")) {
+      if (plain(h.textContent ?? "") === want) return h;
+    }
+    return null;
+  }
+
+  /* A block's body is markdown and renders as SEVERAL paragraphs, so no single
+     text node holds all of it. Its first paragraph does, and that is enough to
+     say where the block begins. */
+  const firstPara = (md: string) => (md ?? "").split(/\n\s*\n/)[0] ?? "";
 
   let marked: HTMLElement | null = null;
   function markInPage(value: string) {
@@ -261,16 +289,48 @@ const changed = rows.filter((r) => r.changed).length;
     const items = [...panel.querySelectorAll<HTMLElement>(":scope > .str, :scope > .blk")];
     const offsets = new Map<HTMLElement, number>();
 
+    const scrolled = doc.scrollingElement?.scrollTop ?? 0;
+    const topOf = (v: string) => {
+      const el = v ? findIn(doc, v) : null;
+      return el ? el.getBoundingClientRect().top + scrolled : Infinity;
+    };
+
     for (const item of items) {
-      /* A block is placed by its first field that can be found, so its fields
-         travel together rather than scattering. */
-      const values = item.classList.contains("blk")
-        ? [...item.querySelectorAll<HTMLElement>(".str")].map((s) => s.dataset.value ?? "")
-        : [item.dataset.value ?? ""];
+      if (!item.classList.contains("blk")) {
+        offsets.set(item, topOf(item.dataset.value ?? ""));
+        continue;
+      }
+      /* A block is placed by its most DISTINCTIVE field, tried in order, and
+         the first one found wins.
+         
+         Not the minimum across all of them: the home page's support block has
+         a link label of "Support the work", which is also a header nav item at
+         the very top of the page. Taking the minimum put a block that lives at
+         the bottom of the page first in the panel. A body paragraph is the
+         thing least likely to appear twice; a link label is the most. */
+      const byField = new Map<string, string>();
+      for (const f of item.querySelectorAll<HTMLElement>(".str")) {
+        byField.set(f.dataset.field ?? "", f.dataset.value ?? "");
+      }
+      const scrolledNow = doc.scrollingElement?.scrollTop ?? 0;
+      const at = (el: HTMLElement | null) =>
+        el ? el.getBoundingClientRect().top + scrolledNow : Infinity;
+
+      /* In order of how distinctive each field is, and how reliably it can be
+         found. A heading match is tried before body text because it is exact;
+         a link label is last because it is the likeliest to also be a nav
+         item — which is what put the home page's support block at the top. */
+      const tries: (() => number)[] = [
+        () => at(findHeadingIn(doc, byField.get("title") ?? "")),
+        () => topOf(firstPara(byField.get("body_md") ?? "")),
+        () => topOf(byField.get("title") ?? ""),
+        () => topOf(byField.get("eyebrow") ?? ""),
+        () => topOf(byField.get("link_label") ?? ""),
+      ];
       let top = Infinity;
-      for (const v of values) {
-        const el = v ? findIn(doc, v) : null;
-        if (el) { top = Math.min(top, el.getBoundingClientRect().top + (doc.documentElement.scrollTop || 0)); }
+      for (const t of tries) {
+        const v = t();
+        if (v < Infinity) { top = v; break; }
       }
       offsets.set(item, top);
     }
