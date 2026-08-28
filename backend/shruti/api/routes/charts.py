@@ -42,6 +42,7 @@ from sqlmodel import select
 from shruti.api.routes.accounts import current_user
 from shruti.core.consents import CONSENT_VERSION, NATIVITY
 from shruti.core.db import get_session
+from shruti.core.moments import birth_moment, timezone_known
 from shruti.models import CardDesign, Media
 from shruti.models.accounts import Comparison, SavedChart, User
 
@@ -85,11 +86,29 @@ class Keep(BaseModel):
     place_name: str = Field(default="", max_length=160)
     lat: float = 0.0
     lon: float = 0.0
+    # The BIRTHPLACE's IANA zone. Without it the birth time is read as UTC and
+    # the chart is cast for somewhere between one and thirteen hours away from
+    # where it should be.
+    timezone: str = Field(default="", max_length=64)
 
     # Required for somebody without an account, ignored for somebody with one
     # — their account already carries the consent, and asking twice for the
     # same permission teaches people to click past it.
     consent: bool = False
+
+
+def _moment_of(chart: SavedChart) -> str:
+    """
+    The instant this chart is cast for, offset and all.
+
+    Every view returns this rather than handing the pages a date and a time to
+    assemble for themselves. Seven surfaces used to do that assembling — the
+    natal tool, the figure, the print page, both comparison pages, the Today
+    wheel and the synastry route — and all seven produced a naive string the
+    ephemeris then read as UTC.
+    """
+    return birth_moment(chart.birth_date, chart.birth_time,
+                        chart.time_unknown, chart.timezone)
 
 
 def _owner_view(chart: SavedChart) -> dict:
@@ -105,6 +124,12 @@ def _owner_view(chart: SavedChart) -> dict:
         "placeName": chart.place_name,
         "lat": chart.lat,
         "lon": chart.lon,
+        # Resolved here, once. The page draws from `when` and never builds one.
+        "when": _moment_of(chart),
+        "timezone": chart.timezone,
+        # False for a chart kept before birthplace zones were recorded. The
+        # page says so rather than redrawing it as though it were right.
+        "timezoneKnown": timezone_known(chart.timezone),
         "mine": chart.user_id is not None,
         "shared": chart.share_token is not None,
         "shareToken": chart.share_token,
@@ -134,6 +159,10 @@ def _shared_view(chart: SavedChart) -> dict:
         "figure": chart.figure,
         "timeUnknown": chart.time_unknown,
         # Needed to cast the chart at all. Not shown as text by the page.
+        # `when` carries the birth date and time as surely as the two fields
+        # below do — the shared page has never printed either, and does not
+        # print this.
+        "when": _moment_of(chart),
         "birthDate": chart.birth_date,
         "birthTime": chart.birth_time,
         "lat": chart.lat,
@@ -189,6 +218,7 @@ async def keep(
         place_name=body.place_name.strip(),
         lat=body.lat,
         lon=body.lon,
+        timezone=body.timezone.strip(),
         last_seen_at=_now(),
     )
 
@@ -392,6 +422,10 @@ def _comparison_view(row: Comparison, left: SavedChart, right: SavedChart,
             "birthDate": c.birth_date,
             "birthTime": c.birth_time,
             "timeUnknown": c.time_unknown,
+            # The instant, resolved. Both sides of a comparison can sit in
+            # different zones, so assembling this per page was wrong twice
+            # over and by a different amount each time.
+            "when": _moment_of(c),
             "lat": c.lat,
             "lon": c.lon,
             "tradition": c.tradition,
@@ -399,6 +433,8 @@ def _comparison_view(row: Comparison, left: SavedChart, right: SavedChart,
         }
         if owner:
             out["placeName"] = c.place_name
+            out["timezone"] = c.timezone
+            out["timezoneKnown"] = timezone_known(c.timezone)
         return out
 
     return {
@@ -604,6 +640,10 @@ class StartIn(BaseModel):
     place_name: str = Field(default="", max_length=160)
     lat: float = 0.0
     lon: float = 0.0
+    # The BIRTHPLACE's IANA zone. Without it the birth time is read as UTC and
+    # the chart is cast for somewhere between one and thirteen hours away from
+    # where it should be.
+    timezone: str = Field(default="", max_length=64)
     label: str = Field(default="", max_length=80)
     consent: bool = False
 
@@ -640,6 +680,7 @@ async def start(
         place_name=body.place_name.strip(),
         lat=body.lat,
         lon=body.lon,
+        timezone=body.timezone.strip(),
         last_seen_at=_now(),
         shared_at=_now(),
     )
@@ -773,16 +814,15 @@ async def _cross(left: SavedChart, right: SavedChart, tradition: str, orb: float
     """Ask the ephemeris what the two charts do to each other."""
     import httpx
 
-    def moment(c: SavedChart) -> str:
-        clock = "12:00" if c.time_unknown else (c.birth_time or "12:00")
-        return f"{c.birth_date}T{clock}:00"
-
     # The same environment variable the journal reads. One name for one thing.
     base = os.environ.get("SHRUTI_ASTRO_INTERNAL", "http://shruti-astro:8000").rstrip("/")
     async with httpx.AsyncClient(timeout=10.0) as client:
         r = await client.get(f"{base}/synastry", params={
-            "when_a": moment(left), "lat_a": left.lat, "lon_a": left.lon,
-            "when_b": moment(right), "lat_b": right.lat, "lon_b": right.lon,
+            # Offset-bearing, from the one helper. This built its own naive
+            # string once, and a comparison between two people in different
+            # countries was wrong by the difference between their zones.
+            "when_a": _moment_of(left), "lat_a": left.lat, "lon_a": left.lon,
+            "when_b": _moment_of(right), "lat_b": right.lat, "lon_b": right.lon,
             "tradition": tradition, "orb": orb,
             "time_unknown_a": str(left.time_unknown).lower(),
             "time_unknown_b": str(right.time_unknown).lower(),
@@ -801,6 +841,10 @@ class InviteIn(BaseModel):
     place_name: str = Field(default="", max_length=160)
     lat: float = 0.0
     lon: float = 0.0
+    # The BIRTHPLACE's IANA zone. Without it the birth time is read as UTC and
+    # the chart is cast for somewhere between one and thirteen hours away from
+    # where it should be.
+    timezone: str = Field(default="", max_length=64)
     label: str = Field(default="", max_length=80)
     tradition: str = "hellenistic"
     consent: bool = False
@@ -854,6 +898,7 @@ async def accept_invite(
         place_name=body.place_name.strip(),
         lat=body.lat,
         lon=body.lon,
+        timezone=body.timezone.strip(),
         last_seen_at=_now(),
     )
     if user is None:

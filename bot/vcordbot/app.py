@@ -25,7 +25,7 @@ from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 from fastapi import FastAPI, Header, HTTPException, Request
 
-from vcordbot import announce, config, storage
+from vcordbot import announce, commands, config, discord_api, render, storage
 from vcordbot.astro import Astro
 from vcordbot.dispatch import dispatch
 
@@ -39,6 +39,16 @@ log = logging.getLogger("vcordbot")
 # Held so `/health` can say whether the sweep is actually running. "Silence"
 # and "stopped" look identical from outside, and only one of them is fine.
 _watcher: "asyncio.Task | None" = None
+
+# Deferred answers in flight. Held in a set because asyncio keeps only a weak
+# reference to a bare task, and a garbage-collected one is an interaction that
+# is acknowledged and then never answered — which looks to the person asking
+# like the bot simply stopped.
+_pending: "set[asyncio.Task]" = set()
+
+# Discord's "I heard you, the answer is coming". The message can be edited for
+# fifteen minutes afterwards, which is far more room than anything here needs.
+DEFERRED_CHANNEL_MESSAGE = 5
 
 CFG = config.load()
 
@@ -123,6 +133,38 @@ async def interactions(
         raise HTTPException(401, "invalid request signature")
 
     payload = await request.json()
+
+    # Some commands cannot answer inside Discord's three seconds — `/chart`
+    # asks a gazetteer and then an ephemeris. Acknowledge first and fill the
+    # answer in, rather than racing a deadline and losing the birth data
+    # somebody just typed to "the application did not respond".
+    #
+    # `dispatch` is untouched by this: it still takes a payload and returns a
+    # response, and every test of it still runs with no HTTP anywhere. The
+    # transport concern stays in the adapter, which is what the adapter is for.
+    name = (payload.get("data") or {}).get("name")
+    if payload.get("type") == 2 and name in commands.DEFERRED:
+        task = asyncio.create_task(_answer_later(payload))
+        _pending.add(task)
+        task.add_done_callback(_pending.discard)
+        return {"type": DEFERRED_CHANNEL_MESSAGE,
+                # Decided HERE and never afterwards: the flag belongs to the
+                # acknowledgement, so a chart cannot become public because
+                # something failed halfway through producing it.
+                "data": {"flags": 0 if _wants_sharing(payload) else 1 << 6}}
+
+    return await _answer(payload)
+
+
+def _wants_sharing(payload: dict) -> bool:
+    """Whether the person asked for this to be posted in the channel."""
+    for option in ((payload.get("data") or {}).get("options") or []):
+        if option.get("name") == "share":
+            return bool(option.get("value"))
+    return False
+
+
+async def _answer(payload: dict) -> dict:
     return await dispatch(
         payload,
         Astro(CFG.astro_url),
@@ -130,3 +172,29 @@ async def interactions(
         site_url=CFG.site_url,
         now_iso=datetime.now(timezone.utc).isoformat(),
     )
+
+
+async def _answer_later(payload: dict) -> None:
+    """
+    Do the slow work, then replace the acknowledgement with the answer.
+
+    Nothing raised in here reaches the person as a stack trace or as silence.
+    Silence is the worse of the two: an acknowledged interaction that is never
+    edited sits there saying the bot is thinking, forever.
+    """
+    try:
+        response = await _answer(payload)
+        embeds = (response.get("data") or {}).get("embeds") or []
+        answer = embeds[0] if embeds else render.failure(
+            "I could not put that together.", CFG.bot_url, CFG.site_url)
+    except Exception as exc:                        # noqa: BLE001
+        # Deliberately says nothing about WHAT failed. The inputs to this
+        # command are somebody's birth details and they must not end up in a
+        # message or a log line.
+        log.warning("deferred %s failed: %s",
+                    (payload.get("data") or {}).get("name"), type(exc).__name__)
+        answer = render.failure(
+            "Something went wrong working that out. Try again in a moment.",
+            CFG.bot_url, CFG.site_url)
+
+    await discord_api.edit_original(CFG.app_id, payload.get("token", ""), answer)

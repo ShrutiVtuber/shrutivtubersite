@@ -59,9 +59,10 @@ const nat = reader?.nativity ?? null;
    a degree every four minutes, so an ascendant computed from an assumed noon
    is fabricated. The daemon computes it anyway and warns; this page withholds
    it, which is the standard the natal instrument already holds to. */
-const natalMoment = nat
-  ? `${nat.birthDate}T${nat.timeUnknown ? "12:00" : nat.birthTime || "12:00"}:00`
-  : "";
+/* Resolved by the API from the BIRTHPLACE's zone. Assembled here once, with
+   no offset, which the ephemeris read as UTC — so the transits were compared
+   against a nativity cast for the wrong instant. */
+const natalMoment = nat?.when ?? "";
 const natalQuery = nat
   ? `&natal=${encodeURIComponent(natalMoment)}&natal_lat=${nat.lat}&natal_lon=${nat.lon}`
   : "";
@@ -214,8 +215,7 @@ const moonProgress = today ? (today.moon.tropical.degree % 30) / 30 : 0;
                 tables are the reading and the wheel is a way of seeing what
                 they already say. */}
             <ChartFigure
-              date={(today.at ?? "").slice(0, 10)}
-              time={(today.at ?? "").slice(11, 16)}
+              when={today.at ?? ""}
               lat={lat}
               lon={lon}
               caption={`asc ${today.sky.ascendant.toFixed(2)}° · mc ${today.sky.midheaven.toFixed(2)}°`}

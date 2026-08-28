@@ -50,9 +50,9 @@ const FIGURE = { wheel: "wheel", north: "North Indian square", south: "South Ind
 /* The placements, so the sheet carries the reading and not only the picture.
    The tables are the reading — that is the design's order everywhere else and
    paper is no reason to invert it. */
-const moment = c
-  ? `${c.birthDate}T${c.timeUnknown ? "12:00" : c.birthTime || "12:00"}:00`
-  : "";
+/* The instant, resolved by the API from the birthplace's own zone. Assembled
+   here once, without an offset, which the ephemeris then read as UTC. */
+const moment = c?.when ?? "";
 const cast = c
   ? await askAstro<any>(
       `/chart?when=${encodeURIComponent(moment)}&lat=${c.lat}&lon=${c.lon}` +
@@ -115,8 +115,7 @@ const host = SITE_URL.replace(/^https?:\/\//, "");
 
             <div class="sheet-figure">
               <ChartFigure
-                date={c.birthDate}
-                time={c.birthTime}
+                when={c.when}
                 timeUnknown={c.timeUnknown}
                 lat={c.lat}
                 lon={c.lon}

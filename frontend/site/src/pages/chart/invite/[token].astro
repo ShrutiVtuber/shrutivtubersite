@@ -55,6 +55,9 @@ if (Astro.request.method === "POST") {
         place_name: String(form.get("place") ?? ""),
         lat: Number(form.get("lat") ?? 0),
         lon: Number(form.get("lon") ?? 0),
+        // The birthplace's zone. Without it the guest's half of the
+        // comparison is cast in UTC while the inviter's half is not.
+        timezone: String(form.get("tz") ?? ""),
         label: String(form.get("label") ?? ""),
         consent: form.get("consent") === "1",
       }),
@@ -116,7 +119,7 @@ const who = await site<any>(`/api/charts/invite/${token}`).catch(() => null);
             </label>
             <p class="hint">{say("text.2", "Without a time the planets still work — the angles do not, and the reading says which parts it has left out rather than guessing them.")}</p>
 
-            <PlaceField lat={37.9838} lon={23.7275} place="" />
+            <PlaceField lat={37.9838} lon={23.7275} place="" wantTimezone />
 
             <label class="check">
               <input type="checkbox" name="consent" value="1" required />

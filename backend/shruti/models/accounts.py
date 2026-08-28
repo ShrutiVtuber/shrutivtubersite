@@ -469,6 +469,16 @@ class SavedChart(TimestampMixin, table=True):
     place_name: str = ""
     lat: float = 0.0
     lon: float = 0.0
+    # The IANA zone NAME of the BIRTHPLACE — never an offset, and never the
+    # visitor's own zone. Without it the ephemeris reads the birth time as UTC,
+    # which gives a chart with the right Sun, the wrong ascendant, and nothing
+    # on its face to say so. `+03:00` would not do instead: Greece was +02:00
+    # in January of the same year, and only the name survives that.
+    #
+    # Empty on rows saved before it was kept. `core.moments.timezone_known()`
+    # is how a page tells, so those can be flagged rather than silently
+    # redrawn as though they had always been right.
+    timezone: str = ""
 
     # The consent that makes holding the above lawful, stored verbatim so the
     # record still says what this person actually read after the wording

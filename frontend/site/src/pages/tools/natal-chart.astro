@@ -22,7 +22,7 @@ import PlaceField from "../../components/forms/PlaceField.astro";
 import DisagreementControl from "../../components/tools/DisagreementControl.astro";
 import CannotCompute from "../../components/tools/CannotCompute.astro";
 import KeepChart from "../../components/chart/KeepChart.astro";
-import { askAstro } from "../../lib/api";
+import { askAstro, SITE_API } from "../../lib/api";
 import { account, asReader } from "../../lib/account";
 import { verifyCsrf } from "../../lib/csrf";
 import { copy } from "../../lib/copy";
@@ -61,6 +61,9 @@ if (Astro.request.method === "POST") {
         place_name: p.get("place") ?? "",
         lat: Number(p.get("lat") ?? 0),
         lon: Number(p.get("lon") ?? 0),
+        // Without this the saved row cannot be re-cast correctly, and every
+        // later view of it falls back to UTC.
+        timezone: p.get("tz") ?? "",
         consent: form.get("consent") === "1",
       }),
     });
@@ -88,6 +91,9 @@ const unknownTime = q.get("unknownTime") === "1" || (!!date && !time);
 const lat = Number(q.get("lat") ?? 37.9838);
 const lon = Number(q.get("lon") ?? 23.7275);
 const place = q.get("place") ?? "";
+/* The BIRTHPLACE's IANA zone, filled in by the place control. Not the
+   visitor's own zone, which is a different fact about a different person. */
+const tz = q.get("tz") ?? "";
 const HOUSE_SYSTEMS = ["whole_sign", "placidus", "equal", "porphyry", "regiomontanus", "campanus"];
 /* North and South Indian are different diagrams, not two styles of one: the
    North figure fixes the houses and moves the signs, the South figure fixes
@@ -139,9 +145,41 @@ const dignityWords = (b: Body) =>
        b.dignities.detriment && "detriment", b.dignities.fall && "fall"].filter(Boolean).join(" · ")
     : "";
 
-/* Noon when the time is unknown: it is the least-wrong instant for the
-   planets and it is stated, not hidden. */
-const moment = date ? `${date}T${unknownTime ? "12:00" : time || "12:00"}:00` : "";
+/* THE INSTANT, NOT A WALL CLOCK.
+ *
+ * This page used to send `1996-05-14T09:30:00` and the ephemeris read it as
+ * UTC, so a birth in Athens was cast for half past twelve there. The planets
+ * barely moved and only the angles did, which is why nothing looked wrong:
+ * Athens came out 37° off, Mumbai 76°, Los Angeles 127° — the right Sun and
+ * the wrong rising sign.
+ *
+ * The offset is the one that applied AT THE BIRTHPLACE ON THE BIRTH DATE, and
+ * it is resolved by the same server function that casts every saved chart.
+ * Greece was +02:00 in the January of the same year.
+ */
+const clock = unknownTime ? "12:00" : time || "12:00";
+
+async function offsetAt(local: string): Promise<{ offset: string; note: string } | null> {
+  if (!tz) return null;
+  try {
+    const r = await fetch(
+      `${SITE_API}/api/places/offset?tz=${encodeURIComponent(tz)}&when=${encodeURIComponent(local)}`,
+    );
+    if (!r.ok) return null;
+    const body = await r.json();
+    return { offset: body.offset as string, note: (body.note as string) ?? "" };
+  } catch {
+    return null;
+  }
+}
+
+const resolved = date ? await offsetAt(`${date}T${clock}`) : null;
+/* No zone means the chart is cast in UTC — the same instant this page has
+   always used. It is now said out loud instead of assumed silently, and the
+   page warns rather than drawing a confident wheel for the wrong sky. */
+const zoneKnown = !!resolved;
+const offsetNote = resolved?.note ?? "";
+const moment = date ? `${date}T${clock}:00${resolved?.offset ?? "+00:00"}` : "";
 const chartUrl = (t: string) =>
   `/chart?when=${encodeURIComponent(moment)}&lat=${lat}&lon=${lon}&tradition=${t}` +
   `&house_system=${houseSystem}&vedic_style=${vedicStyle}`;
@@ -157,9 +195,19 @@ const looks: { from: string; to: string; aspect: string; separationSigns?: numbe
    unknown. Two extra reads at the ends of the day — not an estimate. */
 let moonRange: { start: string; end: string } | null = null;
 if (date && unknownTime) {
+  /* Each end resolved separately: a clock change falls inside this very
+     window, and reusing one offset for both would misplace the far end by an
+     hour on exactly the days it matters. */
+  const [startOff, endOff] = await Promise.all([
+    offsetAt(`${date}T00:00`), offsetAt(`${date}T23:59`),
+  ]);
+  const ends = [
+    `${date}T00:00:00${startOff?.offset ?? "+00:00"}`,
+    `${date}T23:59:00${endOff?.offset ?? "+00:00"}`,
+  ];
   const [a, b] = await Promise.all([
-    askAstro<Payload>(`/chart?when=${encodeURIComponent(`${date}T00:00:00`)}&lat=${lat}&lon=${lon}&tradition=${tradition}`),
-    askAstro<Payload>(`/chart?when=${encodeURIComponent(`${date}T23:59:00`)}&lat=${lat}&lon=${lon}&tradition=${tradition}`),
+    askAstro<Payload>(`/chart?when=${encodeURIComponent(ends[0])}&lat=${lat}&lon=${lon}&tradition=${tradition}`),
+    askAstro<Payload>(`/chart?when=${encodeURIComponent(ends[1])}&lat=${lat}&lon=${lon}&tradition=${tradition}`),
   ]);
   const moonOf = (p: Payload | null) => p?.bodies.find((x) => x.name === "Moon");
   const m0 = moonOf(a.data), m1 = moonOf(b.data);
@@ -193,7 +241,7 @@ const ASPECT_BASIS: Record<string, string> = {
       legend={say("text.8", "Which sky, whose houses")}
       name="tradition"
       value={tradition}
-      keep={{ date, time, lat: String(lat), lon: String(lon), place, house_system: houseSystem, ...(unknownTime ? { unknownTime: "1" } : {}) }}
+      keep={{ date, time, lat: String(lat), lon: String(lon), place, tz, house_system: houseSystem, ...(unknownTime ? { unknownTime: "1" } : {}) }}
       options={[
         {
           value: "hellenistic",
@@ -218,7 +266,9 @@ const ASPECT_BASIS: Record<string, string> = {
         <input type="checkbox" name="unknownTime" value="1" checked={unknownTime} />
         <span class="check-label">{say("text.1", "I don't know my birth time")}</span>
       </label>
-      <PlaceField lat={lat} lon={lon} place={place} />
+      {/* `wantTimezone` is what puts the zone in the form. Without it this
+          page had coordinates and no clock, and cast every chart in UTC. */}
+      <PlaceField lat={lat} lon={lon} place={place} timezone={tz} wantTimezone />
       <label>
         <span>Houses</span>
         <select name="house_system">
@@ -256,6 +306,34 @@ const ASPECT_BASIS: Record<string, string> = {
       />
     ) : (
       <>
+        {
+          /* A chart cast without the birthplace's zone is cast in UTC, and it
+             looks exactly like a correct one — the Sun is right and the rising
+             sign is not. Said here rather than drawn silently. */
+          !zoneKnown && (
+            <CannotCompute
+              mark="◐"
+              title={say("no-zone.1", "This chart is cast in UTC, not local time")}
+              why={say("no-zone.2", "The birthplace's timezone is not set, so the birth time has been read as UTC. Every planet will be very nearly right and the ascendant will not — by an hour's worth of rotation for each hour of offset, which is fifteen degrees. Pick the birth city from the place field above and it will be cast properly.")}
+              alternatives={[
+                "Choose the birth city from the list in the place field, which fills in the timezone with it.",
+                "Read the planetary positions, which are barely affected.",
+                "Treat the ascendant, houses and sect below as unreliable until the place is set.",
+              ]}
+            />
+          )
+        }
+        {
+          /* The clock did something odd that night. Reported, never resolved
+             on somebody's behalf. */
+          offsetNote && (
+            <CannotCompute
+              mark="◐"
+              title={say("clock-note.1", "The clock changed that night")}
+              why={offsetNote}
+            />
+          )
+        }
         {
           unknownTime && (
             <CannotCompute

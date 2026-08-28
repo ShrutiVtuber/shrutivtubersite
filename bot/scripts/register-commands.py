@@ -21,7 +21,7 @@ import urllib.request
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from vcordbot.commands import COMMANDS                      # noqa: E402
+from vcordbot.commands import for_discord                   # noqa: E402
 
 
 def env(name: str) -> str:
@@ -45,7 +45,7 @@ def main() -> int:
            f"https://discord.com/api/v10/applications/{app_id}/commands")
 
     req = urllib.request.Request(
-        url, data=json.dumps(COMMANDS).encode(), method="PUT",
+        url, data=json.dumps(for_discord()).encode(), method="PUT",
         headers={"Authorization": f"Bot {token}", "Content-Type": "application/json",
                  "User-Agent": "vcordbot-register/1.0"})
     try:

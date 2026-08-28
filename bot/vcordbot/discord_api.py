@@ -72,3 +72,46 @@ async def post_message(channel_id: str, token: str, *, content: str = "",
     except Exception as exc:                        # noqa: BLE001
         log.warning("posting to %s failed: %s", channel_id, type(exc).__name__)
         return False
+
+
+async def edit_original(app_id: str, interaction_token: str, embed: dict,
+                        client: httpx.AsyncClient | None = None) -> bool:
+    """
+    Fill in an answer the bot already promised.
+
+    Discord allows three seconds to say ANYTHING, which a gazetteer lookup
+    followed by an ephemeris call is not reliably inside. The interaction is
+    acknowledged immediately and this replaces that acknowledgement with the
+    real answer when it arrives.
+
+    **This needs no bot token.** The interaction token is the authority, it is
+    scoped to this one interaction, and it expires in fifteen minutes — so a
+    followup carries less power than anything else the bot does, not more.
+
+    The ephemeral flag is fixed at the moment of acknowledgement and cannot be
+    changed here. Whether a chart is private is therefore decided before any
+    work begins, which is the right way round: it can never be leaked by a
+    failure partway through.
+    """
+    url = f"{API}/webhooks/{app_id}/{interaction_token}/messages/@original"
+
+    async def _edit(c: httpx.AsyncClient) -> bool:
+        r = await c.patch(url, json={"embeds": [embed],
+                                     "allowed_mentions": {"parse": []}},
+                          headers={"User-Agent": "vcordbot/1.0"}, timeout=10.0)
+        if r.status_code == 404:
+            # The token expired, or the interaction was never acknowledged.
+            # Nothing to retry: there is no message to edit.
+            log.warning("interaction expired before the answer was ready")
+            return False
+        r.raise_for_status()
+        return True
+
+    try:
+        if client is not None:
+            return await _edit(client)
+        async with httpx.AsyncClient() as c:
+            return await _edit(c)
+    except Exception as exc:                        # noqa: BLE001
+        log.warning("could not deliver a deferred answer: %s", type(exc).__name__)
+        return False

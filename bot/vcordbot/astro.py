@@ -87,3 +87,36 @@ class Astro:
 
     async def stations(self, body: str, when: str, lat: float, lon: float) -> dict:
         return await self._get("/stations", {"body": body, "when": when, "lat": lat, "lon": lon, "days": 1})
+
+    async def chart(self, when: str, lat: float, lon: float, *,
+                    tradition: str = "hellenistic",
+                    house_system: str = "whole_sign") -> dict:
+        """
+        A chart for one instant, seen from one place.
+
+        `when` MUST carry its UTC offset. The daemon reads a bare
+        `1996-05-14T09:30:00` as UTC, so a naive local wall clock silently
+        becomes a different moment — right to the minute for somebody in
+        London, three hours out for somebody in Athens, and eight for somebody
+        in California. Every planet stays very nearly correct and only the
+        ascendant moves, which is what makes it hard to see: the chart does not
+        look wrong, it looks like somebody else's.
+
+        `places.at()` is what produces an offset-bearing string, and it is the
+        only thing that should be feeding this.
+        """
+        if not _has_offset(when):
+            # Refused rather than corrected. Guessing UTC here is precisely the
+            # bug this method exists to prevent, and a loud failure in a test
+            # is worth more than a plausible chart.
+            raise AstroError("I could not work out the timezone for that birth place.")
+        return await self._get("/chart", {
+            "when": when, "lat": lat, "lon": lon,
+            "tradition": tradition, "house_system": house_system,
+        })
+
+
+def _has_offset(when: str) -> bool:
+    """Whether an ISO-8601 string names its own offset, `Z` included."""
+    tail = (when or "")[10:]                     # skip the date's own hyphens
+    return tail.endswith("Z") or "+" in tail or "-" in tail

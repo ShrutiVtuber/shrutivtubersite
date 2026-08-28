@@ -30,8 +30,11 @@ export const prerender = false;
 const token = Astro.params.token ?? "";
 const c = await site<any>(`/api/charts/compare/s/${token}`).catch(() => null);
 
-const moment = (s: any) =>
-  `${s.birthDate}T${s.timeUnknown ? "12:00" : s.birthTime || "12:00"}:00`;
+/* Each side's instant, resolved by the API from its own birthplace zone. Two
+   people in different countries were previously both cast as though their
+   birth times were UTC, so a comparison was wrong twice and by a different
+   amount on each side. */
+const moment = (s: any) => s.when ?? "";
 
 const cross = c
   ? await askAstro<any>(
@@ -86,7 +89,7 @@ const rightName = c?.right?.label || "The second";
               <figure class="side">
                 <figcaption>{i === 0 ? leftName : rightName}</figcaption>
                 <ChartFigure
-                  date={s.birthDate} time={s.birthTime} timeUnknown={s.timeUnknown}
+                  when={s.when} timeUnknown={s.timeUnknown}
                   lat={s.lat} lon={s.lon} tradition={s.tradition} figure={s.figure}
                 />
               </figure>

@@ -19,9 +19,19 @@ const say = await copy("component:ChartFigure");
 
 
 interface Props {
-  date: string;
-  /** null or "" when unknown, which is a state and not a gap. */
-  time?: string | null;
+  /* THE INSTANT, WITH ITS OFFSET — `1996-05-14T09:30:00+03:00`.
+   *
+   * This used to be a date and a time that this component assembled itself,
+   * and the string it assembled had no offset. The ephemeris reads a datetime
+   * with no offset as UTC, so every chart drawn here was cast for the wrong
+   * moment: an hour out for London, three for Athens, eight for Los Angeles.
+   * Only the angles move, so nothing about the result looked wrong.
+   *
+   * It is a required prop and it is resolved by the caller, because the zone
+   * belongs to the BIRTHPLACE and this component has never been told where
+   * that is. The API hands it over as `when` on every chart it returns. */
+  when: string;
+  /** A state, not a gap: the angles are undefined and are not drawn. */
   timeUnknown?: boolean;
   lat: number;
   lon: number;
@@ -33,14 +43,15 @@ interface Props {
   caption?: string;
 }
 const {
-  date, time, timeUnknown = false, lat, lon,
+  when, timeUnknown = false, lat, lon,
   tradition = "hellenistic", houseSystem = "whole_sign",
   figure = "wheel", caption,
 } = Astro.props;
 
-/* Noon when the time is unknown: the least-wrong instant for the planets, and
-   said out loud rather than hidden. The angles stay undefined either way. */
-const moment = `${date}T${timeUnknown ? "12:00" : time || "12:00"}:00`;
+const moment = when;
+/* For the description only. The cast uses `when` verbatim. */
+const date = (when ?? "").slice(0, 10);
+const time = (when ?? "").slice(11, 16);
 
 /* The Vedic square is asked for by name; a wheel is what the Hellenistic
    branch draws anyway. Asking for `north` on a Hellenistic chart would get a

@@ -22,6 +22,11 @@ export interface Account {
     label: string; birthDate: string; birthTime: string | null;
     timeUnknown: boolean; placeName: string; lat: number; lon: number;
     elevation: number; timezone: string; utcOffsetMinutes: number | null;
+    /** The instant to cast, offset and all. Never assemble one from the
+        fields above — a datetime with no offset is read as UTC. */
+    when: string;
+    /** False for a nativity saved before the birthplace zone was kept. */
+    timezoneKnown: boolean;
   } | null;
   consents: {
     kind: string; granted: boolean; version: string;

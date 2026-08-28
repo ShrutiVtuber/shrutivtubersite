@@ -97,60 +97,28 @@ async def timezone_offset(
     that looks right: every planet is nearly correct and the ascendant is
     fifteen degrees off.
 
-    Returns the offset and the zone abbreviation, plus whether the local time
-    given is one that the clock skipped or repeated — a spring-forward gap, or
-    an autumn hour lived twice. Both are real and both are the sort of thing
-    someone born at 02:30 deserves to be told rather than have silently
-    resolved.
+    The arithmetic itself lives in `core.moments`, which is also what casts
+    every saved chart. It was inline here once and the natal tool did not call
+    it, which is exactly how the site came to send the ephemeris naive
+    datetimes it read as UTC.
     """
-    from datetime import datetime, timedelta
-    from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+    from shruti.core.moments import UnknownZone, offset_at
 
     try:
-        zone = ZoneInfo(tz)
-    except (ZoneInfoNotFoundError, ValueError, KeyError):
+        offset = offset_at(tz, when)
+    except UnknownZone:
         raise HTTPException(400, f"unknown timezone {tz!r}")
-
-    try:
-        naive = datetime.fromisoformat(when)
     except ValueError:
         raise HTTPException(400, "when must be an ISO-8601 local date or datetime")
-    if naive.tzinfo is not None:
-        naive = naive.replace(tzinfo=None)
 
-    local = naive.replace(tzinfo=zone)
-    offset = local.utcoffset() or timedelta(0)
-
-    # BOTH a spring-forward gap and an autumn fold make the two folds disagree,
-    # so that comparison alone cannot tell them apart — it labelled 01:30 on 29
-    # March 1981 in London as "occurred twice" when in fact the UK clock went
-    # forward at 01:00 GMT and that minute never existed.
-    #
-    # The round trip is what separates them. Normalise to UTC and back: a fold
-    # returns the same wall clock (it happened, twice), a gap does not (it never
-    # showed).
-    other = naive.replace(tzinfo=zone, fold=1)
-    folds_differ = other.utcoffset() != offset
-    imaginary = local.astimezone(ZoneInfo("UTC")).astimezone(zone).replace(tzinfo=None) != naive
-    ambiguous = folds_differ and not imaginary
-
-    minutes = int(offset.total_seconds() // 60)
-    sign = "+" if minutes >= 0 else "-"
     return {
         "timezone": tz,
         "when": when,
-        "offsetMinutes": minutes,
-        "offset": f"{sign}{abs(minutes) // 60:02d}:{abs(minutes) % 60:02d}",
-        "abbreviation": local.tzname() or "",
-        "isDst": bool(local.dst()),
-        "ambiguous": ambiguous,
-        "imaginary": imaginary,
-        "note": (
-            "this local time never occurred — the clock went forward over it, "
-            "so a birth certificate showing it needs checking"
-            if imaginary else
-            "this local time occurred twice that night — the clock went back, "
-            "and the two are an hour apart"
-            if ambiguous else ""
-        ),
+        "offsetMinutes": offset.minutes,
+        "offset": offset.label,
+        "abbreviation": offset.abbreviation,
+        "isDst": offset.is_dst,
+        "ambiguous": offset.ambiguous,
+        "imaginary": offset.imaginary,
+        "note": offset.note,
     }

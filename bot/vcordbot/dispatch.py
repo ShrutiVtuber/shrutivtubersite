@@ -16,8 +16,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from vcordbot import announce, render, storage
+from vcordbot import announce, commands, places, render, storage
 from vcordbot.astro import Astro, AstroError
+from vcordbot.places import PlaceError
 
 # Incoming
 PING = 1
@@ -120,8 +121,22 @@ async def dispatch(interaction: dict, astro: Astro, *, bot_url: str,
             result = await astro.isopsephy(text, opts.get("script") or "greek-iso")
             return _message(render.isopsephy(result, bot_url, site_url))
 
+        if name == "chart":
+            return await _chart(opts, astro, bot_url=bot_url, site_url=site_url)
+
+        if name == "help":
+            return _message(render.manual(
+                commands.COMMANDS, bot_url, site_url,
+                only=(opts.get("command") or "").strip().lstrip("/")),
+                ephemeral=True)
+
         if name == "announce":
             return await _announce(interaction, opts, data, bot_url, site_url)
+
+    except PlaceError as exc:
+        # Already written to be read by a stranger, and never blaming them for
+        # a city the gazetteer spells differently.
+        return _message(render.failure(str(exc), bot_url, site_url), ephemeral=True)
 
     except AstroError as exc:
         # The message is already written to be read by a stranger.
@@ -234,3 +249,128 @@ async def _announce(interaction: dict, opts: dict, data: dict,
 
     return _message(render.failure("I do not know that one.", bot_url, site_url),
                     ephemeral=True)
+
+
+# ── the chart ───────────────────────────────────────────────────────────────
+
+# What somebody types when they do not have a birth time. Accepted as a VALUE
+# of the time option rather than as a separate flag, so nobody types 12:00 to
+# get past a required field and is handed a fabricated ascendant for it.
+UNKNOWN = {"unknown", "unsure", "?", "none", "no", "n/a", "na", "-"}
+
+# Local noon when the time is unknown: the least-wrong instant for the planets,
+# and it is stated in the answer rather than hidden.
+NOON = "12:00"
+
+
+def _birth_date(raw: str) -> str:
+    """
+    An ISO date, or a refusal that says what was wanted.
+
+    Refused rather than guessed. `05/14/1996` and `14/05/1996` are the same
+    eight characters arranged by two conventions that disagree about half the
+    year, and a chart cast on the wrong one is a chart for a different person.
+    """
+    from datetime import date
+
+    text = (raw or "").strip()
+    try:
+        parsed = date.fromisoformat(text)
+    except ValueError:
+        raise PlaceError(
+            "I need the birth date as `YYYY-MM-DD` — `1996-05-14`. "
+            "I will not guess at `05/14/1996`, because half the world reads "
+            "that as the fourteenth of May and half as the fifth of the "
+            "fourteenth month."
+        ) from None
+    # The ephemeris is good for a wide span but not an unbounded one, and a
+    # typo in the year is far commoner than a genuine mediaeval nativity.
+    if not 1 <= parsed.year <= 2999:
+        raise PlaceError("That year is outside what I can compute.")
+    return parsed.isoformat()
+
+
+def _birth_time(raw: str) -> str | None:
+    """
+    A 24-hour clock time, or None for an unknown one.
+
+    `9:30 pm` is the commonest way this goes wrong, and it is worth catching by
+    name: taken as 24-hour it is half past nine in the morning, twelve hours
+    and a whole different chart away from what was meant.
+    """
+    text = (raw or "").strip().lower()
+    if text in UNKNOWN:
+        return None
+
+    if text.endswith(("am", "pm")) or " am" in text or " pm" in text:
+        raise PlaceError(
+            "That looks like a 12-hour time. I need it on the 24-hour clock — "
+            "half past nine at night is `21:30`, half past nine in the morning "
+            "is `09:30`."
+        )
+
+    digits = text.replace(".", ":").replace("h", ":").strip(":")
+    if ":" not in digits and digits.isdigit() and len(digits) == 4:
+        digits = f"{digits[:2]}:{digits[2:]}"
+
+    parts = digits.split(":")
+    if len(parts) < 2 or not all(p.isdigit() for p in parts[:2]):
+        raise PlaceError("I need the birth time as `HH:MM` on the 24-hour clock — "
+                         "`09:30`, or `21:30`. Say `unknown` if you do not have it.")
+    hour, minute = int(parts[0]), int(parts[1])
+    if not (0 <= hour <= 23 and 0 <= minute <= 59):
+        raise PlaceError("That is not a time on the 24-hour clock.")
+    return f"{hour:02d}:{minute:02d}"
+
+
+async def _chart(opts: dict, astro: Astro, *, bot_url: str, site_url: str) -> dict:
+    """
+    Cast one chart and hand it back to the person who asked, and to nobody else.
+
+    **Ephemeral unless they say otherwise.** A chart IS birth data — the
+    ascendant gives the time of day to within a few minutes and the planets
+    give the date — so posting one into a shared channel by default would put
+    somebody's birth record in a room they did not choose. `share:true` is a
+    decision, made by the only person entitled to make it.
+
+    Nothing here is written down. No row, no cache, no log line carrying a
+    date, a time or a place.
+    """
+    date = _birth_date(opts.get("date") or "")
+    clock = _birth_time(opts.get("time") or "")
+    tradition = opts.get("tradition") or "hellenistic"
+    share = bool(opts.get("share"))
+
+    place, alternatives = await places.find(
+        opts.get("city") or "", opts.get("country") or "", opts.get("state") or "")
+
+    moment = places.at(place, date, clock or NOON)
+
+    data = await astro.chart(moment.when, place.lat, place.lon, tradition=tradition)
+
+    # The Moon moves twelve to fifteen degrees across a day, so with no birth
+    # time a single figure for it is precision the chart does not have. Two
+    # further reads at the ends of that local day give the range it was really
+    # somewhere inside — an honest interval rather than an estimate.
+    moon_range = None
+    if clock is None:
+        try:
+            first = places.at(place, date, "00:00")
+            last = places.at(place, date, "23:59")
+            ends = [await astro.chart(m.when, place.lat, place.lon, tradition=tradition)
+                    for m in (first, last)]
+            moons = [next((b for b in (e.get("bodies") or [])
+                           if b.get("name") == "Moon"), None) for e in ends]
+            if all(moons):
+                start, end = (render._sign_of(m) for m in moons)
+                moon_range = (f"{render._dms(start[1])} {start[0]}",
+                              f"{render._dms(end[1])} {end[0]}")
+        except (AstroError, PlaceError):
+            # A refinement, not the answer. The chart still stands without it.
+            moon_range = None
+
+    return _message(
+        render.chart(data, place=place, moment=moment, tradition=tradition,
+                     time_unknown=clock is None, moon_range=moon_range,
+                     alternatives=alternatives, bot_url=bot_url, site_url=site_url),
+        ephemeral=not share)

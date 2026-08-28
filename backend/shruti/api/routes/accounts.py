@@ -335,11 +335,18 @@ async def me(
 def _nativity_payload(n: Nativity | None) -> dict | None:
     if n is None:
         return None
+    from shruti.core.moments import birth_moment, timezone_known
+
     return {
         "label": n.label, "birthDate": n.birth_date, "birthTime": n.birth_time,
         "timeUnknown": n.time_unknown, "placeName": n.place_name,
         "lat": n.lat, "lon": n.lon, "elevation": n.elevation,
         "timezone": n.timezone, "utcOffsetMinutes": n.utc_offset_minutes,
+        # The instant, offset and all. The zone was being stored here and read
+        # back by nothing at all, while Today cast this nativity from a naive
+        # string the ephemeris took for UTC.
+        "when": birth_moment(n.birth_date, n.birth_time, n.time_unknown, n.timezone),
+        "timezoneKnown": timezone_known(n.timezone),
     }
 
 
