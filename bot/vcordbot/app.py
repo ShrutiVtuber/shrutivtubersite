@@ -101,12 +101,27 @@ VERIFIER = _verifier()
 
 @app.get("/health")
 async def health() -> dict:
-    """No secrets, no counts, nothing about who uses it."""
+    """
+    No secrets, no counts, nothing about who uses it.
+
+    **A health check must not be able to fail.** This read the store directly
+    and raised when the store was not there — so the one moment the endpoint
+    exists for, a startup that did not finish, was the one moment it could not
+    answer. An unreachable store is now something it REPORTS.
+    """
     running = _watcher is not None and not _watcher.done()
+    try:
+        watching = len(storage.watches())
+        store = "ready"
+    except Exception:                               # noqa: BLE001
+        # Deliberately broad: whatever went wrong with the store, saying so is
+        # more useful than a 500 that says nothing at all.
+        watching, store = None, "unavailable"
     return {"ok": True, "app": CFG.app_id or None,
             "verifying": VERIFIER is not None,
             "watcher": "running" if running else "stopped",
-            "watching": len(storage.watches())}
+            "store": store,
+            "watching": watching}
 
 
 @app.post("/interactions")

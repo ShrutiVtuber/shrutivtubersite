@@ -39,9 +39,28 @@ was deployed, so cutover is a DNS change with no TLS scramble.
 ```bash
 cd /srv/shrutivtuber/prod
 git pull --ff-only
-dc up -d --build
+dc --profile web --profile bot up -d --build
 dc exec -T backend alembic upgrade head
 ```
+
+**Both profiles, every time.** `site` sits behind `web` and `vcordbot` behind
+`bot`, so a plain `dc up -d --build` rebuilds postgres, backend and caddy and
+silently leaves the other two running whatever they were built from. Nothing
+looks wrong afterwards: the containers are up, healthy, and answering — with
+old code. Naming both here costs nothing when they are already running, because
+a profile that is up is simply rebuilt.
+
+The bot's commands are a separate step and are NOT part of a deploy. Discord
+holds its own copy of the command list, so a changed `commands.py` reaches
+nobody until:
+
+```bash
+python3 bot/scripts/register-commands.py
+```
+
+which registers globally and clears any guild-scoped list that would otherwise
+shadow it. Only needed when commands are added, removed, or their options or
+descriptions change — not for a change to what a command *does*.
 
 ## Bringing the frontend up
 
@@ -124,19 +143,20 @@ be able to do it on its own.
 
 **The Nexcess cancellation.** After DNS has been watched, not before.
 
-## Migrations, in order
+## Migrations
 
-Each is applied by `alembic upgrade head`; the list is here so a failure part
-way through is legible rather than mysterious.
+`alembic upgrade head` applies whatever is outstanding. To see the order before
+running it, or to work out where a part-way failure stopped:
 
-| Revision | What it adds |
-|---|---|
-| `8a1c4f2b7d90` | project credits |
-| `9c3e7b15a4d2` | fan art |
-| `a4f81c26b9e0` | reader accounts, nativities, consents |
-| `b7d2e91f4a63` | `storage_backend` on media rows |
-| `c9a04e1b78f2` | stored sky for journal entries |
-| `d3f16c8b52a4` | passkeys |
+```bash
+dc exec -T backend alembic current      # where this database is
+dc exec -T backend alembic history      # every revision, newest first
+```
+
+There used to be a table of them here. It listed six of the forty-eight that
+exist and had been wrong for weeks — a hand-kept copy of something Alembic
+already knows is a second source that goes stale silently, which is the exact
+failure it was written to prevent.
 
 ## Stripe went live — 2026-08-26
 

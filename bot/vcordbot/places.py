@@ -274,3 +274,25 @@ def at(place: Place, date: str, time: str) -> Moment:
             if ambiguous else ""
         ),
     )
+
+
+async def lookup(text: str, client: httpx.AsyncClient | None = None
+                 ) -> tuple[Place, list[Place]]:
+    """
+    A place as somebody actually types it into a chat box.
+
+    `Tokyo` · `Athens, Greece` · `Springfield, IL, USA` — one field, commas
+    optional, read from the outside in: the first part is always the city and
+    the last is the country, because that is the order every postal address in
+    the world agrees on. Anything between them is the state or province.
+
+    `find()` keeps the three arguments separate because `/chart` has three
+    separate fields to fill them from. This is for the commands that have one.
+    """
+    parts = [p.strip() for p in (text or "").split(",") if p.strip()]
+    if not parts:
+        raise PlaceError("Give me a city.")
+    city = parts[0]
+    country = parts[-1] if len(parts) > 1 else ""
+    region = parts[1] if len(parts) > 2 else ""
+    return await find(city, country, region, client=client)

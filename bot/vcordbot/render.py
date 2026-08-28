@@ -350,6 +350,14 @@ def chart(data: dict, *, place, moment, tradition: str, time_unknown: bool,
 # middle of a word. Wider reads fine on a desktop and badly everywhere else.
 WIDTH = 68
 
+# Discord refuses an embed whose description passes 4096 characters — the whole
+# message fails, it is not truncated. Ten commands come to about 2700, so this
+# is not close today and would be crossed by roughly five more without anything
+# warning first, which is exactly the kind of limit that is discovered by a
+# user. Below the cap the manual is full; above it, it lists.
+DESCRIPTION_LIMIT = 4096
+ROOM = 3600
+
 
 def _entry(command: dict) -> str:
     """
@@ -401,9 +409,249 @@ def manual(commands: list[dict], bot_url: str, site_url: str,
         ]))
 
     body = "\n\n".join(_entry(c) for c in chosen)
+
+    if len(body) > ROOM and not only:
+        # Too many to print in full. A short list plus a way to ask for one is
+        # a worse manual than the full one and a far better one than an embed
+        # Discord refuses to deliver at all.
+        body = "\n".join(
+            f"{c['name']:<11} {c.get('description', '')[:WIDTH - 12]}"
+            for c in chosen)
+
     lines = [f"```\n{body}\n```"]
     if not only:
         lines.append("`/help command:<name>` for one of them on its own.")
     lines += ["", footer(bot_url, site_url)]
     return embed("vcordbot" if not only else f"/{only}", "\n".join(lines),
                  url=f"{site_url}/tools")
+
+
+# ── the rest of the instruments ─────────────────────────────────────────────
+
+def _in(iso: str) -> str:
+    """
+    "in about four hours", in the reader's own reckoning of the clock.
+
+    Relative rather than absolute because every limb of the pañcāṅga ends at
+    some point that is usually today and occasionally tomorrow, and an absolute
+    time of day is ambiguous about which — while a relative one never is.
+    """
+    try:
+        dt = datetime.fromisoformat(iso.replace("Z", "+00:00"))
+    except (ValueError, AttributeError):
+        return iso
+    return f"<t:{int(dt.astimezone(timezone.utc).timestamp())}:R>"
+
+
+def _limb(label: str, part: dict) -> str:
+    """One limb, its name, and when it gives way to the next."""
+    name = part.get("name", "—")
+    line = f"**{label}** {name}"
+    if part.get("ruler"):
+        line += f" — {part['ruler']}"
+    if part.get("endsAt"):
+        line += f", until {_in(part['endsAt'])}"
+    return line
+
+
+def panchanga(data: dict, place: str, bot_url: str, site_url: str) -> dict:
+    """
+    The five limbs, each with the moment it ends.
+
+    A pañcāṅga is not a date, it is five overlapping divisions that begin and
+    end at different times of day — so a limb without its end is half the fact.
+    Reckoned from SUNRISE where the person asked, not from midnight and not
+    from here, which is the whole reason the command takes a place.
+    """
+    lines = [
+        _limb("Vāra", data.get("vara") or {}),
+        _limb("Tithi", data.get("tithi") or {}),
+        _limb("Nakṣatra", data.get("nakshatra") or {}),
+        _limb("Yoga", data.get("yoga") or {}),
+        _limb("Karaṇa", data.get("karana") or {}),
+        "",
+        f"Sunrise {_stamp(data.get('sunrise',''))} — the day is reckoned from there, not from midnight.",
+    ]
+
+    absent = data.get("undefined") or []
+    if absent:
+        # Named rather than omitted. A limb that cannot be reckoned somewhere
+        # is a fact about the place, and hiding it reads as it having no value.
+        lines.append(f"Not reckonable here: {', '.join(str(a) for a in absent)}.")
+
+    ayanamsa = data.get("ayanamsa") or {}
+    if ayanamsa.get("name"):
+        lines += ["", f"_{str(ayanamsa['name']).title()} ayanāṃśa, "
+                      f"{_dms(float(ayanamsa.get('degrees', 0)))}. "
+                      f"A different one can move a nakṣatra boundary._"]
+    lines += ["", footer(bot_url, site_url)]
+    return embed(f"Pañcāṅga · {place}", "\n".join(lines),
+                 url=f"{site_url}/tools/panchanga")
+
+
+def attic(data: dict, bot_url: str, site_url: str) -> dict:
+    """
+    The Athenian calendar for one day.
+
+    Athens is not a default here and is not offered as an option: it is that
+    city's calendar, and reckoning it from somewhere else would be a different
+    calendar rather than the same one seen from further away.
+    """
+    month = data.get("month") or {}
+    day = data.get("day") or {}
+
+    name = month.get("name", "—")
+    greek = month.get("greek", "")
+    header = f"**{name}**" + (f" · {greek}" if greek else "")
+    if month.get("intercalary"):
+        # A repeated month, inserted to keep the calendar with the moon. Worth
+        # saying: it is why the same month name can occur twice in one year.
+        header += " — intercalary, the month repeated"
+
+    lines = [
+        header,
+        f"Day **{day.get('number','—')}** of {month.get('length','—')}"
+        + (f" — {day.get('greek','')} ({day.get('transliteration','')})"
+           if day.get("greek") else ""),
+    ]
+    if day.get("decad"):
+        lines.append(f"In the {day['decad']} decad · {day.get('remaining','—')} days remain.")
+    lines += [
+        "",
+        f"The moon is **{data.get('moonAgeDays','—')} days** old.",
+        f"Next noumenia — the next new month — **{data.get('nextNoumenia','—')}**.",
+    ]
+
+    # The key is `used`. Read as `name`/`note` it silently rendered nothing,
+    # which dropped the one line that says which of two disagreeing rules
+    # produced the date above it.
+    used = (data.get("reckoning") or {}).get("used", "")
+    if used:
+        lines += ["", f"_{used.title()} reckoning — a month opens at "
+                      + ("the astronomical new moon"
+                         if used == "conjunction" else
+                         "the first crescent somebody could see")
+                      + ". The other opens half the months of a year on a "
+                        "different day._"]
+
+    lines += ["", footer(bot_url, site_url)]
+    return embed(f"Attic calendar · {data.get('gregorian','')}", "\n".join(lines),
+                 url=f"{site_url}/tools/attic-calendar")
+
+
+def hindu(data: dict, place: str, bot_url: str, site_url: str) -> dict:
+    """
+    The Hindu calendar date, under the reckoning that was asked for.
+
+    The two reckonings genuinely disagree about which month it is for half of
+    every month, so the one in use is named rather than left as an assumption.
+    Neither is the correction of the other.
+    """
+    years = data.get("years") or {}
+    month = data.get("month") or {}
+    tithi = data.get("tithi") or {}
+
+    name = month.get("name", "—")
+    if month.get("adhika"):
+        name += " (adhika — the intercalary repeat of it)"
+    if month.get("kshaya"):
+        name += " (kṣaya — the month skipped)"
+
+    lines = [
+        f"**{name}**, {data.get('paksha','—')} pakṣa",
+        f"**{tithi.get('name','—')}**",
+        "",
+        f"Vikrama **{years.get('vikrama','—')}** · "
+        f"Śaka **{years.get('shaka','—')}** · "
+        f"Kali **{years.get('kali','—')}**",
+    ]
+
+    lunation = data.get("lunation") or {}
+    if lunation.get("end"):
+        lines += ["", f"This lunation ends {_in(lunation['end'])}."]
+
+    reckoning = data.get("reckoning", "amanta")
+    lines += [
+        "",
+        f"_{reckoning.title()} reckoning — the month ends at the "
+        f"{'new' if reckoning == 'amanta' else 'full'} moon. "
+        f"The other names this month differently for half of every month, and "
+        f"is not a correction of it._",
+    ]
+    if data.get("authority"):
+        lines.append(f"_Computed by {data['authority']}._")
+    lines += ["", footer(bot_url, site_url)]
+    return embed(f"Hindu calendar · {place}", "\n".join(lines),
+                 url=f"{site_url}/tools/hindu-calendar")
+
+
+def sigil(data: dict, bot_url: str, site_url: str) -> dict:
+    """
+    The reduction, step by step, and where the drawing lives.
+
+    The figure is a 512-pixel SVG and a chat client will not render one, so the
+    steps are the answer here and the drawing is a link. Saying that plainly
+    beats posting a broken image and hoping.
+    """
+    steps = data.get("steps") or []
+    lines = []
+    for step in steps:
+        line = f"**{step.get('label','')}** — `{step.get('value','')}`"
+        if step.get("note"):
+            line += f"  _{step['note']}_"
+        lines.append(line)
+
+    lines += [
+        "",
+        f"**{data.get('pointCount','—')} points**, drawn through "
+        f"`{data.get('letters','')}` in order.",
+    ]
+    if data.get("exhausted"):
+        # The method ran out of letters before it ran out of figure. Said,
+        # because the result is then not what the method promises.
+        lines.append(f"_{data.get('exhaustedReason') or 'The letters ran out before the figure did.'}_")
+    lines += [
+        "",
+        f"[Draw it on the site]({site_url}/tools/sigil-generator) — the figure "
+        "is an image, and this is a chat window.",
+        "",
+        footer(bot_url, site_url),
+    ]
+    return embed("Sigil", "\n".join(lines), url=f"{site_url}/tools/sigil-generator")
+
+
+def stations(data: dict, place: str, bot_url: str, site_url: str) -> dict:
+    """
+    Today's stations, including the ones that do not happen.
+
+    **An absent station is an answer.** A polar summer has no sunrise, and
+    printing nothing there would read as a failure to compute rather than as
+    the fact it is. The daemon gives a reason; it is passed on.
+    """
+    table = data.get("table") or []
+    today = (table[0] if table else {}) or {}
+    rows = today.get("stations") or []
+
+    lines = []
+    for s in rows:
+        name = str(s.get("name", "")).replace("_", " ")
+        if s.get("occurred"):
+            line = f"**{name.title()}** {_stamp(s.get('at',''))}"
+            if s.get("dedication"):
+                line += f" — {s['dedication']}"
+        else:
+            line = (f"**{name.title()}** — does not occur"
+                    + (f": {s['absentReason']}" if s.get("absentReason") else ""))
+        lines.append(line)
+
+    if not rows:
+        lines.append("Nothing to report for that body today.")
+
+    lines += [
+        "",
+        f"_{str(data.get('body','sun')).title()}, for {today.get('date','today')}._",
+        "",
+        footer(bot_url, site_url),
+    ]
+    return embed(f"Stations · {place}", "\n".join(lines),
+                 url=f"{site_url}/tools/stations")

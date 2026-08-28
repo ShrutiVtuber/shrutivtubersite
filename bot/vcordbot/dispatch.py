@@ -38,8 +38,13 @@ MANAGE_GUILD = 1 << 5
 
 # The place used when nobody has said otherwise. Athens because that is where
 # the instruments are authored; it is a default, never an assumption about the
-# person asking.
-ATHENS = {"name": "Athens", "lat": 37.9838, "lon": 23.7275}
+# person asking — which is why every command that uses it takes a `place` and
+# says which one it answered for.
+ATHENS = places.Place(
+    name="Athens", region="Attica", country="Greece", country_code="GR",
+    lat=37.9838, lon=23.7275, elevation=90.0,
+    timezone="Europe/Athens", population=664046,
+)
 
 
 def _options(data: dict) -> dict[str, Any]:
@@ -102,10 +107,59 @@ async def dispatch(interaction: dict, astro: Astro, *, bot_url: str,
 
     try:
         if name == "hour":
-            place = ATHENS
-            result = await astro.planetary_hours(now_iso, place["lat"], place["lon"])
+            place = await _place(opts)
+            result = await astro.planetary_hours(now_iso, place.lat, place.lon)
             return _message(render.planetary_hours(
-                result, place["name"], bot_url, site_url))
+                result, place.label, bot_url, site_url))
+
+        if name == "panchanga":
+            place = await _place(opts)
+            result = await astro.panchanga(now_iso, place.lat, place.lon)
+            return _message(render.panchanga(
+                result, place.label, bot_url, site_url))
+
+        if name == "attic":
+            when = (opts.get("date") or "").strip()
+            if when:
+                # Refused rather than guessed, for the same reason a birth date
+                # is: 05/14 and 14/05 are the same characters under two
+                # conventions that disagree for most of the year.
+                from datetime import date as _date
+                try:
+                    when = f"{_date.fromisoformat(when).isoformat()}T12:00:00+00:00"
+                except ValueError:
+                    return _message(render.failure(
+                        "I need the date as `YYYY-MM-DD` — `2026-08-28`.",
+                        bot_url, site_url), ephemeral=True)
+            result = await astro.attic(when or now_iso,
+                                       opts.get("reckoning") or "conjunction")
+            return _message(render.attic(result, bot_url, site_url))
+
+        if name == "hindu":
+            place = await _place(opts)
+            result = await astro.hindu(now_iso, place.lat, place.lon,
+                                       opts.get("reckoning") or "amanta")
+            return _message(render.hindu(
+                result, place.label, bot_url, site_url))
+
+        if name == "sigil":
+            statement = (opts.get("statement") or "").strip()
+            if not statement:
+                return _message(render.failure(
+                    "Give me a statement of intent.", bot_url, site_url), ephemeral=True)
+            if len(statement) > 200:
+                return _message(render.failure(
+                    "That is longer than this is for — two hundred characters at most.",
+                    bot_url, site_url), ephemeral=True)
+            result = await astro.sigil(statement)
+            return _message(render.sigil(result, bot_url, site_url))
+
+        if name == "stations":
+            place = await _place(opts)
+            body = opts.get("body") or "sun"
+            result = await astro.stations(body, now_iso, place.lat, place.lon)
+            return _message(render.stations(
+                result, place.label, bot_url, site_url))
 
         if name == "isopsephy":
             text = (opts.get("text") or "").strip()
@@ -144,6 +198,23 @@ async def dispatch(interaction: dict, astro: Astro, *, bot_url: str,
 
     return _message(render.failure(
         "I do not have that command.", bot_url, site_url), ephemeral=True)
+
+
+async def _place(opts: dict) -> places.Place:
+    """
+    Where the answer is for.
+
+    Athens when nobody says. **The option used to be read by nothing at all**:
+    the handler took Athens whatever was typed and titled the answer "Athens"
+    to match, so `/hour place:Tokyo` was not a missing feature but a confident
+    wrong answer — the one shape of failure this project refuses everywhere
+    else.
+    """
+    named = (opts.get("place") or "").strip()
+    if not named:
+        return ATHENS
+    best, _others = await places.lookup(named)
+    return best
 
 
 def _message(embed: dict, *, ephemeral: bool = False) -> dict:

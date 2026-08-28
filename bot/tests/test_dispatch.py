@@ -41,6 +41,76 @@ class FakeAstro:
                 "letters": [{"char": "λ", "value": 30}],
                 "reduction": {"final": 4}, "unmatched": []}
 
+    # The rest of the instruments, shaped as the daemon actually answers them.
+    # Copied from real responses rather than invented: the Vedic chart taught
+    # this suite that a made-up payload agrees with whatever the code already
+    # does, including where the code is wrong.
+
+    async def panchanga(self, when, lat, lon):
+        self.calls.append(("panchanga", when, lat, lon))
+        if self.fail:
+            raise AstroError(self.fail)
+        return {"sunrise": "2026-08-28T03:55:41+00:00",
+                "ayanamsa": {"name": "lahiri", "degrees": 24.232106},
+                "vara": {"name": "Śukravāra", "ruler": "Venus"},
+                "tithi": {"name": "Kṛṣṇa Pratipadā", "endsAt": "2026-08-29T04:27:25+00:00"},
+                "nakshatra": {"name": "Śatabhiṣā", "endsAt": "2026-08-28T21:43:27+00:00"},
+                "yoga": {"name": "Sukarman", "endsAt": "2026-08-29T01:06:23+00:00"},
+                "karana": {"name": "Bālava", "endsAt": "2026-08-28T16:26:42+00:00"},
+                "undefined": []}
+
+    async def attic(self, when, reckoning="conjunction"):
+        self.calls.append(("attic", when, reckoning))
+        if self.fail:
+            raise AstroError(self.fail)
+        return {"gregorian": "2026-08-28",
+                "month": {"name": "Metageitnion", "greek": "Μεταγειτνιών",
+                          "length": 30, "intercalary": False},
+                "day": {"number": 16, "greek": "16 ἐπὶ δέκα",
+                        "transliteration": "16 epi deka",
+                        "decad": "μεσοῦντος", "remaining": 15},
+                "moonAgeDays": 15.077, "nextNoumenia": "2026-09-12",
+                # The daemon's key is `used`, not `name` or `note`.
+                "reckoning": {"used": reckoning, "note": None}}
+
+    async def hindu(self, when, lat, lon, reckoning="amanta"):
+        self.calls.append(("hindu", when, lat, lon, reckoning))
+        if self.fail:
+            raise AstroError(self.fail)
+        # The two reckonings genuinely name a different month for the same day.
+        return {"reckoning": reckoning, "authority": "drik",
+                "years": {"vikrama": 2083, "shaka": 1948, "kali": 5127},
+                "month": {"name": "Śrāvaṇa" if reckoning == "amanta" else "Bhādrapada",
+                          "adhika": False, "kshaya": False},
+                "paksha": "Kṛṣṇa",
+                "tithi": {"name": "Kṛṣṇa Pratipadā"},
+                "lunation": {"end": "2026-09-11T03:27:01+00:00"}}
+
+    async def sigil(self, statement):
+        self.calls.append(("sigil", statement))
+        if self.fail:
+            raise AstroError(self.fail)
+        return {"steps": [{"label": "Statement of intent", "value": statement, "note": ""},
+                          {"label": "Vowels struck", "value": "CLRTY", "note": "removed: AIU"}],
+                "letters": "CDLNRSTY", "pointCount": 8,
+                "exhausted": False, "exhaustedReason": ""}
+
+    async def stations(self, body, when, lat, lon):
+        self.calls.append(("stations", body, when, lat, lon))
+        if self.fail:
+            raise AstroError(self.fail)
+        return {"body": body,
+                "table": [{"date": "2026-08-28", "stations": [
+                    {"name": "sunrise", "at": "2026-08-28T03:51:08+00:00",
+                     "occurred": True, "absentReason": "", "dedication": ""},
+                    {"name": "sunset", "at": "2026-08-28T17:03:48+00:00",
+                     "occurred": True, "absentReason": "", "dedication": ""},
+                    # A station that does not happen is an answer, not a gap.
+                    {"name": "civil_dawn", "at": "", "occurred": False,
+                     "absentReason": "the Sun does not reach that depth here today",
+                     "dedication": ""},
+                ]}]}
+
 
 def cmd(name, **options):
     return {"type": D.APPLICATION_COMMAND,
@@ -394,3 +464,174 @@ def test_the_help_keys_never_reach_discord() -> None:
     assert not sent & set(C.OURS)
     # And the help still has them to work from.
     assert all(c.get("usage") for c in C.COMMANDS)
+
+
+# ── the rest of the instruments ─────────────────────────────────────────────
+
+TOKYO = P.Place("Tokyo", "Tokyo", "Japan", "JP", 35.6895, 139.6917, 40.0,
+                "Asia/Tokyo", 8336599)
+
+
+def with_place(monkeypatch, name, astro=None, **options):
+    """One command, with the gazetteer stood in for."""
+    async def fake_lookup(text, client=None):
+        return TOKYO, []
+    monkeypatch.setattr(D.places, "lookup", fake_lookup)
+    return run(cmd(name, **options), astro or ChartAstro())
+
+
+def test_hour_actually_uses_the_place_it_was_given(monkeypatch) -> None:
+    """
+    THE bug. `place` was declared, registered, shown in the picker — and read
+    by nothing. The handler took Athens whatever was typed and titled the
+    answer "Athens" to match, so asking for Tokyo did not fail, it lied.
+    """
+    astro = ChartAstro()
+    r = with_place(monkeypatch, "hour", astro, place="Tokyo, Japan")
+    assert astro.calls[0][2:4] == (35.6895, 139.6917), astro.calls
+    assert "Tokyo" in r["data"]["embeds"][0]["title"]
+
+
+def test_hour_without_a_place_is_still_athens(monkeypatch) -> None:
+    astro = ChartAstro()
+    with_place(monkeypatch, "hour", astro)
+    assert astro.calls[0][2:4] == (D.ATHENS.lat, D.ATHENS.lon)
+
+
+def test_a_free_text_place_is_read_city_first_country_last() -> None:
+    """`Springfield, IL, USA` — the order every postal address agrees on."""
+    seen = {}
+
+    async def fake_find(city, country="", region="", client=None):
+        seen.update(city=city, country=country, region=region)
+        return TOKYO, []
+
+    import vcordbot.places as real
+    original, real.find = real.find, fake_find
+    try:
+        asyncio.run(real.lookup("Springfield, IL, USA"))
+    finally:
+        real.find = original
+    assert seen == {"city": "Springfield", "region": "IL", "country": "USA"}
+
+
+def test_panchanga_gives_every_limb_with_its_ending(monkeypatch) -> None:
+    """
+    A limb without its end is half the fact: these are five overlapping
+    divisions that begin and end at different times of day, not a date.
+    """
+    said = with_place(monkeypatch, "panchanga")["data"]["embeds"][0]["description"]
+    for limb in ("Vāra", "Tithi", "Nakṣatra", "Yoga", "Karaṇa"):
+        assert limb in said, limb
+    assert said.count("until <t:") == 4          # vāra alone has no end
+    assert "reckoned from there, not from midnight" in said
+
+
+def test_attic_refuses_an_ambiguous_date(monkeypatch) -> None:
+    r = with_place(monkeypatch, "attic", date="08/28/2026")
+    assert "YYYY-MM-DD" in r["data"]["embeds"][0]["description"]
+
+
+def test_attic_is_athens_and_does_not_offer_otherwise() -> None:
+    """
+    Not a default: it is that city's calendar. Reckoned from elsewhere it
+    would be a different calendar, not the same one seen from further away.
+    """
+    attic = next(c for c in C.COMMANDS if c["name"] == "attic")
+    assert not any(o["name"] == "place" for o in attic["options"])
+
+
+def test_hindu_passes_the_reckoning_through(monkeypatch) -> None:
+    """
+    Amānta and pūrṇimānta name a different month for the same day, for half of
+    every month. Sending the wrong one answers a question nobody asked.
+    """
+    astro = ChartAstro()
+    with_place(monkeypatch, "hindu", astro, reckoning="purnimanta")
+    assert astro.calls[0][4] == "purnimanta"
+
+    said = with_place(monkeypatch, "hindu", ChartAstro(),
+                      reckoning="purnimanta")["data"]["embeds"][0]["description"]
+    assert "Bhādrapada" in said
+    assert "not a correction of it" in said
+
+
+def test_hindu_defaults_to_amanta(monkeypatch) -> None:
+    astro = ChartAstro()
+    with_place(monkeypatch, "hindu", astro)
+    assert astro.calls[0][4] == "amanta"
+
+
+def test_sigil_shows_the_reduction_and_links_the_drawing(monkeypatch) -> None:
+    """A 512px SVG will not render in a chat client. Say so, do not try."""
+    said = with_place(monkeypatch, "sigil",
+                      statement="clarity in study")["data"]["embeds"][0]["description"]
+    assert "Statement of intent" in said and "Vowels struck" in said
+    assert "8 points" in said
+    assert "/tools/sigil-generator" in said
+
+
+def test_stations_reports_the_ones_that_do_not_happen(monkeypatch) -> None:
+    """
+    A polar summer has no sunrise. Printing nothing would read as a failure to
+    compute rather than the fact it is.
+    """
+    said = with_place(monkeypatch, "stations")["data"]["embeds"][0]["description"]
+    assert "**Sunrise** <t:" in said
+    assert "Civil Dawn** — does not occur: the Sun does not reach that depth" in said
+
+
+def test_every_instrument_the_client_can_ask_for_has_a_command() -> None:
+    """
+    Five methods sat on the ephemeris client with no command in front of them.
+    Both halves worked, so nothing was missing to grep for — the feature was
+    simply unreachable. This is the check that would have said so.
+    """
+    import inspect as _inspect
+
+    from vcordbot.astro import Astro
+
+    asked = {n for n, _ in _inspect.getmembers(Astro, _inspect.iscoroutinefunction)
+             if not n.startswith("_")}
+    wired = {n for n in asked if f"astro.{n}(" in _inspect.getsource(D)}
+    assert asked == wired, f"reachable from no command: {sorted(asked - wired)}"
+
+
+def test_the_manual_always_fits_in_an_embed() -> None:
+    """
+    Discord REFUSES an over-long embed rather than truncating it, so the
+    failure is the whole message going missing. Ten commands sit at about
+    2700 characters; this is the check that the eleventh does not break /help
+    for everybody, discovered by whoever runs it.
+    """
+    from vcordbot import render
+
+    many = C.COMMANDS + [dict(c, name=f"{c['name']}{i}")
+                         for i in range(4) for c in C.COMMANDS]
+    for commands in (C.COMMANDS, many):
+        said = render.manual(commands, BOT, SITE)["description"]
+        assert len(said) < render.DESCRIPTION_LIMIT, len(said)
+
+    # And below the cap it is still the full manual, not the short list.
+    full = render.manual(C.COMMANDS, BOT, SITE)["description"]
+    assert "e.g.  /chart" in full
+
+
+def test_attic_names_the_reckoning_it_used(monkeypatch) -> None:
+    """
+    Two rules that open half the months of a year on different days. Which one
+    produced the date has to travel with the date. The daemon's key is `used`;
+    read as `note` it rendered nothing at all and the line vanished silently.
+    """
+    astro = ChartAstro()
+    said = with_place(monkeypatch, "attic", astro,
+                      reckoning="visibility")["data"]["embeds"][0]["description"]
+    assert astro.calls[0][2] == "visibility"
+    assert "Visibility reckoning" in said
+    assert "first crescent somebody could see" in said
+
+
+def test_attic_defaults_to_conjunction(monkeypatch) -> None:
+    astro = ChartAstro()
+    with_place(monkeypatch, "attic", astro)
+    assert astro.calls[0][2] == "conjunction"

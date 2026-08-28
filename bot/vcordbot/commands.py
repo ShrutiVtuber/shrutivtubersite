@@ -34,10 +34,16 @@ COMMANDS: list[dict] = [
         "name": "hour",
         "description": "The planetary hour right now, and when it turns over.",
         "usage": "/hour [place:<city>]",
-        "example": "/hour place:Athens",
+        "example": "/hour place:Tokyo, Japan",
         "options": [
+            # This option existed and was never read: the handler used Athens
+            # and titled the answer "Athens" whatever was typed, which is a
+            # confident wrong answer rather than a missing feature. It also
+            # promised a per-server place that has never existed. Both fixed —
+            # and if a server default is wanted later, it is a storage column
+            # and a command, not a change here.
             {"type": STRING, "name": "place", "required": False,
-             "description": "A city. Defaults to the server's place, or Athens."},
+             "description": "A city — 'Tokyo' or 'Athens, Greece'. Athens if you do not say."},
         ],
     },
     {
@@ -67,6 +73,95 @@ COMMANDS: list[dict] = [
         ],
     },
 ]
+
+# The rest of the instruments. Every one of these had a working method on the
+# ephemeris client and no command in front of it — the halves existed and grep
+# found nothing missing, which is how a feature stays invisibly unfinished.
+COMMANDS += [
+    {
+        "name": "panchanga",
+        "description": "The five limbs of the day — vāra, tithi, nakṣatra, yoga, karaṇa.",
+        "usage": "/panchanga [place:<city>]",
+        "example": "/panchanga place:Varanasi, India",
+        "summary": ("Reckoned from sunrise where you say, not from midnight. "
+                    "Each limb is given with the moment it ends."),
+        "options": [
+            {"type": STRING, "name": "place", "required": False,
+             "description": "A city. Athens if you do not say."},
+        ],
+    },
+    {
+        "name": "attic",
+        "description": "Today in the Athenian calendar — month, day, and the next new moon.",
+        "usage": "/attic [date:<YYYY-MM-DD>] [reckoning:<conjunction|visibility>]",
+        "example": "/attic date:2026-08-28 reckoning:visibility",
+        # Athens is not a default here, it is the definition: the Attic
+        # calendar is that city's calendar and a different observer would be a
+        # different calendar rather than the same one seen from elsewhere.
+        "summary": ("Always reckoned for Athens, because it is Athens's calendar. "
+                    "The two reckonings open half the months of a year on "
+                    "different days."),
+        "options": [
+            {"type": STRING, "name": "date", "required": False,
+             "description": "A Gregorian date, YYYY-MM-DD. Today if you do not say."},
+            # The site puts this disagreement on the page rather than picking
+            # for the reader, and defaults to conjunction. Same here.
+            {"type": STRING, "name": "reckoning", "required": False,
+             "description": "When a month begins. Conjunction unless you say otherwise.",
+             "choices": [
+                 {"name": "Conjunction — the astronomical new moon", "value": "conjunction"},
+                 {"name": "Visibility — the first sighted crescent", "value": "visibility"},
+             ]},
+        ],
+    },
+    {
+        "name": "hindu",
+        "description": "The Hindu calendar date — year, month, pakṣa and tithi.",
+        "usage": "/hindu [place:<city>] [reckoning:<amanta|purnimanta>]",
+        "example": "/hindu place:Chennai, India reckoning:amanta",
+        "summary": ("The two reckonings disagree about which month it is for "
+                    "half of every month. Neither is the correction of the other."),
+        "options": [
+            {"type": STRING, "name": "place", "required": False,
+             "description": "A city. Athens if you do not say."},
+            {"type": STRING, "name": "reckoning", "required": False,
+             "description": "Where the month begins. Amānta unless you say otherwise.",
+             "choices": [
+                 {"name": "Amānta — month ends at the new moon", "value": "amanta"},
+                 {"name": "Pūrṇimānta — month ends at the full moon", "value": "purnimanta"},
+             ]},
+        ],
+    },
+    {
+        "name": "sigil",
+        "description": "Reduce a statement of intent to its letters, step by step.",
+        "usage": "/sigil statement:<what you intend>",
+        "example": "/sigil statement:clarity in study",
+        "summary": ("The reduction is the method; the drawing is on the site, "
+                    "because a chat client will not render one."),
+        "options": [
+            {"type": STRING, "name": "statement", "required": True,
+             "description": "Written as already true. e.g. my work is clear and finished"},
+        ],
+    },
+    {
+        "name": "stations",
+        "description": "Sunrise, sunset and the rest, for today, where you say.",
+        "usage": "/stations [body:<sun|moon>] [place:<city>]",
+        "example": "/stations body:sun place:Reykjavík, Iceland",
+        "summary": ("A station that does not occur is said to be absent and why "
+                    "— a polar summer has no sunrise, which is not a failure."),
+        "options": [
+            {"type": STRING, "name": "body", "required": False,
+             "description": "Which body's stations. The Sun unless you say otherwise.",
+             "choices": [{"name": "Sun", "value": "sun"},
+                         {"name": "Moon", "value": "moon"}]},
+            {"type": STRING, "name": "place", "required": False,
+             "description": "A city. Athens if you do not say."},
+        ],
+    },
+]
+
 
 COMMANDS.append({
     "name": "chart",
@@ -179,7 +274,7 @@ NAMES = {c["name"] for c in COMMANDS}
 # reliably inside that, so these are acknowledged first and filled in after.
 # Getting this list wrong is visible either way: too few and the interaction
 # times out, too many and a fast answer arrives as an edit.
-DEFERRED = {"chart"}
+DEFERRED = {"chart", "hour", "panchanga", "hindu", "stations"}
 
 # `/help command:` offers the same names that exist, rather than a hand-kept
 # copy of them that can fall behind.

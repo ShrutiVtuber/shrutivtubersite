@@ -64,11 +64,30 @@ class Astro:
     async def panchanga(self, when: str, lat: float, lon: float) -> dict:
         return await self._get("/panchanga", {"when": when, "lat": lat, "lon": lon})
 
-    async def attic(self, when: str) -> dict:
-        return await self._get("/attic-calendar", {"when": when})
+    async def attic(self, when: str, reckoning: str = "conjunction") -> dict:
+        """
+        The Athenian calendar for one day, under one reckoning.
 
-    async def hindu(self, when: str, lat: float, lon: float) -> dict:
-        return await self._get("/hindu-calendar", {"when": when, "lat": lat, "lon": lon})
+        Conjunction is the astronomical new moon; visibility is the first
+        crescent somebody could actually see, a day or two later. They open
+        half the months of a year on different days, so which one was used is
+        part of the answer rather than a setting.
+        """
+        return await self._get("/attic-calendar",
+                               {"when": when, "reckoning": reckoning})
+
+    async def hindu(self, when: str, lat: float, lon: float,
+                    reckoning: str = "amanta") -> dict:
+        """
+        The Hindu calendar date under one reckoning.
+
+        `reckoning` is not cosmetic: amānta and pūrṇimānta name the month
+        differently for half of every month — Śrāvaṇa against Bhādrapada for
+        the same day — and neither is the other's correction. Defaulting
+        silently would answer a question nobody asked.
+        """
+        return await self._get("/hindu-calendar", {
+            "when": when, "lat": lat, "lon": lon, "reckoning": reckoning})
 
     async def isopsephy(self, text: str, cipher: str = "greek-iso") -> dict:
         """
@@ -82,8 +101,15 @@ class Astro:
         """
         return await self._get("/isopsephy", {"text": text, "cipher": cipher})
 
-    async def sigil(self, intent: str) -> dict:
-        return await self._get("/sigil", {"intent": intent})
+    async def sigil(self, statement: str) -> dict:
+        """
+        The reduction of a statement of intent, step by step.
+
+        The parameter is `statement`. It was `intent` here, which the daemon
+        does not know: the call came back 422 every time, and nothing noticed
+        because no command had ever been pointed at it.
+        """
+        return await self._get("/sigil", {"statement": statement})
 
     async def stations(self, body: str, when: str, lat: float, lon: float) -> dict:
         return await self._get("/stations", {"body": body, "when": when, "lat": lat, "lon": lon, "days": 1})

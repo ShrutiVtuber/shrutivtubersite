@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import importlib
 import json
+import os
 
 import pytest
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
@@ -112,7 +113,35 @@ def test_a_nonsense_key_does_not_crash_the_service(monkeypatch) -> None:
 
 
 def test_health_says_nothing_secret(signed) -> None:
+    """
+    What must hold is that no CREDENTIAL leaves here, not that the field list
+    never changes. Frozen against an exact set, this failed the day the watcher
+    added two fields and stayed red — a test nobody can act on teaches people
+    to ignore the suite, which costs more than the check was worth.
+
+    So: the token must not appear, in any form, and every field is one somebody
+    decided to publish. The application id IS published on purpose — it is in
+    every invite link — which is why it is named here rather than assumed.
+    """
     _, client = signed
     body = client.get("/health").json()
-    assert set(body) == {"ok", "app", "verifying"}
-    assert "token" not in json.dumps(body).lower()
+
+    PUBLIC = {"ok", "app", "verifying", "watcher", "watching", "store"}
+    assert set(body) <= PUBLIC, f"unpublished field(s): {set(body) - PUBLIC}"
+
+    said = json.dumps(body).lower()
+    assert "not-a-real-token" not in said        # the token from the fixture
+    assert "token" not in said
+    assert os.environ["SHRUTI_DISCORD_PUBLIC_KEY"] not in json.dumps(body)
+
+
+def test_health_answers_even_when_the_store_is_not_there(signed) -> None:
+    """
+    The one moment a health check exists for is a startup that did not finish.
+    This read the store directly and raised, so that was the one moment it
+    could not answer — a 500 where the useful reply was "store: unavailable".
+    """
+    _, client = signed
+    body = client.get("/health").json()
+    assert body["ok"] is True
+    assert body["store"] in ("ready", "unavailable")
