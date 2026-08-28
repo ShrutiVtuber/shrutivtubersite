@@ -80,7 +80,8 @@ def clear_guild_overrides(app_id: str, token: str) -> None:
         return
 
     for g in guilds:
-        gid, name = g["id"], g.get("name", gid)
+        gid = g["id"]
+        name = g.get("name") or gid
         try:
             existing = call(f"{API}/applications/{app_id}/guilds/{gid}/commands", token)
             if not existing:
