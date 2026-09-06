@@ -175,6 +175,7 @@ const year = new Date().getUTCFullYear();
 import Beacon from "../components/insight/Beacon.astro";
 import { copy } from "../lib/copy";
 import Copy from "../components/content/Copy.astro";
+import NewsletterPopup from "../components/brand/NewsletterPopup.astro";
 
 /* Every word on this page, editable from the admin. The defaults below are
    what it was written with and what still renders if nothing was changed. */
@@ -332,5 +333,9 @@ tick();setInterval(tick,1000);
     the dashboard answers the more useful question: what are people trying to
     reach while the door is shut. */}
 <Beacon />
+{/* Asked late and once. Suppressed the moment they have signed up — the form
+    above is already saying "check your email", and a popup over that reads as
+    the site not having noticed. */}
+<NewsletterPopup suppress={sent} />
 </body>
 </html>

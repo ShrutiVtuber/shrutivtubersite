@@ -21,6 +21,7 @@ import PollCard from "../components/community/PollCard.astro";
 import HappeningNow from "../components/community/HappeningNow.astro";
 import SkyCard from "../components/counters/SkyCard.astro";
 import SubscribeBlock from "../components/brand/SubscribeBlock.astro";
+import NewsletterPopup from "../components/brand/NewsletterPopup.astro";
 import { site, SITE_API, type LiveStatus, type LinkGroups, type Project, PATHS } from "../lib/api";
 import { verifyCsrf } from "../lib/csrf";
 import { instruments } from "../lib/instruments";
@@ -411,6 +412,10 @@ const INSTRUMENTS = [
   <section class="section page" id="newsletter">
     <SubscribeBlock state={subscribeState} email={subscribeEmail} error={subscribeError} />
   </section>
+
+  {/* Not on arrival, and not at all once they have answered — the section
+      above is already saying "check your email". */}
+  <NewsletterPopup suppress={subscribeState === "sent"} />
 </BaseLayout>
 
 <style>
