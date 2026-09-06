@@ -55,6 +55,11 @@ services:
       SHRUTI_API_INTERNAL: http://backend:8000
       SHRUTI_ASTRO_INTERNAL: http://shruti-astro:8000
       SHRUTI_SITE_URL: ${SHRUTI_SITE_URL:-http://localhost:8200}
+      # AGPL-3.0 section 13 asks for the CORRESPONDING source — the code of the
+      # build that answered, not merely the project. Set it and the footer link
+      # names that commit; leave it and the link points at the repository,
+      # which stays honest as long as deploys come from the branch.
+      SHRUTI_SOURCE_SHA: ${SHRUTI_SOURCE_SHA:-}
       HOST: 0.0.0.0
       PORT: 4321
       # Where the beeranked agent's synced pages land, for the /journal routes.

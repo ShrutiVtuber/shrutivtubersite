@@ -176,6 +176,7 @@ import Beacon from "../components/insight/Beacon.astro";
 import { copy } from "../lib/copy";
 import Copy from "../components/content/Copy.astro";
 import NewsletterPopup from "../components/brand/NewsletterPopup.astro";
+import { sourceHref, sourceBuild } from "../lib/source";
 
 /* Every word on this page, editable from the admin. The defaults below are
    what it was written with and what still renders if nothing was changed. */
@@ -273,6 +274,20 @@ const consentSent =
       build: source?.version
         ? `, version ${source.version}${source.sha && source.sha !== "dev" ? ` · ${source.sha.slice(0, 7)}` : ""}`
         : "",
+    }}
+  />
+</p>
+<p class="fine">
+  {/* The line above offers the EPHEMERIS's source and only that. The daemon is
+      a separate program under the same licence, so it was right and
+      incomplete: it covered the thing doing the arithmetic and not the page
+      the visitor is actually looking at. This page carries no site footer, so
+      the site's own AGPL-13 offer has to be made here. */}
+  <Copy
+    text={say("site.source", "This page is free software too — [its source]({source}){build} is public, under the same licence.")}
+    vars={{
+      source: sourceHref(),
+      build: sourceBuild() ? ` · ${sourceBuild()}` : "",
     }}
   />
 </p>

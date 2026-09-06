@@ -47,9 +47,17 @@ was deployed, so cutover is a DNS change with no TLS scramble.
 ```bash
 cd /srv/shrutivtuber/prod
 git pull --ff-only
+export SHRUTI_SOURCE_SHA=$(git rev-parse HEAD)
 dc --profile web --profile bot up -d --build
 dc exec -T backend alembic upgrade head
 ```
+
+`SHRUTI_SOURCE_SHA` is the licence, not a nicety. Every file here is AGPL-3.0,
+and section 13 says software people interact with over a network must offer
+them the source **of the build that answered them**. Export it and the footer
+link names that commit; forget it and the link points at the repository, which
+stays true as long as deploys come from `main` — so this degrades honestly
+rather than lying.
 
 **Both profiles, every time.** `site` sits behind `web` and `vcordbot` behind
 `bot`, so a plain `dc up -d --build` rebuilds postgres, backend and caddy and

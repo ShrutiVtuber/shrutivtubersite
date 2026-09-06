@@ -6,6 +6,7 @@
  * brief forbids inventing one.
  */
 import SocialLinkRow from "../brand/SocialLinkRow.astro";
+import { sourceHref, sourceBuild, LICENCE_URL } from "../../lib/source";
 import LegalImprint from "../brand/LegalImprint.astro";
 import type { SocialLink } from "../brand/SocialLinkRow.astro";
 
@@ -135,12 +136,32 @@ const year = new Date().getUTCFullYear();
         · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a>
         · <a href="/admin" class="admin-link">Admin</a>
       </p>
+      {/* AGPL-3.0 section 13: software people interact with over a network has
+          to offer them its source. Not a credit and not a badge — without this
+          link the site runs under terms it does not honour. It names the exact
+          commit when the deploy says which, and the repository when it does
+          not; it never claims a commit it cannot vouch for. */}
+      <p class="footer-source">
+        {say("source.lead", "This site is free software.")}{" "}
+        <a href={sourceHref()} rel="noopener">{say("source.link", "Read or fork its source")}</a>
+        {sourceBuild() && <span class="t-tabular"> · {sourceBuild()}</span>}
+        {" · "}
+        <a href={LICENCE_URL} rel="noopener license">AGPL-3.0</a>
+      </p>
       <span class="seal seal-ring" title={say("text.1", "Soror Eu. A.")}>S∴E.A.</span>
     </div>
   </div>
 </footer>
 
 <style>
+  .footer-source {
+    margin: 6px 0 0;
+    font: 400 var(--text-xs) / 1.6 var(--font-body);
+    color: var(--ink-faint);
+  }
+  .footer-source a { color: inherit; text-decoration: underline; }
+  .footer-source a:hover { color: var(--ink); }
+
 
   .footer-brand { font-family: var(--font-display); font-size: 22px; color: var(--ink); }
   .footer-thesis {
