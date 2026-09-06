@@ -20,7 +20,9 @@ import SponsorRow from "../components/brand/SponsorRow.astro";
 import PollCard from "../components/community/PollCard.astro";
 import HappeningNow from "../components/community/HappeningNow.astro";
 import SkyCard from "../components/counters/SkyCard.astro";
-import { site, type LiveStatus, type LinkGroups, type Project, PATHS } from "../lib/api";
+import SubscribeBlock from "../components/brand/SubscribeBlock.astro";
+import { site, SITE_API, type LiveStatus, type LinkGroups, type Project, PATHS } from "../lib/api";
+import { verifyCsrf } from "../lib/csrf";
 import { instruments } from "../lib/instruments";
 import { pageSections } from "../lib/content";
 import { badgeFrom } from "../lib/live";
@@ -31,6 +33,49 @@ import Copy from "../components/content/Copy.astro";
 /* Every word on the landing page, editable. The defaults here are what it was
    written with and what still renders if nothing has been changed. */
 const say = await copy("home");
+
+/* ── the newsletter, on the landing page itself ───────────────────────────
+ *
+ * It was only at /newsletter and in a footer link, which meant the page most
+ * people arrive on had nowhere to subscribe — the holding page had a form and
+ * the real home page, the one that replaces it, did not. A campaign pointed at
+ * the site would have started losing signups the day the holding page came
+ * down, silently, and the number that went missing would never appear anywhere.
+ *
+ * Same component and same handler as /newsletter, deliberately: one flow, one
+ * set of words, one place to change them. `action` is checked because a landing
+ * page accumulates forms, and a handler that answers every POST is how one form
+ * starts quietly consuming another's.
+ */
+let subscribeState: "idle" | "sent" = "idle";
+let subscribeError = "";
+let subscribeEmail = "";
+
+if (Astro.request.method === "POST") {
+  const form = await Astro.request.formData();
+  if (form.get("action") === "subscribe") {
+    if (!verifyCsrf(Astro.cookies, form)) {
+      subscribeError = say("subscribe.error.retry", "That did not send. Reload the page and try again.");
+    } else {
+      subscribeEmail = String(form.get("email") ?? "").trim();
+      const consented = form.get("consent") === "1";
+      if (!/^\S+@\S+\.\S+$/.test(subscribeEmail)) {
+        subscribeError = say("subscribe.error.address", "That address doesn’t look complete.");
+      } else if (!consented) {
+        subscribeError = say("subscribe.error.consent", "The letter needs your agreement before it can be sent.");
+      } else {
+        const r = await fetch(`${SITE_API}/api/newsletter/subscribe`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: subscribeEmail, consent: true }),
+        });
+        if (r.ok) subscribeState = "sent";
+        else subscribeError = (await r.json().catch(() => null))?.detail
+          ?? say("subscribe.error.failed", "That did not go through.");
+      }
+    }
+  }
+}
 
 interface ScheduleRow {
   title: string;
@@ -358,6 +403,13 @@ const INSTRUMENTS = [
         <p class="quiet-empty">{say("journal.empty", "Nothing published here yet.")}</p>
       )
     }
+  </section>
+
+  {/* Last thing on the page, which is where somebody who read to the bottom is
+      most likely to want it. The block carries its own consent wording and its
+      own "check your email" state — see SubscribeBlock. */}
+  <section class="section page" id="newsletter">
+    <SubscribeBlock state={subscribeState} email={subscribeEmail} error={subscribeError} />
   </section>
 </BaseLayout>
 
