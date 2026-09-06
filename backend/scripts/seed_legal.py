@@ -223,7 +223,7 @@ You also have the right to complain to a supervisory authority.
 - **Resend** — sends the email. Sees the recipient address and the message.
 - **Open-Meteo / GeoNames** — turns a typed city into coordinates. Sees the
   search term, and this server's IP rather than yours.
-- **Hetzner** — hosts the server, in Germany.
+- **netcup** — hosts the server, in Austria.
 - **Cloudflare** — DNS, and object storage for images.
 - **BeeRanked** — serves the journal at /journal.
 - **Google Fonts** — serves the typefaces. This is a request your browser makes

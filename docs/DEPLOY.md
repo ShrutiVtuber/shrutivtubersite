@@ -2,11 +2,19 @@
 
 ## Where it runs
 
-`agent-house` — Debian 13, 4 vCPU / 15 GB. Shares the box with theourgia (8190),
-astropractise (8210) and daskalos (8090). This stack is **8200**.
+One netcup box, `159.195.251.161` (RS 8000 G12 · 16 cores · 64 GB · Debian 13),
+in **Austria** — netcup's Vienna site, per the registry (`AT-NETCUP-KVM`).
+It hosts the whole estate; this stack is on loopback **8200** (bot 8250), and
+`/srv/PORTS.md` on the box is the authority on which ports are taken.
+
+**The Hetzner box is gone.** Everything moved on 3 September 2026, the old
+servers were deleted, and `178.105.106.225` has since been reassigned to a
+stranger — SSH will refuse it on a changed host key, which is the only reason
+anybody noticed this page was still pointing there. `SERVER-ACCESS.md` in the
+repo root is the current record; if it and this page ever disagree, it wins.
 
 ```bash
-ssh -i ~/.ssh/agent-house-access-theourgia theourgia@178.105.106.225
+ssh -i ~/.ssh/agents_netcup deploy@159.195.251.161
 cd /srv/shrutivtuber/prod
 ```
 
@@ -28,7 +36,7 @@ DNS still points at Nexcess, so the public `shrutivtuber.com` is the old
 WordPress site. The new stack is reachable at the origin:
 
 ```bash
-curl --resolve shrutivtuber.com:443:178.105.106.225 https://shrutivtuber.com/api/health
+curl --resolve shrutivtuber.com:443:159.195.251.161 https://shrutivtuber.com/api/health
 ```
 
 TLS already works there — the certificate was issued by DNS-01 before anything
@@ -75,7 +83,7 @@ internal Caddy proxies to the site instead of serving the placeholder.
 Check at the origin before anyone else can see it:
 
 ```bash
-curl -s --resolve shrutivtuber.com:443:178.105.106.225 https://shrutivtuber.com/ -o /dev/null -w '%{http_code}\n'
+curl -s --resolve shrutivtuber.com:443:159.195.251.161 https://shrutivtuber.com/ -o /dev/null -w '%{http_code}\n'
 ```
 
 ---
@@ -124,7 +132,7 @@ and the R2 keys (uploads fall back to disk).
 1. Bring up the `web` profile, check the origin with `--resolve`, and walk the
    site there: sign up, sign in, add a passkey, save a nativity, post a journal
    entry from the admin, and send yourself the newsletter confirmation.
-2. In Cloudflare, point the `A` record at `178.105.106.225` and leave it
+2. In Cloudflare, point the `A` record at `159.195.251.161` and leave it
    proxied.
 3. Watch, then cancel Nexcess. **Keep the final WordPress export offline for a
    year** — a year is long enough to discover what was on a page nobody

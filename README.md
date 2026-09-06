@@ -1,7 +1,7 @@
 # shrutivtuber.com
 
 Rebuild of shrutivtuber.com off Nexcess-managed WordPress onto Astro + FastAPI,
-deployed beside Theourgia on the same Hetzner box but sharing nothing with it.
+deployed beside Theourgia on the same netcup box but sharing nothing with it.
 
 Full plan: <https://claude.ai/code/artifact/415a0a11-5ddf-4bad-94c4-a4974f966a8c>
 
@@ -10,7 +10,7 @@ Full plan: <https://claude.ai/code/artifact/415a0a11-5ddf-4bad-94c4-a4974f966a8c
 ```
 Cloudflare (DNS + proxy)
   ├── /journal/*  →  BeeRanked (edge, R2)      content + auto-translation EL/HI/FR
-  └── everything else  →  Hetzner VPS
+  └── everything else  →  netcup VPS
                             host Caddy :443  →  127.0.0.1:8200
                               └── internal Caddy
                                     ├── /            → Astro (SSR, node)
@@ -59,13 +59,14 @@ client secret never leaves the backend; that is the main reason it exists.
 
 ## Production host
 
-`agent-house` — Debian 13, 4 vCPU / 15 GB RAM, 150 GB disk. Already runs
+`159.195.251.161` — netcup RS 8000 G12, Debian 13, 16 cores, 64 GB RAM,
+2 TB disk, in Austria. Already runs
 theourgia (8190), astropractise (8210) and daskalos (8090); this stack takes
 **8200**. Host Caddy terminates TLS and imports per-tenant drop-ins from
 `/etc/caddy/Caddyfile.d/`.
 
 ```bash
-ssh -i ~/.ssh/agent-house-access-theourgia theourgia@178.105.106.225
+ssh -i ~/.ssh/agents_netcup deploy@159.195.251.161
 ```
 
 Deploy root: `/srv/shrutivtuber/prod`.

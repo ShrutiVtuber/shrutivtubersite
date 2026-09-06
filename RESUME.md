@@ -25,7 +25,7 @@ The switch is **Admin → Settings → "Who can see the site"**. One button.
 
 | | |
 |---|---|
-| Server | `agent-house`, 178.105.106.225, `theourgia@`, key `~/.ssh/agent-house-access-theourgia` |
+| Server | netcup, 159.195.251.161, `deploy@`, key `~/.ssh/agents_netcup` — see `SERVER-ACCESS.md` |
 | Site | `/srv/shrutivtuber/prod` — compose pair, `--profile web` |
 | Ephemeris daemon | `/srv/shruti-astro/prod` — **separate repo, deploy it too** |
 | Local | `~/Documents/development/shurtiwebsite`, `~/Documents/development/shruti-astro` |

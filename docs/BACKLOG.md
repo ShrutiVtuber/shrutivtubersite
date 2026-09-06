@@ -127,7 +127,7 @@ What that means concretely:
   the export and the delete as real endpoints, not a support inbox. Erasure must
   reach the newsletter list and Resend, not only the database
 - **Records of processing (Art. 30)** — a real document
-- **Processor agreements** with Resend, Cloudflare, Hetzner, and any analytics
+- **Processor agreements** with Resend, Cloudflare, netcup, and any analytics
 - **Privacy policy** naming every processor and every purpose. Theourgia has a
   template with placeholders
 - **Legal imprint** — EU e-Commerce Directive Art. 5 requires it the moment

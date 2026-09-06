@@ -155,7 +155,7 @@ reckoned), and anything under `/admin/blocks`.
 
 ## Access facts
 
-- Deploy: `ssh -i ~/.ssh/agent-house-access-theourgia theourgia@178.105.106.225`,
+- Deploy: `ssh -i ~/.ssh/agents_netcup deploy@159.195.251.161`,
   then `cd /srv/shrutivtuber/prod && git pull && docker compose -f
   docker-compose.yml -f docker-compose.prod.yml --profile web --profile bot up
   -d --build`, then `alembic upgrade head`.
