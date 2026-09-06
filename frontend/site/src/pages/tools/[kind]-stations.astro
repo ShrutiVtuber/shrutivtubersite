@@ -106,7 +106,10 @@ const title = self?.name ?? (kind === "lunar" ? "Lunar stations" : "Solar statio
    the structured data the other seven get for free has to be assembled here.
    It was the only pair without any — which is exactly the shape of gap that
    survives a sweep, because the page it is missing from looks complete. */
-const SITE = (import.meta.env.SHRUTI_SITE_URL ?? "https://shrutivtuber.com").replace(/\/$/, "");
+import { SITE_URL } from "../../lib/api";
+
+/* One origin for the whole site, read at runtime. See lib/env.ts. */
+const SITE = SITE_URL;
 const pageUrl = `${SITE}/tools/${kind}-stations`;
 const jsonLd = {
   "@context": "https://schema.org",

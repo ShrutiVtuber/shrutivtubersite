@@ -29,16 +29,17 @@
  */
 import type { APIRoute } from "astro";
 
-import { SITE_API } from "../lib/api";
+import { SITE_API, SITE_URL } from "../lib/api";
 
+
+/* One origin for the whole site, read at runtime. See lib/env.ts. */
+const SITE = SITE_URL;
 /* The origin comes from configuration, NOT from the request.
  *
  * Behind Caddy the Node adapter reports `Astro.url.origin` as
  * "http://localhost" whatever Host says — the same fact that forced Astro's
  * own origin check off in astro.config.mjs. A sitemap full of localhost URLs
  * is invisibly wrong for as long as nobody opens it. */
-const SITE = (import.meta.env.SHRUTI_SITE_URL ?? "https://shrutivtuber.com").replace(/\/$/, "");
-
 
 export const GET: APIRoute = async () => {
   const origin = SITE;

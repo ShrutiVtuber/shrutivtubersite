@@ -16,10 +16,12 @@ import type { APIRoute } from "astro";
  * "http://localhost" whatever Host says — the same fact that forced Astro's
  * own origin check off in astro.config.mjs. A sitemap full of localhost URLs
  * is invisibly wrong for as long as nobody opens it. */
-const SITE = (import.meta.env.SHRUTI_SITE_URL ?? "https://shrutivtuber.com").replace(/\/$/, "");
 
-import { site, SITE_API } from "../lib/api";
+import { site, SITE_API, SITE_URL } from "../lib/api";
 
+
+/* One origin for the whole site, read at runtime. See lib/env.ts. */
+const SITE = SITE_URL;
 /** Weekly-ish reference surfaces, and the pages that are simply always there. */
 const STATIC: [path: string, priority: string, changefreq: string][] = [
   ["/", "1.0", "weekly"],

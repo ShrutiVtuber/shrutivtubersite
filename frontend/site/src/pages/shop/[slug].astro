@@ -9,11 +9,14 @@ import BaseLayout from "../../layouts/BaseLayout.astro";
 import Prose from "../../components/content/Prose.astro";
 import Button from "../../components/forms/Button.astro";
 import CsrfField from "../../components/forms/CsrfField.astro";
-import { site, PATHS, SITE_API, type ShopProduct } from "../../lib/api";
+import { site, PATHS, SITE_API, type ShopProduct, SITE_URL } from "../../lib/api";
 import { renderMarkdown } from "../../lib/markdown";
 import { verifyCsrf } from "../../lib/csrf";
 import { copy } from "../../lib/copy";
 
+
+/* One origin for the whole site, read at runtime. See lib/env.ts. */
+const SITE = SITE_URL;
 /* Every word here, editable from the admin. The defaults below are what
    it was written with and what still renders if nothing was changed. */
 const say = await copy("shop/[slug]");
@@ -73,7 +76,7 @@ const dateWords = (iso: string | null) =>
  * No rating and no review count. Both would be invented, and an invented
  * rating is the one thing here that gets a site penalised rather than ignored.
  */
-const SITE = (import.meta.env.SHRUTI_SITE_URL ?? "https://shrutivtuber.com").replace(/\/$/, "");
+
 const productUrl = `${SITE}/shop/${product.slug}`;
 const jsonLd = {
   "@context": "https://schema.org",

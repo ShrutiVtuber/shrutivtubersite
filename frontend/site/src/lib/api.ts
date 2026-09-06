@@ -9,8 +9,10 @@
  * fetched renders its designed absent state. One endpoint being down must not
  * blank the page.
  */
-export const SITE_API = import.meta.env.SHRUTI_API_INTERNAL ?? "http://backend:8000";
-const ASTRO_API = import.meta.env.SHRUTI_ASTRO_INTERNAL ?? "http://shruti-astro:8000";
+import { env, origin } from "./env";
+
+export const SITE_API = env("SHRUTI_API_INTERNAL", "http://backend:8000");
+const ASTRO_API = env("SHRUTI_ASTRO_INTERNAL", "http://shruti-astro:8000");
 
 async function get<T>(base: string, path: string, timeoutMs = 6000): Promise<T | null> {
   const control = new AbortController();
@@ -153,5 +155,4 @@ export interface ShopProduct {
  *
  * That has now had to be remembered in five places, so it lives here once.
  */
-export const SITE_URL =
-  (import.meta.env.SHRUTI_SITE_URL ?? "https://shrutivtuber.com").replace(/\/$/, "");
+export const SITE_URL = origin("SHRUTI_SITE_URL", "https://shrutivtuber.com");

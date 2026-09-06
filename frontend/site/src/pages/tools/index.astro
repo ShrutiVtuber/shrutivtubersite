@@ -33,7 +33,10 @@ const say = await copy("tools");
 
 export const prerender = false;
 
-const SITE = (import.meta.env.SHRUTI_SITE_URL ?? "https://shrutivtuber.com").replace(/\/$/, "");
+import { SITE_URL } from "../../lib/api";
+
+/* One origin for the whole site, read at runtime. See lib/env.ts. */
+const SITE = SITE_URL;
 const sections = await pageSections("tools");
 
 /* One fetch, and the grouping is derived from what came back rather than from

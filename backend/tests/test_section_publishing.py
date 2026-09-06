@@ -121,7 +121,15 @@ def test_the_sitemap_leaves_hidden_sections_out():
     """Listing a URL that 404s teaches a crawler to distrust the sitemap."""
     sm = (SRC / "pages" / "sitemap.xml.ts").read_text()
     assert "hiddenSections" in sm
-    assert "SITE_API" in sm.split("\n")[0:40][-1] or "import { site, SITE_API }" in sm, (
+    # Matched by MEANING, not by an exact import line. Written as a literal
+    # string it broke the moment another name was added to the same import —
+    # the code was correct and the test was not, which is the worst way round.
+    import re as _re
+    imported = _re.search(
+        r'import\s*\{([^}]*)\}\s*from\s*"\.\./lib/api"', sm)
+    assert imported and "SITE_API" in [
+        n.strip() for n in imported.group(1).split(",")
+    ], (
         "SITE_API is used by the filter and must be imported — unimported, the "
         "fetch throws, the catch swallows it, and the filter silently does nothing"
     )

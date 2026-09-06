@@ -12,11 +12,14 @@ import SiteFooter from "../components/chrome/SiteFooter.astro";
 import CookieNotice from "../components/brand/CookieNotice.astro";
 import Beacon from "../components/insight/Beacon.astro";
 import HoldingNotice from "../components/chrome/HoldingNotice.astro";
-import { site, type LiveStatus, type LinkGroups, PATHS } from "../lib/api";
+import { site, type LiveStatus, type LinkGroups, PATHS, SITE_URL } from "../lib/api";
 import { badgeFrom } from "../lib/live";
 import type { SocialLink } from "../components/brand/SocialLinkRow.astro";
 import { copy } from "../lib/copy";
 
+
+/* One origin for the whole site, read at runtime. See lib/env.ts. */
+const siteUrl = SITE_URL;
 /* Every word here, editable from the admin. The defaults below are what
    it was written with and what still renders if nothing was changed. */
 const say = await copy("component:BaseLayout");
@@ -50,7 +53,6 @@ interface Props {
 }
 const { title, description = "", bare = false, noindex = false,
         ogImage, ogImageAlt, jsonLd: pageLd = null } = Astro.props;
-const siteUrl = import.meta.env.SHRUTI_SITE_URL ?? "https://shrutivtuber.com";
 
 const [live, links] = await Promise.all([
   site<LiveStatus>(PATHS.live),

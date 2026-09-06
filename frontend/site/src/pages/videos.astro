@@ -14,10 +14,13 @@ import SectionHeader from "../components/brand/SectionHeader.astro";
 import VideoCard from "../components/cards/VideoCard.astro";
 import EmptyState from "../components/feedback/EmptyState.astro";
 import Button from "../components/forms/Button.astro";
-import { site, PATHS, type LiveStatus } from "../lib/api";
+import { site, PATHS, type LiveStatus, SITE_URL } from "../lib/api";
 import { badgeFrom } from "../lib/live";
 import { copy } from "../lib/copy";
 
+
+/* One origin for the whole site, read at runtime. See lib/env.ts. */
+const siteUrl = SITE_URL;
 /* Every word here, editable from the admin. The defaults below are what
    it was written with and what still renders if nothing was changed. */
 const say = await copy("videos");
@@ -35,7 +38,6 @@ const [feed, liveStatus] = await Promise.all([
 ]);
 const videos = feed?.videos ?? [];
 const live = badgeFrom(liveStatus);
-const siteUrl = import.meta.env.SHRUTI_SITE_URL ?? "https://shrutivtuber.com";
 
 /* VideoObject, one per video.
  *

@@ -11,9 +11,12 @@ import ScheduleItem from "../components/tables/ScheduleItem.astro";
 import TimezoneToggle from "../components/tables/TimezoneToggle.astro";
 import EmptyState from "../components/feedback/EmptyState.astro";
 import Button from "../components/forms/Button.astro";
-import { site, PATHS } from "../lib/api";
+import { site, PATHS, SITE_URL } from "../lib/api";
 import { copy } from "../lib/copy";
 
+
+/* One origin for the whole site, read at runtime. See lib/env.ts. */
+const SITE = SITE_URL;
 /* Every word on this page, editable from the admin. The defaults below are
    what it was written with and what still renders if nothing was changed. */
 const say = await copy("schedule");
@@ -44,7 +47,7 @@ const statusOf = (r: ScheduleRow): "live" | "upcoming" | "past" => {
  * usually left off, and without them an online stream reads as an event with
  * no venue rather than as one you attend from anywhere.
  */
-const SITE = (import.meta.env.SHRUTI_SITE_URL ?? "https://shrutivtuber.com").replace(/\/$/, "");
+
 const upcoming = rows.filter((r) => statusOf(r) !== "past");
 const jsonLd = upcoming.length
   ? {

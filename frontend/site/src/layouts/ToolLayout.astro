@@ -84,7 +84,10 @@ const DISCLOSURE_WORD = { "○": "public", "◐": "named, not detailed", "●": 
  * stars in a result, both would be invented, and inventing them is the one
  * thing in this file that could get the site penalised rather than ignored.
  */
-const SITE = (import.meta.env.SHRUTI_SITE_URL ?? "https://shrutivtuber.com").replace(/\/$/, "");
+import { SITE_URL } from "../lib/api";
+
+/* One origin for the whole site, read at runtime. See lib/env.ts. */
+const SITE = SITE_URL;
 const pageUrl = `${SITE}${here}`;
 
 const jsonLd = {

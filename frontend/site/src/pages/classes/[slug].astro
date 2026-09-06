@@ -9,11 +9,14 @@ import BaseLayout from "../../layouts/BaseLayout.astro";
 import Button from "../../components/forms/Button.astro";
 import Prose from "../../components/content/Prose.astro";
 import LessonList from "../../components/classes/LessonList.astro";
-import { SITE_API } from "../../lib/api";
+import { SITE_API, SITE_URL } from "../../lib/api";
 import { READER_COOKIE } from "../../lib/account";
 import { renderMarkdown } from "../../lib/markdown";
 import { copy } from "../../lib/copy";
 
+
+/* One origin for the whole site, read at runtime. See lib/env.ts. */
+const SITE_ORIGIN = SITE_URL;
 /* Every word on this page, editable from the admin. The defaults below are
    what it was written with and what still renders if nothing was changed. */
 const say = await copy("classes/[slug]");
@@ -68,7 +71,7 @@ const REASON: Record<string, string> = {
  * zero rather than omitting the price — an absent price reads as unknown, and
  * unknown is worse than free.
  */
-const SITE_ORIGIN = (import.meta.env.SHRUTI_SITE_URL ?? "https://shrutivtuber.com").replace(/\/$/, "");
+
 /* `slug` from the params, not `course.slug` — every other link on this page
    uses the param, and the payload is not guaranteed to echo it back. A
    canonical URL reading /classes/undefined would be worse than none. */
