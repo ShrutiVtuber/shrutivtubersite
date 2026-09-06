@@ -27,3 +27,6 @@ docs/RESEARCH_BRIEF.md
 # pnpm content-addressable store — written when a container runs pnpm against
 # the mounted repo. Build detritus, not source.
 .pnpm-store/
+
+# Server layout, users and paths — useful locally, not for a public repo.
+SERVER-ACCESS.md
