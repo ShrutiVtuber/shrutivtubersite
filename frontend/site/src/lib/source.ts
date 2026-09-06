@@ -18,13 +18,28 @@
  * claims more than it has.
  */
 
+/**
+ * Read at RUNTIME, not at build.
+ *
+ * `import.meta.env.X` is substituted when the site is compiled, and the commit
+ * is not known then — the image is built before it is deployed. Reading it that
+ * way baked `undefined` into the bundle and quietly ignored the value the
+ * container was actually given, so the link fell back to the repository while
+ * looking like it was working. `process.env` is the runtime half, and the
+ * adapter here is the Node one, so it is there.
+ */
+function env(name: string): string {
+  const runtime =
+    typeof process !== "undefined" && process.env ? process.env[name] : undefined;
+  return (runtime ?? (import.meta.env as Record<string, string | undefined>)[name] ?? "").trim();
+}
+
 /** The repository. Overridable, because a project can move host. */
 export const SOURCE_URL: string =
-  import.meta.env.SHRUTI_SOURCE_URL ??
-  "https://github.com/ShrutiVtuber/shrutivtubersite";
+  env("SHRUTI_SOURCE_URL") || "https://github.com/ShrutiVtuber/shrutivtubersite";
 
 /** The deployed commit, when the deploy troubles to say. */
-export const SOURCE_SHA: string = import.meta.env.SHRUTI_SOURCE_SHA ?? "";
+export const SOURCE_SHA: string = env("SHRUTI_SOURCE_SHA");
 
 /** The licence these terms come from, for linking. */
 export const LICENCE_URL = "https://www.gnu.org/licenses/agpl-3.0.html";
