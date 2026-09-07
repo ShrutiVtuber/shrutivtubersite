@@ -90,13 +90,47 @@ run `caddy validate` by hand. See `docs/DEPLOY.md`.
 
 ## Left to do
 
-1. `/horoscopes/<sign>/<period>/<id>` as the canonical URL shape. Today the
-   period id is a query parameter. **Production has zero published horoscopes,
-   so this is still free.**
-2. An **oEmbed** endpoint, so a pasted link expands in Discord or WordPress.
-3. **Per-sign feeds**, RSS and JSON.
-4. The **OG image** endpoint — a shared horoscope previewing with its own wheel.
+**One thing, and it is hers, not mine:** she reviews the writing desk
+(`/admin/horoscopes`) in one pass and I fix what is awkward. She asked
+specifically that the desk not be iterated on before the rest was finished, so
+that she tests it once rather than fixing the same thing twice.
 
-Then: she reviews the writing desk in one pass and I fix what is awkward. She
-asked specifically that the desk not be iterated on before the rest was
-finished, to avoid fixing the same thing twice.
+### One open decision
+
+**A dynamic OG image** — a shared reading previewing with its own wheel — is
+not built. Every route to one needs a rasteriser, and there is none in the
+tree: no `sharp`, no `@resvg/resvg-js`, no `canvas`, no `satori`. The cost is
+roughly ten megabytes of platform-specific native module in the site image, on
+a project that has otherwise been careful about what it takes on. Readings do
+have correct per-page OG metadata now — real title, the reading's own opening
+as the description — falling back to `/social-card.png` for the picture.
+
+Worth doing if sharing turns out to matter; not worth deciding on her behalf.
+
+## Done in this pass
+
+* `/horoscopes/<sign>/<period>/<covers>` is the canonical address. The undated
+  form renders the same component and points at the dated one.
+* An unwritten reading is `noindex` — otherwise twelve signs times four periods
+  times any valid date is an unbounded number of indexable "not written yet".
+* A feed per sign at `/horoscopes/<sign>/feed.xml`, with autodiscovery.
+* `/oembed.json`, refusing anything not on this origin and anything without an
+  embed. A shared reading draws **its own** period's sky, not today's.
+* The sitemap lists every published reading with a real `lastmod`.
+* `GET /api/horoscopes/published` — the flat list with timestamps. `/archive`
+  groups by period and has none; both the feed and the sitemap were written
+  against it first and would have shipped empty `<pubDate>`s.
+
+## A trap worth remembering
+
+Two migrations now share the `d4a71b` prefix — `d4a71b96c8e2_copy.py` is the
+big copy seeder. A `rm alembic/versions/d4a71b*` deleted it. Restored from git,
+and the new revision renumbered to `e9b3c05a7d14` so the prefixes no longer
+collide. Do not glob migration filenames by revision prefix.
+
+## Not deployed
+
+All of the above is committed on `main` locally and verified against the local
+stack. **It has not been pushed or deployed** — production still runs the
+previous code behind the holding page. Deploy with the block above when she
+says so; `alembic upgrade head` is required (one migration, `e9b3c05a7d14`).
