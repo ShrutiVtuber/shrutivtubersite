@@ -68,6 +68,16 @@ shrutivtuber.com {
     # is a narrowing from 'none', not an opening: another site still cannot
     # frame anything here, and a page that could frame this one would already
     # have to be served from this origin.
+    # The embed widget is the ONE path other sites may frame, and that is the
+    # whole point of it: another astrologer putting the wheel in their own post
+    # is the best inbound link this project has. Safe here because the page has
+    # no authority to borrow — no session, no cookie, nothing to click, nothing
+    # that acts on a reader's behalf. Everything else stays 'self' and the
+    # admin stays 'none'; this is a hole punched in one wall, not a door left
+    # open.
+    @embed path /embed /embed/*
+    header @embed >Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; base-uri 'self'; form-action 'none'; frame-ancestors *"
+
     @admin path /admin /admin/*
     header @admin >Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self'; frame-src 'self' https://www.youtube-nocookie.com https://player.twitch.tv; base-uri 'self'; form-action 'self' https://checkout.stripe.com https://billing.stripe.com; frame-ancestors 'none'"
 

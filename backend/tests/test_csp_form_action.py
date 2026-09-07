@@ -117,3 +117,70 @@ def test_the_twitch_authorisation_is_a_link() -> None:
     assert "<Button href={auth.url}" in body, (
         "the authorise control must be a link — a form is blocked by "
         "form-action 'self' and fails silently")
+
+
+# ── who may frame what ──────────────────────────────────────────────────────
+
+
+def _both_caddies() -> list[tuple[str, str]]:
+    """
+    Production AND local.
+
+    These two have diverged before, and it was expensive: local had no
+    site-wide CSP at all, so `/admin/preview` framed the site perfectly here
+    and was blocked in production. A framing rule proved on one machine and
+    absent on the other is the same bug waiting.
+    """
+    root = SRC.parents[2]
+    found = []
+    for name, path in (("production", root / "deploy" / "shrutivtuber.caddy"),
+                       ("local", root / "Caddyfile.internal")):
+        if path.is_file():
+            found.append((name, path.read_text(encoding="utf-8")))
+    if not found:
+        pytest.skip("no caddy config mounted")
+    return found
+
+
+def test_the_embed_is_the_only_path_anyone_may_frame() -> None:
+    """
+    Three tiers, and each is deliberate: the admin may be framed by nobody,
+    because a transparent iframe over a one-click Delete is the whole
+    clickjacking attack; the site by itself, because /admin/preview embeds the
+    real page; and /embed by anybody, because another astrologer putting the
+    wheel in their own post is the best inbound link this project has.
+
+    That last one is safe because the embed has no authority to borrow — no
+    session, no cookie, nothing to click. It stops being safe the moment it
+    grows any of those.
+    """
+    for where, text in _both_caddies():
+        assert "@embed path /embed /embed/*" in text, f"{where}: /embed is not matched"
+        assert "frame-ancestors *" in text, f"{where}: /embed cannot be framed"
+        assert "frame-ancestors 'none'" in text, f"{where}: the admin is framable"
+
+
+def test_the_open_framing_is_scoped_to_the_embed_and_nothing_else() -> None:
+    """
+    `frame-ancestors *` must appear only on the embed's own header. Anywhere
+    else it would let another page frame something that can act for a reader.
+    """
+    for where, text in _both_caddies():
+        for line in text.splitlines():
+            if "frame-ancestors *" in line:
+                assert "@embed" in line, \
+                    f"{where}: open framing on a line that is not the embed's: {line.strip()[:80]}"
+
+
+def test_the_embed_carries_no_session_and_no_form() -> None:
+    """
+    A page other sites may frame must have nothing worth borrowing. `form-action
+    'none'` on the production header says so in the policy as well as in the
+    markup.
+    """
+    embed = SRC / "pages" / "embed" / "wheel.astro"
+    assert embed.is_file()
+    text = embed.read_text(encoding="utf-8")
+    assert "<form" not in text, "the embed has a form"
+    assert "account(" not in text and "cookies" not in text.lower().replace("no cookie", ""), \
+        "the embed reads a session"

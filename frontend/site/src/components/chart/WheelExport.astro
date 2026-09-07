@@ -1,0 +1,146 @@
+---
+/* Taking the wheel away as a picture.
+ *
+ * **A serialised SVG loses its stylesheet.** Everything in this drawing takes
+ * its colour from `currentColor` and its size from custom properties defined
+ * far away in the page, so lifting the markup out and saving it produces a
+ * black-on-transparent tangle at the wrong sizes — or nothing at all. So the
+ * clone is walked and the computed value of every property that matters is
+ * written onto the element as an attribute. That is what makes the file open
+ * correctly in something that has never seen this site.
+ *
+ * PNG goes through a canvas at twice the drawn size, which is what makes it
+ * usable in a thumbnail or a slide rather than only on screen.
+ *
+ * Client-side and entirely optional: with scripting off there are no buttons,
+ * and the wheel is still a wheel.
+ */
+interface Props {
+  /** Used for the filename, so a folder of these is legible later. */
+  name?: string;
+}
+const { name = "wheel" } = Astro.props;
+---
+
+<div class="export" data-export data-name={name}>
+  <button type="button" data-save="svg">Save SVG</button>
+  <button type="button" data-save="png">Save PNG</button>
+  <span class="export-note" data-export-note aria-live="polite"></span>
+</div>
+
+<script>
+  /* The properties that carry the drawing. Anything not listed here is either
+     inherited harmlessly or does not survive serialisation anyway. */
+  const CARRIED = [
+    "fill", "stroke", "stroke-width", "opacity", "font-size", "font-family",
+    "font-weight", "text-anchor", "dominant-baseline",
+  ];
+
+  const root = document.querySelector<HTMLElement>("[data-export]");
+  const svg = document.querySelector<SVGSVGElement>("[data-wheel]");
+  const note = root?.querySelector<HTMLElement>("[data-export-note]");
+
+  function say(text: string): void {
+    if (note) note.textContent = text;
+  }
+
+  /** A copy that carries its own appearance. */
+  function standalone(): SVGSVGElement {
+    const clone = svg!.cloneNode(true) as SVGSVGElement;
+    const originals = [svg!, ...Array.from(svg!.querySelectorAll<SVGElement>("*"))];
+    const copies = [clone, ...Array.from(clone.querySelectorAll<SVGElement>("*"))];
+
+    for (let i = 0; i < originals.length; i++) {
+      const computed = getComputedStyle(originals[i]);
+      const target = copies[i];
+      /* Hidden things must stay hidden: a leader line for a glyph that was not
+         displaced would otherwise reappear in the saved file. */
+      if (computed.display === "none") { target.remove(); continue; }
+      for (const property of CARRIED) {
+        const value = computed.getPropertyValue(property);
+        if (value) target.setAttribute(property, value.trim());
+      }
+      target.removeAttribute("class");
+    }
+    clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+    /* An explicit ground: transparent is right on the page, where something is
+       behind it, and wrong in a file that may be opened on black. */
+    const ground = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+    ground.setAttribute("width", "100%");
+    ground.setAttribute("height", "100%");
+    ground.setAttribute("fill", getComputedStyle(document.body).backgroundColor || "#fff");
+    clone.insertBefore(ground, clone.firstChild);
+    return clone;
+  }
+
+  function download(blob: Blob, extension: string): void {
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${root!.dataset.name || "wheel"}.${extension}`;
+    link.click();
+    /* Revoked on the next tick rather than immediately: some browsers have not
+       finished reading the blob when click() returns. */
+    setTimeout(() => URL.revokeObjectURL(url), 10_000);
+  }
+
+  root?.querySelector('[data-save="svg"]')?.addEventListener("click", () => {
+    try {
+      const text = new XMLSerializer().serializeToString(standalone());
+      download(new Blob([text], { type: "image/svg+xml" }), "svg");
+      say("Saved.");
+    } catch {
+      say("That did not save — try the PNG.");
+    }
+  });
+
+  root?.querySelector('[data-save="png"]')?.addEventListener("click", () => {
+    say("Rendering…");
+    try {
+      const clone = standalone();
+      const box = svg!.getBoundingClientRect();
+      const scale = 2;
+      const width = Math.max(1, Math.round(box.width || 640)) * scale;
+      const height = Math.max(1, Math.round(box.height || 640)) * scale;
+      clone.setAttribute("width", String(width));
+      clone.setAttribute("height", String(height));
+
+      const text = new XMLSerializer().serializeToString(clone);
+      /* A data URI rather than a blob URL: some browsers taint a canvas drawn
+         from a blob-backed image, and a tainted canvas cannot be exported —
+         which fails at the last step, after everything looked fine. */
+      const source = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(text)}`;
+
+      const image = new Image();
+      image.onload = () => {
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const context = canvas.getContext("2d");
+        if (!context) { say("This browser cannot render it."); return; }
+        context.drawImage(image, 0, 0, width, height);
+        canvas.toBlob((blob) => {
+          if (!blob) { say("That did not render."); return; }
+          download(blob, "png");
+          say("Saved at 2×.");
+        }, "image/png");
+      };
+      image.onerror = () => say("That did not render — the SVG will still save.");
+      image.src = source;
+    } catch {
+      say("That did not render — the SVG will still save.");
+    }
+  });
+</script>
+
+<style>
+  .export { display: flex; gap: 6px; align-items: center; justify-content: center; flex-wrap: wrap; }
+  .export button {
+    font: 500 var(--text-xs) var(--font-body); color: var(--ink-soft);
+    background: var(--surface-card); border: var(--border-w) solid var(--line);
+    border-radius: var(--radius-sm); padding: 7px 12px; cursor: pointer; min-height: 38px;
+  }
+  .export button:hover { color: var(--ink); border-color: var(--line-strong); }
+  .export button:focus-visible { outline: 2px solid var(--focus-ring, var(--accent)); outline-offset: 1px; }
+  .export-note { font: 400 var(--text-xs) var(--font-body); color: var(--ink-faint); }
+</style>

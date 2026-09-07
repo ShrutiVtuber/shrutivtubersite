@@ -1,0 +1,92 @@
+---
+/* The wheel, embeddable in somebody else's page.
+ *
+ * The point is not generosity. Another astrologer putting this in their own
+ * post is the best inbound link this project has, and the attribution is not
+ * decoration — it is the whole exchange.
+ *
+ * **No account, no cookie, nothing stored.** An embed runs on a page we do not
+ * control, in front of readers who never came here, so it carries no session,
+ * sets nothing and asks for nothing. There is no personal data in a transit
+ * wheel, and that stays true only while it never starts collecting any.
+ *
+ * Framed by anybody, deliberately: `/embed/*` is the one path where
+ * `frame-ancestors` is opened, in BOTH Caddy files — local had no site-wide
+ * CSP once, and a framing rule that worked here and failed in production is
+ * how that difference was found the first time. It is safe here precisely
+ * because this page has no authority to borrow: nothing to click, nothing
+ * signed in, nothing that acts on a reader's behalf.
+ */
+import "../../styles/global.css";
+import TransitWheel from "../../components/chart/TransitWheel.astro";
+import { askAstro, SITE_URL } from "../../lib/api";
+import { ZODIAC } from "../../lib/signs";
+
+export const prerender = false;
+
+const q = Astro.url.searchParams;
+const rising = ZODIAC.includes(q.get("rising") as any) ? q.get("rising")! : "";
+const at = q.get("at") || new Date().toISOString().slice(0, 19) + "Z";
+const theme = q.get("theme") === "dark" ? "dark" : q.get("theme") === "light" ? "light" : "";
+
+interface ChartBody {
+  name: string; longitude: number; retrograde: boolean;
+  dignities?: { sign: string; degree: number };
+}
+const chart = await askAstro<{ bodies: ChartBody[] }>(
+  `/chart?when=${encodeURIComponent(at)}&lat=51.4779&lon=0` +
+  `&tradition=hellenistic&house_system=whole_sign&diagram=false`, 15000);
+const bodies = (chart?.data?.bodies ?? []).map((b) => ({
+  name: b.name,
+  longitude: b.longitude,
+  sign: b.dignities?.sign ?? ZODIAC[Math.floor((((b.longitude % 360) + 360) % 360) / 30)],
+  degree: b.dignities?.degree ?? ((b.longitude % 30) + 30) % 30,
+  retrograde: b.retrograde,
+}));
+
+const here = `${SITE_URL}/tools/events${rising ? `?rising=${rising}` : ""}`;
+const when = at.slice(0, 16).replace("T", " ");
+---
+
+<!doctype html>
+<html lang="en" data-theme={theme || undefined}>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Transit wheel — {when} UT</title>
+  {/* Not a page for a search index; the tool it links to is. */}
+  <meta name="robots" content="noindex" />
+  <link rel="canonical" href={here} />
+</head>
+<body class="embed">
+  {
+    bodies.length > 0 ? (
+      <TransitWheel bodies={bodies} rising={rising} size={480}
+                    degreeRing={false} houseNumbers={!!rising} caption="" />
+    ) : (
+      <p class="held">The ephemeris could not be reached.</p>
+    )
+  }
+  <p class="credit">
+    <a href={here} target="_blank" rel="noopener">
+      {when} UT{rising ? ` · ${rising} rising` : ""} — shrutivtuber.com
+    </a>
+  </p>
+</body>
+</html>
+
+<style is:global>
+  html, body { margin: 0; padding: 0; }
+  body.embed {
+    display: grid; gap: 6px; justify-items: center;
+    padding: 10px; background: var(--surface-page); color: var(--ink);
+    font-family: var(--font-body);
+  }
+  body.embed figcaption { display: none; }
+  .credit { margin: 0; font: 400 12px var(--font-body); text-align: center; }
+  /* Inherits the quiet ink rather than the accent: in somebody else's page
+     this should read as a caption, not as a link they did not choose to add. */
+  .credit a { color: var(--ink-faint); text-decoration: none; }
+  .credit a:hover { color: var(--accent); text-decoration: underline; }
+  .held { font: 400 13px var(--font-body); color: var(--ink-faint); }
+</style>

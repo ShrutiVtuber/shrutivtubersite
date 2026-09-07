@@ -156,8 +156,21 @@ Try /api/health
 	# Both halves, stated here so local and production say the same thing.
 	# Local previously set NEITHER, which is why the preview worked on a laptop
 	# and was blocked on the site — twice, for two different directives.
-	@framable not path /admin /admin/*
+	@framable not path /admin /admin/* /embed /embed/*
 	header @framable Content-Security-Policy "frame-src 'self' https://www.youtube-nocookie.com https://player.twitch.tv; frame-ancestors 'self'"
+
+	# The embed widget is the ONE path other sites may frame, and that is what
+	# it is for: another astrologer putting the wheel in their own post is the
+	# best inbound link this project has. Safe here because the page has no
+	# authority to borrow — no session, no cookie, nothing to click, nothing
+	# that acts on a reader's behalf. Everything else stays 'self' and the
+	# admin stays 'none'; a hole punched in one wall, not a door left open.
+	#
+	# Local had no site-wide CSP at all once, so a framing rule worked here and
+	# was blocked in production. Both files carry this, or it is the same bug
+	# again.
+	@embed path /embed /embed/*
+	header @embed Content-Security-Policy "frame-src 'self'; frame-ancestors *"
 
 	header {
 		X-Content-Type-Options "nosniff"

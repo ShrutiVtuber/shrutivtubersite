@@ -18,6 +18,7 @@
 import ToolLayout from "../../layouts/ToolLayout.astro";
 import TransitWheel from "../../components/chart/TransitWheel.astro";
 import WheelStepper from "../../components/chart/WheelStepper.astro";
+import WheelExport from "../../components/chart/WheelExport.astro";
 import { askAstro } from "../../lib/api";
 import { copy } from "../../lib/copy";
 
@@ -241,6 +242,7 @@ const withParam = (key: string, value: string) => {
           at={at}
           marks={events.map((e) => ({ at: e.at, what: describe(e) }))}
         />
+        <WheelExport name={`wheel-${period}-${rising || "unrotated"}`} />
       </>
     )
   }
@@ -309,6 +311,26 @@ const withParam = (key: string, value: string) => {
           </table>
         </div>
 
+        <p class="take">
+          {say("take.lead", "Take it with you:")}{" "}
+          <a href={`/tools/events/export?format=csv&start=${start}&end=${end}${rising ? `&rising=${rising}` : ""}`}
+             download>CSV</a> ·
+          <a href={`/tools/events/export?format=md&start=${start}&end=${end}${rising ? `&rising=${rising}` : ""}`}
+             download>Markdown</a> ·
+          <a href={`/tools/events/export?format=json&start=${start}&end=${end}${rising ? `&rising=${rising}` : ""}`}
+             download>JSON</a>
+          <span class="take-note">{say("take.note", "All times Universal, to the second. The house column comes with the rotation you chose.")}</span>
+        </p>
+
+        {/* The copy-paste snippet. Another astrologer putting this in their
+            own post is the best inbound link here, so it has to be one
+            selection away rather than something to work out. */}
+        <details class="embed-offer">
+          <summary>{say("embed.summary", "Put this wheel in your own page")}</summary>
+          <p class="adm-note">{say("embed.note", "Paste this anywhere HTML is allowed. It carries a link back and nothing else — no cookie, no script of ours on your page, nothing stored.")}</p>
+          <textarea readonly rows="3" class="snippet" onclick="this.select()">{`<iframe src="https://shrutivtuber.com/embed/wheel?rising=${rising || ""}&at=${at}" width="520" height="560" style="border:0;max-width:100%" loading="lazy" title="Transit wheel — shrutivtuber.com"></iframe>`}</textarea>
+        </details>
+
         <p class="legend">
           <b>⊘</b> {say("legend.averse", "in aversion — the 2nd, 6th, 8th and 12th from the rising sign cannot see it.")}
           {" "}{say("legend.voc", "Void windows use the thirty-degree rule, kenodromia, which is this site's default.")}
@@ -357,6 +379,22 @@ const withParam = (key: string, value: string) => {
      set in the full ink, and both carry their own words. */
   .k-eclipse td, .k-station td { font-weight: 600; }
   .k-void td { color: var(--ink-soft); }
+  .embed-offer { margin-top: var(--space-3); }
+  .embed-offer summary {
+    cursor: pointer; font: 500 var(--text-sm) var(--font-body); color: var(--accent);
+  }
+  .snippet {
+    width: 100%; margin-top: 8px; font: 400 var(--text-xs) var(--font-mono);
+    color: var(--ink); background: var(--surface-inset);
+    border: var(--border-w) solid var(--line); border-radius: var(--radius-sm);
+    padding: 8px; resize: vertical; box-sizing: border-box;
+  }
+  .take {
+    margin: var(--space-3) 0 0; font: 400 var(--text-sm) var(--font-body);
+    display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap;
+  }
+  .take a { color: var(--accent); }
+  .take-note { color: var(--ink-faint); font-size: var(--text-xs); }
   .legend {
     margin-top: var(--space-3); color: var(--ink-faint);
     font: 400 var(--text-xs) / 1.6 var(--font-body);
