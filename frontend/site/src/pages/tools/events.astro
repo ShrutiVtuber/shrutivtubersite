@@ -1,0 +1,304 @@
+---
+/* Every moment in a period, which is what a column is written from.
+ *
+ * A chart is a snapshot and cannot produce the sentence "Mercury turns
+ * retrograde on the fourteenth". This is the other half of the working set: the
+ * complete list of ingresses, stations, lunations, eclipses, exact
+ * configurations and void windows between two dates, with the whole-sign house
+ * each falls in **for the sign you are writing for**.
+ *
+ * **The rotation is the point.** Writing twelve columns means reading the same
+ * sky twelve times, once from each rising sign. Nothing about the sky changes
+ * between them — only the house each event lands in — so the house column
+ * recomputes and nothing else does.
+ *
+ * Server-rendered and works with scripting off, because it is a table and
+ * because it is the thing most likely to be open beside a stream.
+ */
+import ToolLayout from "../../layouts/ToolLayout.astro";
+import { askAstro } from "../../lib/api";
+import { copy } from "../../lib/copy";
+
+const say = await copy("tools/events");
+
+const SIGNS = [
+  "Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo",
+  "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces",
+];
+const SIGN_GLYPH: Record<string, string> = {
+  Aries: "♈︎", Taurus: "♉︎", Gemini: "♊︎", Cancer: "♋︎",
+  Leo: "♌︎", Virgo: "♍︎", Libra: "♎︎", Scorpio: "♏︎",
+  Sagittarius: "♐︎", Capricorn: "♑︎", Aquarius: "♒︎", Pisces: "♓︎",
+};
+const KINDS = ["ingress", "station", "lunation", "eclipse", "aspect", "void"];
+
+const q = Astro.url.searchParams;
+
+/* ── the period ──────────────────────────────────────────────────────────
+   Weeks are ISO-8601: Monday start, week 1 contains the first Thursday, and
+   the week id is what a URL and an article key are made of. A Sunday-start
+   preference is a way of DISPLAYING the same seven days, never a second set
+   of periods — so it does not appear here at all. */
+const type = ["day", "week", "month", "year"].includes(q.get("type") ?? "")
+  ? q.get("type")!
+  : "month";
+
+const now = new Date();
+const pad = (n: number) => String(n).padStart(2, "0");
+
+function isoWeekOf(d: Date): string {
+  /* Thursday decides the year, which is the whole of the ISO rule and the
+     reason a week in early January can belong to the previous year. */
+  const t = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+  t.setUTCDate(t.getUTCDate() + 4 - (t.getUTCDay() || 7));
+  const yearStart = new Date(Date.UTC(t.getUTCFullYear(), 0, 1));
+  const week = Math.ceil(((t.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+  return `${t.getUTCFullYear()}-W${pad(week)}`;
+}
+function weekRange(id: string): [string, string] {
+  const [y, w] = id.split("-W").map(Number);
+  const jan4 = new Date(Date.UTC(y, 0, 4));
+  const monday = new Date(jan4);
+  monday.setUTCDate(jan4.getUTCDate() - ((jan4.getUTCDay() || 7) - 1) + (w - 1) * 7);
+  const sunday = new Date(monday);
+  sunday.setUTCDate(monday.getUTCDate() + 6);
+  return [monday.toISOString().slice(0, 10), sunday.toISOString().slice(0, 10)];
+}
+
+const period = q.get("period") ?? (
+  type === "day" ? now.toISOString().slice(0, 10)
+  : type === "week" ? isoWeekOf(now)
+  : type === "year" ? String(now.getUTCFullYear())
+  : `${now.getUTCFullYear()}-${pad(now.getUTCMonth() + 1)}`
+);
+
+let start = "", end = "", label = "";
+if (type === "day") {
+  start = period; end = period;
+  label = new Date(`${period}T00:00:00Z`).toLocaleDateString("en-GB",
+    { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
+} else if (type === "week") {
+  [start, end] = weekRange(period);
+  label = `${period} · ${start} to ${end}`;
+} else if (type === "year") {
+  start = `${period}-01-01`; end = `${period}-12-31`;
+  label = period;
+} else {
+  const [y, m] = period.split("-").map(Number);
+  start = `${period}-01`;
+  end = `${period}-${pad(new Date(Date.UTC(y, m, 0)).getUTCDate())}`;
+  label = new Date(`${start}T00:00:00Z`).toLocaleDateString("en-GB",
+    { month: "long", year: "numeric", timeZone: "UTC" });
+}
+
+const rising = SIGNS.includes(q.get("rising") ?? "") ? q.get("rising")! : "";
+const chosen = KINDS.filter((k) => q.get(k) !== "0");
+/* A year of every configuration between every pair is a very long list and a
+   slow one. Narrowed by default at that length, and said out loud. */
+const narrowed = type === "year" && !q.get("aspect");
+const kinds = narrowed ? chosen.filter((k) => k !== "aspect") : chosen;
+
+interface EventRow {
+  kind: string; at: string; bodies: string[]; sign: string;
+  degree: number; detail?: Record<string, any>;
+}
+const answer = await askAstro<{ count: number; events: EventRow[] }>(
+  `/events?start=${start}&end=${end}&kinds=${kinds.join(",")}` +
+  `&void_rule=thirtyDegrees&true_node=true`,
+  25000,
+);
+const events = answer?.data?.events ?? [];
+
+/* The one line of arithmetic the rotation needs. Positions do not change. */
+const houseOf = (sign: string) =>
+  rising ? ((SIGNS.indexOf(sign) - SIGNS.indexOf(rising) + 12) % 12) + 1 : 0;
+/* A planet in the 2nd, 6th, 8th or 12th from the rising sign cannot see it,
+   and that materially changes what gets written about it. */
+const AVERSE = new Set([2, 6, 8, 12]);
+
+const dm = (d: number) => `${Math.floor(d)}°${pad(Math.round((d - Math.floor(d)) * 60) % 60)}′`;
+const describe = (e: EventRow): string => {
+  const who = e.bodies.join(" · ");
+  if (e.kind === "ingress") return `${who} enters ${e.sign}${e.detail?.retrograde ? ", retrograde" : ""}`;
+  if (e.kind === "station") return `${who} stations ${e.detail?.direction}`;
+  if (e.kind === "lunation") return `${e.detail?.phase} moon`;
+  if (e.kind === "eclipse") return `${e.detail?.type} ${e.detail?.of} eclipse`;
+  if (e.kind === "aspect") return `${e.bodies[0]} ${e.detail?.aspect} ${e.bodies[1]}`;
+  if (e.kind === "void") return `Moon void of course · ${e.detail?.minutes} min, after ${e.detail?.after}`;
+  return e.kind;
+};
+
+const withParam = (key: string, value: string) => {
+  const p = new URLSearchParams(q);
+  value ? p.set(key, value) : p.delete(key);
+  if (key === "type") p.delete("period");
+  return `/tools/events?${p}`;
+};
+---
+
+<ToolLayout
+  rule={rising ? `${rising} rising` : "no rotation"}
+  ruleLabel="read from"
+  date={label}
+  disclosure="○"
+  noJs={say("nojs", "This page is a table and a set of links. It needs no scripting.")}
+>
+  <div slot="parameters" class="params">
+    <form class="param-panel" method="GET">
+      <label>
+        <span>Period</span>
+        <select name="type">
+          {["day", "week", "month", "year"].map((t) => (
+            <option value={t} selected={t === type}>{t}</option>
+          ))}
+        </select>
+      </label>
+      <label>
+        <span>{type === "week" ? "ISO week" : type === "year" ? "Year" : type === "day" ? "Date" : "Month"}</span>
+        <input type={type === "day" ? "date" : type === "month" ? "month" : "text"}
+               name="period" value={period} />
+      </label>
+      <label>
+        <span>Read from</span>
+        <select name="rising">
+          <option value="">— no rotation —</option>
+          {SIGNS.map((s) => <option value={s} selected={s === rising}>{s} rising</option>)}
+        </select>
+      </label>
+      <fieldset class="kinds">
+        <legend>{say("kinds.legend", "Include")}</legend>
+        {KINDS.map((k) => (
+          <label class="check">
+            <input type="checkbox" name={k} value="1" checked={kinds.includes(k)} />
+            <span class="check-label">{k}</span>
+          </label>
+        ))}
+      </fieldset>
+      <button type="submit">{say("submit", "Generate")}</button>
+    </form>
+    <p class="privacy">
+      {say("rotation.note", "Switching the rising sign does not recompute anything. The sky is the same; only the house each event falls in changes, which is the one number that differs between twelve columns.")}
+    </p>
+  </div>
+
+  {
+    events.length === 0 ? (
+      <p class="prompt">{say("absent", "Nothing found for that period — or the ephemeris could not be reached, which would be a failure on this side rather than a quiet sky.")}</p>
+    ) : (
+      <>
+        <div class="rot" role="group" aria-label="Rising sign">
+          <a href={withParam("rising", "")} class:list={["chip", !rising && "on"]}>—</a>
+          {SIGNS.map((s) => (
+            <a href={withParam("rising", s)} class:list={["chip", s === rising && "on"]}
+               title={`${s} rising`}>{SIGN_GLYPH[s]}</a>
+          ))}
+        </div>
+
+        {narrowed && (
+          <p class="narrowed">
+            {say("narrowed", "Exact configurations are left out of a whole year by default — every pair of bodies over twelve months is thousands of lines.")}
+            {" "}<a href={withParam("aspect", "1")}>{say("narrowed.link", "Include them anyway")}</a>
+          </p>
+        )}
+
+        <div class="table-scroll">
+          <table class="ev">
+            <caption>
+              {events.length} {say("caption", "moments, all times Universal.")}
+              {rising && ` ${say("caption.rot", "Houses are whole-sign from")} ${rising}.`}
+            </caption>
+            <thead>
+              <tr>
+                <th scope="col">UT</th>
+                <th scope="col">{say("th.what", "What")}</th>
+                <th scope="col">{say("th.where", "Where")}</th>
+                {rising && <th scope="col">{say("th.house", "House")}</th>}
+              </tr>
+            </thead>
+            <tbody>
+              {events.map((e) => {
+                const house = houseOf(e.sign);
+                return (
+                  <tr class={`k-${e.kind}`}>
+                    <td class="t-tabular when">
+                      <span class="d">{e.at.slice(0, 10)}</span>
+                      <span class="t">{e.at.slice(11, 16)}</span>
+                    </td>
+                    <td>{describe(e)}</td>
+                    <td class="t-tabular">
+                      {e.kind === "void" ? "" : <>{dm(e.degree)} <span title={e.sign}>{SIGN_GLYPH[e.sign]}</span></>}
+                    </td>
+                    {rising && (
+                      <td class="t-tabular house">
+                        {house}
+                        {AVERSE.has(house) && (
+                          <abbr title="in aversion to the rising sign — it cannot see the Ascendant"> ⊘</abbr>
+                        )}
+                      </td>
+                    )}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        <p class="legend">
+          <b>⊘</b> {say("legend.averse", "in aversion — the 2nd, 6th, 8th and 12th from the rising sign cannot see it.")}
+          {" "}{say("legend.voc", "Void windows use the thirty-degree rule, kenodromia, which is this site's default.")}
+        </p>
+      </>
+    )
+  }
+</ToolLayout>
+
+<style>
+  .rot { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: var(--space-3); }
+  .chip {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 38px; min-height: 38px; border-radius: var(--radius-sm);
+    border: var(--border-w) solid var(--line); color: var(--ink-soft);
+    text-decoration: none; font-size: 1.05rem;
+  }
+  .chip.on {
+    border-color: var(--accent); color: var(--on-accent, #fff);
+    background: var(--accent); font-weight: 600;
+  }
+  .chip:focus-visible { outline: 2px solid var(--focus-ring, var(--accent)); outline-offset: 2px; }
+
+  .narrowed {
+    font: 400 var(--text-sm) / 1.6 var(--font-body); color: var(--ink-soft);
+    margin: 0 0 var(--space-3);
+  }
+  .table-scroll { overflow-x: auto; }
+  .ev { border-collapse: collapse; width: 100%; font-size: var(--text-sm); }
+  .ev caption {
+    caption-side: top; text-align: left; padding-bottom: var(--space-2);
+    color: var(--ink-faint); font: 400 var(--text-xs) / 1.6 var(--font-body);
+  }
+  .ev th, .ev td {
+    border-bottom: var(--border-w) solid var(--line);
+    padding: 5px 10px; text-align: left; vertical-align: baseline;
+  }
+  .ev thead th {
+    color: var(--ink-faint); font: 600 var(--text-micro) var(--font-body);
+    letter-spacing: var(--tracking-eyebrow, .08em); text-transform: uppercase;
+    border-bottom: var(--border-w) solid var(--line-strong);
+  }
+  .when .d { color: var(--ink-faint); margin-right: 8px; }
+  .house { text-align: right; }
+  /* Never colour alone — the eclipse and station rows are also the only ones
+     set in the full ink, and both carry their own words. */
+  .k-eclipse td, .k-station td { font-weight: 600; }
+  .k-void td { color: var(--ink-soft); }
+  .legend {
+    margin-top: var(--space-3); color: var(--ink-faint);
+    font: 400 var(--text-xs) / 1.6 var(--font-body);
+  }
+  .prompt { color: var(--ink-soft); }
+  .kinds { border: 0; padding: 0; margin: 0; display: grid; gap: 2px; }
+  .kinds legend {
+    font: 600 var(--text-micro) var(--font-body); color: var(--ink-faint);
+    letter-spacing: var(--tracking-eyebrow, .08em); text-transform: uppercase;
+  }
+</style>

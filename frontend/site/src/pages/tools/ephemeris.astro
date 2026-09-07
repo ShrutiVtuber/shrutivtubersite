@@ -1,0 +1,312 @@
+---
+/* The ephemeris, as a page you could have bought printed.
+ *
+ * A wheel answers "where is everything now". This answers the other question a
+ * student of the craft actually works from: a column per body, a row per day,
+ * read DOWN to watch a planet move and ACROSS to see what it meets. That is how
+ * astrology has been learned since the tables were first printed, and it is a
+ * different instrument from a chart rather than a lesser one.
+ *
+ * **Everything here is server-rendered and works with scripting off.** A table
+ * is the one thing on this site that genuinely does not need JavaScript, and a
+ * page somebody might print or keep offline should not depend on it.
+ *
+ * Declination is here because the page this replaces has it: longitude alone
+ * cannot show a parallel or a body out of bounds, and both are ordinary working
+ * facts for anyone reading a table.
+ */
+import ToolLayout from "../../layouts/ToolLayout.astro";
+import DisagreementControl from "../../components/tools/DisagreementControl.astro";
+import { askAstro } from "../../lib/api";
+import { copy } from "../../lib/copy";
+
+/* Every word here, editable from the admin. */
+const say = await copy("tools/ephemeris");
+
+const q = Astro.url.searchParams;
+
+/* A month is the unit a printed ephemeris comes in, and the unit a monthly
+   column is written from. Default to the one we are in. */
+const today = new Date();
+const monthParam = q.get("month") ?? "";
+const month = /^\d{4}-\d{2}$/.test(monthParam)
+  ? monthParam
+  : `${today.getUTCFullYear()}-${String(today.getUTCMonth() + 1).padStart(2, "0")}`;
+
+const [year, mon] = month.split("-").map(Number);
+const start = `${month}-01`;
+const lastDay = new Date(Date.UTC(year, mon, 0)).getUTCDate();
+const end = `${month}-${String(lastDay).padStart(2, "0")}`;
+
+/* Raphael's is computed for noon, most modern tables for midnight, and the Moon
+   is seven degrees apart between them. Anybody checking this against a book they
+   own has to know which they are looking at, so it is a visible choice. */
+const hour = q.get("hour") === "noon" ? "noon" : "midnight";
+const modern = q.get("modern") === "1";
+const showDeclination = q.get("dec") === "1";
+
+interface Position {
+  name: string; longitude: number; sign: string; degree: number;
+  speed: number; retrograde: boolean; latitude: number;
+  declination: number; outOfBounds: boolean;
+}
+interface EventRow {
+  kind: string; at: string; bodies: string[]; sign: string; degree: number;
+  detail?: Record<string, any>;
+}
+interface DayRow {
+  at: string; date: string; siderealTime: number; moonPhase: number;
+  positions: Position[]; events: EventRow[];
+}
+interface Payload { start: string; end: string; hour: string; note: string; days: DayRow[] }
+
+const answer = await askAstro<Payload>(
+  `/ephemeris?start=${start}&end=${end}&hour=${hour}` +
+  `&include_modern=${modern}&events=true`,
+  20000,
+);
+const days = answer?.data?.days ?? [];
+const bodies = days[0]?.positions.map((p) => p.name) ?? [];
+
+/* ── formatting, in one place ─────────────────────────────────────────────
+   A table of numbers is only readable if every number is written the same way,
+   and degrees-and-minutes is what the printed page uses. */
+const SIGN_GLYPH: Record<string, string> = {
+  Aries: "♈︎", Taurus: "♉︎", Gemini: "♊︎", Cancer: "♋︎",
+  Leo: "♌︎", Virgo: "♍︎", Libra: "♎︎", Scorpio: "♏︎",
+  Sagittarius: "♐︎", Capricorn: "♑︎", Aquarius: "♒︎", Pisces: "♓︎",
+};
+const dm = (degree: number) => {
+  const d = Math.floor(degree);
+  const m = Math.round((degree - d) * 60);
+  return m === 60 ? `${d + 1}°00′` : `${d}°${String(m).padStart(2, "0")}′`;
+};
+const signed = (value: number) =>
+  `${value < 0 ? "−" : "+"}${dm(Math.abs(value))}`;
+const clock = (hours: number) => {
+  const h = Math.floor(hours);
+  const m = Math.floor((hours - h) * 60);
+  const s = Math.round((((hours - h) * 60) - m) * 60);
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+};
+const dayName = (iso: string) =>
+  new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-GB", { weekday: "short", timeZone: "UTC" });
+
+/* The margin notes. A printed ephemeris puts ingresses and stations beside the
+   columns; the same facts, in the same place, are why the table can be read
+   without a second document open. */
+const marginal = (event: EventRow): string => {
+  const glyph = SIGN_GLYPH[event.sign] ?? event.sign;
+  const at = event.at.slice(11, 16);
+  if (event.kind === "ingress") {
+    return `${at} ${event.bodies[0]} → ${glyph}${event.detail?.retrograde ? " ℞" : ""}`;
+  }
+  if (event.kind === "station") {
+    return `${at} ${event.bodies[0]} ${event.detail?.direction === "retrograde" ? "℞ stations" : "stations direct"} ${dm(event.degree)} ${glyph}`;
+  }
+  if (event.kind === "lunation") {
+    return `${at} ${event.detail?.phase} moon ${dm(event.degree)} ${glyph}`;
+  }
+  if (event.kind === "eclipse") {
+    return `${at} ${event.detail?.type} ${event.detail?.of} eclipse ${dm(event.degree)} ${glyph}`;
+  }
+  if (event.kind === "void") {
+    return `${at} Moon void → ${String(event.detail?.until ?? "").slice(11, 16)}`;
+  }
+  return "";
+};
+
+const shift = (by: number) => {
+  const d = new Date(Date.UTC(year, mon - 1 + by, 1));
+  const m = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+  const p = new URLSearchParams(q);
+  p.set("month", m);
+  return `/tools/ephemeris?${p}`;
+};
+const monthName = new Date(Date.UTC(year, mon - 1, 1))
+  .toLocaleDateString("en-GB", { month: "long", year: "numeric", timeZone: "UTC" });
+---
+
+<ToolLayout
+  rule={hour === "noon" ? "noon UT" : "midnight UT"}
+  ruleLabel="computed for"
+  date={month}
+  disclosure="○"
+  noJs={say("nojs", "This page is a table. It needs no scripting and never did.")}
+>
+  <div slot="parameters" class="params">
+    {/* The two conventions printed ephemerides come in. Not cosmetic: the Moon
+        moves about seven degrees between them. */}
+    <DisagreementControl
+      legend={say("hour.legend", "Which hour the day is taken from")}
+      name="hour"
+      value={hour}
+      keep={{ month, ...(modern ? { modern: "1" } : {}), ...(showDeclination ? { dec: "1" } : {}) }}
+      options={[
+        {
+          value: "midnight",
+          name: "Midnight",
+          rule: "00:00 Universal Time. What most modern tables and most software use.",
+          consequence: days[0] ? `Moon ${dm(days[0].positions[1].degree)} ${days[0].positions[1].sign}` : "00:00 UT",
+        },
+        {
+          value: "noon",
+          name: "Noon",
+          rule: "12:00 Universal Time. What Raphael's and the older printed ephemerides use.",
+          consequence: "12:00 UT",
+        },
+      ]}
+    />
+    <hr class="param-rule" />
+    <form class="param-panel" method="GET">
+      <label>
+        <span>Month</span>
+        <input type="month" name="month" value={month} />
+      </label>
+      <input type="hidden" name="hour" value={hour} />
+      <label class="check">
+        <input type="checkbox" name="modern" value="1" checked={modern} />
+        <span class="check-label">{say("modern.label", "Show Uranus, Neptune and Pluto")}</span>
+      </label>
+      <label class="check">
+        <input type="checkbox" name="dec" value="1" checked={showDeclination} />
+        <span class="check-label">{say("dec.label", "Show declination instead of longitude")}</span>
+      </label>
+      <button type="submit">Show</button>
+    </form>
+    <p class="privacy">{say("print.note", "This page prints. The table is set to fit a sheet of A4 in portrait, with the margin notes kept beside their day.")}</p>
+  </div>
+
+  {
+    days.length === 0 ? (
+      <p class="prompt">{say("absent", "The ephemeris could not be reached. That is a failure on this side, not a fact about the sky.")}</p>
+    ) : (
+      <>
+        <nav class="months" aria-label="Move by month">
+          <a href={shift(-1)} rel="prev">← {say("prev", "Previous month")}</a>
+          <h2>{monthName}</h2>
+          <a href={shift(1)} rel="next">{say("next", "Next month")} →</a>
+        </nav>
+
+        <div class="table-scroll">
+          <table class="eph">
+            <caption>
+              {showDeclination
+                ? say("cap.dec", "Declination, in degrees and minutes north or south of the equator.")
+                : say("cap.lon", "Longitude, in degrees and minutes of the sign.")}
+              {" "}
+              {hour === "noon"
+                ? say("cap.noon", "Positions are for noon Universal Time on each date.")
+                : say("cap.midnight", "Positions are for midnight Universal Time on each date.")}
+            </caption>
+            <thead>
+              <tr>
+                <th scope="col" class="c-date">Date</th>
+                <th scope="col" class="c-sid">Sid. time</th>
+                {bodies.map((name) => <th scope="col">{name}</th>)}
+                <th scope="col" class="c-notes">{say("notes.head", "The day")}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {days.map((day) => (
+                <tr>
+                  <th scope="row" class="c-date">
+                    <span class="t-tabular">{day.date.slice(8)}</span>
+                    <span class="wd">{dayName(day.date)}</span>
+                  </th>
+                  <td class="t-tabular c-sid">{clock(day.siderealTime)}</td>
+                  {day.positions.map((p) => (
+                    <td class="t-tabular pos">
+                      {showDeclination ? (
+                        <span class={p.outOfBounds ? "oob" : undefined}
+                              title={p.outOfBounds ? "out of bounds" : undefined}>
+                          {signed(p.declination)}{p.outOfBounds && <b aria-label="out of bounds"> ‡</b>}
+                        </span>
+                      ) : (
+                        <>
+                          {dm(p.degree)}
+                          <span class="sg" title={p.sign}>{SIGN_GLYPH[p.sign] ?? p.sign}</span>
+                          {/* Never colour alone: retrograde is a mark, and it is
+                              the mark the printed page uses. */}
+                          {p.retrograde && <b class="rx" aria-label="retrograde"> ℞</b>}
+                        </>
+                      )}
+                    </td>
+                  ))}
+                  <td class="c-notes">
+                    {day.events.filter((e) => marginal(e)).map((e) => (
+                      <span class={`note n-${e.kind}`}>{marginal(e)}</span>
+                    ))}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <p class="legend">
+          <b>℞</b> {say("legend.rx", "retrograde")} · <b>‡</b> {say("legend.oob", "out of bounds — further from the equator than the Sun ever goes")} ·
+          {" "}{say("legend.sid", "Sidereal time is for Greenwich.")}
+        </p>
+      </>
+    )
+  }
+</ToolLayout>
+
+<style>
+  .months {
+    display: flex; align-items: baseline; justify-content: space-between;
+    gap: var(--space-3); flex-wrap: wrap; margin-bottom: var(--space-3);
+  }
+  .months h2 {
+    margin: 0; font: 600 var(--text-h3) var(--font-display);
+    line-height: var(--leading-heading, 1.2);
+  }
+  .months a { color: var(--accent); font: 400 var(--text-sm) var(--font-body); }
+
+  .table-scroll { overflow-x: auto; }
+
+  .eph { border-collapse: collapse; width: 100%; font-size: var(--text-xs); }
+  .eph caption {
+    caption-side: top; text-align: left; padding-bottom: var(--space-2);
+    color: var(--ink-faint); font: 400 var(--text-xs) / 1.6 var(--font-body);
+    max-width: 78ch;
+  }
+  .eph th, .eph td {
+    border-bottom: var(--border-w) solid var(--line);
+    padding: 3px 8px; text-align: right; white-space: nowrap;
+  }
+  .eph thead th {
+    text-align: right; color: var(--ink-faint);
+    font: 600 var(--text-micro) var(--font-body);
+    letter-spacing: var(--tracking-eyebrow, .08em); text-transform: uppercase;
+    border-bottom: var(--border-w) solid var(--line-strong);
+  }
+  .c-date { text-align: left !important; }
+  .c-date .wd { color: var(--ink-faint); margin-left: 6px; font-weight: 400; }
+  .c-sid { color: var(--ink-soft); }
+  .pos .sg { margin-left: 4px; }
+  .rx { color: var(--rose); font-weight: 600; }
+  .oob { font-weight: 600; }
+
+  .c-notes { text-align: left !important; white-space: normal; min-width: 22ch; }
+  .note { display: block; color: var(--ink-soft); }
+  .n-eclipse, .n-station { color: var(--ink); font-weight: 600; }
+
+  /* Every other row tinted, because forty rows of numbers is where the eye
+     slips a line — which is the one error a table like this must not invite. */
+  .eph tbody tr:nth-child(even) { background: var(--surface-inset, transparent); }
+
+  .legend {
+    margin-top: var(--space-3); color: var(--ink-faint);
+    font: 400 var(--text-xs) / 1.6 var(--font-body);
+  }
+  .prompt { color: var(--ink-soft); }
+
+  @media print {
+    .params, .months a { display: none; }
+    .eph { font-size: 8pt; }
+    .eph tbody tr:nth-child(even) { background: none; }
+    .table-scroll { overflow: visible; }
+  }
+</style>

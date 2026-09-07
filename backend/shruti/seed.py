@@ -112,6 +112,9 @@ TOOLS = [
      "The Athenian lunisolar date, with the intercalation rule shown rather than hidden.", 20),
     ("isopsephy", "Isopsephy calculator",
      "Greek numerology over any text, with the cipher shown.", 30),
+    ("ephemeris", "The ephemeris",
+     "A month of the sky as a table — a column per body, a row per day, the way "
+     "the craft has been learned since the tables were printed.", 25),
     ("natal-chart", "Natal chart",
      "A chart cast against the Swiss Ephemeris, with every point, configuration and lot.", 40),
     ("geomantic-shield", "Geomantic shield chart",
