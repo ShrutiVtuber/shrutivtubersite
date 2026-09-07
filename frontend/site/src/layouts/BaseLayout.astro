@@ -32,6 +32,11 @@ interface Props {
   bare?: boolean;
   /** Kept out of search results — the admin, and anything behind sign-in. */
   noindex?: boolean;
+  /** Overrides the canonical URL. For a page reachable at more than one
+      address — "this week's reading" and the dated one are the same words —
+      where the undated form must point at the dated one rather than compete
+      with it for the same search result. */
+  canonical?: string;
   /**
    * A page-specific share image, absolute.
    *
@@ -50,9 +55,24 @@ interface Props {
    * a shop page ends up claiming to be a course.
    */
   jsonLd?: Record<string, unknown> | null;
+  /**
+   * A feed this page belongs to, for autodiscovery.
+   *
+   * Site-relative. A reader app finds a feed by looking for this tag, not by
+   * guessing the path — an undiscoverable feed is a feed nobody subscribes to.
+   */
+  feed?: { href: string; title: string };
+  /**
+   * Site-relative canonical URL of this page, when it can be embedded.
+   *
+   * Editors and chat clients look for a `json+oembed` link before deciding
+   * whether a pasted URL becomes a card or stays a bare link.
+   */
+  oembed?: string;
 }
 const { title, description = "", bare = false, noindex = false,
-        ogImage, ogImageAlt, jsonLd: pageLd = null } = Astro.props;
+        ogImage, ogImageAlt, jsonLd: pageLd = null, canonical,
+        feed, oembed} = Astro.props;
 
 const [live, links] = await Promise.all([
   site<LiveStatus>(PATHS.live),
@@ -120,8 +140,18 @@ const homeLd = isHome
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{title}</title>
     {description && <meta name="description" content={description} />}
-    <link rel="canonical" href={new URL(Astro.url.pathname, siteUrl).href} />
+    <link rel="canonical" href={new URL(canonical ?? Astro.url.pathname, siteUrl).href} />
     {noindex && <meta name="robots" content={say("text.3", "noindex, nofollow")} />}
+    {feed && (
+      <link rel="alternate" type="application/rss+xml"
+            title={feed.title} href={new URL(feed.href, siteUrl).href} />
+    )}
+    {oembed && (
+      <link rel="alternate" type="application/json+oembed"
+            href={`${new URL("/oembed.json", siteUrl).href}?url=${
+              encodeURIComponent(new URL(oembed, siteUrl).href)}&format=json`}
+            title={title} />
+    )}
 
     {/* A crescent rather than the wordmark: at sixteen pixels a wordmark is a
         smudge, and the brief forbids inventing a seal. Transparent, so it

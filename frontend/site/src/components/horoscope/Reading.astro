@@ -1,0 +1,212 @@
+---
+/* One reading, rendered the same way whichever URL asked for it.
+ *
+ * Two routes reach this: `/horoscopes/<sign>/<period>` for whatever is
+ * current, and `/horoscopes/<sign>/<period>/<id>` for a particular one.
+ * The dated form is canonical — it is what a sitemap lists and what a link
+ * posted in a Discord should still open in a year — and the undated form
+ * points at it rather than competing with it for the same words.
+ *
+ * Both render this, so there is one reading page and not two that drift.
+ *
+ * Readings are bylined Soror Eu. A., because magickal writing signs with the
+ * motto.
+ */
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import SectionHeader from "../brand/SectionHeader.astro";
+import PeriodSwitcher from "../navigation/PeriodSwitcher.astro";
+import LocalTimes from "../content/LocalTimes.astro";
+import TransitWheel from "../chart/TransitWheel.astro";
+import Badge from "../navigation/Badge.astro";
+import EmptyState from "../feedback/EmptyState.astro";
+import Button from "../forms/Button.astro";
+import { site } from "../../lib/api";
+import { account } from "../../lib/account";
+import { renderMarkdown } from "../../lib/markdown";
+import { resolveTokens } from "../../lib/tokens";
+import { askAstro } from "../../lib/api";
+import { sunSign, ZODIAC } from "../../lib/signs";
+import { copy } from "../../lib/copy";
+
+/* Every word on this page, editable from the admin. The defaults below are
+   what it was written with and what still renders if nothing was changed. */
+/* A component namespace, not a page one.
+ *
+ * These words are now shared by the dated and undated routes, so they are not
+ * "the words on that page" any more — editing one has to change both, and the
+ * admin says so for a `component:` namespace. */
+const say = await copy("component:HoroscopeReading");
+
+
+/* The instant a period is drawn for. Noon on its first day: it is inside the
+   period for every reader on earth, which midnight is not — at UTC+14 the
+   midnight that opens a UT week is already the previous afternoon locally. */
+function anchorOf(covers: string): string {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(covers)) return `${covers}T12:00:00Z`;
+  if (/^\d{4}-W\d{2}$/.test(covers)) {
+    const [y, w] = covers.split("-W").map(Number);
+    const jan4 = new Date(Date.UTC(y, 0, 4));
+    const monday = new Date(jan4);
+    monday.setUTCDate(jan4.getUTCDate() - ((jan4.getUTCDay() || 7) - 1) + (w - 1) * 7);
+    return `${monday.toISOString().slice(0, 10)}T12:00:00Z`;
+  }
+  if (/^\d{4}-\d{2}$/.test(covers)) return `${covers}-01T12:00:00Z`;
+  if (/^\d{4}$/.test(covers)) return `${covers}-01-01T12:00:00Z`;
+  return "";
+}
+
+const { sign, period, covers = "" } = Astro.props as
+  { sign: string; period: string; covers?: string };
+
+interface Reading {
+  sign: string; period: string; covers: string; published: boolean;
+  bodyMd: string; byline: string; availablePeriods: string[];
+}
+const answer = await site<Reading>(
+  `/api/horoscopes/${sign}/${period}${covers ? `?covers=${encodeURIComponent(covers)}` : ""}`,
+);
+/* **An absent reading is ABSENT, not an error.** That is this site's rule for
+   every period that has not been written, and it holds when the backend
+   returns nothing at all: a period nobody has written yet and a period the API
+   could not describe look the same to a reader, and both are honest as "not
+   written". A 404 here would tell somebody following a link from a Discord
+   that the page never existed, which is a different and wrong claim. */
+const data: Reading = answer ?? {
+  sign, period, covers, published: false,
+  bodyMd: "", byline: "", availablePeriods: [],
+};
+
+const me = await account(Astro);
+const yours = me?.nativity ? sunSign(me.nativity.birthDate) : null;
+
+/* Tokens are resolved AFTER markdown — `{{…}}` carries no markdown syntax, so
+   it survives the processor untouched, and doing it here does not depend on
+   whether the processor passes raw HTML through. Each becomes a `<time>` in
+   Universal Time, which a script then rewrites into the reader's own clock. */
+const html = data.published ? resolveTokens(await renderMarkdown(data.bodyMd)) : "";
+
+/* ── the wheel, locked ────────────────────────────────────────────────────
+   On a reading the wheel is fixed to the period's own anchor, so it can never
+   disagree with the prose beside it. Stepping happens in the tool, which the
+   link below opens at exactly this view. */
+const anchor = anchorOf(data.covers);
+interface ChartBody {
+  name: string; longitude: number; retrograde: boolean;
+  dignities?: { sign: string; degree: number };
+}
+const chart = anchor
+  ? await askAstro<{ bodies: ChartBody[] }>(
+      `/chart?when=${encodeURIComponent(anchor)}&lat=51.4779&lon=0` +
+      `&tradition=hellenistic&house_system=whole_sign&diagram=false`, 15000)
+  : null;
+
+const wheelBodies = (chart?.data?.bodies ?? []).map((b) => ({
+  name: b.name,
+  longitude: b.longitude,
+  sign: b.dignities?.sign ?? ZODIAC[Math.floor((((b.longitude % 360) + 360) % 360) / 30)],
+  degree: b.dignities?.degree ?? ((b.longitude % 30) + 30) % 30,
+  retrograde: b.retrograde,
+}));
+const NAME = sign.charAt(0).toUpperCase() + sign.slice(1);
+
+/* The opening of the reading, for the search snippet and the link preview.
+ *
+ * A generic "the weekly reading for Leo" is the same sentence on forty-eight
+ * pages, which is what a search engine sees as forty-eight near-duplicates.
+ * The words she actually wrote are different every time and are also what a
+ * reader is deciding on when the link shows up in a Discord.
+ */
+const summary = (() => {
+  const plain = (data.bodyMd ?? "")
+    .replace(/[*_`#>\[\]]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!plain) {
+    return `The ${period} reading for ${NAME}, written by hand and signed Soror Eu. A.`;
+  }
+  if (plain.length <= 200) return plain;
+  const cut = plain.slice(0, 200);
+  const stop = Math.max(cut.lastIndexOf(". "), cut.lastIndexOf("! "), cut.lastIndexOf("? "));
+  return stop > 80 ? cut.slice(0, stop + 1) : cut.slice(0, cut.lastIndexOf(" ")) + "…";
+})();
+/* From the slug, not by indexing `SIGNS` — that list is ordered by calendar
+   month, so indexing it here rotated a Leo reading to Scorpio. */
+const risingName = NAME;
+const GLYPH: Record<string, string> = {
+  aries: "♈", taurus: "♉", gemini: "♊", cancer: "♋", leo: "♌", virgo: "♍",
+  libra: "♎", scorpio: "♏", sagittarius: "♐", capricorn: "♑", aquarius: "♒", pisces: "♓",
+};
+---
+
+{/* The dated URL is canonical whichever route rendered this, so the undated
+    form does not compete with it for the same words. */}
+<BaseLayout
+  title={`${NAME} — ${data.covers} — Shruti`}
+  description={summary}
+  canonical={`/horoscopes/${sign}/${period}/${data.covers}`}
+  noindex={!data.published}
+  feed={{ href: `/horoscopes/${sign}/feed.xml`, title: `${NAME} — Shruti` }}
+  oembed={`/horoscopes/${sign}/${period}/${data.covers}`}
+>
+  <div class="page reading">
+    <div class="reading-head">
+      <SectionHeader as="h1" glyph={GLYPH[sign]} eyebrow={data.covers} title={NAME} />
+      {sign === yours && <Badge tone="rose">your sign</Badge>}
+    </div>
+
+    <PeriodSwitcher
+      available={data.availablePeriods.length ? data.availablePeriods : ["monthly"]}
+      current={period}
+      hrefFor={(p) => `/horoscopes/${sign}/${p}`}
+    />
+
+    {
+      data.published ? (
+        <>
+          {wheelBodies.length > 0 && (
+            <figure class="anchor-wheel">
+              <TransitWheel bodies={wheelBodies} rising={risingName} size={420}
+                            degreeRing={false}
+                            caption={`Drawn for ${anchor.slice(0, 10)}, the start of this period`} />
+              <figcaption class="open-in">
+                <a href={`/tools/events?rising=${risingName}&type=${period === "yearly" ? "year" : period.replace("ly", "")}&period=${data.covers}&at=${encodeURIComponent(anchor)}`}>
+                  {say("open.tool", "Open this moment in the tool, where it steps →")}
+                </a>
+              </figcaption>
+            </figure>
+          )}
+          <LocalTimes html={html} />
+          {data.byline && <p class="byline">{data.byline}</p>}
+        </>
+      ) : (
+        <EmptyState
+          glyph="○"
+          title={say("text.2", "Not written yet")}
+          body={say("text.3", "This one is not up. Twelve go together — an empty reading is worse than a late one.")}
+        >
+          <Button slot="action" variant="secondary" href="/horoscopes">{say("text.4", "All twelve signs")}</Button>
+        </EmptyState>
+      )
+    }
+
+    <p class="back">
+      <a href={`/horoscopes?covers=${data.covers}`}>{say("text.1", "← All twelve signs")}</a>
+      <a href={`/horoscopes/archive?sign=${sign}`}>Every {NAME} reading →</a>
+    </p>
+  </div>
+</BaseLayout>
+
+<style>
+  .reading { max-width: 720px; display: grid; gap: var(--space-4); }
+  .anchor-wheel { margin: 0; display: grid; gap: var(--space-2); justify-items: center; }
+  .open-in { font: 400 var(--text-sm) var(--font-body); text-align: center; }
+  .open-in a { color: var(--accent); }
+  .byline {
+    margin: var(--space-3) 0 0; font: 400 var(--text-sm) var(--font-body);
+    color: var(--ink-faint); font-style: italic;
+  }
+  .reading-head { display: flex; gap: var(--space-4); align-items: baseline; flex-wrap: wrap; }
+  .back { margin: var(--space-5) 0 0; font: 400 var(--text-sm) var(--font-body); display: flex; gap: var(--space-5); flex-wrap: wrap; }
+  .back a { color: var(--accent); text-decoration: none; }
+  .back a:hover { text-decoration: underline; }
+</style>

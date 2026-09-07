@@ -18,7 +18,15 @@ from tests.test_copy import SRC
 TOKENS = SRC / "lib" / "tokens.ts"
 LOCAL = SRC / "components" / "content" / "LocalTimes.astro"
 SIGNS = SRC / "lib" / "signs.ts"
-READING = SRC / "pages" / "horoscopes" / "[sign]" / "[period].astro"
+# The reading body lives in a component, shared by the dated and undated
+# routes. The routes themselves are thin — they validate the slug and hand
+# over — so the rotation is checked where it actually happens, and the routes
+# are checked for not having grown a copy of it.
+READING = SRC / "components" / "horoscope" / "Reading.astro"
+READING_ROUTES = (
+    SRC / "pages" / "horoscopes" / "[sign]" / "[period].astro",
+    SRC / "pages" / "horoscopes" / "[sign]" / "[period]" / "[covers].astro",
+)
 
 
 def test_an_unresolved_token_is_visible_and_never_empty() -> None:
@@ -99,6 +107,24 @@ def test_the_reading_page_does_not_index_the_calendar_list() -> None:
     assert not re.search(r"\bSIGNS\s*\[", text)
     assert not re.search(r"SIGNS\.indexOf\([^)]*\)\s*\]", text)
     assert "risingName = NAME" in text, "the rotation comes from the slug"
+
+
+def test_no_route_rotates_a_wheel_by_itself() -> None:
+    """
+    The bug moved once already, when the body became a component.
+
+    A route that grew its own rotation would reintroduce it somewhere this
+    file is not looking, and the failure — a Leo reading drawn as Scorpio —
+    is one nobody notices without counting signs on the wheel.
+    """
+    for route in READING_ROUTES:
+        assert route.is_file(), f"{route} is missing"
+        text = route.read_text(encoding="utf-8")
+        assert not re.search(r"\bSIGNS\s*\[", text), f"{route.name} indexes SIGNS"
+        assert not re.search(r"SIGNS\.indexOf\([^)]*\)\s*\]", text), \
+            f"{route.name} indexes SIGNS"
+        assert "rising" not in text, \
+            f"{route.name} should hand the slug over, not rotate anything"
 
 
 # ── stepping ────────────────────────────────────────────────────────────────

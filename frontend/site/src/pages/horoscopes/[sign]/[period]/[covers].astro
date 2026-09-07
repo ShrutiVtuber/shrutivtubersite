@@ -1,0 +1,31 @@
+---
+/* One reading, addressed by its own period — the canonical shape.
+ *
+ * `/horoscopes/leo/weekly/2026-W38`. Readings do not expire and one somebody
+ * liked should still be there next year, so the period belongs in the path
+ * rather than in a query string: it is what a sitemap lists, what an OG card
+ * is generated for, and what survives being pasted somewhere.
+ *
+ * The id shape is checked here rather than passed through. Unchecked, any
+ * string renders a page that says "not written yet", which is a soft 404 —
+ * indexable, infinite, and indistinguishable from a real one that simply has
+ * not been written.
+ */
+import Reading from "../../../../components/horoscope/Reading.astro";
+import { SIGNS } from "../../../../lib/signs";
+
+const SHAPE: Record<string, RegExp> = {
+  daily: /^\d{4}-\d{2}-\d{2}$/,
+  weekly: /^\d{4}-W\d{2}$/,
+  monthly: /^\d{4}-\d{2}$/,
+  yearly: /^\d{4}$/,
+};
+
+const sign = String(Astro.params.sign ?? "");
+const period = String(Astro.params.period ?? "");
+const covers = String(Astro.params.covers ?? "");
+
+if (!SIGNS.includes(sign)) return Astro.rewrite("/404");
+if (!SHAPE[period]?.test(covers)) return Astro.rewrite("/404");
+---
+<Reading sign={sign} period={period} covers={covers} />

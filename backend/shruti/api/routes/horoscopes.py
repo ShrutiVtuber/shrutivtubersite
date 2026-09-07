@@ -46,6 +46,17 @@ COVERS_SHAPE = {
 }
 
 
+def _opening(body_md: str, limit: int = 240) -> str:
+    """The first sentence or so, as plain text, for feed summaries."""
+    text = re.sub(r"[*_`#>\[\]]", "", body_md or "").strip()
+    text = re.sub(r"\s+", " ", text)
+    if len(text) <= limit:
+        return text
+    cut = text[:limit]
+    stop = max(cut.rfind(". "), cut.rfind("! "), cut.rfind("? "))
+    return (cut[: stop + 1] if stop > 80 else cut.rsplit(" ", 1)[0] + "…").strip()
+
+
 def _valid_covers(period: str, covers: str) -> bool:
     shape = COVERS_SHAPE.get(period)
     return bool(shape and shape.match(covers or ""))
@@ -269,6 +280,52 @@ async def publish(
         row.published_at = row.published_at or now
     await session.commit()
     return {"ok": True, "published": len(SIGNS), "covers": body.covers}
+
+
+@router.get("/published")
+async def published(
+    sign: str | None = None, limit: int = 100,
+    session: AsyncSession = Depends(get_session),
+) -> list[dict]:
+    """
+    A flat list of published readings, newest published first.
+
+    /archive answers "what months exist" and groups by period to do it, which
+    is right for a reader browsing but wrong for a machine: a feed needs one
+    entry per reading and a real timestamp to put in <pubDate>, and a sitemap
+    needs <lastmod>. Both were reading /archive and both would have been
+    quietly wrong — it has no timestamp at all and returns one period per call.
+
+    Sorted by `published_at` rather than by `covers`, because those differ:
+    a reading for next month written today is published now and covers later.
+    A feed sorted by `covers` would put it above readings the subscriber has
+    not been shown yet.
+    """
+    query = select(Horoscope).where(Horoscope.published.is_(True))
+    if sign:
+        if sign not in SIGNS:
+            raise HTTPException(404, "no such sign")
+        query = query.where(Horoscope.sign == sign)
+
+    rows = (await session.execute(
+        query.order_by(Horoscope.published_at.desc().nullslast(),
+                       Horoscope.covers.desc())
+        .limit(max(1, min(500, limit)))
+    )).scalars().all()
+
+    return [
+        {
+            "sign": r.sign,
+            "period": r.period,
+            "covers": r.covers,
+            "publishedAt": r.published_at.isoformat() if r.published_at else None,
+            # Enough of the opening for a feed summary, without shipping the
+            # whole reading — a feed that carries the full text is a feed
+            # people read instead of visiting, and she signs these.
+            "opening": _opening(r.body_md),
+        }
+        for r in rows
+    ]
 
 
 @router.get("/archive")

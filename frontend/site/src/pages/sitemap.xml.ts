@@ -112,7 +112,25 @@ export const GET: APIRoute = async () => {
     if (reachable(path)) add(path, priority, changefreq);
   }
   if (reachable("/horoscopes")) {
-    for (const sign of SIGNS) add(`/horoscopes/${sign}/monthly`, "0.7", "monthly");
+    /* The undated form for each sign — "whatever is current" — plus every
+       reading that has actually been published, at its DATED address.
+       The dated one is canonical, so listing only the undated form would
+       leave every past reading out of the index while pointing crawlers at a
+       URL whose content changes underneath them. */
+    for (const sign of SIGNS) {
+      for (const period of ["daily", "weekly", "monthly", "yearly"]) {
+        add(`/horoscopes/${sign}/${period}`, "0.7", period === "daily" ? "daily" : "weekly");
+      }
+    }
+    /* /published is the flat one WITH timestamps. /archive groups by period
+       and has none, so a <lastmod> read from it would not exist. */
+    const readings = (await site<{ sign: string; period: string; covers: string;
+                                   publishedAt: string | null }[]>(
+      "/api/horoscopes/published?limit=500")) ?? [];
+    for (const r of readings) {
+      add(`/horoscopes/${r.sign}/${r.period}/${r.covers}`, "0.6", "never",
+          r.publishedAt ?? undefined);
+    }
   }
 
   /* Published writing, if the backend is reachable. Absent, the static list
