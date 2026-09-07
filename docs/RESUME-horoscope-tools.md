@@ -95,18 +95,6 @@ run `caddy validate` by hand. See `docs/DEPLOY.md`.
 specifically that the desk not be iterated on before the rest was finished, so
 that she tests it once rather than fixing the same thing twice.
 
-### One open decision
-
-**A dynamic OG image** — a shared reading previewing with its own wheel — is
-not built. Every route to one needs a rasteriser, and there is none in the
-tree: no `sharp`, no `@resvg/resvg-js`, no `canvas`, no `satori`. The cost is
-roughly ten megabytes of platform-specific native module in the site image, on
-a project that has otherwise been careful about what it takes on. Readings do
-have correct per-page OG metadata now — real title, the reading's own opening
-as the description — falling back to `/social-card.png` for the picture.
-
-Worth doing if sharing turns out to matter; not worth deciding on her behalf.
-
 ## Done in this pass
 
 * `/horoscopes/<sign>/<period>/<covers>` is the canonical address. The undated
@@ -117,16 +105,29 @@ Worth doing if sharing turns out to matter; not worth deciding on her behalf.
 * `/oembed.json`, refusing anything not on this origin and anything without an
   embed. A shared reading draws **its own** period's sky, not today's.
 * The sitemap lists every published reading with a real `lastmod`.
+* A share card per reading at `/horoscopes/<sign>/<period>/<covers>/og.png`,
+  drawn server-side with resvg — the wheel for that period, rotated to that
+  sign. ~10MB on the image, ~70ms a card, cached hard because a dated sky
+  never changes.
 * `GET /api/horoscopes/published` — the flat list with timestamps. `/archive`
   groups by period and has none; both the feed and the sitemap were written
   against it first and would have shipped empty `<pubDate>`s.
 
-## A trap worth remembering
+## Traps worth remembering
 
 Two migrations now share the `d4a71b` prefix — `d4a71b96c8e2_copy.py` is the
 big copy seeder. A `rm alembic/versions/d4a71b*` deleted it. Restored from git,
 and the new revision renumbered to `e9b3c05a7d14` so the prefixes no longer
 collide. Do not glob migration filenames by revision prefix.
+
+**The share card fails by looking fine.** `fontBuffers` returns a valid PNG
+with no text; a font without the astrological block draws hollow boxes;
+`180 - lon` runs the zodiac clockwise and still looks like a chart. If a card
+ever looks subtly wrong, check those three before anything else.
+
+**`pnpm deploy --prod` will triple the image.** astro, typescript and tailwind
+are under `dependencies`, not `devDependencies`. The runtime only needs the one
+native module, installed on its own — see the comment in the Dockerfile.
 
 ## Not deployed
 
