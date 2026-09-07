@@ -1,0 +1,111 @@
+---
+/* The transit wheel as a stream source.
+ *
+ * The seventh overlay, and the same instrument as `/tools/events` rather than
+ * a second drawing of it: the wheel component is shared, so what is on stream
+ * and what a viewer opens afterwards cannot drift apart.
+ *
+ * **Everything is in the URL**, so an OBS scene opens straight to a date, a
+ * rising sign and a set of options — and a second scene can hold a different
+ * sign without a second browser source being configured by hand.
+ *
+ * Transparent by default for chroma-free compositing; `bg` sets a key colour
+ * where a scene wants one. The typography is larger than the site's because
+ * this is read at 1080p from across a room, not at arm's length.
+ *
+ * Positions arrive finished from the server. No ephemeris ships to the
+ * browser: this renders beside the encoder and frames are the budget.
+ */
+import "../../styles/global.css";
+import "../../styles/overlay.css";
+import TransitWheel from "../../components/chart/TransitWheel.astro";
+import { askAstro } from "../../lib/api";
+import { ZODIAC } from "../../lib/signs";
+
+export const prerender = false;
+
+const q = Astro.url.searchParams;
+const rising = ZODIAC.includes(q.get("rising") as any) ? q.get("rising")! : "";
+const at = q.get("at") || new Date().toISOString().slice(0, 19) + "Z";
+const size = Math.min(1080, Math.max(320, Number(q.get("size") ?? 720)));
+const bg = q.get("bg") ?? "";
+const showLower = q.get("strip") !== "0";
+
+interface ChartBody {
+  name: string; longitude: number; retrograde: boolean;
+  dignities?: { sign: string; degree: number };
+}
+const chart = await askAstro<{ bodies: ChartBody[] }>(
+  `/chart?when=${encodeURIComponent(at)}&lat=51.4779&lon=0` +
+  `&tradition=hellenistic&house_system=whole_sign&diagram=false`, 15000);
+
+const bodies = (chart?.data?.bodies ?? []).map((b) => ({
+  name: b.name,
+  longitude: b.longitude,
+  sign: b.dignities?.sign ?? ZODIAC[Math.floor((((b.longitude % 360) + 360) % 360) / 30)],
+  degree: b.dignities?.degree ?? ((b.longitude % 30) + 30) % 30,
+  retrograde: b.retrograde,
+}));
+const when = at.slice(0, 16).replace("T", " ");
+---
+
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Wheel — overlay</title>
+  <meta name="robots" content="noindex" />
+</head>
+<body>
+  <div class="ov ov-wheel" style={bg ? `background:${bg}` : undefined}>
+    {
+      bodies.length > 0 ? (
+        <>
+          <TransitWheel bodies={bodies} rising={rising} size={size}
+                        degreeRing={false} houseNumbers={!!rising}
+                        caption="" />
+          {showLower && (
+            <div class="strip">
+              <span class="strip-when">{when} UT</span>
+              {rising && <span class="strip-sign">{rising} rising</span>}
+            </div>
+          )}
+        </>
+      ) : (
+        /* Held, never blanked — an overlay that empties itself mid-stream is
+           worse than one showing a stale figure, and this says which it is. */
+        <p class="held">Waiting for the ephemeris.</p>
+      )
+    }
+  </div>
+</body>
+</html>
+
+<style is:global>
+  .ov-wheel {
+    display: grid; gap: 14px; justify-items: center; padding: 8px;
+  }
+  /* Bigger than the site: read at 1080p from across a room. Colour comes from
+     the same custom properties, so the stream and the page are one instrument
+     drawn at two sizes. */
+  .ov-wheel :global(.body-glyph) { font-size: 10.5px; }
+  .ov-wheel :global(.body-degree) { font-size: 5.2px; }
+  .ov-wheel :global(.sign-glyph) { font-size: 9px; }
+  .ov-wheel :global(.house-no) { font-size: 5.5px; }
+  .ov-wheel :global(figcaption) { display: none; }
+
+  .strip {
+    display: flex; gap: 18px; align-items: baseline;
+    background: color-mix(in srgb, var(--dusk-card) 94%, transparent);
+    border-radius: 8px; padding: 8px 16px;
+  }
+  .strip-when {
+    font: 600 20px var(--font-mono); color: var(--dusk-ink);
+    font-variant-numeric: tabular-nums;
+  }
+  .strip-sign {
+    font: 600 15px var(--font-body); color: var(--dusk-rose);
+    letter-spacing: .06em; text-transform: uppercase;
+  }
+  .held { font: 500 16px var(--font-body); color: var(--dusk-ink-faint); }
+</style>

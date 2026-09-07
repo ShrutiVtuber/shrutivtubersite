@@ -121,8 +121,27 @@ event type in 1.3s.
    with `2026-W38` as the key. `covers` is validated per period, because an
    unchecked typo saved a row that never appeared in the list it was meant for.
    Still to do: the public `/horoscopes/<sign>/<period>/<id>` URL shape.
-5. **Bounds** — Egyptian ⇄ Ptolemaic into `/doctrine`. The daemon returns a
-   bound ruler but does not yet let you choose the table.
+5. **Bounds** — Egyptian ⇄ Ptolemaic. **Blocked on you, deliberately.**
+
+   The daemon computes Egyptian bounds and does not offer a choice. Adding the
+   toggle is half an hour; the table is the problem. I wrote out Ptolemy's
+   terms from memory and checked them against the per-planet totals he gives
+   in the *Tetrabiblos* — Saturn 57, Jupiter 79, Mars 66, Venus 82, Mercury 76,
+   summing to 360. Mine came out **Venus 83 and Mercury 75**: one degree
+   misplaced between them, in a sign I cannot identify without the text.
+
+   Structurally it was sound — five distinct planets per sign, every sign
+   ending at 30 — which is exactly what makes it dangerous. It would have
+   looked right in every dignity readout on the site and been wrong for one
+   degree of the zodiac.
+
+   §12.2 rules out copying a table off astrology software or a website, and
+   that is the correct rule. So this needs the reading YOU use — Robbins,
+   Schmidt, whichever edition you work from — and then it is quick.
+
+   The validator is worth having either way: any table that goes in should be
+   checked for five distinct planets per sign, every sign closing at 30, and
+   the published per-planet totals.
 6. Stream overlay, then the embed.
 
 ## Still open for her

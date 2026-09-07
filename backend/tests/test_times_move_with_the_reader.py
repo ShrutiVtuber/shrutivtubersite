@@ -167,3 +167,40 @@ def test_a_failed_span_says_so_rather_than_looking_alive() -> None:
     text = code_of(STEPPER)
     assert "Stepping is unavailable" in text
     assert 'setAttribute("disabled"' in text
+
+
+# ── which way round a wheel goes ────────────────────────────────────────────
+
+WHEELS = ["components/chart/TransitWheel.astro",
+          "components/counters/SkyCard.astro",
+          "pages/overlay/sky.astro"]
+
+
+def test_every_wheel_on_the_site_turns_the_same_way() -> None:
+    """
+    A chart wheel runs ANTICLOCKWISE: 0° Aries at nine o'clock, 30° Taurus at
+    eight, not ten. Two of these ran the other way while their own comments
+    said otherwise — `180 - lon` mirrors the zodiac — so the same sky was drawn
+    one way in the tools and the reverse on the stream overlay and the home
+    page card.
+
+    The screen y axis grows downward and these all subtract the sine, so the
+    angle increases anticlockwise; `180 + longitude` is the anticlockwise
+    reading and `180 - longitude` is its mirror.
+    """
+    for name in WHEELS:
+        text = code_of(SRC / name)
+        assert "180 - lon" not in text, f"{name} draws the zodiac backwards"
+        assert re.search(r"180\s*\+\s*(lonDeg|angle|relative)", text), \
+            f"{name} does not place a longitude anticlockwise from nine o'clock"
+
+
+def test_the_stream_wheel_is_the_same_component_as_the_page() -> None:
+    """
+    Not a second drawing of the same thing. A separate implementation for the
+    overlay is two wheels to keep in agreement, and the one on stream is the
+    one nobody can inspect while it is wrong.
+    """
+    overlay = (SRC / "pages" / "overlay" / "wheel.astro").read_text(encoding="utf-8")
+    assert "TransitWheel" in overlay
+    assert "noindex" in overlay, "a stream source is not a page for search"

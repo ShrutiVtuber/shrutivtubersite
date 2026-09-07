@@ -50,10 +50,18 @@ const R = 148;          // the wheel
 const CX = 164;
 const CY = 164;
 
-/* 0° Aries at the left, running anticlockwise — the way every chart on this
-   site is already drawn, so this reads as the same instrument as /tools. */
+/* 0° Aries at the left, running ANTICLOCKWISE — the way every chart on this
+   site is drawn, and the way a chart wheel has always been drawn.
+
+   It said that and did the opposite. `180 - lon` runs the zodiac CLOCKWISE:
+   0° Aries landed at nine o'clock correctly and then 30° Taurus went to ten
+   rather than eight, so the whole zodiac was mirrored. The ephemeris draws
+   anticlockwise, the transit wheel draws anticlockwise, and these two —
+   the same wheel copied into two files — drew backwards while claiming not
+   to. Every sector, glyph and aspect line here comes from this one function,
+   so they were at least consistently wrong with each other. */
 const pos = (lonDeg: number, radius: number) => {
-  const a = ((180 - lonDeg) * Math.PI) / 180;
+  const a = ((180 + lonDeg) * Math.PI) / 180;
   return { x: CX + radius * Math.cos(a), y: CY - radius * Math.sin(a) };
 };
 
