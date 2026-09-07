@@ -11,14 +11,26 @@ have pages behind them today. A visible row with no page puts a card on /tools
 that leads to a 404, which is the failure the tests guard against in the other
 direction.
 
-Idempotent on the slug: these rows were inserted by hand on production before
-this migration existed, and re-running must not duplicate or overwrite the
-wording if it has since been edited in the admin.
+Idempotent on the slug: these rows were inserted by hand before this migration
+existed, and re-running must not duplicate or overwrite the wording if it has
+since been edited in the admin.
+
+**Every not-null column without a default is supplied here.** `created_at`,
+`updated_at`, `body_md`, `faq_md` and `locale` are enforced by the table and
+not filled in by `bulk_insert` — the model's Python defaults never run, because
+this goes to the database as SQL and never through the model at all.
+
+That is also why the first version of this migration passed locally and failed
+on production: locally both rows already existed, so the idempotence guard
+skipped the insert and the insert was never actually executed. A migration
+whose only test is a database that does not need it has not been tested.
 
 Revision ID: c1f92a4e77b3
 Revises: b8e4d1f70a35
 """
 from __future__ import annotations
+
+from datetime import datetime, timezone
 
 import sqlalchemy as sa
 from alembic import op
@@ -76,14 +88,23 @@ def upgrade() -> None:
         "tool",
         sa.column("slug", sa.String), sa.column("name", sa.String),
         sa.column("summary", sa.String), sa.column("glyph", sa.String),
-        sa.column("category", sa.String), sa.column("reckoned", sa.String),
+        sa.column("category", sa.String), sa.column("reckoned", sa.Text),
         sa.column("landing_blurb", sa.String), sa.column("position", sa.Integer),
-        sa.column("visible", sa.Boolean),
+        sa.column("visible", sa.Boolean), sa.column("body_md", sa.Text),
+        sa.column("faq_md", sa.Text), sa.column("native", sa.String),
+        sa.column("locale", sa.String),
+        sa.column("created_at", sa.DateTime(timezone=True)),
+        sa.column("updated_at", sa.DateTime(timezone=True)),
     )
     existing = set(
         op.get_bind().execute(sa.text("SELECT slug FROM tool")).scalars().all()
     )
-    fresh = [dict(row, visible=True) for row in ROWS if row["slug"] not in existing]
+    now = datetime.now(timezone.utc)
+    fresh = [
+        dict(row, visible=True, body_md="", faq_md="", native="", locale="en",
+             created_at=now, updated_at=now)
+        for row in ROWS if row["slug"] not in existing
+    ]
     if fresh:
         op.bulk_insert(tool, fresh)
 

@@ -110,13 +110,17 @@ event type in 1.3s.
 2. **Stepping** — client interpolation over `/positions`, snap-to-event. The
    endpoint and the accuracy are already proven; what is left is the browser
    side: read the table, interpolate, repaint, and the keyboard scheme.
-3. **The writing desk** — event table beside a Markdown editor, twelve-up
-   drafting, the `{{event:…}}` token layer. Rough first, then reshaped: this is
-   the screen operated live and its ergonomics matter more than its looks.
-4. **The horoscope pages** — extend the existing `horoscope` table. It has
-   monthly, daily, seasonal and yearly; weekly needs adding and the URL becomes
-   `/horoscopes/<sign>/<period>/<id>`. **Production has zero published rows, so
-   changing the scheme is free now and will not be later.**
+3. ~~The writing desk~~ — **done.** `/admin/horoscopes`. Sign rail showing
+   which of the twelve are written, events and wheel rotated to the sign being
+   written for, click-to-insert, autosave on a pause, ⌘/Ctrl + arrows to move
+   sign and S to save, an unsaved-work warning, and publish that stays disabled
+   until all twelve exist. Works with scripting off. **The token layer
+   (`{{event:…}}`) is not built yet** — that is what makes the prose itself
+   shift with the reader's timezone, and it is the next thing.
+4. ~~Periods~~ — **done.** daily · weekly · monthly · yearly, weeks ISO-8601
+   with `2026-W38` as the key. `covers` is validated per period, because an
+   unchecked typo saved a row that never appeared in the list it was meant for.
+   Still to do: the public `/horoscopes/<sign>/<period>/<id>` URL shape.
 5. **Bounds** — Egyptian ⇄ Ptolemaic into `/doctrine`. The daemon returns a
    bound ruler but does not yet let you choose the table.
 6. Stream overlay, then the embed.
@@ -150,3 +154,14 @@ found later by somebody reading a wrong answer.
    ending "2026-09-30" dropped everything on the thirtieth after midnight, and
    a single day was a zero-length span the engine refused — so the day view
    showed nothing and blamed the ephemeris.
+
+4. **`test_every_instrument_page_has_a_row` could not pass for a new
+   instrument.** It read one named migration, and you do not edit an applied
+   migration — a new tool's row lands in a new one the test was not looking at.
+   Widening it naively then swept up projects and link groups, which are not
+   tools; and the row-needs-a-page direction has to read only rows seeded
+   VISIBLE, because `seed.py` seeds placeholders hidden on purpose. Both
+   directions now read the set they actually mean.
+
+5. **Neither new tool page reported its own use**, so both would have read as
+   unused on the dashboard for ever. The suite caught it; I had not.
