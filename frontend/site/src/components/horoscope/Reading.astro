@@ -12,6 +12,7 @@
  * Readings are bylined Soror Eu. A., because magickal writing signs with the
  * motto.
  */
+import { SITE_URL } from "../../lib/api";
 import BaseLayout from "../../layouts/BaseLayout.astro";
 import SectionHeader from "../brand/SectionHeader.astro";
 import PeriodSwitcher from "../navigation/PeriodSwitcher.astro";
@@ -145,6 +146,8 @@ const GLYPH: Record<string, string> = {
   description={summary}
   canonical={`/horoscopes/${sign}/${period}/${data.covers}`}
   noindex={!data.published}
+  ogImage={`${SITE_URL}/horoscopes/${sign}/${period}/${data.covers}/og.png`}
+  ogImageAlt={`${NAME}, ${data.covers} — the transit wheel for the period, rotated to ${NAME}`}
   feed={{ href: `/horoscopes/${sign}/feed.xml`, title: `${NAME} — Shruti` }}
   oembed={`/horoscopes/${sign}/${period}/${data.covers}`}
 >
