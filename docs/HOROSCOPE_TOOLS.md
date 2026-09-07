@@ -121,27 +121,20 @@ event type in 1.3s.
    with `2026-W38` as the key. `covers` is validated per period, because an
    unchecked typo saved a row that never appeared in the list it was meant for.
    Still to do: the public `/horoscopes/<sign>/<period>/<id>` URL shape.
-5. **Bounds** — Egyptian ⇄ Ptolemaic. **Blocked on you, deliberately.**
+5. ~~Bounds~~ — **Egyptian only. Her decision, 7 September; dropped rather
+   than deferred.** The daemon computes the Egyptian set, which is the
+   traditional default and the one she works in; the Ptolemaic toggle was a
+   courtesy to modern-trained visitors and is not worth a table nobody has
+   verified.
 
-   The daemon computes Egyptian bounds and does not offer a choice. Adding the
-   toggle is half an hour; the table is the problem. I wrote out Ptolemy's
-   terms from memory and checked them against the per-planet totals he gives
-   in the *Tetrabiblos* — Saturn 57, Jupiter 79, Mars 66, Venus 82, Mercury 76,
-   summing to 360. Mine came out **Venus 83 and Mercury 75**: one degree
-   misplaced between them, in a sign I cannot identify without the text.
+   If it is ever revisited: I wrote Ptolemy's terms from memory and they failed
+   his own arithmetic — Venus came to 83° against a published 82, Mercury 75
+   against 76, so one Venus/Mercury boundary is a degree out in a sign I could
+   not identify. The table was structurally perfect, which is what would have
+   let it pass. **Do not add one without a source she supplies**, and check any
+   table against the per-planet totals: Saturn 57, Jupiter 79, Mars 66,
+   Venus 82, Mercury 76, summing to 360.
 
-   Structurally it was sound — five distinct planets per sign, every sign
-   ending at 30 — which is exactly what makes it dangerous. It would have
-   looked right in every dignity readout on the site and been wrong for one
-   degree of the zodiac.
-
-   §12.2 rules out copying a table off astrology software or a website, and
-   that is the correct rule. So this needs the reading YOU use — Robbins,
-   Schmidt, whichever edition you work from — and then it is quick.
-
-   The validator is worth having either way: any table that goes in should be
-   checked for five distinct planets per sign, every sign closing at 30, and
-   the published per-planet totals.
 6. ~~Stream overlay~~ — **done.** `/overlay/wheel`, the seventh, sharing the
    component rather than redrawing it. Transparent by default, key colour on
    request, everything in the URL for an OBS scene.
