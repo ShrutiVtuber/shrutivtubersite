@@ -103,9 +103,13 @@ event type in 1.3s.
 
 ## Next, in order
 
-1. **The wheel** — rotation, degree and bounds rings, house numbers, aversion,
-   ruler highlight. Extends the wheel the daemon already draws.
-2. **Stepping** — client interpolation over `/positions`, snap-to-event.
+1. ~~The wheel~~ — **done.** `components/chart/TransitWheel.astro`, drawn on the
+   server, whole-sign, sign-rotated, degree ring, house numbers, aversion
+   marked, deterministic glyph spreading with leader lines, and the rising
+   sign's ruler and house called out in words. Wired into `/tools/events`.
+2. **Stepping** — client interpolation over `/positions`, snap-to-event. The
+   endpoint and the accuracy are already proven; what is left is the browser
+   side: read the table, interpolate, repaint, and the keyboard scheme.
 3. **The writing desk** — event table beside a Markdown editor, twelve-up
    drafting, the `{{event:…}}` token layer. Rough first, then reshaped: this is
    the screen operated live and its ergonomics matter more than its looks.
@@ -122,3 +126,27 @@ event type in 1.3s.
 - Whether weekly replaces seasonal or joins it.
 - Whether the writing desk's twelve-up screen is one page or twelve tabs — a
   question better answered by pushing a rough one around than by specifying it.
+
+
+---
+
+## Bugs this work found in code that was already live
+
+Recorded because each was invisible from the outside and each would have been
+found later by somebody reading a wrong answer.
+
+1. **`/void-of-course` could not see an opposition at all.** The separation
+   folds at ±180, so testing `sep − 180` for a sign change watched −0.1 become
+   −359.9 and found nothing. The Moon was reported void while she still had an
+   opposition to perfect — wrong in the one direction that reading must never
+   be wrong, since its entire claim is "she completes nothing more". The same
+   listing also counted 180 and −180 as two oppositions where there is one.
+
+2. **Perfections asked the ephemeris for the same longitudes tens of thousands
+   of times.** Once per pair, per aspect, per target, per sample. A month took
+   8.6 seconds; it now scans one precomputed grid and takes 0.31.
+
+3. **Period ranges were closed where they should have been half-open.** A month
+   ending "2026-09-30" dropped everything on the thirtieth after midnight, and
+   a single day was a zero-length span the engine refused — so the day view
+   showed nothing and blamed the ephemeris.
