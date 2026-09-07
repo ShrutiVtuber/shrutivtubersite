@@ -1,0 +1,247 @@
+---
+/* The transit wheel: whole-sign, sign-rotated, drawn on the server.
+ *
+ * **The rotation is presentation, never computation.** The selected sign sits
+ * in the first place at nine o'clock, where an Ascendant conventionally goes,
+ * and the rest follow anticlockwise in zodiacal order. Longitudes do not move
+ * when the selection changes — only which house each falls in — so all twelve
+ * rotations are the same numbers seen twelve ways. That is what makes writing
+ * twelve columns from one computation possible, and it is the single most
+ * important thing about this component.
+ *
+ * **This is not a natal chart and must never look like one.** There is no
+ * computed Ascendant and no Midheaven: the "Ascendant" here is a sign somebody
+ * chose, not a degree the sky produced, and drawing a degree for it would
+ * assert a birth place that does not exist.
+ *
+ * Server-rendered SVG rather than canvas — inspectable, styleable, printable,
+ * and readable with scripting off. Every colour comes from a custom property so
+ * the light, dark and stream themes are the same drawing.
+ *
+ * A wheel is never the only representation. Whoever uses this must render the
+ * equivalent table too; the SVG is marked up for a screen reader to skip.
+ */
+interface Body {
+  name: string;
+  longitude: number;
+  sign: string;
+  degree: number;
+  retrograde?: boolean;
+}
+interface Props {
+  bodies: Body[];
+  /** The sign placed in the first house. Empty draws the wheel unrotated. */
+  rising?: string;
+  /** Rings, off by default because a stream frame wants them off. */
+  degreeRing?: boolean;
+  houseNumbers?: boolean;
+  /** Marks the 2nd, 6th, 8th and 12th, which cannot see the rising sign. */
+  markAversion?: boolean;
+  size?: number;
+  caption?: string;
+}
+const {
+  bodies, rising = "", degreeRing = true, houseNumbers = true,
+  markAversion = true, size = 640, caption,
+} = Astro.props;
+
+const SIGNS = [
+  "Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo",
+  "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces",
+];
+const SIGN_GLYPH = ["♈︎", "♉︎", "♊︎", "♋︎", "♌︎", "♍︎", "♎︎", "♏︎", "♐︎", "♑︎", "♒︎", "♓︎"];
+const BODY_GLYPH: Record<string, string> = {
+  Sun: "☉︎", Moon: "☾︎", Mercury: "☿︎", Venus: "♀︎", Mars: "♂︎",
+  Jupiter: "♃︎", Saturn: "♄︎", Uranus: "♅︎", Neptune: "♆︎", Pluto: "♇︎",
+  Rahu: "☊︎", Ketu: "☋︎",
+};
+/* Whose sign it is. The rising sign's ruler is the single most useful readout
+   for writing a column, so it is called out rather than left to be worked out. */
+const DOMICILE: Record<string, string> = {
+  Aries: "Mars", Taurus: "Venus", Gemini: "Mercury", Cancer: "Moon",
+  Leo: "Sun", Virgo: "Mercury", Libra: "Venus", Scorpio: "Mars",
+  Sagittarius: "Jupiter", Capricorn: "Saturn", Aquarius: "Saturn", Pisces: "Jupiter",
+};
+const AVERSE = new Set([2, 6, 8, 12]);
+
+/* "the 2th house" is the kind of thing that gets screenshotted. English
+   ordinals are irregular in the teens, which is the half people forget. */
+const ordinal = (n: number) => {
+  const teen = n % 100;
+  if (teen >= 11 && teen <= 13) return `${n}th`;
+  return `${n}${["th", "st", "nd", "rd"][n % 10] ?? "th"}`;
+};
+
+const risingIndex = Math.max(0, SIGNS.indexOf(rising));
+const rotated = rising !== "";
+
+/* Degrees past the start of the first house — the only transform in here. */
+const relative = (longitude: number) =>
+  ((longitude - (rotated ? risingIndex * 30 : 0)) % 360 + 360) % 360;
+const houseOf = (longitude: number) => Math.floor(relative(longitude) / 30) + 1;
+
+/* Nine o'clock is 180°, and the zodiac runs anticlockwise from there. SVG's y
+   grows downward, so the sine is subtracted. */
+const R = 100;
+const point = (angle: number, radius: number) => {
+  const a = ((180 + angle) * Math.PI) / 180;
+  return [R + radius * Math.cos(a), R - radius * Math.sin(a)] as const;
+};
+const f = (n: number) => Number(n.toFixed(3));
+
+/* ── glyph collision ──────────────────────────────────────────────────────
+   Two planets a degree apart would print on top of each other. They are spread
+   along the ring and joined to their true positions by leader lines — spread
+   DETERMINISTICALLY, by a fixed relaxation from the true angles, so that
+   stepping the wheel forward never makes the glyphs jitter. */
+const MIN_SEPARATION = 7;
+const placed = bodies
+  .map((b) => ({ ...b, at: relative(b.longitude), shown: relative(b.longitude) }))
+  .sort((a, b) => a.at - b.at);
+
+for (let pass = 0; pass < 40; pass++) {
+  let moved = false;
+  for (let i = 0; i < placed.length; i++) {
+    const a = placed[i];
+    const b = placed[(i + 1) % placed.length];
+    if (placed.length < 2) break;
+    let gap = b.shown - a.shown;
+    if (gap < 0) gap += 360;
+    if (gap < MIN_SEPARATION) {
+      const push = (MIN_SEPARATION - gap) / 2;
+      a.shown = (a.shown - push + 360) % 360;
+      b.shown = (b.shown + push) % 360;
+      moved = true;
+    }
+  }
+  if (!moved) break;
+}
+
+const described = caption
+  ?? `Transit wheel${rotated ? `, ${rising} rising` : ""}, ${bodies.length} bodies`;
+---
+
+<figure class="wheel">
+  <svg viewBox="0 0 200 200" width={size} height={size}
+       role="img" aria-label={described}>
+    <g class="rings" fill="none" stroke="currentColor">
+      <circle cx={R} cy={R} r="96" class="r-outer" />
+      <circle cx={R} cy={R} r="80" class="r-sign" />
+      <circle cx={R} cy={R} r={degreeRing ? 74 : 80} class="r-degree" />
+      <circle cx={R} cy={R} r="42" class="r-inner" />
+    </g>
+
+    {/* Sign boundaries and glyphs. Twelve equal sectors, because whole sign is
+        the only house system this wheel draws — one sign is one house and
+        there are no cusps inside a sign to show. */}
+    <g class="signs">
+      {SIGNS.map((_, i) => {
+        const start = i * 30;
+        const [x1, y1] = point(start, 42);
+        const [x2, y2] = point(start, 96);
+        const [gx, gy] = point(start + 15, 88);
+        const zodiac = (risingIndex + i) % 12;
+        const house = i + 1;
+        const averse = markAversion && rotated && AVERSE.has(house);
+        return (
+          <>
+            <line x1={f(x1)} y1={f(y1)} x2={f(x2)} y2={f(y2)} class="divider" />
+            <text x={f(gx)} y={f(gy)} class:list={["sign-glyph", averse && "averse"]}
+                  text-anchor="middle" dominant-baseline="central">
+              {SIGN_GLYPH[zodiac]}
+            </text>
+            {houseNumbers && rotated && (
+              <text x={f(point(start + 15, 48)[0])} y={f(point(start + 15, 48)[1])}
+                    class:list={["house-no", averse && "averse"]}
+                    text-anchor="middle" dominant-baseline="central">{house}</text>
+            )}
+          </>
+        );
+      })}
+    </g>
+
+    {degreeRing && (
+      <g class="degrees">
+        {Array.from({ length: 72 }, (_, i) => {
+          const at = i * 5;
+          const long = at % 10 === 0;
+          const [x1, y1] = point(at, 74);
+          const [x2, y2] = point(at, long ? 78 : 76.5);
+          return <line x1={f(x1)} y1={f(y1)} x2={f(x2)} y2={f(y2)}
+                       class:list={["tick", long && "tick-long"]} />;
+        })}
+      </g>
+    )}
+
+    {/* The bodies. Each glyph sits on the spread angle; the leader line runs
+        back to where the planet actually is, so a crowded stellium is legible
+        without ever lying about a position. */}
+    <g class="bodies">
+      {placed.map((b) => {
+        const [tx, ty] = point(b.at, 74);
+        const [lx, ly] = point(b.shown, 68);
+        const [gx, gy] = point(b.shown, 62);
+        const [dx, dy] = point(b.shown, 52);
+        const moved = Math.abs(((b.shown - b.at + 540) % 360) - 180) > 0.25;
+        return (
+          <>
+            {moved && <line x1={f(tx)} y1={f(ty)} x2={f(lx)} y2={f(ly)} class="leader" />}
+            <circle cx={f(tx)} cy={f(ty)} r="0.9" class="true-mark" />
+            <text x={f(gx)} y={f(gy)} class:list={["body-glyph", b.retrograde && "rx"]}
+                  text-anchor="middle" dominant-baseline="central">
+              {BODY_GLYPH[b.name] ?? b.name.slice(0, 2)}
+            </text>
+            <text x={f(dx)} y={f(dy)} class="body-degree"
+                  text-anchor="middle" dominant-baseline="central">
+              {Math.floor(b.degree)}°{b.retrograde ? "℞" : ""}
+            </text>
+          </>
+        );
+      })}
+    </g>
+  </svg>
+
+  <figcaption>
+    {rotated ? (
+      <>
+        <b>{rising} rising.</b>{" "}
+        {(() => {
+          const ruler = DOMICILE[rising];
+          const found = bodies.find((b) => b.name === ruler);
+          return found
+            ? <>Its ruler <b>{ruler}</b> is in the <b>{ordinal(houseOf(found.longitude))}</b>{", "}at {Math.floor(found.degree)}° {found.sign}.</>
+            : <>Its ruler is {ruler}.</>;
+        })()}
+      </>
+    ) : (
+      <>Unrotated — the zodiac from 0° Aries. Choose a rising sign to read it as a chart.</>
+    )}
+  </figcaption>
+</figure>
+
+<style>
+  .wheel { margin: 0; display: grid; gap: var(--space-3); justify-items: center; }
+  .wheel svg { width: 100%; max-width: 640px; height: auto; color: var(--ink); }
+
+  .r-outer, .r-sign, .r-inner { stroke-width: 0.4; opacity: 0.55; }
+  .r-degree { stroke-width: 0.25; opacity: 0.35; }
+  .divider { stroke-width: 0.3; opacity: 0.45; }
+  .tick { stroke-width: 0.2; opacity: 0.35; }
+  .tick-long { stroke-width: 0.35; opacity: 0.6; }
+
+  .sign-glyph { font-size: 8px; fill: var(--ink-soft); }
+  .house-no { font-size: 5px; fill: var(--ink-faint); }
+  /* Aversion is marked by weight and by the legend, never by colour alone. */
+  .averse { opacity: 0.45; }
+
+  .body-glyph { font-size: 9px; fill: var(--ink); font-weight: 600; }
+  .body-degree { font-size: 4.5px; fill: var(--ink-faint); }
+  .rx { fill: var(--rose); }
+  .leader { stroke: currentColor; stroke-width: 0.2; opacity: 0.5; }
+  .true-mark { fill: currentColor; opacity: 0.6; stroke: none; }
+
+  figcaption {
+    font: 400 var(--text-sm) / 1.6 var(--font-body);
+    color: var(--ink-soft); text-align: center; max-width: 52ch;
+  }
+</style>

@@ -16,6 +16,7 @@
  * because it is the thing most likely to be open beside a stream.
  */
 import ToolLayout from "../../layouts/ToolLayout.astro";
+import TransitWheel from "../../components/chart/TransitWheel.astro";
 import { askAstro } from "../../lib/api";
 import { copy } from "../../lib/copy";
 
@@ -72,6 +73,16 @@ const period = q.get("period") ?? (
   : `${now.getUTCFullYear()}-${pad(now.getUTCMonth() + 1)}`
 );
 
+/* The range handed to the engine is HALF-OPEN: [start, end). Written closed, a
+   month ending "2026-09-30" dropped everything that happened on the thirtieth
+   after midnight, and a single day was a zero-length span the engine refused
+   outright — a day view that showed nothing and blamed the ephemeris for it. */
+const dayAfter = (iso: string) => {
+  const d = new Date(`${iso}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + 1);
+  return d.toISOString().slice(0, 10);
+};
+
 let start = "", end = "", label = "";
 if (type === "day") {
   start = period; end = period;
@@ -102,12 +113,43 @@ interface EventRow {
   kind: string; at: string; bodies: string[]; sign: string;
   degree: number; detail?: Record<string, any>;
 }
-const answer = await askAstro<{ count: number; events: EventRow[] }>(
-  `/events?start=${start}&end=${end}&kinds=${kinds.join(",")}` +
-  `&void_rule=thirtyDegrees&true_node=true`,
-  25000,
-);
+/* The wheel is drawn for one instant in the period — the start unless a
+   moment is named. It is the same sky the table lists, rotated to the same
+   rising sign, so the two can never disagree about where anything is. */
+const at = q.get("at") || `${start}T12:00:00Z`;
+
+interface ChartBody {
+  name: string; longitude: number; retrograde: boolean;
+  dignities?: { sign: string; degree: number };
+}
+/* The last day belongs to the period, so the exclusive bound is the day after. */
+const endExclusive = dayAfter(end);
+
+const [answer, chart] = await Promise.all([
+  askAstro<{ count: number; events: EventRow[] }>(
+    `/events?start=${start}&end=${endExclusive}&kinds=${kinds.join(",")}` +
+    `&void_rule=thirtyDegrees&true_node=true`,
+    25000,
+  ),
+  askAstro<{ bodies: ChartBody[] }>(
+    `/chart?when=${encodeURIComponent(at)}&lat=51.4779&lon=0` +
+    `&tradition=hellenistic&house_system=whole_sign&diagram=false`,
+    15000,
+  ),
+]);
 const events = answer?.data?.events ?? [];
+
+/* Greenwich, because a transit wheel has no birth place and the UT anchor is
+   the honest default. Nothing drawn here depends on the horizon: there is no
+   computed Ascendant, and the "Ascendant" is the sign somebody chose. */
+const SIGN_OF = (lon: number) => SIGNS[Math.floor(((lon % 360) + 360) % 360 / 30)];
+const wheelBodies = (chart?.data?.bodies ?? []).map((b) => ({
+  name: b.name,
+  longitude: b.longitude,
+  sign: b.dignities?.sign ?? SIGN_OF(b.longitude),
+  degree: b.dignities?.degree ?? ((b.longitude % 30) + 30) % 30,
+  retrograde: b.retrograde,
+}));
 
 /* The one line of arithmetic the rotation needs. Positions do not change. */
 const houseOf = (sign: string) =>
@@ -182,8 +224,20 @@ const withParam = (key: string, value: string) => {
   </div>
 
   {
+    wheelBodies.length > 0 && (
+      <TransitWheel
+        bodies={wheelBodies}
+        rising={rising}
+        caption={`The sky at ${at.slice(0, 16).replace("T", " ")} UT${rising ? `, read from ${rising} rising` : ""}`}
+      />
+    )
+  }
+
+  {
+    /* A quiet period is a real answer, not a failure — so the wheel above
+       stays either way and this says which of the two happened. */
     events.length === 0 ? (
-      <p class="prompt">{say("absent", "Nothing found for that period — or the ephemeris could not be reached, which would be a failure on this side rather than a quiet sky.")}</p>
+      <p class="prompt">{say("quiet", "Nothing exact in that period under the filters you chose — or the ephemeris could not be reached, which would be a failure on this side rather than a quiet sky. The wheel above is drawn either way.")}</p>
     ) : (
       <>
         <div class="rot" role="group" aria-label="Rising sign">
