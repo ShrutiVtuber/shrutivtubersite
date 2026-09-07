@@ -8,20 +8,40 @@
 import BaseLayout from "../../../layouts/BaseLayout.astro";
 import SectionHeader from "../../../components/brand/SectionHeader.astro";
 import PeriodSwitcher from "../../../components/navigation/PeriodSwitcher.astro";
-import Prose from "../../../components/content/Prose.astro";
+import LocalTimes from "../../../components/content/LocalTimes.astro";
+import TransitWheel from "../../../components/chart/TransitWheel.astro";
 import Badge from "../../../components/navigation/Badge.astro";
 import EmptyState from "../../../components/feedback/EmptyState.astro";
 import Button from "../../../components/forms/Button.astro";
 import { site } from "../../../lib/api";
 import { account } from "../../../lib/account";
 import { renderMarkdown } from "../../../lib/markdown";
-import { sunSign, SIGNS } from "../../../lib/signs";
+import { resolveTokens } from "../../../lib/tokens";
+import { askAstro } from "../../../lib/api";
+import { sunSign, SIGNS, ZODIAC } from "../../../lib/signs";
 import { copy } from "../../../lib/copy";
 
 /* Every word on this page, editable from the admin. The defaults below are
    what it was written with and what still renders if nothing was changed. */
 const say = await copy("horoscopes/[sign]/[period]");
 
+
+/* The instant a period is drawn for. Noon on its first day: it is inside the
+   period for every reader on earth, which midnight is not — at UTC+14 the
+   midnight that opens a UT week is already the previous afternoon locally. */
+function anchorOf(covers: string): string {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(covers)) return `${covers}T12:00:00Z`;
+  if (/^\d{4}-W\d{2}$/.test(covers)) {
+    const [y, w] = covers.split("-W").map(Number);
+    const jan4 = new Date(Date.UTC(y, 0, 4));
+    const monday = new Date(jan4);
+    monday.setUTCDate(jan4.getUTCDate() - ((jan4.getUTCDay() || 7) - 1) + (w - 1) * 7);
+    return `${monday.toISOString().slice(0, 10)}T12:00:00Z`;
+  }
+  if (/^\d{4}-\d{2}$/.test(covers)) return `${covers}-01T12:00:00Z`;
+  if (/^\d{4}$/.test(covers)) return `${covers}-01-01T12:00:00Z`;
+  return "";
+}
 
 const sign = String(Astro.params.sign ?? "");
 const period = String(Astro.params.period ?? "monthly");
@@ -41,8 +61,39 @@ if (!data) return Astro.rewrite("/404");
 
 const me = await account(Astro);
 const yours = me?.nativity ? sunSign(me.nativity.birthDate) : null;
-const html = data.published ? await renderMarkdown(data.bodyMd) : "";
+
+/* Tokens are resolved AFTER markdown — `{{…}}` carries no markdown syntax, so
+   it survives the processor untouched, and doing it here does not depend on
+   whether the processor passes raw HTML through. Each becomes a `<time>` in
+   Universal Time, which a script then rewrites into the reader's own clock. */
+const html = data.published ? resolveTokens(await renderMarkdown(data.bodyMd)) : "";
+
+/* ── the wheel, locked ────────────────────────────────────────────────────
+   On a reading the wheel is fixed to the period's own anchor, so it can never
+   disagree with the prose beside it. Stepping happens in the tool, which the
+   link below opens at exactly this view. */
+const anchor = anchorOf(data.covers);
+interface ChartBody {
+  name: string; longitude: number; retrograde: boolean;
+  dignities?: { sign: string; degree: number };
+}
+const chart = anchor
+  ? await askAstro<{ bodies: ChartBody[] }>(
+      `/chart?when=${encodeURIComponent(anchor)}&lat=51.4779&lon=0` +
+      `&tradition=hellenistic&house_system=whole_sign&diagram=false`, 15000)
+  : null;
+
+const wheelBodies = (chart?.data?.bodies ?? []).map((b) => ({
+  name: b.name,
+  longitude: b.longitude,
+  sign: b.dignities?.sign ?? ZODIAC[Math.floor((((b.longitude % 360) + 360) % 360) / 30)],
+  degree: b.dignities?.degree ?? ((b.longitude % 30) + 30) % 30,
+  retrograde: b.retrograde,
+}));
 const NAME = sign.charAt(0).toUpperCase() + sign.slice(1);
+/* From the slug, not by indexing `SIGNS` — that list is ordered by calendar
+   month, so indexing it here rotated a Leo reading to Scorpio. */
+const risingName = NAME;
 const GLYPH: Record<string, string> = {
   aries: "♈", taurus: "♉", gemini: "♊", cancer: "♋", leo: "♌", virgo: "♍",
   libra: "♎", scorpio: "♏", sagittarius: "♐", capricorn: "♑", aquarius: "♒", pisces: "♓",
@@ -67,7 +118,22 @@ const GLYPH: Record<string, string> = {
 
     {
       data.published ? (
-        <Prose html={html} byline={data.byline} />
+        <>
+          {wheelBodies.length > 0 && (
+            <figure class="anchor-wheel">
+              <TransitWheel bodies={wheelBodies} rising={risingName} size={420}
+                            degreeRing={false}
+                            caption={`Drawn for ${anchor.slice(0, 10)}, the start of this period`} />
+              <figcaption class="open-in">
+                <a href={`/tools/events?rising=${risingName}&type=${period === "yearly" ? "year" : period.replace("ly", "")}&period=${data.covers}&at=${encodeURIComponent(anchor)}`}>
+                  {say("open.tool", "Open this moment in the tool, where it steps →")}
+                </a>
+              </figcaption>
+            </figure>
+          )}
+          <LocalTimes html={html} />
+          {data.byline && <p class="byline">{data.byline}</p>}
+        </>
       ) : (
         <EmptyState
           glyph="○"
@@ -88,6 +154,13 @@ const GLYPH: Record<string, string> = {
 
 <style>
   .reading { max-width: 720px; display: grid; gap: var(--space-4); }
+  .anchor-wheel { margin: 0; display: grid; gap: var(--space-2); justify-items: center; }
+  .open-in { font: 400 var(--text-sm) var(--font-body); text-align: center; }
+  .open-in a { color: var(--accent); }
+  .byline {
+    margin: var(--space-3) 0 0; font: 400 var(--text-sm) var(--font-body);
+    color: var(--ink-faint); font-style: italic;
+  }
   .reading-head { display: flex; gap: var(--space-4); align-items: baseline; flex-wrap: wrap; }
   .back { margin: var(--space-5) 0 0; font: 400 var(--text-sm) var(--font-body); display: flex; gap: var(--space-5); flex-wrap: wrap; }
   .back a { color: var(--accent); text-decoration: none; }

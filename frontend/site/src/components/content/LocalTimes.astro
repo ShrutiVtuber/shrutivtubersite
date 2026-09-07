@@ -1,0 +1,136 @@
+---
+/* Prose whose times move with the reader.
+ *
+ * The server has already written every instant into a `<time datetime>` in
+ * Universal Time — readable, indexable, and honest with scripting off. This
+ * rewrites the text of each one into the zone the browser is actually in, and
+ * says which zone that was, because a time with no zone on it is the thing
+ * that caused the problem in the first place.
+ *
+ * `Intl.DateTimeFormat` carries the tz database, so this handles half-hour
+ * zones, a DST change between writing and reading, and historical rules — none
+ * of which a fixed offset would. Nothing here does date arithmetic by hand.
+ */
+interface Props {
+  /** HTML that has already been through `resolveTokens`. */
+  html: string;
+  /** Shown once, under the prose, naming the zone in use. */
+  note?: boolean;
+}
+const { html, note = true } = Astro.props;
+---
+
+<div class="localised" data-local-times set:html={html} />
+{note && (
+  <p class="tz-note" data-tz-note hidden>
+    {/* Filled in by the script. Hidden until then: with no script the times
+        already say UT, and a note claiming otherwise would be a lie. */}
+  </p>
+)}
+
+<script>
+  /* Every read is guarded. A browser with a broken or unknown zone must show
+     the Universal Time it already has rather than throw and leave the page
+     half-rewritten. */
+  function zone(): string {
+    try {
+      return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+    } catch {
+      return "UTC";
+    }
+  }
+
+  function part(hour: number): string {
+    if (hour < 5) return "overnight";
+    if (hour < 12) return "in the morning";
+    if (hour < 17) return "in the afternoon";
+    if (hour < 22) return "in the evening";
+    return "overnight";
+  }
+
+  function relative(then: Date): string {
+    const days = Math.round((then.getTime() - Date.now()) / 86400000);
+    if (days === 0) return "today";
+    if (days === 1) return "tomorrow";
+    if (days === -1) return "yesterday";
+    try {
+      return new Intl.RelativeTimeFormat(undefined, { numeric: "auto" })
+        .format(days, "day");
+    } catch {
+      return days > 0 ? `in ${days} days` : `${-days} days ago`;
+    }
+  }
+
+  const tz = zone();
+
+  function localise(el: HTMLElement): void {
+    const iso = el.getAttribute("datetime");
+    if (!iso) return;
+    const when = new Date(iso);
+    if (Number.isNaN(when.getTime())) return;
+
+    const kind = el.dataset.token ?? "instant";
+    const format = el.dataset.format ?? "long";
+
+    try {
+      if (kind === "daypart") {
+        /* The hour in the READER's zone, which is the whole point — the same
+           instant is the evening in Athens and the morning in Los Angeles. */
+        const hour = Number(new Intl.DateTimeFormat("en-GB", {
+          timeZone: tz, hour: "2-digit", hour12: false,
+        }).format(when));
+        el.textContent = part(hour);
+        return;
+      }
+      if (format === "relative") {
+        el.textContent = relative(when);
+        return;
+      }
+      const options: Intl.DateTimeFormatOptions = { timeZone: tz };
+      if (format === "date") Object.assign(options, { day: "numeric", month: "long", year: "numeric" });
+      else if (format === "time") Object.assign(options, { hour: "2-digit", minute: "2-digit", hour12: false });
+      else if (format === "weekday") Object.assign(options, { weekday: "long" });
+      else Object.assign(options, {
+        weekday: "long", day: "numeric", month: "long",
+        hour: "2-digit", minute: "2-digit", hour12: false,
+      });
+      el.textContent = new Intl.DateTimeFormat(undefined, options).format(when);
+      el.title = `${when.toISOString().slice(0, 16).replace("T", " ")} UT`;
+    } catch {
+      /* Leave the Universal Time the server wrote. */
+    }
+  }
+
+  for (const root of document.querySelectorAll<HTMLElement>("[data-local-times]")) {
+    const times = root.querySelectorAll<HTMLElement>("time[data-token]");
+    for (const el of times) localise(el);
+    for (const el of root.querySelectorAll<HTMLElement>('[data-token="tz"]')) {
+      el.textContent = tz;
+    }
+    if (times.length === 0) continue;
+
+    const note = root.parentElement?.querySelector<HTMLElement>("[data-tz-note]");
+    if (note) {
+      note.textContent = `All times shown in ${tz}.`;
+      note.hidden = false;
+    }
+  }
+</script>
+
+<style>
+  .localised :global(time) {
+    /* Nothing decorative. A localised time must not look like a link, because
+       it is not one — and the dotted underline that says "there is more here"
+       would be a promise this does not keep. */
+    font-variant-numeric: tabular-nums;
+  }
+  .localised :global(.token-broken) {
+    background: var(--live, #a62639); color: #fff;
+    padding: 0 4px; border-radius: 3px; font-size: 0.9em;
+  }
+  .tz-note {
+    margin: var(--space-3) 0 0;
+    font: 400 var(--text-xs) / 1.6 var(--font-body);
+    color: var(--ink-faint);
+  }
+</style>
