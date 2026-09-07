@@ -112,6 +112,9 @@ TOOLS = [
      "The Athenian lunisolar date, with the intercalation rule shown rather than hidden.", 20),
     ("isopsephy", "Isopsephy calculator",
      "Greek numerology over any text, with the cipher shown.", 30),
+    ("events", "Transits",
+     "Every ingress, station, lunation, eclipse, exact configuration and void "
+     "window in a period — with the wheel, read from any of the twelve rising signs.", 26),
     ("ephemeris", "The ephemeris",
      "A month of the sky as a table — a column per body, a row per day, the way "
      "the craft has been learned since the tables were printed.", 25),

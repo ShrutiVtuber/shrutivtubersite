@@ -163,7 +163,7 @@ class Horoscope(TimestampMixin, table=True):
     One reading: one sign, one period, one month. Written by hand.
 
     The period column exists now even though only `monthly` is published, so
-    daily, seasonal and yearly are a switch rather than a rebuild.
+    daily, weekly and yearly are a switch rather than a rebuild.
     """
 
     __tablename__ = "horoscope"

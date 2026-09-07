@@ -1,14 +1,23 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 """
-Horoscopes: twelve a month, written by hand.
+Horoscopes: twelve at a time, written by hand.
 
-The `period` dimension exists now though only `monthly` is published, so daily,
-seasonal and yearly are a switch rather than a rebuild. **A period that does
-not exist renders as ABSENT** — never as an error and never as a disabled
-control with a tooltip.
+Four periods — daily, weekly, monthly, yearly. **A period that does not exist
+renders as ABSENT** — never as an error and never as a disabled control with a
+tooltip.
+
+**Weeks are ISO-8601**: Monday starts the week, week one contains the first
+Thursday, and the id is `2026-W38`. That id is the database key and the URL, so
+it does not move if anyone ever wants a Sunday-start display — that would be a
+way of RENDERING the same seven days, never a second set of columns.
+
+`covers` is checked against the shape its period requires. Unchecked, a typo
+becomes a row nobody can find again: it saves, it does not appear in the list
+it was meant for, and the work is simply gone.
 """
 from __future__ import annotations
 
+import re
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -24,17 +33,41 @@ SIGNS = (
     "aries", "taurus", "gemini", "cancer", "leo", "virgo",
     "libra", "scorpio", "sagittarius", "capricorn", "aquarius", "pisces",
 )
-PERIODS = ("monthly", "daily", "seasonal", "yearly")
+PERIODS = ("daily", "weekly", "monthly", "yearly")
+
+# What a period id has to look like. A weekly id is the ISO week, so `2026-W38`
+# and never `2026-38`, because the W is what says which of the two conventions
+# for numbering a week is meant.
+COVERS_SHAPE = {
+    "daily": re.compile(r"^\d{4}-\d{2}-\d{2}$"),
+    "weekly": re.compile(r"^\d{4}-W\d{2}$"),
+    "monthly": re.compile(r"^\d{4}-\d{2}$"),
+    "yearly": re.compile(r"^\d{4}$"),
+}
+
+
+def _valid_covers(period: str, covers: str) -> bool:
+    shape = COVERS_SHAPE.get(period)
+    return bool(shape and shape.match(covers or ""))
 
 
 def _current(period: str) -> str:
+    """
+    The period we are in now.
+
+    The ISO week year is NOT always the calendar year — the last days of
+    December can belong to week 1 of the year after, and the first days of
+    January to week 52 or 53 of the year before. `isocalendar()` knows this and
+    arithmetic on `now.year` does not, which is why it is used.
+    """
     now = datetime.now(timezone.utc)
     if period == "daily":
         return now.date().isoformat()
+    if period == "weekly":
+        iso = now.isocalendar()
+        return f"{iso.year}-W{iso.week:02d}"
     if period == "yearly":
         return str(now.year)
-    if period == "seasonal":
-        return f"{now.year}-Q{(now.month - 1) // 3 + 1}"
     return f"{now.year}-{now.month:02d}"
 
 
@@ -141,6 +174,10 @@ async def save_draft(
         raise HTTPException(400, "no such sign")
     if body.period not in PERIODS:
         raise HTTPException(400, "no such period")
+    if not _valid_covers(body.period, body.covers):
+        raise HTTPException(
+            400, f"a {body.period} period is written like "
+                 f"{_current(body.period)!r}, not {body.covers!r}")
 
     row = (
         await session.execute(

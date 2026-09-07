@@ -30,24 +30,28 @@ def _repo() -> Path:
 REPO = _repo()
 TOOL_PAGES = REPO / "frontend" / "site" / "src" / "pages" / "tools"
 
-MIGRATION = "a1c74e9d3b52_tools_become_content.py"
-
-
-def _seed_file() -> Path:
-    """
-    In the test container alembic is mounted at /app/alembic; in a checkout it
-    is at backend/alembic. Both, rather than whichever was tried first.
-    """
-    for candidate in (
-        REPO / "alembic" / "versions" / MIGRATION,
-        REPO / "backend" / "alembic" / "versions" / MIGRATION,
-    ):
-        if candidate.is_file():
+# Rows are seeded by migrations — plural, deliberately. This used to name one
+# of them and read only that file, which quietly meant a NEW instrument could
+# never satisfy the check: you do not edit an applied migration, so its row
+# lands in a new one the test was not looking at. It reads all of them now, and
+# `seed.py` too, which is where a fresh install gets its rows.
+def _versions() -> Path:
+    for candidate in (REPO / "alembic" / "versions",
+                      REPO / "backend" / "alembic" / "versions"):
+        if candidate.is_dir():
             return candidate
-    return REPO / "backend" / "alembic" / "versions" / MIGRATION
+    return REPO / "backend" / "alembic" / "versions"
 
 
-SEED = _seed_file()
+def _seed_files() -> list[Path]:
+    out = sorted(_versions().glob("*.py"))
+    for candidate in (REPO / "shruti" / "seed.py", REPO / "backend" / "shruti" / "seed.py"):
+        if candidate.is_file():
+            out.append(candidate)
+    return out
+
+
+SEED_FILES = _seed_files()
 
 # The one dynamic route: one file, two instruments, and the params are not
 # derivable from the filename.
@@ -64,13 +68,35 @@ def _slugs_with_pages() -> set[str]:
 
 
 def _seeded_slugs() -> set[str]:
-    text = SEED.read_text(encoding="utf-8")
-    return set(re.findall(r'slug="([a-z0-9-]+)"', text))
+    """
+    Every slug a seeding step creates **as a tool**, and only those.
+
+    Scoping matters both ways. Reading one named migration meant a new
+    instrument could never satisfy the check, because you do not edit an
+    applied migration and its row lands in a new one. Reading every `slug="…"`
+    in every file goes too far the other way and sweeps up projects and link
+    groups, which are not tools and have no page on /tools by design.
+
+    So: migrations that touch the `tool` table, and the `TOOLS` list in
+    `seed.py` — nothing else in either place.
+    """
+    found: set[str] = set()
+    for path in SEED_FILES:
+        text = path.read_text(encoding="utf-8")
+        if path.name == "seed.py":
+            block = re.search(r"^TOOLS = \[(.*?)^\]", text, re.M | re.S)
+            if block:
+                found |= set(re.findall(r'\("([a-z0-9-]+)",', block.group(1)))
+            continue
+        if re.search(r'"tool"|\btool_table\b|Tool\(', text):
+            found |= set(re.findall(r'slug="([a-z0-9-]+)"', text))
+    return found
 
 
 def test_the_files_are_where_we_think() -> None:
     assert TOOL_PAGES.is_dir(), f"no tool pages at {TOOL_PAGES}"
-    assert SEED.is_file(), f"no seed migration at {SEED}"
+    assert SEED_FILES, "no seeding step found at all"
+    assert all(p.is_file() for p in SEED_FILES)
     assert len(_slugs_with_pages()) >= 9
 
 
@@ -82,8 +108,29 @@ def test_every_instrument_page_has_a_row() -> None:
     )
 
 
+def _seeded_visible() -> set[str]:
+    """
+    Only the rows a seeding step makes VISIBLE.
+
+    The two directions of this check are not about the same set, and conflating
+    them fails on rows that are deliberately hidden. `seed.py` seeds its tools
+    `visible=False` precisely so a row can exist as a statement of intent
+    before the page does — the comment in the migration says as much. Those
+    need a row-with-no-page allowance; a row that shows a card on /tools does
+    not.
+    """
+    found: set[str] = set()
+    for path in SEED_FILES:
+        if path.name == "seed.py":
+            continue                    # seeded hidden, on purpose
+        text = path.read_text(encoding="utf-8")
+        if re.search(r'visible=True|"visible": True|visible\s*=\s*True', text):
+            found |= set(re.findall(r'slug="([a-z0-9-]+)"', text))
+    return found
+
+
 def test_every_seeded_row_has_a_page() -> None:
-    missing = _seeded_slugs() - _slugs_with_pages()
+    missing = _seeded_visible() - _slugs_with_pages()
     assert not missing, (
         f"rows seeded visible with no page behind them: {sorted(missing)}. Each "
         f"puts a card on /tools that leads to a 404."

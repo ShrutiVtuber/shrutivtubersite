@@ -216,7 +216,7 @@ const withParam = (key: string, value: string) => {
           </label>
         ))}
       </fieldset>
-      <button type="submit">{say("submit", "Generate")}</button>
+      <button type="submit" data-track="tool:used" data-track-tool="transits">{say("submit", "Generate")}</button>
     </form>
     <p class="privacy">
       {say("rotation.note", "Switching the rising sign does not recompute anything. The sky is the same; only the house each event falls in changes, which is the one number that differs between twelve columns.")}

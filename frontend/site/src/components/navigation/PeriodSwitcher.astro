@@ -10,7 +10,7 @@ const say = await copy("component:PeriodSwitcher");
  *
  * UNAVAILABLE PERIODS ARE ABSENT, not errors and not disabled-with-a-tooltip.
  * The control is placed now, with only monthly existing, so turning daily,
- * seasonal or yearly on is a switch rather than a rebuild.
+ * weekly or yearly on is a switch rather than a rebuild.
  */
 interface Props {
   available: string[];
@@ -19,7 +19,7 @@ interface Props {
 }
 const { available, current, hrefFor } = Astro.props;
 const LABEL: Record<string, string> = {
-  daily: "Daily", monthly: "Monthly", seasonal: "Seasonal", yearly: "Yearly",
+  daily: "Daily", weekly: "Weekly", monthly: "Monthly", yearly: "Yearly",
 };
 ---
 

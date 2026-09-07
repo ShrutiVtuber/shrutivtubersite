@@ -1,237 +1,567 @@
 ---
-/* Horoscope authoring — the design's admin `Horoscopes` tab.
+/* The writing desk.
  *
- * DIVERGENCE, flagged rather than quiet: the design specifies a small React
- * SPA for the admin, and that SPA does not exist yet — `frontend/admin` is
- * empty. Building one tab of a shell that has not been built is not possible,
- * so this is the same screen rendered server-side, with the same layout and
- * the same rules. When the SPA is built, this moves into it.
+ * Twelve columns is the unit of work, not one — so this is built around moving
+ * between twelve drafts without leaving the screen, not around editing a single
+ * horoscope well. Everything follows from that: the sign rail is always
+ * visible and says which are written, the events beside the editor rotate with
+ * the sign, and switching signs costs one click and no page you have to find
+ * your way back from.
  *
- * The design's reasoning is what shapes it: writing twelve of anything monthly
- * is a chore, and a bad editor is how a monthly feature becomes a quarterly
- * one. So the sign row, the progress count, the editor and the preview are all
- * on ONE SCREEN with no navigating away and back.
+ * **It is used live, while talking.** Which is why it autosaves, says when it
+ * last saved, and answers the keyboard: nothing here should need hunting for
+ * while a chat is watching. Losing a paragraph to a missed save is the failure
+ * that would make her stop trusting it, and trust is the whole product.
  *
- * Publishing is blocked until all twelve exist, because AN EMPTY READING IS
- * WORSE THAN A LATE ONE.
+ * It works with scripting off — the editor is a real form and Save is a real
+ * button. The autosave, the keyboard and click-to-insert are enhancements on
+ * top of something that already functions.
  */
 import AdminLayout from "../../layouts/AdminLayout.astro";
 import SectionHeader from "../../components/brand/SectionHeader.astro";
 import Badge from "../../components/navigation/Badge.astro";
-import Prose from "../../components/content/Prose.astro";
 import CsrfField from "../../components/forms/CsrfField.astro";
-import Button from "../../components/forms/Button.astro";
-import { SITE_API } from "../../lib/api";
+import TransitWheel from "../../components/chart/TransitWheel.astro";
+import { SITE_API, askAstro } from "../../lib/api";
 import { verifyCsrf } from "../../lib/csrf";
 import { renderMarkdown } from "../../lib/markdown";
-import { redirectWithCookies } from "../../lib/redirect";
 
 const ADMIN_COOKIE = "shruti_session";
 const adminToken = Astro.cookies.get(ADMIN_COOKIE)?.value;
-const headers = adminToken ? { cookie: `${ADMIN_COOKIE}=${adminToken}` } : {};
+const headers: Record<string, string> =
+  adminToken ? { cookie: `${ADMIN_COOKIE}=${adminToken}` } : {};
 
+const SIGNS = [
+  "aries", "taurus", "gemini", "cancer", "leo", "virgo",
+  "libra", "scorpio", "sagittarius", "capricorn", "aquarius", "pisces",
+];
+const GLYPH: Record<string, string> = {
+  aries: "♈︎", taurus: "♉︎", gemini: "♊︎", cancer: "♋︎", leo: "♌︎", virgo: "♍︎",
+  libra: "♎︎", scorpio: "♏︎", sagittarius: "♐︎", capricorn: "♑︎",
+  aquarius: "♒︎", pisces: "♓︎",
+};
+const PERIODS = ["daily", "weekly", "monthly", "yearly"];
+const Name = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+const pad = (n: number) => String(n).padStart(2, "0");
+
+/* ── which period ─────────────────────────────────────────────────────────
+   ISO weeks: Monday starts it, week one holds the first Thursday, and the id
+   is what the database and the URL are keyed on. Thursday decides the year,
+   which is why a week in early January can belong to the year before. */
 const now = new Date();
-const thisMonth = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
-const covers = Astro.url.searchParams.get("covers") ?? thisMonth;
-const sign = Astro.url.searchParams.get("sign") ?? "aries";
+function isoWeek(d: Date): string {
+  const t = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+  t.setUTCDate(t.getUTCDate() + 4 - (t.getUTCDay() || 7));
+  const start = new Date(Date.UTC(t.getUTCFullYear(), 0, 1));
+  return `${t.getUTCFullYear()}-W${pad(Math.ceil(((t.getTime() - start.getTime()) / 86400000 + 1) / 7))}`;
+}
+function weekDays(id: string): [string, string] {
+  const [y, w] = id.split("-W").map(Number);
+  const jan4 = new Date(Date.UTC(y, 0, 4));
+  const monday = new Date(jan4);
+  monday.setUTCDate(jan4.getUTCDate() - ((jan4.getUTCDay() || 7) - 1) + (w - 1) * 7);
+  const sunday = new Date(monday);
+  sunday.setUTCDate(monday.getUTCDate() + 6);
+  return [monday.toISOString().slice(0, 10), sunday.toISOString().slice(0, 10)];
+}
+const currentFor = (p: string) =>
+  p === "daily" ? now.toISOString().slice(0, 10)
+  : p === "weekly" ? isoWeek(now)
+  : p === "yearly" ? String(now.getUTCFullYear())
+  : `${now.getUTCFullYear()}-${pad(now.getUTCMonth() + 1)}`;
 
+const q = Astro.url.searchParams;
+const period = PERIODS.includes(q.get("period") ?? "") ? q.get("period")! : "weekly";
+const covers = q.get("covers") || currentFor(period);
+const sign = SIGNS.includes(q.get("sign") ?? "") ? q.get("sign")! : "aries";
+
+/* ── saving ───────────────────────────────────────────────────────────────
+   The same handler serves the form and the autosave. A JSON answer for the
+   autosave, because returning the whole page to a keystroke is absurd — and
+   because the editor must not be re-rendered underneath a cursor. */
 let notice = "";
 let failed = "";
+let savedAt = "";
 
 if (Astro.request.method === "POST") {
   const form = await Astro.request.formData();
+  const wantsJson = (Astro.request.headers.get("accept") ?? "").includes("application/json");
+  const action = String(form.get("action") ?? "");
+
   if (!verifyCsrf(Astro.cookies, form)) {
     failed = "That did not save. Reload the page and try again.";
-  } else if (String(form.get("action")) === "draft") {
+    if (wantsJson) {
+      return new Response(JSON.stringify({ ok: false, detail: failed }), {
+        status: 403, headers: { "Content-Type": "application/json" },
+      });
+    }
+  } else if (action === "draft") {
     const r = await fetch(`${SITE_API}/api/horoscopes/draft`, {
       method: "PUT",
       headers: { "Content-Type": "application/json", ...headers },
       body: JSON.stringify({
-        sign: String(form.get("sign") ?? ""),
-        period: "monthly",
+        sign: String(form.get("sign") ?? sign),
+        period: String(form.get("period") ?? period),
         covers: String(form.get("covers") ?? covers),
         body_md: String(form.get("body_md") ?? ""),
       }),
     });
-    notice = r.ok ? "Draft saved." : "";
-    failed = r.ok ? "" : ((await r.json().catch(() => null))?.detail ?? "That did not save.");
-  } else if (String(form.get("action")) === "publish") {
+    const body = await r.json().catch(() => null);
+    if (wantsJson) {
+      return new Response(JSON.stringify({
+        ok: r.ok,
+        written: body?.written ?? false,
+        detail: r.ok ? "" : (body?.detail ?? "That did not save."),
+      }), { status: r.ok ? 200 : 400, headers: { "Content-Type": "application/json" } });
+    }
+    notice = r.ok ? "Saved." : "";
+    failed = r.ok ? "" : (body?.detail ?? "That did not save.");
+    savedAt = r.ok ? new Date().toISOString() : "";
+  } else if (action === "publish") {
     const r = await fetch(`${SITE_API}/api/horoscopes/publish`, {
       method: "POST",
       headers: { "Content-Type": "application/json", ...headers },
-      body: JSON.stringify({ period: "monthly", covers: String(form.get("covers") ?? covers) }),
+      body: JSON.stringify({ period, covers }),
     });
     const body = await r.json().catch(() => null);
     notice = r.ok ? `Published all twelve for ${covers}.` : "";
-    // The refusal names how many are missing, rather than just saying no.
+    /* The refusal names how many are missing rather than just saying no. */
     failed = r.ok ? "" : (body?.detail ?? "Publishing was refused.");
   }
 }
 
+/* ── what the desk needs ──────────────────────────────────────────────────
+   Drafts, the events for the period, and the sky at its start — fetched
+   together, because three round trips in sequence is a second of staring at
+   nothing every time she changes sign. */
 interface Drafts {
   period: string; covers: string; written: number; total: number;
   published: boolean;
   drafts: { sign: string; bodyMd: string; published: boolean }[];
 }
-const r = await fetch(`${SITE_API}/api/horoscopes/drafts?period=monthly&covers=${covers}`, { headers });
-const data: Drafts | null = r.ok ? await r.json() : null;
+interface EventRow {
+  kind: string; at: string; bodies: string[]; sign: string;
+  degree: number; detail?: Record<string, any>;
+}
+interface ChartBody {
+  name: string; longitude: number; retrograde: boolean;
+  dignities?: { sign: string; degree: number };
+}
+
+let start = covers, end = covers, label = covers;
+if (period === "weekly") {
+  [start, end] = weekDays(covers);
+  label = `${covers} · ${start} to ${end}`;
+} else if (period === "monthly") {
+  const [y, m] = covers.split("-").map(Number);
+  start = `${covers}-01`;
+  end = `${covers}-${pad(new Date(Date.UTC(y, m, 0)).getUTCDate())}`;
+  label = new Date(`${start}T00:00:00Z`).toLocaleDateString("en-GB",
+    { month: "long", year: "numeric", timeZone: "UTC" });
+} else if (period === "yearly") {
+  start = `${covers}-01-01`; end = `${covers}-12-31`; label = covers;
+} else {
+  label = new Date(`${covers}T00:00:00Z`).toLocaleDateString("en-GB",
+    { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
+}
+const dayAfter = (iso: string) => {
+  const d = new Date(`${iso}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + 1);
+  return d.toISOString().slice(0, 10);
+};
+/* Half-open: the last day belongs to the period. */
+const kinds = period === "yearly"
+  ? "ingress,station,lunation,eclipse"
+  : "ingress,station,lunation,eclipse,aspect,void";
+
+const [draftsRes, eventsRes, chartRes] = await Promise.all([
+  fetch(`${SITE_API}/api/horoscopes/drafts?period=${period}&covers=${covers}`, { headers }),
+  askAstro<{ events: EventRow[] }>(
+    `/events?start=${start}&end=${dayAfter(end)}&kinds=${kinds}&true_node=true`, 25000),
+  askAstro<{ bodies: ChartBody[] }>(
+    `/chart?when=${encodeURIComponent(`${start}T12:00:00Z`)}&lat=51.4779&lon=0` +
+    `&tradition=hellenistic&house_system=whole_sign&diagram=false`, 15000),
+]);
+const data: Drafts | null = draftsRes.ok ? await draftsRes.json() : null;
+const events = eventsRes?.data?.events ?? [];
 
 const current = data?.drafts.find((d) => d.sign === sign);
-const previewHtml = current?.bodyMd ? await renderMarkdown(current.bodyMd) : "";
-const NAME = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
-const GLYPH: Record<string, string> = {
-  aries: "♈", taurus: "♉", gemini: "♊", cancer: "♋", leo: "♌", virgo: "♍",
-  libra: "♎", scorpio: "♏", sagittarius: "♐", capricorn: "♑", aquarius: "♒", pisces: "♓",
+const bodyMd = current?.bodyMd ?? "";
+const previewHtml = bodyMd ? await renderMarkdown(bodyMd) : "";
+const written = new Set((data?.drafts ?? []).filter((d) => d.bodyMd.trim()).map((d) => d.sign));
+
+const SIGN_NAMES = [
+  "Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo",
+  "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces",
+];
+const risingName = SIGN_NAMES[SIGNS.indexOf(sign)];
+const SIGN_OF = (lon: number) => SIGN_NAMES[Math.floor((((lon % 360) + 360) % 360) / 30)];
+const wheelBodies = (chartRes?.data?.bodies ?? []).map((b) => ({
+  name: b.name,
+  longitude: b.longitude,
+  sign: b.dignities?.sign ?? SIGN_OF(b.longitude),
+  degree: b.dignities?.degree ?? ((b.longitude % 30) + 30) % 30,
+  retrograde: b.retrograde,
+}));
+
+/* One number changes per rotation, and this is it. */
+const houseOf = (s: string) =>
+  ((SIGN_NAMES.indexOf(s) - SIGN_NAMES.indexOf(risingName) + 12) % 12) + 1;
+const AVERSE = new Set([2, 6, 8, 12]);
+const describe = (e: EventRow) => {
+  const who = e.bodies.join(" · ");
+  if (e.kind === "ingress") return `${who} enters ${e.sign}${e.detail?.retrograde ? " ℞" : ""}`;
+  if (e.kind === "station") return `${who} stations ${e.detail?.direction}`;
+  if (e.kind === "lunation") return `${e.detail?.phase} moon`;
+  if (e.kind === "eclipse") return `${e.detail?.type} ${e.detail?.of} eclipse`;
+  if (e.kind === "aspect") return `${e.bodies[0]} ${e.detail?.aspect} ${e.bodies[1]}`;
+  if (e.kind === "void") return `Moon void · ${e.detail?.minutes} min`;
+  return e.kind;
 };
+
+const link = (over: Record<string, string>) => {
+  const p = new URLSearchParams({ period, covers, sign, ...over });
+  if (over.period && !over.covers) p.set("covers", currentFor(over.period));
+  return `/admin/horoscopes?${p}`;
+};
+const shiftCovers = (by: number): string => {
+  if (period === "daily") {
+    const d = new Date(`${covers}T00:00:00Z`);
+    d.setUTCDate(d.getUTCDate() + by);
+    return d.toISOString().slice(0, 10);
+  }
+  if (period === "weekly") {
+    const [s] = weekDays(covers);
+    const d = new Date(`${s}T00:00:00Z`);
+    d.setUTCDate(d.getUTCDate() + by * 7);
+    return isoWeek(d);
+  }
+  if (period === "yearly") return String(Number(covers) + by);
+  const [y, m] = covers.split("-").map(Number);
+  const d = new Date(Date.UTC(y, m - 1 + by, 1));
+  return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}`;
+};
+const index = SIGNS.indexOf(sign);
+const prevSign = SIGNS[(index + 11) % 12];
+const nextSign = SIGNS[(index + 1) % 12];
 ---
 
 <AdminLayout title="Horoscopes">
-  <div class="authoring">
-    <div class="head">
-      <SectionHeader as="h1" glyph="☾" eyebrow="Admin" title="Horoscopes" />
-      {
-        data && (
+  <div class="desk" data-desk
+       data-prev={link({ sign: prevSign })} data-next={link({ sign: nextSign })}>
+
+    <header class="desk-head">
+      <SectionHeader as="h1" glyph="☾" eyebrow="Admin" title="The writing desk" />
+
+      <form method="GET" class="period-pick">
+        <select name="period" class="adm-select" aria-label="Period type">
+          {PERIODS.map((p) => <option value={p} selected={p === period}>{Name(p)}</option>)}
+        </select>
+        <input type="text" name="covers" value={covers} class="adm-input cov"
+               aria-label="Which period" />
+        <input type="hidden" name="sign" value={sign} />
+        <button type="submit" class="ghost">Go</button>
+      </form>
+
+      <nav class="step" aria-label="Move by period">
+        <a href={link({ covers: shiftCovers(-1) })} title="Previous">←</a>
+        <span class="label">{label}</span>
+        <a href={link({ covers: shiftCovers(1) })} title="Next">→</a>
+      </nav>
+
+      <div class="desk-side">
+        {data && (
           <Badge tone={data.written === data.total ? "accent" : "faint"}>
             {data.written} of {data.total} written
           </Badge>
-        )
-      }
-      <form method="GET" class="month">
-        <input type="hidden" name="sign" value={sign} />
-        <label><span class="lbl">Month</span><input type="month" name="covers" value={covers} /></label>
-        <Button type="submit" size="sm" variant="secondary">Open</Button>
-      </form>
-    </div>
+        )}
+        {data?.published && <Badge tone="accent">published</Badge>}
+        <form method="POST" class="pub"
+              onsubmit={`return confirm('Publish all twelve for ${covers}? It goes live at once.')`}>
+          <CsrfField />
+          <input type="hidden" name="action" value="publish" />
+          <button type="submit" class="publish"
+                  disabled={!data || data.written < data.total}>
+            Publish twelve
+          </button>
+        </form>
+      </div>
+    </header>
 
-    <p class="why">
-      Twelve fields, one per sign. The sign list, the progress count and the preview stay on this
-      screen — no navigating away and back.
-    </p>
+    {notice && <p class="adm-ok" role="status">{notice}</p>}
+    {failed && <p class="adm-bad" role="alert">{failed}</p>}
 
-    {notice && <p class="notice" role="status">{notice}</p>}
-    {failed && <p class="failed" role="alert">{failed}</p>}
+    <div class="desk-body">
+      {/* The rail. Always visible, always says which are done — this is the
+          twelve-up view made usable, rather than twelve pages to find. */}
+      <nav class="rail" aria-label="Sign">
+        {SIGNS.map((s) => (
+          <a href={link({ sign: s })}
+             class:list={["rail-sign", s === sign && "on", written.has(s) && "done"]}
+             aria-current={s === sign ? "page" : undefined}
+             title={`${Name(s)}${written.has(s) ? " — written" : " — empty"}`}>
+            <span class="g">{GLYPH[s]}</span>
+            <span class="n">{Name(s)}</span>
+            <span class="dot" aria-hidden="true" />
+          </a>
+        ))}
+      </nav>
 
-    {
-      !data ? (
-        <p class="failed">Could not load the drafts.</p>
-      ) : (
-        <>
-          <nav class="signs" aria-label="Signs">
-            {
-              data.drafts.map((d) => (
-                <a
-                  href={`/admin/horoscopes?covers=${covers}&sign=${d.sign}`}
-                  data-current={d.sign === sign || undefined}
-                  data-written={d.bodyMd.trim() ? "" : undefined}
-                >
-                  <span class="t-glyph" aria-hidden="true">{GLYPH[d.sign]}</span>
-                  <span>{NAME(d.sign)}</span>
-                </a>
-              ))
-            }
-          </nav>
+      {/* The sky, rotated to the sign being written for. */}
+      <section class="sky">
+        <h2 class="adm-lbl">The sky · {risingName} rising</h2>
+        {wheelBodies.length > 0 && (
+          <TransitWheel bodies={wheelBodies} rising={risingName} size={300}
+                        caption={`${start} 12:00 UT`} />
+        )}
+        <ol class="events">
+          {events.map((e) => {
+            const house = houseOf(e.sign);
+            return (
+              <li class={`k-${e.kind}`}>
+                <button type="button" class="ins" data-insert={
+                  `${e.at.slice(5, 10)} ${e.at.slice(11, 16)} — ${describe(e)}`
+                } title="Insert into the column">
+                  <span class="when">{e.at.slice(5, 10)} {e.at.slice(11, 16)}</span>
+                  <span class="what">{describe(e)}</span>
+                  <span class:list={["hs", AVERSE.has(house) && "averse"]}>
+                    {house}{AVERSE.has(house) ? "⊘" : ""}
+                  </span>
+                </button>
+              </li>
+            );
+          })}
+          {events.length === 0 && <li class="quiet">Nothing exact in this period.</li>}
+        </ol>
+      </section>
 
-          <div class="cols">
-            <form method="POST" class="editor">
-              <CsrfField />
-              <input type="hidden" name="action" value="draft" />
-              <input type="hidden" name="sign" value={sign} />
-              <input type="hidden" name="covers" value={covers} />
-              <label class="field">
-                <span class="lbl">{NAME(sign)} — reading</span>
-                <textarea
-                  name="body_md" rows="16" maxlength="8000"
-                  placeholder="Two or three paragraphs. Name the timing — a station, an ingress, a lunation — and say plainly what it asks."
-                >{current?.bodyMd ?? ""}</textarea>
-              </label>
-              <div class="actions">
-                <Button type="submit">Save draft</Button>
-                <span class="hint">
-                  {data.written === data.total ? "ready" : "publishing needs all twelve"}
-                </span>
-              </div>
-            </form>
-
-            <aside class="preview">
-              <span class="lbl">Preview · exactly the reading page</span>
-              {
-                previewHtml ? (
-                  <Prose html={previewHtml} byline="Soror Eu. A." />
-                ) : (
-                  <p class="empty-preview">
-                    Nothing written for {NAME(sign)} yet. An empty reading is worse than a late one.
-                  </p>
-                )
-              }
-            </aside>
+      {/* The column. */}
+      <section class="column">
+        <div class="col-head">
+          <h2 class="adm-lbl">{risingName} · {label}</h2>
+          <span class="save-state" data-save-state aria-live="polite">
+            {savedAt ? "Saved" : ""}
+          </span>
+        </div>
+        <form method="POST" class="editor" data-editor>
+          <CsrfField />
+          <input type="hidden" name="action" value="draft" />
+          <input type="hidden" name="sign" value={sign} />
+          <input type="hidden" name="period" value={period} />
+          <input type="hidden" name="covers" value={covers} />
+          <textarea name="body_md" class="adm-area" rows="18" data-body
+                    placeholder={`What the sky does for ${risingName} this ${period === "weekly" ? "week" : period.replace("ly", "")}…`}
+                    >{bodyMd}</textarea>
+          <div class="col-foot">
+            <button type="submit" class="save">Save</button>
+            <span class="count" data-count>{bodyMd.trim() ? bodyMd.trim().split(/\s+/).length : 0} words</span>
+            <span class="keys">⌘/Ctrl + ← → moves sign · ⌘/Ctrl + S saves</span>
           </div>
-
-          <form method="POST" class="publish">
-            <CsrfField />
-            <input type="hidden" name="action" value="publish" />
-            <input type="hidden" name="covers" value={covers} />
-            <Button type="submit" variant={data.written === data.total ? "primary" : "secondary"}>
-              Publish {covers}
-            </Button>
-            <span class="hint">
-              {
-                data.published
-                  ? "Already published — saving a draft updates the live reading."
-                  : data.written === data.total
-                    ? "All twelve are written."
-                    : `${data.total - data.written} still unwritten; publishing will be refused and will say which.`
-              }
-            </span>
-          </form>
-        </>
-      )
-    }
+        </form>
+        {previewHtml && (
+          <details class="preview">
+            <summary class="adm-lbl">Preview</summary>
+            <div class="prose" set:html={previewHtml} />
+          </details>
+        )}
+      </section>
+    </div>
   </div>
 </AdminLayout>
 
+<script>
+  /* Everything below is an enhancement. The form posts and saves without it. */
+  const desk = document.querySelector<HTMLElement>("[data-desk]");
+  const form = document.querySelector<HTMLFormElement>("[data-editor]");
+  const body = document.querySelector<HTMLTextAreaElement>("[data-body]");
+  const state = document.querySelector<HTMLElement>("[data-save-state]");
+  const count = document.querySelector<HTMLElement>("[data-count]");
+
+  if (desk && form && body) {
+    let timer = 0;
+    let saving = false;
+    let dirty = false;
+
+    const words = () => {
+      const t = body.value.trim();
+      if (count) count.textContent = `${t ? t.split(/\s+/).length : 0} words`;
+    };
+
+    async function save(): Promise<void> {
+      if (saving) return;
+      saving = true;
+      dirty = false;
+      if (state) state.textContent = "Saving…";
+      try {
+        const r = await fetch(location.pathname + location.search, {
+          method: "POST",
+          headers: { Accept: "application/json" },
+          body: new FormData(form!),
+        });
+        const answer = await r.json().catch(() => null);
+        if (state) {
+          state.textContent = r.ok
+            ? `Saved ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
+            : (answer?.detail ?? "Not saved");
+          state.classList.toggle("bad", !r.ok);
+        }
+        /* The rail is the progress readout; keep it honest as she types. */
+        if (r.ok) {
+          const here = document.querySelector(".rail-sign.on");
+          here?.classList.toggle("done", !!body!.value.trim());
+        }
+      } catch {
+        if (state) { state.textContent = "Not saved — offline?"; state.classList.add("bad"); }
+      } finally {
+        saving = false;
+        if (dirty) save();
+      }
+    }
+
+    body.addEventListener("input", () => {
+      words();
+      dirty = true;
+      if (state) { state.textContent = "Unsaved"; state.classList.remove("bad"); }
+      window.clearTimeout(timer);
+      /* Long enough not to fire mid-sentence, short enough that nothing is
+         ever more than a couple of seconds from disk. */
+      timer = window.setTimeout(save, 1500);
+    });
+
+    form.addEventListener("submit", (e) => {
+      /* Save in place rather than reloading and losing the caret. */
+      e.preventDefault();
+      window.clearTimeout(timer);
+      save();
+    });
+
+    /* Leaving with unsaved work is the one thing this must not allow quietly. */
+    window.addEventListener("beforeunload", (e) => {
+      if (dirty) e.preventDefault();   // enough on its own since 2021
+    });
+
+    /* Insert an event where the caret is. */
+    for (const button of document.querySelectorAll<HTMLElement>("[data-insert]")) {
+      button.addEventListener("click", () => {
+        const text = button.dataset.insert ?? "";
+        const at = body.selectionStart ?? body.value.length;
+        body.value = `${body.value.slice(0, at)}${text}${body.value.slice(at)}`;
+        body.focus();
+        body.selectionStart = body.selectionEnd = at + text.length;
+        body.dispatchEvent(new Event("input"));
+      });
+    }
+
+    /* She is talking while she does this; the keyboard has to work. Save
+       before moving, or switching sign would throw the last sentence away. */
+    document.addEventListener("keydown", async (e) => {
+      if (!(e.ctrlKey || e.metaKey)) return;
+      if (e.key === "s") { e.preventDefault(); window.clearTimeout(timer); await save(); return; }
+      if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+        e.preventDefault();
+        window.clearTimeout(timer);
+        if (dirty) await save();
+        const to = e.key === "ArrowLeft" ? desk.dataset.prev : desk.dataset.next;
+        if (to) location.href = to;
+      }
+    });
+  }
+</script>
+
 <style>
-  .authoring { display: grid; gap: var(--space-4); }
-  .head { display: flex; gap: var(--space-4); align-items: baseline; flex-wrap: wrap; }
-  .month { display: flex; gap: 8px; align-items: end; margin-left: auto; }
-  .month label { display: grid; gap: 4px; }
-  .lbl { font: 600 var(--text-micro) var(--font-body); letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; color: var(--ink-faint); }
-  .month input {
-    font: 400 var(--text-sm) var(--font-body); color: var(--ink); background: var(--surface-page);
-    border: var(--border-w) solid var(--line); border-radius: var(--radius-sm); padding: 8px 10px; min-height: 40px;
-  }
-  .why { font: 400 var(--text-sm) / 1.6 var(--font-body); color: var(--ink-soft); margin: 0; max-width: 70ch; }
-  .notice { font: 400 var(--text-sm) var(--font-body); color: var(--accent); margin: 0; }
-  .failed { font: 400 var(--text-sm) var(--font-body); color: var(--live); margin: 0; max-width: 70ch; }
+  .desk { display: grid; gap: var(--space-4); }
 
-  .signs { display: flex; gap: 4px; flex-wrap: wrap; }
-  .signs a {
-    display: inline-flex; gap: 6px; align-items: center; padding: 8px 12px;
-    border: var(--border-w) solid var(--line); border-radius: var(--radius-full);
-    text-decoration: none; font: 500 var(--text-sm) var(--font-body); color: var(--ink-soft);
-    min-height: 40px;
+  .desk-head {
+    display: flex; align-items: center; gap: var(--space-4); flex-wrap: wrap;
   }
-  .signs a:hover { border-color: var(--line-strong); color: var(--ink); }
-  .signs a[data-current] { background: var(--accent-wash); border-color: color-mix(in srgb, var(--accent) 50%, transparent); color: var(--accent); }
-  /* Unwritten signs are quiet, not hidden — the point is seeing what is left. */
-  .signs a[data-written] { opacity: 0.55; }
-  .signs .t-glyph { color: var(--rose); }
+  .period-pick { display: flex; gap: 6px; align-items: center; }
+  .period-pick .cov { width: 11ch; }
+  .ghost {
+    font: 500 var(--text-xs) var(--font-body); color: var(--ink-soft);
+    background: none; border: var(--border-w) solid var(--line);
+    border-radius: var(--radius-sm); padding: 8px 12px; cursor: pointer; min-height: 40px;
+  }
+  .step { display: flex; align-items: center; gap: 10px; }
+  .step a {
+    color: var(--ink-soft); text-decoration: none; font-size: 1.1rem;
+    padding: 4px 10px; border-radius: var(--radius-sm);
+  }
+  .step a:hover { background: var(--surface-veil); color: var(--ink); }
+  .step .label { font: 500 var(--text-sm) var(--font-body); color: var(--ink); }
+  .desk-side { margin-left: auto; display: flex; gap: var(--space-3); align-items: center; }
+  .publish {
+    font: 600 var(--text-xs) var(--font-body); color: var(--on-accent, #fff);
+    background: var(--accent); border: var(--border-w) solid var(--accent);
+    border-radius: var(--radius-sm); padding: 9px 14px; cursor: pointer; min-height: 40px;
+  }
+  .publish:disabled { background: var(--surface-inset); color: var(--ink-faint);
+    border-color: var(--line); cursor: not-allowed; }
 
-  .cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; align-items: start; }
-  @media (max-width: 960px) { .cols { grid-template-columns: 1fr; } }
-  .editor { display: grid; gap: 12px; }
-  .field { display: grid; gap: 4px; }
-  .editor textarea {
-    font: 400 var(--text-body) / var(--leading-body) var(--font-display);
-    color: var(--ink); background: var(--surface-card);
-    border: var(--border-w) solid var(--line); border-radius: var(--radius-sm);
-    padding: 12px 14px; width: 100%; box-sizing: border-box; resize: vertical;
+  .desk-body {
+    display: grid; gap: var(--space-4);
+    grid-template-columns: 168px minmax(280px, 340px) 1fr;
+    align-items: start;
   }
-  .actions, .publish { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
-  .hint { font: 400 var(--text-xs) var(--font-mono); color: var(--ink-faint); }
-  .preview {
-    border: var(--border-w) solid var(--line); border-radius: var(--radius-md);
-    background: var(--surface-card); padding: 20px 22px; display: grid; gap: 10px;
+  @media (max-width: 1100px) { .desk-body { grid-template-columns: 1fr; } }
+
+  /* ── the rail ── */
+  .rail { display: grid; gap: 2px; position: sticky; top: var(--space-4); }
+  .rail-sign {
+    display: grid; grid-template-columns: 22px 1fr 10px; align-items: center; gap: 8px;
+    padding: 7px 9px; border-radius: var(--radius-sm); text-decoration: none;
+    color: var(--ink-soft); font: 400 var(--text-sm) var(--font-body);
+    border: var(--border-w) solid transparent;
   }
-  .empty-preview { font: 400 var(--text-sm) / 1.7 var(--font-body); color: var(--ink-faint); margin: 0; }
-  .publish { border-top: var(--border-w) solid var(--line); padding-top: var(--space-4); }
+  .rail-sign .g { font-size: 1rem; }
+  .rail-sign:hover { background: var(--surface-veil); color: var(--ink); }
+  .rail-sign.on {
+    background: var(--surface-card); border-color: var(--line-strong);
+    color: var(--ink); font-weight: 600;
+  }
+  /* Written is a filled dot AND a weight change — never colour alone. */
+  .rail-sign .dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    border: var(--border-w) solid var(--line-strong);
+  }
+  .rail-sign.done .dot { background: var(--accent); border-color: var(--accent); }
+  .rail-sign.done .n { color: var(--ink); }
+
+  /* ── the sky ── */
+  .sky { display: grid; gap: var(--space-3); }
+  .events {
+    list-style: none; margin: 0; padding: 0; display: grid; gap: 1px;
+    max-height: 46vh; overflow-y: auto;
+  }
+  .ins {
+    display: grid; grid-template-columns: 9ch 1fr 3.5ch; gap: 8px; width: 100%;
+    text-align: left; background: none; border: 0; cursor: pointer;
+    padding: 5px 7px; border-radius: var(--radius-sm);
+    font: 400 var(--text-xs) var(--font-body); color: var(--ink-soft);
+  }
+  .ins:hover { background: var(--surface-veil); color: var(--ink); }
+  .ins:focus-visible { outline: 2px solid var(--focus-ring, var(--accent)); outline-offset: -2px; }
+  .ins .when { color: var(--ink-faint); font-variant-numeric: tabular-nums; }
+  .ins .hs { text-align: right; font-variant-numeric: tabular-nums; }
+  .hs.averse { color: var(--ink-faint); }
+  .k-eclipse .ins, .k-station .ins { font-weight: 600; color: var(--ink); }
+  .quiet { color: var(--ink-faint); font: 400 var(--text-xs) var(--font-body); padding: 6px; }
+
+  /* ── the column ── */
+  .column { display: grid; gap: 10px; }
+  .col-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+  .save-state { font: 400 var(--text-xs) var(--font-body); color: var(--ink-faint); }
+  .save-state.bad { color: var(--live); }
+  .editor { display: grid; gap: 10px; }
+  .editor textarea { min-height: 46vh; }
+  .col-foot { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
+  .save {
+    font: 500 var(--text-xs) var(--font-body); color: var(--ink);
+    background: var(--surface-card); border: var(--border-w) solid var(--line-strong);
+    border-radius: var(--radius-sm); padding: 9px 16px; cursor: pointer; min-height: 40px;
+  }
+  .count, .keys { font: 400 var(--text-xs) var(--font-body); color: var(--ink-faint); }
+  .keys { margin-left: auto; }
+  .preview { border-top: var(--border-w) solid var(--line); padding-top: 10px; }
+  .preview summary { cursor: pointer; }
+  .prose { font: 400 var(--text-body) / var(--leading-body) var(--font-display); color: var(--ink); }
 </style>

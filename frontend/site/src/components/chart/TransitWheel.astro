@@ -117,8 +117,15 @@ for (let pass = 0; pass < 40; pass++) {
   if (!moved) break;
 }
 
-const described = caption
-  ?? `Transit wheel${rotated ? `, ${rising} rising` : ""}, ${bodies.length} bodies`;
+/* The caption ADDS to the description, it does not replace it. Passing a
+   caption used to overwrite the accessible name entirely, so a wheel labelled
+   "2026-09-07 12:00 UT" announced a timestamp and nothing about what it was or
+   which way round it was read. */
+const described = [
+  `Transit wheel${rotated ? `, ${rising} rising` : ", unrotated"}`,
+  `${bodies.length} bodies`,
+  caption?.trim(),
+].filter(Boolean).join(". ");
 ---
 
 <figure class="wheel">
