@@ -142,7 +142,18 @@ event type in 1.3s.
    The validator is worth having either way: any table that goes in should be
    checked for five distinct planets per sign, every sign closing at 30, and
    the published per-planet totals.
-6. Stream overlay, then the embed.
+6. ~~Stream overlay~~ — **done.** `/overlay/wheel`, the seventh, sharing the
+   component rather than redrawing it. Transparent by default, key colour on
+   request, everything in the URL for an OBS scene.
+7. ~~Embed~~ — **done.** `/embed/wheel` with a copy-paste snippet on the tool.
+   `/embed/*` is the one path where `frame-ancestors` is opened; everything
+   else stays `'self'` and the admin `'none'`.
+8. ~~Exports~~ — **done.** CSV, Markdown and JSON off the event table, SVG and
+   PNG off the wheel.
+
+**Left, and worth doing next:** the horoscope URL shape
+(`/horoscopes/<sign>/<period>/<id>`), an oEmbed endpoint, per-sign feeds, and
+the OG image endpoint.
 
 ## Still open for her
 

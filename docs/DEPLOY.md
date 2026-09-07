@@ -52,6 +52,28 @@ dc --profile web --profile bot up -d --build
 dc exec -T backend alembic upgrade head
 ```
 
+### When the public CSP changes
+
+The **host** Caddy owns the public headers, and it does not read the repo. A
+change to `deploy/shrutivtuber.caddy` reaches nobody until it is copied and
+reloaded:
+
+```bash
+sudo diff -u /etc/caddy/Caddyfile.d/shrutivtuber.caddy deploy/shrutivtuber.caddy
+sudo cp deploy/shrutivtuber.caddy /etc/caddy/Caddyfile.d/shrutivtuber.caddy
+sudo systemctl reload caddy
+```
+
+**Diff first.** The live file has drifted from the repo before, and a copy is
+silent about what it overwrites.
+
+⚠ **Do not run `caddy validate` by hand here.** It loads the config without
+systemd's EnvironmentFile, so the Cloudflare token is empty and it fails with
+`API token '' appears invalid` — which looks exactly like a broken deploy and
+is not one. `systemctl reload` is the check that matters, and it does read the
+environment. The same trap as the reload-versus-restart note in
+`SERVER-ACCESS.md`, from the other side.
+
 `SHRUTI_SOURCE_SHA` is the licence, not a nicety. Every file here is AGPL-3.0,
 and section 13 says software people interact with over a network must offer
 them the source **of the build that answered them**. Export it and the footer
