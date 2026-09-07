@@ -130,7 +130,9 @@ const described = [
 
 <figure class="wheel">
   <svg viewBox="0 0 200 200" width={size} height={size}
-       role="img" aria-label={described}>
+       role="img" aria-label={described}
+       data-wheel data-rising={rotated ? String(risingIndex) : ""}
+       data-centre={R}>
     <g class="rings" fill="none" stroke="currentColor">
       <circle cx={R} cy={R} r="96" class="r-outer" />
       <circle cx={R} cy={R} r="80" class="r-sign" />
@@ -183,7 +185,11 @@ const described = [
     {/* The bodies. Each glyph sits on the spread angle; the leader line runs
         back to where the planet actually is, so a crowded stellium is legible
         without ever lying about a position. */}
-    <g class="bodies">
+    {/* Each body is one group, addressable by name, so a stepper can move it
+        without touching the rings — which never move while stepping, because
+        only the planets do. That is why this is server-rendered SVG with a
+        small script over it rather than a canvas redrawn from scratch. */}
+    <g class="bodies" data-bodies data-radii="74,68,62,52" data-min-separation={MIN_SEPARATION}>
       {placed.map((b) => {
         const [tx, ty] = point(b.at, 74);
         const [lx, ly] = point(b.shown, 68);
@@ -191,18 +197,22 @@ const described = [
         const [dx, dy] = point(b.shown, 52);
         const moved = Math.abs(((b.shown - b.at + 540) % 360) - 180) > 0.25;
         return (
-          <>
-            {moved && <line x1={f(tx)} y1={f(ty)} x2={f(lx)} y2={f(ly)} class="leader" />}
-            <circle cx={f(tx)} cy={f(ty)} r="0.9" class="true-mark" />
-            <text x={f(gx)} y={f(gy)} class:list={["body-glyph", b.retrograde && "rx"]}
+          <g data-body={b.name} data-longitude={f(b.longitude)}>
+            {/* A class, not `hidden`: SVG elements do not take the HTML
+                attribute, and the checker is right to refuse it. */}
+            <line x1={f(tx)} y1={f(ty)} x2={f(lx)} y2={f(ly)} data-leader
+                  class:list={["leader", !moved && "gone"]} />
+            <circle cx={f(tx)} cy={f(ty)} r="0.9" class="true-mark" data-mark />
+            <text x={f(gx)} y={f(gy)} data-glyph
+                  class:list={["body-glyph", b.retrograde && "rx"]}
                   text-anchor="middle" dominant-baseline="central">
               {BODY_GLYPH[b.name] ?? b.name.slice(0, 2)}
             </text>
-            <text x={f(dx)} y={f(dy)} class="body-degree"
+            <text x={f(dx)} y={f(dy)} class="body-degree" data-degree
                   text-anchor="middle" dominant-baseline="central">
               {Math.floor(b.degree)}°{b.retrograde ? "℞" : ""}
             </text>
-          </>
+          </g>
         );
       })}
     </g>
@@ -245,6 +255,7 @@ const described = [
   .body-degree { font-size: 4.5px; fill: var(--ink-faint); }
   .rx { fill: var(--rose); }
   .leader { stroke: currentColor; stroke-width: 0.2; opacity: 0.5; }
+  .leader.gone { display: none; }
   .true-mark { fill: currentColor; opacity: 0.6; stroke: none; }
 
   figcaption {

@@ -17,6 +17,7 @@
  */
 import ToolLayout from "../../layouts/ToolLayout.astro";
 import TransitWheel from "../../components/chart/TransitWheel.astro";
+import WheelStepper from "../../components/chart/WheelStepper.astro";
 import { askAstro } from "../../lib/api";
 import { copy } from "../../lib/copy";
 
@@ -225,11 +226,22 @@ const withParam = (key: string, value: string) => {
 
   {
     wheelBodies.length > 0 && (
-      <TransitWheel
-        bodies={wheelBodies}
-        rising={rising}
-        caption={`The sky at ${at.slice(0, 16).replace("T", " ")} UT${rising ? `, read from ${rising} rising` : ""}`}
-      />
+      <>
+        <TransitWheel
+          bodies={wheelBodies}
+          rising={rising}
+          caption={`The sky at ${at.slice(0, 16).replace("T", " ")} UT${rising ? `, read from ${rising} rising` : ""}`}
+        />
+        {/* Every event in the period is a place the wheel can jump to, which
+            is the difference between a chart and a thing you can read a week
+            from. */}
+        <WheelStepper
+          from={`${start}T00:00:00Z`}
+          to={`${endExclusive}T00:00:00Z`}
+          at={at}
+          marks={events.map((e) => ({ at: e.at, what: describe(e) }))}
+        />
+      </>
     )
   }
 

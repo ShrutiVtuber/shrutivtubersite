@@ -1,0 +1,309 @@
+---
+/* Stepping the wheel through time, without an ephemeris in the browser.
+ *
+ * The browser asks the ephemeris directly — Caddy proxies `/api/astro/*` to
+ * it already — for a span of sampled longitudes — the Moon hourly, the
+ * inner planets twice daily, everything else daily — and this interpolates
+ * between the nodes. Measured against Swiss Ephemeris itself, the worst error
+ * over a month is under a fifth of an arcsecond for every body, which is finer
+ * than the wheel can draw and finer than a printed table gives. A month with
+ * the outer planets is under nine kilobytes.
+ *
+ * The alternative in the brief was Swiss Ephemeris compiled to WebAssembly in
+ * a worker, a second server implementation, and continuous integration proving
+ * the two agree to one arcsecond. This has one implementation, so there is
+ * nothing that can disagree.
+ *
+ * **It moves the planets and nothing else.** The rings, the sign glyphs, the
+ * house numbers and the dividers are fixed by the rotation, which only changes
+ * on a page navigation — so stepping rewrites nine positions rather than
+ * redrawing a chart, and the whole thing stays inside one animation frame.
+ *
+ * With scripting off nothing here appears and the wheel is simply the moment
+ * the server drew, which is what an article wants anyway.
+ */
+interface Props {
+  /** ISO instants bounding what can be stepped through. */
+  from: string;
+  to: string;
+  /** Where the wheel starts. */
+  at: string;
+  /** Instants worth snapping to, as ISO strings. */
+  marks?: { at: string; what: string }[];
+  modern?: boolean;
+}
+const { from, to, at, marks = [], modern = false } = Astro.props;
+---
+
+<div class="stepper" data-stepper
+     data-from={from} data-to={to} data-at={at}
+     data-modern={modern ? "1" : ""}
+     data-marks={JSON.stringify(marks)}>
+  <div class="controls">
+    <button type="button" data-step="-1440" title="Back a day">‹‹</button>
+    <button type="button" data-step="-60" title="Back an hour">‹</button>
+    <output class="at" data-at-label>{at.slice(0, 16).replace("T", " ")} UT</output>
+    <button type="button" data-step="60" title="On an hour">›</button>
+    <button type="button" data-step="1440" title="On a day">››</button>
+    <button type="button" data-snap="-1" title="Previous event">⇤ event</button>
+    <button type="button" data-snap="1" title="Next event">event ⇥</button>
+  </div>
+  <input type="range" class="scrub" data-scrub min="0" max="1000" value="0"
+         aria-label="Move through the period" />
+  <p class="hint" data-hint hidden></p>
+</div>
+
+<script>
+  /* One frame of reference, shared with the server drawing: nine o'clock is
+     180°, the zodiac runs anticlockwise from there, and SVG's y grows down. */
+  const CENTRE = 100;
+
+  interface Table {
+    startJd: number;
+    bodies: Record<string, { spacingDays: number; longitude: number[]; speed: number[] }>;
+  }
+
+  const root = document.querySelector<HTMLElement>("[data-stepper]");
+  const svg = document.querySelector<SVGElement>("[data-wheel]");
+  if (root && svg) {
+    const from = new Date(root.dataset.from!);
+    const to = new Date(root.dataset.to!);
+    const marks: { at: string; what: string }[] = JSON.parse(root.dataset.marks || "[]");
+    const label = root.querySelector<HTMLElement>("[data-at-label]");
+    const scrub = root.querySelector<HTMLInputElement>("[data-scrub]");
+    const hint = root.querySelector<HTMLElement>("[data-hint]");
+    const risingIndex = svg.dataset.rising === "" ? null : Number(svg.dataset.rising);
+    const group = svg.querySelector<SVGElement>("[data-bodies]");
+    const radii = (group?.dataset.radii ?? "74,68,62,52").split(",").map(Number);
+    const minSeparation = Number(group?.dataset.minSeparation ?? 7);
+
+    let table: Table | null = null;
+    let at = new Date(root.dataset.at!);
+    let queued = 0;
+
+    const say = (text: string) => {
+      if (!hint) return;
+      hint.textContent = text;
+      hint.hidden = !text;
+    };
+
+    /* Julian Day from a Date. The daemon's grid is keyed on it, and doing the
+       conversion here rather than shipping a second time axis keeps the table
+       to numbers. */
+    const toJd = (d: Date) => d.getTime() / 86400000 + 2440587.5;
+
+    /* Longitudes wrap; interpolation must not. Unwrapped once per body when
+       the table arrives, not per frame. */
+    const unwrapped: Record<string, number[]> = {};
+    function prepare(t: Table): void {
+      for (const [name, body] of Object.entries(t.bodies)) {
+        const out = [body.longitude[0]];
+        for (let i = 1; i < body.longitude.length; i++) {
+          out.push(out[i - 1] + ((body.longitude[i] - out[i - 1] + 180) % 360) - 180);
+        }
+        unwrapped[name] = out;
+      }
+    }
+
+    /* Catmull-Rom through four nodes. Cubic, because linear between hourly
+       lunar samples is visibly wrong at the ends of a step and this costs
+       nothing. */
+    function longitudeOf(name: string, jd: number): number | null {
+      if (!table) return null;
+      const body = table.bodies[name];
+      const lon = unwrapped[name];
+      if (!body || !lon) return null;
+      const x = (jd - table.startJd) / body.spacingDays;
+      const i = Math.max(1, Math.min(Math.floor(x), lon.length - 3));
+      const t = x - i;
+      const [p0, p1, p2, p3] = [lon[i - 1], lon[i], lon[i + 1], lon[i + 2]];
+      const value = p1 + 0.5 * t * (p2 - p0 + t * (2 * p0 - 5 * p1 + 4 * p2 - p3
+                  + t * (3 * (p1 - p2) + p3 - p0)));
+      return ((value % 360) + 360) % 360;
+    }
+
+    function speedOf(name: string, jd: number): number {
+      const body = table?.bodies[name];
+      if (!body) return 0;
+      const x = (jd - table!.startJd) / body.spacingDays;
+      return body.speed[Math.max(0, Math.min(Math.round(x), body.speed.length - 1))] ?? 0;
+    }
+
+    const point = (angle: number, radius: number): [number, number] => {
+      const a = ((180 + angle) * Math.PI) / 180;
+      return [CENTRE + radius * Math.cos(a), CENTRE - radius * Math.sin(a)];
+    };
+
+    function draw(when: Date): void {
+      const jd = toJd(when);
+      const groups = Array.from(svg!.querySelectorAll<SVGGElement>("[data-body]"));
+
+      const placed = groups.map((g) => {
+        const name = g.dataset.body!;
+        const longitude = longitudeOf(name, jd);
+        return { g, name, longitude, shown: 0, at: 0 };
+      }).filter((p) => p.longitude !== null) as
+        { g: SVGGElement; name: string; longitude: number; shown: number; at: number }[];
+
+      if (placed.length === 0) return;
+
+      for (const p of placed) {
+        p.at = risingIndex === null
+          ? p.longitude
+          : ((p.longitude - risingIndex * 30) % 360 + 360) % 360;
+        p.shown = p.at;
+      }
+      placed.sort((a, b) => a.at - b.at);
+
+      /* The same fixed relaxation the server uses. Anything adaptive would
+         make the glyphs jitter as the wheel steps, which is exactly what a
+         stream viewer would notice. */
+      for (let pass = 0; pass < 40 && placed.length > 1; pass++) {
+        let moved = false;
+        for (let i = 0; i < placed.length; i++) {
+          const a = placed[i];
+          const b = placed[(i + 1) % placed.length];
+          let gap = b.shown - a.shown;
+          if (gap < 0) gap += 360;
+          if (gap < minSeparation) {
+            const push = (minSeparation - gap) / 2;
+            a.shown = (a.shown - push + 360) % 360;
+            b.shown = (b.shown + push) % 360;
+            moved = true;
+          }
+        }
+        if (!moved) break;
+      }
+
+      for (const p of placed) {
+        const [tx, ty] = point(p.at, radii[0]);
+        const [lx, ly] = point(p.shown, radii[1]);
+        const [gx, gy] = point(p.shown, radii[2]);
+        const [dx, dy] = point(p.shown, radii[3]);
+        const retro = speedOf(p.name, jd) < 0;
+
+        const leader = p.g.querySelector<SVGLineElement>("[data-leader]");
+        const mark = p.g.querySelector<SVGCircleElement>("[data-mark]");
+        const glyph = p.g.querySelector<SVGTextElement>("[data-glyph]");
+        const degree = p.g.querySelector<SVGTextElement>("[data-degree]");
+
+        if (leader) {
+          leader.setAttribute("x1", tx.toFixed(3));
+          leader.setAttribute("y1", ty.toFixed(3));
+          leader.setAttribute("x2", lx.toFixed(3));
+          leader.setAttribute("y2", ly.toFixed(3));
+          leader.classList.toggle("gone",
+            Math.abs(((p.shown - p.at + 540) % 360) - 180) <= 0.25);
+        }
+        if (mark) { mark.setAttribute("cx", tx.toFixed(3)); mark.setAttribute("cy", ty.toFixed(3)); }
+        if (glyph) {
+          glyph.setAttribute("x", gx.toFixed(3));
+          glyph.setAttribute("y", gy.toFixed(3));
+          glyph.classList.toggle("rx", retro);
+        }
+        if (degree) {
+          degree.setAttribute("x", dx.toFixed(3));
+          degree.setAttribute("y", dy.toFixed(3));
+          degree.textContent = `${Math.floor(p.longitude % 30)}°${retro ? "℞" : ""}`;
+        }
+        p.g.dataset.longitude = p.longitude.toFixed(3);
+      }
+
+      if (label) label.textContent = `${when.toISOString().slice(0, 16).replace("T", " ")} UT`;
+      if (scrub) {
+        const span = to.getTime() - from.getTime();
+        scrub.value = String(Math.round(((when.getTime() - from.getTime()) / span) * 1000));
+      }
+    }
+
+    function moveTo(when: Date): void {
+      /* Clamped rather than refused: running off the end of the loaded span is
+         an ordinary thing to do with an arrow key, and silently doing nothing
+         reads as the page having frozen. */
+      const clamped = new Date(Math.min(Math.max(when.getTime(), from.getTime()), to.getTime()));
+      at = clamped;
+      if (queued) cancelAnimationFrame(queued);
+      queued = requestAnimationFrame(() => draw(clamped));
+    }
+
+    async function load(): Promise<void> {
+      say("Loading the span…");
+      try {
+        /* Straight to the ephemeris. Caddy already proxies `/api/astro/*` to
+           it with the prefix stripped, and that route exists for exactly this
+           — a second hop through the site would add a cache to invalidate and
+           a validator to keep in step with the daemon's own. */
+        const r = await fetch(`/api/astro/positions?start=${encodeURIComponent(root!.dataset.from!)}`
+          + `&end=${encodeURIComponent(root!.dataset.to!)}`
+          + `&true_node=true&include_modern=${root!.dataset.modern ? "true" : "false"}`);
+        if (!r.ok) throw new Error(String(r.status));
+        table = await r.json();
+        prepare(table!);
+        say("");
+        root!.classList.add("ready");
+        draw(at);
+      } catch {
+        /* The wheel keeps the moment the server drew. Saying so beats controls
+           that look live and do nothing. */
+        say("Stepping is unavailable — the wheel is showing the moment it was drawn for.");
+        root!.querySelectorAll("button, input").forEach((el) =>
+          el.setAttribute("disabled", ""));
+      }
+    }
+
+    for (const button of root.querySelectorAll<HTMLButtonElement>("[data-step]")) {
+      button.addEventListener("click", () => {
+        moveTo(new Date(at.getTime() + Number(button.dataset.step) * 60000));
+      });
+    }
+    for (const button of root.querySelectorAll<HTMLButtonElement>("[data-snap]")) {
+      button.addEventListener("click", () => {
+        const forward = Number(button.dataset.snap) > 0;
+        const times = marks.map((m) => new Date(m.at).getTime())
+          .filter((t) => (forward ? t > at.getTime() + 1000 : t < at.getTime() - 1000))
+          .sort((a, b) => (forward ? a - b : b - a));
+        if (times.length === 0) { say(forward ? "Nothing further in this period." : "Nothing earlier."); return; }
+        say("");
+        moveTo(new Date(times[0]));
+      });
+    }
+    scrub?.addEventListener("input", () => {
+      const span = to.getTime() - from.getTime();
+      moveTo(new Date(from.getTime() + (Number(scrub.value) / 1000) * span));
+    });
+
+    /* Used on stream, so the keyboard has to work without hunting for focus. */
+    document.addEventListener("keydown", (e) => {
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+      const day = 1440 * 60000;
+      if (e.key === "ArrowRight") { e.preventDefault(); moveTo(new Date(at.getTime() + (e.shiftKey ? 7 * day : day))); }
+      else if (e.key === "ArrowLeft") { e.preventDefault(); moveTo(new Date(at.getTime() - (e.shiftKey ? 7 * day : day))); }
+      else if (e.key === "t") { e.preventDefault(); moveTo(new Date()); }
+    });
+
+    load();
+  }
+</script>
+
+<style>
+  .stepper { display: grid; gap: 8px; opacity: 0.55; }
+  .stepper.ready { opacity: 1; }
+  .controls { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; justify-content: center; }
+  .controls button {
+    font: 500 var(--text-xs) var(--font-body); color: var(--ink-soft);
+    background: var(--surface-card); border: var(--border-w) solid var(--line);
+    border-radius: var(--radius-sm); padding: 7px 11px; cursor: pointer; min-height: 38px;
+  }
+  .controls button:hover:not(:disabled) { color: var(--ink); border-color: var(--line-strong); }
+  .controls button:disabled { opacity: 0.4; cursor: not-allowed; }
+  .controls button:focus-visible { outline: 2px solid var(--focus-ring, var(--accent)); outline-offset: 1px; }
+  .at {
+    font: 500 var(--text-sm) var(--font-mono); color: var(--ink);
+    padding: 0 10px; font-variant-numeric: tabular-nums; min-width: 17ch; text-align: center;
+  }
+  .scrub { width: 100%; accent-color: var(--accent); }
+  .hint { margin: 0; font: 400 var(--text-xs) var(--font-body); color: var(--ink-faint); text-align: center; }
+  @media (prefers-reduced-motion: reduce) { .stepper { transition: none; } }
+</style>

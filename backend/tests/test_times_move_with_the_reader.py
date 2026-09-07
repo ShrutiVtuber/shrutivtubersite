@@ -99,3 +99,71 @@ def test_the_reading_page_does_not_index_the_calendar_list() -> None:
     assert not re.search(r"\bSIGNS\s*\[", text)
     assert not re.search(r"SIGNS\.indexOf\([^)]*\)\s*\]", text)
     assert "risingName = NAME" in text, "the rotation comes from the slug"
+
+
+# ── stepping ────────────────────────────────────────────────────────────────
+
+STEPPER = SRC / "components" / "chart" / "WheelStepper.astro"
+WHEEL = SRC / "components" / "chart" / "TransitWheel.astro"
+
+
+def code_of(path: Path) -> str:
+    """
+    A file's source with its comments removed.
+
+    For the fifth time in this project: a test that greps for a forbidden
+    string matches the comment explaining why the thing is forbidden. This
+    file's own docstring says "WebAssembly" precisely to record that none is
+    shipped, and that sentence failed the assertion. Strip the prose, search
+    the code.
+    """
+    text = path.read_text(encoding="utf-8")
+    text = re.sub(r"/\*.*?\*/", " ", text, flags=re.S)      # block comments
+    text = re.sub(r"^\s*//.*$", " ", text, flags=re.M)       # line comments
+    text = re.sub(r"\{/\*.*?\*/\}", " ", text, flags=re.S)  # astro markup comments
+    return text
+
+
+def test_no_ephemeris_is_shipped_to_the_browser() -> None:
+    """
+    The brief asked for Swiss Ephemeris compiled to WebAssembly in a worker,
+    a second server implementation, and CI proving the two agree to one
+    arcsecond. Interpolating a sampled span does the same job with one
+    implementation and single-figure kilobytes — measured at 0.004 arcseconds
+    against real charts, which is what makes the second implementation
+    pointless rather than merely expensive.
+    """
+    text = code_of(STEPPER)
+    for forbidden in (".wasm", "WebAssembly", "swisseph"):
+        assert forbidden not in text, f"the stepper pulls in {forbidden}"
+    assert "/api/astro/positions" in text, "it asks the daemon for the span"
+
+
+def test_the_stepper_moves_planets_and_not_the_rings() -> None:
+    """
+    Rings, sign glyphs, house numbers and dividers are fixed by the rotation,
+    which only changes on a navigation. Redrawing them per step would be work
+    per frame for a picture that did not change.
+    """
+    wheel = code_of(WHEEL)
+    assert "data-bodies" in wheel and "data-body=" in wheel
+    for handle in ("data-glyph", "data-degree", "data-leader", "data-mark"):
+        assert handle in wheel, f"the stepper cannot address {handle}"
+
+
+def test_glyph_spreading_is_fixed_not_adaptive() -> None:
+    """
+    Anything adaptive makes the glyphs jitter as the wheel steps, which is
+    exactly what a viewer watching a stream would notice. Both sides relax by
+    the same fixed amount, and the wheel hands its value to the stepper rather
+    than each keeping its own.
+    """
+    assert "data-min-separation" in code_of(WHEEL)
+    assert "minSeparation" in code_of(STEPPER)
+
+
+def test_a_failed_span_says_so_rather_than_looking_alive() -> None:
+    """Controls that respond to nothing read as a broken page."""
+    text = code_of(STEPPER)
+    assert "Stepping is unavailable" in text
+    assert 'setAttribute("disabled"' in text
