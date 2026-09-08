@@ -40,17 +40,26 @@ RUN pnpm --filter @shruti/site build
 # The package.json is not optional: without one npm walks UP looking for the
 # nearest manifest, finds the workspace root, and installs into /app instead —
 # leaving /app/runtime/node_modules absent and the COPY below failing.
+#
+# The result is folded into the site's own node_modules HERE rather than by a
+# second COPY in the runtime stage. Two COPYs into one directory looked fine
+# and built locally, then failed on the server: pnpm leaves a SYMLINK at
+# node_modules/@resvg/resvg-js, and overlaying a real directory onto it is
+# "cannot copy to non-directory". Whether the two orders collide depends on the
+# builder's snapshotter, which is exactly the kind of difference that passes at
+# home and stops a deploy.
 RUN mkdir -p /app/runtime \
  && echo '{"name":"site-runtime","private":true}' > /app/runtime/package.json \
  && cd /app/runtime \
  && npm install --omit=dev --no-package-lock --no-audit --no-fund \
-      @resvg/resvg-js@2.6.2
+      @resvg/resvg-js@2.6.2 \
+ && rm -rf /app/frontend/site/node_modules/@resvg \
+ && cp -R /app/runtime/node_modules/@resvg /app/frontend/site/node_modules/@resvg
 
 FROM base AS prod
 ENV NODE_ENV=production HOST=0.0.0.0 PORT=4321
 COPY --from=build /app/frontend/site/dist ./dist
 COPY --from=build /app/frontend/site/node_modules ./node_modules
-COPY --from=build /app/runtime/node_modules ./node_modules
 COPY --from=build /app/frontend/site/package.json ./package.json
 # The fonts the OG card is rasterised with. Not in public/ on purpose: these
 # are for the SERVER to draw with, and serving them to browsers would ship a
