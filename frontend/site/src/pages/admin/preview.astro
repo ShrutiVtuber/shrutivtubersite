@@ -51,6 +51,14 @@ const blocks = allSections
   .filter((b: any) => b.page === page)
   .sort((a: any, b: any) => (a.position ?? 0) - (b.position ?? 0));
 
+/* Every image, so a block can show the one it uses and offer the rest.
+ *
+ * The sections listing returns `media_id` and nothing else about the picture —
+ * it is the generic table route and does not join. One extra call here is
+ * cheaper than one per block, and the same list is what the picker offers. */
+const media: any[] = (await asAdmin(Astro, "/api/admin/media")).body ?? [];
+const byId = new Map<number, any>(media.map((m: any) => [m.id, m]));
+
 /* The fields of a block a person reads, in the order they render. */
 const BLOCK_FIELDS: [string, string, boolean][] = [
   ["eyebrow", "Eyebrow", false],
@@ -113,6 +121,42 @@ const changed = rows.filter((r) => r.changed).length;
                 </div>
               </div>
             ))}
+
+            {/* The picture. Every block can carry one, so the control is
+                always here — a block with no image needs the control MORE
+                than one that has it, because adding the first image is the
+                thing that was impossible from this screen. */}
+            <div class="pic" data-block={b.id} data-media={b.media_id ?? ""}>
+              <div class="head"><label>Image</label></div>
+              <div class="pic-row">
+                <div class="pic-thumb">
+                  {b.media_id && byId.get(b.media_id) ? (
+                    <img src={byId.get(b.media_id).url}
+                         alt={byId.get(b.media_id).altText || ""} />
+                  ) : (
+                    <span class="pic-none">none</span>
+                  )}
+                </div>
+                <div class="pic-do">
+                  <label class="pic-btn">
+                    Upload…
+                    <input type="file" accept="image/*" hidden />
+                  </label>
+                  <button type="button" class="pic-btn pic-pick">Choose…</button>
+                  {b.media_id && <button type="button" class="pic-btn pic-clear">Remove</button>}
+                </div>
+              </div>
+              {b.media_id && byId.get(b.media_id) && (
+                <input class="pic-alt" placeholder="Alt text — what the picture shows"
+                       value={byId.get(b.media_id).altText ?? ""}
+                       data-orig={byId.get(b.media_id).altText ?? ""}
+                       data-media={b.media_id} />
+              )}
+              <div class="foot">
+                <code>block · media_id</code>
+                <span class="state" aria-live="polite"></span>
+              </div>
+            </div>
           </section>
         ))}
 
@@ -142,6 +186,28 @@ const changed = rows.filter((r) => r.changed).length;
         )}
       </aside>
     </div>
+
+    {/* The library, opened by "Choose…" on any block. One dialog reused rather
+        than one per block: at a few hundred images the markup would otherwise
+        be repeated for every block on the page. */}
+    <dialog id="picker" class="picker">
+      <header class="picker-bar">
+        <input id="picker-q" type="search" placeholder="Search images…" />
+        <button type="button" id="picker-close">Close</button>
+      </header>
+      <div class="picker-grid" id="picker-grid">
+        {media.map((m: any) => (
+          <button type="button" class="picker-item" data-media={m.id}
+                  data-hay={`${m.title ?? ""} ${(m.tags ?? []).join(" ")} ${m.altText ?? ""}`.toLowerCase()}>
+            <img src={m.url} alt={m.altText || m.title || ""} loading="lazy" />
+            <span>{m.title || m.filename}</span>
+          </button>
+        ))}
+      </div>
+      {media.length === 0 && (
+        <p class="picker-empty">Nothing uploaded yet. Use Upload… on a block.</p>
+      )}
+    </dialog>
   </div>
 </AdminLayout>
 
@@ -245,8 +311,73 @@ const changed = rows.filter((r) => r.changed).length;
   function wireFrame() {
     const doc = frame.contentDocument;
     if (!doc) return;
+    /* Nothing in the preview navigates. Ever.
+     *
+     * This is an editor, and a link that works is a link that takes the frame
+     * somewhere else — which loses the panel's place, re-runs the reorder, and
+     * makes a button impossible to edit because clicking it leaves the page it
+     * belongs to. Her words: it should be possible to edit buttons and link
+     * content, and clicking them should not activate them.
+     *
+     * Prevented FIRST and unconditionally, before any attempt to match a
+     * field. The previous version only prevented the default once it had found
+     * a panel entry, so every link the panel did not know about — a nav item, a
+     * card, anything behind a condition — still navigated.
+     *
+     * This changes nothing about the real page. The handler lives in the admin
+     * document and is attached to the iframe's DOM from outside; a reader
+     * loading the same URL gets a page with no listener on it at all. */
+    const swallow = (ev: Event) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+    };
+    doc.addEventListener("submit", swallow, true);
+    /* Ctrl/middle-click opens a new tab without a click event of the usual
+       kind; auxclick is where that arrives. */
+    doc.addEventListener("auxclick", swallow, true);
+
     doc.body.addEventListener("click", (ev) => {
       const target = ev.target as HTMLElement;
+
+      /* An image is a block's picture, not a string. Clicking one should open
+         the control that changes it.
+         
+         The wrapper counts as the image. Every picture on this site is served
+         as a <picture> with avif and webp sources, and its box is larger than
+         the <img> inside it — so a click aimed at a photograph frequently
+         lands on the wrapper, where `closest("img")` finds nothing and the
+         whole thing silently does nothing at all. A <figure> is the same story
+         with a caption. */
+      const holder = target.closest?.("img,picture,figure") as HTMLElement | null;
+      const img = holder
+        ? (holder.tagName === "IMG" ? holder as HTMLImageElement
+                                    : holder.querySelector("img"))
+        : null;
+      if (img) {
+        ev.preventDefault();
+        const file = (img.currentSrc || img.src || "").split("/").pop() ?? "";
+        const pic = file
+          ? [...panel.querySelectorAll<HTMLElement>(".pic")].find((el) =>
+              (el.querySelector("img")?.getAttribute("src") ?? "").endsWith(file))
+          : null;
+        if (pic) {
+          pic.scrollIntoView({ block: "center", behavior: "smooth" });
+          pic.classList.add("lit");
+          setTimeout(() => pic.classList.remove("lit"), 1200);
+          hint.textContent = "";
+        } else {
+          hint.textContent = "That picture is not one of this page's blocks.";
+        }
+        return;
+      }
+
+      /* Anything that would take the frame somewhere is stopped whether or not
+         a field is found for it. */
+      if (target.closest?.("a,button,[role=button],label,summary")) {
+        ev.preventDefault();
+        ev.stopPropagation();
+      }
+
       const text = flat(target.textContent ?? "");
       if (!text) return;
       let match: HTMLElement | null = null;
@@ -261,8 +392,17 @@ const changed = rows.filter((r) => r.changed).length;
           if (d < bestLen) { bestLen = d; match = box; }
         }
       }
-      if (!match) return;
+      if (!match) {
+        /* Say so. Silence here reads as a broken editor — the click did stop
+           the link, so something clearly happened, and nothing moved. */
+        if (target.closest?.("a,button")) {
+          hint.textContent = "That one is not editable from this panel — "
+            + "try Blocks on this page.";
+        }
+        return;
+      }
       ev.preventDefault();
+      hint.textContent = "";
       match.scrollIntoView({ block: "center", behavior: "smooth" });
       match.querySelector<HTMLElement>("input,textarea")?.focus();
     }, true);
@@ -339,6 +479,17 @@ const changed = rows.filter((r) => r.changed).length;
                         .sort((a, b) => offsets.get(a)! - offsets.get(b)!);
     const elsewhere = items.filter((i) => offsets.get(i)! === Infinity);
 
+    /* Clear the previous run's heading before writing this one.
+     *
+     * This runs on every `load` of the iframe, and it used to only ever ADD.
+     * One reorder per page-change would have been survivable; what made it
+     * visible was that clicking a link in the preview navigated the frame,
+     * which fired `load`, which stacked another heading — so the panel filled
+     * with "6 not visible…", "32 not visible…", "6 not visible…" and the
+     * counts differed because they were counted against different pages. The
+     * navigation is prevented now as well; this is the other half. */
+    for (const stale of panel.querySelectorAll(".not-here")) stale.remove();
+
     for (const i of onPage) panel.appendChild(i);
     if (elsewhere.length) {
       const h = document.createElement("p");
@@ -349,6 +500,218 @@ const changed = rows.filter((r) => r.changed).length;
     }
   }
   frame.addEventListener("load", reorderByPage);
+
+  /* ── does the picture actually appear? ─────────────────────────────────
+   *
+   * A block can carry a `media_id` that its page has nowhere to render. Not
+   * every template shows a block's image — the home page passes its blocks to
+   * SupportBand, which has no picture in it at all — so the image can be set,
+   * saved, and never seen.
+   *
+   * That is the same complaint as "the areas to edit don't match what is on
+   * the page", and the answer is the same one: say so. Silence here means she
+   * uploads a picture, sees nothing change, and has no way to tell whether
+   * the upload failed, the page is cached, or the template simply does not
+   * have a place for it. */
+  function checkPicturesShow() {
+    const doc = frame.contentDocument;
+    if (!doc) return;
+    const shown = [...doc.querySelectorAll("img")]
+      .map((i) => (i.getAttribute("src") ?? "").split("/").pop() ?? "")
+      .filter(Boolean);
+
+    for (const pic of panel.querySelectorAll<HTMLElement>(".pic")) {
+      pic.querySelector(".pic-unused")?.remove();
+      const src = pic.querySelector("img")?.getAttribute("src") ?? "";
+      if (!src) continue;
+      const file = src.split("/").pop() ?? "";
+      if (file && shown.includes(file)) continue;
+      const note = document.createElement("p");
+      note.className = "pic-unused";
+      note.textContent = "Saved, but this page does not show a block image here.";
+      pic.querySelector(".foot")!.before(note);
+    }
+  }
+  frame.addEventListener("load", checkPicturesShow);
+
+  /* ── pictures ─────────────────────────────────────────────────────────
+   *
+   * Adding or changing a block's image was the one thing this screen could not
+   * do: the panel edited four text fields and `media_id` was not among them,
+   * so the only route to a picture was the Media screen and then the Blocks
+   * screen, with the page you were editing nowhere in sight.
+   *
+   * Two writes are involved and they go to different places — the FILE is a
+   * media row, the CHOICE is a field on the block — so an upload is a POST to
+   * /media followed by a PATCH of the section. Alt text belongs to the image
+   * rather than to the block, because the same picture used twice describes
+   * itself the same way both times.
+   */
+  const picker = document.getElementById("picker") as HTMLDialogElement | null;
+  let pickingFor: HTMLElement | null = null;
+
+  /** Redraw one block's thumbnail after its image changes. */
+  function showPicture(pic: HTMLElement, m: any | null) {
+    const thumb = pic.querySelector<HTMLElement>(".pic-thumb")!;
+    thumb.innerHTML = "";
+    if (m) {
+      const img = document.createElement("img");
+      img.src = m.url;
+      img.alt = m.altText || "";
+      thumb.appendChild(img);
+    } else {
+      const none = document.createElement("span");
+      none.className = "pic-none";
+      none.textContent = "none";
+      thumb.appendChild(none);
+    }
+    pic.dataset.media = m ? String(m.id) : "";
+
+    /* The alt field belongs to whichever image is there now. */
+    pic.querySelector(".pic-alt")?.remove();
+    if (m) {
+      const alt = document.createElement("input");
+      alt.className = "pic-alt";
+      alt.placeholder = "Alt text — what the picture shows";
+      alt.value = m.altText ?? "";
+      alt.dataset.orig = m.altText ?? "";
+      alt.dataset.media = String(m.id);
+      pic.querySelector(".foot")!.before(alt);
+    }
+
+    const doRow = pic.querySelector<HTMLElement>(".pic-do")!;
+    const clear = doRow.querySelector(".pic-clear");
+    if (m && !clear) {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "pic-btn pic-clear";
+      b.textContent = "Remove";
+      doRow.appendChild(b);
+    } else if (!m && clear) {
+      clear.remove();
+    }
+  }
+
+  /** Point a block at an image, or at none. Returns false if it did not save. */
+  async function setPicture(pic: HTMLElement, m: any | null): Promise<boolean> {
+    const state = pic.querySelector<HTMLElement>(".state")!;
+    state.textContent = "saving…";
+    try {
+      const r = await fetch(`/api/admin/sections/${pic.dataset.block}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ media_id: m ? m.id : null }),
+      });
+      if (!r.ok) throw new Error(String(r.status));
+      showPicture(pic, m);
+      state.textContent = "saved";
+      /* The page has to be re-fetched to show it — the change is on the
+         server, and the frame is holding the old render. The load handler
+         then reports whether it actually appears anywhere. */
+      frame.contentWindow?.location.reload();
+      setTimeout(() => (state.textContent = ""), 1500);
+      return true;
+    } catch (err) {
+      state.textContent = `did not save (${err instanceof Error ? err.message : "error"})`;
+      return false;
+    }
+  }
+
+  for (const pic of panel.querySelectorAll<HTMLElement>(".pic")) {
+    /* Upload. The file goes up first; only if that succeeds is the block
+       pointed at it, so a failed upload never leaves a block referring to a
+       row that does not exist. */
+    pic.querySelector<HTMLInputElement>('input[type=file]')!
+      .addEventListener("change", async (ev) => {
+        const input = ev.target as HTMLInputElement;
+        const file = input.files?.[0];
+        if (!file) return;
+        const state = pic.querySelector<HTMLElement>(".state")!;
+        state.textContent = "uploading…";
+        try {
+          const form = new FormData();
+          form.append("file", file);
+          /* Named from the filename so the library is searchable straight
+             away; she can rename it on the Media screen. */
+          form.append("title", file.name.replace(/\.[^.]+$/, ""));
+          const up = await fetch("/api/admin/media", { method: "POST", body: form });
+          if (!up.ok) {
+            /* 415 is the one worth spelling out: it is a real answer, not a
+               fault, and it names the formats that would work. */
+            const why = up.status === 415
+              ? "that file type is not allowed"
+              : `upload failed (${up.status})`;
+            throw new Error(why);
+          }
+          await setPicture(pic, await up.json());
+        } catch (err) {
+          state.textContent = err instanceof Error ? err.message : "upload failed";
+        } finally {
+          input.value = "";
+        }
+      });
+
+    pic.querySelector(".pic-pick")?.addEventListener("click", () => {
+      pickingFor = pic;
+      picker?.showModal();
+      (document.getElementById("picker-q") as HTMLInputElement | null)?.focus();
+    });
+
+    /* Delegated, because the Remove button is created and destroyed as the
+       picture changes. */
+    pic.addEventListener("click", (ev) => {
+      const t = ev.target as HTMLElement;
+      if (!t.classList.contains("pic-clear")) return;
+      setPicture(pic, null);
+    });
+
+    /* Alt text saves to the IMAGE, not the block. Delegated for the same
+       reason: the field comes and goes with the picture. */
+    pic.addEventListener("blur", async (ev) => {
+      const t = ev.target as HTMLInputElement;
+      if (!t.classList.contains("pic-alt")) return;
+      if (t.value === t.dataset.orig) return;
+      const state = pic.querySelector<HTMLElement>(".state")!;
+      state.textContent = "saving…";
+      try {
+        const r = await fetch(`/api/admin/media/${t.dataset.media}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ alt_text: t.value }),
+        });
+        if (!r.ok) throw new Error(String(r.status));
+        t.dataset.orig = t.value;
+        state.textContent = "saved";
+        setTimeout(() => (state.textContent = ""), 1500);
+      } catch (err) {
+        state.textContent = `did not save (${err instanceof Error ? err.message : "error"})`;
+      }
+    }, true);
+  }
+
+  /* The library. */
+  document.getElementById("picker-close")?.addEventListener("click", () => picker?.close());
+  picker?.addEventListener("click", (ev) => {
+    /* Clicking the backdrop closes it — the dialog element reports those as
+       clicks on itself rather than on any child. */
+    if (ev.target === picker) picker.close();
+  });
+  document.getElementById("picker-q")?.addEventListener("input", (ev) => {
+    const q = (ev.target as HTMLInputElement).value.trim().toLowerCase();
+    for (const item of document.querySelectorAll<HTMLElement>(".picker-item")) {
+      item.hidden = q !== "" && !(item.dataset.hay ?? "").includes(q);
+    }
+  });
+  document.getElementById("picker-grid")?.addEventListener("click", async (ev) => {
+    const item = (ev.target as HTMLElement).closest<HTMLElement>(".picker-item");
+    if (!item || !pickingFor) return;
+    picker?.close();
+    const id = Number(item.dataset.media);
+    const r = await fetch("/api/admin/media");
+    const all: any[] = r.ok ? await r.json() : [];
+    await setPicture(pickingFor, all.find((m) => m.id === id) ?? null);
+    pickingFor = null;
+  });
 
   /* ── panel → page, and saving ─────────────────────────────────────────── */
   for (const box of panel.querySelectorAll<HTMLElement>(".str")) {
@@ -488,6 +851,109 @@ const changed = rows.filter((r) => r.changed).length;
     background: var(--surface-page); color: var(--ink);
   }
   .str textarea { line-height: 1.55; resize: vertical; }
+
+  /* ── the picture control ─────────────────────────────────────────────── */
+  .pic {
+    border: var(--border-w) solid var(--line);
+    border-radius: var(--radius-sm);
+    padding: 10px;
+    display: grid;
+    gap: 8px;
+    background: var(--surface-card);
+  }
+  .pic.lit { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-wash); }
+  .pic-row { display: flex; gap: 10px; align-items: flex-start; }
+  .pic-thumb {
+    width: 84px; height: 84px; flex: none;
+    border: var(--border-w) solid var(--line);
+    border-radius: var(--radius-sm);
+    background: var(--surface-inset);
+    display: grid; place-items: center; overflow: hidden;
+  }
+  .pic-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .pic-none {
+    font: 400 var(--text-micro) var(--font-body);
+    color: var(--ink-faint); text-transform: uppercase;
+    letter-spacing: var(--tracking-eyebrow);
+  }
+  .pic-do { display: flex; flex-wrap: wrap; gap: 6px; }
+  .pic-btn {
+    font: 500 var(--text-xs) var(--font-body);
+    color: var(--ink-soft);
+    background: var(--surface-page);
+    border: var(--border-w) solid var(--line);
+    border-radius: var(--radius-sm);
+    padding: 6px 10px; min-height: 32px; cursor: pointer;
+  }
+  .pic-btn:hover { color: var(--accent); border-color: var(--accent); }
+  .pic-unused {
+    font: 400 var(--text-xs) var(--font-body);
+    color: var(--ink-faint);
+    margin: 0;
+    padding: 6px 8px;
+    border-left: 2px solid var(--line-strong);
+    background: var(--surface-inset);
+    border-radius: var(--radius-sm);
+  }
+  .pic-alt {
+    font: 400 var(--text-sm) var(--font-body);
+    color: var(--ink); background: var(--surface-page);
+    border: var(--border-w) solid var(--line);
+    border-radius: var(--radius-sm);
+    padding: 7px 9px; width: 100%; box-sizing: border-box;
+  }
+
+  /* ── the library ─────────────────────────────────────────────────────── */
+  .picker {
+    border: var(--border-w) solid var(--line);
+    border-radius: var(--radius-md);
+    background: var(--surface-card);
+    color: var(--ink);
+    width: min(880px, 92vw);
+    max-height: 82vh;
+    padding: 0;
+  }
+  .picker::backdrop { background: rgb(0 0 0 / 0.55); }
+  .picker-bar {
+    display: flex; gap: 8px; padding: 12px;
+    border-bottom: var(--border-w) solid var(--line);
+    position: sticky; top: 0; background: var(--surface-card); z-index: 1;
+  }
+  .picker-bar input {
+    flex: 1; font: 400 var(--text-sm) var(--font-body);
+    color: var(--ink); background: var(--surface-page);
+    border: var(--border-w) solid var(--line);
+    border-radius: var(--radius-sm); padding: 8px 10px; min-height: 38px;
+  }
+  .picker-bar button {
+    font: 500 var(--text-xs) var(--font-body); color: var(--ink-soft);
+    background: none; border: var(--border-w) solid var(--line);
+    border-radius: var(--radius-sm); padding: 8px 12px; cursor: pointer;
+  }
+  .picker-grid {
+    display: grid; gap: 10px; padding: 12px;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    overflow: auto;
+  }
+  .picker-item {
+    display: grid; gap: 6px; padding: 6px; cursor: pointer; text-align: left;
+    background: var(--surface-page);
+    border: var(--border-w) solid var(--line);
+    border-radius: var(--radius-sm);
+  }
+  .picker-item:hover { border-color: var(--accent); }
+  .picker-item img {
+    width: 100%; aspect-ratio: 1; object-fit: cover;
+    border-radius: var(--radius-sm); display: block;
+  }
+  .picker-item span {
+    font: 400 var(--text-micro) var(--font-body); color: var(--ink-soft);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .picker-empty {
+    font: 400 var(--text-sm) var(--font-body); color: var(--ink-soft);
+    padding: 24px; margin: 0; text-align: center;
+  }
 
   .foot { display: flex; align-items: baseline; gap: 8px; }
   .foot code { font: 400 10px var(--font-mono); color: var(--ink-faint); }
