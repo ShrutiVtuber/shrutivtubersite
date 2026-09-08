@@ -129,9 +129,26 @@ ever looks subtly wrong, check those three before anything else.
 are under `dependencies`, not `devDependencies`. The runtime only needs the one
 native module, installed on its own — see the comment in the Dockerfile.
 
-## Not deployed
+## Deployed
 
-All of the above is committed on `main` locally and verified against the local
-stack. **It has not been pushed or deployed** — production still runs the
-previous code behind the holding page. Deploy with the block above when she
-says so; `alembic upgrade head` is required (one migration, `e9b3c05a7d14`).
+Live on 2026-09-09 at `e86f1a8`, migration `e9b3c05a7d14` applied. The site
+reports its own commit in the footer, which is the quickest way to tell whether
+a fix has actually shipped — three rounds of "it still does it" turned out to
+be production running code from before the fix.
+
+### The feeds and cards are behind the holding gate
+
+`PASS_THROUGH` in `frontend/site/src/middleware.ts` lists what the holding page
+must not swallow — assets, `/api`, `/overlay/`, `robots.txt`, `sitemap.xml`.
+The three NEW public surfaces are not on it, so while the holding page is up
+they answer 200 `text/html` with the holding page:
+
+    /horoscopes/<sign>/feed.xml
+    /oembed.json
+    /horoscopes/<sign>/<period>/<covers>/og.png
+
+That is the safe default and is correct while the site is held — nothing leaks.
+It also means the share cards do nothing until she goes live, and a feed reader
+pointed at one now would store an HTML page. Decide when the holding page comes
+down: either add them to `PASS_THROUGH`, or leave them and let them start
+working with everything else. Nothing needs doing if the latter.
