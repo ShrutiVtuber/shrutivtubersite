@@ -52,6 +52,29 @@ dc --profile web --profile bot up -d --build
 dc exec -T backend alembic upgrade head
 ```
 
+### Register new strings
+
+A `say("key", "default")` renders on its own — the default is right there — but
+it does not appear in the admin until the database knows the key exists. The
+panel lists rows, not templates. Forget this and the words are on the site and
+uneditable, which is exactly how 61 of them sat for weeks.
+
+Reading the templates needs no authority, so the extraction and the write are
+split and neither one needs a password:
+
+```bash
+cd /srv/shrutivtuber/prod
+docker run --rm -v "$PWD:/repo:ro" -w /repo node:22-alpine \
+  node scripts/seed-copy.mjs --json > /tmp/copy.json
+dc exec -T backend python scripts/seed_copy.py < /tmp/copy.json
+rm /tmp/copy.json
+```
+
+Safe to repeat. **Nothing she has written is overwritten**: a row still holding
+its old default follows the template, and the moment it differs it is hers and
+is left alone.
+```
+
 ### When the public CSP changes
 
 The **host** Caddy owns the public headers, and it does not read the repo. A
