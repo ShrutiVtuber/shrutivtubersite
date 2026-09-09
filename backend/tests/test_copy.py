@@ -395,10 +395,23 @@ def test_markdown_is_normalised_on_both_sides_before_matching() -> None:
     The page shows rendered markdown; a block stores the source. Comparing
     "**Shruti** — Shruti Swara" against "Shruti — Shruti Swara" fails on the
     asterisks alone.
+
+    Whitespace collapsing is not enough on its own. A string routed through
+    <Copy> is stored as markdown and RENDERED as several nodes — a <strong>
+    and the text either side of it — so the markers have to come off the
+    stored value before it is compared, and the comparison has to be able to
+    look at a whole element rather than a single text node. Nineteen
+    paragraphs were made editable and became invisible to the panel in the
+    same commit for want of exactly this.
     """
     prev = code_of(SRC / "pages" / "admin" / "preview.astro")
     assert "const plain" in prev
-    assert "plain(t.data)" in prev and "plain(value)" in prev
+    assert "plain(t.data)" in prev
+    assert "const spoken" in prev, "markdown markers must come off the value"
+    assert "plain(spoken(value))" in prev
+    assert "el.textContent" in prev, (
+        "a <Copy> sentence spans children, so whole elements have to be tried"
+    )
 
 
 def test_the_copy_helper_never_appears_inside_a_client_script() -> None:
@@ -501,4 +514,138 @@ def test_no_prose_is_stranded_around_inline_markup() -> None:
         "prose stranded beside inline markup — wrap the whole sentence in "
         "<Copy text={say(...)} /> with the emphasis as markdown:\n  "
         + "\n  ".join(offenders[:8])
+    )
+
+
+def test_every_visible_string_is_editable() -> None:
+    """
+    The sweep that should have existed three rounds ago.
+
+    Each earlier check named the element types it looked at — first leaf
+    elements only, then p/li/h*. Naming them is guessing, and the guess was
+    wrong every time: an <option> label, a legend inside a <span>, a sentence
+    in a <blockquote>. She found each of those, one screenshot at a time.
+
+    So this names nothing. It removes the frontmatter, the client scripts, the
+    styles, the comments and every JSX expression — `say(...)` calls included,
+    since those ARE editable — and whatever text survives is text a reader sees
+    and nobody can change.
+
+    ⚠ The frontmatter fence is `---` AT THE START OF A LINE. Searching for the
+    bare string cuts at the first horizontal rule inside a doc comment and then
+    reports that comment's prose as visible, which sent this hunting three
+    strings no reader will ever see.
+    """
+    import re as _re
+
+    def strip_expressions(text: str) -> str:
+        """
+        Remove JSX expressions, ignoring braces inside string literals.
+
+        A `say("…", "… {sign} …")` default carries braces of its own, and
+        counting those as expression delimiters unbalances everything after
+        them — which reported five fragments of perfectly editable sentences
+        as uneditable text.
+        """
+        out, depth, quote = [], 0, ""
+        prev = ""
+        for ch in text:
+            if quote:
+                if ch == quote and prev != "\\":
+                    quote = ""
+            # Quotes only delimit a string INSIDE an expression. At depth zero
+            # an apostrophe is prose — "don't" — and treating it as an opening
+            # quote swallows everything up to the next one, braces included,
+            # which desynchronises the rest of the file and reports fragments
+            # of perfectly editable sentences as uneditable.
+            elif depth > 0 and ch in "\"'`":
+                quote = ch
+            elif ch == "{":
+                depth += 1
+            elif ch == "}":
+                depth = max(0, depth - 1)
+            elif depth == 0:
+                out.append(ch)
+            prev = ch
+        return "".join(out)
+
+    prose = _re.compile(r"[a-z]{3}")
+    junk = _re.compile(r"^(&[a-z]+;|[\s·—–|/,.:;()\[\]{}<>+\-*&%$#@!?\"'`~^=]*)$")
+
+    offenders: list[str] = []
+    for f in sorted(SRC.rglob("*.astro")):
+        # The admin is hers to read, not her audience's.
+        if "/admin/" in str(f) or "/overlay/" in str(f) or f.name == "AdminLayout.astro":
+            continue
+        text = f.read_text(encoding="utf-8")
+        if text.startswith("---"):
+            fence = _re.search(r"^---\s*$", text[3:], _re.M)
+            if fence:
+                text = text[3 + fence.end():]
+        text = _re.sub(r"<script[\s>].*?</script>", " ", text, flags=_re.S | _re.I)
+        text = _re.sub(r"<style[\s>].*?</style>", " ", text, flags=_re.S | _re.I)
+        text = _re.sub(r"\{/\*.*?\*/\}", " ", text, flags=_re.S)
+        text = strip_expressions(text)
+        text = _re.sub(r"<[^>]*>", "\x00", text)
+        for run in text.split("\x00"):
+            run = _re.sub(r"\s+", " ", run).strip()
+            if len(run) < 3 or junk.match(run) or not prose.search(run):
+                continue
+            offenders.append(f"{f.relative_to(SRC)}: {run[:60]!r}")
+
+    assert not offenders, (
+        f"{len(offenders)} strings a reader sees and nobody can edit — route "
+        "each through say(), or through <Copy> if it sits beside inline "
+        "markup:\n  " + "\n  ".join(offenders[:12])
+    )
+
+
+def test_the_helper_is_never_inside_a_template_literal() -> None:
+    """
+    `{say(...)}` inside a JavaScript template literal is four characters and a
+    function name, not a call.
+
+    Two pages were shipping it verbatim: /tools built a paragraph as a string
+    for `<Prose html=...>`, and /tools/events showed an embed snippet in a
+    textarea. Both rendered the literal text of the call to a reader, and
+    neither the build nor a typecheck says a word.
+
+    ⚠ Backticks are NOT paired off globally. A regex character class holding a
+    backtick, or a say() default quoting one, leaves an odd count — and the
+    first version of this test skipped any such file rather than guess. That
+    was worse than guessing: /tools/index.astro is one of those files, so the
+    check was inert on the very page the bug was found. It went green against
+    a deliberately reintroduced fault.
+
+    Instead: find each place an expression OPENS with a template literal —
+    `={`` or `>{`` — and scan forward to that literal's own closing backtick.
+    Starting from a known opening needs no pairing at all.
+    """
+    import re as _re
+
+    offenders: list[str] = []
+    for f in sorted(SRC.rglob("*.astro")):
+        text = _re.sub(r"\{/\*.*?\*/\}", " ",
+                       f.read_text(encoding="utf-8"), flags=_re.S)
+        text = _re.sub(r"/\*.*?\*/", " ", text, flags=_re.S)
+        text = _re.sub(r"(?m)^\s*//.*$", " ", text)
+
+        for opening in _re.finditer(r"[=>]\s*\{\s*`", text):
+            i = opening.end()
+            # Forward to this literal's closing backtick, honouring escapes.
+            j = i
+            while j < len(text):
+                if text[j] == "\\":
+                    j += 2
+                    continue
+                if text[j] == "`":
+                    break
+                j += 1
+            body = text[i:j]
+            if _re.search(r"(?<!\$)\{\s*say\(", body):
+                offenders.append(f"{f.relative_to(SRC)}: {body[:70]!r}")
+
+    assert not offenders, (
+        "the copy helper is inside a template literal and will render as its "
+        "own source; use ${say(...)}:\n  " + "\n  ".join(offenders[:6])
     )

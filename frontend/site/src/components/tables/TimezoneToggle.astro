@@ -1,4 +1,10 @@
 ---
+import { copy } from "../../lib/copy";
+
+/* Every word here, editable from the admin. The defaults below are what
+   it was written with and what still renders if nothing was changed. */
+const say = await copy("component:TimezoneToggle");
+
 /* Ported from `components/tables/TimezoneToggle.jsx`; contract in
  * `TimezoneToggle.d.ts`.
  *
@@ -10,13 +16,12 @@
 interface Props { value?: "local" | "athens"; }
 const { value = "athens" } = Astro.props;
 ---
-
 <div class="sh-tz" role="group" aria-label="Timezone" data-tz-toggle>
   <button type="button" aria-pressed={value === "local"} data-tz="local">
-    Your time <span class="sh-tz-zone" data-tz-zone></span>
+    {say("text.20", "Your time")} <span class="sh-tz-zone" data-tz-zone></span>
   </button>
   <button type="button" aria-pressed={value === "athens"} data-tz="athens">
-    Athens <span class="sh-tz-zone">GMT+3</span>
+    {say("text.21", "Athens")} <span class="sh-tz-zone">GMT+3</span>
   </button>
 </div>
 

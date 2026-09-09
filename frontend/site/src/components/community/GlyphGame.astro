@@ -43,7 +43,7 @@ const say = await copy("component:GlyphGame");
     <button type="button" class="g-go" data-start
             data-track="game:played" data-track-tool="glyph-game">{say("text.3", "Start")}</button>
     <span class="g-score">
-      Streak <strong data-streak>0</strong> · best <strong data-best>0</strong>
+      {say("text.20", "Streak")} <strong data-streak>0</strong> · {say("text.21", "best")} <strong data-best>0</strong>
     </span>
   </div>
 

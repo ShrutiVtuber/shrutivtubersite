@@ -1,4 +1,10 @@
 ---
+import { copy } from "../../lib/copy";
+
+/* Every word here, editable from the admin. The defaults below are what
+   it was written with and what still renders if nothing was changed. */
+const say = await copy("component:FanArtCard");
+
 /* Ported from `components/cards/FanArtCard.jsx`; contract in
  * `FanArtCard.d.ts`.
  *
@@ -17,7 +23,6 @@ interface Props {
 }
 const { image, title, artist, artistHref, platform } = Astro.props;
 ---
-
 <figure class="sh-fan">
   {
     image ? (
@@ -31,7 +36,7 @@ const { image, title, artist, artistHref, platform } = Astro.props;
     )
   }
   <figcaption class="sh-fan-credit">
-    <span class="sh-fan-by">art by</span>
+    <span class="sh-fan-by">{say("text.20", "art by")}</span>
     {
       artistHref
         ? <a class="sh-fan-artist" href={artistHref}>{artist}</a>

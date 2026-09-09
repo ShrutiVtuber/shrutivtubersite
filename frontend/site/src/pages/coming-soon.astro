@@ -199,7 +199,7 @@ const consentSent =
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>{say("text.1", "Shruti — instruments for magick")}</title>
-<meta name="description" content="Instruments for magick — an ephemeris, four calendars, planetary hours and letter-reckoning. The site is being built; the sky is not waiting." />
+<meta name="description" content={say("text.31", "Instruments for magick — an ephemeris, four calendars, planetary hours and letter-reckoning. The site is being built; the sky is not waiting.")} />
 {/* Stays until the full site launches — handoff §4. */}
 <meta name="robots" content="noindex" />
 <meta property="og:title" content={say("text.11", "Shruti — instruments for magick")} />
@@ -222,12 +222,12 @@ const consentSent =
 <div class="panel veil">
 <div style="display:grid;gap:12px">
 <p class="eyebrow">{say("text.2", "shrutivtuber.com · in construction")}</p>
-<h1>The site is being built.<br />{say("text.3", "The sky is not waiting.")}</h1>
+<h1>{say("text.32", "The site is being built.")}<br />{say("text.3", "The sky is not waiting.")}</h1>
 <p class="lede">{say("text.4", "Instruments for magick — an ephemeris, four calendars, planetary hours, letter-reckoning — built in the open and given away. The pages are still going up. Below is the sky over Athens as of this moment, which is the only part that was never going to wait for a launch date.")}</p>
 </div>
 <div class="card">
 <div style="display:flex;align-items:baseline;gap:8px 12px;flex-wrap:wrap">
-<p class="eyebrow">The sky over {ATHENS.label}</p>
+<p class="eyebrow">{say("text.30", "The sky over")} {ATHENS.label}</p>
 <span class="tab" id="clock" style="margin-left:auto;font-family:var(--font-mono);font-size:var(--text-xs);color:var(--ink-faint)">—</span>
 </div>
 {

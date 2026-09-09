@@ -21,6 +21,7 @@ import { READER_COOKIE } from "../../../lib/account";
 import { renderMarkdown } from "../../../lib/markdown";
 import { verifyCsrf } from "../../../lib/csrf";
 import { copy } from "../../../lib/copy";
+import Copy from "../../../components/content/Copy.astro";
 
 /* Every word on this page, editable from the admin. The defaults below are
    what it was written with and what still renders if nothing was changed. */
@@ -89,7 +90,6 @@ const here = all.findIndex((l: any) => String(l.id) === String(lessonId));
 const next = all.slice(here + 1).find((l: any) => l.open) ?? null;
 const done = here >= 0 ? all[here].done : false;
 ---
-
 <BaseLayout title={`${it.title ?? "Lesson"} — ${course.title}`} description={course.tagline}>
   <div class="reader">
 
@@ -167,7 +167,7 @@ const done = here >= 0 ? all[here].done : false;
           )}
           {!done && (
             <Button type="submit" size="lg">
-              {next ? "Complete and continue →" : "Mark finished"}
+              {next ? say("text.30", "Complete and continue →") : say("text.31", "Mark finished")}
             </Button>
           )}
         </form>
@@ -177,7 +177,12 @@ const done = here >= 0 ? all[here].done : false;
       {/* Kept above the outline rather than in it: stacked on a phone this is
           the way back out, and burying it under forty lessons hides the exit. */}
       <a class="back" href={`/classes/${slug}`}>← {course.title}</a>
-      <p class="tally">{course.progress.done} of {course.progress.total} finished</p>
+      <p class="tally">
+        <Copy
+          text={say("text.32", "{done} of {total} finished")}
+          vars={{ done: String(course.progress.done), total: String(course.progress.total) }}
+        />
+      </p>
       <LessonList slug={slug} modules={course.modules} current={Number(lessonId)} />
     </aside>
   </div>

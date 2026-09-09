@@ -1,4 +1,10 @@
 ---
+import { copy } from "../../lib/copy";
+
+/* Every word here, editable from the admin. The defaults below are what
+   it was written with and what still renders if nothing was changed. */
+const say = await copy("component:ScheduleItem");
+
 /* Ported from `components/tables/ScheduleItem.jsx`; contract in
  * `ScheduleItem.d.ts`.
  *
@@ -27,7 +33,6 @@ const ath = (opts: Intl.DateTimeFormatOptions) =>
 const hours = durationMin ? Math.round((durationMin / 60) * 10) / 10 : null;
 const Tag = href ? "a" : "article";
 ---
-
 <Tag class="sh-sched" data-status={status} href={href}>
   <span class="sh-sc-date">
     <span class="sh-sc-dow">{ath({ weekday: "short" })}</span>
@@ -40,7 +45,7 @@ const Tag = href ? "a" : "article";
     {topic && <span class="sh-sc-topic">{topic}{hours ? ` · ~${hours}h` : ""}</span>}
   </span>
   <span class="sh-sc-time">
-    <span class="sh-sc-t1">{ath({ hour: "2-digit", minute: "2-digit", hour12: false })} Athens</span>
+    <span class="sh-sc-t1">{ath({ hour: "2-digit", minute: "2-digit", hour12: false })} {say("text.20", "Athens")}</span>
     <span class="sh-sc-t2" data-local-time={startISO} hidden></span>
   </span>
 </Tag>

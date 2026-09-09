@@ -1,4 +1,10 @@
 ---
+import { copy } from "../../lib/copy";
+
+/* Every word here, editable from the admin. The defaults below are what
+   it was written with and what still renders if nothing was changed. */
+const say = await copy("component:ConsentCheckbox");
+
 /* Ported from `components/forms/ConsentCheckbox.jsx`; contract in
  * `ConsentCheckbox.d.ts`.
  *
@@ -33,7 +39,6 @@ const BASIS_WORD: Record<string, string> = {
   "explicit-consent": "explicit consent",
 };
 ---
-
 <div class="consent" data-invalid={!!error || undefined}>
   <label class="consent-head">
     {/* Never `checked` by default — the prop exists so a settings screen can
@@ -46,7 +51,7 @@ const BASIS_WORD: Record<string, string> = {
       </span>
     </span>
   </label>
-  <p class="consent-basis">lawful basis: {BASIS_WORD[basis]}</p>
+  <p class="consent-basis">{say("text.20", "lawful basis:")} {BASIS_WORD[basis]}</p>
   {explanation && <p class="consent-explain">{explanation}</p>}
   {wording && <p class="consent-wording">“{wording}”</p>}
   {error && <p class="consent-error" role="alert">{error}</p>}

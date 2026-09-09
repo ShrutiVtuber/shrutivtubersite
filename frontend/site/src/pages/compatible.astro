@@ -222,7 +222,7 @@ const ALMANAC = [
           </ol>
 
           <div class="cx-branch">
-            <p class="t-eyebrow"><span class="t-glyph" aria-hidden="true">{MOON}</span> Without a time</p>
+            <p class="t-eyebrow"><span class="t-glyph" aria-hidden="true">{MOON}</span> {say("text.30", "Without a time")}</p>
             <p class="cx-branch-lead">{say("one-submit-does-all-thre.5", "Then it says so, instead of guessing at it.")}</p>
             <p class="cx-branch-body">{say("one-submit-does-all-thre.6", "Four minutes of clock error is a whole degree of Ascendant, so a chart with no time has no angles at all — and every contact that needs one drops out of the count. The result names them rather than quietly leaving them off.")}</p>
             <div class="cx-plates">
@@ -370,7 +370,7 @@ const ALMANAC = [
           <p class="cx-lead">{say("pick-a-card-or-let-it-pi.2", "Every comparison is drawn as an image on our own server. The designs are rows in a table — Shruti adds one and it appears here.")}</p>
         </div>
         <p class="cx-count t-tabular">
-          {designs.length === 1 ? "1 design" : `${designs.length} designs`} · more get added
+          {designs.length === 1 ? say("text.32", "1 design") : `${designs.length} ${say("text.33", "designs")}`} · {say("text.34", "more get added")}
         </p>
       </div>
 
@@ -426,16 +426,13 @@ const ALMANAC = [
     <section class="cx-in cx-sec">
       <div class="cx-honest">
         <div class="cx-honest-l">
-          <p class="t-eyebrow"><span class="t-glyph" aria-hidden="true">{OPEN}</span> The honest part</p>
+          <p class="t-eyebrow"><span class="t-glyph" aria-hidden="true">{OPEN}</span> {say("text.31", "The honest part")}</p>
           <h2>{say("it-is-a-reading-not-a-re.1", "It is a reading, not a result.")}</h2>
           <p class="cx-lead">{say("it-is-a-reading-not-a-re.2", "Astrologers have argued about these rules for two thousand years and have not finished. I am not going to pretend a share card settles it — and the disagreement is the interesting part, not an embarrassment.")}</p>
           <p class="cx-lead">
-            <strong>{say("it-is-a-reading-not-a-re.3", "It does not predict anything")}</strong>, and there is no
-            percentage in it anywhere. It reads the contacts between two charts
-            and tells you what classical practice attaches to them. Post it
-            because it is fun, not because it is a verdict.
+            <Copy text={say("it-is-a-reading-not-a-re.3", "**It does not predict anything**, and there is no percentage in it anywhere. It reads the contacts between two charts and tells you what classical practice attaches to them. Post it because it is fun, not because it is a verdict.")} />
           </p>
-          <p class="cx-sign"><span class="cx-sign-rule" aria-hidden="true"></span> Shruti</p>
+          <p class="cx-sign"><span class="cx-sign-rule" aria-hidden="true"></span> {say("text.35", "Shruti")}</p>
         </div>
         <dl class="cx-almanac">
           {ALMANAC.map(([k, v]) => (

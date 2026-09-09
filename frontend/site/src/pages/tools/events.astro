@@ -205,7 +205,7 @@ const withParam = (key: string, value: string) => {
       <label>
         <span>{say("text.4", "Read from")}</span>
         <select name="rising">
-          <option value="">— no rotation —</option>
+          <option value="">{say("text.30", "— no rotation —")}</option>
           {SIGNS.map((s) => <option value={s} selected={s === rising}>{s} rising</option>)}
         </select>
       </label>
@@ -328,7 +328,7 @@ const withParam = (key: string, value: string) => {
         <details class="embed-offer">
           <summary>{say("embed.summary", "Put this wheel in your own page")}</summary>
           <p class="adm-note">{say("embed.note", "Paste this anywhere HTML is allowed. It carries a link back and nothing else — no cookie, no script of ours on your page, nothing stored.")}</p>
-          <textarea readonly rows="3" class="snippet" onclick="this.select()">{`<iframe src="https://shrutivtuber.com/embed/wheel?rising=${rising || ""}&at=${at}" width="520" height="560" style="border:0;max-width:100%" loading="lazy" title={say("text.2", "Transit wheel — shrutivtuber.com")}></iframe>`}</textarea>
+          <textarea readonly rows="3" class="snippet" onclick="this.select()">{`<iframe src="https://shrutivtuber.com/embed/wheel?rising=${rising || ""}&at=${at}" width="520" height="560" style="border:0;max-width:100%" loading="lazy" title="${say('text.2', 'Transit wheel — shrutivtuber.com')}"></iframe>`}</textarea>
         </details>
 
         <p class="legend">

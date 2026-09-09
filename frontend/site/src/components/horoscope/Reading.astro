@@ -14,6 +14,7 @@
  */
 import { SITE_URL } from "../../lib/api";
 import BaseLayout from "../../layouts/BaseLayout.astro";
+import Copy from "../content/Copy.astro";
 import SectionHeader from "../brand/SectionHeader.astro";
 import PeriodSwitcher from "../navigation/PeriodSwitcher.astro";
 import LocalTimes from "../content/LocalTimes.astro";
@@ -194,7 +195,9 @@ const GLYPH: Record<string, string> = {
 
     <p class="back">
       <a href={`/horoscopes?covers=${data.covers}`}>{say("text.1", "← All twelve signs")}</a>
-      <a href={`/horoscopes/archive?sign=${sign}`}>Every {NAME} reading →</a>
+      <a href={`/horoscopes/archive?sign=${sign}`}>
+        <Copy text={say("text.30", "Every {sign} reading →")} vars={{ sign: NAME }} />
+      </a>
     </p>
   </div>
 </BaseLayout>

@@ -46,17 +46,17 @@ const keepVowels = q.get("vowels") === "keep";
         <label class="sel">
           <span class="lbl">{say("text.12", "Line")}</span>
           <select name="weight" data-opt="weight">
-            <option value="hairline" selected={weight === "hairline"}>Hairline</option>
-            <option value="broad-pen" selected={weight === "broad-pen"}>Broad pen</option>
-            <option value="engraved" selected={weight === "engraved"}>Engraved</option>
+            <option value="hairline" selected={weight === "hairline"}>{say("text.20", "Hairline")}</option>
+            <option value="broad-pen" selected={weight === "broad-pen"}>{say("text.21", "Broad pen")}</option>
+            <option value="engraved" selected={weight === "engraved"}>{say("text.22", "Engraved")}</option>
           </select>
         </label>
         <label class="sel">
           <span class="lbl">{say("text.13", "Enclosure")}</span>
           <select name="enclosure" data-opt="enclosure">
-            <option value="none" selected={enclosure === "none"}>None</option>
-            <option value="circle" selected={enclosure === "circle"}>Circle</option>
-            <option value="vesica" selected={enclosure === "vesica"}>Vesica</option>
+            <option value="none" selected={enclosure === "none"}>{say("text.23", "None")}</option>
+            <option value="circle" selected={enclosure === "circle"}>{say("text.24", "Circle")}</option>
+            <option value="vesica" selected={enclosure === "vesica"}>{say("text.25", "Vesica")}</option>
           </select>
         </label>
       </fieldset>

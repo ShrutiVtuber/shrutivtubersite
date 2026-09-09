@@ -299,8 +299,28 @@ const changed = rows.filter((r) => r.changed).length;
     return out;
   }
 
+  /* Inline markdown, as the reader will see it.
+   *
+   * A string routed through <Copy> is stored as markdown and RENDERED as
+   * several nodes: `**How this works.** These are…` becomes a <strong> and a
+   * sibling text node, and no single text node holds the whole sentence. The
+   * matcher below reads text nodes, so every one of those strings became
+   * invisible to this panel the moment it was made editable — which is the
+   * opposite of the intended effect, and is why they kept being reported as
+   * missing.
+   *
+   * Stripping the markers here means the value is compared against what is
+   * actually on the page. */
+  const spoken = (value: string) =>
+    value
+      .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")   // [text](/href) → text
+      .replace(/\*\*([^*]+)\*\*/g, "$1")          // **bold** → bold
+      .replace(/\*([^*]+)\*/g, "$1")               // *italic* → italic
+      .replace(/`([^`]+)`/g, "$1")                 // `code` → code
+      .replace(/\{[a-zA-Z_][\w]*\}/g, "");         // a {placeholder} has a value
+
   function findIn(doc: Document, value: string): HTMLElement | null {
-    const want = plain(value);
+    const want = plain(spoken(value));
     /* Short strings collide — a nav label, a button, a heading that repeats.
        Below this length a match says more about coincidence than location. */
     if (want.length < 8) return null;
@@ -317,7 +337,29 @@ const changed = rows.filter((r) => r.changed).length;
         best = t.parentElement;
       }
     }
-    return best;
+    if (best) return best;
+
+    /* Nothing matched a single text node. Try whole ELEMENTS, whose
+       textContent spans their children — which is where a <Copy> sentence
+       lives, split across a <strong> and the text either side of it.
+       
+       Smallest match wins: a paragraph and the <body> that contains it both
+       contain the sentence, and the paragraph is the answer. */
+    let smallest: HTMLElement | null = null;
+    let smallestLength = Infinity;
+    for (const el of doc.querySelectorAll<HTMLElement>(
+      "p, li, blockquote, figcaption, dd, dt, h1, h2, h3, h4, h5, h6, span, div, a, button, summary, label, td, th",
+    )) {
+      const have = plain(el.textContent ?? "");
+      if (!have) continue;
+      if (have === want || (want.length > 16 && have.includes(want))) {
+        if (have.length < smallestLength) {
+          smallest = el;
+          smallestLength = have.length;
+        }
+      }
+    }
+    return smallest;
   }
 
   /* A whole text node, matched exactly, with no length floor.
@@ -332,7 +374,7 @@ const changed = rows.filter((r) => r.changed).length;
    * panel as "not on this page" while being plainly on it.
    */
   function findExact(doc: Document, value: string): HTMLElement | null {
-    const want = plain(value);
+    const want = plain(spoken(value));
     if (!want) return null;
     for (const t of textNodes(doc)) {
       if (plain(t.data) === want) return t.parentElement;
@@ -346,7 +388,7 @@ const changed = rows.filter((r) => r.changed).length;
      unambiguous. Raising the general minimum to eight had pushed /about's
      blocks into "not visible" for exactly this reason. */
   function findHeadingIn(doc: Document, value: string): HTMLElement | null {
-    const want = plain(value);
+    const want = plain(spoken(value));
     if (want.length < 3) return null;
     for (const h of doc.querySelectorAll<HTMLElement>("h1,h2,h3,h4,h5,h6")) {
       if (plain(h.textContent ?? "") === want) return h;

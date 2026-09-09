@@ -126,7 +126,7 @@ const jsonLd = {
 
       <p class="price">{money}</p>
       <p class="taxline">
-        Tax included.
+        {say("text.40", "Tax included.")}
         {product.kind === "physical"
           ? " Posted to the address you give at checkout."
           : " A download link is emailed to you the moment it is paid for."}
