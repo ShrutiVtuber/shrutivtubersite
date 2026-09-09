@@ -15,9 +15,14 @@
 import fs from "node:fs";
 import path from "node:path";
 
-const ROOT = path.resolve(process.argv[2] ?? "frontend/site/src");
+/* argv[2] is the source root, but flags land there too — `--json` was read as
+   a directory name and the whole run died on ENOENT. */
+const ARGS = process.argv.slice(2).filter((a) => !a.startsWith("--"));
+const ROOT = path.resolve(ARGS[0] ?? "frontend/site/src");
 const BASE = process.env.BASE ?? "http://127.0.0.1:8200";
 const COOKIE = process.env.ADMIN_COOKIE ?? "";
+const JSON_ONLY = process.argv.includes("--json");
+const payload = [];
 
 /* `t("key", "text")` and `t("key", 'text')` and backticks, across newlines.
    Deliberately NOT a general expression parser: a default that is not a plain
@@ -105,6 +110,19 @@ for (const file of walk(ROOT)) {
     process.exitCode = 1;
     continue;
   }
+  /* --json prints the payload instead of posting it.
+   *
+   * The POST needs an admin session, which means a password, which means the
+   * person deploying has to hand one to whatever is running the deploy. The
+   * extraction does not need any of that — it only reads the templates — so it
+   * can be done anywhere and APPLIED on the server, straight to the database,
+   * by backend/scripts/seed_copy.py. Same rows, no credential. */
+  if (JSON_ONLY) {
+    payload.push({ page, items });
+    pages++; strings += items.length;
+    continue;
+  }
+
   const r = await fetch(`${BASE}/api/admin/copy/seed`, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...(COOKIE ? { Cookie: COOKIE } : {}) },
@@ -119,4 +137,8 @@ for (const file of walk(ROOT)) {
   pages++; strings += got.seen; added += got.added;
   console.log(`  ${page.padEnd(28)} ${String(got.seen).padStart(3)} strings, ${got.added} new`);
 }
-console.log(`\n  ${pages} pages, ${strings} strings, ${added} newly registered`);
+if (JSON_ONLY) {
+  process.stdout.write(JSON.stringify(payload));
+} else {
+  console.log(`\n  ${pages} pages, ${strings} strings, ${added} newly registered`);
+}
