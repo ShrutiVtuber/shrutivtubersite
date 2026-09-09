@@ -371,6 +371,55 @@ class Supporter(TimestampMixin, table=True):
     stream_name: str = ""
 
 
+class StandingTest(TimestampMixin, table=True):
+    """
+    A compatibility test that stands at its own address.
+
+    Two things at once, and the second is the business one:
+
+    - **"Are you compatible with Shruti?"** — hers, permanent, no account, a
+      share hook anybody can take for fun.
+    - **Another VTuber's**, against their chart, for a run their tier decides:
+      five days for somebody who is not a member, ten for the lower tier,
+      permanent for the higher.
+
+    Which makes this a **membership feature with an expiry**, not a page.
+
+    ⚠ **The expiry is the part that goes wrong quietly.** An expired test that
+    keeps answering is a feature given away; one that 404s with no explanation
+    is a VTuber who thinks the site is broken. So `expires_at` is checked on
+    every read, an expired one still has a page, and that page says when it ran
+    and what would keep it up.
+
+    ⚠ `chart_id` points at a SavedChart rather than copying the birth data. A
+    host who deletes their chart has the test stop, which is the right way
+    round: it is their birth moment and asking for it back should work.
+    """
+
+    __tablename__ = "standing_test"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    # The public address: /compatible-with/<slug>.
+    slug: str = Field(index=True, unique=True)
+    chart_id: int = Field(foreign_key="saved_chart.id", index=True)
+    # Null for hers. Set for anybody else's, so the tier can be looked up and
+    # so they can take it down.
+    user_id: Optional[int] = Field(default=None, foreign_key="site_user.id", index=True)
+
+    host_name: str = ""
+    blurb: str = ""
+
+    # What they had when it was made, kept verbatim. The run was bought at that
+    # tier and does not shorten because they later cancelled — nor lengthen
+    # because they later upgraded, which is what the renew path is for.
+    tier_at_setup: str = ""
+    # ⚠ Null means permanent. Only the higher tier and hers get one.
+    expires_at: Optional[datetime] = Field(default=None, sa_type=UTC_TS)
+
+    # Taken down by its host, or by her.
+    hidden: bool = False
+
+
 class BannedEmail(TimestampMixin, table=True):
     """
     An address that may not register again.

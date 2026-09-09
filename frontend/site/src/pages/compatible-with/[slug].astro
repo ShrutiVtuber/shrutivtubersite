@@ -1,0 +1,134 @@
+---
+/* "Are you compatible with <somebody>?"
+ *
+ * Hers is permanent and is the share hook; another VTuber's runs for as long as
+ * their tier bought. Both live here, because they are the same page — the only
+ * difference is whose chart is behind it and whether it has stopped.
+ *
+ * ⚠ **An expired test still has a page.** That is the whole warning in the
+ * plan: one that 404s with no explanation is a VTuber who thinks the site is
+ * broken and says so publicly, which is worse than the leak it was meant to
+ * stop. So it says when it ran, and what would put it back.
+ *
+ * ⚠ Nothing about the host's birth data reaches this page. The API sends the
+ * aspects and never the moment.
+ */
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import { site, SITE_URL } from "../../lib/api";
+import { copy } from "../../lib/copy";
+
+const say = await copy("compatible-with/[slug]");
+
+const slug = String(Astro.params.slug ?? "");
+interface Standing {
+  slug: string; host: string; blurb: string; hasChart: boolean;
+  expiresAt: string | null; permanent: boolean;
+  running: boolean; ranOut: boolean; wouldKeepIt: string;
+}
+const test = await site<Standing>(`/api/standing/${encodeURIComponent(slug)}`);
+if (!test) return Astro.rewrite("/404");
+
+const host = test.host || "somebody";
+const on = (iso: string | null) =>
+  iso
+    ? new Date(iso).toLocaleDateString("en-GB",
+        { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" })
+    : "";
+
+const TIER_NAMES: Record<string, string> = {
+  lamplighter: "Lamplighter",
+  almanac: "Almanac",
+};
+---
+
+<BaseLayout
+  title={say("meta.title", `Are you compatible with ${host}?`)}
+  description={say("meta.description", `Read your chart against ${host}'s.`)}
+>
+  <div class="page cw">
+    <h1>{say("head", "Are you compatible with")} {host}?</h1>
+    {test.blurb && <p class="blurb">{test.blurb}</p>}
+
+    {
+      test.running ? (
+        <>
+          <p class="lede">
+            {say("lede", "Put in when and where you were born. Your birth data is used to draw the chart and is not kept unless you ask for it to be.")}
+          </p>
+          {/* The form posts to the same comparison the site already does —
+              this page is an address, not a second implementation. */}
+          <p class="go">
+            <a class="cta" href={`/compatible?against=${encodeURIComponent(test.slug)}`}>
+              {say("cta", "Take it")}
+            </a>
+          </p>
+          {!test.permanent && test.expiresAt && (
+            <p class="until">
+              {say("until", "This one is up until")} <time datetime={test.expiresAt}>{on(test.expiresAt)}</time>.
+            </p>
+          )}
+        </>
+      ) : (
+        <section class="ran-out">
+          <h2>{say("out.head", "This one has finished its run.")}</h2>
+          <p>
+            {say("out.body", "It was up until")}{" "}
+            {test.expiresAt && <time datetime={test.expiresAt}>{on(test.expiresAt)}</time>}.
+            {" "}
+            {say("out.why", "Standing tests run for as long as the host's membership buys — five days, ten, or for good.")}
+          </p>
+          {test.wouldKeepIt && (
+            <p>
+              <a class="cta" href="/support">
+                {say("out.cta", "A")} {TIER_NAMES[test.wouldKeepIt] ?? test.wouldKeepIt}{" "}
+                {say("out.cta.2", "membership keeps one up")}
+              </a>
+            </p>
+          )}
+          <p class="quiet">
+            {say("out.mine", "If this is yours, you can start it again from your account once you are a member.")}
+          </p>
+        </section>
+      )
+    }
+
+    <p class="also">
+      <a href="/compatible">{say("also", "Compare two charts of your own →")}</a>
+    </p>
+  </div>
+</BaseLayout>
+
+<style>
+  .cw { max-width: 62ch; }
+  .cw h1 { font: 600 var(--text-h1) var(--font-display); margin: 0 0 var(--space-2); }
+  .blurb {
+    margin: 0 0 var(--space-3); color: var(--ink);
+    font: 400 var(--text-md) / 1.7 var(--font-body);
+  }
+  .lede {
+    margin: 0 0 var(--space-4); color: var(--ink-soft);
+    font: 400 var(--text-md) / 1.7 var(--font-body);
+  }
+  .go { margin: 0 0 var(--space-3); }
+  .cta {
+    display: inline-block; padding: 10px 18px;
+    background: var(--accent); color: var(--on-accent);
+    border-radius: var(--radius-sm); text-decoration: none;
+    font: 500 var(--text-body) var(--font-body);
+  }
+  .cta:hover { background: var(--accent-hover); }
+  .until, .quiet {
+    color: var(--ink-faint); font: 400 var(--text-sm) / 1.6 var(--font-body);
+  }
+  /* Finished, not broken. It reads as an ending with a way on from it. */
+  .ran-out {
+    border: var(--border-w) solid var(--line);
+    border-radius: var(--radius-md, 10px);
+    padding: var(--space-4);
+    margin-bottom: var(--space-4);
+  }
+  .ran-out h2 { margin: 0 0 var(--space-2); font: 600 var(--text-h3) var(--font-display); }
+  .ran-out p { margin: 0 0 var(--space-3); color: var(--ink-soft); font: 400 var(--text-md) / 1.7 var(--font-body); }
+  .also { margin-top: var(--space-5); font: 400 var(--text-sm) var(--font-body); }
+  .also a { color: var(--accent); }
+</style>
