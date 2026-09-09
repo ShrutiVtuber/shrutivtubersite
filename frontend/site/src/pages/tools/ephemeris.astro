@@ -129,6 +129,10 @@ const monthName = new Date(Date.UTC(year, mon - 1, 1))
 ---
 
 <ToolLayout
+  {/* The table is fourteen columns. Beside an aside it needs a horizontal
+      scrollbar to read at all, and the notes column — the eclipses, the phases
+      — sits off the right edge where nobody finds it. */}
+  wide
   rule={hour === "noon" ? "noon UT" : "midnight UT"}
   ruleLabel={say("text.1", "computed for")}
   date={month}

@@ -1,0 +1,124 @@
+---
+/* What this reading used to say.
+ *
+ * She asked to be able to correct something already published — a spelling, a
+ * wrong word — and for the correction to be "subtly marked so people can see
+ * and track the edit history". This is the tracking half. The mark on the
+ * reading links here rather than asserting "edited" and leaving it there: a
+ * correction nobody can inspect is not one anybody has reason to trust.
+ *
+ * ⚠ Only PUBLISHED readings have a history. Editing a draft is writing, and
+ * nothing files it — see the note on HoroscopeRevision.
+ */
+import BaseLayout from "../../../../../layouts/BaseLayout.astro";
+import { site } from "../../../../../lib/api";
+import { copy } from "../../../../../lib/copy";
+import { renderMarkdown } from "../../../../../lib/markdown";
+import { SIGNS } from "../../../../../lib/signs";
+import { SHAPE, asPeriod, label as periodLabel } from "../../../../../lib/periods";
+
+const say = await copy("horoscopes/[sign]/[period]/[covers]/history");
+
+const sign = String(Astro.params.sign ?? "");
+const period = String(Astro.params.period ?? "");
+const covers = String(Astro.params.covers ?? "");
+if (!SIGNS.includes(sign)) return Astro.rewrite("/404");
+if (!SHAPE[asPeriod(period)]?.test(covers)) return Astro.rewrite("/404");
+
+interface Version { bodyMd: string; until: string }
+interface History {
+  sign: string; period: string; covers: string;
+  publishedAt: string | null; editedAt: string | null;
+  now: string; was: Version[];
+}
+const data = await site<History>(
+  `/api/horoscopes/${sign}/${period}/${encodeURIComponent(covers)}/history`);
+
+/* An unpublished reading has no history and is not a page. */
+if (!data) return Astro.rewrite("/404");
+
+const Sign = sign.charAt(0).toUpperCase() + sign.slice(1);
+const heading = periodLabel(asPeriod(period), covers);
+const reading = `/horoscopes/${sign}/${period}/${covers}`;
+
+const on = (iso: string) =>
+  new Date(iso).toLocaleDateString("en-GB",
+    { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
+const at = (iso: string) =>
+  new Date(iso).toLocaleTimeString("en-GB",
+    { hour: "2-digit", minute: "2-digit", timeZone: "UTC" });
+
+/* Newest first, and the current words at the top, so the page reads as "this
+   is what it says, and this is what it said before". */
+const nowHtml = await renderMarkdown(data.now);
+const wasHtml = await Promise.all(data.was.map((v) => renderMarkdown(v.bodyMd)));
+---
+
+<BaseLayout
+  title={say("meta.title", `${Sign} · ${heading} · what it used to say`)}
+  description={say("meta.description", "Every version of this reading, and when each was replaced.")}
+  noindex={true}
+>
+  <div class="page hist">
+    <p class="back"><a href={reading}>← {say("back", "Back to the reading")}</a></p>
+    <h1>{Sign} · {heading}</h1>
+    <p class="lede">
+      {say("lede", "Corrections are kept. A reading that could be quietly rewritten would not be a record of what was said that week — so what it used to say is here, with the moment each version was replaced.")}
+    </p>
+
+    {data.publishedAt && (
+      <p class="when">
+        {say("published", "Published")} <time datetime={data.publishedAt}>{on(data.publishedAt)}</time>
+      </p>
+    )}
+
+    <section class="ver current">
+      <h2>{say("now", "As it stands")}</h2>
+      <div class="prose" set:html={nowHtml} />
+    </section>
+
+    {data.was.length === 0 ? (
+      <p class="none">{say("none", "It has not been changed since it was published.")}</p>
+    ) : (
+      data.was.map((v, i) => (
+        <section class="ver">
+          <h2>
+            {say("until", "Until")}{" "}
+            <time datetime={v.until}>{on(v.until)}, {at(v.until)} UT</time>
+          </h2>
+          <div class="prose" set:html={wasHtml[i]} />
+        </section>
+      ))
+    )}
+  </div>
+</BaseLayout>
+
+<style>
+  .hist { max-width: 68ch; }
+  .back { margin: 0 0 var(--space-3); font: 400 var(--text-sm) var(--font-body); }
+  .back a { color: var(--accent); }
+  .hist h1 { font: 600 var(--text-h1) var(--font-display); margin: 0 0 var(--space-2); }
+  .lede {
+    margin: 0 0 var(--space-3); color: var(--ink-soft);
+    font: 400 var(--text-md) / 1.7 var(--font-body);
+  }
+  .when { margin: 0 0 var(--space-5); color: var(--ink-faint); font: 400 var(--text-sm) var(--font-body); }
+  .none { color: var(--ink-soft); font: 400 var(--text-md) var(--font-body); }
+
+  .ver { margin-bottom: var(--space-5); }
+  .ver h2 {
+    margin: 0 0 var(--space-2); color: var(--ink-faint);
+    font: 600 var(--text-micro) var(--font-body);
+    letter-spacing: var(--tracking-eyebrow, .08em); text-transform: uppercase;
+  }
+  /* The current words read as the reading; the older ones read as a record,
+     set back so the eye does not mistake one for the other. */
+  .ver.current .prose { color: var(--ink); }
+  .ver:not(.current) {
+    border-left: 2px solid var(--line-strong);
+    padding-left: var(--space-3);
+  }
+  .ver:not(.current) .prose { color: var(--ink-soft); }
+  .prose { font: 400 var(--text-md) / 1.75 var(--font-body); }
+  .prose :global(p) { margin: 0 0 var(--space-3); }
+</style>

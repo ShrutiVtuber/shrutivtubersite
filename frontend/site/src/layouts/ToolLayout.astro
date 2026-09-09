@@ -28,6 +28,19 @@ interface Props {
      What IS still a prop is everything computed per request: which rule is in
      force for the options this visitor chose, the place, the date. Those are
      state, not copy, and they do not belong in a table. */
+  /** Put the aside BELOW the results instead of beside them.
+   *
+   * For an instrument whose result is WIDE. The ephemeris is a table of
+   * fourteen columns; squeezed into two thirds of the page it needs a
+   * horizontal scrollbar to read at all, and the notes column — where the
+   * eclipses and the phases are — sits off the right edge. Her words: "the how
+   * it's reckoned and all the stuff in the side right column should be
+   * organised on the bottom as that would stop the ephemeris from needing the
+   * scroll bar left and right."
+   *
+   * ⚠ The aside comes FIRST in the DOM (its heading order depends on that), so
+   * this reorders with CSS rather than moving the markup. */
+  wide?: boolean;
   /** Meta bar: the rule currently in force. */
   rule?: string;
   ruleLabel?: string;
@@ -45,7 +58,7 @@ interface Props {
   noJs?: string;
 }
 const {
-  rule, ruleLabel, place, date, lat, lon, disclosure = "○", where = "server", noJs,
+  wide = false, rule, ruleLabel, place, date, lat, lon, disclosure = "○", where = "server", noJs,
 } = Astro.props;
 
 const here = Astro.url.pathname;
@@ -160,7 +173,7 @@ const jsonLd = {
       <div class="param-card"><slot name="parameters" /></div>
     )}
 
-    <div class="tool-cols">
+    <div class:list={["tool-cols", wide && "tool-cols-wide"]}>
       <div class="tool-results"><slot /></div>
       <aside class="tool-aside">
         {
@@ -257,6 +270,19 @@ const jsonLd = {
   }
 
   .tool-cols { display: flex; gap: var(--space-5); flex-wrap: wrap; align-items: start; }
+  /* Wide instruments: the result takes the whole column and the aside goes
+     underneath it. The aside is first in the DOM for heading order, so this is
+     a reorder rather than a move. */
+  .tool-cols-wide { flex-direction: column; }
+  .tool-cols-wide .tool-results { flex: 1 1 auto; width: 100%; order: 1; }
+  .tool-cols-wide .tool-aside {
+    flex: 1 1 auto; max-width: none; width: 100%; order: 2;
+    display: grid; gap: var(--space-5);
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    align-items: start;
+    border-top: var(--border-w) solid var(--line);
+    padding-top: var(--space-4);
+  }
   .tool-results { flex: 1 1 520px; min-width: 0; display: grid; gap: var(--space-4); }
   .tool-aside { flex: 1 1 280px; max-width: 440px; display: grid; gap: var(--space-5); }
   /* h2, not h3. The aside comes before the main column in the DOM, so its

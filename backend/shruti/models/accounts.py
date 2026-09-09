@@ -177,6 +177,37 @@ class Horoscope(TimestampMixin, table=True):
     body_md: str = ""
     published: bool = False
     published_at: Optional[datetime] = Field(default=None, sa_type=UTC_TS)
+    # Set the first time the words change AFTER publishing, and left alone
+    # while it is still a draft: editing a draft is just writing.
+    edited_at: Optional[datetime] = Field(default=None, sa_type=UTC_TS)
+
+
+class HoroscopeRevision(TimestampMixin, table=True):
+    """
+    What a published reading used to say.
+
+    She asked to be able to fix a spelling in something already on the site, and
+    that the fix be "subtly marked so people can see and track the edit history".
+    Both halves matter: a reading nobody may correct grows typos, and a reading
+    that can be silently rewritten is not a record of what she said in September
+    — it is whatever she thinks now, wearing September's date.
+
+    ⚠ Each row holds the text BEFORE the edit that made it. The current words
+    live on the horoscope itself, so reading one is never a join, and the
+    history is only touched by somebody who asks for it.
+
+    ⚠ Only published readings are filed. Editing a draft is writing, and a
+    history of every keystroke of the drafting is noise that would bury the one
+    correction anybody cares about.
+    """
+
+    __tablename__ = "horoscope_revision"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    horoscope_id: int = Field(index=True, foreign_key="horoscope.id")
+    # The words as they stood before the edit that replaced them.
+    body_md: str = ""
+    replaced_at: datetime = Field(sa_type=UTC_TS)
 
 
 class Issue(TimestampMixin, table=True):

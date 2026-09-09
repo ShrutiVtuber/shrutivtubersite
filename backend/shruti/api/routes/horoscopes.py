@@ -25,7 +25,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
 from shruti.core.db import get_session
-from shruti.models.accounts import Horoscope
+from shruti.models.accounts import Horoscope, HoroscopeRevision
 
 router = APIRouter(prefix="/api/horoscopes", tags=["horoscopes"])
 
@@ -145,6 +145,11 @@ async def reading(
         "bodyMd": row.body_md if row else "",
         # Magickal writing signs with the motto.
         "byline": "Soror Eu. A.",
+        # Null until the words are corrected after publishing. The page marks
+        # it, quietly — a reading nobody may fix grows typos, and one that can
+        # be silently rewritten is not a record of what she said that week.
+        "editedAt": (row.edited_at.isoformat()
+                     if row is not None and row.edited_at else None),
         "availablePeriods": await _available(session),
     }
 
@@ -177,6 +182,23 @@ class DraftIn(BaseModel):
     body_md: str = Field(default="", max_length=8000)
 
 
+def is_a_correction(published: bool, was: str, now: str) -> bool:
+    """
+    Whether this change to a reading belongs in its history.
+
+    ⚠ Two conditions, and both matter.
+
+    **Published.** Editing a draft is writing. A history of every keystroke of
+    the drafting would bury the one correction anybody actually cares about,
+    and there is nothing for a reader to have been misled by yet.
+
+    **Different.** The desk autosaves, so the same words arrive again and again
+    while she thinks. Filing those would fill the history with versions
+    identical to each other and make the real correction impossible to find.
+    """
+    return published and was != now
+
+
 @router.put("/draft", dependencies=[Depends(require_admin)])
 async def save_draft(
     body: DraftIn, session: AsyncSession = Depends(get_session)
@@ -206,6 +228,14 @@ async def save_draft(
         )
         session.add(row)
     else:
+        if is_a_correction(row.published, row.body_md, body.body_md):
+            now = datetime.now(timezone.utc)
+            session.add(HoroscopeRevision(
+                horoscope_id=row.id,
+                body_md=row.body_md,      # what it said before this edit
+                replaced_at=now,
+            ))
+            row.edited_at = now
         row.body_md = body.body_md
     await session.commit()
     return {"ok": True, "sign": body.sign, "written": bool(body.body_md.strip())}
@@ -326,6 +356,51 @@ async def published(
         }
         for r in rows
     ]
+
+
+@router.get("/{sign}/{period}/{covers}/history")
+async def history(
+    sign: str, period: str, covers: str,
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """
+    What a published reading used to say, newest change first.
+
+    Public, and it has to be: a correction nobody can inspect is not a
+    correction anyone has reason to trust. Unpublished readings have no history
+    to show and are answered as though they do not exist, which for a reader is
+    true.
+    """
+    row = (
+        await session.execute(
+            select(Horoscope).where(
+                Horoscope.sign == sign, Horoscope.period == period,
+                Horoscope.covers == covers, Horoscope.published == True,  # noqa: E712
+            )
+        )
+    ).scalar_one_or_none()
+    if row is None:
+        raise HTTPException(404, "no such reading")
+
+    revisions = (
+        await session.execute(
+            select(HoroscopeRevision)
+            .where(HoroscopeRevision.horoscope_id == row.id)
+            .order_by(HoroscopeRevision.replaced_at.desc())
+        )
+    ).scalars().all()
+
+    return {
+        "sign": sign, "period": period, "covers": covers,
+        "publishedAt": row.published_at.isoformat() if row.published_at else None,
+        "editedAt": row.edited_at.isoformat() if row.edited_at else None,
+        "now": row.body_md,
+        # Each entry is what the reading said UNTIL that moment.
+        "was": [
+            {"bodyMd": r.body_md, "until": r.replaced_at.isoformat()}
+            for r in revisions
+        ],
+    }
 
 
 @router.get("/archive")

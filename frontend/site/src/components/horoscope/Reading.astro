@@ -63,6 +63,7 @@ const { sign, period, covers = "" } = Astro.props as
 interface Reading {
   sign: string; period: string; covers: string; published: boolean;
   bodyMd: string; byline: string; availablePeriods: string[];
+  editedAt?: string | null;
 }
 const answer = await site<Reading>(
   `/api/horoscopes/${sign}/${period}${covers ? `?covers=${encodeURIComponent(covers)}` : ""}`,
@@ -75,7 +76,7 @@ const answer = await site<Reading>(
    that the page never existed, which is a different and wrong claim. */
 const data: Reading = answer ?? {
   sign, period, covers, published: false,
-  bodyMd: "", byline: "", availablePeriods: [],
+  bodyMd: "", byline: "", availablePeriods: [], editedAt: null,
 };
 
 const me = await account(Astro);
@@ -181,6 +182,21 @@ const GLYPH: Record<string, string> = {
           )}
           <LocalTimes html={html} />
           {data.byline && <p class="byline">{data.byline}</p>}
+          {/* Subtly marked, and checkable. A correction nobody can inspect is
+              not a correction anybody has reason to trust, so the mark is a
+              link to what it used to say rather than a claim to take on
+              faith. */}
+          {data.editedAt && (
+            <p class="edited">
+              <a href={`/horoscopes/${sign}/${period}/${data.covers}/history`}>
+                {say("edited", "Edited")}{" "}
+                <time datetime={data.editedAt}>
+                  {new Date(data.editedAt).toLocaleDateString("en-GB",
+                    { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" })}
+                </time>
+              </a>
+            </p>
+          )}
         </>
       ) : (
         <EmptyState
@@ -207,6 +223,12 @@ const GLYPH: Record<string, string> = {
   .anchor-wheel { margin: 0; display: grid; gap: var(--space-2); justify-items: center; }
   .open-in { font: 400 var(--text-sm) var(--font-body); text-align: center; }
   .open-in a { color: var(--accent); }
+  .edited {
+    margin: 4px 0 0; font: 400 var(--text-xs) var(--font-body);
+    color: var(--ink-faint);
+  }
+  .edited a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+  .edited a:hover { color: var(--accent); }
   .byline {
     margin: var(--space-3) 0 0; font: 400 var(--text-sm) var(--font-body);
     color: var(--ink-faint); font-style: italic;
