@@ -53,6 +53,16 @@ if (Astro.request.method === "POST") {
       failed = r.ok ? "" : (r.body?.detail ?? "That did not save.");
     }
 
+    if (action === "stream-name") {
+      const r = await asReader(Astro, "/api/billing/me/stream-name", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ stream_name: String(form.get("stream_name") ?? "") }),
+      });
+      notice = r.ok ? "Saved. She will read that one." : "";
+      failed = r.ok ? "" : (r.body?.detail ?? "That did not save.");
+    }
+
     if (action === "consent") {
       const kind = String(form.get("kind") ?? "");
       const granted = form.get("granted") === "1";
@@ -281,6 +291,27 @@ const TRADITIONS = [
             }
           </p>
           <p class="quiet">{say("your-support.2", "Cancelling is one button on Stripe's own page, it takes effect at the end of the month you have already paid for rather than the moment you press it, and no message to me is needed or wanted. Thank you either way — genuinely.")}</p>
+          {/* The name she reads out.
+              ⚠ Only here, inside the monthly-support card. A one-off gift is
+              not read on stream, and a box that quietly did nothing for
+              somebody who had given once would be worse than no box. */}
+          <form method="POST" class="stream-name">
+            <CsrfField />
+            <input type="hidden" name="action" value="stream-name" />
+            <label for="stream-name">{say("stream.label", "Name to read on stream")}</label>
+            <div class="stream-row">
+              <input id="stream-name" name="stream_name" maxlength="60"
+                     value={support.streamName ?? ""}
+                     placeholder={say("stream.placeholder", "However you would like to be called")} />
+              <Button type="submit" variant="secondary">{say("stream.save", "Save")}</Button>
+            </div>
+            <p class="quiet">
+              {support.streamName
+                ? say("stream.set", "This is what she says when she reads the supporters out.")
+                : say("stream.unset", "Left blank, she reads your account name. Put something here if you would rather be called something else — a magickal name, a handle, anything.")}
+            </p>
+          </form>
+
           <div>
             <form method="POST">
               <CsrfField />
@@ -385,6 +416,19 @@ const TRADITIONS = [
   .undef { color: var(--ink-faint); font-style: italic; }
   .notice { font: 400 var(--text-sm) var(--font-body); color: var(--accent); margin: 0; }
   .failed { font: 400 var(--text-sm) var(--font-body); color: var(--live); margin: 0; }
+  .stream-name { margin: var(--space-3) 0; display: grid; gap: 6px; }
+  .stream-name label {
+    font: 600 var(--text-micro) var(--font-body); color: var(--ink-faint);
+    letter-spacing: var(--tracking-eyebrow, .08em); text-transform: uppercase;
+  }
+  .stream-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .stream-row input {
+    flex: 1 1 260px; box-sizing: border-box; padding: 8px 10px;
+    font: 400 var(--text-body) var(--font-body); color: var(--ink);
+    background: var(--surface-page);
+    border: var(--border-w) solid var(--line); border-radius: var(--radius-sm);
+  }
+  .stream-row input:focus { border-color: var(--accent); outline: none; }
   .support-tier { font: 500 var(--text-h4) var(--font-body); color: var(--ink); margin: 0; }
   .nat-line { font: 500 var(--text-h4) var(--font-mono); color: var(--ink); margin: 0; }
   .nat-place { font: 400 var(--text-sm) var(--font-body); color: var(--ink-soft); margin: 0; }

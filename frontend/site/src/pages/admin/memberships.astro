@@ -81,10 +81,39 @@ const BLANK = {
 };
 const row = creating ? BLANK : tiers.find((t) => String(t.id) === editing) ?? null;
 const money = (cents: number) => `${(cents / 100).toFixed(2)} EUR`;
+
+/* The names to read out on stream.
+ *
+ * The point of collecting them. Monthly supporters only — a one-off gift is not
+ * read out, which is enforced where the name is asked for rather than filtered
+ * here: the one-off checkout has no field to fill in. */
+const toRead = await asAdmin(Astro, "/api/billing/admin/to-read");
+const names: any[] = Array.isArray(toRead.body) ? toRead.body : [];
 ---
 
 <AdminLayout title="Memberships">
   <h1 class="adm-h">Memberships</h1>
+
+  <section class="adm-card to-read">
+    <h2 class="h2">To read on stream</h2>
+    <p class="quiet">
+      Monthly supporters, newest first. A name in <b>bold</b> is one they chose;
+      the rest are account names. One-off gifts are not read out and are not
+      here.
+    </p>
+    {names.length === 0 ? (
+      <p class="quiet">Nobody yet.</p>
+    ) : (
+      <ol class="names">
+        {names.map((n) => (
+          <li>
+            <span class={n.chosen ? "chosen" : "given"}>{n.name}</span>
+            <span class="tier">{n.tier}</span>
+          </li>
+        ))}
+      </ol>
+    )}
+  </section>
 
   {notice && <p class="adm-ok" role="status">{notice}</p>}
   {failed && <p class="adm-bad" role="alert">{failed}</p>}
@@ -217,6 +246,15 @@ const money = (cents: number) => `${(cents / 100).toFixed(2)} EUR`;
     )
   }
 </AdminLayout>
+
+<style>
+  .to-read { margin-bottom: var(--space-4); }
+  .names { list-style: none; margin: var(--space-2) 0 0; padding: 0; display: grid; gap: 4px; }
+  .names li { display: flex; gap: 10px; align-items: baseline; }
+  .names .chosen { font-weight: 600; color: var(--ink); }
+  .names .given { color: var(--ink-soft); }
+  .names .tier { color: var(--ink-faint); font-size: var(--text-xs); }
+</style>
 
 <style>
   .editor { display: grid; gap: var(--space-4); max-width: 680px; }

@@ -283,6 +283,21 @@ def _subscription_line_items(price_id: str, tier: str) -> dict[str, Any]:
         "mode": "subscription",
         "line_items": [{"price": price_id, "quantity": 1}],
         "subscription_data": {"metadata": {"tier": tier}},
+        # The name she reads out on stream.
+        #
+        # ⚠ Asked HERE and not in the one-off builder, which is the whole of the
+        # rule: one-offs are not read out. It is not a check somebody could edit
+        # away later — the other builder has no field to fill in.
+        #
+        # Optional, because plenty of people would rather not be named, and
+        # blank means "use my account name" rather than "do not read me".
+        "custom_fields": [{
+            "key": "stream_name",
+            "label": {"type": "custom", "custom": "Name to read on stream"},
+            "type": "text",
+            "optional": True,
+            "text": {"maximum_length": 60},
+        }],
         # A box to type a code into. Stripe does the checking — exists, not
         # expired, not exhausted, applies to this — which is a great deal of
         # rule-following not worth reimplementing.
@@ -596,7 +611,86 @@ async def my_support(
             row.current_period_end.isoformat() if row.current_period_end else None
         ),
         "canManage": bool(row.stripe_customer_id),
+        # What she calls them on stream. Empty means their account name, which
+        # is why the page says so rather than showing an empty box and letting
+        # somebody think they have opted out of being thanked.
+        "streamName": row.stream_name,
     }
+
+
+class StreamNameIn(BaseModel):
+    stream_name: str = Field(default="", max_length=60)
+
+
+@router.put("/me/stream-name")
+async def set_stream_name(
+    body: StreamNameIn, request: Request,
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """
+    Change the name she reads out.
+
+    ⚠ Monthly supporters only. A one-off gift is not read on stream, so
+    somebody who has only ever given once has nothing to set here and is told
+    that plainly rather than given a box that does nothing.
+
+    Emptying it is allowed and means "use my account name" — this is the only
+    place the value is ever cleared, because the billing webhooks that also
+    write this row carry no custom fields and would otherwise wipe it on every
+    renewal.
+    """
+    from shruti.api.routes.accounts import current_user
+
+    user = await current_user(request, session)
+    if user is None:
+        raise HTTPException(401, "sign in first")
+
+    row = (
+        await session.execute(select(Supporter).where(Supporter.user_id == user.id))
+    ).scalars().first()
+    if row is None or not row.stripe_subscription_id:
+        raise HTTPException(
+            403, "names are read out for monthly supporters — a one-off gift is "
+                 "not read on stream")
+
+    row.stream_name = body.stream_name.strip()[:60]
+    await session.commit()
+    return {"ok": True, "streamName": row.stream_name}
+
+
+@router.get("/admin/to-read", dependencies=[Depends(require_admin)])
+async def supporters_to_read(
+    session: AsyncSession = Depends(get_session),
+) -> list[dict]:
+    """
+    The list she reads from on stream.
+
+    The point of the whole feature: names are collected so they can be said out
+    loud. Monthly supporters whose subscription is live, newest first — a name
+    somebody chose, or their account name where they chose nothing.
+    """
+    rows = (
+        await session.execute(
+            select(Supporter, User)
+            .join(User, User.id == Supporter.user_id, isouter=True)
+            .where(Supporter.status.in_(["active", "trialing"]))
+            .where(Supporter.stripe_subscription_id != "")
+            .order_by(Supporter.created_at.desc())
+        )
+    ).all()
+
+    out = []
+    for supporter, user in rows:
+        chosen = (supporter.stream_name or "").strip()
+        fallback = (user.display_name.strip() if user and user.display_name else "")
+        out.append({
+            "name": chosen or fallback,
+            "chosen": bool(chosen),
+            "tier": supporter.tier,
+            "since": supporter.created_at.isoformat() if supporter.created_at else None,
+        })
+    # Somebody with no chosen name and no account name has nothing to read.
+    return [r for r in out if r["name"]]
 
 
 # ── what Stripe tells us afterwards ─────────────────────────────────────────
@@ -701,7 +795,7 @@ async def _current_imprint(session: AsyncSession) -> dict:
 
 async def _upsert(
     session: AsyncSession, *, customer_id: str, subscription: dict | None,
-    email: str = "", user_id: int | None = None,
+    email: str = "", user_id: int | None = None, stream_name: str = "",
 ) -> None:
     """One row per Stripe customer. Found by customer id, then by account, then
     by email — in that order, because the ids are exact and the email is not."""
@@ -729,6 +823,12 @@ async def _upsert(
         row.user_id = user_id
     if email:
         row.email = email
+    # ⚠ Only ever set, never cleared. The other webhooks that reach this
+    # function — a renewal, a card change — carry no custom fields, and an
+    # empty string from those would silently forget a name she reads out every
+    # month. Clearing it is done from the account page, deliberately.
+    if stream_name:
+        row.stream_name = stream_name
 
     if subscription is not None:
         row.stripe_subscription_id = subscription.get("id", "")
@@ -839,6 +939,20 @@ async def _tier_for(session: AsyncSession, customer_id: str) -> str:
     return row.tier if row else ""
 
 
+def _chosen_name(checkout_session: dict) -> str:
+    """
+    The name typed into the checkout's custom field, if any.
+
+    ⚠ Only ever present on a SUBSCRIPTION session, because only the
+    subscription builder asks for it. A one-off cannot carry one, which is how
+    "one-offs are not read on stream" is enforced rather than remembered.
+    """
+    for field in checkout_session.get("custom_fields") or []:
+        if field.get("key") == "stream_name":
+            return ((field.get("text") or {}).get("value") or "").strip()[:60]
+    return ""
+
+
 @router.post("/webhook", include_in_schema=False)
 async def webhook(
     request: Request,
@@ -921,6 +1035,7 @@ async def webhook(
                 session, customer_id=customer_id,
                 subscription=dict(subscription) if subscription else None,
                 email=email, user_id=user_id,
+                stream_name=_chosen_name(obj),
             )
             await session.commit()
 

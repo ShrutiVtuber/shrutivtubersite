@@ -362,6 +362,14 @@ class Supporter(TimestampMixin, table=True):
     cancel_at_period_end: bool = False
     current_period_end: Optional[datetime] = Field(default=None, sa_type=UTC_TS)
 
+    # What she calls them when she reads the supporters out on stream.
+    #
+    # ⚠ MONTHLY ONLY. A one-off gift is not read out — that is her rule, and it
+    # is why this is asked for at the subscription checkout and nowhere else.
+    # Empty means "read my account name", not "do not read me": somebody who
+    # never filled it in still gets thanked.
+    stream_name: str = ""
+
 
 class BannedEmail(TimestampMixin, table=True):
     """
