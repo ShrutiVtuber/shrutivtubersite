@@ -1,178 +1,83 @@
-# Resume note — 26 August 2026
+# Where the site is, 9 September 2026
 
-Written because context was filling. If you are picking this up cold, read this
-first, then `docs/NEXT.md`.
+The August note is kept beside this one as `RESUME-2026-08-26.md` — it covers
+the cutover and the design pass, which are done.
 
-## Where things stand
+Written before a compaction.
 
-**The website is built and deployed**, behind the holding page. 446 backend
-tests, 55 bot tests. Everything below is live on production unless it says
-otherwise.
+## Live
 
-**The one thing blocking launch is the imprint address** — a Greek lawyer
-question, not a build. Jurisdiction is **Greece**, not Germany: the imprint
-form offers `GEMI` and `VAT EL…`. Earlier legal research was commissioned
-against Germany by mistake and is marked not-applicable in
-`docs/MARKETING_2026-08-26.md` §0.
+`https://shrutivtuber.com`, deployed from `/srv/shrutivtuber/prod` on
+159.195.251.161 as `deploy`, with `~/.ssh/agents_netcup`. **The holding page is
+still up** — she is signed in as owner, so she sees the real site and anonymous
+visitors do not.
 
-## Built today, in order
+⚠ **Pushing is not deploying.** Three times this session she was looking at
+work that had never left this machine. The site's footer prints the deployed
+commit; that is the fastest way to settle "is this live".
 
-| What | Where |
-|---|---|
-| SEO audit + every correction | `docs/AUDIT_SEO_2026-08-26.md` |
-| Marketing research | `docs/MARKETING_2026-08-26.md` |
-| Instrument pages deepened, `/tools` hub | rows in `tool`, editable |
-| `/compatible` design pass | `docs/design/HANDOFF_COMPATIBLE.md` |
-| `/collab`, `/official` | new pages |
-| Shop: always-open **and** windowed drops | `product.opens_at/closes_at` |
-| Instruments remember your place | `site_user.place_*` |
-| `/admin/growth` — her two lists | `growth_item` |
-| **vcordbot** — Discord bot | `bot/`, live at bot.shrutivtuber.com |
-| Twitch EventSub | `/admin/twitch` |
-| Counters + counter overlay | `/admin/counters`, `/overlay/counter` |
-| Alerts overlay — nine members, one queue | `/overlay/alerts` |
-| Sky chart + hours strip | `/overlay/sky`, `/overlay/hours` |
-| Ticker + countdown | `/overlay/ticker`, `/overlay/countdown` |
-| Web variants | `SkyCard` on `/`, `CounterCard` on `/support` |
-| Guard: every sitemap page must be linked | `test_every_page_is_reachable.py` |
+```bash
+cd /srv/shrutivtuber/prod && git pull --ff-only
+export SHRUTI_SOURCE_SHA=$(git rev-parse HEAD)
+dc --profile web --profile bot up -d --build
+dc exec -T backend alembic upgrade head
+```
 
-## In flight
+⚠ **Then seed the copy**, or new strings render fine and are missing from the
+admin. `docs/DEPLOY.md` has the command. Forgetting it stranded 61 strings.
 
-**The overlays.** Design handoff at `docs/design/HANDOFF_OVERLAYS.md`;
-reconciliation with the schema at `docs/design/OVERLAYS_DELTAS.md`.
+## Done this session
 
-**The overlay set from the handoff is complete.** All six OBS surfaces, both
-web variants, and sound:
+- **Horoscopes**: canonical dated URLs, per-sign feeds, oEmbed, share cards
+  drawn server-side with resvg. Weekly now surfaces everywhere — the backend
+  always had it, only the site's archive and index hardcoded monthly.
+- **The editor**: preview links no longer navigate, component words are
+  editable there, images can be set from it, and **every visible string on the
+  site is editable** — a sweep that names no element types is a test now.
+- **The writing desk**, public at `/tools/horoscope-writing`. Its card comes
+  from a `tool` row, so its words are editable like every instrument's.
+- **Language packs** served from `/packs/*` and listed at `/api/packs`, on
+  production, digests verified. All Rights Reserved — a test refuses any `.mbf`
+  committed anywhere.
 
-| | |
-|---|---|
-| Counter bar (wide + compact) | `/overlay/counter` |
-| Alerts — nine kinds, one queue | `/overlay/alerts` |
-| Supporters ticker | `/overlay/ticker` |
-| Sky chart | `/overlay/sky` |
-| Planetary hours strip | `/overlay/hours` |
-| Countdown | `/overlay/countdown` |
-| Web variants | `SkyCard` on `/`, `CounterCard` on `/support` |
-| Sound | uploaded and assigned in `/admin/counters` |
+667 tests pass. `astro check` sits at **143 errors — that is the baseline**, not
+a regression.
 
-She mints the tokens herself in `/admin/counters` — there are none in either
-database, by design. Each URL is one OBS Browser Source at 1920 × 1080.
+## Next, in her order
 
-Nothing from the handoff is outstanding. What is left is hers, not mine — see
-the list below.
+Read **`docs/PLAN-horoscope-practice.md`** first: eleven requirements, two
+decisions taken, and the one real constraint — her bot is HTTP-interactions
+only and the bridge she chose needs a gateway, which is a new long-running
+process rather than a permission.
 
-## Editing copy — where things live now
+Outstanding on the site specifically:
 
-| What | Where |
-|---|---|
-| Sections on a page (eyebrow, heading, prose, link, art) | `/admin/blocks?kind=sections`, grouped by page |
-| Every other string on a page | `/admin/copy` — the **Words** screen, grouped by page |
-| Instrument name, summary, body, FAQ, reckoning | `/admin/blocks?kind=tools` |
-| Journal entries | BeeRanked, not here |
+1. **Supporters give a name to be read on stream** — asked at the point of
+   donating or subscribing, optional, custom names allowed.
+   ⚠ **Monthly only. One-offs are not read out.**
+2. **Practice readings**: drafts kept to an account rather than to a browser,
+   and a **series** as a first-class thing — twelve signs for a week is one
+   piece of work.
+3. **A Discord slash command** handing back the material to write from. The
+   cheap half: the bot already answers signed interactions and already talks to
+   the ephemeris.
+4. **The standing compatibility test** — a fixed one against her chart, and
+   per-VTuber ones with a tier-set lifetime (5 days / 10 / permanent). It is
+   the only item that touches billing, and the expiry is what will go wrong
+   quietly.
 
-**The rule.** A page ships its own words as the default and always renders
-them; a `copy` row only ever overrides one. An empty table renders a complete
-site. So a new page needs no migration — write it with `t("key", "the words")`,
-then run `node scripts/seed-copy.mjs` and it appears in Words.
+## Traps this session paid for
 
-Two converters, both of which refuse rather than guess:
+- **A trailing comma** in `say(…,…,)` made the seeder skip the string entirely.
+  The page rendered its default and the admin had no row. One character.
+- **`{/* … */}` cannot open an expression that returns an element.** Astro
+  drops the comment AND the element's attributes, silently. Made twice.
+- **`{say(…)}` inside a template literal** is four characters and a function
+  name. Two pages shipped it as visible text.
+- **NOT NULL columns not on the model's face** — `tool` has `locale`,
+  `landing_blurb`, `faq_md`.
+- **Marks need U+FE0E** or a browser may draw them from a colour emoji font.
+- **Migration filenames must not share a revision prefix**: `rm d4a71b*`
+  deleted a second migration.
 
-- `scripts/convert-to-copy.py <file> <page>` — plain text nodes.
-- `scripts/convert-inline-copy.py <file> <page>` — a paragraph carrying a link
-  or a bold run becomes ONE string holding inline markdown, rendered by
-  `components/content/Copy.astro`. Splitting those instead would give her
-  "Their hours are in" as a box to edit.
-
-`<Copy vars={{...}} />` fills `{name}` placeholders, for a sentence built
-around a value.
-
-**Reseeding is safe and necessary.** A row whose value still equals its seeded
-default has never been edited, so a changed template updates it. Once she edits
-it the two diverge and seeding leaves it alone. Without that rule, rewriting a
-line in a template silently does nothing — which happened, on /press.
-
-414 words remain in templates, all sentences wrapping an expression.
-
----
-
-## Next session: the commission progress tracker
-
-Agreed 2026-08-27. The thing from the tweet she saved — clients having to beg
-for updates on a commission, no Trello, no visible progress. On the growth list
-twice: build it, then use it on her own commissions first, which is the only
-way to find out whether it is any good.
-
-Everything else outstanding is on `/admin/growth` — 26 items, and that list is
-the source of truth rather than this file.
-
-**She is writing page copy in the meantime.** Do not touch content she may be
-editing: `section`, `tool` (name, summary, body_md, faq_md, landing_blurb,
-reckoned), and anything under `/admin/blocks`.
-
----
-
-## Decisions not to re-litigate
-
-- **The astrology engine is not changed to fit a design.** Her words: *"don't
-  change the engine to fit the design but adjust the design to fit the
-  engine."* The `/compatible` handoff wanted seven fixed testimonies; the
-  engine bands by ratio. The page was adapted.
-- **Everything user-visible is editable from the admin.** If copy is pulled
-  from a row anywhere it must be that row everywhere. Guarded by
-  `test_instruments_are_content.py`.
-- **The bot is read-only against the website** and holds no site credential at
-  all. It computes via `shruti-astro` directly.
-- **The bot is free.** Discord already syncs YouTube and Twitch memberships
-  natively and free, which killed the paid tier before it was built. Member
-  sync is dropped — it was the only reason to hold other people's OAuth tokens.
-- **Every free-tier bot message carries the attribution footer**, which also
-  carries the automated-post disclosure.
-- **Counters hold no running total.** A counter is a sum over `support_event`.
-- **Overlay tokens are shown once**, at mint. No route returns one afterwards.
-
-## Traps already paid for — do not rediscover
-
-1. **CSP `form-action 'self'` governs the whole redirect chain after a form
-   POST.** It silently broke Twitch authorise *and* Buy / Support / Manage
-   subscription. curl cannot reproduce it. Fixed by naming the Stripe origins
-   and making Twitch a link. Guarded by `test_csp_form_action.py`.
-2. **OBS has no session.** Overlay paths must bypass the holding-page gate or
-   every overlay renders the holding page — on stream.
-3. **`ON CONFLICT` cannot use a PARTIAL unique index** unless the statement
-   repeats the predicate, and SQLAlchemy emits it as a bound parameter which
-   never matches. Every insert fails. Fixed by giving every event an id.
-4. **A source-reading test passed while that was broken.** Guards against SQL
-   behaviour belong on the migration.
-5. **Comments trip their own checks** — five times now. Strip docstrings and
-   comments before scanning source. `bot/tests/conftest.py` has `code_of`.
-6. **Prod containers are baked images.** A new migration or module needs
-   `--build` before it exists in the container.
-7. **`Astro.url` reports localhost behind Caddy.** Use `SITE_URL`.
-8. **A page can ship reachable by nobody.** `/collab` and `/official` were
-   built, deployed and in the sitemap with zero inbound links. Guarded now —
-   and the guard has to know that the instruments and the primary nav are
-   linked from DATA, not from literal hrefs.
-
-## Access facts
-
-- Deploy: `ssh -i ~/.ssh/agents_netcup deploy@159.195.251.161`,
-  then `cd /srv/shrutivtuber/prod && git pull && docker compose -f
-  docker-compose.yml -f docker-compose.prod.yml --profile web --profile bot up
-  -d --build`, then `alembic upgrade head`.
-- Secrets go in via `./scripts/set-secret.sh NAME` — echo off, never in chat.
-- `python3 bot/scripts/check-app.py` audits the Discord application.
-- `/home/sophia/stopextra` stops other Claude sessions, never its own.
-
-## Hers, not mine
-
-Live in `/admin/growth`. The three that matter most:
-
-1. **Change the Twitch category to Software and Game Development.** Two
-   minutes, free, highest leverage on the list — Astrology has no ranked
-   channels; Software and Game Development does 368,185 viewer-hours.
-2. **Email a Greek lawyer about the imprint address.** The only hard blocker.
-3. **Run vcordbot beside Pingcord for a week, then cancel.**
-
-Also outstanding: `/official` is live and empty; Stripe key rotation; and
-**nobody has ever completed a checkout in a browser** — worth doing now that
-the CSP bug is fixed.
+Each has a test. Every one of them looked completely fine.
