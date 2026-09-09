@@ -16,15 +16,38 @@ visitors do not.
 work that had never left this machine. The site's footer prints the deployed
 commit; that is the fastest way to settle "is this live".
 
+⚠ **Run it as `theourgia`, not as `deploy`.** The checkout and `.env` belong to
+uid 1008 and `deploy` is not in that group, so a plain `git pull` fails on
+FETCH_HEAD and compose fails on `.env` — both with permission errors that read
+like a broken box rather than a wrong user. `deploy` has passwordless sudo.
+
 ```bash
-cd /srv/shrutivtuber/prod && git pull --ff-only
-export SHRUTI_SOURCE_SHA=$(git rev-parse HEAD)
-dc --profile web --profile bot up -d --build
-dc exec -T backend alembic upgrade head
+ssh -i ~/.ssh/agents_netcup deploy@159.195.251.161
+sudo -u theourgia -H bash -lc '
+  cd /srv/shrutivtuber/prod && git pull --ff-only
+  export SHRUTI_SOURCE_SHA=$(git rev-parse HEAD)
+  docker compose -f docker-compose.yml -f docker-compose.prod.yml \
+    --profile web --profile bot up -d --build
+  docker compose -f docker-compose.yml -f docker-compose.prod.yml \
+    exec -T backend alembic upgrade head
+'
 ```
 
+(First time only: `git config --global --add safe.directory /srv/shrutivtuber/prod`.)
+
 ⚠ **Then seed the copy**, or new strings render fine and are missing from the
-admin. `docs/DEPLOY.md` has the command. Forgetting it stranded 61 strings.
+admin. Forgetting it stranded 61 strings once already.
+
+```bash
+node scripts/seed-copy.mjs --json > /tmp/copy.json      # locally
+scp -i ~/.ssh/agents_netcup /tmp/copy.json deploy@159.195.251.161:/tmp/
+ssh … 'sudo -u theourgia -H bash -lc "cd /srv/shrutivtuber/prod && \
+  docker compose -f docker-compose.yml -f docker-compose.prod.yml \
+  exec -T backend python scripts/seed_copy.py < /tmp/copy.json"'
+```
+
+⚠ The seeder reads **stdin**, not an argument. A path is silently a JSON parse
+error on the empty string.
 
 ## Done this session
 
