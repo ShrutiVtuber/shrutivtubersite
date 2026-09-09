@@ -18,6 +18,7 @@ import EmptyState from "../components/feedback/EmptyState.astro";
 import Button from "../components/forms/Button.astro";
 import { site, PATHS, type Project } from "../lib/api";
 import { copy } from "../lib/copy";
+import { instruments } from "../lib/instruments";
 
 /* Every word on this page, editable from the admin. The defaults below are
    what it was written with and what still renders if nothing was changed. */
@@ -37,17 +38,19 @@ const STATUS_WORD: Record<string, string> = {
   active: "Active", maintained: "Maintained", archived: "Archived",
 };
 
-const INSTRUMENTS: [string, string, string, string][] = [
-  ["☉", "Planetary hours", say("text.divided.light", "The day divided by its own light."), "/tools/planetary-hours"],
-  ["◉", "Solar stations", say("text.sunrise.culmination.sunset", "Sunrise, culmination, sunset and nadir — the adoration hours."), "/tools/solar-stations"],
-  ["☾", "Lunar stations", say("text.moonrise.culmination.moonset", "Moonrise, culmination, moonset and nadir, with the phase."), "/tools/lunar-stations"],
-  ["☽", "Attic calendar", say("text.lunisolar.month.kept", "The lunisolar month, kept current."), "/tools/attic-calendar"],
-  ["◐", "Pañcāṅga", say("text.five.limbs", "The five limbs of the day."), "/tools/pancanga"],
-  ["☾", "Hindu calendar", say("text.lunisolar.year.festivals", "The lunisolar year and its festivals."), "/tools/hindu-calendar"],
-  ["Σ", "Isopsephy", say("text.letter.reckoning.scripts", "Letter-reckoning in six scripts."), "/tools/isopsephy"],
-  ["✶", "Natal chart", say("text.figure.moment.place", "A figure for a moment and a place."), "/tools/natal-chart"],
-  ["●", "Sigil generator", say("text.intent.reduced.drawn", "Intent, reduced and drawn."), "/tools/sigil-generator"],
-];
+/* The instruments, from their own rows.
+ *
+ * This was a hardcoded list of nine, and by the time anybody looked it was
+ * three behind: the ephemeris, the events table and the horoscope desk all
+ * existed and none of them appeared here. A tool added to the table has to
+ * appear everywhere the tools are named, and the only way that holds is for
+ * "everywhere" to read the table.
+ *
+ * No filtering or sorting here: the endpoint already returns only visible
+ * rows, ordered by position. Repeating either would be a second opinion about
+ * what /tools shows, and the two would eventually differ.
+ */
+const INSTRUMENTS = await instruments();
 ---
 
 <BaseLayout
@@ -124,11 +127,11 @@ const INSTRUMENTS: [string, string, string, string][] = [
     />
     <div class="instrument-grid">
       {
-        INSTRUMENTS.map(([glyph, name, desc, href]) => (
-          <a class="instrument" href={href}>
-            <span aria-hidden="true" class="instrument-glyph t-glyph">{glyph}</span>
-            <span class="instrument-name">{name}</span>
-            <span class="instrument-desc">{desc}</span>
+        INSTRUMENTS.map((i) => (
+          <a class="instrument" href={`/tools/${i.slug}`}>
+            <span aria-hidden="true" class="instrument-glyph t-glyph">{i.glyph}</span>
+            <span class="instrument-name">{i.name}</span>
+            <span class="instrument-desc">{i.summary}</span>
           </a>
         ))
       }

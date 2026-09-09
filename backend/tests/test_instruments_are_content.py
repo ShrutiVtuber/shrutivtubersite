@@ -187,3 +187,45 @@ def test_the_landing_page_and_the_hub_read_the_rows() -> None:
             f"instruments from an array in the file, that is the second place "
             f"to edit them again."
         )
+
+
+def test_no_page_keeps_its_own_list_of_the_instruments() -> None:
+    """
+    A tool added to the table has to appear everywhere the tools are named.
+
+    /work kept a hardcoded list of nine, and by the time anybody looked it was
+    three behind: the ephemeris, the events table and the horoscope desk all
+    existed and none of them appeared on the portfolio page. Nothing was
+    broken, nothing errored, and the page looked complete — it was simply a
+    different list from the one on /tools.
+
+    The only way that holds is for "everywhere" to read the table. This refuses
+    a page that names three or more tool paths in a row, which is what a
+    hand-kept list looks like and what a contextual link never does.
+
+    Two links to specific tools is a page pointing somewhere on purpose —
+    /today sends you to the solar and lunar trackers for the day it is showing.
+    Three or more is a list.
+    """
+    import re as _re
+
+    site = REPO / "frontend" / "site" / "src"
+    if not site.is_dir():
+        site = REPO.parent / "frontend" / "site" / "src"
+
+    path = _re.compile(r'["\'`]/tools/([a-z0-9-]+)["\'`]')
+    offenders: list[str] = []
+    for f in sorted(site.rglob("*.astro")):
+        if f.name == "SiteFooter.astro":
+            # The footer is site navigation that happens to include a few
+            # tools, not a list OF the tools. It is curated on purpose.
+            continue
+        slugs = {m.group(1) for m in path.finditer(f.read_text(encoding="utf-8"))}
+        if len(slugs) >= 3:
+            offenders.append(f"{f.relative_to(site)}: {sorted(slugs)}")
+
+    assert not offenders, (
+        "these pages keep their own list of the instruments and will drift "
+        "from the table; read `instruments()` instead:\n  "
+        + "\n  ".join(offenders)
+    )
