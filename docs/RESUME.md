@@ -122,7 +122,24 @@ Outstanding items from the practice plan, all done:
    decides who hears what. Triggers wired for readings published, replies to
    your practice reading, and going live.
 
-### ⚠ Two things only she can do
+### ⚠ Her own compatibility test needs her chart
+
+`/compatible-with/shruti` has no test behind it on production yet, because
+setting one up means naming a chart — and inventing a birth moment for her would
+be worse than leaving it empty. One call once she has cast and kept hers:
+
+```bash
+# the owner token of a chart on her account
+curl -X POST https://shrutivtuber.com/api/standing/admin \
+  -H "Content-Type: application/json" -b "shruti_session=<her admin session>" \
+  -d '{"chart":"<owner token>","slug":"shruti","host_name":"Shruti",
+       "blurb":"For fun. It means nothing, and it is quite fun."}'
+```
+
+It is permanent, and re-running it repoints the existing one rather than
+refusing.
+
+### ⚠ Three things only she can do
 
 **Firebase**, for notifications to actually leave the building, and
 **MESSAGE_CONTENT** in the Discord developer portal for the bridge's inbound
