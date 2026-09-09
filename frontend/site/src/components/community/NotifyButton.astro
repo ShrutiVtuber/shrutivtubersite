@@ -1,5 +1,6 @@
 ---
 import { copy } from "../../lib/copy";
+import Copy from "../content/Copy.astro";
 
 /* Every word here, editable from the admin. The defaults below are what
    it was written with and what still renders if nothing was changed. */
@@ -28,8 +29,7 @@ const say = await copy("component:NotifyButton");
 
 <noscript>
   <p class="n-fine">
-    Notifications need scripting. <a href="/newsletter">{say("text.1", "The monthly letter")}</a>
-    does not, and neither does the schedule.
+    <Copy text={say("text.1", "Notifications need scripting. [The monthly letter](/newsletter) does not, and neither does the schedule.")} />
   </p>
 </noscript>
 

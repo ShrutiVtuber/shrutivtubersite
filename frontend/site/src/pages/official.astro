@@ -19,6 +19,7 @@ import EmptyState from "../components/feedback/EmptyState.astro";
 import { pageSections } from "../lib/content";
 import { site } from "../lib/api";
 import { copy } from "../lib/copy";
+import Copy from "../components/content/Copy.astro";
 
 /* Every word on this page, editable from the admin. The defaults below are
    what it was written with and what still renders if nothing was changed. */
@@ -89,9 +90,7 @@ const host = (url: string) => {
           <h2>{say("if-you-find-something-th.1", "If you find something that is not here")}</h2>
           <p>{say("if-you-find-something-th.2", "It is not mine, whatever it says about itself. Some of these copy a creator's art, their name and even the word “official” onto a storefront that has nothing to do with them. Nobody is expected to spot that from the page itself — that is why this list exists.")}</p>
           <p>
-            Do not buy from it, and if you have the time,{" "}
-            <a href="/contact">tell me</a>. Knowing which ones exist is most of
-            what I can do about them.
+            <Copy text={say("if-you-find-something-th.3", "Do not buy from it, and if you have the time, [tell me](/contact). Knowing which ones exist is most of what I can do about them.")} />
           </p>
         </section>
       </>

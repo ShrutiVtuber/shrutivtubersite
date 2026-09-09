@@ -22,6 +22,7 @@ import CsrfField from "../components/forms/CsrfField.astro";
 import { SITE_API } from "../lib/api";
 import { verifyCsrf } from "../lib/csrf";
 import { copy } from "../lib/copy";
+import Copy from "../components/content/Copy.astro";
 
 /* Every word on this page, editable from the admin. The defaults below are
    what it was written with and what still renders if nothing was changed. */
@@ -193,11 +194,13 @@ const extra = sections.filter((s) => s.key !== "intro");
 
     <section class="ask">
       <h2>{say("ask-something.1", "Ask something")}</h2>
+      {/* One string, bold and all.
+          
+          It was three pieces: two runs of prose hardcoded around an editable
+          <strong>. Only the bold half could be changed, which is the worst of
+          both — the sentence is visibly editable and mostly is not. */}
       <p class="ask-why">
-        Different from the form above. That one reaches an inbox and gets a reply to you; this
-        one may be answered here, in public, where the next person with the same question can
-        read it. <strong>{say("ask-something.2", "Nothing appears until she has approved it")}</strong>, and you can leave
-        the name blank.
+        <Copy text={say("ask-something.2", "Different from the form above. That one reaches an inbox and gets a reply to you; this one may be answered here, in public, where the next person with the same question can read it. **Nothing appears until she has approved it**, and you can leave the name blank.")} />
       </p>
 
       {asked ? (

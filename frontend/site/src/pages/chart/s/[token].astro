@@ -24,6 +24,7 @@ import { verifyCsrf } from "../../../lib/csrf";
 import CsrfField from "../../../components/forms/CsrfField.astro";
 import Button from "../../../components/forms/Button.astro";
 import { copy } from "../../../lib/copy";
+import Copy from "../../../components/content/Copy.astro";
 
 /* Every word on this page, editable from the admin. The defaults below are
    what it was written with and what still renders if nothing was changed. */
@@ -155,8 +156,7 @@ const FIGURE = { wheel: "a wheel", north: say("text.north.indian.square", "a Nor
                 form here would mean a second copy of the consent handling,
                 and that is the part of this site not to have two of. */}
             <p class="fine">
-              There is also <a href="/newsletter" data-track="newsletter:from-share">{say("cast-your-own.3", "a monthly letter")}</a> — what shipped, what the sky is doing, and the occasional paid thing.
-              One click to leave, from any issue.
+              <Copy text={say("cast-your-own.3", "There is also [a monthly letter](/newsletter) — what shipped, what the sky is doing, and the occasional paid thing. One click to leave, from any issue.")} />
             </p>
           </section>
         </>

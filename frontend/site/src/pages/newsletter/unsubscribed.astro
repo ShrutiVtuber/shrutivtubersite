@@ -37,13 +37,18 @@ if (token) {
         : say("done.unknown", "That address will not get the letter again.")}
       {" "}{say("done.tail", "No further email, and nothing else needed from you.")}
     </p>
-    {/* Mentioned once. Then it stops. */}
+    {/* Mentioned once. Then it stops.
+        
+        The link's HREF carries a token, so the address is a value rather than
+        something she would ever type. `{pause}` keeps the sentence whole and
+        the token out of the admin. */}
     {
       ok && token && (
         <p class="body quiet">
-          If you only wanted a break rather than an ending, there is a pause —
-          <a href={`/newsletter/preferences?token=${encodeURIComponent(token)}`}>{say("text.4", "here")}</a>. It deletes
-          nothing.
+          <Copy
+            text={say("text.4", "If you only wanted a break rather than an ending, there is [a pause]({pause}). It deletes nothing.")}
+            vars={{ pause: `/newsletter/preferences?token=${encodeURIComponent(token)}` }}
+          />
         </p>
       )
     }

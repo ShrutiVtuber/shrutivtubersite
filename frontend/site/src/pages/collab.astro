@@ -253,10 +253,13 @@ const COMMON = [
             </ul>
           ) : (
             <p class="cb-none">
-              The best any hour manages is{" "}
-              <strong>{Math.max(...columns.map((c) => c.count))} of {people.length}</strong>.
-              Widening one person's window by an hour is usually enough — the grid
-              below shows who is the constraint.
+              <Copy
+                text={say("text.9", "The best any hour manages is **{best} of {people}**. Widening one person's window by an hour is usually enough — the grid below shows who is the constraint.")}
+                vars={{
+                  best: String(Math.max(...columns.map((c) => c.count))),
+                  people: String(people.length),
+                }}
+              />
             </p>
           )}
         </section>

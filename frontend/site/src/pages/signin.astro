@@ -67,9 +67,15 @@ if (Astro.request.method === "POST") {
         /* The state where people get lost, designed rather than implied. */
         <div class="check">
           <SectionHeader as="h1" glyph="☾" eyebrow={say("text.7", "Check your email")} title={say("text.8", "The link is on its way")} />
+          {/* Three pieces before: an address, and two editable words with
+              hardcoded prose between them. The whole line is one string now,
+              so "once" and "20 minutes" can be reworded together with the
+              sentence that carries them. */}
           <p class="check-body">
-            Sent to <strong>{values.email}</strong>. It works <strong>{say("text.15", "once")}</strong> and expires in
-            <strong>{say("text.16", "20 minutes")}</strong>.
+            <Copy
+              text={say("text.15", "Sent to **{email}**. It works **once** and expires in **20 minutes**.")}
+              vars={{ email: values.email }}
+            />
           </p>
           <p class="check-body">{say("text.1", "Nothing yet? It sometimes lands in spam — and if the address has no account here, no mail is sent at all, which is deliberate: whether an address has an account is not something a stranger gets to learn from this form.")}</p>
           <div class="check-actions">
@@ -114,7 +120,9 @@ if (Astro.request.method === "POST") {
             {/* Reader accounts and the site owner's admin are separate systems
                 with separate credentials. Saying so here costs nothing and
                 saves the owner concluding her password is broken. */}
-            <p class="admin-hint">Looking for the site admin? That is <a href="/admin">{say("text.3", "a separate sign-in")}</a>.</p>
+            <p class="admin-hint">
+    <Copy text={say("text.3", "Looking for the site admin? That is [a separate sign-in](/admin).")} />
+  </p>
           </form>
         </>
       )

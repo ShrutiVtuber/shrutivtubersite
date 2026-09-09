@@ -22,6 +22,7 @@ import { savedPlace } from "../../lib/account";
 import FestivalMonths from "../../components/tools/FestivalMonths.astro";
 import { byMonth, corpus } from "../../lib/festivals";
 import { copy } from "../../lib/copy";
+import Copy from "../../components/content/Copy.astro";
 
 /* Every word here, editable from the admin. The defaults below are what
    it was written with and what still renders if nothing was changed. */
@@ -175,9 +176,10 @@ const RULE_NAME: Record<string, string> = {
         {
           d.day.number > 20 && (
             <p class="note">
-              Past the twentieth the days are counted <strong>{say("text.15", "backwards")}</strong>: this is
-              {" "}{d.day.remaining} from the end, not {d.day.number} from the beginning. The last day of the
-              month is ἕνη καὶ νέα, “old and new”, and belongs to both months at once.
+              <Copy
+                text={say("text.15", "Past the twentieth the days are counted **backwards**: this is {remaining} from the end, not {number} from the beginning. The last day of the month is ἕνη καὶ νέα, “old and new”, and belongs to both months at once.")}
+                vars={{ remaining: String(d.day.remaining), number: String(d.day.number) }}
+              />
             </p>
           )
         }

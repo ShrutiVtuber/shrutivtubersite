@@ -1,5 +1,6 @@
 ---
 import { copy } from "../../lib/copy";
+import Copy from "../content/Copy.astro";
 
 /* Every word here, editable from the admin. The defaults below are what
    it was written with and what still renders if nothing was changed. */
@@ -20,8 +21,7 @@ const say = await copy("component:HoldingNotice");
 <div class="holding-notice" role="status">
   <span class="hn-dot" aria-hidden="true"></span>
   <p>
-    <strong>{say("text.1", "Only you can see this.")}</strong> Visitors get the holding page —
-    you are signed in as the site owner.
+    <Copy text={say("text.1", "**Only you can see this.** Visitors get the holding page — you are signed in as the site owner.")} />
   </p>
   <span class="hn-links">
     <a href="/coming-soon">{say("text.2", "See what they see")}</a>

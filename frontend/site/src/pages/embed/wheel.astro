@@ -21,6 +21,7 @@ import "../../styles/global.css";
 import TransitWheel from "../../components/chart/TransitWheel.astro";
 import { askAstro, SITE_URL } from "../../lib/api";
 import { ZODIAC } from "../../lib/signs";
+import Copy from "../../components/content/Copy.astro";
 import { copy } from "../../lib/copy";
 
 /* Every word here, editable from the admin. The defaults below are what
@@ -73,9 +74,17 @@ const when = at.slice(0, 16).replace("T", " ");
       <p class="held">{say("text.1", "The ephemeris could not be reached.")}</p>
     )
   }
+  {/* How she is credited on somebody else's page.
+      
+      This is the one line of the widget a stranger reads, and it was the last
+      piece of prose on the site that could not be changed from the admin —
+      which made "shrutivtuber.com" the one word here she could not rewrite. */}
   <p class="credit">
     <a href={here} target="_blank" rel="noopener">
-      {when} UT{rising ? ` · ${rising} rising` : ""} — shrutivtuber.com
+      <Copy
+        text={say("credit", "{when} UT{rising} — shrutivtuber.com")}
+        vars={{ when, rising: rising ? ` \u00b7 ${rising} rising` : "" }}
+      />
     </a>
   </p>
 </body>

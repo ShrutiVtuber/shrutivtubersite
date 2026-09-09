@@ -26,6 +26,7 @@ import { askAstro, SITE_API } from "../../lib/api";
 import { account, asReader } from "../../lib/account";
 import { verifyCsrf } from "../../lib/csrf";
 import { copy } from "../../lib/copy";
+import Copy from "../../components/content/Copy.astro";
 
 /* Every word on this page, editable from the admin. The defaults below are
    what it was written with and what still renders if nothing was changed. */
@@ -379,9 +380,10 @@ const ASPECT_BASIS: Record<string, string> = {
           {
             unknownTime && moonRange && (
               <p class="moon-range">
-                <strong>{say("positions.2", "Moon across the day:")}</strong>{" "}
-                <span class="t-tabular">{moonRange.start}</span> at midnight to{" "}
-                <span class="t-tabular">{moonRange.end}</span> at the day's end.
+                <Copy
+                  text={say("positions.2", "**Moon across the day:** {start} at midnight to {end} at the day's end.")}
+                  vars={{ start: moonRange.start, end: moonRange.end }}
+                />
               </p>
             )
           }
@@ -408,9 +410,15 @@ const ASPECT_BASIS: Record<string, string> = {
             <section class="sect">
               <h2>{say("sect.1", "Sect")}</h2>
               <p>
-                A <strong>{d.sect.isDay ? "day" : "night"}</strong> chart. Luminary of the sect:
-                {" "}{d.sect.luminary}. Benefic of the sect: {d.sect.benefic}. Malefic:
-                {" "}{d.sect.malefic}.
+                <Copy
+                  text={say("sect.2", "A **{sect}** chart. Luminary of the sect: {luminary}. Benefic of the sect: {benefic}. Malefic: {malefic}.")}
+                  vars={{
+                    sect: d.sect.isDay ? "day" : "night",
+                    luminary: d.sect.luminary,
+                    benefic: d.sect.benefic,
+                    malefic: d.sect.malefic,
+                  }}
+                />
               </p>
             </section>
           )

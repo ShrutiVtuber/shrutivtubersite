@@ -440,3 +440,65 @@ def test_the_copy_helper_never_appears_inside_a_client_script() -> None:
         "the copy helper is inside client code and will render literally: "
         f"{offenders}"
     )
+
+
+def test_no_prose_is_stranded_around_inline_markup() -> None:
+    """
+    A sentence with a bold run or a link in it must be ONE editable string.
+
+    The failure she found: on /contact the bold half was editable and the two
+    runs of prose around it were not. The sentence looks editable, mostly is
+    not, and the panel offers a fragment — "Nothing appears until she has
+    approved it" — with no way to reach the words on either side of it.
+
+    Splitting is not the fix either. Three boxes for one sentence is a worse
+    editing experience than none: she cannot read the sentence, and moving the
+    bold means retyping both halves. `Copy` renders inline markdown from a
+    single string, which is what these are converted to.
+
+    Checks the TEMPLATE, not the rendered page, because the rendered page looks
+    completely normal either way.
+    """
+    import re as _re
+
+    inline = r"(?:strong|em|b|i|code|a|abbr)"
+    prose = _re.compile(r"^[A-Za-z][A-Za-z0-9 ,.;:'’—–\-()!?]{11,}$")
+
+    def outside_braces(text: str) -> str:
+        out, depth = [], 0
+        for ch in text:
+            if ch == "{":
+                depth += 1
+            elif ch == "}":
+                depth = max(0, depth - 1)
+            elif depth == 0:
+                out.append(ch)
+        return "".join(out)
+
+    offenders: list[str] = []
+    for f in sorted(SRC.rglob("*.astro")):
+        if "/admin/" in str(f) or "/overlay/" in str(f):
+            continue
+        text = f.read_text(encoding="utf-8")
+        if text.startswith("---"):
+            end = text.find("---", 3)
+            if end > 0:
+                text = text[end + 3:]
+        text = _re.sub(r"<script[\s>].*?</script>", " ", text, flags=_re.S | _re.I)
+        text = _re.sub(r"<style[\s>].*?</style>", " ", text, flags=_re.S | _re.I)
+
+        for block in _re.finditer(r"<(p|li|h[1-6])\b[^>]*>(.*?)</\1>", text, _re.S):
+            inner = block.group(2)
+            if not _re.search(rf"<{inline}\b", inner):
+                continue
+            bare = _re.sub(r"<[^>]*>", "\x00", outside_braces(inner))
+            for run in bare.split("\x00"):
+                cleaned = _re.sub(r"\s+", " ", run).strip()
+                if prose.match(cleaned) and " " in cleaned:
+                    offenders.append(f"{f.relative_to(SRC)}: {cleaned[:56]!r}")
+
+    assert not offenders, (
+        "prose stranded beside inline markup — wrap the whole sentence in "
+        "<Copy text={say(...)} /> with the emphasis as markdown:\n  "
+        + "\n  ".join(offenders[:8])
+    )

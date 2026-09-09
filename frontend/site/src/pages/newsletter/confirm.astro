@@ -6,6 +6,7 @@ import EmptyState from "../../components/feedback/EmptyState.astro";
 import Button from "../../components/forms/Button.astro";
 import { SITE_API } from "../../lib/api";
 import { copy } from "../../lib/copy";
+import Copy from "../../components/content/Copy.astro";
 
 /* Every word on this page, editable from the admin. The defaults below are
    what it was written with and what still renders if nothing was changed. */
@@ -34,9 +35,15 @@ if (token) {
       ok ? (
         <>
           <SectionHeader as="h1" glyph="☾" eyebrow="Confirmed" title={say("text.6", "You're on the list")} />
+          {/* The address is a VALUE in the sentence, not a fragment of it.
+              Split around it she gets an empty box and " will get the letter
+              once a month"; with a placeholder the whole line stays one
+              string and the address can be moved or dropped. */}
           <p class="body">
-            <strong>{email}</strong> will get the letter once a month. The first one goes out at the
-            new moon after it is written.
+            <Copy
+              text={say("text.7", "**{email}** will get the letter once a month. The first one goes out at the new moon after it is written.")}
+              vars={{ email }}
+            />
           </p>
           <p class="body quiet">{say("text.1", "One click unsubscribes from any issue, with no login. You can also just pause it — pausing deletes nothing and your consent stays exactly as it is.")}</p>
           <div class="actions">

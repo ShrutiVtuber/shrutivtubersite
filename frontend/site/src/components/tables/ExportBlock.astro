@@ -1,5 +1,6 @@
 ---
 import { copy } from "../../lib/copy";
+import Copy from "../content/Copy.astro";
 
 /* Every word here, editable from the admin. The defaults below are what
    it was written with and what still renders if nothing was changed. */
@@ -56,9 +57,7 @@ const {
     <div class="eb-col">
       <h2 class="eb-sub">{say("download-a-snapshot.1", "Download a snapshot")}</h2>
       <p class="eb-body">
-        A fixed <code class="eb-inline">.ics</code> file of the range shown. It does not update —
-        <strong>{say("download-a-snapshot.2", "it will go stale")}</strong>, so take it only if you want exactly these dates and
-        nothing more.
+        <Copy text={say("download-a-snapshot.2", "A fixed `.ics` file of the range shown. It does not update — **it will go stale**, so take it only if you want exactly these dates and nothing more.")} />
       </p>
       <div><a class="eb-secondary" href={fileHref} download={fileName}>{say("download-a-snapshot.3", "Download .ics")}</a></div>
       {fileScope && <span class="t-tabular eb-meta">{fileScope}</span>}
