@@ -228,7 +228,7 @@ const monthName = new Date(Date.UTC(year, mon - 1, 1))
                           <span class="sg" title={p.sign}>{SIGN_GLYPH[p.sign] ?? p.sign}</span>
                           {/* Never colour alone: retrograde is a mark, and it is
                               the mark the printed page uses. */}
-                          {p.retrograde && <b class="rx" aria-label="retrograde"> ℞</b>}
+                          {p.retrograde && <b class="rx" aria-label={say("text.6", "retrograde")}> ℞</b>}
                         </>
                       )}
                     </td>

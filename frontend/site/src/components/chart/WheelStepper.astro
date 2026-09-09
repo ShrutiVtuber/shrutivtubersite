@@ -46,13 +46,13 @@ const { from, to, at, marks = [], modern = false } = Astro.props;
      data-modern={modern ? "1" : ""}
      data-marks={JSON.stringify(marks)}>
   <div class="controls">
-    <button type="button" data-step="-1440" title="Back a day">‹‹</button>
+    <button type="button" data-step="-1440" title={say("text.6", "Back a day")}>‹‹</button>
     <button type="button" data-step="-60" title={say("text.1", "Back an hour")}>‹</button>
     <output class="at" data-at-label>{at.slice(0, 16).replace("T", " ")} UT</output>
-    <button type="button" data-step="60" title="On an hour">›</button>
-    <button type="button" data-step="1440" title="On a day">››</button>
+    <button type="button" data-step="60" title={say("text.7", "On an hour")}>›</button>
+    <button type="button" data-step="1440" title={say("text.8", "On a day")}>››</button>
     <button type="button" data-snap="-1" title={say("text.2", "Previous event")}>{say("text.4", "⇤ event")}</button>
-    <button type="button" data-snap="1" title="Next event">{say("text.5", "event ⇥")}</button>
+    <button type="button" data-snap="1" title={say("text.9", "Next event")}>{say("text.5", "event ⇥")}</button>
   </div>
   <input type="range" class="scrub" data-scrub min="0" max="1000" value="0"
          aria-label={say("text.3", "Move through the period")} />

@@ -33,7 +33,7 @@ const sections = await pageSections("terms");
 
 <BaseLayout title={say("text.1", "Terms — Shruti")} description={say("text.2", "The terms this site is used under.")}>
   <div class="page legal-page">
-    <SectionHeader as="h1" glyph="○" eyebrow="Legal" title="Terms" />
+    <SectionHeader as="h1" glyph="○" eyebrow="Legal" title={say("text.5", "Terms")} />
     {
       sections.length > 0 ? (
         <div class="legal-body">

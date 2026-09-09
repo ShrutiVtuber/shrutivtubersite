@@ -216,8 +216,8 @@ const ALMANAC = [
           <p class="t-eyebrow">{say("text.10", "Your half of it")}</p>
           <h2>{say("one-submit-does-all-thre.1", "One submit does all three.")}</h2>
           <ol class="cx-roman">
-            <li><span class="cx-num t-tabular">i</span><span>{say("one-submit-does-all-thre.2", "Casts your chart from the Swiss Ephemeris — the same engine as the natal instrument.")}</span></li>
-            <li><span class="cx-num t-tabular">ii</span><span>{say("one-submit-does-all-thre.3", "Keeps it behind a link that only you have.")}</span></li>
+            <li><span class="cx-num t-tabular">{say("text.36", "i")}</span><span>{say("one-submit-does-all-thre.2", "Casts your chart from the Swiss Ephemeris — the same engine as the natal instrument.")}</span></li>
+            <li><span class="cx-num t-tabular">{say("text.37", "ii")}</span><span>{say("one-submit-does-all-thre.3", "Keeps it behind a link that only you have.")}</span></li>
             <li><span class="cx-num t-tabular">{say("text.18", "iii")}</span><span>{say("one-submit-does-all-thre.4", "Makes one invitation to hand to anybody. They fill in their half; the comparison appears for both of you.")}</span></li>
           </ol>
 
@@ -304,7 +304,7 @@ const ALMANAC = [
 
               <label class="cx-field">
                 <span class="cx-flabel">Name or handle <em class="cx-opt">{say("text.25", "optional")}</em></span>
-                <input class="cx-input" name="label" maxlength="80" placeholder="Someone" value={name} />
+                <input class="cx-input" name="label" maxlength="80" placeholder={say("text.38", "Someone")} value={name} />
                 <span class="cx-help">{say("now-hand-it-to-somebody.10", "Whatever should sit under your face on the card. Leave it and you are “Someone”.")}</span>
               </label>
 

@@ -47,7 +47,7 @@ const asks = !signedIn || !hasNativityConsent;
     <input type="hidden" name="action" value="keep" />
     <label class="keep-name">
       <span>{say("keep-this-chart.3", "Call it something")}</span>
-      <input type="text" name="label" maxlength="80" placeholder="Mine" autocomplete="off" />
+      <input type="text" name="label" maxlength="80" placeholder={say("text.2", "Mine")} autocomplete="off" />
     </label>
 
     {

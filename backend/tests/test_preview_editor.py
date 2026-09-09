@@ -148,4 +148,7 @@ def test_the_panel_says_when_a_picture_has_nowhere_to_render():
     """
     code = code_of(PREVIEW)
     assert "pic-unused" in code
-    assert "does not show a block image" in code
+    # The note used to say "block image". Blocks were the only pictures the
+    # panel could set; it now sets a content row's picture and a copy string
+    # that holds one, so the wording covers all three.
+    assert "does not show this picture" in code

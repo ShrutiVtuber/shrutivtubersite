@@ -40,7 +40,7 @@ const items = windowed(page, pageCount);
       ),
     )
   }
-  <a data-p href={hrefFor(page + 1)} aria-disabled={page >= pageCount || undefined} aria-label="Next page">›</a>
+  <a data-p href={hrefFor(page + 1)} aria-disabled={page >= pageCount || undefined} aria-label={say("text.2", "Next page")}>›</a>
 </nav>
 
 <style>

@@ -300,7 +300,7 @@ const consentSent =
 </div>
 <form id="sub" method="POST">
 <input type="hidden" name="_csrf" value={csrf} />
-<label><span>{say("text.10", "Email address")}</span><input type="email" name="email" required placeholder="you@example.com" autocomplete="email" /></label>
+<label><span>{say("text.10", "Email address")}</span><input type="email" name="email" required placeholder={say("text.34", "you@example.com")} autocomplete="email" /></label>
 <button type="submit" id="subbtn">{sent ? "Check your email" : "Send me the letter"}</button>
 </form>
 <p class="consent" id="consent">{sent ? consentSent : failed ? failed : consentDefault}</p>
@@ -320,7 +320,7 @@ const consentSent =
 <div class="foot">
 <p class="imprint" set:html={imprintHtml}></p>
 <p>© <span id="yr">{year}</span> {holder} · <a href="/privacy">{say("text.18", "Privacy")}</a> · <a href="/terms">{say("text.19", "Terms")}</a></p>
-<span class="seal" title={say("text.8", "Soror Eu. A.")}>S∴E.A.</span>
+<span class="seal" title={say("text.8", "Soror Eu. A.")}>{say("text.33", "S∴E.A.")}</span>
 </div>
 </footer>
 </div>

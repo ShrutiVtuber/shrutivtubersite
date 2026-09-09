@@ -147,9 +147,9 @@ const year = new Date().getUTCFullYear();
         <a href={sourceHref()} rel="noopener">{say("source.link", "Read or fork its source")}</a>
         {sourceBuild() && <span class="t-tabular"> · {sourceBuild()}</span>}
         {" · "}
-        <a href={LICENCE_URL} rel="noopener license">AGPL-3.0</a>
+        <a href={LICENCE_URL} rel="noopener license">{say("text.8", "AGPL-3.0")}</a>
       </p>
-      <span class="seal seal-ring" title={say("text.1", "Soror Eu. A.")}>S∴E.A.</span>
+      <span class="seal seal-ring" title={say("text.1", "Soror Eu. A.")}>{say("text.9", "S∴E.A.")}</span>
     </div>
   </div>
 </footer>

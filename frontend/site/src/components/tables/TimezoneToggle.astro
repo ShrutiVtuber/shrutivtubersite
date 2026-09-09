@@ -16,12 +16,12 @@ const say = await copy("component:TimezoneToggle");
 interface Props { value?: "local" | "athens"; }
 const { value = "athens" } = Astro.props;
 ---
-<div class="sh-tz" role="group" aria-label="Timezone" data-tz-toggle>
+<div class="sh-tz" role="group" aria-label={say("text.23", "Timezone")} data-tz-toggle>
   <button type="button" aria-pressed={value === "local"} data-tz="local">
     {say("text.20", "Your time")} <span class="sh-tz-zone" data-tz-zone></span>
   </button>
   <button type="button" aria-pressed={value === "athens"} data-tz="athens">
-    {say("text.21", "Athens")} <span class="sh-tz-zone">GMT+3</span>
+    {say("text.21", "Athens")} <span class="sh-tz-zone">{say("text.22", "GMT+3")}</span>
   </button>
 </div>
 

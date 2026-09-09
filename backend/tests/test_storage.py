@@ -8,9 +8,12 @@ against R2 with a 403 and no useful message, which is a bad way to find out.
 """
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import hashlib
 import hmac
 
+from shruti.core import storage
 from shruti.core.storage import authorization_header, public_url, signing_key
 
 
@@ -61,9 +64,25 @@ def test_the_payload_hash_is_of_the_actual_body():
     assert a["Authorization"] != b["Authorization"]
 
 
-def test_urls_fall_back_to_local_when_r2_is_not_configured():
-    """A half-configured bucket must not produce URLs that 404."""
+def test_urls_fall_back_to_local_when_r2_is_not_configured(monkeypatch):
+    """A half-configured bucket must not produce URLs that 404.
+
+    ⚠ The configuration is forced, not inherited. This used to call
+    `public_url` and trust the machine, so it passed on a laptop with no bucket
+    and failed on one with `.env` filled in — a red test that says nothing
+    about the code is worse than no test, because the next person learns to
+    scroll past it.
+    """
+    monkeypatch.setattr(storage, "r2_configured", lambda: False)
     assert public_url("abc.png") == "/media/abc.png"
+
+
+def test_urls_go_through_this_site_when_r2_is_on_without_a_public_base(monkeypatch):
+    """The other branch, pinned for the same reason."""
+    monkeypatch.setattr(storage, "r2_configured", lambda: True)
+    monkeypatch.setattr(storage, "get_settings",
+                        lambda: SimpleNamespace(r2_public_base=""))
+    assert public_url("abc.png") == "/api/media/abc.png"
 
 
 # ── where a stored file is read from ────────────────────────────────────────

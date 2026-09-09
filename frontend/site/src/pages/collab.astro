@@ -204,7 +204,7 @@ const COMMON = [
             </label>
             <label>
               <span>{say("text.14", "Timezone")}</span>
-              <input name={`z${i}`} list="zones" value={p?.zone ?? ""} placeholder="Europe/Athens" />
+              <input name={`z${i}`} list="zones" value={p?.zone ?? ""} placeholder={say("text.19", "Europe/Athens")} />
             </label>
             <div class="cb-window">
               <label>
@@ -227,7 +227,7 @@ const COMMON = [
 
       <div class="cb-actions">
         <label class="cb-date">
-          <span>On</span>
+          <span>{say("text.18", "On")}</span>
           <input type="date" name="on" value={when} />
         </label>
         <Button type="submit">{say("text.16", "Work it out")}</Button>

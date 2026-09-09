@@ -34,7 +34,7 @@ const sections = await pageSections("privacy");
 
 <BaseLayout title={say("text.1", "Privacy — Shruti")} description={say("text.2", "What is collected, why, and how to get it back or delete it.")}>
   <div class="page legal-page">
-    <SectionHeader as="h1" glyph="◐" eyebrow="Legal" title="Privacy" />
+    <SectionHeader as="h1" glyph="◐" eyebrow="Legal" title={say("text.5", "Privacy")} />
     {
       sections.length > 0 ? (
         <div class="legal-body">

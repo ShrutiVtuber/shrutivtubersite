@@ -56,13 +56,14 @@ const current = (href: string) => (href === "/" ? here === "/" : here.startsWith
       <a class="brand" href="/" aria-label={say("text.1", "Shruti — home")}>
         {
           withArt ? (
-            <img src="/brand/wordmark-small.png" alt="Shruti" />
+            <img src={say("brand.wordmark", "/brand/wordmark-small.png", "Wordmark")}
+                 alt={say("brand.wordmark.alt", "Shruti", "Wordmark alt text")} />
           ) : (
             <span class="brand-word">{say("text.5", "Shruti")}</span>
           )
         }
       </a>
-      <nav class="site-nav" aria-label="Primary">
+      <nav class="site-nav" aria-label={say("text.31", "Primary")}>
         {
           NAV.filter(([href]) => visible(href)).map(([href, label]) => (
             <a href={href} aria-current={current(href) ? "page" : undefined}>

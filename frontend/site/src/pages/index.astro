@@ -152,7 +152,13 @@ const socials: SocialLink[] = Object.values(links?.groups ?? {})
    missing. Clouds are deliberately not layered in yet: the delivered PNG is
    6.5MB, and the readme is explicit that the sky is fully designed without
    it. Optimising that asset is a task, not a licence to ship it as-is. */
-const AVATAR = "/brand/avatar-square.png";
+/* The hero picture, as an editable string rather than a constant.
+ *
+ * She could change every word on this page and not the face at the top of it —
+ * "I can't edit the picture in the hero on the home page". A path through
+ * say() is a copy row like any other, so the editor can point it at a different
+ * image; the default here still renders if nobody ever touches it. */
+const AVATAR = say("hero.art", "/brand/avatar-square.png", "Hero picture");
 
 /* Named by the question each one answers, not by what it is. "Pañcāṅga" means
    nothing to someone who has not met it; "the five limbs of the day, and when

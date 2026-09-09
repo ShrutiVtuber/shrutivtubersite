@@ -3,6 +3,8 @@
 interface Tag { href: string; label: string; count: number | null; current: boolean }
 interface Props { eyebrow: string; title: string; lede?: string; count?: string; tags?: Tag[] }
 const { eyebrow, title, lede, count, tags = [] } = Astro.props;
+import { copy } from "../../lib/copy";
+const say = await copy("component:Masthead");
 ---
 <header class="j-masthead">
   <div class="j-masthead-text">
@@ -13,7 +15,7 @@ const { eyebrow, title, lede, count, tags = [] } = Astro.props;
   </div>
   {
     tags.length > 0 && (
-      <nav class="j-tags" aria-label="Categories">
+      <nav class="j-tags" aria-label={say("text.1", "Categories")}>
         {tags.map((t) => (
           <a class="j-tag" href={t.href} aria-current={t.current ? "page" : undefined}>
             {t.label}{t.count !== null && <b>{t.count}</b>}

@@ -31,7 +31,7 @@ const WORD: Record<string, string> = {
 };
 ---
 
-<nav class="ll" aria-label="Lessons">
+<nav class="ll" aria-label={say("text.2", "Lessons")}>
   {
     modules.map((m) => (
       <section class="ll-part">

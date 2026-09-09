@@ -104,7 +104,7 @@ const moonProgress = today ? (today.moon.tropical.degree % 30) / 30 : 0;
 >
   <div class="page today">
     <SectionHeader
-      as="h1" glyph="☾︎" eyebrow={say("text.5", "Day at a glance")} title="Today"
+      as="h1" glyph="☾︎" eyebrow={say("text.5", "Day at a glance")} title={say("text.20", "Today")}
       body={say("text.6", "What the sky is doing right now, here. Everything on this page works without an account.")}
     />
 
@@ -225,7 +225,7 @@ const moonProgress = today ? (today.moon.tropical.degree % 30) / 30 : 0;
                 <li>
                   <span class="body-name">{b.name}</span>
                   <span class="t-tabular body-pos">{b.sign}</span>
-                  {b.retrograde && <span class="retro" title="retrograde">℞</span>}
+                  {b.retrograde && <span class="retro" title={say("text.21", "retrograde")}>℞</span>}
                 </li>
               ))}
             </ul>

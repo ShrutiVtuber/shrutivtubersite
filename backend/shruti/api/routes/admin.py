@@ -35,6 +35,7 @@ from shruti.models import (BannedEmail, Course, FanArt, Product, ProductPhoto,
     ContactMessage, Credit, GrowthItem, Media, OfficialPlace, ProfileField,
     Project, Question,
     CardDesign, Outfit, ScheduleEntry, Section, SocialLink, Sponsor, Tool,
+    Lesson, Module, Poll, PollOption, Tier,
 )
 
 log = logging.getLogger(__name__)
@@ -442,6 +443,216 @@ def _model(kind: str) -> type[SQLModel]:
 
 def _order(model: type[SQLModel]):
     return model.position if hasattr(model, "position") else model.id
+
+
+# ── every prose field on the site, in one list ──────────────────────────────
+#
+# ⚠ MUST STAY ABOVE the generic /{kind} routes. FastAPI matches in definition
+# order and /{kind} will happily answer for "editables". The note further down
+# says this has bitten twice already.
+#
+# Why this exists: the page editor could reach copy strings and page blocks and
+# nothing else, so a tool's description, its FAQ, a tier's perks and a sponsor's
+# blurb were words on the site that nobody could change — her words, "I should
+# be able to edit everything from the editor, not just some things."
+#
+# The rule for what belongs here: **prose a reader reads.** Not slugs (they are
+# addresses, and changing one breaks every link to it), not prices, not Stripe
+# ids, not colours, not enums that decide layout. Those have their own screens
+# where the consequences are visible. Everything a person READS is here.
+
+# source → (model, field naming the row, [(field, label, is_long)])
+PROSE: dict[str, tuple[type[SQLModel], str, list[tuple[str, str, bool]]]] = {
+    "tools": (Tool, "name", [
+        ("name", "Name", False),
+        ("native", "Name in its own script", False),
+        ("glyph", "Glyph", False),
+        ("summary", "Summary", False),
+        ("landing_blurb", "Blurb on the tools page", True),
+        ("body_md", "Body", True),
+        ("reckoned", "How it is reckoned", True),
+        ("faq_md", "Questions and answers", True),
+    ]),
+    "tiers": (Tier, "name", [
+        ("name", "Name", False),
+        ("tagline", "Tagline", False),
+        ("perks", "Perks", True),
+        ("cta", "Button", False),
+        ("badge", "Badge", False),
+    ]),
+    "products": (Product, "name", [
+        ("name", "Name", False),
+        ("tagline", "Tagline", False),
+        ("body_md", "Description", True),
+        ("lead_time", "Lead time", False),
+    ]),
+    "questions": (Question, "body", [
+        ("body", "The question", True),
+        ("answered_md", "Your answer", True),
+    ]),
+    "sponsors": (Sponsor, "name", [
+        ("name", "Name", False),
+        ("tagline", "Tagline", False),
+        ("body_md", "Body", True),
+        ("cta_label", "Button", False),
+    ]),
+    "projects": (Project, "name", [
+        ("name", "Name", False),
+        ("tagline", "Tagline", False),
+        ("body_md", "Body", True),
+        ("role", "Your part in it", False),
+        ("stack", "Built with", False),
+        ("licence", "Licence", False),
+        ("contributors", "Contributors", False),
+    ]),
+    "courses": (Course, "title", [
+        ("title", "Title", False),
+        ("tagline", "Tagline", False),
+        ("body_md", "Description", True),
+    ]),
+    "modules": (Module, "title", [("title", "Title", False)]),
+    "lessons": (Lesson, "title", [
+        ("title", "Title", False),
+        ("body_md", "Body", True),
+    ]),
+    "links": (SocialLink, "label", [("label", "Label", False)]),
+    "profile-fields": (ProfileField, "label", [
+        ("label", "Label", False),
+        ("value", "Value", False),
+    ]),
+    "credits": (Credit, "name", [
+        ("role", "Role", False),
+        ("name", "Name", False),
+    ]),
+    "schedule": (ScheduleEntry, "title", [
+        ("title", "Title", False),
+        ("notes_md", "Notes", True),
+    ]),
+    "fan-art": (FanArt, "title", [
+        ("title", "Title", False),
+        ("artist", "Artist", False),
+    ]),
+    "outfits": (Outfit, "name", [
+        ("name", "Name", False),
+        ("note", "Note", True),
+        ("artist", "Artist", False),
+    ]),
+    "card-designs": (CardDesign, "name", [
+        ("name", "Name", False),
+        ("blurb", "Blurb", True),
+    ]),
+    "official": (OfficialPlace, "label", [
+        ("label", "Label", False),
+        ("note", "Note", True),
+    ]),
+    "polls": (Poll, "question", [
+        ("question", "Question", False),
+        ("note", "Note", True),
+    ]),
+    "poll-options": (PollOption, "label", [("label", "Answer", False)]),
+}
+
+# The sources whose rows also carry a picture. Ten tables have a media_id and
+# until now exactly one of them — sections — could be pointed at a different
+# image without a database client.
+WITH_PICTURES = {
+    "tools", "sponsors", "products", "projects", "outfits", "fan-art",
+    "courses", "card-designs",
+}
+
+
+@router.get("/editables")
+async def list_editables(
+    session: AsyncSession = Depends(get_session),
+    _: str = Depends(require_admin),
+) -> list[dict]:
+    """
+    Every editable prose field on the site, flat.
+
+    The page editor matches these against the text the page actually renders
+    and throws away the ones it cannot find, exactly as it already does for
+    component strings — which page shows which tool is a fact about the
+    rendered page, not something this query could know.
+
+    Empty fields are included. A blurb that has never been written is precisely
+    the one she is looking for a box to type into.
+    """
+    out: list[dict] = []
+    for source, (model, names, fields) in PROSE.items():
+        rows = (await session.execute(
+            select(model).order_by(_order(model))
+        )).scalars().all()
+        for row in rows:
+            title = str(getattr(row, names, "") or "").strip()
+            for field, label, long in fields:
+                out.append({
+                    "source": source,
+                    "id": row.id,
+                    "field": field,
+                    "label": label,
+                    "long": long,
+                    "value": getattr(row, field, "") or "",
+                    "row": (title[:60] or f"#{row.id}"),
+                })
+            if source in WITH_PICTURES and hasattr(row, "media_id"):
+                out.append({
+                    "source": source,
+                    "id": row.id,
+                    "field": "media_id",
+                    "label": "Picture",
+                    "long": False,
+                    "picture": True,
+                    # The id, not a URL: the editor already holds the whole
+                    # media list for its picker and can look the file up.
+                    "value": row.media_id,
+                    "row": (title[:60] or f"#{row.id}"),
+                })
+    return out
+
+
+class ProseIn(BaseModel):
+    field: str
+    # A picture is an id or nothing; prose is a string. One route, because the
+    # panel should not make her care which kind of thing she is changing.
+    value: str | int | None = None
+
+
+@router.patch("/editables/{source}/{item_id}")
+async def set_editable(
+    source: str,
+    item_id: int,
+    body: ProseIn,
+    session: AsyncSession = Depends(get_session),
+    _: str = Depends(require_admin),
+) -> dict:
+    """
+    Change one prose field.
+
+    ⚠ The whitelist is the point, not a formality. This route is reachable from
+    a page that lists every row on the site, so without it a stray field name
+    would let the editor write a slug, a price or a Stripe id — none of which
+    are prose, and two of which take money.
+    """
+    if source not in PROSE:
+        raise HTTPException(404, f"nothing editable called {source!r}")
+    model, _names, fields = PROSE[source]
+    picture = body.field == "media_id" and source in WITH_PICTURES
+    if not picture and body.field not in {f for f, _l, _long in fields}:
+        raise HTTPException(422, f"{source} has no editable prose called {body.field!r}")
+
+    row = await session.get(model, item_id)
+    if row is None:
+        raise HTTPException(404, "no such item")
+    if picture:
+        # "" from an empty form field means no picture, not a picture called "".
+        setattr(row, "media_id", int(body.value) if body.value not in (None, "") else None)
+    else:
+        setattr(row, body.field, str(body.value or ""))
+    if hasattr(row, "updated_at"):
+        row.updated_at = datetime.now(timezone.utc)
+    await session.commit()
+    return {"ok": True}
+
 
 
 

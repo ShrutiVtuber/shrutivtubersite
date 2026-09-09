@@ -108,11 +108,11 @@ const n = me.nativity;
       ) : (
         <form method="POST" class="card stack">
           <CsrfField />
-          <TextField label="Label" name="label" value={n?.label ?? ""} optionalLabel hint={say("text.5", "For your own reference, if you save more than one later.")} />
-          <TextField label="Birth date" name="birth_date" type="date" required value={n?.birthDate ?? ""} />
+          <TextField label={say("text.8", "Label")} name="label" value={n?.label ?? ""} optionalLabel hint={say("text.5", "For your own reference, if you save more than one later.")} />
+          <TextField label={say("text.9", "Birth date")} name="birth_date" type="date" required value={n?.birthDate ?? ""} />
 
           <div class="time-block">
-            <TextField label="Birth time" name="birth_time" type="time" value={n?.birthTime ?? ""} optionalLabel />
+            <TextField label={say("text.10", "Birth time")} name="birth_time" type="time" value={n?.birthTime ?? ""} optionalLabel />
             <label class="unknown">
               <input type="checkbox" name="time_unknown" value="1" checked={n?.timeUnknown ?? false} data-unknown-time />
               <span>{say("this-needs-its-own-conse.4", "I don't know my birth time")}</span>
@@ -137,7 +137,7 @@ const n = me.nativity;
               place={n?.placeName ?? ""}
               elevation={n?.elevation ?? 0}
               timezone={n?.timezone ?? ""}
-              label="Birth place"
+              label={say("text.11", "Birth place")}
               wantTimezone
             />
             <p class="place-why">{say("this-needs-its-own-conse.6", "A chart cast for the wrong city is indistinguishable from a right one — so the resolved place, its coordinates and its timezone stay visible above. The timezone is stored by name, not as an offset, because the offset that applied on your birth date is not a lookup of today's rules.")}</p>

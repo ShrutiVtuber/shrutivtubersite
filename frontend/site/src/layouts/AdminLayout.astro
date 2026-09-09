@@ -60,10 +60,10 @@ const here = Astro.url.pathname;
   <body class="admin-body">
     <header class="admin-bar">
       <div class="page bar-inner">
-        <a class="admin-brand" href="/admin">Shruti <span>{say("text.2", "admin")}</span></a>
+        <a class="admin-brand" href="/admin">{say("text.5", "Shruti")} <span>{say("text.2", "admin")}</span></a>
         {
           !open && (
-            <nav class="admin-nav" aria-label="Admin">
+            <nav class="admin-nav" aria-label={say("text.6", "Admin")}>
               {
                 NAV.map(([href, label]) => (
                   <a href={href} aria-current={here === href ? "page" : undefined}>{label}</a>

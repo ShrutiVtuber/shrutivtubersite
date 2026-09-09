@@ -130,11 +130,11 @@ const FIGURE = { wheel: "a wheel", north: say("text.north.indian.square", "a Nor
               <CsrfField />
               <label>
                 <span class="c-lbl">{say("compare-it-with-yours.3", "The address of your kept chart")}</span>
-                <input class="c-in" name="mine" placeholder="https://shrutivtuber.com/chart/…" />
+                <input class="c-in" name="mine" placeholder={say("text.11", "https://shrutivtuber.com/chart/…")} />
               </label>
               <label>
                 <span class="c-lbl">{say("compare-it-with-yours.4", "Call the comparison something")}</span>
-                <input class="c-in" name="label" maxlength="80" placeholder="Us" />
+                <input class="c-in" name="label" maxlength="80" placeholder={say("text.12", "Us")} />
               </label>
               <label class="c-consent">
                 <input type="checkbox" name="consent" value="1" />

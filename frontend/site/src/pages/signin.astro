@@ -105,10 +105,10 @@ if (Astro.request.method === "POST") {
           <form method="POST" novalidate class="auth-form">
             <CsrfField />
             {failed && <p class="auth-failed" role="alert">{failed}</p>}
-            <TextField label="Email" name="email" type="email" required value={values.email} autocomplete="email" />
+            <TextField label={say("text.18", "Email")} name="email" type="email" required value={values.email} autocomplete="email" />
             {
               method === "password" && (
-                <TextField label="Password" name="password" type="password" required autocomplete="current-password" />
+                <TextField label={say("text.19", "Password")} name="password" type="password" required autocomplete="current-password" />
               )
             }
             <div>

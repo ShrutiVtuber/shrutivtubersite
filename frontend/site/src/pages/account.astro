@@ -153,10 +153,10 @@ const TRADITIONS = [
         <CsrfField />
         <input type="hidden" name="action" value="profile" />
         <TextField label={say("text.4", "Display name")} name="display_name" value={me.displayName} optionalLabel hint={say("text.5", "Only ever shown back to you.")} />
-        <TextField label="Timezone" name="timezone" value={me.timezone} optionalLabel hint={say("text.6", "IANA name, e.g. Europe/Athens.")} />
+        <TextField label={say("text.21", "Timezone")} name="timezone" value={me.timezone} optionalLabel hint={say("text.6", "IANA name, e.g. Europe/Athens.")} />
         <SelectField label={say("text.7", "Preferred tradition")} name="preferred_tradition" value={me.preferredTradition} options={TRADITIONS} />
         <TextField label={say("text.8", "House system")} name="house_system" value={me.houseSystem} optionalLabel />
-        <TextField label="Ayanāṁśa" name="ayanamsa" value={me.ayanamsa} optionalLabel />
+        <TextField label={say("text.22", "Ayanāṁśa")} name="ayanamsa" value={me.ayanamsa} optionalLabel />
         <div><Button type="submit">{say("text.14", "Save")}</Button></div>
       </form>
     </section>

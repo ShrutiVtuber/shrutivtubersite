@@ -127,7 +127,7 @@ const LEDE: Record<string, string> = {
                     ? <Listing eyebrow="Journal" title={say("text.1", "Writing, documentation, and what changed")}
                                lede={LEDE.hub} entries={page.entries} feature />
                     : page.type === "all"
-                      ? <Listing eyebrow="Everything" title="All content"
+                      ? <Listing eyebrow="Everything" title={say("text.2", "All content")}
                                  lede={LEDE.all} entries={page.entries} grouped />
                       : <Listing
                           eyebrow={page.type === "category" ? "Category" : KIND_LABEL[page.kind]}

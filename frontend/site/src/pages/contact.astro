@@ -171,16 +171,16 @@ const extra = sections.filter((s) => s.key !== "intro");
           <CsrfField />
           {failed && <p class="contact-failed" role="alert">{failed}</p>}
           <SelectField
-            label="Route" name="topic" required placeholder="Choose one"
+            label={say("text.13", "Route")} name="topic" required placeholder={say("text.14", "Choose one")}
             value={values.topic} error={errors.topic}
             options={[
               { value: "business", label: "Business — sponsorship, events, press" },
               { value: "general", label: "Everything else" },
             ]}
           />
-          <TextField label="Name" name="name" required value={values.name} error={errors.name} autocomplete="name" />
-          <TextField label="Email" name="email" type="email" required value={values.email} error={errors.email} autocomplete="email" />
-          <TextArea label="Message" name="msg" required rows={6} maxlength={5000} value={values.msg} error={errors.msg} />
+          <TextField label={say("text.15", "Name")} name="name" required value={values.name} error={errors.name} autocomplete="name" />
+          <TextField label={say("text.16", "Email")} name="email" type="email" required value={values.email} error={errors.email} autocomplete="email" />
+          <TextArea label={say("text.17", "Message")} name="msg" required rows={6} maxlength={5000} value={values.msg} error={errors.msg} />
           {/* Honeypot: a real person never fills this; bots fill everything. */}
           <div class="hp" aria-hidden="true">
             <label for="website">{say("text.11", "Website")}</label>

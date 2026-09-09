@@ -364,7 +364,7 @@ const ASPECT_BASIS: Record<string, string> = {
               {
                 d.bodies.map((b) => (
                   <tr>
-                    <th scope="row">{b.name}{b.retrograde && <span class="retro" title="retrograde"> ℞</span>}</th>
+                    <th scope="row">{b.name}{b.retrograde && <span class="retro" title={say("text.21", "retrograde")}> ℞</span>}</th>
                     <td class="t-tabular">{b.longitude}°</td>
                     <td>{signOf(b)} <span class="t-tabular faint">{degreeOf(b)}°</span></td>
                     <td class="t-tabular">

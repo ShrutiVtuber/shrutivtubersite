@@ -59,7 +59,7 @@ const day = (iso: string | null) =>
   <div class="pk-add">
     <label class="pk-field">
       <span class="pk-lbl">{say("text.2", "Name this one")}</span>
-      <input class="pk-input" id="pk-label" placeholder="My phone" maxlength="60" />
+      <input class="pk-input" id="pk-label" placeholder={say("text.7", "My phone")} maxlength="60" />
       <span class="pk-hint">{say("text.3", "Only so you can tell it from the others later.")}</span>
     </label>
     <button

@@ -80,6 +80,39 @@ const blocks = allSections
 const media: any[] = (await asAdmin(Astro, "/api/admin/media")).body ?? [];
 const byId = new Map<number, any>(media.map((m: any) => [m.id, m]));
 
+/* Everything else on the site that holds words: a tool's description and its
+   questions, a tier's perks, a sponsor's blurb, a project's body.
+   
+   These were the gap. Copy strings and blocks were editable here; the CONTENT
+   ROWS were not editable anywhere at all — there is a generic admin API for
+   them but no screen, so a tool's FAQ was words on the site that nobody could
+   change. Her words: "I should be able to edit everything from the editor, not
+   just some things", after finding tool descriptions and questions while
+   writing the final copy.
+   
+   Same trick as the shared component strings: fetch them all, render them all,
+   and let the browser drop the ones this page does not show — which tool a page
+   shows is a fact about the rendered page, not something the database knows. */
+const editables: any[] = (await asAdmin(Astro, "/api/admin/editables")).body ?? [];
+
+type Record = { source: string; id: number; row: string; fields: any[]; picture: any | null };
+const records: Record[] = [];
+const seen = new Map<string, Record>();
+for (const e of editables) {
+  const at = `${e.source}:${e.id}`;
+  let rec = seen.get(at);
+  if (!rec) {
+    rec = { source: e.source, id: e.id, row: e.row, fields: [], picture: null };
+    seen.set(at, rec);
+    records.push(rec);
+  }
+  if (e.picture) rec.picture = e; else rec.fields.push(e);
+}
+
+/** "poll-options" reads as "poll option" in the panel. */
+const kindOf = (source: string) =>
+  source.replace(/-/g, " ").replace(/s$/, "");
+
 /* The fields of a block a person reads, in the order they render. */
 const BLOCK_FIELDS: [string, string, boolean][] = [
   ["eyebrow", "Eyebrow", false],
@@ -87,6 +120,22 @@ const BLOCK_FIELDS: [string, string, boolean][] = [
   ["body_md", "Body", true],
   ["link_label", "Link label", false],
 ];
+
+/* A copy string that is really a picture.
+ *
+ * Two images on this site are written into the templates rather than held in a
+ * table — the face at the top of the home page and the wordmark in the header —
+ * and both now go through say(), which makes them copy rows. A row holding a
+ * path to an image should offer the picture library, not a box to type a
+ * filename into.
+ *
+ * ⚠ This is a guess from the VALUE, so a row emptied to nothing stops looking
+ * like a picture and gets a text box back. The text box still writes the same
+ * field, so nothing is lost — but that is why the control is offered ALONGSIDE
+ * the input rather than instead of it. */
+const looksLikeAPicture = (v: string) =>
+  /^(\/|https?:\/\/)\S+\.(png|jpe?g|webp|avif|svg)$/i.test((v ?? "").trim());
+const byUrl = new Map<string, any>(media.map((m: any) => [m.url, m]));
 
 /* The route the iframe loads. "home" is "/". */
 const previewUrl = `/${page === "home" ? "" : page}`;
@@ -181,6 +230,66 @@ const changed = rows.filter((r) => r.changed).length;
           </section>
         ))}
 
+        {/* Content rows — a tool, a tier, a sponsor. Thinned on load to the
+            ones this page actually shows, like the shared strings below. The
+            whole GROUP goes or stays together: a tool whose name is on the
+            page keeps its blurb and its questions even though those are not
+            rendered here, because they are the same thing to her. */}
+        {records.map((rec) => (
+          <section class="blk rec" data-source={rec.source} data-item={rec.id}>
+            <h3 class="blk-head">
+              {rec.row}
+              <span class="shared-tag" title="A content row — editing it changes it everywhere it appears">
+                {kindOf(rec.source)}
+              </span>
+            </h3>
+            {rec.fields.map((f: any) => (
+              <div class="str" data-source={rec.source} data-item={rec.id}
+                   data-field={f.field} data-value={f.value}>
+                <div class="head"><label for={`e-${rec.source}-${rec.id}-${f.field}`}>{f.label}</label></div>
+                {f.long ? (
+                  <textarea id={`e-${rec.source}-${rec.id}-${f.field}`} rows="5" data-orig={f.value}>{f.value}</textarea>
+                ) : (
+                  <input id={`e-${rec.source}-${rec.id}-${f.field}`} value={f.value} data-orig={f.value} />
+                )}
+                <div class="foot">
+                  <code>{kindOf(rec.source)} · {f.field}</code>
+                  <span class="state" aria-live="polite"></span>
+                </div>
+              </div>
+            ))}
+
+            {rec.picture && (
+              <div class="pic" data-source={rec.source} data-item={rec.id}
+                   data-media={rec.picture.value ?? ""}>
+                <div class="head"><label>Picture</label></div>
+                <div class="pic-row">
+                  <div class="pic-thumb">
+                    {rec.picture.value && byId.get(rec.picture.value) ? (
+                      <img src={byId.get(rec.picture.value).url}
+                           alt={byId.get(rec.picture.value).altText || ""} />
+                    ) : (
+                      <span class="pic-none">none</span>
+                    )}
+                  </div>
+                  <div class="pic-do">
+                    <label class="pic-btn">
+                      Upload…
+                      <input type="file" accept="image/*" hidden />
+                    </label>
+                    <button type="button" class="pic-btn pic-pick">Choose…</button>
+                    {rec.picture.value && <button type="button" class="pic-btn pic-clear">Remove</button>}
+                  </div>
+                </div>
+                <div class="foot">
+                  <code>{kindOf(rec.source)} · media_id</code>
+                  <span class="state" aria-live="polite"></span>
+                </div>
+              </div>
+            )}
+          </section>
+        ))}
+
         {rows.length === 0 && blocks.length === 0 ? (
           <p class="empty">
             Nothing registered for this page yet. Run <code>node scripts/seed-copy.mjs</code>.
@@ -196,6 +305,24 @@ const changed = rows.filter((r) => r.changed).length;
                 <textarea id={`f-${r.id}`} rows="3" data-orig={r.value}>{r.value}</textarea>
               ) : (
                 <input id={`f-${r.id}`} value={r.value} data-orig={r.value} />
+              )}
+              {looksLikeAPicture(r.value) && (
+                <div class="pic" data-copy={r.id} data-media={byUrl.get(r.value)?.id ?? ""}>
+                  <div class="pic-row">
+                    <div class="pic-thumb"><img src={r.value} alt="" /></div>
+                    <div class="pic-do">
+                      <label class="pic-btn">
+                        Upload…
+                        <input type="file" accept="image/*" hidden />
+                      </label>
+                      <button type="button" class="pic-btn pic-pick">Choose…</button>
+                    </div>
+                  </div>
+                  <div class="foot">
+                    <code>picture</code>
+                    <span class="state" aria-live="polite"></span>
+                  </div>
+                </div>
               )}
               <div class="foot">
                 <code>{r.key}</code>
@@ -222,6 +349,24 @@ const changed = rows.filter((r) => r.changed).length;
               <textarea id={`s-${r.id}`} rows="3" data-orig={r.value}>{r.value}</textarea>
             ) : (
               <input id={`s-${r.id}`} value={r.value} data-orig={r.value} />
+            )}
+              {looksLikeAPicture(r.value) && (
+              <div class="pic" data-copy={r.id} data-media={byUrl.get(r.value)?.id ?? ""}>
+                <div class="pic-row">
+                  <div class="pic-thumb"><img src={r.value} alt="" /></div>
+                  <div class="pic-do">
+                    <label class="pic-btn">
+                      Upload…
+                      <input type="file" accept="image/*" hidden />
+                    </label>
+                    <button type="button" class="pic-btn pic-pick">Choose…</button>
+                  </div>
+                </div>
+                <div class="foot">
+                  <code>picture</code>
+                  <span class="state" aria-live="polite"></span>
+                </div>
+              </div>
             )}
             <div class="foot">
               <code>{componentName(r.page)} · {r.key}</code>
@@ -546,6 +691,17 @@ const changed = rows.filter((r) => r.changed).length;
     if (!doc) return;
     for (const item of panel.querySelectorAll<HTMLElement>(".str.shared")) {
       const value = item.dataset.value ?? "";
+      /* A row holding a path to a picture is on the page as an IMG SRC, never
+         as text — the wordmark in the header is the case. Matching it as prose
+         would drop the one control that can change it. */
+      if (item.querySelector(".pic")) {
+        if (doc.querySelector(`img[src="${CSS.escape(value)}"]`)
+            || [...doc.querySelectorAll("img")].some(
+                 (i) => (i.getAttribute("src") ?? "").split("/").pop()
+                        === value.split("/").pop())) continue;
+        item.remove();
+        continue;
+      }
       /* findIn refuses anything under eight characters as coincidence, so a
          short label goes through the heading matcher as well before it is
          given up on. */
@@ -556,10 +712,46 @@ const changed = rows.filter((r) => r.changed).length;
     }
   }
 
+  /* Content rows the page does not show.
+   *
+   * Unlike a shared string, a record is kept or dropped AS A GROUP. A tool's
+   * name may be the only one of its eight fields rendered on /tools — the blurb
+   * is there, the FAQ is on the tool's own page, the glyph is a character in a
+   * heading — and dropping the seven that did not match would leave her looking
+   * at the page with no box for the words she came to change.
+   *
+   * ⚠ Long prose is checked by its OPENING, not whole. A body_md of six
+   * paragraphs is never a single text node, and asking for the whole of it back
+   * out of the page always fails. */
+  function dropAbsentRecords() {
+    const doc = frame.contentDocument;
+    if (!doc) return;
+    for (const rec of panel.querySelectorAll<HTMLElement>(".rec")) {
+      let here = false;
+      for (const item of rec.querySelectorAll<HTMLElement>(".str")) {
+        const value = (item.dataset.value ?? "").trim();
+        /* ⚠ A single character is never evidence. Three tools survived on
+           every page in the first version of this because their one-character
+           glyphs — Sun, Moon and Mercury — matched a character in a sky table,
+           and a glyph in a table says nothing about whether the tool is on the
+           page. The name is what settles it. */
+        if (value.length < 3) continue;
+        const opening = value.split(/\n\s*\n/)[0].replace(/^#+\s*/, "").trim();
+        if (findIn(doc, value) || findHeadingIn(doc, value) || findExact(doc, value)
+            || (opening !== value && (findIn(doc, opening) || findExact(doc, opening)))) {
+          here = true;
+          break;
+        }
+      }
+      if (!here) rec.remove();
+    }
+  }
+
   function reorderByPage() {
     const doc = frame.contentDocument;
     if (!doc) return;
     dropAbsentShared();
+    dropAbsentRecords();
 
     const items = [...panel.querySelectorAll<HTMLElement>(":scope > .str, :scope > .blk")];
     const offsets = new Map<HTMLElement, number>();
@@ -667,7 +859,7 @@ const changed = rows.filter((r) => r.changed).length;
       if (file && shown.includes(file)) continue;
       const note = document.createElement("p");
       note.className = "pic-unused";
-      note.textContent = "Saved, but this page does not show a block image here.";
+      note.textContent = "Saved, but this page does not show this picture.";
       pic.querySelector(".foot")!.before(note);
     }
   }
@@ -736,11 +928,42 @@ const changed = rows.filter((r) => r.changed).length;
     const state = pic.querySelector<HTMLElement>(".state")!;
     state.textContent = "saving…";
     try {
-      const r = await fetch(`/api/admin/sections/${pic.dataset.block}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ media_id: m ? m.id : null }),
-      });
+      /* A block keeps its picture in its own row; a content row keeps it in
+         whatever table it belongs to. Same control either way. */
+      /* A picture that is really a copy string keeps a URL, not an id — the
+         template renders it straight into src. */
+      const copyId = pic.dataset.copy;
+      if (copyId) {
+        const w = await fetch(`/api/admin/copy/${copyId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ value: m ? m.url : "" }),
+        });
+        if (!w.ok) {
+          state.textContent = `did not save (${w.status})`;
+          return false;
+        }
+        showPicture(pic, m);
+        const box = pic.closest(".str")?.querySelector<HTMLInputElement>("input:not(.pic-alt):not([type=file])");
+        if (box) { box.value = m ? m.url : ""; box.dataset.orig = box.value; }
+        state.textContent = "saved";
+        frame.contentWindow?.location.reload();
+        setTimeout(() => (state.textContent = ""), 1500);
+        return true;
+      }
+
+      const source = pic.dataset.source;
+      const r = source
+        ? await fetch(`/api/admin/editables/${source}/${pic.dataset.item}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ field: "media_id", value: m ? m.id : null }),
+          })
+        : await fetch(`/api/admin/sections/${pic.dataset.block}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ media_id: m ? m.id : null }),
+          });
       if (!r.ok) throw new Error(String(r.status));
       showPicture(pic, m);
       state.textContent = "saved";
@@ -864,15 +1087,23 @@ const changed = rows.filter((r) => r.changed).length;
       if (value === field.dataset.orig) return;
       state.textContent = "saving…";
       try {
-        /* Two kinds of thing in one panel: a copy string, and one field of a
-           page block. They save to different routes, and the panel should not
-           make her care which is which. */
+        /* Three kinds of thing in one panel: a copy string, one field of a
+           page block, and one field of a content row. They save to three
+           different routes, and the panel should not make her care which is
+           which. */
         const blockId = box.dataset.block;
+        const source = box.dataset.source;
         const r = blockId
           ? await fetch(`/api/admin/sections/${blockId}`, {
               method: "PATCH",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ [box.dataset.field!]: value }),
+            })
+          : source
+          ? await fetch(`/api/admin/editables/${source}/${box.dataset.item}`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ field: box.dataset.field, value }),
             })
           : await fetch(`/api/admin/copy/${box.dataset.id}`, {
               method: "PUT",

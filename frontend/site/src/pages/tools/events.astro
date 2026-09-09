@@ -254,7 +254,7 @@ const withParam = (key: string, value: string) => {
       <p class="prompt">{say("quiet", "Nothing exact in that period under the filters you chose — or the ephemeris could not be reached, which would be a failure on this side rather than a quiet sky. The wheel above is drawn either way.")}</p>
     ) : (
       <>
-        <div class="rot" role="group" aria-label="Rising sign">
+        <div class="rot" role="group" aria-label={say("text.31", "Rising sign")}>
           <a href={withParam("rising", "")} class:list={["chip", !rising && "on"]}>—</a>
           {SIGNS.map((s) => (
             <a href={withParam("rising", s)} class:list={["chip", s === rising && "on"]}

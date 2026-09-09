@@ -46,7 +46,7 @@ const credits = (who?.credits ?? []).map((c) => ({
       as="h1"
       glyph="☾︎"
       eyebrow="About"
-      title="Shruti"
+      title={say("text.7", "Shruti")}
       body={say("text.3", "VTuber · theurgist · toolmaker. Athens, GMT+3.")}
     />
 
@@ -122,7 +122,7 @@ const credits = (who?.credits ?? []).map((c) => ({
               <SectionHeader
                 glyph="✶"
                 eyebrow="Costumes"
-                title="Outfits"
+                title={say("text.8", "Outfits")}
                 body={say("text.6", "Commissioned work. Every one names the artist who drew it.")}
               />
             </div>

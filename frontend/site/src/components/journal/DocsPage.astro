@@ -21,7 +21,7 @@ const hasToc = page.toc.length >= 3;
 ---
 <main class="j-page j-page--docs">
   <div class="j-shell j-shell--docs">
-    <nav class="j-nav-rail" aria-label="Documentation">
+    <nav class="j-nav-rail" aria-label={say("text.5", "Documentation")}>
       {
         page.nav.map((group) => (
           <div class="j-nav-group">
@@ -39,7 +39,7 @@ const hasToc = page.toc.length >= 3;
     <article class="j-col j-col--narrow">
       {
         page.crumbs.length > 0 && (
-          <nav class="j-bc" aria-label="Breadcrumb">
+          <nav class="j-bc" aria-label={say("text.6", "Breadcrumb")}>
             {page.crumbs.map((c) => (
               <>
                 <a href={c.href}>{c.label}</a>

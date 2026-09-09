@@ -78,7 +78,7 @@ const { afterSeconds = 20, afterScroll = 0.4, suppress = false } = Astro.props;
             type="email"
             name="email"
             required
-            placeholder="you@example.com"
+            placeholder={say("text.1", "you@example.com")}
             autocomplete="email"
             data-np-email
           />
