@@ -95,7 +95,9 @@ const eventLine = (e: EventRow) => {
 {/* No title, heading or lede here. ToolLayout reads them from the
     instrument's row — that is the whole point of the row, and a prop would be
     a second place to write them. This page's slug does the finding. */}
-<ToolLayout where="server" disclosure="○">
+{/* wide: the writing box gets the page rather than two thirds of it. Prose
+    written in a narrow column reads like it was written in a narrow column. */}
+<ToolLayout where="server" disclosure="○" wide>
   <Fragment slot="parameters">
     <nav class="hw-periods" aria-label={say("nav.period", "Period")}>
       {PERIODS.map((p) => (
@@ -129,8 +131,16 @@ const eventLine = (e: EventRow) => {
     <p class="hw-covers">{heading}</p>
   </Fragment>
 
+  {/* ⚠ The writing box goes BELOW everything, not beside it.
+      
+      It used to sit in the right half of a two-column split, which gave it
+      about sixty characters of line and a column of sky pressed against it the
+      whole time. Her words: "put the part where they write below all the other
+      information so it's large enough for them to actually write meaningful
+      things." A reading is prose, and prose written in a narrow box reads like
+      it was written in a narrow box. */}
   <div class="hw">
-    <div class="hw-split">
+    <div class="hw-material">
       <div class="hw-sky">
         <TransitWheel
           bodies={bodies}
@@ -159,21 +169,22 @@ const eventLine = (e: EventRow) => {
         )}
       </div>
 
-      <div class="hw-write">
-        <h2 class="hw-h">{say("write.heading", "Your reading")}</h2>
-        <p class="hw-note">
-          <Copy text={say("write.note", "Kept in this browser and nowhere else. Nothing here is published — the readings on this site are hers. To have other people read yours and say what they think, submit it from the app.")} />
-        </p>
-        <textarea
-          class="hw-text"
-          rows="18"
-          data-hw-text
-          data-hw-key={`hw:${period}:${covers}:${sign}`}
-          placeholder={say("write.placeholder", "What does this sky ask of this sign?")}
-          aria-label={say("write.label", "Your reading")}
-        ></textarea>
-        <p class="hw-state" data-hw-state aria-live="polite"></p>
-      </div>
+    </div>
+
+    <div class="hw-write">
+      <h2 class="hw-h">{say("write.heading", "Your reading")}</h2>
+      <p class="hw-note">
+        <Copy text={say("write.note", "Kept in this browser and nowhere else. Nothing here is published — the readings on this site are hers. To have other people read yours and say what they think, submit it from the app.")} />
+      </p>
+      <textarea
+        class="hw-text"
+        rows="26"
+        data-hw-text
+        data-hw-key={`hw:${period}:${covers}:${sign}`}
+        placeholder={say("write.placeholder", "What does this sky ask of this sign?")}
+        aria-label={say("write.label", "Your reading")}
+      ></textarea>
+      <p class="hw-state" data-hw-state aria-live="polite"></p>
     </div>
   </div>
 </ToolLayout>
@@ -231,8 +242,13 @@ const eventLine = (e: EventRow) => {
     font: 600 var(--text-sm) var(--font-body);
     color: var(--ink-soft); margin: 0;
   }
-  .hw-split { display: grid; gap: var(--space-5); }
-  @media (min-width: 900px) { .hw-split { grid-template-columns: 380px 1fr; } }
+  /* The sky across the top, in as many columns as fit; the writing below it
+     with the whole width to itself. */
+  .hw-material {
+    display: grid; gap: var(--space-5); align-items: start;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  }
+  .hw-write { margin-top: var(--space-5); }
   .hw-h { font: 600 var(--text-h4, 1.05rem) var(--font-display); color: var(--ink); margin: var(--space-4) 0 8px; }
   .hw-advanced { margin: 0 0 var(--space-3); }
   .hw-events { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
@@ -247,6 +263,9 @@ const eventLine = (e: EventRow) => {
   }
   .hw-text {
     width: 100%; box-sizing: border-box;
+    /* Tall enough to hold a reading rather than a paragraph, and it grows with
+       the window instead of staying at whatever rows="" said. */
+    min-height: clamp(360px, 52vh, 720px);
     font: 400 var(--text-body) / var(--leading-body) var(--font-display);
     color: var(--ink); background: var(--surface-page);
     border: var(--border-w) solid var(--line); border-radius: var(--radius-sm);

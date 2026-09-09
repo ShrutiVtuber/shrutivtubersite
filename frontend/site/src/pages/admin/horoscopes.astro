@@ -262,6 +262,42 @@ const nextSign = SIGNS[(index + 1) % 12];
     {notice && <p class="adm-ok" role="status">{notice}</p>}
     {failed && <p class="adm-bad" role="alert">{failed}</p>}
 
+    <div class="sky-band">
+    {/* The sky, rotated to the sign being written for. */}
+    <section class="sky">
+      <h2 class="adm-lbl">The sky · {risingName} rising</h2>
+      {/* The same drawer the public desk has. She asked that the two tools be
+          "pretty much exactly the same except the ones I write get published"
+          — this is the same component, given the same period. */}
+      <p class="adm-advanced">
+        <SkyDrawer start={start} end={end} heading={label} />
+      </p>
+      {wheelBodies.length > 0 && (
+        <TransitWheel bodies={wheelBodies} rising={risingName} size={300}
+                      caption={`${start} 12:00 UT`} />
+      )}
+      <ol class="events">
+        {events.map((e) => {
+          const house = houseOf(e.sign);
+          return (
+            <li class={`k-${e.kind}`}>
+              <button type="button" class="ins" data-insert={
+                `${e.at.slice(5, 10)} ${e.at.slice(11, 16)} — ${describe(e)}`
+              } title="Insert into the column">
+                <span class="when">{e.at.slice(5, 10)} {e.at.slice(11, 16)}</span>
+                <span class="what">{describe(e)}</span>
+                <span class:list={["hs", AVERSE.has(house) && "averse"]}>
+                  {house}{AVERSE.has(house) ? "⊘" : ""}
+                </span>
+              </button>
+            </li>
+          );
+        })}
+        {events.length === 0 && <li class="quiet">Nothing exact in this period.</li>}
+      </ol>
+    </section>
+    </div>
+
     <div class="desk-body">
       {/* The rail. Always visible, always says which are done — this is the
           twelve-up view made usable, rather than twelve pages to find. */}
@@ -277,40 +313,6 @@ const nextSign = SIGNS[(index + 1) % 12];
           </a>
         ))}
       </nav>
-
-      {/* The sky, rotated to the sign being written for. */}
-      <section class="sky">
-        <h2 class="adm-lbl">The sky · {risingName} rising</h2>
-        {/* The same drawer the public desk has. She asked that the two tools be
-            "pretty much exactly the same except the ones I write get published"
-            — this is the same component, given the same period. */}
-        <p class="adm-advanced">
-          <SkyDrawer start={start} end={end} heading={label} />
-        </p>
-        {wheelBodies.length > 0 && (
-          <TransitWheel bodies={wheelBodies} rising={risingName} size={300}
-                        caption={`${start} 12:00 UT`} />
-        )}
-        <ol class="events">
-          {events.map((e) => {
-            const house = houseOf(e.sign);
-            return (
-              <li class={`k-${e.kind}`}>
-                <button type="button" class="ins" data-insert={
-                  `${e.at.slice(5, 10)} ${e.at.slice(11, 16)} — ${describe(e)}`
-                } title="Insert into the column">
-                  <span class="when">{e.at.slice(5, 10)} {e.at.slice(11, 16)}</span>
-                  <span class="what">{describe(e)}</span>
-                  <span class:list={["hs", AVERSE.has(house) && "averse"]}>
-                    {house}{AVERSE.has(house) ? "⊘" : ""}
-                  </span>
-                </button>
-              </li>
-            );
-          })}
-          {events.length === 0 && <li class="quiet">Nothing exact in this period.</li>}
-        </ol>
-      </section>
 
       {/* The column. */}
       <section class="column">
@@ -474,12 +476,30 @@ const nextSign = SIGNS[(index + 1) % 12];
   .publish:disabled { background: var(--surface-inset); color: var(--ink-faint);
     border-color: var(--line); cursor: not-allowed; }
 
+  /* ⚠ Two columns, not three. The sky was the middle one and took 340px away
+     from the writing for the whole of every session; it is a BAND across the
+     top now and the column has the rest. Her words about the public desk, and
+     it is the same argument here: "so it's large enough for them to actually
+     write meaningful things".
+
+     The rail stays beside the column on purpose — she writes twelve of these in
+     a sitting and switches sign between almost every paragraph. */
   .desk-body {
     display: grid; gap: var(--space-4);
-    grid-template-columns: 168px minmax(280px, 340px) 1fr;
+    grid-template-columns: 168px 1fr;
     align-items: start;
   }
   @media (max-width: 1100px) { .desk-body { grid-template-columns: 1fr; } }
+
+  .sky-band {
+    margin-bottom: var(--space-4);
+    padding-bottom: var(--space-4);
+    border-bottom: var(--border-w) solid var(--line);
+  }
+  .sky-band .sky {
+    display: grid; gap: var(--space-4); align-items: start;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  }
 
   /* ── the rail ── */
   .rail { display: grid; gap: 2px; position: sticky; top: var(--space-4); }
@@ -530,7 +550,7 @@ const nextSign = SIGNS[(index + 1) % 12];
   .save-state { font: 400 var(--text-xs) var(--font-body); color: var(--ink-faint); }
   .save-state.bad { color: var(--live); }
   .editor { display: grid; gap: 10px; }
-  .editor textarea { min-height: 46vh; }
+  .editor textarea { min-height: clamp(360px, 56vh, 760px); }
   .col-foot { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
   .save {
     font: 500 var(--text-xs) var(--font-body); color: var(--ink);
