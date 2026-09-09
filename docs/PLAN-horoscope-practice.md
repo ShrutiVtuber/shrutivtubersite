@@ -29,6 +29,30 @@ losing one of them is the likely failure.
    donating or taking a membership, optional, and a custom name is allowed.
    ⚠ **Monthly supporters only — one-offs are not read on stream.**
 
+10. **A standing compatibility test.** Two things, and the second is the
+    business one:
+
+    - **"Are you compatible with Shruti?"** — a fixed one anybody can take for
+      fun, against her own chart. No account, no setup; it is a share hook.
+    - **Other VTubers can set one up against their chart**, for a limited run:
+
+      | | how long it stays up |
+      |---|---|
+      | not a member | 5 days |
+      | lower tier | 10 days |
+      | higher tier | permanent |
+
+    Which makes it a **membership feature with an expiry**, not a page. It
+    needs: a chart stored per host, a public URL per host, an expiry the tier
+    sets, something that stops serving an expired one, and a path from
+    "expired" back to the tier that would keep it. The expiry is the part that
+    will be got wrong quietly — an expired test that keeps answering is a
+    feature given away, and one that 404s with no explanation is a VTuber who
+    thinks the site is broken.
+
+    **Later, and deliberately after the practice work.** It touches billing
+    tiers, which nothing else here does.
+
 ## Decisions she made
 
 - **The bridge is a gateway.** Truly seamless: someone types normally in

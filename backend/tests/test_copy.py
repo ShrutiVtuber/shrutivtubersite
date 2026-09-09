@@ -683,3 +683,43 @@ def test_the_seeder_reads_a_call_with_a_trailing_comma() -> None:
     match = pattern.search(wrapped)
     assert match is not None, "the wrapped form must match"
     assert match.group(4) == "A default long enough to wrap."
+
+
+def test_no_astro_comment_opens_an_expression_that_returns_an_element() -> None:
+    """
+    `{/* … */}` is not a comment everywhere it looks like one.
+
+    Inside an arrow body that returns an element —
+
+        {LIST.map((x) => (
+          {/* why */}
+          <a …>{x}</a>
+        ))}
+
+    — it is not in a position that allows a comment, and Astro does not fail.
+    In unsubscribed.astro it broke the page outright; on the horoscope desk it
+    silently dropped the element's ATTRIBUTES, so twelve links rendered
+    perfectly and none of them counted. `astro check` reported nothing either
+    time.
+
+    Made twice by me, ten commits apart, which is what makes it worth a test
+    rather than a resolution to be careful.
+    """
+    import re as _re
+
+    # An opening `(` that begins a returned element, then a comment before any
+    # element starts. `=> (` and `&& (` are the two forms that carry one.
+    opener = _re.compile(r"(?:=>|&&|\?|:)\s*\(\s*\{\s*/\*", _re.S)
+
+    offenders: list[str] = []
+    for f in sorted(SRC.rglob("*.astro")):
+        text = f.read_text(encoding="utf-8")
+        for m in opener.finditer(text):
+            line = text[: m.start()].count("\n") + 1
+            offenders.append(f"{f.relative_to(SRC)}:{line}")
+
+    assert not offenders, (
+        "an Astro comment cannot open an expression that returns an element — "
+        "it is dropped along with the element's attributes, silently. Move it "
+        f"above the expression:\n  " + "\n  ".join(offenders[:8])
+    )
