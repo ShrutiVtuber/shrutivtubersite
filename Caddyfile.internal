@@ -58,6 +58,28 @@
 		header Cache-Control "public, max-age=604800"
 	}
 
+	# ── Language packs ───────────────────────────────────────────────────────
+	#
+	# Isopsephy's letter values and word corpora, as .mbf containers. Served
+	# from here rather than bundled in the app for two reasons, and the second
+	# is the one that is not negotiable:
+	#
+	#   the Greek corpus alone is 4.3MB and Arabic 2MB, and most people want
+	#   one language, not five;
+	#
+	#   the packs are All Rights Reserved. The app is AGPL and its repository
+	#   is public, so the packs cannot live in it. Serving them at runtime is
+	#   what keeps the code free and the corpora hers.
+	#
+	# `immutable` is honest here: a pack filename carries its version, so a
+	# given URL's bytes never change. A new version is a new name.
+	handle /packs/* {
+		root * /srv
+		file_server
+		header Cache-Control "public, max-age=31536000, immutable"
+		header Access-Control-Allow-Origin "*"
+	}
+
 	# ── Fonts ────────────────────────────────────────────────────────────────
 	#
 	# Every filename here carries a hash of its own contents

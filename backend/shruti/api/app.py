@@ -13,8 +13,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from shruti.api.routes import (
     accounts, admin, billing, charts, classes, collab, community, content,
     horoscopes,
-    insight, journal, live, media, newsletter, passkeys, places, public,
-    overlay, shop, twitch, videos
+    insight, journal, live, media, newsletter, packs, passkeys, places,
+    public, overlay, shop, twitch, videos
 )
 from shruti.core.config import get_settings
 from shruti.core.db import SessionLocal
@@ -149,5 +149,6 @@ app.include_router(journal.router)
 app.include_router(passkeys.router)
 app.include_router(billing.router)
 app.include_router(media.router)
+app.include_router(packs.router)
 app.include_router(videos.router)
 app.include_router(admin.router)

@@ -22,6 +22,13 @@ losing one of them is the likely failure.
    from inside the app**, not by being sent to the website.
 7. **One account, both places.**
 
+8. **The horoscope tool goes on the tools page** and everywhere else the
+   tools are mentioned — including a card in the admin so its wording is
+   editable like every other instrument.
+9. **Supporters can give a name to be read on stream.** Asked at the point of
+   donating or taking a membership, optional, and a custom name is allowed.
+   ⚠ **Monthly supporters only — one-offs are not read on stream.**
+
 ## Decisions she made
 
 - **The bridge is a gateway.** Truly seamless: someone types normally in

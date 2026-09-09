@@ -31,6 +31,7 @@ services:
     volumes:
       - ./Caddyfile.internal:/etc/caddy/Caddyfile:ro
       - media:/srv/media:ro
+      - packs:/srv/packs:ro
       - journal:/srv/journal:ro
       - caddy_data:/data
       - caddy_config:/config
@@ -115,6 +116,7 @@ services:
       SHRUTI_DATABASE_URL: postgresql+asyncpg://${SHRUTI_POSTGRES_USER:-shruti}:${SHRUTI_POSTGRES_PASSWORD}@postgres:5432/${SHRUTI_POSTGRES_DB:-shruti}
     volumes:
       - media:/app/media
+      - packs:/app/packs
       - journal:/srv/journal:ro
     networks: [shruti, shruti-interop]
 
@@ -173,6 +175,8 @@ volumes:
   media:
   caddy_data:
   caddy_config:
+  packs:
+    name: shruti_packs
 
 networks:
   shruti:
