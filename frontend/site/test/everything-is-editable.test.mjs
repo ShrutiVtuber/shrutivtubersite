@@ -39,6 +39,9 @@ const ALLOWED = [
   { file: "pages/shop/thank-you.astro", text: "✶&#xFE0E;" },
   // "3 of 8" — the word between two numbers, assembled in the template.
   { file: "components/counters/CounterCard.astro", text: "of" },
+  // The drawer's button icon. Same reason as the marks above: an entity cannot
+  // travel through say(). The button's WORDS beside it are editable.
+  { file: "components/tools/SkyDrawer.astro", text: "☰&#xFE0E;" },
 ];
 
 function walk(dir) {
@@ -117,4 +120,30 @@ test("the exceptions are still real", () => {
     assert.ok(src.includes(a.text),
       `${a.file} no longer contains ${JSON.stringify(a.text)} — drop the exception`);
   }
+});
+
+/* ── one implementation of "which week is it" ─────────────────────────────── */
+
+test("nobody keeps a second copy of the period arithmetic", () => {
+  /* ISO weeks are subtle — Monday starts it, week one holds the first Thursday,
+   * and Thursday decides the year, so a week in early January can belong to the
+   * year before. `lib/periods.ts` exists so that lives in ONE place.
+   *
+   * The admin horoscope desk carried its own isoWeek and weekDays anyway. Two
+   * implementations of which week it is are two chances to disagree, and both
+   * render a perfectly plausible week — the reader cannot tell, and neither can
+   * she until a reading files itself under the wrong id.
+   */
+  const stray = [];
+  for (const path of walk(SRC)) {
+    const rel = relative(SRC, path).split("\\").join("/");
+    if (rel === "lib/periods.ts") continue;
+    const src = readFileSync(path, "utf8");
+    for (const name of ["function isoWeek", "function weekDays", "const isoWeek =", "const weekDays ="]) {
+      if (src.includes(name)) stray.push(`${rel}: ${name}`);
+    }
+  }
+  assert.deepEqual(stray, [],
+    "these files define their own period arithmetic instead of importing " +
+    `lib/periods.ts:\n  ${stray.join("\n  ")}`);
 });

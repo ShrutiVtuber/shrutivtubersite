@@ -22,7 +22,11 @@ import SectionHeader from "../../components/brand/SectionHeader.astro";
 import Badge from "../../components/navigation/Badge.astro";
 import CsrfField from "../../components/forms/CsrfField.astro";
 import TransitWheel from "../../components/chart/TransitWheel.astro";
+import SkyDrawer from "../../components/tools/SkyDrawer.astro";
 import { SITE_API, askAstro } from "../../lib/api";
+import {
+  PERIODS, asPeriod, currentCovers, isoWeek, label as periodLabel, range, weekDays,
+} from "../../lib/periods";
 import { verifyCsrf } from "../../lib/csrf";
 import { renderMarkdown } from "../../lib/markdown";
 
@@ -45,34 +49,15 @@ const Name = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 const pad = (n: number) => String(n).padStart(2, "0");
 
 /* ── which period ─────────────────────────────────────────────────────────
-   ISO weeks: Monday starts it, week one holds the first Thursday, and the id
-   is what the database and the URL are keyed on. Thursday decides the year,
-   which is why a week in early January can belong to the year before. */
-const now = new Date();
-function isoWeek(d: Date): string {
-  const t = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
-  t.setUTCDate(t.getUTCDate() + 4 - (t.getUTCDay() || 7));
-  const start = new Date(Date.UTC(t.getUTCFullYear(), 0, 1));
-  return `${t.getUTCFullYear()}-W${pad(Math.ceil(((t.getTime() - start.getTime()) / 86400000 + 1) / 7))}`;
-}
-function weekDays(id: string): [string, string] {
-  const [y, w] = id.split("-W").map(Number);
-  const jan4 = new Date(Date.UTC(y, 0, 4));
-  const monday = new Date(jan4);
-  monday.setUTCDate(jan4.getUTCDate() - ((jan4.getUTCDay() || 7) - 1) + (w - 1) * 7);
-  const sunday = new Date(monday);
-  sunday.setUTCDate(monday.getUTCDate() + 6);
-  return [monday.toISOString().slice(0, 10), sunday.toISOString().slice(0, 10)];
-}
-const currentFor = (p: string) =>
-  p === "daily" ? now.toISOString().slice(0, 10)
-  : p === "weekly" ? isoWeek(now)
-  : p === "yearly" ? String(now.getUTCFullYear())
-  : `${now.getUTCFullYear()}-${pad(now.getUTCMonth() + 1)}`;
-
+   ⚠ The arithmetic is in lib/periods.ts and NOT repeated here. This file used
+   to carry its own isoWeek and weekDays, which is the exact duplication that
+   module was made to end: two implementations of "which week is it" are two
+   chances to disagree, and both render a perfectly plausible week. The public
+   writing desk already uses the shared one, and she asked that the two desks be
+   the same tool. */
 const q = Astro.url.searchParams;
-const period = PERIODS.includes(q.get("period") ?? "") ? q.get("period")! : "weekly";
-const covers = q.get("covers") || currentFor(period);
+const period = asPeriod(q.get("period"));
+const covers = q.get("covers") || currentCovers(period);
 const sign = SIGNS.includes(q.get("sign") ?? "") ? q.get("sign")! : "aries";
 
 /* ── saving ───────────────────────────────────────────────────────────────
@@ -148,22 +133,8 @@ interface ChartBody {
   dignities?: { sign: string; degree: number };
 }
 
-let start = covers, end = covers, label = covers;
-if (period === "weekly") {
-  [start, end] = weekDays(covers);
-  label = `${covers} · ${start} to ${end}`;
-} else if (period === "monthly") {
-  const [y, m] = covers.split("-").map(Number);
-  start = `${covers}-01`;
-  end = `${covers}-${pad(new Date(Date.UTC(y, m, 0)).getUTCDate())}`;
-  label = new Date(`${start}T00:00:00Z`).toLocaleDateString("en-GB",
-    { month: "long", year: "numeric", timeZone: "UTC" });
-} else if (period === "yearly") {
-  start = `${covers}-01-01`; end = `${covers}-12-31`; label = covers;
-} else {
-  label = new Date(`${covers}T00:00:00Z`).toLocaleDateString("en-GB",
-    { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
-}
+const [start, end] = range(period, covers);
+const label = periodLabel(period, covers);
 const dayAfter = (iso: string) => {
   const d = new Date(`${iso}T00:00:00Z`);
   d.setUTCDate(d.getUTCDate() + 1);
@@ -221,7 +192,7 @@ const describe = (e: EventRow) => {
 
 const link = (over: Record<string, string>) => {
   const p = new URLSearchParams({ period, covers, sign, ...over });
-  if (over.period && !over.covers) p.set("covers", currentFor(over.period));
+  if (over.period && !over.covers) p.set("covers", currentCovers(asPeriod(over.period)));
   return `/admin/horoscopes?${p}`;
 };
 const shiftCovers = (by: number): string => {
@@ -310,6 +281,12 @@ const nextSign = SIGNS[(index + 1) % 12];
       {/* The sky, rotated to the sign being written for. */}
       <section class="sky">
         <h2 class="adm-lbl">The sky · {risingName} rising</h2>
+        {/* The same drawer the public desk has. She asked that the two tools be
+            "pretty much exactly the same except the ones I write get published"
+            — this is the same component, given the same period. */}
+        <p class="adm-advanced">
+          <SkyDrawer start={start} end={end} heading={label} />
+        </p>
         {wheelBodies.length > 0 && (
           <TransitWheel bodies={wheelBodies} rising={risingName} size={300}
                         caption={`${start} 12:00 UT`} />
@@ -528,6 +505,7 @@ const nextSign = SIGNS[(index + 1) % 12];
 
   /* ── the sky ── */
   .sky { display: grid; gap: var(--space-3); }
+  .adm-advanced { margin: 0 0 10px; }
   .events {
     list-style: none; margin: 0; padding: 0; display: grid; gap: 1px;
     max-height: 46vh; overflow-y: auto;

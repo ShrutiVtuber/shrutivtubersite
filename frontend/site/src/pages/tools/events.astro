@@ -15,6 +15,7 @@
  * Server-rendered and works with scripting off, because it is a table and
  * because it is the thing most likely to be open beside a stream.
  */
+import { isoWeek, weekDays } from "../../lib/periods";
 import ToolLayout from "../../layouts/ToolLayout.astro";
 import TransitWheel from "../../components/chart/TransitWheel.astro";
 import WheelStepper from "../../components/chart/WheelStepper.astro";
@@ -49,28 +50,14 @@ const type = ["day", "week", "month", "year"].includes(q.get("type") ?? "")
 const now = new Date();
 const pad = (n: number) => String(n).padStart(2, "0");
 
-function isoWeekOf(d: Date): string {
-  /* Thursday decides the year, which is the whole of the ISO rule and the
-     reason a week in early January can belong to the previous year. */
-  const t = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
-  t.setUTCDate(t.getUTCDate() + 4 - (t.getUTCDay() || 7));
-  const yearStart = new Date(Date.UTC(t.getUTCFullYear(), 0, 1));
-  const week = Math.ceil(((t.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
-  return `${t.getUTCFullYear()}-W${pad(week)}`;
-}
-function weekRange(id: string): [string, string] {
-  const [y, w] = id.split("-W").map(Number);
-  const jan4 = new Date(Date.UTC(y, 0, 4));
-  const monday = new Date(jan4);
-  monday.setUTCDate(jan4.getUTCDate() - ((jan4.getUTCDay() || 7) - 1) + (w - 1) * 7);
-  const sunday = new Date(monday);
-  sunday.setUTCDate(monday.getUTCDate() + 6);
-  return [monday.toISOString().slice(0, 10), sunday.toISOString().slice(0, 10)];
-}
+/* ⚠ The ISO week arithmetic is in lib/periods.ts, not here. This page kept a
+   third copy of it — the admin desk had the second — and three implementations
+   of "which week is it" are three chances to disagree about a rule subtle
+   enough that all three would render a plausible week. */
 
 const period = q.get("period") ?? (
   type === "day" ? now.toISOString().slice(0, 10)
-  : type === "week" ? isoWeekOf(now)
+  : type === "week" ? isoWeek(now)
   : type === "year" ? String(now.getUTCFullYear())
   : `${now.getUTCFullYear()}-${pad(now.getUTCMonth() + 1)}`
 );
@@ -91,7 +78,7 @@ if (type === "day") {
   label = new Date(`${period}T00:00:00Z`).toLocaleDateString("en-GB",
     { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
 } else if (type === "week") {
-  [start, end] = weekRange(period);
+  [start, end] = weekDays(period);
   label = `${period} · ${start} to ${end}`;
 } else if (type === "year") {
   start = `${period}-01-01`; end = `${period}-12-31`;

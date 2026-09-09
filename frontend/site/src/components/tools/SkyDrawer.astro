@@ -1,0 +1,128 @@
+---
+/* The sky in full, behind a button.
+ *
+ * Her ask, in her words: "we can make an 'advanced' mode button that turns on
+ * all this extra information including the full ephemeris (perhaps we can do it
+ * in a neat modal way so they can open and close it as a reference while
+ * keeping their working area clutter free for writing their horoscopes?)".
+ *
+ * So: a dialog, not a panel that pushes the writing box around. It is rendered
+ * with the page and hidden — opening it shows something that is already there
+ * rather than starting a fetch, because a reference you have to wait for is one
+ * you stop opening.
+ *
+ * ⚠ It stays open across a reload and remembers that it was open, because the
+ * whole point is to have it beside you while you write, and the writing desk
+ * reloads whenever the sign or period changes.
+ */
+import SkyReference from "./SkyReference.astro";
+import { copy } from "../../lib/copy";
+
+interface Props {
+  start: string;
+  end: string;
+  /** What the button says. */
+  label?: string;
+  /** The heading inside. */
+  heading?: string;
+}
+const { start, end, label, heading } = Astro.props;
+const say = await copy("component:SkyDrawer");
+---
+
+<div class="sky-drawer">
+  <button type="button" class="sky-open" data-sky-open>
+    <span aria-hidden="true">☰&#xFE0E;</span>
+    {label ?? say("open", "The sky in full")}
+  </button>
+
+  <dialog class="sky-dialog" data-sky-dialog aria-label={say("aria", "The sky for this period")}>
+    <header class="sky-bar">
+      <strong>{heading ?? say("head", "The sky in full")}</strong>
+      <button type="button" class="sky-close" data-sky-close>
+        {say("close", "Close")}
+      </button>
+    </header>
+    <div class="sky-body">
+      <SkyReference start={start} end={end} table={true} heading={say("inside", "This period")} />
+    </div>
+  </dialog>
+</div>
+
+<style>
+  .sky-open {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 6px 12px; cursor: pointer;
+    border: var(--border-w) solid var(--line-strong);
+    border-radius: var(--radius-sm, 6px);
+    background: var(--surface-card, transparent);
+    color: var(--ink); font: 500 var(--text-sm) var(--font-body);
+  }
+  .sky-open:hover { border-color: var(--accent); color: var(--accent); }
+
+  .sky-dialog {
+    width: min(96vw, 1100px); max-width: 96vw;
+    height: min(88vh, 900px);
+    padding: 0; border: var(--border-w) solid var(--line-strong);
+    border-radius: var(--radius-md, 10px);
+    background: var(--surface-page); color: var(--ink);
+    box-shadow: var(--shadow-2, 0 12px 40px rgba(0,0,0,.35));
+  }
+  .sky-dialog::backdrop { background: rgba(0, 0, 0, .45); }
+
+  .sky-bar {
+    position: sticky; top: 0; z-index: 1;
+    display: flex; align-items: center; justify-content: space-between;
+    gap: var(--space-3); padding: var(--space-3) var(--space-4);
+    border-bottom: var(--border-w) solid var(--line);
+    background: var(--surface-page);
+  }
+  .sky-bar strong { font: 600 var(--text-h4) var(--font-display); }
+  .sky-close {
+    cursor: pointer; padding: 4px 10px;
+    border: var(--border-w) solid var(--line-strong);
+    border-radius: var(--radius-sm, 6px);
+    background: transparent; color: var(--ink-soft);
+    font: 500 var(--text-sm) var(--font-body);
+  }
+  .sky-close:hover { color: var(--ink); border-color: var(--accent); }
+
+  .sky-body { padding: var(--space-4); overflow: auto; height: calc(100% - 58px); }
+
+  @media (max-width: 720px) {
+    .sky-dialog { width: 100vw; max-width: 100vw; height: 100vh; border-radius: 0; }
+  }
+</style>
+
+<script>
+  /* Plain <dialog>. showModal gives the backdrop, the focus trap and Escape
+     without any of it being written here. */
+  const dialog = document.querySelector<HTMLDialogElement>("[data-sky-dialog]");
+  const open = document.querySelector<HTMLButtonElement>("[data-sky-open]");
+  const close = document.querySelector<HTMLButtonElement>("[data-sky-close]");
+  const REMEMBER = "sky-drawer-open";
+
+  const show = () => {
+    dialog?.showModal();
+    try { localStorage.setItem(REMEMBER, "1"); } catch { /* private window */ }
+  };
+  const hide = () => {
+    dialog?.close();
+    try { localStorage.removeItem(REMEMBER); } catch { /* private window */ }
+  };
+
+  open?.addEventListener("click", show);
+  close?.addEventListener("click", hide);
+  /* Escape closes the dialog itself; this keeps the memory in step so it does
+     not spring open again on the next reload. */
+  dialog?.addEventListener("close", () => {
+    try { localStorage.removeItem(REMEMBER); } catch { /* private window */ }
+  });
+
+  /* Reopen where it was. The desk reloads on every change of sign or period,
+     and a reference that closes itself each time is a reference you stop
+     using. */
+  try {
+    if (localStorage.getItem(REMEMBER) === "1") dialog?.showModal();
+  } catch { /* private window: it simply does not reopen */ }
+</script>

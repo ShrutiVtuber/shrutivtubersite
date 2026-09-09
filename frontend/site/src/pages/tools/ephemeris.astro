@@ -16,6 +16,7 @@
  * facts for anyone reading a table.
  */
 import ToolLayout from "../../layouts/ToolLayout.astro";
+import SkyReference from "../../components/tools/SkyReference.astro";
 import DisagreementControl from "../../components/tools/DisagreementControl.astro";
 import { askAstro } from "../../lib/api";
 import { copy } from "../../lib/copy";
@@ -116,56 +117,6 @@ const marginal = (event: EventRow): string => {
   return "";
 };
 
-/* The month's events, gathered out of the days.
- *
- * They are already in the table, in the notes column beside their row — which
- * is where a printed ephemeris puts them and where they belong when this page
- * is printed. On a screen that column is the LAST of fourteen and sits off the
- * right edge behind the aside, so in practice the eclipses and the phases were
- * invisible unless you thought to scroll a table sideways. Her words: "we need
- * to show on that page ingresses, eclipses, the moon cycle/phases and the signs
- * they are in".
- *
- * So the same facts, gathered once, in a shape you can read. The table keeps
- * its margin notes; nothing is moved, something is added. */
-const allEvents: EventRow[] = days.flatMap((d) => d.events ?? []);
-const ofKind = (kind: string) =>
-  allEvents.filter((e) => e.kind === kind)
-           .sort((a, b) => a.at.localeCompare(b.at));
-
-const lunations = ofKind("lunation");
-const eclipses = ofKind("eclipse");
-const stations = ofKind("station");
-const voids = ofKind("void");
-/* The Moon changes sign every two and a bit days, which is a third of this
-   list and none of its interest. A printed ephemeris lists the Moon's
-   ingresses in the daily columns and the planets' separately, for the same
-   reason. */
-const ingresses = ofKind("ingress").filter((e) => e.bodies[0] !== "Moon");
-const moonIngresses = ofKind("ingress").filter((e) => e.bodies[0] === "Moon");
-const aspects = ofKind("aspect");
-
-/** "2026-08-12T17:46:00Z" → "12 Aug 17:46". */
-const when = (iso: string) =>
-  `${iso.slice(8, 10)} ${new Date(`${iso.slice(0, 10)}T00:00:00Z`)
-      .toLocaleDateString("en-GB", { month: "short", timeZone: "UTC" })} ${iso.slice(11, 16)}`;
-
-const sign = (name: string) => SIGN_GLYPH[name] ?? name;
-
-/* The aspectarian, by day. A printed ephemeris gives one column of these and it
-   is half of what the book is FOR — the daily positions tell you where a body
-   is, the aspects tell you what it is doing. This page fetched a hundred of
-   them a month and rendered none. */
-const ASPECT_GLYPH: Record<string, string> = {
-  conjunction: "☌\uFE0E", opposition: "☍\uFE0E", trine: "△\uFE0E",
-  square: "□\uFE0E", sextile: "⚹\uFE0E", quincunx: "⚻\uFE0E",
-  semisextile: "⚺\uFE0E",
-};
-const aspectsByDay = days.map((d) => ({
-  date: d.date,
-  rows: (d.events ?? []).filter((e) => e.kind === "aspect"),
-})).filter((d) => d.rows.length > 0);
-
 const shift = (by: number) => {
   const d = new Date(Date.UTC(year, mon - 1 + by, 1));
   const m = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
@@ -238,93 +189,7 @@ const monthName = new Date(Date.UTC(year, mon - 1, 1))
           <a href={shift(1)} rel="next">{say("next", "Next month")} →</a>
         </nav>
 
-        <section class="month-sky" aria-labelledby="month-sky-h">
-          <h3 id="month-sky-h">{say("sky.head", "The month")}</h3>
-          <div class="sky-cols">
-            <div class="sky-col">
-              <h4>{say("sky.moon", "The Moon")}</h4>
-              {lunations.length === 0 && <p class="sky-none">{say("sky.none", "Nothing this month.")}</p>}
-              <ul>
-                {lunations.map((e) => (
-                  <li>
-                    <span class="sky-when t-tabular">{when(e.at)}</span>
-                    <span class="sky-what">
-                      {e.detail?.phase} moon
-                      <span class="sky-at"> {dm(e.degree)} <span class="sg">{sign(e.sign)}</span></span>
-                    </span>
-                  </li>
-                ))}
-                {eclipses.map((e) => (
-                  <li class="sky-eclipse">
-                    <span class="sky-when t-tabular">{when(e.at)}</span>
-                    <span class="sky-what">
-                      <b>{e.detail?.type} {e.detail?.of} eclipse</b>
-                      <span class="sky-at"> {dm(e.degree)} <span class="sg">{sign(e.sign)}</span></span>
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            <div class="sky-col">
-              <h4>{say("sky.ingress", "Into a new sign")}</h4>
-              {ingresses.length === 0 && <p class="sky-none">{say("sky.none.ingress", "No planet changes sign this month.")}</p>}
-              <ul>
-                {ingresses.map((e) => (
-                  <li>
-                    <span class="sky-when t-tabular">{when(e.at)}</span>
-                    <span class="sky-what">
-                      {e.bodies[0]} → <span class="sg">{sign(e.sign)}</span> {e.sign}
-                      {e.detail?.retrograde && <b class="rx"> ℞</b>}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-              {moonIngresses.length > 0 && (
-                <p class="sky-aside">
-                  {say("sky.moon.ingress", "The Moon changes sign")}
-                  {" "}{moonIngresses.length}{" "}
-                  {say("sky.moon.ingress.2", "times this month — those are beside their own rows in the table.")}
-                </p>
-              )}
-            </div>
-
-            <div class="sky-col">
-              <h4>{say("sky.station", "Turning")}</h4>
-              {stations.length === 0 && <p class="sky-none">{say("sky.none.station", "Nothing turns this month.")}</p>}
-              <ul>
-                {stations.map((e) => (
-                  <li>
-                    <span class="sky-when t-tabular">{when(e.at)}</span>
-                    <span class="sky-what">
-                      {e.bodies[0]}{" "}
-                      {e.detail?.direction === "retrograde"
-                        ? <b class="rx">stations ℞</b>
-                        : <b>stations direct</b>}
-                      <span class="sky-at"> {dm(e.degree)} <span class="sg">{sign(e.sign)}</span></span>
-                    </span>
-                  </li>
-                ))}
-              </ul>
-              {voids.length > 0 && (
-                <>
-                  <h4 class="sky-h-second">{say("sky.void", "Moon void of course")}</h4>
-                  <ul>
-                    {voids.map((e) => (
-                      <li>
-                        <span class="sky-when t-tabular">{when(e.at)}</span>
-                        <span class="sky-what">
-                          {say("sky.void.until", "until")} {String(e.detail?.until ?? "").slice(11, 16)}
-                          <span class="sky-at"> ({e.detail?.minutes} min, {say("sky.void.after", "after")} {e.detail?.after})</span>
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                </>
-              )}
-            </div>
-          </div>
-        </section>
+        <SkyReference days={days} heading={say("sky.head", "The month")} />
 
         <div class="table-scroll">
           <table class="eph">
@@ -387,46 +252,6 @@ const monthName = new Date(Date.UTC(year, mon - 1, 1))
             </tbody>
           </table>
         </div>
-
-        <section class="aspectarian" aria-labelledby="asp-h">
-          <h3 id="asp-h">{say("asp.head", "Aspects, day by day")}</h3>
-          <p class="asp-intro">
-            {say("asp.intro", "The other half of a printed ephemeris. The columns say where each body is; these say what they are doing to each other. Times are the exact moment the angle is reached.")}
-          </p>
-          {aspectsByDay.length === 0 ? (
-            <p class="sky-none">{say("asp.none", "No aspects were returned for this month.")}</p>
-          ) : (
-            <div class="asp-grid">
-              {aspectsByDay.map((day) => (
-                <div class="asp-day">
-                  <h4 class="t-tabular">{day.date.slice(8)} <span class="wd">{dayName(day.date)}</span></h4>
-                  <ul>
-                    {day.rows.map((e) => (
-                      <li>
-                        <span class="asp-when t-tabular">{e.at.slice(11, 16)}</span>
-                        <span class="asp-what">
-                          {e.bodies[0]}
-                          {" "}
-                          <span class="asp-glyph" title={e.detail?.aspect}>
-                            {ASPECT_GLYPH[String(e.detail?.aspect)] ?? e.detail?.aspect}
-                          </span>
-                          {" "}
-                          {e.bodies[1]}
-                          {/* Closing or separating: the same angle means a
-                              different thing on the way in and on the way out,
-                              and the printed page marks it with a and s. */}
-                          <span class="asp-dir" title={e.detail?.closing ? "applying" : "separating"}>
-                            {e.detail?.closing ? " a" : " s"}
-                          </span>
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
 
         <p class="legend">
           <b class="rx">℞</b> {say("legend.rx", "retrograde — the tinted cells are one retrograde period, first day to last")} · <b>‡</b> {say("legend.oob", "out of bounds — further from the equator than the Sun ever goes")} ·
@@ -495,71 +320,6 @@ const monthName = new Date(Date.UTC(year, mon - 1, 1))
   /* Every other row tinted, because forty rows of numbers is where the eye
      slips a line — which is the one error a table like this must not invite. */
   .eph tbody tr:nth-child(even) { background: var(--surface-inset, transparent); }
-
-  /* The month, gathered. Beside the table rather than inside it, because the
-     notes column is the fourteenth of fourteen and scrolls off the edge. */
-  .month-sky {
-    border: var(--border-w) solid var(--line);
-    border-radius: var(--radius-md, 10px);
-    padding: var(--space-4);
-    margin-bottom: var(--space-4);
-    background: var(--surface-card, transparent);
-  }
-  .month-sky h3 {
-    margin: 0 0 var(--space-3); color: var(--ink);
-    font: 600 var(--text-h4) var(--font-display);
-  }
-  .sky-cols {
-    display: grid; gap: var(--space-4);
-    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  }
-  .sky-col h4 {
-    margin: 0 0 6px; color: var(--ink-faint);
-    font: 600 var(--text-micro) var(--font-body);
-    letter-spacing: var(--tracking-eyebrow, .08em); text-transform: uppercase;
-  }
-  .sky-h-second { margin-top: var(--space-3) !important; }
-  .sky-col ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
-  .sky-col li { display: flex; gap: 8px; align-items: baseline; font-size: var(--text-sm); }
-  .sky-when { color: var(--ink-faint); white-space: nowrap; }
-  .sky-what { color: var(--ink); }
-  .sky-at { color: var(--ink-soft); }
-  .sky-none, .sky-aside {
-    margin: 0; color: var(--ink-faint);
-    font: 400 var(--text-sm) / 1.6 var(--font-body);
-  }
-  .sky-aside { margin-top: var(--space-2); }
-  /* An eclipse is not just another lunation, and the page should not make you
-     read carefully to notice one. */
-  .sky-eclipse .sky-what b { color: var(--rose); }
-
-  .aspectarian { margin-top: var(--space-5); }
-  .aspectarian h3 {
-    margin: 0 0 6px; color: var(--ink);
-    font: 600 var(--text-h4) var(--font-display);
-  }
-  .asp-intro {
-    margin: 0 0 var(--space-3); max-width: 70ch;
-    color: var(--ink-soft); font: 400 var(--text-sm) / 1.7 var(--font-body);
-  }
-  .asp-grid {
-    display: grid; gap: var(--space-3);
-    grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
-  }
-  .asp-day {
-    border: var(--border-w) solid var(--line);
-    border-radius: var(--radius-sm, 6px); padding: 8px 10px;
-  }
-  .asp-day h4 {
-    margin: 0 0 4px; color: var(--ink); font: 600 var(--text-sm) var(--font-body);
-  }
-  .asp-day .wd { color: var(--ink-faint); font-weight: 400; margin-left: 4px; }
-  .asp-day ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
-  .asp-day li { display: flex; gap: 6px; font-size: var(--text-xs); }
-  .asp-when { color: var(--ink-faint); }
-  .asp-what { color: var(--ink-soft); }
-  .asp-glyph { color: var(--ink); font-weight: 600; }
-  .asp-dir { color: var(--ink-faint); }
 
   .legend {
     margin-top: var(--space-3); color: var(--ink-faint);

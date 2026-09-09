@@ -17,6 +17,7 @@
  */
 import ToolLayout from "../../layouts/ToolLayout.astro";
 import TransitWheel from "../../components/chart/TransitWheel.astro";
+import SkyDrawer from "../../components/tools/SkyDrawer.astro";
 import Copy from "../../components/content/Copy.astro";
 import { askAstro } from "../../lib/api";
 import { copy } from "../../lib/copy";
@@ -140,6 +141,15 @@ const eventLine = (e: EventRow) => {
           caption=""
         />
         <h2 class="hw-h">{say("events.heading", "What happens in this period")}</h2>
+        {/* The whole sky, behind a button. What is listed below are the loud
+            events; the drawer has the daily positions, every aspect, the
+            phases, the eclipses and the voids — everything a printed ephemeris
+            would give you, without any of it sitting on top of the writing. */}
+        <p class="hw-advanced">
+          <SkyDrawer start={start} end={end}
+                     label={say("sky.open", "The sky in full")}
+                     heading={heading} />
+        </p>
         {events.length === 0 ? (
           <p class="hw-none">{say("events.none", "Nothing ingresses, stations or lunates inside it. That is itself worth saying in a reading — a quiet period reads differently from a loud one.")}</p>
         ) : (
@@ -224,6 +234,7 @@ const eventLine = (e: EventRow) => {
   .hw-split { display: grid; gap: var(--space-5); }
   @media (min-width: 900px) { .hw-split { grid-template-columns: 380px 1fr; } }
   .hw-h { font: 600 var(--text-h4, 1.05rem) var(--font-display); color: var(--ink); margin: var(--space-4) 0 8px; }
+  .hw-advanced { margin: 0 0 var(--space-3); }
   .hw-events { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
   .hw-events li {
     font: 400 var(--text-sm) var(--font-body); color: var(--ink-soft);
