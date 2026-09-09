@@ -153,3 +153,45 @@ resume. That is the real cost, not the permission.
 
 Moderation is not optional at step 4: an account makes abuse traceable, it does
 not make it impossible, and this content reaches her Discord.
+
+## Notifications: what is built, and the two things only she can do
+
+Built and tested:
+
+- `app_device` — one row per phone, five switches, pruned when a token dies.
+- `core/notify.tell(kind, …)` — the ONE place that decides who hears about
+  what. Every trigger calls it; nothing else reads a preference flag.
+- `core/fcm.py` — FCM HTTP v1, service-account JWT, cached access token.
+- Triggers: readings published, somebody replied to your practice reading, and
+  she went live (the bot calls the site at the transition, once per sweep
+  however many servers are watching).
+- The app's switches, where they are kept, and taking the phone off the list.
+
+⚠ **Unconfigured is a working state.** With no service account nothing is sent
+and nothing raises — publishing a horoscope must not 500 because a Google
+credential is missing.
+
+### 1. Firebase (her, ~15 minutes)
+
+1. Make a Firebase project; add an Android app with the id
+   `com.shrutivtuber.shruti_tools`.
+2. Download `google-services.json` into `shruti-tools/android/app/`.
+3. Add `firebase_core` and `firebase_messaging` to the app's pubspec.
+4. Fill in `_registrationToken()` in `lib/services/notifications.dart` — the
+   five lines are written out in the comment above it.
+5. On the site, set `SHRUTI_FCM_SERVICE_ACCOUNT` to the service account JSON
+   (the whole thing, or a path to it).
+
+⚠ The app is deliberately not built against Firebase yet. Adding the plugin
+against a project that does not exist does not compile, and would leave the app
+un-buildable until step 1 is done.
+
+### 2. iOS, when there is an iOS build
+
+APNs needs an Apple developer account and a key uploaded to the same Firebase
+project. The backend already sends the `apns` block; nothing changes there.
+
+### 3. The Discord bridge's inbound half
+
+See above — MESSAGE_CONTENT in the developer portal, plus three environment
+variables.

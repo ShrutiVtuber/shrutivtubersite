@@ -464,6 +464,24 @@ async def comment(
         work_id=work_id, user_id=user.id, body_md=body.body_md.strip())
     session.add(row)
     await session.commit()
+
+    # ⚠ Their own comment must not wake their own phone. Somebody saying
+    # something on their own work is not news to them, and being notified about
+    # yourself is the fastest way to turn notifications off.
+    if work.user_id != user.id:
+        try:
+            from shruti.core.notify import tell
+
+            await tell(
+                session, "replies",
+                title="Somebody read your reading",
+                body=f"{_name(user)} said something about it.",
+                url=f"/practice/{work_id}",
+                to_user=work.user_id,
+            )
+        except Exception as exc:                   # noqa: BLE001
+            log.warning("could not tell the author: %s", type(exc).__name__)
+
     return {"ok": True, "id": row.id, "author": _name(user)}
 
 

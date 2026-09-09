@@ -101,28 +101,34 @@ say; `Horoscope.edited_at` marks that it changed. The reading shows a quiet
 Drafting is writing, and the desk autosaves — filing either would bury the one
 correction anybody came to see.
 
-## Next, in her order
+## Everything on her list is built
 
-Read **`docs/PLAN-horoscope-practice.md`** first: eleven requirements, two
-decisions taken, and the one real constraint — her bot is HTTP-interactions
-only and the bridge she chose needs a gateway, which is a new long-running
-process rather than a permission.
+Outstanding items from the practice plan, all done:
 
-Outstanding on the site specifically:
+1. **Supporters give a name to be read on stream** — asked at the SUBSCRIPTION
+   checkout as a Stripe custom field. ⚠ The one-off builder has no such field,
+   so a gift cannot carry a name and there is nothing to filter later. Names to
+   read are listed at `/admin/memberships`.
+2. **Practice readings** — `practice_work` / `_reading` / `_vote` / `_comment`.
+   ⚠ A WORK is the unit: twelve signs is one piece of work. The site's desk
+   keeps drafts to the account, so a reading started on a phone finishes at a
+   desk. In the app: the Practice tab.
+3. **The Discord slash command** — `/horoscope` hands back the material to
+   write from and interprets nothing.
+4. **The standing compatibility test** — hers permanent at
+   `/compatible-with/shruti`; anybody else's runs 5/10/permanent by tier.
+   ⚠ An expired one still HAS a page saying what would keep it up.
+5. **Notifications** — `core/notify.tell(kind, …)` is the only thing that
+   decides who hears what. Triggers wired for readings published, replies to
+   your practice reading, and going live.
 
-1. **Supporters give a name to be read on stream** — asked at the point of
-   donating or subscribing, optional, custom names allowed.
-   ⚠ **Monthly only. One-offs are not read out.**
-2. **Practice readings**: drafts kept to an account rather than to a browser,
-   and a **series** as a first-class thing — twelve signs for a week is one
-   piece of work.
-3. **A Discord slash command** handing back the material to write from. The
-   cheap half: the bot already answers signed interactions and already talks to
-   the ephemeris.
-4. **The standing compatibility test** — a fixed one against her chart, and
-   per-VTuber ones with a tier-set lifetime (5 days / 10 / permanent). It is
-   the only item that touches billing, and the expiry is what will go wrong
-   quietly.
+### ⚠ Two things only she can do
+
+**Firebase**, for notifications to actually leave the building, and
+**MESSAGE_CONTENT** in the Discord developer portal for the bridge's inbound
+half. Both are written, tested and dormant; `docs/PLAN-horoscope-practice.md`
+has the exact steps. Unconfigured is a WORKING state in both — nothing raises,
+nothing 500s, the features are simply quiet.
 
 ## Traps this session paid for
 

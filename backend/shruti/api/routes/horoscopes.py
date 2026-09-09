@@ -17,6 +17,8 @@ it was meant for, and the work is simply gone.
 """
 from __future__ import annotations
 
+import logging
+
 import re
 from datetime import datetime, timezone
 
@@ -28,6 +30,7 @@ from shruti.core.db import get_session
 from shruti.models.accounts import Horoscope, HoroscopeRevision
 
 router = APIRouter(prefix="/api/horoscopes", tags=["horoscopes"])
+log = logging.getLogger(__name__)
 
 SIGNS = (
     "aries", "taurus", "gemini", "cancer", "leo", "virgo",
@@ -309,6 +312,22 @@ async def publish(
         row.published = True
         row.published_at = row.published_at or now
     await session.commit()
+    # ⚠ After the commit, and unable to fail the publish. A notification is a
+    # courtesy attached to something that has already happened; failing the
+    # publish because a push service is down would be absurd.
+    try:
+        from shruti.core.notify import tell
+
+        await tell(
+            session, "horoscope",
+            title="The readings are up",
+            body=f"{body.period.title()} horoscopes for {body.covers}.",
+            url="/horoscopes",
+        )
+    except Exception as exc:                       # noqa: BLE001
+        log.warning("could not tell anybody about the readings: %s",
+                    type(exc).__name__)
+
     return {"ok": True, "published": len(SIGNS), "covers": body.covers}
 
 
