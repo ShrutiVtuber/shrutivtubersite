@@ -79,6 +79,28 @@ browser, and its cookie was issued httpOnly; letting a header override it would
 let a script that cannot read the cookie still choose whose account the request
 runs as. `tests/test_the_app_signs_in.py` holds that.
 
+## The ephemeris and the writing desks
+
+`components/tools/SkyReference.astro` is the sky for a span of days — phases
+with sign and degree, eclipses, planetary ingresses, stations, void-of-course,
+the daily table and the aspectarian. **One component, three places**: the
+ephemeris page, the public writing desk and hers. `SkyDrawer` wraps it in a
+`<dialog>` so it opens beside the writing without pushing it around, and
+remembers being open across the reloads the desk does on every change.
+
+- Retrograde is a **band** down the column, not just a mark on each row.
+- The ephemeris page is `wide` — aside underneath, no horizontal scrollbar. That
+  scrollbar is what put the eclipses off the right edge.
+- ⚠ Past ~70 days the daily detail is not offered. A year is 365 rows and some
+  twelve hundred aspects, and the page says so rather than rendering half.
+
+**Corrections.** `horoscope_revision` keeps what a published reading used to
+say; `Horoscope.edited_at` marks that it changed. The reading shows a quiet
+"Edited …" linking to `/horoscopes/<sign>/<period>/<covers>/history`.
+⚠ `is_a_correction()` decides what is filed: published AND actually different.
+Drafting is writing, and the desk autosaves — filing either would bury the one
+correction anybody came to see.
+
 ## Next, in her order
 
 Read **`docs/PLAN-horoscope-practice.md`** first: eleven requirements, two
@@ -115,6 +137,12 @@ Outstanding on the site specifically:
 - **Marks need U+FE0E** or a browser may draw them from a colour emoji font.
 - **Migration filenames must not share a revision prefix**: `rm d4a71b*`
   deleted a second migration.
+- **Astro INLINES small client scripts** — no `src=` on the tag. Grepping for
+  `<script type="module" src=` says a page has no script when it has one, and
+  looks exactly like a site-wide breakage. It is not one.
+- **Interleaved builds leave a broken `dist/`.** A build run while a `git stash`
+  was active left the manifest naming client scripts that were not on disk.
+  `rm -rf dist` before trusting a strange build.
 - **A guard nobody invokes is a comment.** `scripts/check_consent_wording.py`
   said "run in CI" and grep found its name nowhere else. It runs in the suite
   now.
