@@ -63,7 +63,7 @@ const NAME = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
     {
       yours && yourReading?.published && (
         <section class="yours-band">
-          <p class="t-eyebrow">Your sign</p>
+          <p class="t-eyebrow">{say("text.10", "Your sign")}</p>
           <h2>{NAME(yours)}</h2>
           <Prose html={yourHtml} byline={say("text.9", "Soror Eu. A.")} />
           <div><Button variant="secondary" href={`/horoscopes/${yours}/${period}${covers ? `?covers=${covers}` : ""}`}>{say("text.8", "Open the reading")}</Button></div>

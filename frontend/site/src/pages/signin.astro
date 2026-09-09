@@ -68,8 +68,8 @@ if (Astro.request.method === "POST") {
         <div class="check">
           <SectionHeader as="h1" glyph="☾" eyebrow={say("text.7", "Check your email")} title={say("text.8", "The link is on its way")} />
           <p class="check-body">
-            Sent to <strong>{values.email}</strong>. It works <strong>once</strong> and expires in
-            <strong> 20 minutes</strong>.
+            Sent to <strong>{values.email}</strong>. It works <strong>{say("text.15", "once")}</strong> and expires in
+            <strong>{say("text.16", "20 minutes")}</strong>.
           </p>
           <p class="check-body">{say("text.1", "Nothing yet? It sometimes lands in spam — and if the address has no account here, no mail is sent at all, which is deliberate: whether an address has an account is not something a stranger gets to learn from this form.")}</p>
           <div class="check-actions">
@@ -94,7 +94,7 @@ if (Astro.request.method === "POST") {
           <p class="or">or</p>
           <nav class="method-switch" aria-label={say("text.12", "Sign-in method")}>
             <a href="/signin" aria-current={method === "link" ? "page" : undefined}>{say("text.14", "Emailed link")}</a>
-            <a href="/signin?method=password" aria-current={method === "password" ? "page" : undefined}>Password</a>
+            <a href="/signin?method=password" aria-current={method === "password" ? "page" : undefined}>{say("text.17", "Password")}</a>
           </nav>
           <form method="POST" novalidate class="auth-form">
             <CsrfField />

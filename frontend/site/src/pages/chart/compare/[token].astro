@@ -183,7 +183,7 @@ const rightName = c?.right?.label || "The second";
                 <span class="lbl">{say("your-reading.3", "What you make of it")}</span>
                 <textarea class="area" name="reading_md" rows="12">{c.readingMd}</textarea>
               </label>
-              <div><Button type="submit">Save it</Button></div>
+              <div><Button type="submit">{say("text.8", "Save it")}</Button></div>
             </form>
             {readingHtml && (
               <div class="preview">
@@ -221,7 +221,7 @@ const rightName = c?.right?.label || "The second";
               c.shared ? (
                 <>
                   <label class="link-out">
-                    <span class="lbl">The link</span>
+                    <span class="lbl">{say("text.9", "The link")}</span>
                     <input type="text" readonly value={shareUrl} onclick="this.select()" />
                   </label>
                   <form method="POST">
@@ -249,7 +249,7 @@ const rightName = c?.right?.label || "The second";
             <form method="POST" onsubmit="return confirm('Delete this comparison and the reading?')">
               <CsrfField />
               <input type="hidden" name="action" value="forget" />
-              <Button type="submit" variant="secondary">Delete it</Button>
+              <Button type="submit" variant="secondary">{say("text.10", "Delete it")}</Button>
             </form>
           </section>
         </>

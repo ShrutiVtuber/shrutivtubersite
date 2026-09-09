@@ -399,3 +399,44 @@ def test_markdown_is_normalised_on_both_sides_before_matching() -> None:
     prev = code_of(SRC / "pages" / "admin" / "preview.astro")
     assert "const plain" in prev
     assert "plain(t.data)" in prev and "plain(value)" in prev
+
+
+def test_the_copy_helper_never_appears_inside_a_client_script() -> None:
+    """
+    `say()` is server-side. Inside a <script> it is not called — it is TEXT.
+
+    Three pages were shipping `{say("text.3", "No place of that name found…")}`
+    verbatim into the place-search dropdown, because a page's client script
+    builds markup in a JS string and a text-node rewrite matched happily inside
+    it. Nothing catches that: it builds, it typechecks, the page returns 200,
+    and the wrong thing only appears when a visitor searches for a place that
+    does not exist.
+
+    Only the BRACED form is a fault. A bare `say(a, b)` inside a script is a
+    local helper — NotifyButton, WheelStepper and MediaField each define one —
+    and rewriting those produced invalid JavaScript the first time this was
+    cleaned up.
+    """
+    import re as _re
+
+    # The WHOLE interpolation, closing brace included. Matching only the
+    # opening `{` catches a JavaScript block brace sitting above a local call —
+    #
+    #     if (blocked) {
+    #       say("Notifications are blocked for this site.", "…");
+    #
+    # — which is not a fault at all. This checker made exactly that mistake
+    # first, and so did the tool that cleaned the real ones up, which rewrote
+    # those local calls into invalid JavaScript.
+    braced = _re.compile(r'\{\s*say\([^()]*\)\s*\}')
+    offenders = []
+    for f in sorted(SRC.rglob("*.astro")):
+        text = f.read_text(encoding="utf-8")
+        for block in _re.finditer(r"<script[\s>].*?</script>", text, _re.S | _re.I):
+            if braced.search(block.group(0)):
+                offenders.append(f.relative_to(SRC))
+                break
+    assert not offenders, (
+        "the copy helper is inside client code and will render literally: "
+        f"{offenders}"
+    )

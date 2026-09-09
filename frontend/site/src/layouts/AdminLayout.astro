@@ -10,6 +10,12 @@
  */
 import "../styles/global.css";
 import "../styles/site.css";
+import { copy } from "../lib/copy";
+
+/* Every word here, editable from the admin. The defaults below are what
+   it was written with and what still renders if nothing was changed. */
+const say = await copy("component:AdminLayout");
+
 interface Props {
   title: string;
   /** The sign-in page, which has no nav and no sign-out. */
@@ -45,7 +51,7 @@ const here = Astro.url.pathname;
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{title} — admin</title>
-    <meta name="robots" content="noindex, nofollow" />
+    <meta name="robots" content={say("text.1", "noindex, nofollow")} />
     <link rel="icon" href="/favicon.ico" sizes="any" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <meta name="theme-color" content="#121829" />
@@ -54,7 +60,7 @@ const here = Astro.url.pathname;
   <body class="admin-body">
     <header class="admin-bar">
       <div class="page bar-inner">
-        <a class="admin-brand" href="/admin">Shruti <span>admin</span></a>
+        <a class="admin-brand" href="/admin">Shruti <span>{say("text.2", "admin")}</span></a>
         {
           !open && (
             <nav class="admin-nav" aria-label="Admin">
@@ -67,11 +73,11 @@ const here = Astro.url.pathname;
           )
         }
         <div class="bar-side">
-          <a class="view-site" href="/">View site ↗</a>
+          <a class="view-site" href="/">{say("text.3", "View site ↗")}</a>
           {
             !open && (
               <form method="POST" action="/admin/signout" class="signout">
-                <button type="submit">Sign out</button>
+                <button type="submit">{say("text.4", "Sign out")}</button>
               </form>
             )
           }

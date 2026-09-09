@@ -129,7 +129,7 @@ const monthName = new Date(Date.UTC(year, mon - 1, 1))
 
 <ToolLayout
   rule={hour === "noon" ? "noon UT" : "midnight UT"}
-  ruleLabel="computed for"
+  ruleLabel={say("text.1", "computed for")}
   date={month}
   disclosure="○"
   noJs={say("nojs", "This page is a table. It needs no scripting and never did.")}
@@ -160,7 +160,7 @@ const monthName = new Date(Date.UTC(year, mon - 1, 1))
     <hr class="param-rule" />
     <form class="param-panel" method="GET">
       <label>
-        <span>Month</span>
+        <span>{say("text.4", "Month")}</span>
         <input type="month" name="month" value={month} />
       </label>
       <input type="hidden" name="hour" value={hour} />
@@ -172,7 +172,7 @@ const monthName = new Date(Date.UTC(year, mon - 1, 1))
         <input type="checkbox" name="dec" value="1" checked={showDeclination} />
         <span class="check-label">{say("dec.label", "Show declination instead of longitude")}</span>
       </label>
-      <button type="submit" data-track="tool:used" data-track-tool="ephemeris">Show</button>
+      <button type="submit" data-track="tool:used" data-track-tool="ephemeris">{say("text.5", "Show")}</button>
     </form>
     <p class="privacy">{say("print.note", "This page prints. The table is set to fit a sheet of A4 in portrait, with the margin notes kept beside their day.")}</p>
   </div>
@@ -182,7 +182,7 @@ const monthName = new Date(Date.UTC(year, mon - 1, 1))
       <p class="prompt">{say("absent", "The ephemeris could not be reached. That is a failure on this side, not a fact about the sky.")}</p>
     ) : (
       <>
-        <nav class="months" aria-label="Move by month">
+        <nav class="months" aria-label={say("text.2", "Move by month")}>
           <a href={shift(-1)} rel="prev">← {say("prev", "Previous month")}</a>
           <h2>{monthName}</h2>
           <a href={shift(1)} rel="next">{say("next", "Next month")} →</a>
@@ -220,7 +220,7 @@ const monthName = new Date(Date.UTC(year, mon - 1, 1))
                       {showDeclination ? (
                         <span class={p.outOfBounds ? "oob" : undefined}
                               title={p.outOfBounds ? "out of bounds" : undefined}>
-                          {signed(p.declination)}{p.outOfBounds && <b aria-label="out of bounds"> ‡</b>}
+                          {signed(p.declination)}{p.outOfBounds && <b aria-label={say("text.3", "out of bounds")}> ‡</b>}
                         </span>
                       ) : (
                         <>

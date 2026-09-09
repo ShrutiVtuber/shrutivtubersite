@@ -20,8 +20,8 @@ const say = await copy("component:NotFound");
     <h1>{say("nothing-is-filed-here.1", "Nothing is filed here")}</h1>
     <p>{say("nothing-is-filed-here.2", "The address is well formed and the entry is not. It may have been renamed, or it may never have existed — I would rather say so than show you a search page dressed as an answer.")}</p>
     <div class="j-actions">
-      <a class="j-btn" href="/journal/all/">All content</a>
-      <a class="j-btn j-btn--quiet" href="/journal/sitemap/">Sitemap</a>
+      <a class="j-btn" href="/journal/all/">{say("text.2", "All content")}</a>
+      <a class="j-btn j-btn--quiet" href="/journal/sitemap/">{say("text.3", "Sitemap")}</a>
     </div>
   </div>
 </main>

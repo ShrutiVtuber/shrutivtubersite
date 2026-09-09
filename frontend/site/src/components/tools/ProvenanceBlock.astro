@@ -41,10 +41,10 @@ const v = await astro<Version>("/version");
   <h2 class="prov-head">{say("provenance.1", "Provenance")}</h2>
   <p class="prov-intro">{say("provenance.2", "The astrology is only as good as the engineering behind it, so the engineering is on the table.")}</p>
   <div class="prov-rows">
-    <div><span>engine</span><span>{say("provenance.3", "Swiss Ephemeris 2.10.03")}</span></div>
+    <div><span>{say("text.1", "engine")}</span><span>{say("provenance.3", "Swiss Ephemeris 2.10.03")}</span></div>
     {rule && <div><span>{ruleLabel}</span><span>{rule}</span></div>}
     <div>
-      <span>computed</span>
+      <span>{say("text.2", "computed")}</span>
       <span>
         {
           where === "device"
@@ -54,9 +54,9 @@ const v = await astro<Version>("/version");
       </span>
     </div>
     {noJs && <div><span>no-JS</span><span>{noJs}</span></div>}
-    <div><span>licence</span><span>{v?.licence ?? "AGPL-3.0-only"}</span></div>
+    <div><span>{say("text.3", "licence")}</span><span>{v?.licence ?? "AGPL-3.0-only"}</span></div>
     <div>
-      <span>version</span>
+      <span>{say("text.4", "version")}</span>
       <span class="t-tabular">{v?.version ?? "—"} · {v?.sha ?? "—"}</span>
     </div>
   </div>

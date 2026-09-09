@@ -90,7 +90,7 @@ const SECTIONS: [keyof Prefs["sections"], string, string][] = [
             <input type="hidden" name="token" value={token} />
 
             <fieldset>
-              <legend>Sections</legend>
+              <legend>{say("text.3", "Sections")}</legend>
               {
                 SECTIONS.map(([key, label, note]) => (
                   <label class="row">
@@ -105,10 +105,10 @@ const SECTIONS: [keyof Prefs["sections"], string, string][] = [
             </fieldset>
 
             <fieldset>
-              <legend>Cadence</legend>
+              <legend>{say("text.10", "Cadence")}</legend>
               <label class="row">
                 <input type="radio" name="cadence" value="monthly" checked={prefs.cadence !== "paused"} />
-                <span><strong>Monthly</strong><span class="note">{say("text.2", "One letter a month.")}</span></span>
+                <span><strong>{say("text.11", "Monthly")}</strong><span class="note">{say("text.2", "One letter a month.")}</span></span>
               </label>
               <label class="row">
                 <input type="radio" name="cadence" value="paused" checked={prefs.cadence === "paused"} />
@@ -120,12 +120,12 @@ const SECTIONS: [keyof Prefs["sections"], string, string][] = [
                 </span>
               </label>
               <label class="until">
-                <span class="lbl">Pause until</span>
+                <span class="lbl">{say("text.12", "Pause until")}</span>
                 <input type="date" name="paused_until" value={prefs.pausedUntil ?? ""} />
               </label>
             </fieldset>
 
-            <div><Button type="submit">Save</Button></div>
+            <div><Button type="submit">{say("text.13", "Save")}</Button></div>
           </form>
 
           <p class="out">

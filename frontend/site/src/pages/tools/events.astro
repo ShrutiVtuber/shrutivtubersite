@@ -190,7 +190,7 @@ const withParam = (key: string, value: string) => {
   <div slot="parameters" class="params">
     <form class="param-panel" method="GET">
       <label>
-        <span>Period</span>
+        <span>{say("text.3", "Period")}</span>
         <select name="type">
           {["day", "week", "month", "year"].map((t) => (
             <option value={t} selected={t === type}>{t}</option>
@@ -203,7 +203,7 @@ const withParam = (key: string, value: string) => {
                name="period" value={period} />
       </label>
       <label>
-        <span>Read from</span>
+        <span>{say("text.4", "Read from")}</span>
         <select name="rising">
           <option value="">— no rotation —</option>
           {SIGNS.map((s) => <option value={s} selected={s === rising}>{s} rising</option>)}
@@ -300,7 +300,7 @@ const withParam = (key: string, value: string) => {
                       <td class="t-tabular house">
                         {house}
                         {AVERSE.has(house) && (
-                          <abbr title="in aversion to the rising sign — it cannot see the Ascendant"> ⊘</abbr>
+                          <abbr title={say("text.1", "in aversion to the rising sign — it cannot see the Ascendant")}> ⊘</abbr>
                         )}
                       </td>
                     )}
@@ -316,7 +316,7 @@ const withParam = (key: string, value: string) => {
           <a href={`/tools/events/export?format=csv&start=${start}&end=${end}${rising ? `&rising=${rising}` : ""}`}
              download>CSV</a> ·
           <a href={`/tools/events/export?format=md&start=${start}&end=${end}${rising ? `&rising=${rising}` : ""}`}
-             download>Markdown</a> ·
+             download>{say("text.5", "Markdown")}</a> ·
           <a href={`/tools/events/export?format=json&start=${start}&end=${end}${rising ? `&rising=${rising}` : ""}`}
              download>JSON</a>
           <span class="take-note">{say("take.note", "All times Universal, to the second. The house column comes with the rotation you chose.")}</span>
@@ -328,7 +328,7 @@ const withParam = (key: string, value: string) => {
         <details class="embed-offer">
           <summary>{say("embed.summary", "Put this wheel in your own page")}</summary>
           <p class="adm-note">{say("embed.note", "Paste this anywhere HTML is allowed. It carries a link back and nothing else — no cookie, no script of ours on your page, nothing stored.")}</p>
-          <textarea readonly rows="3" class="snippet" onclick="this.select()">{`<iframe src="https://shrutivtuber.com/embed/wheel?rising=${rising || ""}&at=${at}" width="520" height="560" style="border:0;max-width:100%" loading="lazy" title="Transit wheel — shrutivtuber.com"></iframe>`}</textarea>
+          <textarea readonly rows="3" class="snippet" onclick="this.select()">{`<iframe src="https://shrutivtuber.com/embed/wheel?rising=${rising || ""}&at=${at}" width="520" height="560" style="border:0;max-width:100%" loading="lazy" title={say("text.2", "Transit wheel — shrutivtuber.com")}></iframe>`}</textarea>
         </details>
 
         <p class="legend">

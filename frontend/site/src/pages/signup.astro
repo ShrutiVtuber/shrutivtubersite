@@ -88,7 +88,7 @@ if (Astro.request.method === "POST") {
         <EmptyState glyph="☾" title="You're in" body={say("text.5", "The account is made. Where would you like to start?")}>
           <div slot="action" class="auth-actions">
             <Button href="/nativity">{say("text.8", "Add a nativity")}</Button>
-            <Button variant="secondary" href="/today">See today</Button>
+            <Button variant="secondary" href="/today">{say("text.9", "See today")}</Button>
           </div>
         </EmptyState>
       ) : (

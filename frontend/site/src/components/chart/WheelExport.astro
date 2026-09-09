@@ -1,4 +1,10 @@
 ---
+import { copy } from "../../lib/copy";
+
+/* Every word here, editable from the admin. The defaults below are what
+   it was written with and what still renders if nothing was changed. */
+const say = await copy("component:WheelExport");
+
 /* Taking the wheel away as a picture.
  *
  * **A serialised SVG loses its stylesheet.** Everything in this drawing takes
@@ -23,8 +29,8 @@ const { name = "wheel" } = Astro.props;
 ---
 
 <div class="export" data-export data-name={name}>
-  <button type="button" data-save="svg">Save SVG</button>
-  <button type="button" data-save="png">Save PNG</button>
+  <button type="button" data-save="svg">{say("text.1", "Save SVG")}</button>
+  <button type="button" data-save="png">{say("text.2", "Save PNG")}</button>
   <span class="export-note" data-export-note aria-live="polite"></span>
 </div>
 

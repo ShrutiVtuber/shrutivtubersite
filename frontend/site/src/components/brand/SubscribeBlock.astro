@@ -52,7 +52,7 @@ const spec = CONSENTS.find((c) => c.kind === "newsletter")!;
         <h2 class="sb-head">{say("the-monthly-letter.1", "The monthly letter")}</h2>
         <p class="body">{say("the-monthly-letter.2", "One a month: your horoscope if you have a saved nativity, the videos and streams since last time, notes on what was written — and a letter, which is the part people actually subscribe for.")}</p>
         <label class="field">
-          <span class="lbl">Email</span>
+          <span class="lbl">{say("text.2", "Email")}</span>
           <input type="email" name="email" value={email} required placeholder="you@example.com" autocomplete="email" />
         </label>
         {error && <p class="error" role="alert">{error}</p>}

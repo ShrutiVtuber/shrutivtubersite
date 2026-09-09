@@ -210,9 +210,9 @@ const INSTRUMENTS = [
       <Fragment slot="actions">
         {
           badge.status === "live" ? (
-            <Button variant="live" size="lg" href={badge.href ?? "/videos"}>Watch live</Button>
+            <Button variant="live" size="lg" href={badge.href ?? "/videos"}>{say("text.10", "Watch live")}</Button>
           ) : (
-            <Button size="lg" href="/schedule">Next stream</Button>
+            <Button size="lg" href="/schedule">{say("text.11", "Next stream")}</Button>
           )
         }
         <Button variant="secondary" size="lg" href="/work">{say("text.6", "See the work")}</Button>
@@ -245,7 +245,7 @@ const INSTRUMENTS = [
         {/* No "everything happening" link here: the band directly above this
             already carries one, and two identical links a few lines apart read
             as a mistake rather than as emphasis. */}
-        <span class="t-eyebrow">Have a say</span>
+        <span class="t-eyebrow">{say("text.12", "Have a say")}</span>
         <PollCard poll={openPoll} />
       </section>
     )
@@ -335,7 +335,7 @@ const INSTRUMENTS = [
         </ul>
         <div class="ai-actions">
           <Button size="lg" href="/signup">{say("account.button", "Make an account")}</Button>
-          <Button variant="ghost" href="/signin">Sign in</Button>
+          <Button variant="ghost" href="/signin">{say("text.13", "Sign in")}</Button>
         </div>
         <p class="ai-quiet">{say("text.1", "Nothing public — no profile, no avatar, no follower count. Birth data is a separate, optional decision, and withdrawing it deletes it. Free, and staying that way.")}</p>
       </div>

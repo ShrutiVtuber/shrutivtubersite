@@ -38,13 +38,13 @@ const keepVowels = q.get("vowels") === "keep";
   <div slot="parameters" class="params">
     <form class="sigil-form" method="GET" data-sigil-form>
       <fieldset class="options">
-        <legend class="t-eyebrow">Method</legend>
+        <legend class="t-eyebrow">{say("text.10", "Method")}</legend>
         <label class="opt">
           <input type="checkbox" name="vowels" value="keep" checked={keepVowels} data-opt="vowels" />
-          <span>Keep vowels</span>
+          <span>{say("text.11", "Keep vowels")}</span>
         </label>
         <label class="sel">
-          <span class="lbl">Line</span>
+          <span class="lbl">{say("text.12", "Line")}</span>
           <select name="weight" data-opt="weight">
             <option value="hairline" selected={weight === "hairline"}>Hairline</option>
             <option value="broad-pen" selected={weight === "broad-pen"}>Broad pen</option>
@@ -52,7 +52,7 @@ const keepVowels = q.get("vowels") === "keep";
           </select>
         </label>
         <label class="sel">
-          <span class="lbl">Enclosure</span>
+          <span class="lbl">{say("text.13", "Enclosure")}</span>
           <select name="enclosure" data-opt="enclosure">
             <option value="none" selected={enclosure === "none"}>None</option>
             <option value="circle" selected={enclosure === "circle"}>Circle</option>
@@ -178,16 +178,16 @@ const keepVowels = q.get("vowels") === "keep";
       const repeats = r.afterVowels.length - r.unique.length;
 
       stepsOut.innerHTML =
-        `<h2>{say("the-reduction.1", "The reduction")}</h2><dl>` +
+        `<h2>The reduction</h2><dl>` +
         `<div class="sig-step"><dt>Statement</dt><dd>${esc(r.statement)}</dd></div>` +
         `<div class="sig-step"><dt>Upper case</dt><dd>${esc(r.upper)}</dd></div>` +
-        `<div class="sig-step"><dt>{say("text.5", "Letters only")}</dt><dd>${esc(r.lettersOnly.join(""))}</dd></div>` +
+        `<div class="sig-step"><dt>Letters only</dt><dd>${esc(r.lettersOnly.join(""))}</dd></div>` +
         `<div class="sig-step"><dt>${o.keepVowels ? "Vowels kept" : "Vowels struck"}</dt>` +
         `<dd>${esc(r.afterVowels.join(""))}` +
         (struck.length ? ` <span class="sig-struck">${esc(struck.join(""))}</span>` : "") + `</dd></div>` +
-        `<div class="sig-step"><dt>{say("text.6", "Repeats struck")}</dt><dd>${esc(r.unique.join(""))}` +
+        `<div class="sig-step"><dt>Repeats struck</dt><dd>${esc(r.unique.join(""))}` +
         (repeats > 0 ? ` <span class="sig-struck">${repeats} removed</span>` : "") + `</dd></div>` +
-        `<div class="sig-step"><dt>{say("text.7", "The letter set")}</dt><dd><strong>${esc(r.unique.join(" "))}</strong></dd></div>` +
+        `<div class="sig-step"><dt>The letter set</dt><dd><strong>${esc(r.unique.join(" "))}</strong></dd></div>` +
         `</dl>`;
       stepsOut.hidden = false;
 
@@ -195,27 +195,27 @@ const keepVowels = q.get("vowels") === "keep";
         /* The reduction consumed the sentence. A real outcome with a designed
            state — never an error, and never a figure invented to fill it. */
         figureOut.innerHTML =
-          `<div class="sig-cc"><p class="mark">{say("the-reduction.2", "◐ Nothing left to draw")}</p>` +
-          `<h3>{say("the-reduction-consumed-t.1", "The reduction consumed the sentence")}</h3>` +
+          `<div class="sig-cc"><p class="mark">◐ Nothing left to draw</p>` +
+          `<h3>The reduction consumed the sentence</h3>` +
           `<p>${r.exhausted
             ? "Every letter was a vowel or a repeat, so no letters remain and there is no figure to draw. That is a fact about the sentence, not a failure of the tool."
             : "Only one letter remains, and a single point is not a figure."}</p>` +
-          `<ol><li>{say("the-reduction-consumed-t.2", "Keep the vowels, using the option above — the set will be longer.")}</li>` +
-          `<li>{say("the-reduction-consumed-t.3", "Write a longer statement, or one with more distinct consonants.")}</li>` +
-          `<li>{say("the-reduction-consumed-t.4", "Draw it by hand. The tool is a convenience, never a requirement.")}</li></ol></div>`;
+          `<ol><li>Keep the vowels, using the option above — the set will be longer.</li>` +
+          `<li>Write a longer statement, or one with more distinct consonants.</li>` +
+          `<li>Draw it by hand. The tool is a convenience, never a requirement.</li></ol></div>`;
         figureOut.hidden = false;
         return;
       }
 
       const svg = draw(r.unique, { weight: o.weight, enclosure: o.enclosure, size: 512 });
       figureOut.innerHTML =
-        `<h2>{say("the-figure.1", "The figure")}</h2><div class="sig-figure-frame" data-svg>${svg}</div>` +
+        `<h2>The figure</h2><div class="sig-figure-frame" data-svg>${svg}</div>` +
         `<div class="sig-actions">` +
-        `<button type="button" data-download="svg" data-track="tool:used" data-track-tool="sigil-generator">{say("text.8", "Download SVG")}</button>` +
-        `<button type="button" data-download="png" data-track="tool:used" data-track-tool="sigil-generator">{say("the-figure.2", "Download PNG · 2048px")}</button>` +
-        `<a href="?letters=${encodeURIComponent(r.unique.join(""))}&weight=${o.weight}&enclosure=${o.enclosure}${o.keepVowels ? "&vowels=keep" : ""}">{say("the-figure.3", "Link to this figure")}</a>` +
+        `<button type="button" data-download="svg" data-track="tool:used" data-track-tool="sigil-generator">Download SVG</button>` +
+        `<button type="button" data-download="png" data-track="tool:used" data-track-tool="sigil-generator">Download PNG · 2048px</button>` +
+        `<a href="?letters=${encodeURIComponent(r.unique.join(""))}&weight=${o.weight}&enclosure=${o.enclosure}${o.keepVowels ? "&vowels=keep" : ""}">Link to this figure</a>` +
         `</div>` +
-        `<p class="never-leaves">{say("the-figure.4", "The link carries the letter set, never the statement.")}</p>`;
+        `<p class="never-leaves">The link carries the letter set, never the statement.</p>`;
       figureOut.hidden = false;
 
       figureOut.querySelectorAll("[data-download]").forEach((button) => {

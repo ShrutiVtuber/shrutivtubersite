@@ -122,7 +122,7 @@ const jsonLd = videos.length > 0
         >
           <div slot="action" class="video-actions">
             {live.status === "live" && live.href && (
-              <Button variant="live" href={live.href}>Watch live</Button>
+              <Button variant="live" href={live.href}>{say("text.7", "Watch live")}</Button>
             )}
             <Button variant="secondary" href="/schedule">{say("text.6", "See the schedule")}</Button>
           </div>

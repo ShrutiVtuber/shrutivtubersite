@@ -106,7 +106,7 @@ const done = here >= 0 ? all[here].done : false;
               : "This lesson is part of a class you do not have."}
           </p>
           <div class="acts">
-            {lesson.status === 401 && <Button href="/signin">Sign in</Button>}
+            {lesson.status === 401 && <Button href="/signin">{say("text.6", "Sign in")}</Button>}
             <Button variant={lesson.status === 401 ? "secondary" : "primary"}
                     href={`/classes/${slug}`}>{say("text.3", "About this class")}</Button>
           </div>
@@ -160,7 +160,7 @@ const done = here >= 0 ? all[here].done : false;
           <CsrfField />
           <input type="hidden" name="done" value={done ? "0" : "1"} />
           <input type="hidden" name="next" value={next ? `/classes/${slug}/${next.id}` : ""} />
-          {done && <span class="already">✓ Finished</span>}
+          {done && <span class="already">{say("text.7", "✓ Finished")}</span>}
           {done && <Button type="submit" variant="ghost" size="sm">{say("text.4", "Mark unfinished")}</Button>}
           {done && next && (
             <Button href={`/classes/${slug}/${next.id}`} variant="secondary">{say("text.5", "Next lesson →")}</Button>

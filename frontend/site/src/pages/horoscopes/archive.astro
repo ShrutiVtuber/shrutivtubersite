@@ -52,7 +52,7 @@ const monthName = (covers: string) => {
     />
 
     <nav class="filter" aria-label={say("text.3", "Filter by sign")}>
-      <a href="/horoscopes/archive" aria-current={!sign ? "page" : undefined}>All signs</a>
+      <a href="/horoscopes/archive" aria-current={!sign ? "page" : undefined}>{say("text.6", "All signs")}</a>
       {
         SIGNS.map((s) => (
           <a href={`/horoscopes/archive?sign=${s}`} aria-current={s === sign ? "page" : undefined}>
@@ -69,7 +69,7 @@ const monthName = (covers: string) => {
           title={say("text.4", "Nothing published yet")}
           body={say("text.5", "Once a month's twelve readings go up they stay here, and this fills in behind them.")}
         >
-          <Button slot="action" variant="secondary" href="/horoscopes">This month</Button>
+          <Button slot="action" variant="secondary" href="/horoscopes">{say("text.7", "This month")}</Button>
         </EmptyState>
       ) : (
         <ul class="periods">
@@ -78,7 +78,7 @@ const monthName = (covers: string) => {
               <li>
                 <div class="p-head">
                   <span class="p-name">{monthName(p.covers)}</span>
-                  {p.covers === data?.current && <span class="p-now">current</span>}
+                  {p.covers === data?.current && <span class="p-now">{say("text.8", "current")}</span>}
                   <span class="t-tabular p-count">{p.count} of 12</span>
                 </div>
                 <div class="p-signs">

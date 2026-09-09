@@ -1,4 +1,10 @@
 ---
+import { copy } from "../../lib/copy";
+
+/* Every word here, editable from the admin. The defaults below are what
+   it was written with and what still renders if nothing was changed. */
+const say = await copy("component:CounterCard");
+
 /* The counter bar, on the website.
  *
  * The same numbers the overlay draws, and deliberately NOT the same component.
@@ -107,7 +113,7 @@ const closed = ends ? ends.getTime() <= Date.now() : false;
     <p class="when">
       {closed ? "Closed " : "Open until "}
       <time datetime={counter.endsAt!} data-when={counter.endsAt!}>{athens}</time>
-      <span class="zone" data-zone>Athens</span>
+      <span class="zone" data-zone>{say("text.1", "Athens")}</span>
     </p>
   )}
 </article>

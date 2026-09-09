@@ -65,7 +65,7 @@ const hasToc = page.toc.length >= 3;
       {page.deck && <p class="j-deck">{page.deck}</p>}
 
       <div class="j-meta">
-        <span>By <a href="https://shrutivtuber.com" rel="author">Shruti</a></span>
+        <span>By <a href="https://shrutivtuber.com" rel="author">{say("text.4", "Shruti")}</a></span>
         {page.date && <span class="j-bc-sep" aria-hidden="true">·</span>}
         {page.date && <time datetime={page.date}>{longDate(page.date)}</time>}
       </div>
@@ -117,9 +117,9 @@ const hasToc = page.toc.length >= 3;
             </>
           ) : (
             <>
-              <p class="j-eyebrow">Filed under</p>
+              <p class="j-eyebrow">{say("text.5", "Filed under")}</p>
               <p class="j-rail-note">{KIND_LABEL[page.kind]}</p>
-              {page.date && <p class="j-eyebrow">Published</p>}
+              {page.date && <p class="j-eyebrow">{say("text.6", "Published")}</p>}
               {page.date && <p class="j-rail-note j-mono">{shortDate(page.date)}</p>}
             </>
           )

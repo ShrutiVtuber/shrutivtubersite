@@ -75,6 +75,30 @@ def is_prose(t):
     if not re.search(r"[a-z]{3}", t): return False
     return sum(c.isalpha() or c.isspace() for c in t) / len(t) > 0.7
 
+def mask_client_code(tpl):
+    """
+    Hide <script> and <style> bodies from the substitutions.
+
+    `say()` is a SERVER-side helper. A page's client script often builds markup
+    in a JS string — `n.innerHTML = '<li><span>No place of that name…</span>'` —
+    and the text-node regex matches happily inside it, producing a literal
+    `{say("text.3", "…")}` in the browser's output. It renders as those exact
+    characters on the page, and nothing in a build or a typecheck says a word.
+
+    Three pages shipped that before this was added.
+    """
+    held = []
+    def hide(m):
+        held.append(m.group(0))
+        return f"\x00HELD{len(held) - 1}\x00"
+    masked = re.sub(r"<(script|style)[\s>].*?</\1>", hide, tpl, flags=re.S | re.I)
+    return masked, held
+
+
+def unmask_client_code(tpl, held):
+    return re.sub(r"\x00HELD(\d+)\x00", lambda m: held[int(m.group(1))], tpl)
+
+
 def convert(path, page):
     src = pathlib.Path(path).read_text(encoding="utf-8")
     parts = src.split("---", 2)
@@ -103,6 +127,8 @@ def convert(path, page):
     # it early — "...credit yourself, don't sell..." truncated at "don" and
     # left the rest of the sentence dangling outside the attribute, which is a
     # syntax error the build only reports as a column number.
+    tpl, _held = mask_client_code(tpl)
+
     tpl = re.sub(r'\b(' + "|".join(PROSE_ATTRS) + r')=(["\'])((?:(?!\2)[^\n])+)\2',
                  attr_repl, tpl)
 
@@ -113,13 +139,25 @@ def convert(path, page):
         if re.match(r"<h[1-6][\s>]", open_tag):
             plain = text.strip()
             if plain and "{" not in plain: section = slug(plain)
-        floor = 3 if re.match(r"<h[1-6][\s>]", open_tag) else 12
+        # Tags whose contents are DATA, not prose. A planet name in a table
+        # cell, a command in <code>, a timestamp — none of those is a sentence
+        # somebody rewrites, and turning them into editable copy fills the
+        # panel with noise and invites a table to be edited into nonsense.
+        if re.match(r"<(code|pre|kbd|samp|var|time|option|td|th|abbr)[\s>]", open_tag):
+            return m.group(0)
         stripped = text.strip()
-        if len(stripped) < floor or any(c in text for c in "{}<>"): return m.group(0)
+        # The regex above already guarantees this is the WHOLE content of a
+        # leaf element with no braces and no nested tags, which is what makes
+        # a short one safe: "Offline" here is a complete label, not seven
+        # letters found inside a paragraph. The old floor of twelve characters
+        # and two words is what left every one-word label on the site
+        # uneditable — "Published", "Offline", "Discord", "here now".
+        if len(stripped) < 3 or any(c in text for c in "{}<>"): return m.group(0)
         if not re.search(r"[a-z]{3}", stripped): return m.group(0)
-        if len(stripped.split()) < 2 and floor > 3: return m.group(0)
         return f"{open_tag}{take(stripped)}{close}"
     tpl = re.sub(r"(<[a-zA-Z][^<>]*>)([^<>{}]+?)(</[a-zA-Z][a-zA-Z0-9]*>)", text_repl, tpl, flags=re.S)
+
+    tpl = unmask_client_code(tpl, _held)
 
     if count == 0:
         return None, 0, "nothing convertible"

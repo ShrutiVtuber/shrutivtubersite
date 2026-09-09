@@ -1,4 +1,10 @@
 ---
+import { copy } from "../../lib/copy";
+
+/* Every word here, editable from the admin. The defaults below are what
+   it was written with and what still renders if nothing was changed. */
+const say = await copy("component:LegalImprint");
+
 /* Footer imprint. Ported from `components/brand/LegalImprint.jsx`; contract in
  * `LegalImprint.d.ts`.
  *
@@ -46,7 +52,7 @@ const registryLine = [registry, vat].filter(Boolean).join(" · ");
 {
   show && (
     <div>
-      <p class="t-eyebrow" style="margin:0 0 8px">Imprint</p>
+      <p class="t-eyebrow" style="margin:0 0 8px">{say("text.1", "Imprint")}</p>
       <p class="imprint" data-layout={layout}>
         {entity}{inline ? " · " : <br />}
         {officeLine && <Fragment>Registered office (virtual): {officeLine}{inline ? " · " : <br />}</Fragment>}

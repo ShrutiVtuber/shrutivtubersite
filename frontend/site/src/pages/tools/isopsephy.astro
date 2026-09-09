@@ -75,7 +75,7 @@ const current = CIPHERS[slug];
   </div>
 
   <section class="entry">
-    <label class="entry-label" for="iso-input">Text</label>
+    <label class="entry-label" for="iso-input">{say("text.3", "Text")}</label>
     <textarea
       id="iso-input"
       rows="3"
@@ -199,10 +199,10 @@ const current = CIPHERS[slug];
         /* No total, and the reason is stated rather than left as an absence. */
         head =
           `<p class="iso-total"><span class="n">${esc(r.assembled || "—")}</span>` +
-          `<span class="lbl">{say("text.7", "assembled number")}</span></p>` +
-          `<p class="iso-note">Kaṭapayādi is a <strong>{say("text.3", "place-value encoding, not a sum")}</strong>. ` +
+          `<span class="lbl">assembled number</span></p>` +
+          `<p class="iso-note">Kaṭapayādi is a <strong>place-value encoding, not a sum</strong>. ` +
           `Only the last consonant of a cluster counts, standalone vowels are zero, and the digits ` +
-          `are read right to left — <em lang="sa">{say("text.4", "aṅkānāṁ vāmato gatiḥ")}</em>. ` +
+          `are read right to left — <em lang="sa">aṅkānāṁ vāmato gatiḥ</em>. ` +
           `No total is offered because the system does not make one.</p>` +
           `<p class="iso-rule" lang="sa">अङ्कानां वामतो गतिः</p>`;
       } else {

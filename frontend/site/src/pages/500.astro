@@ -16,8 +16,8 @@ const say = await copy("500");
     <h1>{say("the-instrument-slipped.1", "The instrument slipped.")}</h1>
     <p>{say("the-instrument-slipped.2", "Something failed on my side, not yours. It's being looked at — try again in a moment.")}</p>
     <div class="err-actions">
-      <Button href="/">Back home</Button>
-      <Button variant="secondary" href="/">Try again</Button>
+      <Button href="/">{say("text.3", "Back home")}</Button>
+      <Button variant="secondary" href="/">{say("text.4", "Try again")}</Button>
     </div>
     <p class="err-code">{say("the-instrument-slipped.3", "error 500 · if it persists, hello@shrutivtuber.com")}</p>
   </div>

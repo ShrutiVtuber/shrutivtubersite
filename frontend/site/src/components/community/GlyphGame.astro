@@ -34,14 +34,14 @@ const say = await copy("component:GlyphGame");
   <div class="g-board">
     <div class="g-prompt">
       <span class="g-glyph" data-glyph aria-live="polite">·</span>
-      <span class="g-hint" data-hint>Press start</span>
+      <span class="g-hint" data-hint>{say("text.2", "Press start")}</span>
     </div>
     <div class="g-answers" data-answers></div>
   </div>
 
   <div class="g-foot">
     <button type="button" class="g-go" data-start
-            data-track="game:played" data-track-tool="glyph-game">Start</button>
+            data-track="game:played" data-track-tool="glyph-game">{say("text.3", "Start")}</button>
     <span class="g-score">
       Streak <strong data-streak>0</strong> · best <strong data-best>0</strong>
     </span>

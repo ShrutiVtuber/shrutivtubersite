@@ -114,14 +114,14 @@ const readable = (iso: string | null) =>
             <div class="chart-facts">
               <h2>{say("the-moment.1", "The moment")}</h2>
               <dl>
-                <div><dt>Date</dt><dd>{c.birthDate}</dd></div>
+                <div><dt>{say("text.7", "Date")}</dt><dd>{c.birthDate}</dd></div>
                 <div>
-                  <dt>Time</dt>
+                  <dt>{say("text.8", "Time")}</dt>
                   <dd>{c.timeUnknown ? "unknown — the angles are undefined" : c.birthTime}</dd>
                 </div>
-                {c.placeName && <div><dt>Place</dt><dd>{c.placeName}</dd></div>}
+                {c.placeName && <div><dt>{say("text.9", "Place")}</dt><dd>{c.placeName}</dd></div>}
                 <div><dt>Sky</dt><dd>{TRADITION[c.tradition] ?? c.tradition}</dd></div>
-                <div><dt>Figure</dt><dd>{FIGURE[c.figure] ?? c.figure}</dd></div>
+                <div><dt>{say("text.10", "Figure")}</dt><dd>{FIGURE[c.figure] ?? c.figure}</dd></div>
               </dl>
               <p class="fine">{say("the-moment.2", "Only you see this part. Whoever holds a share link sees the drawing, not these words.")}</p>
               <p class="more">
@@ -171,7 +171,7 @@ const readable = (iso: string | null) =>
                 <>
                   <p class="fine">Shared since {readable(c.sharedAt)}.</p>
                   <label class="link-out">
-                    <span>The link</span>
+                    <span>{say("text.11", "The link")}</span>
                     <input type="text" readonly value={shareUrl} onclick="this.select()" />
                   </label>
                   <form method="POST">

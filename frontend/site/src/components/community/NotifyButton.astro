@@ -20,9 +20,9 @@ const say = await copy("component:NotifyButton");
 ---
 
 <div class="notify" data-notify>
-  <p class="n-state" data-notify-state>Checking…</p>
+  <p class="n-state" data-notify-state>{say("text.2", "Checking…")}</p>
   <button type="button" class="n-go" data-notify-go hidden
-          data-track="push:subscribed">Notify me</button>
+          data-track="push:subscribed">{say("text.3", "Notify me")}</button>
   <p class="n-fine" data-notify-fine></p>
 </div>
 

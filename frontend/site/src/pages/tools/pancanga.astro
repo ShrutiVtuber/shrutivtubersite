@@ -127,15 +127,15 @@ const limbs = d
     <hr class="param-rule" />
     <form class="param-panel" method="GET">
       <input type="hidden" name="convention" value={convention} />
-      <label><span>Date</span><input type="date" name="when" value={when} /></label>
+      <label><span>{say("text.6", "Date")}</span><input type="date" name="when" value={when} /></label>
       <PlaceField lat={lat} lon={lon} place={place} />
       <label>
-        <span>Ayanāṁśa</span>
+        <span>{say("text.7", "Ayanāṁśa")}</span>
         <select name="ayanamsa">
           {AYANAMSAS.map((a) => <option value={a} selected={a === ayanamsa}>{a.replace(/_/g, " ")}</option>)}
         </select>
       </label>
-      <button type="submit" data-track="tool:used" data-track-tool="pancanga">Show</button>
+      <button type="submit" data-track="tool:used" data-track-tool="pancanga">{say("text.8", "Show")}</button>
     </form>
   </div>
 
@@ -220,7 +220,7 @@ const limbs = d
         </section>
 
         <section class="ayanamsa-note">
-          <span class="t-eyebrow">Ayanāṁśa</span>
+          <span class="t-eyebrow">{say("text.9", "Ayanāṁśa")}</span>
           <p>
             <strong>{d.ayanamsa.name.replace(/_/g, " ")}</strong>, currently
             {" "}<span class="t-tabular">{d.ayanamsa.degrees.toFixed(4)}°</span>. {d.ayanamsa.note}

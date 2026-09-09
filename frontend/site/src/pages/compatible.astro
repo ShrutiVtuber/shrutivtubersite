@@ -218,7 +218,7 @@ const ALMANAC = [
           <ol class="cx-roman">
             <li><span class="cx-num t-tabular">i</span><span>{say("one-submit-does-all-thre.2", "Casts your chart from the Swiss Ephemeris — the same engine as the natal instrument.")}</span></li>
             <li><span class="cx-num t-tabular">ii</span><span>{say("one-submit-does-all-thre.3", "Keeps it behind a link that only you have.")}</span></li>
-            <li><span class="cx-num t-tabular">iii</span><span>{say("one-submit-does-all-thre.4", "Makes one invitation to hand to anybody. They fill in their half; the comparison appears for both of you.")}</span></li>
+            <li><span class="cx-num t-tabular">{say("text.18", "iii")}</span><span>{say("one-submit-does-all-thre.4", "Makes one invitation to hand to anybody. They fill in their half; the comparison appears for both of you.")}</span></li>
           </ol>
 
           <div class="cx-branch">
@@ -226,7 +226,7 @@ const ALMANAC = [
             <p class="cx-branch-lead">{say("one-submit-does-all-thre.5", "Then it says so, instead of guessing at it.")}</p>
             <p class="cx-branch-body">{say("one-submit-does-all-thre.6", "Four minutes of clock error is a whole degree of Ascendant, so a chart with no time has no angles at all — and every contact that needs one drops out of the count. The result names them rather than quietly leaving them off.")}</p>
             <div class="cx-plates">
-              <p class="cx-plate cx-plate-good"><span>{say("one-submit-does-all-thre.7", "Sun, Moon, Mercury, Venus, Mars, Jupiter, Saturn")}</span><em>weighed</em></p>
+              <p class="cx-plate cx-plate-good"><span>{say("one-submit-does-all-thre.7", "Sun, Moon, Mercury, Venus, Mars, Jupiter, Saturn")}</span><em>{say("text.19", "weighed")}</em></p>
               <p class="cx-plate cx-plate-no"><span>{say("one-submit-does-all-thre.8", "Ascendant and Midheaven")}</span><em>{say("text.11", "cannot be weighed")}</em></p>
             </div>
             <p class="cx-branch-foot">{say("one-submit-does-all-thre.9", "Find the time later and the chart takes it and recounts. Nothing has to be cast again.")}</p>
@@ -249,12 +249,12 @@ const ALMANAC = [
                 <div class="cx-copyrow">
                   <input class="cx-code" type="text" readonly value={inviteUrl}
                          aria-label={say("text.6", "Your invitation link")} onclick="this.select()" />
-                  <button type="button" class="cx-copy" data-copy={inviteUrl}>Copy link</button>
+                  <button type="button" class="cx-copy" data-copy={inviteUrl}>{say("text.20", "Copy link")}</button>
                 </div>
 
                 <div class="cx-share">
                   <a href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(SUGGESTED)}&url=${encodeURIComponent(inviteUrl)}`}
-                     rel="noopener noreferrer" target="_blank">Post on X</a>
+                     rel="noopener noreferrer" target="_blank">{say("text.21", "Post on X")}</a>
                   <a href={`https://bsky.app/intent/compose?text=${encodeURIComponent(`${SUGGESTED} ${inviteUrl}`)}`}
                      rel="noopener noreferrer" target="_blank">{say("text.12", "Post on Bluesky")}</a>
                   <a href={`/chart/invite/${made.shareToken}`}>{say("now-hand-it-to-somebody.3", "See what they will see →")}</a>
@@ -264,7 +264,7 @@ const ALMANAC = [
                 <p class="cx-lbl">{say("now-hand-it-to-somebody.5", "Something to post with it")}</p>
                 <div class="cx-copyrow">
                   <textarea class="cx-code" rows="3" aria-label={say("text.7", "Suggested post text")}>{SUGGESTED}</textarea>
-                  <button type="button" class="cx-copy" data-copy={SUGGESTED}>Copy text</button>
+                  <button type="button" class="cx-copy" data-copy={SUGGESTED}>{say("text.22", "Copy text")}</button>
                 </div>
                 <p class="cx-fine">{say("now-hand-it-to-somebody.6", "Edit it. It is only a suggestion.")}</p>
               </div>
@@ -276,11 +276,11 @@ const ALMANAC = [
                 <div class="cx-copyrow">
                   <input class="cx-code" type="text" readonly value={ownUrl}
                          aria-label={say("text.8", "The link back to your own chart")} onclick="this.select()" />
-                  <button type="button" class="cx-copy cx-copy-rose" data-copy={ownUrl}>Copy link</button>
+                  <button type="button" class="cx-copy cx-copy-rose" data-copy={ownUrl}>{say("text.23", "Copy link")}</button>
                 </div>
                 <p class="cx-keep-body"><Copy text={say("text.2", "This link is the **only** way back to your chart. We never asked for your email, so there is nothing we could send you if it goes missing — and no account to recover. Put it where you keep things.")} /></p>
                 <p class="cx-keep-links">
-                  <a href={ownUrl}>Open it now</a>
+                  <a href={ownUrl}>{say("text.24", "Open it now")}</a>
                   <a href={`data:text/plain;charset=utf-8,${encodeURIComponent(ownUrl)}`}
                      download="my-chart-link.txt">{say("now-hand-it-to-somebody.7", "Download it as a text file")}</a>
                   <a href="/signup">{say("now-hand-it-to-somebody.8", "Attach it to an account later")}</a>
@@ -303,18 +303,18 @@ const ALMANAC = [
               )}
 
               <label class="cx-field">
-                <span class="cx-flabel">Name or handle <em class="cx-opt">optional</em></span>
+                <span class="cx-flabel">Name or handle <em class="cx-opt">{say("text.25", "optional")}</em></span>
                 <input class="cx-input" name="label" maxlength="80" placeholder="Someone" value={name} />
                 <span class="cx-help">{say("now-hand-it-to-somebody.10", "Whatever should sit under your face on the card. Leave it and you are “Someone”.")}</span>
               </label>
 
               <div class="cx-row">
                 <label class="cx-field">
-                  <span class="cx-flabel">Birth date <em class="cx-req">required</em></span>
+                  <span class="cx-flabel">Birth date <em class="cx-req">{say("text.26", "required")}</em></span>
                   <input class="cx-input" type="date" name="date" required />
                 </label>
                 <label class="cx-field" data-time-field hidden={noTime}>
-                  <span class="cx-flabel">Birth time <em class="cx-opt">optional</em></span>
+                  <span class="cx-flabel">Birth time <em class="cx-opt">{say("text.27", "optional")}</em></span>
                   <input class="cx-input" type="time" name="time" />
                 </label>
               </div>
@@ -328,14 +328,14 @@ const ALMANAC = [
               </label>
 
               <div class="cx-field">
-                <span class="cx-flabel">Birth place <em class="cx-req">required</em></span>
+                <span class="cx-flabel">Birth place <em class="cx-req">{say("text.28", "required")}</em></span>
                 <PlaceField lat={37.9838} lon={23.7275} place="" />
                 <span class="cx-help">{say("now-hand-it-to-somebody.12", "The gazetteer is on our own server; typing here reaches nobody else.")}</span>
               </div>
 
               {signedIn ? (
                 <div class="cx-signed">
-                  <p class="t-eyebrow">Signed in</p>
+                  <p class="t-eyebrow">{say("text.29", "Signed in")}</p>
                   <p>{say("now-hand-it-to-somebody.13", "Your account already carries this consent.")}</p>
                   <p><a href="/account">{say("now-hand-it-to-somebody.14", "Review or withdraw")}</a></p>
                 </div>

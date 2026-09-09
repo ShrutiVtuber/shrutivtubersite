@@ -110,7 +110,7 @@ const moonProgress = today ? (today.moon.tropical.degree % 30) / 30 : 0;
 
     <form class="place-bar" method="GET">
       <PlaceField lat={lat} lon={lon} place={place} />
-      <Button type="submit" size="sm">Show</Button>
+      <Button type="submit" size="sm">{say("text.13", "Show")}</Button>
     </form>
 
     {
@@ -135,7 +135,7 @@ const moonProgress = today ? (today.moon.tropical.degree % 30) / 30 : 0;
               <div class="lum">
                 <span class="lum-glyph t-glyph" aria-hidden="true">☾</span>
                 <div>
-                  <span class="lum-name">Moon</span>
+                  <span class="lum-name">{say("text.14", "Moon")}</span>
                   <span class="lum-pos t-tabular">{fmtDeg(today.moon.tropical.degree)} {today.moon.tropical.sign}</span>
                   <span class="lum-alt t-tabular">{fmtDeg(today.moon.sidereal.degree)} {today.moon.sidereal.rashi} · {today.moon.sidereal.nakshatra}</span>
                   {/* The Moon moves visibly over a day and the Sun does not, so
@@ -195,7 +195,7 @@ const moonProgress = today ? (today.moon.tropical.degree % 30) / 30 : 0;
                   </div>
                   <div class="hour hour-next">
                     <div class="hour-next-head">
-                      <span class="t-eyebrow">Next</span>
+                      <span class="t-eyebrow">{say("text.15", "Next")}</span>
                       <Badge tone="rose">{say("text.9", "plan against this")}</Badge>
                     </div>
                     <span class="hour-ruler">{today.planetaryHours.next?.ruler}</span>
@@ -286,27 +286,27 @@ const moonProgress = today ? (today.moon.tropical.degree % 30) / 30 : 0;
             <h2>{say("today-in-every-reckoning.1", "Today in every reckoning kept")}</h2>
             <ul class="reckonings">
               <li>
-                <span class="r-name">Gregorian</span>
+                <span class="r-name">{say("text.16", "Gregorian")}</span>
                 <span class="t-tabular r-val">{today.reckonings.gregorian}</span>
                 <span class="r-rule">{say("today-in-every-reckoning.2", "civil, by the clock")}</span>
               </li>
               {today.reckonings.hindu && (
                 <li>
-                  <span class="r-name">Hindu</span>
+                  <span class="r-name">{say("text.17", "Hindu")}</span>
                   <span class="r-val">{today.reckonings.hindu.month} {today.reckonings.hindu.tithi}</span>
                   <span class="r-rule">amānta · Vikrama {today.reckonings.hindu.vikrama} · <a href="/tools/hindu-calendar">{say("text.10", "the calendar →")}</a></span>
                 </li>
               )}
               {today.reckonings.attic && (
                 <li>
-                  <span class="r-name">Attic</span>
+                  <span class="r-name">{say("text.18", "Attic")}</span>
                   <span class="r-val" lang="el">{today.reckonings.attic.greek} {today.reckonings.attic.day}</span>
                   <span class="r-rule">month opened by conjunction · <a href="/tools/attic-calendar">{say("text.11", "the calendar →")}</a></span>
                 </li>
               )}
               {today.reckonings.thelemic && (
                 <li>
-                  <span class="r-name">Thelemic</span>
+                  <span class="r-name">{say("text.19", "Thelemic")}</span>
                   <span class="r-val">{today.reckonings.thelemic.formatted}</span>
                   <span class="r-rule">{say("today-in-every-reckoning.3", "year turns at the March equinox")}</span>
                 </li>

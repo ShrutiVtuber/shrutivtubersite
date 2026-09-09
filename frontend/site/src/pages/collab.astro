@@ -185,7 +185,7 @@ const COMMON = [
                 <CsrfField />
                 <input type="hidden" name="action" value="forget" />
                 <input type="hidden" name="id" value={g.id} />
-                <button type="submit" aria-label={`Forget ${g.name}`}>Forget</button>
+                <button type="submit" aria-label={`Forget ${g.name}`}>{say("text.12", "Forget")}</button>
               </form>
             </li>
           ))}
@@ -199,11 +199,11 @@ const COMMON = [
           <fieldset class="cb-person">
             <legend>{p ? p.name : "Add somebody"}</legend>
             <label>
-              <span>Name</span>
+              <span>{say("text.13", "Name")}</span>
               <input name={`n${i}`} maxlength="40" value={p?.name ?? ""} placeholder={say("text.8", "Their handle")} />
             </label>
             <label>
-              <span>Timezone</span>
+              <span>{say("text.14", "Timezone")}</span>
               <input name={`z${i}`} list="zones" value={p?.zone ?? ""} placeholder="Europe/Athens" />
             </label>
             <div class="cb-window">
@@ -212,7 +212,7 @@ const COMMON = [
                 <input name={`f${i}`} type="number" min="0" max="23" value={p?.from ?? 16} />
               </label>
               <label>
-                <span>until</span>
+                <span>{say("text.15", "until")}</span>
                 <input name={`t${i}`} type="number" min="1" max="24" value={p?.to ?? 24} />
               </label>
             </div>
@@ -230,7 +230,7 @@ const COMMON = [
           <span>On</span>
           <input type="date" name="on" value={when} />
         </label>
-        <Button type="submit">Work it out</Button>
+        <Button type="submit">{say("text.16", "Work it out")}</Button>
         <p class="cb-fine"><Copy text={say("text.1", "Their hours are in **their own** local time — “from 16 until 24” means four in the afternoon to midnight where they are.")} /></p>
       </div>
     </form>
@@ -304,7 +304,7 @@ const COMMON = [
                 <CsrfField />
                 <input type="hidden" name="action" value="save" />
                 <input name="name" maxlength="80" placeholder={say("text.9", "What to call it — “Tuesday crew”")} />
-                <Button type="submit">Keep it</Button>
+                <Button type="submit">{say("text.17", "Keep it")}</Button>
               </form>
             </>
           ) : (

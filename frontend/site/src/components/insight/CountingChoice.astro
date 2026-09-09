@@ -20,7 +20,7 @@ const say = await copy("component:CountingChoice");
 ---
 
 <div class="choice" data-counting-choice hidden>
-  <p class="state" data-counting-state>Checking…</p>
+  <p class="state" data-counting-state>{say("text.2", "Checking…")}</p>
   <button type="button" class="sh-btn" data-variant="secondary" data-size="sm" data-counting-toggle>
     <span data-counting-label>…</span>
   </button>

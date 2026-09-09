@@ -14,6 +14,12 @@
  * screen in her timezone, and this is not.
  */
 import { SITE_API } from "../../lib/api";
+import { copy } from "../../lib/copy";
+
+/* Every word here, editable from the admin. The defaults below are what
+   it was written with and what still renders if nothing was changed. */
+const say = await copy("component:SkyCard");
+
 
 interface Props {
   lat?: number;
@@ -89,10 +95,10 @@ const athens = at
 {ok && (
   <article class="sky-card">
     <header>
-      <H class="title">The sky now</H>
+      <H class="title">{say("text.1", "The sky now")}</H>
       <p class="at">
         <time datetime={d.at} data-at={d.at}>{athens}</time>
-        <span class="zone" data-zone>Athens</span>
+        <span class="zone" data-zone>{say("text.2", "Athens")}</span>
       </p>
     </header>
 
@@ -143,7 +149,7 @@ const athens = at
       ))}
       {moon && (
         <div class="row">
-          <dt>drifting</dt>
+          <dt>{say("text.3", "drifting")}</dt>
           <span class="lead" aria-hidden="true"></span>
           <dd>{drift(moon.perHour)}</dd>
         </div>

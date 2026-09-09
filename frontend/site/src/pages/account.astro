@@ -157,7 +157,7 @@ const TRADITIONS = [
         <SelectField label={say("text.7", "Preferred tradition")} name="preferred_tradition" value={me.preferredTradition} options={TRADITIONS} />
         <TextField label={say("text.8", "House system")} name="house_system" value={me.houseSystem} optionalLabel />
         <TextField label="Ayanāṁśa" name="ayanamsa" value={me.ayanamsa} optionalLabel />
-        <div><Button type="submit">Save</Button></div>
+        <div><Button type="submit">{say("text.14", "Save")}</Button></div>
       </form>
     </section>
 
@@ -177,12 +177,12 @@ const TRADITIONS = [
               <span class="t-tabular faint"> · {me.nativity.lat.toFixed(4)}, {me.nativity.lon.toFixed(4)}</span>
               {me.nativity.timezone && <span class="t-tabular faint"> · {me.nativity.timezone}</span>}
             </p>
-            <div><Button variant="secondary" href="/nativity">Edit</Button></div>
+            <div><Button variant="secondary" href="/nativity">{say("text.15", "Edit")}</Button></div>
           </div>
         ) : state.nativity?.granted ? (
           <div class="stack">
             <p class="quiet">{say("nativity.3", "No nativity saved yet.")}</p>
-            <div><Button href="/nativity">Add one</Button></div>
+            <div><Button href="/nativity">{say("text.16", "Add one")}</Button></div>
           </div>
         ) : (
           <p class="quiet">{say("nativity.4", "Storing birth data needs its own consent, below. Nothing is kept until it is given.")}</p>
@@ -196,7 +196,7 @@ const TRADITIONS = [
         charts.length === 0 ? (
           <div class="stack">
             <p class="quiet">{say("your-charts.2", "None kept yet. A chart you keep gets its own address, and a separate link you can hand to somebody and take back later without losing your own.")}</p>
-            <div><Button variant="secondary" href="/tools/natal-chart">Cast one</Button></div>
+            <div><Button variant="secondary" href="/tools/natal-chart">{say("text.17", "Cast one")}</Button></div>
           </div>
         ) : (
           <ul class="charts">
@@ -208,7 +208,7 @@ const TRADITIONS = [
                   {c.tradition === "vedic" ? "Vedic" : "Hellenistic"}
                   {c.figure === "south" ? " · South Indian" : c.figure === "north" ? " · North Indian" : ""}
                 </span>
-                {c.shared && <span class="shared-mark">shared</span>}
+                {c.shared && <span class="shared-mark">{say("text.18", "shared")}</span>}
               </li>
             ))}
           </ul>
@@ -306,7 +306,7 @@ const TRADITIONS = [
       <form method="POST">
         <CsrfField />
         <input type="hidden" name="action" value="signout" />
-        <div><Button variant="secondary" type="submit">Sign out</Button></div>
+        <div><Button variant="secondary" type="submit">{say("text.19", "Sign out")}</Button></div>
       </form>
     </section>
 
@@ -353,7 +353,7 @@ const TRADITIONS = [
         <form method="POST">
           <CsrfField />
           <input type="hidden" name="action" value="delete" />
-          <Button type="submit">Delete it</Button>
+          <Button type="submit">{say("text.20", "Delete it")}</Button>
         </form>
         <Button variant="ghost" data-close-delete>{say("text.13", "Keep my account")}</Button>
       </div>

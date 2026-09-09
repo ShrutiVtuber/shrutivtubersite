@@ -136,9 +136,9 @@ const RULE_NAME: Record<string, string> = {
     <hr class="param-rule" />
     <form class="param-panel" method="GET">
       <input type="hidden" name="reckoning" value={reckoning} />
-      <label><span>Date</span><input type="date" name="when" value={when} /></label>
+      <label><span>{say("text.8", "Date")}</span><input type="date" name="when" value={when} /></label>
       <PlaceField lat={lat} lon={lon} place={place} />
-      <button type="submit" data-track="tool:used" data-track-tool="attic-calendar">Show</button>
+      <button type="submit" data-track="tool:used" data-track-tool="attic-calendar">{say("text.9", "Show")}</button>
     </form>
   </div>
 
@@ -158,24 +158,24 @@ const RULE_NAME: Record<string, string> = {
     ) : d ? (
       <>
         <section class="today-card">
-          <span class="t-eyebrow">Today</span>
+          <span class="t-eyebrow">{say("text.10", "Today")}</span>
           <h2 lang="el">{d.month.greek} <span class="tr">{d.month.name}</span></h2>
           <p class="day-greek" lang="el">{d.day.greek}</p>
           <p class="day-tr">{d.day.transliteration} · day {d.day.number} of {d.month.length}</p>
           <dl class="facts">
-            <div><dt>Decad</dt><dd lang="el">{d.day.decad}</dd></div>
-            <div><dt>Month</dt><dd>{d.month.full ? "full — 30 days" : "hollow — 29 days"}</dd></div>
+            <div><dt>{say("text.11", "Decad")}</dt><dd lang="el">{d.day.decad}</dd></div>
+            <div><dt>{say("text.12", "Month")}</dt><dd>{d.month.full ? "full — 30 days" : "hollow — 29 days"}</dd></div>
             <div><dt>{say("text.4", "Days remaining")}</dt><dd class="t-tabular">{d.day.remaining}</dd></div>
-            <div><dt>Moon age</dt><dd class="t-tabular">{d.moonAgeDays} days</dd></div>
+            <div><dt>{say("text.13", "Moon age")}</dt><dd class="t-tabular">{d.moonAgeDays} days</dd></div>
             <div><dt>{say("text.5", "Next noumenia")}</dt><dd class="t-tabular">{d.nextNoumenia}</dd></div>
-            <div><dt>Year</dt><dd>{d.year.months} months{d.year.intercalary ? " — intercalary" : ""}</dd></div>
+            <div><dt>{say("text.14", "Year")}</dt><dd>{d.year.months} months{d.year.intercalary ? " — intercalary" : ""}</dd></div>
           </dl>
         </section>
 
         {
           d.day.number > 20 && (
             <p class="note">
-              Past the twentieth the days are counted <strong>backwards</strong>: this is
+              Past the twentieth the days are counted <strong>{say("text.15", "backwards")}</strong>: this is
               {" "}{d.day.remaining} from the end, not {d.day.number} from the beginning. The last day of the
               month is ἕνη καὶ νέα, “old and new”, and belongs to both months at once.
             </p>
@@ -209,7 +209,7 @@ const RULE_NAME: Record<string, string> = {
         }
 
         <section class="archon">
-          <span class="t-eyebrow">Archon year</span>
+          <span class="t-eyebrow">{say("text.16", "Archon year")}</span>
           {/* Never fabricated. The daemon refuses and explains; that refusal is
               the content here, not a gap to fill. */}
           <p class="archon-body">{d.archonYear ?? "—"}</p>

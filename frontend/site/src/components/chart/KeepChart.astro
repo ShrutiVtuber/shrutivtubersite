@@ -62,7 +62,7 @@ const asks = !signedIn || !hasNativityConsent;
     }
 
     <div class="keep-go">
-      <Button type="submit" data-track="chart:kept">Keep it</Button>
+      <Button type="submit" data-track="chart:kept">{say("text.1", "Keep it")}</Button>
       {
         !signedIn && (
           <span class="keep-alt">

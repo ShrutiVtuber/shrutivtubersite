@@ -58,7 +58,7 @@ const current = (href: string) => (href === "/" ? here === "/" : here.startsWith
           withArt ? (
             <img src="/brand/wordmark-small.png" alt="Shruti" />
           ) : (
-            <span class="brand-word">Shruti</span>
+            <span class="brand-word">{say("text.5", "Shruti")}</span>
           )
         }
       </a>
@@ -100,11 +100,11 @@ const current = (href: string) => (href === "/" ? here === "/" : here.startsWith
           stations — two of nine, picked because they were the two with no
           other way in — and left the other seven reachable only from the
           landing page. The hub covers all of them and is one item shorter. */}
-      <a href="/tools">Instruments</a>
+      <a href="/tools">{say("text.6", "Instruments")}</a>
       <a href="/newsletter">{say("text.3", "The monthly letter")}</a>
       <a href={signedIn ? "/account" : "/signin"}>{signedIn ? "Account" : "Sign in"}</a>
       <a href="/support">{say("text.4", "Support the work")}</a>
-      <a href="/contact">Contact</a>
+      <a href="/contact">{say("text.7", "Contact")}</a>
     </nav>
   </div>
 </header>

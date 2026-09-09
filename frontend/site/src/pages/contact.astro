@@ -182,10 +182,10 @@ const extra = sections.filter((s) => s.key !== "intro");
           <TextArea label="Message" name="msg" required rows={6} maxlength={5000} value={values.msg} error={errors.msg} />
           {/* Honeypot: a real person never fills this; bots fill everything. */}
           <div class="hp" aria-hidden="true">
-            <label for="website">Website</label>
+            <label for="website">{say("text.11", "Website")}</label>
             <input id="website" name="website" type="text" tabindex="-1" autocomplete="off" />
           </div>
-          <div><Button type="submit">Send</Button></div>
+          <div><Button type="submit">{say("text.12", "Send")}</Button></div>
         </form>
       )
     }

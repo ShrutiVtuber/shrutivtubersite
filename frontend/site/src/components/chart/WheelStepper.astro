@@ -1,4 +1,10 @@
 ---
+import { copy } from "../../lib/copy";
+
+/* Every word here, editable from the admin. The defaults below are what
+   it was written with and what still renders if nothing was changed. */
+const say = await copy("component:WheelStepper");
+
 /* Stepping the wheel through time, without an ephemeris in the browser.
  *
  * The browser asks the ephemeris directly — Caddy proxies `/api/astro/*` to
@@ -41,15 +47,15 @@ const { from, to, at, marks = [], modern = false } = Astro.props;
      data-marks={JSON.stringify(marks)}>
   <div class="controls">
     <button type="button" data-step="-1440" title="Back a day">‹‹</button>
-    <button type="button" data-step="-60" title="Back an hour">‹</button>
+    <button type="button" data-step="-60" title={say("text.1", "Back an hour")}>‹</button>
     <output class="at" data-at-label>{at.slice(0, 16).replace("T", " ")} UT</output>
     <button type="button" data-step="60" title="On an hour">›</button>
     <button type="button" data-step="1440" title="On a day">››</button>
-    <button type="button" data-snap="-1" title="Previous event">⇤ event</button>
-    <button type="button" data-snap="1" title="Next event">event ⇥</button>
+    <button type="button" data-snap="-1" title={say("text.2", "Previous event")}>{say("text.4", "⇤ event")}</button>
+    <button type="button" data-snap="1" title="Next event">{say("text.5", "event ⇥")}</button>
   </div>
   <input type="range" class="scrub" data-scrub min="0" max="1000" value="0"
-         aria-label="Move through the period" />
+         aria-label={say("text.3", "Move through the period")} />
   <p class="hint" data-hint hidden></p>
 </div>
 

@@ -87,7 +87,7 @@ const year = new Date().getUTCFullYear();
   <div class="page">
     <div class="cols">
       <div>
-        <span class="brand-word footer-brand">Shruti</span>
+        <span class="brand-word footer-brand">{say("text.3", "Shruti")}</span>
         <p class="footer-thesis">{say("text.2", "Instruments for magick, built live from Athens.")}</p>
         <SocialLinkRow links={socials} size={16} />
       </div>
@@ -128,13 +128,13 @@ const year = new Date().getUTCFullYear();
             to arrive for and the part with no room in the header. A footer link
             costs no header width and gives the hub one site-wide inbound link,
             which is what makes it the page worth linking to from outside. */}
-        © {year} {holder} · <a href="/tools">Instruments</a>
+        © {year} {holder} · <a href="/tools">{say("text.4", "Instruments")}</a>
         {/* The page somebody checks when they are unsure whether a shop is
             really hers. It has to be findable from every page, because the
             moment they need it is not a moment they will go looking. */}
         · <a href="/official">{say("elsewhere.2", "Official places")}</a>
-        · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a>
-        · <a href="/admin" class="admin-link">Admin</a>
+        · <a href="/privacy">{say("text.5", "Privacy")}</a> · <a href="/terms">{say("text.6", "Terms")}</a>
+        · <a href="/admin" class="admin-link">{say("text.7", "Admin")}</a>
       </p>
       {/* AGPL-3.0 section 13: software people interact with over a network has
           to offer them its source. Not a credit and not a badge — without this

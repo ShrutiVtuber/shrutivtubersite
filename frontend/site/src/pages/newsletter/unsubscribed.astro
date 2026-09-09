@@ -42,7 +42,7 @@ if (token) {
       ok && token && (
         <p class="body quiet">
           If you only wanted a break rather than an ending, there is a pause —
-          <a href={`/newsletter/preferences?token=${encodeURIComponent(token)}`}> here</a>. It deletes
+          <a href={`/newsletter/preferences?token=${encodeURIComponent(token)}`}>{say("text.4", "here")}</a>. It deletes
           nothing.
         </p>
       )

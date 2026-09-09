@@ -260,8 +260,8 @@ const ASPECT_BASIS: Record<string, string> = {
     <hr class="param-rule" />
     <form class="param-panel" method="GET">
       <input type="hidden" name="tradition" value={tradition} />
-      <label><span>Birth date</span><input type="date" name="date" value={date} required /></label>
-      <label><span>Birth time</span><input type="time" name="time" value={time} disabled={unknownTime} /></label>
+      <label><span>{say("text.10", "Birth date")}</span><input type="date" name="date" value={date} required /></label>
+      <label><span>{say("text.11", "Birth time")}</span><input type="time" name="time" value={time} disabled={unknownTime} /></label>
       <label class="check">
         <input type="checkbox" name="unknownTime" value="1" checked={unknownTime} />
         <span class="check-label">{say("text.1", "I don't know my birth time")}</span>
@@ -270,7 +270,7 @@ const ASPECT_BASIS: Record<string, string> = {
           page had coordinates and no clock, and cast every chart in UTC. */}
       <PlaceField lat={lat} lon={lon} place={place} timezone={tz} wantTimezone />
       <label>
-        <span>Houses</span>
+        <span>{say("text.12", "Houses")}</span>
         <select name="house_system">
           {HOUSE_SYSTEMS.map((h) => <option value={h} selected={h === houseSystem}>{h.replace(/_/g, " ")}</option>)}
         </select>
@@ -281,7 +281,7 @@ const ASPECT_BASIS: Record<string, string> = {
            software which has not understood the difference. */
         tradition === "vedic" ? (
           <label>
-            <span>Figure</span>
+            <span>{say("text.13", "Figure")}</span>
             <select name="vedic_style">
               <option value="north" selected={vedicStyle === "north"}>{say("text.6", "North Indian")}</option>
               <option value="south" selected={vedicStyle === "south"}>{say("text.7", "South Indian")}</option>
@@ -291,7 +291,7 @@ const ASPECT_BASIS: Record<string, string> = {
           <input type="hidden" name="vedic_style" value={vedicStyle} />
         )
       }
-      <button type="submit" data-track="tool:used" data-track-tool="natal-chart">Cast</button>
+      <button type="submit" data-track="tool:used" data-track-tool="natal-chart">{say("text.14", "Cast")}</button>
     </form>
     <p class="privacy">{say("text.2", "Birth data in a link is birth data in a browser history. This page puts the date, time and place in the URL so a reckoning can be shared or re-opened — bear that in mind before sending one on.")}</p>
   </div>
@@ -367,7 +367,7 @@ const ASPECT_BASIS: Record<string, string> = {
                     <td class="t-tabular">{b.longitude}°</td>
                     <td>{signOf(b)} <span class="t-tabular faint">{degreeOf(b)}°</span></td>
                     <td class="t-tabular">
-                      {unknownTime ? <span class="undef">undefined</span> : (b.house ?? "—")}
+                      {unknownTime ? <span class="undef">{say("text.15", "undefined")}</span> : (b.house ?? "—")}
                     </td>
                     <td class="dig">{dignityWords(b) || "—"}</td>
                   </tr>
@@ -394,10 +394,10 @@ const ASPECT_BASIS: Record<string, string> = {
               <p class="undef-block">{say("angles.2", "◐ Ascendant, midheaven, descendant and imum coeli are undefined without a birth time. Nothing is shown here because there is nothing true to show.")}</p>
             ) : (
               <dl>
-                <div><dt>Ascendant</dt><dd class="t-tabular">{d.angles.ascendant}°</dd></div>
-                <div><dt>Midheaven</dt><dd class="t-tabular">{d.angles.midheaven}°</dd></div>
-                <div><dt>Descendant</dt><dd class="t-tabular">{d.angles.descendant}°</dd></div>
-                <div><dt>Imum coeli</dt><dd class="t-tabular">{d.angles.imumCoeli}°</dd></div>
+                <div><dt>{say("text.16", "Ascendant")}</dt><dd class="t-tabular">{d.angles.ascendant}°</dd></div>
+                <div><dt>{say("text.17", "Midheaven")}</dt><dd class="t-tabular">{d.angles.midheaven}°</dd></div>
+                <div><dt>{say("text.18", "Descendant")}</dt><dd class="t-tabular">{d.angles.descendant}°</dd></div>
+                <div><dt>{say("text.19", "Imum coeli")}</dt><dd class="t-tabular">{d.angles.imumCoeli}°</dd></div>
               </dl>
             )
           }
@@ -434,7 +434,7 @@ const ASPECT_BASIS: Record<string, string> = {
                   <span class="a-pair">{c.from} — {c.to}</span>
                   <span class="a-kind">{c.aspect}</span>
                   {c.separationSigns != null && <span class="t-tabular a-sep">{c.separationSigns} signs</span>}
-                  {c.mutual && <span class="a-sep">mutual</span>}
+                  {c.mutual && <span class="a-sep">{say("text.20", "mutual")}</span>}
                 </li>
               ))
             }

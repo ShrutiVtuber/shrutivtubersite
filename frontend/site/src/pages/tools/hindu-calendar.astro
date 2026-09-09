@@ -157,16 +157,16 @@ const RULE_NAME: Record<string, string> = {
     <hr class="param-rule" />
     <form class="param-panel" method="GET">
       <input type="hidden" name="reckoning" value={reckoning} />
-      <label><span>Year</span><input type="number" name="year" value={year} min="1900" max="2100" /></label>
+      <label><span>{say("text.8", "Year")}</span><input type="number" name="year" value={year} min="1900" max="2100" /></label>
       <PlaceField lat={lat} lon={lon} place={place} />
       <label>
-        <span>Authority</span>
+        <span>{say("text.9", "Authority")}</span>
         <select name="authority">
           <option value="drik" selected={authority === "drik"}>{say("text.1", "Dṛk gaṇita — modern ephemeris")}</option>
           <option value="surya_siddhanta" selected={authority === "surya_siddhanta"}>{say("text.2", "Sūrya Siddhānta — classical tables")}</option>
         </select>
       </label>
-      <button type="submit" data-track="tool:used" data-track-tool="hindu-calendar">Show</button>
+      <button type="submit" data-track="tool:used" data-track-tool="hindu-calendar">{say("text.10", "Show")}</button>
     </form>
   </div>
 
@@ -182,11 +182,11 @@ const RULE_NAME: Record<string, string> = {
           <h2>{say("the-year.1", "The year")}</h2>
           <dl>
             <div><dt>{say("text.6", "Vikrama Saṁvat")}</dt><dd class="t-tabular">{d.eras.vikrama}</dd></div>
-            <div><dt>Śaka Saṁvat</dt><dd class="t-tabular">{d.eras.shaka}</dd></div>
-            <div><dt>Kali Yuga</dt><dd class="t-tabular">{d.eras.kali}</dd></div>
-            <div><dt>Bengali San</dt><dd class="t-tabular">{d.eras.bengali}</dd></div>
-            <div><dt>Saṁvatsara</dt><dd>{d.eras.samvatsara.name} <span class="t-tabular faint">({d.eras.samvatsara.index}/60)</span></dd></div>
-            <div><dt>Months</dt><dd class="t-tabular">{d.monthCount}</dd></div>
+            <div><dt>{say("text.11", "Śaka Saṁvat")}</dt><dd class="t-tabular">{d.eras.shaka}</dd></div>
+            <div><dt>{say("text.12", "Kali Yuga")}</dt><dd class="t-tabular">{d.eras.kali}</dd></div>
+            <div><dt>{say("text.13", "Bengali San")}</dt><dd class="t-tabular">{d.eras.bengali}</dd></div>
+            <div><dt>{say("text.14", "Saṁvatsara")}</dt><dd>{d.eras.samvatsara.name} <span class="t-tabular faint">({d.eras.samvatsara.index}/60)</span></dd></div>
+            <div><dt>{say("text.15", "Months")}</dt><dd class="t-tabular">{d.monthCount}</dd></div>
           </dl>
         </section>
 
@@ -214,8 +214,8 @@ const RULE_NAME: Record<string, string> = {
                   <tr data-adhika={m.adhika || undefined} data-kshaya={m.kshaya || undefined}>
                     <th scope="row">
                       {m.name}
-                      {m.adhika && <span class="tag">adhika</span>}
-                      {m.kshaya && <span class="tag">kṣaya</span>}
+                      {m.adhika && <span class="tag">{say("text.16", "adhika")}</span>}
+                      {m.kshaya && <span class="tag">{say("text.17", "kṣaya")}</span>}
                     </th>
                     <td class="t-tabular">{spanDay(m.start)}</td>
                     <td class="t-tabular">{spanDay(m.end)}</td>

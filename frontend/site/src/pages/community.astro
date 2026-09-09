@@ -78,7 +78,7 @@ const closed = (polls ?? []).filter((p: any) => p.closed).slice(0, 2);
 
     <div class="c-top">
       <section class="c-card c-live">
-        <span class="t-eyebrow">Right now</span>
+        <span class="t-eyebrow">{say("text.14", "Right now")}</span>
         <LiveBadge status={live?.status ?? "offline"} href="/videos" />
         <p class="c-note">
           {live?.status === "live"
@@ -91,7 +91,7 @@ const closed = (polls ?? []).filter((p: any) => p.closed).slice(0, 2);
       </section>
 
       <section class="c-card c-room">
-        <span class="t-eyebrow">The room</span>
+        <span class="t-eyebrow">{say("text.15", "The room")}</span>
         <p class="c-count">
           {room?.online != null
             ? <><strong>{room.online}</strong> here now</>
@@ -121,7 +121,7 @@ const closed = (polls ?? []).filter((p: any) => p.closed).slice(0, 2);
         most likely to bring somebody here who has never heard of the site. */}
     <section class="c-block c-compat">
       <div class="cc-words">
-        <span class="t-eyebrow">For fun</span>
+        <span class="t-eyebrow">{say("text.16", "For fun")}</span>
         <h2>{say("are-we-compatible.1", "Are we compatible?")}</h2>
         <p class="c-note">{say("are-we-compatible.2", "Put your chart beside somebody else's and see what the tradition makes of the pair. Twenty seconds, no account, and it gives you a card worth posting. It says what it cannot know, which is most of it.")}</p>
         <div class="c-acts">

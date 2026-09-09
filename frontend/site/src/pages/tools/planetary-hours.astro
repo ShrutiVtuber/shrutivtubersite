@@ -122,7 +122,7 @@ const GLYPH: Record<string, string> = {
       <input type="hidden" name="convention" value={convention} />
       {when && <input type="hidden" name="when" value={when} />}
       <PlaceField lat={lat} lon={lon} place={place} />
-      <button type="submit" data-track="tool:used" data-track-tool="planetary-hours">Show</button>
+      <button type="submit" data-track="tool:used" data-track-tool="planetary-hours">{say("text.8", "Show")}</button>
     </form>
   </div>
 

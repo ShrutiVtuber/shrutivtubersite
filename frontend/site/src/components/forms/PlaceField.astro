@@ -68,8 +68,8 @@ const {
 
   {/* The fallback, and what actually gets submitted. */}
   <div class="place-manual">
-    <label><span class="lbl">Latitude</span><input type="number" name="lat" value={lat} step="0.000001" min="-90" max="90" data-place-lat /></label>
-    <label><span class="lbl">Longitude</span><input type="number" name="lon" value={lon} step="0.000001" min="-180" max="180" data-place-lon /></label>
+    <label><span class="lbl">{say("text.4", "Latitude")}</span><input type="number" name="lat" value={lat} step="0.000001" min="-90" max="90" data-place-lat /></label>
+    <label><span class="lbl">{say("text.5", "Longitude")}</span><input type="number" name="lon" value={lon} step="0.000001" min="-180" max="180" data-place-lon /></label>
     {wantTimezone && <input type="hidden" name="tz" value={timezone} data-place-tzfield />}
     <input type="hidden" name="elevation" value={elevation} data-place-elevfield />
   </div>
@@ -216,7 +216,7 @@ const {
         if (!r.ok) { hide(); return; }
         const { places } = await r.json();
         if (!places || places.length === 0) {
-          list.innerHTML = `<li class="r-none"><span class="r-where">{say("text.3", "No place of that name found. The coordinate boxes still work.")}</span></li>`;
+          list.innerHTML = `<li class="r-none"><span class="r-where">No place of that name found. The coordinate boxes still work.</span></li>`;
           list.hidden = false;
           return;
         }

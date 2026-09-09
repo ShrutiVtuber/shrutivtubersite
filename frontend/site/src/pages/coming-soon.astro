@@ -214,7 +214,7 @@ const consentSent =
 <div class="sky">
 <div class="sky-stars"></div>
 <header>
-<span class="mark">Shruti</span>
+<span class="mark">{say("text.13", "Shruti")}</span>
 {/* Never says live unless she is — handoff §4. */}
 <span class="status"><i></i>{badge === "live" ? "live now · building" : "offline · building"}</span>
 </header>
@@ -248,7 +248,7 @@ const consentSent =
         </div>
         <div class="count">
           <b class="tab">{sky.moon.perDay.toFixed(2)}°</b>
-          <span class="tab">per day</span>
+          <span class="tab">{say("text.14", "per day")}</span>
         </div>
       </div>
     </>
@@ -258,10 +258,10 @@ const consentSent =
 }
 <div class="reck">
 <p class="eyebrow" style="margin-bottom:3px">{say("text.6", "Today, in every reckoning kept here")}</p>
-<div class="r"><span>Gregorian</span><i></i><b class="tab" id="greg">—</b></div>
-<div class="r"><span>Attic</span><i></i><b>{reck.attic}</b></div>
+<div class="r"><span>{say("text.15", "Gregorian")}</span><i></i><b class="tab" id="greg">—</b></div>
+<div class="r"><span>{say("text.16", "Attic")}</span><i></i><b>{reck.attic}</b></div>
 <div class="r"><span>{say("text.9", "Hindu · amānta")}</span><i></i><b>{reck.hindu}</b></div>
-<div class="r"><span>Thelemic</span><i></i><b>{reck.thelemic}</b></div>
+<div class="r"><span>{say("text.17", "Thelemic")}</span><i></i><b>{reck.thelemic}</b></div>
 <p class="fine"><Copy text={say("text.7", "[Swiss Ephemeris](https://www.astro.com/swisseph/) · tropical above, sidereal below, neither a correction of the other · amānta reckoning. The finished instruments let you change every one of those.")} /></p>
 <p class="fine">
   {/* One sentence, with the engine link and its build stamped in by
@@ -319,7 +319,7 @@ const consentSent =
 <footer>
 <div class="foot">
 <p class="imprint" set:html={imprintHtml}></p>
-<p>© <span id="yr">{year}</span> {holder} · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a></p>
+<p>© <span id="yr">{year}</span> {holder} · <a href="/privacy">{say("text.18", "Privacy")}</a> · <a href="/terms">{say("text.19", "Terms")}</a></p>
 <span class="seal" title={say("text.8", "Soror Eu. A.")}>S∴E.A.</span>
 </div>
 </footer>

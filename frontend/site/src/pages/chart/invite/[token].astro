@@ -105,11 +105,11 @@ const who = await site<any>(`/api/charts/invite/${token}`).catch(() => null);
             </label>
             <div class="two">
               <label>
-                <span class="lbl">Birth date</span>
+                <span class="lbl">{say("text.13", "Birth date")}</span>
                 <input class="in" type="date" name="date" required />
               </label>
               <label>
-                <span class="lbl">Birth time</span>
+                <span class="lbl">{say("text.14", "Birth time")}</span>
                 <input class="in" type="time" name="time" />
               </label>
             </div>

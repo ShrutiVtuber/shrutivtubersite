@@ -190,14 +190,14 @@ const polarReason = noRiseOrSet
 
     <form class="controls" method="GET">
       <PlaceField lat={lat} lon={lon} place={place} />
-      <label><span>Days</span><input type="number" name="days" value={days} min="1" max={MAX_DAYS} /></label>
+      <label><span>{say("text.6", "Days")}</span><input type="number" name="days" value={days} min="1" max={MAX_DAYS} /></label>
       <label>
-        <span>Naming</span>
+        <span>{say("text.7", "Naming")}</span>
         <select name="preset">
           {PRESETS.map((p) => <option value={p.value} selected={p.value === preset}>{p.label}</option>)}
         </select>
       </label>
-      <Button type="submit" size="sm" data-track="tool:used" data-track-tool="stations">Show</Button>
+      <Button type="submit" size="sm" data-track="tool:used" data-track-tool="stations">{say("text.8", "Show")}</Button>
     </form>
 
     {

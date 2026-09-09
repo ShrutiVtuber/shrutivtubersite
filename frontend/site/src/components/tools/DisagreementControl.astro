@@ -1,4 +1,10 @@
 ---
+import { copy } from "../../lib/copy";
+
+/* Every word here, editable from the admin. The defaults below are what
+   it was written with and what still renders if nothing was changed. */
+const say = await copy("component:DisagreementControl");
+
 /* The disagreement control — the most important pattern in the tool pages.
  *
  * Every instrument opens with a first-class control over a REAL scholarly
@@ -49,7 +55,7 @@ const { legend, name, options, value, keep = {} } = Astro.props;
             <span class="dc-body">
               <span class="dc-head">
                 <span class="dc-name">{o.name}</span>
-                {o.value === value && <span class="dc-inuse">✓ in use</span>}
+                {o.value === value && <span class="dc-inuse">{say("text.1", "✓ in use")}</span>}
               </span>
               <span class="dc-rule">{o.rule}</span>
               {o.consequence && <span class="t-tabular dc-consequence">{o.consequence}</span>}
@@ -58,7 +64,7 @@ const { legend, name, options, value, keep = {} } = Astro.props;
         ))
       }
     </div>
-    <button type="submit" class="dc-apply">Recompute</button>
+    <button type="submit" class="dc-apply">{say("text.2", "Recompute")}</button>
   </fieldset>
 </form>
 

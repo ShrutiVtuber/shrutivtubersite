@@ -120,7 +120,7 @@ const jsonLd = {
     </div>
 
     <div class="detail">
-      <p class="eyebrow"><a href="/shop">Shop</a></p>
+      <p class="eyebrow"><a href="/shop">{say("text.2", "Shop")}</a></p>
       <h1>{product.name}</h1>
       {product.tagline && <p class="dek">{product.tagline}</p>}
 
@@ -151,7 +151,7 @@ const jsonLd = {
           <form method="POST" class="buy">
             <CsrfField />
             <label class="qty">
-              <span>How many</span>
+              <span>{say("text.3", "How many")}</span>
               <input type="number" name="quantity" value="1" min="1" max="20" />
             </label>
             <Button type="submit" size="lg">Buy it</Button>

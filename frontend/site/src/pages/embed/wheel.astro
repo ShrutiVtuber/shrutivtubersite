@@ -21,6 +21,12 @@ import "../../styles/global.css";
 import TransitWheel from "../../components/chart/TransitWheel.astro";
 import { askAstro, SITE_URL } from "../../lib/api";
 import { ZODIAC } from "../../lib/signs";
+import { copy } from "../../lib/copy";
+
+/* Every word here, editable from the admin. The defaults below are what
+   it was written with and what still renders if nothing was changed. */
+const say = await copy("embed/wheel");
+
 
 export const prerender = false;
 
@@ -64,7 +70,7 @@ const when = at.slice(0, 16).replace("T", " ");
       <TransitWheel bodies={bodies} rising={rising} size={480}
                     degreeRing={false} houseNumbers={!!rising} caption="" />
     ) : (
-      <p class="held">The ephemeris could not be reached.</p>
+      <p class="held">{say("text.1", "The ephemeris could not be reached.")}</p>
     )
   }
   <p class="credit">

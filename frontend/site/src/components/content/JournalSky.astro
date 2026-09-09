@@ -84,7 +84,7 @@ const deg = (d: number | undefined) => (d == null ? "" : `${d.toFixed(1)}°`);
               {
                 attic?.greek && (
                   <div>
-                    <dt>Attic</dt>
+                    <dt>{say("text.2", "Attic")}</dt>
                     <dd lang="el">{attic.greek} {attic.day}</dd>
                   </div>
                 )
@@ -92,7 +92,7 @@ const deg = (d: number | undefined) => (d == null ? "" : `${d.toFixed(1)}°`);
               {
                 hindu?.tithi && (
                   <div>
-                    <dt>Hindu</dt>
+                    <dt>{say("text.3", "Hindu")}</dt>
                     <dd>{hindu.month} {hindu.tithi}</dd>
                   </div>
                 )
@@ -100,7 +100,7 @@ const deg = (d: number | undefined) => (d == null ? "" : `${d.toFixed(1)}°`);
               {
                 thelemic?.formatted && (
                   <div class="wide">
-                    <dt>Thelemic</dt>
+                    <dt>{say("text.4", "Thelemic")}</dt>
                     <dd>{thelemic.formatted}</dd>
                   </div>
                 )
