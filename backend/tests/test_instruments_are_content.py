@@ -88,8 +88,23 @@ def _seeded_slugs() -> set[str]:
             if block:
                 found |= set(re.findall(r'\("([a-z0-9-]+)",', block.group(1)))
             continue
-        if re.search(r'"tool"|\btool_table\b|Tool\(', text):
+        # Touching the tool table has three spellings too: an ORM insert
+        # (`Tool(`), a table object (`tool_table`), and plain SQL, which says
+        # `INSERT INTO tool` with no quotes at all. Missing the third meant a
+        # migration that really did seed a row was invisible here.
+        touches_tools = re.search(
+            r'"tool"|\btool_table\b|Tool\(|(?i:INTO|UPDATE|FROM)\s+tool\b',
+            text,
+        )
+        if touches_tools:
+            # Two spellings, because a migration writes it either way. An
+            # ORM insert says `slug="…"`; a plain INSERT binds a parameter and
+            # names the value in a constant at the top of the file. Reading
+            # only the first form meant a migration that genuinely seeded a row
+            # still failed this check, which sends the next person editing the
+            # migration to satisfy a regex rather than fixing anything.
             found |= set(re.findall(r'slug="([a-z0-9-]+)"', text))
+            found |= set(re.findall(r'^SLUG = "([a-z0-9-]+)"', text, re.M))
     return found
 
 

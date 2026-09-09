@@ -106,9 +106,15 @@ const eventLine = (e: EventRow) => {
 
     <nav class="hw-signs" aria-label={say("nav.sign", "Sign")}>
       {ZODIAC.map((s) => (
+        {/* Counted here, on the sign links, because choosing a sign is what
+            makes this tool compute — there is no submit button to hang it on.
+            Without it the desk reads as unused on her dashboard however many
+            people write at it. */}
         <a
           href={href({ sign: s.toLowerCase() })}
           aria-current={s.toLowerCase() === sign ? "page" : undefined}
+          data-track="tool:used"
+          data-track-tool="horoscope-writing"
         >{s}</a>
       ))}
     </nav>
