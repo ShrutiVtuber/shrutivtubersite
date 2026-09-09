@@ -29,7 +29,7 @@ const isLive = live?.status === "live";
 <section class="section page happening">
   <div class="h-head">
     <div>
-      <span class="t-eyebrow">Right now</span>
+      <span class="t-eyebrow">{say("what-is-going-on.7", "Right now")}</span>
       <h2>{say("what-is-going-on.1", "What is going on")}</h2>
     </div>
     <a class="h-all" href="/community">{say("what-is-going-on.2", "Everything happening →")}</a>
@@ -37,9 +37,11 @@ const isLive = live?.status === "live";
 
   <div class="h-cards">
     <div class="h-card" data-live={isLive || undefined}>
-      <span class="h-lbl">The stream</span>
+      <span class="h-lbl">{say("what-is-going-on.8", "The stream")}</span>
       <p class="h-big">
-        {isLive ? <><span class="h-dot" aria-hidden="true"></span>Live now</> : "Offline"}
+        {isLive
+          ? <><span class="h-dot" aria-hidden="true"></span>{say("what-is-going-on.9", "Live now")}</>
+          : say("what-is-going-on.10", "Offline")}
       </p>
       {
         isLive
@@ -47,14 +49,16 @@ const isLive = live?.status === "live";
           : <p class="h-note">{say("what-is-going-on.4", "The schedule says when next — streams are announced on Discord first.")}</p>
       }
       <a class="h-go" href={isLive ? "/videos" : "/schedule"}>
-        {isLive ? "Watch →" : "The schedule →"}
+        {isLive ? say("what-is-going-on.11", "Watch →") : say("what-is-going-on.12", "The schedule →")}
       </a>
     </div>
 
     <div class="h-card h-room">
-      <span class="h-lbl">The room</span>
+      <span class="h-lbl">{say("what-is-going-on.13", "The room")}</span>
       <p class="h-big">
-        {room?.online != null ? <>{room.online} <span class="h-unit">here now</span></> : "Discord"}
+        {room?.online != null
+          ? <>{room.online} <span class="h-unit">{say("what-is-going-on.14", "here now")}</span></>
+          : say("what-is-going-on.15", "Discord")}
       </p>
       <p class="h-note">{say("what-is-going-on.5", "Where things get talked about between streams, and where a stream is announced first.")}</p>
       {

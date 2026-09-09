@@ -26,8 +26,19 @@ import { asAdmin } from "../../lib/admin";
 
 const all: any[] = (await asAdmin(Astro, "/api/admin/copy")).body ?? [];
 
-/* Components have no page of their own to preview — their words are shared by
-   every page that shows them. They stay on the Words screen. */
+/* A component has no page of its own, so it cannot be PICKED here — but its
+   words are on the page all the same, and they used to be missing from this
+   panel entirely.
+   
+   That was the complaint: the "What is going on" band, its two cards and their
+   captions had no field beside them, because every one of those strings lives
+   under `component:HappeningNow`. They were editable on the Words screen, which
+   is the screen this one exists to replace — and being editable somewhere else
+   is not much comfort when you are looking straight at the words.
+   
+   So components are included, and the ones that turn out not to be on this page
+   are dropped client-side once the frame has rendered. Which components a page
+   shows is a fact about the rendered page, not something the database knows. */
 const isComponent = (pg: string) => pg.startsWith("component:");
 const pages = [...new Set(all.map((r) => r.page))].filter((p) => !isComponent(p)).sort();
 
@@ -38,6 +49,16 @@ const page = pages.includes(Astro.url.searchParams.get("page") ?? "")
 const rows = all
   .filter((r) => r.page === page)
   .sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+
+/* Every component string, offered to every page and filtered by what is
+   actually rendered. 154 of them across 44 components; a page shows a few
+   dozen at most and the rest are removed on load. */
+const shared = all
+  .filter((r) => isComponent(r.page))
+  .sort((a, b) => (a.page + a.key).localeCompare(b.page + b.key));
+
+/** "component:HappeningNow" reads as "HappeningNow" in the panel. */
+const componentName = (pg: string) => pg.slice("component:".length);
 
 /* The page's BLOCKS, which are most of what a reader actually sees.
  *
@@ -184,6 +205,31 @@ const changed = rows.filter((r) => r.changed).length;
             </div>
           ))
         )}
+
+        {/* Shared words. Rendered for every page and thinned on load to the
+            ones this page actually shows — see dropAbsentShared below. */}
+        {shared.map((r: any) => (
+          <div class="str shared" data-id={r.id} data-value={r.value}
+               data-shared={componentName(r.page)}>
+            <div class="head">
+              <label for={`s-${r.id}`}>{r.label || r.key}</label>
+              <span class="shared-tag" title="Shared — editing this changes it on every page that shows it">
+                {componentName(r.page)}
+              </span>
+              {r.changed && <span class="dot" title="changed from the original"></span>}
+            </div>
+            {r.multiline ? (
+              <textarea id={`s-${r.id}`} rows="3" data-orig={r.value}>{r.value}</textarea>
+            ) : (
+              <input id={`s-${r.id}`} value={r.value} data-orig={r.value} />
+            )}
+            <div class="foot">
+              <code>{componentName(r.page)} · {r.key}</code>
+              <span class="state" aria-live="polite"></span>
+              {r.changed && <button type="button" class="revert" data-id={r.id}>put it back</button>}
+            </div>
+          </div>
+        ))}
       </aside>
     </div>
 
@@ -272,6 +318,26 @@ const changed = rows.filter((r) => r.changed).length;
       }
     }
     return best;
+  }
+
+  /* A whole text node, matched exactly, with no length floor.
+   *
+   * `findIn` refuses anything under eight characters, and it is right to: a
+   * short string matched as a SUBSTRING says more about coincidence than about
+   * location. But an EXACT match on a complete text node is a different claim
+   * — "Offline" is the entire content of that element, not seven letters found
+   * inside a paragraph.
+   *
+   * Without this, "Offline", "The room" and "here now" were dropped from the
+   * panel as "not on this page" while being plainly on it.
+   */
+  function findExact(doc: Document, value: string): HTMLElement | null {
+    const want = plain(value);
+    if (!want) return null;
+    for (const t of textNodes(doc)) {
+      if (plain(t.data) === want) return t.parentElement;
+    }
+    return null;
   }
 
   /* A heading is a reliable place to match a SHORT string. "Shruti" is six
@@ -422,16 +488,47 @@ const changed = rows.filter((r) => r.changed).length;
    * page at all — the meta tags, a hidden block, a string behind a condition —
    * and is moved to the end under a heading that says so, rather than sitting
    * at the top pretending to be the first thing a reader sees. */
+  /* Shared strings this page does not show are removed, not listed.
+   *
+   * Every component's words are rendered into the panel, because the database
+   * cannot say which components a page uses — only the rendered page can. The
+   * ones that are not here belong to some other page and would be noise under
+   * "not visible", which is meant for things that ARE this page's and happen
+   * not to be on screen: the title, the meta description, a block behind a
+   * condition.
+   *
+   * Run before the reorder measures anything, so the survivors sort into place
+   * beside the page's own strings rather than in a clump at the end. */
+  function dropAbsentShared() {
+    const doc = frame.contentDocument;
+    if (!doc) return;
+    for (const item of panel.querySelectorAll<HTMLElement>(".str.shared")) {
+      const value = item.dataset.value ?? "";
+      /* findIn refuses anything under eight characters as coincidence, so a
+         short label goes through the heading matcher as well before it is
+         given up on. */
+      if (value && (findIn(doc, value)
+                    || findHeadingIn(doc, value)
+                    || findExact(doc, value))) continue;
+      item.remove();
+    }
+  }
+
   function reorderByPage() {
     const doc = frame.contentDocument;
     if (!doc) return;
+    dropAbsentShared();
 
     const items = [...panel.querySelectorAll<HTMLElement>(":scope > .str, :scope > .blk")];
     const offsets = new Map<HTMLElement, number>();
 
     const scrolled = doc.scrollingElement?.scrollTop ?? 0;
     const topOf = (v: string) => {
-      const el = v ? findIn(doc, v) : null;
+      /* Exact whole-node match as a fallback, so a short string like "Offline"
+         sorts where it actually sits instead of dropping to the bottom under
+         "not visible" — which is what the eight-character floor did to every
+         one-word label on the page. */
+      const el = v ? (findIn(doc, v) || findExact(doc, v)) : null;
       return el ? el.getBoundingClientRect().top + scrolled : Infinity;
     };
 
@@ -851,6 +948,21 @@ const changed = rows.filter((r) => r.changed).length;
     background: var(--surface-page); color: var(--ink);
   }
   .str textarea { line-height: 1.55; resize: vertical; }
+
+  /* Shared words carry their component's name, because editing one changes it
+     everywhere it is shown — which is not obvious when it is sitting in a
+     panel labelled with one page's name. */
+  .str.shared { border-left: 2px solid var(--accent-wash); }
+  .shared-tag {
+    font: 600 var(--text-micro) var(--font-body);
+    letter-spacing: var(--tracking-eyebrow);
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    background: var(--surface-inset);
+    border-radius: var(--radius-sm);
+    padding: 2px 6px;
+    margin-left: auto;
+  }
 
   /* ── the picture control ─────────────────────────────────────────────── */
   .pic {
