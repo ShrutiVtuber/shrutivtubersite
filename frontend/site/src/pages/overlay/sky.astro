@@ -37,12 +37,12 @@ if (token) {
 
 const TEXT = "︎";
 const GLYPH: Record<string, string> = {
-  Sun: `☉${TEXT}`, Moon: `☾${TEXT}`, Mercury: `☿${TEXT}`, Venus: `♀${TEXT}`,
-  Mars: `♂${TEXT}`, Jupiter: `♃${TEXT}`, Saturn: `♄${TEXT}`,
+  Sun: `☉︎${TEXT}`, Moon: `☾︎${TEXT}`, Mercury: `☿︎${TEXT}`, Venus: `♀︎${TEXT}`,
+  Mars: `♂︎${TEXT}`, Jupiter: `♃︎${TEXT}`, Saturn: `♄︎${TEXT}`,
 };
 /* U+FE0E on every one, or a client swaps in a colour-emoji font and the
    sector marks stop taking the ink colour. */
-const SIGN_GLYPH = "♈♉♊♋♌♍♎♏♐♑♒♓".split("").map((g) => g + TEXT);
+const SIGN_GLYPH = "♈︎♉︎♊︎♋︎♌︎♍︎♎︎♏︎♐︎♑︎♒︎♓︎".split("").map((g) => g + TEXT);
 const SIGNS = ["Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo",
                "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces"];
 

@@ -53,47 +53,47 @@ const SPEC: Record<string, {
   amount: (e: RawEvent) => string;
 }> = {
   "stripe.support": {
-    glyph: `♀${TEXT}`, eyebrow: "Support", hold: 4200, tone: "accent",
+    glyph: `♀︎${TEXT}`, eyebrow: "Support", hold: 4200, tone: "accent",
     amount: (e) => money(e.amountMinor, e.currency), unit: () => "",
   },
   "stripe.membership": {
-    glyph: `♀${TEXT}`, eyebrow: "A membership begins", hold: 4800, tone: "accent",
+    glyph: `♀︎${TEXT}`, eyebrow: "A membership begins", hold: 4800, tone: "accent",
     amount: (e) => money(e.amountMinor, e.currency), unit: () => "per month",
   },
   "stripe.shop": {
-    glyph: `♀${TEXT}`, eyebrow: "From the shop", hold: 4200, tone: "accent",
+    glyph: `♀︎${TEXT}`, eyebrow: "From the shop", hold: 4200, tone: "accent",
     amount: (e) => money(e.amountMinor, e.currency), unit: () => "",
   },
   "youtube.superchat": {
-    glyph: `♀${TEXT}`, eyebrow: "Super Chat", hold: 4800, tone: "accent",
+    glyph: `♀︎${TEXT}`, eyebrow: "Super Chat", hold: 4800, tone: "accent",
     amount: (e) => money(e.amountMinor, e.currency), unit: () => "",
   },
   "twitch.sub": {
-    glyph: `♃${TEXT}`, eyebrow: "Subscribed", hold: 4200, tone: "accent",
+    glyph: `♃︎${TEXT}`, eyebrow: "Subscribed", hold: 4200, tone: "accent",
     amount: () => "1", unit: () => "subscription",
   },
   "twitch.gift": {
     // Longer, and the giver is the one named — they are the one being thanked.
-    glyph: `☿${TEXT}`, eyebrow: "Gifted", hold: 6000, tone: "accent",
+    glyph: `☿︎${TEXT}`, eyebrow: "Gifted", hold: 6000, tone: "accent",
     amount: (e) => String(e.quantity),
     unit: (e) => (e.quantity === 1 ? "recipient" : "recipients"),
   },
   "twitch.bits": {
     // Bits are never converted to money. They are not money.
-    glyph: `☉${TEXT}`, eyebrow: "Cheered", hold: 4200, tone: "accent",
+    glyph: `☉︎${TEXT}`, eyebrow: "Cheered", hold: 4200, tone: "accent",
     amount: (e) => e.quantity.toLocaleString("en-GB"), unit: () => "bits",
   },
   "twitch.raid": {
     // Different in KIND, not degree — somebody arrived with a crowd.
-    glyph: `♂${TEXT}`, eyebrow: "A crowd arrived", hold: 5400, tone: "rose",
+    glyph: `♂︎${TEXT}`, eyebrow: "A crowd arrived", hold: 5400, tone: "rose",
     amount: (e) => String(e.quantity), unit: () => "viewers",
   },
   "course.signup": {
-    glyph: `☾${TEXT}`, eyebrow: "Joined a class", hold: 4800, tone: "accent",
+    glyph: `☾︎${TEXT}`, eyebrow: "Joined a class", hold: 4800, tone: "accent",
     amount: () => "1", unit: () => "seat",
   },
   "workshop.signup": {
-    glyph: `☾${TEXT}`, eyebrow: "Joined a workshop", hold: 4800, tone: "accent",
+    glyph: `☾︎${TEXT}`, eyebrow: "Joined a workshop", hold: 4800, tone: "accent",
     amount: () => "1", unit: () => "seat",
   },
   "twitch.follow": {

@@ -121,7 +121,7 @@ const INSTRUMENTS = await instruments();
 
     <SectionHeader
       as="h2"
-      glyph="☿"
+      glyph="☿︎"
       title={say("text.7", "Instruments you can run here")}
       body={say("text.8", "Seven of Theourgia's tools run on their own pages — the software demonstrating itself, no install.")}
     />
@@ -191,7 +191,15 @@ const INSTRUMENTS = await instruments();
   }
   .instrument-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    /* 260px, the same floor /tools uses.
+       
+       It was 180, which fitted nine instruments across at a comfortable width
+       and then had to squeeze when there were twelve — five to a row, each too
+       narrow for its own sentence, wrapping to four and five lines. Wider
+       cards and an extra row read better than a tighter grid, and the two
+       pages listing the same things should not disagree about how wide a card
+       is. */
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
     gap: 12px;
     /* Tight to its own heading; the container spaces the sections. */
     margin-top: calc(-1 * var(--space-4));

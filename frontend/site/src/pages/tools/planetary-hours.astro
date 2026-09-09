@@ -83,7 +83,7 @@ const meanLen = (list: Hour[]) =>
     : `≈ ${Math.round(list.reduce((t, h) => t + (new Date(h.endsAt).getTime() - new Date(h.startsAt).getTime()), 0) / list.length / 60000)} min`;
 
 const GLYPH: Record<string, string> = {
-  Saturn: "♄", Jupiter: "♃", Mars: "♂", Sun: "☉", Venus: "♀", Mercury: "☿", Moon: "☾",
+  Saturn: "♄︎", Jupiter: "♃︎", Mars: "♂︎", Sun: "☉︎", Venus: "♀︎", Mercury: "☿︎", Moon: "☾︎",
 };
 ---
 

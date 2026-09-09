@@ -123,7 +123,7 @@ const reck = {
   thelemic: r.thelemic?.anno
     ? r.thelemic.anno
     : r.thelemic
-      ? `Anno ${r.thelemic.year} ☉ in ${r.thelemic.sun?.sign ?? ""}`
+      ? `Anno ${r.thelemic.year} ☉︎ in ${r.thelemic.sun?.sign ?? ""}`
       : "—",
 };
 
@@ -234,14 +234,14 @@ const consentSent =
   sky ? (
     <>
       <div class="lum">
-        <span class="g glyph" aria-hidden="true">☉</span>
+        <span class="g glyph" aria-hidden="true">☉︎</span>
         <div style="display:grid;gap:2px;min-width:0">
           <h2>{sky.sun.degree} {sky.sun.sign}</h2>
           <span class="who">{sky.sun.rashi} · {sky.sun.nakshatra}</span>
         </div>
       </div>
       <div class="lum">
-        <span class="g glyph" aria-hidden="true">☾</span>
+        <span class="g glyph" aria-hidden="true">☾︎</span>
         <div style="display:grid;gap:2px;min-width:0">
           <h2>{sky.moon.degree} {sky.moon.sign}</h2>
           <span class="who">{sky.moon.rashi} · {sky.moon.nakshatra}</span>

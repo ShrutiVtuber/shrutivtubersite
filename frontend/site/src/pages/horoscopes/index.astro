@@ -49,7 +49,7 @@ const NAME = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 <BaseLayout title={say("text.2", "Horoscopes — Shruti")} description={say("text.3", "Twelve readings a month, one per sign, written by hand from a real ephemeris rather than generated. This month's, and the archive of every one before it.")}>
   <div class="page horoscopes">
     <SectionHeader
-      as="h1" glyph="☾" eyebrow="Horoscopes" title={data?.covers && data.covers !== new Date().toISOString().slice(0, 7) ? data.covers : "This month"}
+      as="h1" glyph="☾︎" eyebrow="Horoscopes" title={data?.covers && data.covers !== new Date().toISOString().slice(0, 7) ? data.covers : "This month"}
       body={say("text.4", "Twelve a month, one per sign, written by hand.")}
     />
 

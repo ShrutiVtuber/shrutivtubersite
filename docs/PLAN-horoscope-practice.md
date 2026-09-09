@@ -53,6 +53,26 @@ losing one of them is the likely failure.
     **Later, and deliberately after the practice work.** It touches billing
     tiers, which nothing else here does.
 
+11. **One reading, three places.** A person writing horoscopes should be able
+    to keep what they write and share it, whether they started on the website,
+    in the app, or in Discord — and a series should be as natural as a single
+    reading.
+
+    - **Website**: drafts are kept to their account rather than to the browser.
+    - **App**: submit for others to read, comment on and vote.
+    - **Discord**: a slash command that hands back the material to write from —
+      the sky for a period rotated to a sign, and the events inside it. The
+      same thing the desk shows, in a message.
+
+    A **series** is a first-class thing, not twelve loose readings: somebody
+    writing all twelve signs for a week is doing one piece of work, and it
+    should be submitted, read and voted on as one.
+
+    ⚠ The slash command is the cheap half — her bot already answers signed
+    interactions and already talks to the ephemeris. The expensive half is the
+    same gateway the bridge needs, so build the command first and let it stand
+    alone until the socket exists.
+
 ## Decisions she made
 
 - **The bridge is a gateway.** Truly seamless: someone types normally in

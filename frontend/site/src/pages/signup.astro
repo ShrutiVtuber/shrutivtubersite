@@ -79,13 +79,13 @@ if (Astro.request.method === "POST") {
 <BaseLayout title={say("text.2", "Sign up — Shruti")} description={say("text.3", "An account for your own chart and your own reading. Nothing public.")} noindex>
   <div class="page auth">
     <SectionHeader
-      as="h1" glyph="☾" eyebrow="Sign up" title="An account"
+      as="h1" glyph="☾︎" eyebrow="Sign up" title="An account"
       body={say("text.4", "For keeping your own chart and reading your own horoscope. Nothing here is public — no profile, no avatar, no follower count.")}
     />
 
     {
       done ? (
-        <EmptyState glyph="☾" title="You're in" body={say("text.5", "The account is made. Where would you like to start?")}>
+        <EmptyState glyph="☾︎" title="You're in" body={say("text.5", "The account is made. Where would you like to start?")}>
           <div slot="action" class="auth-actions">
             <Button href="/nativity">{say("text.8", "Add a nativity")}</Button>
             <Button variant="secondary" href="/today">{say("text.9", "See today")}</Button>

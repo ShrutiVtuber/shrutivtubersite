@@ -60,7 +60,7 @@ const deg = (d: number | undefined) => (d == null ? "" : `${d.toFixed(1)}°`);
               {
                 sun && (
                   <div>
-                    <dt><span class="t-glyph" aria-hidden="true">☉</span> Sun</dt>
+                    <dt><span class="t-glyph" aria-hidden="true">☉︎</span> Sun</dt>
                     <dd class="t-tabular">{deg(sun.degree)} {sun.sign}</dd>
                   </div>
                 )
@@ -68,7 +68,7 @@ const deg = (d: number | undefined) => (d == null ? "" : `${d.toFixed(1)}°`);
               {
                 moon && (
                   <div>
-                    <dt><span class="t-glyph" aria-hidden="true">☾</span> Moon</dt>
+                    <dt><span class="t-glyph" aria-hidden="true">☾︎</span> Moon</dt>
                     <dd class="t-tabular">{deg(moon.degree)} {moon.sign}</dd>
                   </div>
                 )
@@ -76,7 +76,7 @@ const deg = (d: number | undefined) => (d == null ? "" : `${d.toFixed(1)}°`);
               {
                 hour?.ruler && (
                   <div>
-                    <dt><span class="t-glyph" aria-hidden="true">☿</span> Hour</dt>
+                    <dt><span class="t-glyph" aria-hidden="true">☿︎</span> Hour</dt>
                     <dd>{hour.ruler}</dd>
                   </div>
                 )

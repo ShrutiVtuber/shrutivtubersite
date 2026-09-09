@@ -179,7 +179,7 @@ const openPoll = ((await site<any[]>("/api/community/polls/open")) ?? [])
    /today, which is a page rather than an instrument, and giving it a row would
    mean putting a card on /tools that leaves /tools. */
 const TODAY = {
-  glyph: "☾", name: "Day at a glance", href: "/today", wide: true,
+  glyph: "☾︎", name: "Day at a glance", href: "/today", wide: true,
   answers: say("text.what.doing.right", "What the sky is doing right now, where you are — luminaries, stations, the planetary hour, and today in four reckonings."),
 };
 const INSTRUMENTS = [
@@ -312,14 +312,14 @@ const INSTRUMENTS = [
             </span>
           </li>
           <li>
-            <span class="t-glyph" aria-hidden="true">☾</span>
+            <span class="t-glyph" aria-hidden="true">☾︎</span>
             <span>
               <strong>{say("account.perk2.title", "Transits on Day at a glance.")}</strong>{" "}
               {say("account.perk2.body", "The one block on that page that needs to know where you were born. Nothing else does.")}
             </span>
           </li>
           <li>
-            <span class="t-glyph" aria-hidden="true">☉</span>
+            <span class="t-glyph" aria-hidden="true">☉︎</span>
             <span>
               <strong>{say("account.perk3.title", "Your place, remembered.")}</strong>{" "}
               {say("account.perk3.body", "Stations, sunrise and the pañcāṅga answer for where you actually are, without setting it each visit.")}
@@ -351,7 +351,7 @@ const INSTRUMENTS = [
     <section class="section page">
       <div class="section-head">
         <SectionHeader
-          glyph="☾"
+          glyph="☾︎"
           eyebrow="Horoscopes"
           title={monthName ? `${monthName}, one per sign` : "This month, one per sign"}
           body={say("text.5", "Twelve readings a month, written by hand and signed Soror Eu. A. Pick a sign — or save a nativity and yours comes up first.")}

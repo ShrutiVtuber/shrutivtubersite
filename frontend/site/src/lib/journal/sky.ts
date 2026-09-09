@@ -12,15 +12,15 @@ import type { SkyRecord } from "./types";
 /* Tropical signs come back in English, sidereal rāśis in Sanskrit, and both
    are drawn as the same twelve glyphs. */
 const SIGN: Record<string, string> = {
-  Aries: "♈", Taurus: "♉", Gemini: "♊", Cancer: "♋",
-  Leo: "♌", Virgo: "♍", Libra: "♎", Scorpio: "♏",
-  Sagittarius: "♐", Capricorn: "♑", Aquarius: "♒", Pisces: "♓",
+  Aries: "♈︎", Taurus: "♉︎", Gemini: "♊︎", Cancer: "♋︎",
+  Leo: "♌︎", Virgo: "♍︎", Libra: "♎︎", Scorpio: "♏︎",
+  Sagittarius: "♐︎", Capricorn: "♑︎", Aquarius: "♒︎", Pisces: "♓︎",
 };
 
 const RASHI: Record<string, string> = {
-  "Meṣa": "♈", "Vṛṣabha": "♉", "Mithuna": "♊", "Karka": "♋",
-  "Siṃha": "♌", "Kanyā": "♍", "Tulā": "♎", "Vṛścika": "♏",
-  "Dhanu": "♐", "Makara": "♑", "Kumbha": "♒", "Mīna": "♓",
+  "Meṣa": "♈︎", "Vṛṣabha": "♉︎", "Mithuna": "♊︎", "Karka": "♋︎",
+  "Siṃha": "♌︎", "Kanyā": "♍︎", "Tulā": "♎︎", "Vṛścika": "♏︎",
+  "Dhanu": "♐︎", "Makara": "♑︎", "Kumbha": "♒︎", "Mīna": "♓︎",
 };
 
 /** 20.0751 → "20°04′". Arc-minutes, because that is how a chart is read. */

@@ -43,8 +43,8 @@ export const LUNAR = ["moonrise", "culmination", "moonset", "nadir"] as const;
 
 /** Astronomical glyphs, set as type. Never emoji, never an icon font. */
 export const GLYPHS: Record<string, string> = {
-  sunrise: "☉", noon: "☀", sunset: "☉", midnight: "☾",
-  moonrise: "☾", culmination: "☽", moonset: "☾", nadir: "●",
+  sunrise: "☉︎", noon: "☀", sunset: "☉︎", midnight: "☾︎",
+  moonrise: "☾︎", culmination: "☽︎", moonset: "☾︎", nadir: "●",
 };
 
 export const PRESETS = [

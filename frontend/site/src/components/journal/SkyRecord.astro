@@ -57,7 +57,7 @@ const rows: [string, string, boolean][] = [
 <section class="j-record" aria-label={HEADING}>
   <div class="j-record-head">
     <p class="j-eyebrow">{HEADING}</p>
-    <span class="j-glyph" aria-hidden="true">☉&#xFE0E; ☾&#xFE0E;</span>
+    <span class="j-glyph" aria-hidden="true">☉︎&#xFE0E; ☾︎&#xFE0E;</span>
   </div>
   <div class="j-leaders">
     {
@@ -68,7 +68,9 @@ const rows: [string, string, boolean][] = [
           <span
             class={`j-leader-v${glyph ? " j-glyph" : ""}${k === "Attic" ? " j-leader-v--greek" : ""}`}
             lang={k === "Attic" ? "grc" : undefined}
-            set:html={glyph ? v.replace(/([♈-♓☉☾])/g, "$1&#xFE0E;") : v}
+            set:html={glyph
+              ? v.replace(/([\u2648-\u2653\u2609\u263E])/g, "$1&#xFE0E;")
+              : v}
           />
         </div>
       ))

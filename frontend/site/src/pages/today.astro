@@ -104,7 +104,7 @@ const moonProgress = today ? (today.moon.tropical.degree % 30) / 30 : 0;
 >
   <div class="page today">
     <SectionHeader
-      as="h1" glyph="☾" eyebrow={say("text.5", "Day at a glance")} title="Today"
+      as="h1" glyph="☾︎" eyebrow={say("text.5", "Day at a glance")} title="Today"
       body={say("text.6", "What the sky is doing right now, here. Everything on this page works without an account.")}
     />
 
@@ -125,7 +125,7 @@ const moonProgress = today ? (today.moon.tropical.degree % 30) / 30 : 0;
             <h2>{say("sun-and-moon.1", "Sun and Moon")}</h2>
             <div class="lum-row">
               <div class="lum">
-                <span class="lum-glyph t-glyph" aria-hidden="true">☉</span>
+                <span class="lum-glyph t-glyph" aria-hidden="true">☉︎</span>
                 <div>
                   <span class="lum-name">Sun</span>
                   <span class="lum-pos t-tabular">{fmtDeg(today.sun.tropical.degree)} {today.sun.tropical.sign}</span>
@@ -133,7 +133,7 @@ const moonProgress = today ? (today.moon.tropical.degree % 30) / 30 : 0;
                 </div>
               </div>
               <div class="lum">
-                <span class="lum-glyph t-glyph" aria-hidden="true">☾</span>
+                <span class="lum-glyph t-glyph" aria-hidden="true">☾︎</span>
                 <div>
                   <span class="lum-name">{say("text.14", "Moon")}</span>
                   <span class="lum-pos t-tabular">{fmtDeg(today.moon.tropical.degree)} {today.moon.tropical.sign}</span>

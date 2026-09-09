@@ -11,10 +11,10 @@
 export type Kind = "writing" | "documentation" | "wiki" | "changelog";
 
 export const GLYPH: Record<Kind, string> = {
-  writing: "☾",
-  documentation: "♄",
-  wiki: "☿",
-  changelog: "♃",
+  writing: "☾︎",
+  documentation: "♄︎",
+  wiki: "☿︎",
+  changelog: "♃︎",
 };
 
 export const KIND_LABEL: Record<Kind, string> = {

@@ -290,7 +290,7 @@ export const FIELDS: Record<string, Record<string, FieldSpec>> = {
     },
     glyph: {
       label: "Glyph", group: "Details",
-      placeholder: "☉",
+      placeholder: "☉︎",
       help: "One character, set in the display face. Type, not an icon.",
     },
     category: {

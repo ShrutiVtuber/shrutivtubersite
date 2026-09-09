@@ -66,7 +66,7 @@ if (Astro.request.method === "POST") {
       sent ? (
         /* The state where people get lost, designed rather than implied. */
         <div class="check">
-          <SectionHeader as="h1" glyph="☾" eyebrow={say("text.7", "Check your email")} title={say("text.8", "The link is on its way")} />
+          <SectionHeader as="h1" glyph="☾︎" eyebrow={say("text.7", "Check your email")} title={say("text.8", "The link is on its way")} />
           {/* Three pieces before: an address, and two editable words with
               hardcoded prose between them. The whole line is one string now,
               so "once" and "20 minutes" can be reworded together with the
@@ -90,7 +90,7 @@ if (Astro.request.method === "POST") {
       ) : (
         <>
           <SectionHeader
-            as="h1" glyph="☾" eyebrow="Sign in" title={say("text.9", "Welcome back")}
+            as="h1" glyph="☾︎" eyebrow="Sign in" title={say("text.9", "Welcome back")}
             body={say("text.10", "By emailed link, or with a password if you set one.")}
           />
           {/* Above the email field, because for anyone who has one it is the
