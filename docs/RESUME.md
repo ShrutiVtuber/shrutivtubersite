@@ -5,6 +5,17 @@ the cutover and the design pass, which are done.
 
 Written before a compaction.
 
+## ⚠ Read this first if it is the morning of 10 September 2026
+
+She asked, last thing, for a note so she could **ask to be walked through the
+three things that need her**. That walkthrough is `docs/SETUP-THREE-THINGS.md`
+— Firebase, the Discord MESSAGE_CONTENT intent, and pointing her own
+compatibility test at her chart. It is written for somebody starting cold: what
+she does, what I do, and how we know each one worked.
+
+Offer it. She is expecting to be asked about it rather than to have to remember
+which three.
+
 ## Live
 
 `https://shrutivtuber.com`, deployed from `/srv/shrutivtuber/prod` on
