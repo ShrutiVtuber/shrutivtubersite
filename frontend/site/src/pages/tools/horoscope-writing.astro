@@ -21,6 +21,7 @@ import SkyDrawer from "../../components/tools/SkyDrawer.astro";
 import Copy from "../../components/content/Copy.astro";
 import { askAstro } from "../../lib/api";
 import { copy } from "../../lib/copy";
+import { asReader } from "../../lib/account";
 import { ZODIAC } from "../../lib/signs";
 import type { Period } from "../../lib/periods";
 import {
@@ -37,6 +38,21 @@ const sign = ZODIAC.map((s) => s.toLowerCase()).includes(signParam)
   ? signParam
   : "aries";
 const Rising = sign.charAt(0).toUpperCase() + sign.slice(1);
+
+/* Signed in? Then the draft belongs to the account and follows them to the app
+   and to any other machine. Signed out, it stays in this browser — which is
+   still the right answer, because a writing tool that demands an account
+   before you may type a sentence is a tool people close. */
+const me = await asReader(Astro, "/api/account/me");
+const signedIn = me.ok;
+/* What the account already holds for this exact sign and period, so the box
+   opens on it rather than on whatever this browser happens to remember. */
+const savedHere = signedIn
+  ? ((await asReader(
+      Astro,
+      `/api/practice/draft?period=${period}&covers=${encodeURIComponent(covers)}&sign=${sign}`,
+    )).body?.bodyMd ?? "")
+  : "";
 
 const [start, end] = range(period, covers);
 const heading = periodLabel(period, covers);
@@ -139,7 +155,14 @@ const eventLine = (e: EventRow) => {
       information so it's large enough for them to actually write meaningful
       things." A reading is prose, and prose written in a narrow box reads like
       it was written in a narrow box. */}
-  <div class="hw">
+  <div class="hw"
+       data-hw-desk
+       data-signed-in={signedIn ? "1" : "0"}
+       data-period={period}
+       data-covers={covers}
+       data-sign={sign}
+       data-title={heading}
+       data-saved={savedHere}>
     <div class="hw-material">
       <div class="hw-sky">
         <TransitWheel
@@ -190,33 +213,81 @@ const eventLine = (e: EventRow) => {
 </ToolLayout>
 
 <script>
-  /* A draft belongs to the person who wrote it, so it stays on their machine.
-     Keyed by period, covers and sign, so switching sign does not silently
-     overwrite what was written for the last one. */
+  /* Where a draft lives.
+   *
+   * Signed out: this browser, and the tool says so. That is still the right
+   * answer for a public instrument — one that demands an account before you may
+   * type a sentence is one people close.
+   *
+   * Signed in: the account as well, so it follows them to the app and to
+   * whatever machine they open next. Both, not either: the local copy is what
+   * survives the connection dropping mid-sentence.
+   */
   const box = document.querySelector<HTMLTextAreaElement>("[data-hw-text]");
   const state = document.querySelector<HTMLElement>("[data-hw-state]");
-  if (box && state) {
+  const desk = document.querySelector<HTMLElement>("[data-hw-desk]");
+
+  if (box && state && desk) {
     const key = box.dataset.hwKey ?? "hw";
+    const signedIn = desk.dataset.signedIn === "1";
+    const period = desk.dataset.period ?? "weekly";
+    const covers = desk.dataset.covers ?? "";
+    const sign = desk.dataset.sign ?? "aries";
+    const title = desk.dataset.title ?? "";
+
+    /* The account's copy wins where there is one: it is the newer of the two
+       whenever anything was written on another machine, and the local copy is
+       still underneath if this one is offline. */
+    const fromAccount = desk.dataset.saved ?? "";
     try {
-      box.value = localStorage.getItem(key) ?? "";
+      box.value = fromAccount || localStorage.getItem(key) || "";
     } catch {
-      /* Private browsing, or storage refused. The tool still works; the draft
-         simply will not survive a reload, and saying so is better than a
-         silent failure to save. */
+      box.value = fromAccount;
       state.textContent = "This browser will not keep a draft.";
     }
+
+    const words = () => (box.value.trim() ? box.value.trim().split(/\s+/).length : 0);
+    const said = (where: string) => {
+      const n = words();
+      state.textContent = `${n} word${n === 1 ? "" : "s"} · ${where}`;
+    };
+
     let timer: number | undefined;
+    let sending = false;
+
+    async function keep() {
+      let local = true;
+      try {
+        localStorage.setItem(key, box!.value);
+      } catch {
+        local = false;
+      }
+      if (!signedIn) {
+        said(local ? "kept in this browser" : "not kept — this browser refused");
+        return;
+      }
+      if (sending) return;
+      sending = true;
+      try {
+        const r = await fetch("/api/practice/draft", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            period, covers, sign, title, body_md: box!.value,
+          }),
+        });
+        said(r.ok ? "kept to your account" : "kept here — the site did not answer");
+      } catch {
+        /* Offline. The local copy is the point of keeping both. */
+        said("kept here — you are offline");
+      } finally {
+        sending = false;
+      }
+    }
+
     box.addEventListener("input", () => {
       window.clearTimeout(timer);
-      timer = window.setTimeout(() => {
-        try {
-          localStorage.setItem(key, box.value);
-          const words = box.value.trim() ? box.value.trim().split(/\s+/).length : 0;
-          state.textContent = `${words} word${words === 1 ? "" : "s"} · kept here`;
-        } catch {
-          state.textContent = "Not kept — this browser refused to store it.";
-        }
-      }, 400);
+      timer = window.setTimeout(keep, 600);
     });
   }
 </script>

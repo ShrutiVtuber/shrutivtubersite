@@ -32,6 +32,12 @@ GLYPH = {
 }
 
 
+ZODIAC = (
+    "aries", "taurus", "gemini", "cancer", "leo", "virgo",
+    "libra", "scorpio", "sagittarius", "capricorn", "aquarius", "pisces",
+)
+
+
 def footer(bot_url: str, site_url: str) -> str:
     """The one line every message ends with."""
     return f"{SUBTEXT}[vcordbot]({bot_url}) · posted automatically · [instruments]({site_url}/tools)"
@@ -136,6 +142,74 @@ def isopsephy(data: dict, bot_url: str, site_url: str) -> dict:
     ]
     return embed(f"“{data.get('text','')}”", "\n".join(lines),
                  url=f"{site_url}/tools/isopsephy")
+
+
+def horoscope_material(
+    events: dict, *, sign: str, period_label: str, start: str, end: str,
+    bot_url: str, site_url: str,
+) -> dict:
+    """
+    What to write a horoscope FROM — not a horoscope.
+
+    ⚠ This says nothing about what the sky means. It is the same material the
+    writing desk on the site puts beside the box: the events inside the period,
+    and which house each falls in from the given rising sign. The interpretation
+    is the person's, which is the whole point of a practice room.
+    """
+    rising = sign.title()
+    inside = [
+        e for e in (events.get("events") or [])
+        if e.get("kind") in ("ingress", "station", "lunation", "eclipse")
+    ]
+
+    def house_of(where: str) -> int:
+        """Whole sign, counted from the rising sign — one, not zero."""
+        try:
+            return (ZODIAC.index(where.lower()) - ZODIAC.index(sign.lower())) % 12 + 1
+        except ValueError:
+            return 0
+
+    lines = []
+    for e in inside[:24]:
+        when = _stamp(e.get("at", ""))
+        who = " & ".join(e.get("bodies") or []) or "—"
+        where = e.get("sign", "")
+        detail = e.get("detail") or {}
+        if e["kind"] == "ingress":
+            what = f"{who} enters {where}"
+        elif e["kind"] == "station":
+            what = f"{who} turns {detail.get('direction', 'station')}"
+        elif e["kind"] == "lunation":
+            what = f"{detail.get('phase', 'lunation')} moon in {where}"
+        else:
+            what = f"{detail.get('type', '')} {detail.get('of', '')} eclipse in {where}".strip()
+        house = house_of(where)
+        lines.append(f"`{when}` {what}" + (f" — **{house}th**" if house else ""))
+
+    if not lines:
+        # A quiet period is a real answer and worth saying so, because it reads
+        # differently from a loud one and that is itself something to write.
+        lines = [
+            "Nothing ingresses, stations or lunates inside this period.",
+            "",
+            "That is not nothing to write about — a quiet week reads differently "
+            "from a loud one.",
+        ]
+
+    body = "\n".join([
+        f"**{rising} rising** · {period_label}",
+        f"{start} to {end}",
+        "",
+        *lines,
+        "",
+        "Houses are whole sign, counted from the rising sign.",
+        "",
+        footer(bot_url, site_url),
+    ])
+    return embed(
+        f"To write from · {rising} · {period_label}", body,
+        url=f"{site_url}/tools/horoscope-writing?sign={sign}",
+    )
 
 
 def failure(message: str, bot_url: str, site_url: str) -> dict:

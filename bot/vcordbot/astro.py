@@ -114,6 +114,16 @@ class Astro:
     async def stations(self, body: str, when: str, lat: float, lon: float) -> dict:
         return await self._get("/stations", {"body": body, "when": when, "lat": lat, "lon": lon, "days": 1})
 
+    async def events(self, start: str, end: str) -> dict:
+        """
+        What the sky does between two moments — ingresses, stations, lunations,
+        eclipses. The material a horoscope is written FROM.
+
+        Half-open at neither end: the desk on the site asks for the same span,
+        and two answers to "what happens this week" would be one too many.
+        """
+        return await self._get("/events", {"start": start, "end": end})
+
     async def chart(self, when: str, lat: float, lon: float, *,
                     tradition: str = "hellenistic",
                     house_system: str = "whole_sign") -> dict:

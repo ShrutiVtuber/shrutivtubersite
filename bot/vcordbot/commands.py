@@ -47,6 +47,35 @@ COMMANDS: list[dict] = [
         ],
     },
     {
+        "name": "horoscope",
+        "description": "The sky to write a horoscope from: a period, a sign, and what happens in it.",
+        "usage": "/horoscope [sign:<sign>] [period:<daily|weekly|monthly>]",
+        "example": "/horoscope sign:leo period:weekly",
+        "summary": (
+            "The same material the writing desk on the site gives you — the "
+            "chart for the start of the period rotated to a rising sign, and "
+            "every ingress, station, lunation and eclipse inside it."
+        ),
+        "options": [
+            {"type": STRING, "name": "sign", "required": False,
+             "description": "Which sign is rising. Aries if you do not say.",
+             "choices": [
+                 {"name": s.title(), "value": s} for s in (
+                     "aries", "taurus", "gemini", "cancer", "leo", "virgo",
+                     "libra", "scorpio", "sagittarius", "capricorn",
+                     "aquarius", "pisces",
+                 )
+             ]},
+            {"type": STRING, "name": "period", "required": False,
+             "description": "This week if you do not say.",
+             "choices": [
+                 {"name": "Today", "value": "daily"},
+                 {"name": "This week", "value": "weekly"},
+                 {"name": "This month", "value": "monthly"},
+             ]},
+        ],
+    },
+    {
         "name": "isopsephy",
         "description": "Add up a word by its letters, in six scripts.",
         "usage": "/isopsephy text:<word> [script:<table>]",

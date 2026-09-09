@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from vcordbot import announce, commands, places, render, storage
+from vcordbot import announce, commands, periods, places, render, storage
 from vcordbot.astro import Astro, AstroError
 from vcordbot.places import PlaceError
 
@@ -160,6 +160,21 @@ async def dispatch(interaction: dict, astro: Astro, *, bot_url: str,
             result = await astro.stations(body, now_iso, place.lat, place.lon)
             return _message(render.stations(
                 result, place.label, bot_url, site_url))
+
+        if name == "horoscope":
+            # The cheap half of the practice bridge: hand back the material to
+            # write from. Reading the channel — the other half — needs a gateway
+            # this bot does not have, so this stands alone until it does.
+            sign = (opts.get("sign") or "aries").strip().lower()
+            period = (opts.get("period") or "weekly").strip().lower()
+            if period not in periods.PERIODS:
+                period = "weekly"
+            covers = periods.current_covers(period)
+            start, end = periods.span(period, covers)
+            result = await astro.events(f"{start}T00:00:00Z", f"{end}T23:59:59Z")
+            return _message(render.horoscope_material(
+                result, sign=sign, period_label=periods.label(period, covers),
+                start=start, end=end, bot_url=bot_url, site_url=site_url))
 
         if name == "isopsephy":
             text = (opts.get("text") or "").strip()

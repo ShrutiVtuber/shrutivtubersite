@@ -41,6 +41,27 @@ class FakeAstro:
                 "letters": [{"char": "λ", "value": 30}],
                 "reduction": {"final": 4}, "unmatched": []}
 
+    async def events(self, start, end):
+        self.calls.append(("events", start, end))
+        if self.fail:
+            raise AstroError(self.fail)
+        return {"events": [
+            {"kind": "ingress", "at": "2026-09-10T08:06:00+00:00",
+             "bodies": ["Venus"], "sign": "Scorpio", "degree": 0.0,
+             "detail": {"retrograde": False}},
+            {"kind": "lunation", "at": "2026-09-11T03:27:00+00:00",
+             "bodies": ["Moon", "Sun"], "sign": "Virgo", "degree": 18.4,
+             "detail": {"phase": "new"}},
+            {"kind": "station", "at": "2026-09-10T18:27:00+00:00",
+             "bodies": ["Uranus"], "sign": "Gemini", "degree": 5.7,
+             "detail": {"direction": "retrograde"}},
+            # Filtered out: an aspect is not one of the loud events the desk
+            # lists, and the command must not start listing a hundred of them.
+            {"kind": "aspect", "at": "2026-09-09T19:17:00+00:00",
+             "bodies": ["Moon", "Rahu"], "sign": "Virgo", "degree": 0.0,
+             "detail": {"aspect": "opposition"}},
+        ]}
+
     # The rest of the instruments, shaped as the daemon actually answers them.
     # Copied from real responses rather than invented: the Vedic chart taught
     # this suite that a made-up payload agrees with whatever the code already
