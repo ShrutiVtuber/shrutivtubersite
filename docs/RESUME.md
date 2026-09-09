@@ -66,6 +66,19 @@ error on the empty string.
 667 tests pass. `astro check` sits at **143 errors — that is the baseline**, not
 a regression.
 
+## The app signs in against this site
+
+`GET /api/account/consents` serves the three decisions with the exact wording
+that gets filed, so Shruti's Tools has no copy of its own. `current_user` reads
+`Authorization: Bearer` when there is no cookie, and `signup`/`signin` return
+the session token **only when the body says `bearer: true`** — the website never
+sends it, so browser replies are unchanged.
+
+⚠ **The cookie wins when both are present.** A request carrying a cookie is a
+browser, and its cookie was issued httpOnly; letting a header override it would
+let a script that cannot read the cookie still choose whose account the request
+runs as. `tests/test_the_app_signs_in.py` holds that.
+
 ## Next, in her order
 
 Read **`docs/PLAN-horoscope-practice.md`** first: eleven requirements, two
@@ -102,5 +115,14 @@ Outstanding on the site specifically:
 - **Marks need U+FE0E** or a browser may draw them from a colour emoji font.
 - **Migration filenames must not share a revision prefix**: `rm d4a71b*`
   deleted a second migration.
+- **A guard nobody invokes is a comment.** `scripts/check_consent_wording.py`
+  said "run in CI" and grep found its name nowhere else. It runs in the suite
+  now.
+- **A test that asks the machine instead of saying.** `test_storage` read the
+  real R2 configuration: green on a laptop without a bucket, red on one with
+  `.env` filled in.
+- **The deploy checkout belongs to `theourgia`, not `deploy`.** As `deploy` the
+  pull fails on FETCH_HEAD and compose on `.env`, both reading like a broken box
+  rather than a wrong user. See the Live section.
 
 Each has a test. Every one of them looked completely fine.

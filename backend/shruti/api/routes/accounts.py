@@ -32,10 +32,41 @@ router = APIRouter(prefix="/api/account", tags=["accounts"])
 
 # ── who is asking ───────────────────────────────────────────────────────────
 
+def session_token(request: Request) -> str | None:
+    """
+    The session credential this request carries, cookie first.
+
+    ⚠ Cookie FIRST, and it matters. Anything that sends a cookie is a browser,
+    and its cookie was issued httpOnly, samesite and secure; letting a header
+    override it would mean a script that cannot read the cookie could still
+    choose the identity by adding one.
+    """
+    cookie = request.cookies.get(SESSION_COOKIE)
+    if cookie:
+        return cookie
+    header = request.headers.get("authorization") or ""
+    if header[:7].lower() == "bearer ":
+        return header[7:].strip() or None
+    return None
+
+
 async def current_user(
     request: Request, session: AsyncSession = Depends(get_session)
 ) -> User | None:
-    claims = read_session(request.cookies.get(SESSION_COOKIE))
+    """
+    Who is asking — from the browser's cookie, or the app's bearer token.
+
+    Same signed value either way, because it is the same account: she asked
+    that somebody who signs up on their phone be signed in on the site too. A
+    phone has no cookie jar worth the name, so the app holds the token itself
+    and sends it as a bearer; the website carries on with the httpOnly cookie
+    it has always had.
+
+    ⚠ The cookie is tried FIRST. A browser that somehow sends both is a browser,
+    and its cookie is the credential that was issued with httpOnly, samesite and
+    secure on it.
+    """
+    claims = read_session(session_token(request))
     if not claims:
         return None
     return (
@@ -69,6 +100,11 @@ class SignUpIn(BaseModel):
     password: str | None = Field(default=None, min_length=10, max_length=200)
     display_name: str = Field(default="", max_length=120)
     consents: list[ConsentIn] = Field(default_factory=list)
+    # ⚠ Opt-in, so the website's behaviour does not change. A browser gets the
+    # session as an httpOnly cookie and nothing else; asking for it in the body
+    # would hand any injected script the credential the cookie flag exists to
+    # keep away from it. The app cannot use a cookie, so it asks.
+    bearer: bool = False
 
 
 async def _record_consents(
@@ -91,6 +127,35 @@ async def _record_consents(
             version=CONSENT_VERSION, wording=spec.wording,
             lawful_basis=spec.lawful_basis, source=source,
         ))
+
+
+@router.get("/consents")
+async def consent_wording() -> dict:
+    """
+    The three decisions, with the exact words that will be filed.
+
+    Public, and read by the app so it can show what it is about to store. The
+    wording lives in one place for a reason the module says plainly: a form that
+    displays one sentence and files another is worse than no record at all. The
+    website mirrors it in TypeScript with a test holding the two together; the
+    app asks instead, which is one fewer copy to drift.
+    """
+    from shruti.core.consents import ALL, CONSENT_VERSION
+
+    return {
+        "version": CONSENT_VERSION,
+        "consents": [
+            {
+                "kind": c.kind,
+                "label": c.label,
+                "wording": c.wording,
+                "basis": c.lawful_basis,
+                "required": c.required,
+                "explanation": c.explanation,
+            }
+            for c in ALL
+        ],
+    }
 
 
 @router.post("/signup", status_code=201)
@@ -142,7 +207,10 @@ async def sign_up(
     secure = request.url.scheme == "https" or \
         request.headers.get("x-forwarded-proto") == "https"
     _set_session(response, user, secure)
-    return {"ok": True, "id": user.id, "email": user.email}
+    out = {"ok": True, "id": user.id, "email": user.email}
+    if body.bearer:
+        out["token"] = issue_session(user.id, user.email)
+    return out
 
 
 # ── signing in ──────────────────────────────────────────────────────────────
@@ -150,6 +218,7 @@ async def sign_up(
 class SignInIn(BaseModel):
     email: EmailStr
     password: str | None = None
+    bearer: bool = False       # see SignUpIn.bearer
 
 
 @router.post("/signin")
@@ -170,7 +239,12 @@ async def sign_in(
         secure = request.url.scheme == "https" or \
             request.headers.get("x-forwarded-proto") == "https"
         _set_session(response, user, secure)
-        return {"ok": True, "signedIn": True}
+        out = {"ok": True, "signedIn": True,
+               "id": user.id, "email": user.email,
+               "displayName": user.display_name}
+        if body.bearer:
+            out["token"] = issue_session(user.id, user.email)
+        return out
 
     # Magic link. The reply is identical whether or not the address is known.
     if user is not None:
