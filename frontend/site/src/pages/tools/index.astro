@@ -125,11 +125,32 @@ const jsonLd = {
 
     <section class="inst-note">
       <h2>{say("what-these-are-and-what-.1", "What these are, and what they are not")}</h2>
-      {/* The say() has to be evaluated BEFORE the template literal, not
-   inside it. A `${...}` interpolates; a `{...}` in a JS string is four
-   characters, and this rendered `{say("what-these-are-and-what-.2",
-   "Every instrument here computes…")}` verbatim on the page. */}
-      <Prose html={`<p>${say("what-these-are-and-what-.2", "Every instrument here computes something with a definite answer — where a body was, when a month opened, what a set of letters sums to. That part is arithmetic and it is either right or wrong, so each page shows the rule it used and you can check it.")}</p>`} /></p>`} />
+      {/* Real elements in a slot, not markup built as a string.
+          
+          This was `<Prose html={`<p>{say(…)}</p><p><Copy …/></p>`} />` and it
+          was wrong twice over: inside a JS string `{say(…)}` is four
+          characters and a function name rather than a call, and `<Copy />` is
+          an unknown tag rather than a component. Both rendered as their own
+          source. Prose takes a SLOT when it is given no html, which is what
+          this needed all along. */}
+      <Prose>
+        <p>
+          <Copy
+            text={say(
+              "what-these-are-and-what-.2",
+              "Every instrument here computes something with a definite answer — where a body was, when a month opened, what a set of letters sums to. That part is arithmetic and it is either right or wrong, so each page shows the rule it used and you can check it.",
+            )}
+          />
+        </p>
+        <p>
+          <Copy
+            text={say(
+              "text.1",
+              "What the numbers *mean* is a different question, and none of these answer it. They will not tell you what to do, and nothing here predicts anything. They are for people who already have a practice and want the reckoning done properly.",
+            )}
+          />
+        </p>
+      </Prose>
     </section>
   </div>
 </BaseLayout>

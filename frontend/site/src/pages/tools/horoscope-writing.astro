@@ -1,0 +1,234 @@
+---
+/* The horoscope writing desk, for everybody.
+ *
+ * The same material her own desk gives her — the sky for a period, rotated to
+ * a sign, and the events that fall inside it — with somewhere to write. What
+ * it deliberately does NOT have is a publish button: readings on this site are
+ * hers, and a public tool that could put words on her pages would be a
+ * different thing entirely.
+ *
+ * Practice is the point. Somebody who wants feedback submits from the app,
+ * where there is an account behind the name and a room to be read in; here
+ * they get the instrument and their own draft, kept in this browser.
+ *
+ * ⚠ The period arithmetic comes from `lib/periods.ts`, shared with the admin
+ * desk. Two copies of ISO week reckoning is two chances to disagree about
+ * which week it is, and both would render a perfectly plausible week.
+ */
+import ToolLayout from "../../layouts/ToolLayout.astro";
+import TransitWheel from "../../components/chart/TransitWheel.astro";
+import Copy from "../../components/content/Copy.astro";
+import { askAstro } from "../../lib/api";
+import { copy } from "../../lib/copy";
+import { ZODIAC } from "../../lib/signs";
+import type { Period } from "../../lib/periods";
+import {
+  PERIODS, asPeriod, currentCovers, label as periodLabel, range,
+} from "../../lib/periods";
+
+const say = await copy("tools/horoscope-writing");
+
+const q = Astro.url.searchParams;
+const period: Period = asPeriod(q.get("period"));
+const covers = q.get("covers") || currentCovers(period);
+const signParam = (q.get("sign") ?? "").toLowerCase();
+const sign = ZODIAC.map((s) => s.toLowerCase()).includes(signParam)
+  ? signParam
+  : "aries";
+const Rising = sign.charAt(0).toUpperCase() + sign.slice(1);
+
+const [start, end] = range(period, covers);
+const heading = periodLabel(period, covers);
+
+interface EventRow {
+  kind: string; at: string; bodies: string[]; sign: string;
+  degree: number; detail?: Record<string, any>;
+}
+interface ChartBody {
+  name: string; longitude: number; retrograde: boolean;
+  dignities?: { sign: string; degree: number };
+}
+
+/* Both at once. Two round trips in sequence is a second of staring at nothing
+   every time somebody changes sign, and the sign changes a lot here. */
+const [eventsRes, chartRes] = await Promise.all([
+  askAstro<{ events: EventRow[] }>(
+    `/events?start=${start}T00:00:00Z&end=${end}T23:59:59Z`, 20000),
+  askAstro<{ bodies: ChartBody[] }>(
+    `/chart?when=${start}T12:00:00Z&lat=51.4779&lon=0` +
+    `&tradition=hellenistic&house_system=whole_sign&diagram=false`, 20000),
+]);
+
+const events = (eventsRes?.data?.events ?? []).filter((e) =>
+  ["ingress", "station", "lunation", "eclipse"].includes(e.kind));
+const bodies = (chartRes?.data?.bodies ?? []).map((b) => ({
+  name: b.name,
+  longitude: b.longitude,
+  sign: b.dignities?.sign ??
+    ZODIAC[Math.floor((((b.longitude % 360) + 360) % 360) / 30)],
+  degree: b.dignities?.degree ?? ((b.longitude % 30) + 30) % 30,
+  retrograde: b.retrograde,
+}));
+
+/* Changing the PERIOD moves to that period's current id — "this week" rather
+   than a week number borrowed from a month. Changing only the sign keeps the
+   period being read. */
+const href = (o: { period?: Period; covers?: string; sign?: string }) => {
+  const p = o.period ?? period;
+  const c = o.covers ?? (o.period && o.period !== period ? currentCovers(p) : covers);
+  return `/tools/horoscope-writing?period=${p}&covers=${c}&sign=${o.sign ?? sign}`;
+};
+
+const eventLine = (e: EventRow) => {
+  const when = new Date(e.at).toLocaleDateString("en-GB",
+    { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" });
+  const who = e.bodies.join(" & ");
+  const what = e.kind === "ingress" ? `${who} enters ${e.sign}`
+    : e.kind === "station" ? `${who} turns ${e.detail?.direction ?? "station"}`
+    : e.kind === "lunation" ? `${e.detail?.phase ?? "lunation"} in ${e.sign}`
+    : `${e.kind} in ${e.sign}`;
+  return `${when} · ${what}`;
+};
+---
+
+{/* No title, heading or lede here. ToolLayout reads them from the
+    instrument's row — that is the whole point of the row, and a prop would be
+    a second place to write them. This page's slug does the finding. */}
+<ToolLayout where="server" disclosure="○">
+  <Fragment slot="parameters">
+    <nav class="hw-periods" aria-label={say("nav.period", "Period")}>
+      {PERIODS.map((p) => (
+        <a href={href({ period: p })} aria-current={p === period ? "page" : undefined}>
+          {p.charAt(0).toUpperCase() + p.slice(1)}
+        </a>
+      ))}
+    </nav>
+
+    <nav class="hw-signs" aria-label={say("nav.sign", "Sign")}>
+      {ZODIAC.map((s) => (
+        <a
+          href={href({ sign: s.toLowerCase() })}
+          aria-current={s.toLowerCase() === sign ? "page" : undefined}
+        >{s}</a>
+      ))}
+    </nav>
+
+    <p class="hw-covers">{heading}</p>
+  </Fragment>
+
+  <div class="hw">
+    <div class="hw-split">
+      <div class="hw-sky">
+        <TransitWheel
+          bodies={bodies}
+          rising={Rising}
+          size={360}
+          degreeRing={false}
+          houseNumbers={true}
+          caption=""
+        />
+        <h2 class="hw-h">{say("events.heading", "What happens in this period")}</h2>
+        {events.length === 0 ? (
+          <p class="hw-none">{say("events.none", "Nothing ingresses, stations or lunates inside it. That is itself worth saying in a reading — a quiet period reads differently from a loud one.")}</p>
+        ) : (
+          <ul class="hw-events">
+            {events.map((e) => <li>{eventLine(e)}</li>)}
+          </ul>
+        )}
+      </div>
+
+      <div class="hw-write">
+        <h2 class="hw-h">{say("write.heading", "Your reading")}</h2>
+        <p class="hw-note">
+          <Copy text={say("write.note", "Kept in this browser and nowhere else. Nothing here is published — the readings on this site are hers. To have other people read yours and say what they think, submit it from the app.")} />
+        </p>
+        <textarea
+          class="hw-text"
+          rows="18"
+          data-hw-text
+          data-hw-key={`hw:${period}:${covers}:${sign}`}
+          placeholder={say("write.placeholder", "What does this sky ask of this sign?")}
+          aria-label={say("write.label", "Your reading")}
+        ></textarea>
+        <p class="hw-state" data-hw-state aria-live="polite"></p>
+      </div>
+    </div>
+  </div>
+</ToolLayout>
+
+<script>
+  /* A draft belongs to the person who wrote it, so it stays on their machine.
+     Keyed by period, covers and sign, so switching sign does not silently
+     overwrite what was written for the last one. */
+  const box = document.querySelector<HTMLTextAreaElement>("[data-hw-text]");
+  const state = document.querySelector<HTMLElement>("[data-hw-state]");
+  if (box && state) {
+    const key = box.dataset.hwKey ?? "hw";
+    try {
+      box.value = localStorage.getItem(key) ?? "";
+    } catch {
+      /* Private browsing, or storage refused. The tool still works; the draft
+         simply will not survive a reload, and saying so is better than a
+         silent failure to save. */
+      state.textContent = "This browser will not keep a draft.";
+    }
+    let timer: number | undefined;
+    box.addEventListener("input", () => {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => {
+        try {
+          localStorage.setItem(key, box.value);
+          const words = box.value.trim() ? box.value.trim().split(/\s+/).length : 0;
+          state.textContent = `${words} word${words === 1 ? "" : "s"} · kept here`;
+        } catch {
+          state.textContent = "Not kept — this browser refused to store it.";
+        }
+      }, 400);
+    });
+  }
+</script>
+
+<style>
+  .hw { display: grid; gap: var(--space-4); }
+  .hw-periods, .hw-signs { display: flex; flex-wrap: wrap; gap: 6px; }
+  .hw-periods a, .hw-signs a {
+    font: 600 var(--text-xs) var(--font-body);
+    letter-spacing: var(--tracking-eyebrow);
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    text-decoration: none;
+    padding: 5px 10px;
+    border: var(--border-w) solid var(--line);
+    border-radius: 999px;
+  }
+  .hw-periods a:hover, .hw-signs a:hover { color: var(--ink); border-color: var(--line-strong); }
+  .hw-periods a[aria-current="page"], .hw-signs a[aria-current="page"] {
+    color: var(--accent); border-color: var(--accent); background: var(--accent-wash);
+  }
+  .hw-covers {
+    font: 600 var(--text-sm) var(--font-body);
+    color: var(--ink-soft); margin: 0;
+  }
+  .hw-split { display: grid; gap: var(--space-5); }
+  @media (min-width: 900px) { .hw-split { grid-template-columns: 380px 1fr; } }
+  .hw-h { font: 600 var(--text-h4, 1.05rem) var(--font-display); color: var(--ink); margin: var(--space-4) 0 8px; }
+  .hw-events { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
+  .hw-events li {
+    font: 400 var(--text-sm) var(--font-body); color: var(--ink-soft);
+    padding: 7px 10px; border: var(--border-w) solid var(--line);
+    border-radius: var(--radius-sm); background: var(--surface-card);
+  }
+  .hw-none, .hw-note {
+    font: 400 var(--text-sm) / 1.6 var(--font-body); color: var(--ink-soft);
+    margin: 0 0 10px; max-width: 62ch;
+  }
+  .hw-text {
+    width: 100%; box-sizing: border-box;
+    font: 400 var(--text-body) / var(--leading-body) var(--font-display);
+    color: var(--ink); background: var(--surface-page);
+    border: var(--border-w) solid var(--line); border-radius: var(--radius-sm);
+    padding: 12px 14px; resize: vertical;
+  }
+  .hw-text:focus { border-color: var(--accent); outline: none; }
+  .hw-state { font: 400 var(--text-xs) var(--font-body); color: var(--ink-faint); margin: 6px 0 0; }
+</style>

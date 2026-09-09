@@ -152,7 +152,13 @@ const jsonLd = {
       </span>
     </div>
 
-    <div class="param-card"><slot name="parameters" /></div>
+    {/* No card when there is nothing to put in it. Every instrument so far
+        fills this with a form, so an empty one had never been seen — the
+        horoscope desk keeps its controls elsewhere and got a full-width empty
+        box above the page. */}
+    {Astro.slots.has("parameters") && (
+      <div class="param-card"><slot name="parameters" /></div>
+    )}
 
     <div class="tool-cols">
       <div class="tool-results"><slot /></div>

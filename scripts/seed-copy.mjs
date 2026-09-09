@@ -28,7 +28,16 @@ const payload = [];
    Deliberately NOT a general expression parser: a default that is not a plain
    literal cannot be seeded, and should not be — a string assembled at runtime
    is not a string somebody can edit. */
-const CALL = /\bsay\(\s*(["'`])([^"'`]+?)\1\s*,\s*(["'`])([\s\S]*?)\3\s*(?:,\s*(["'`])([^"'`]*?)\5\s*)?\)/g;
+/* ⚠ The `,?` before the closing paren is load-bearing.
+   
+   A trailing comma is ordinary in modern JavaScript and a formatter will add
+   one to a call it wraps across lines — which is exactly what happens to a
+   long default. Without it the regex simply does not match, the string is
+   never registered, and it disappears from the admin with no error anywhere:
+   the page renders its default perfectly and the panel has no row for it.
+   Found when a paragraph on /tools stayed truncated after its template had
+   been fixed. */
+const CALL = /\bsay\(\s*(["'`])([^"'`]+?)\1\s*,\s*(["'`])([\s\S]*?)\3\s*(?:,\s*(["'`])([^"'`]*?)\5\s*)?,?\s*\)/g;
 
 /* The file DECLARES its own namespace — `copy("support")`, or
    `copy("component:SubscribeBlock")` for something shared across pages. Read

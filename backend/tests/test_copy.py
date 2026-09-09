@@ -649,3 +649,37 @@ def test_the_helper_is_never_inside_a_template_literal() -> None:
         "the copy helper is inside a template literal and will render as its "
         "own source; use ${say(...)}:\n  " + "\n  ".join(offenders[:6])
     )
+
+
+def test_the_seeder_reads_a_call_with_a_trailing_comma() -> None:
+    """
+    A dangling comma must not make a string vanish.
+
+    `say(\n  "key",\n  "a long default",\n)` is what a formatter produces when
+    it wraps a long call across lines, and the seeder's pattern originally
+    required the closing paren to follow the default directly. Without the
+    comma allowed, the call simply does not match: the string is never
+    registered, the page renders its default perfectly, and the admin has no
+    row for it. No error anywhere.
+
+    Found when a paragraph on /tools stayed truncated after its template had
+    already been fixed — the fix could not reach the database because the
+    database had never heard of the key.
+    """
+    import re as _re
+
+    seeder = (ROOT_SCRIPTS / "seed-copy.mjs").read_text(encoding="utf-8")
+    line = next(
+        l for l in seeder.splitlines() if l.startswith("const CALL")
+    )
+    assert ",?" in line, "a trailing comma must be tolerated"
+
+    # And prove it against the shape itself rather than trusting the read.
+    pattern = _re.compile(
+        r"""\bsay\(\s*(["'`])([^"'`]+?)\1\s*,\s*(["'`])([\s\S]*?)\3\s*"""
+        r"""(?:,\s*(["'`])([^"'`]*?)\5\s*)?,?\s*\)"""
+    )
+    wrapped = 'say(\n  "text.9",\n  "A default long enough to wrap.",\n)'
+    match = pattern.search(wrapped)
+    assert match is not None, "the wrapped form must match"
+    assert match.group(4) == "A default long enough to wrap."
