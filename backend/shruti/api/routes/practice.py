@@ -259,7 +259,44 @@ async def submit(
 
     work.submitted_at = datetime.now(timezone.utc)
     await session.commit()
+
+    # ⚠ After the commit, and it must not be able to fail the submission. They
+    # wrote it and it is saved; the channel catching up late — or not at all —
+    # is a smaller thing than losing somebody's work to a Discord outage.
+    await _tell_discord(await _work_json(work, session, viewer=user, full=False))
+
     return {"ok": True, "id": work.id, "signs": len(written)}
+
+
+async def _tell_discord(work: dict) -> None:
+    """
+    Let the practice channel know, if there is one.
+
+    The bot owns every fact about Discord — the token, the channel, the shape of
+    a message. This says only that something was submitted, to an endpoint that
+    refuses anybody without the shared secret.
+    """
+    import os
+
+    import httpx
+
+    bot = os.environ.get("VCORDBOT_INTERNAL_URL", "").strip()
+    secret = os.environ.get("SHRUTI_INTERNAL_SECRET", "").strip()
+    if not (bot and secret):
+        return                      # no bridge configured; a working state
+    try:
+        async with httpx.AsyncClient(timeout=5) as client:
+            await client.post(
+                f"{bot}/internal/practice",
+                json={
+                    "id": work["id"], "author": work["author"],
+                    "title": work.get("title", ""), "signs": work.get("signs", []),
+                    "opening": work.get("opening", ""),
+                },
+                headers={"X-Shruti-Internal": secret},
+            )
+    except Exception as exc:                       # noqa: BLE001
+        log.warning("practice channel not told: %s", type(exc).__name__)
 
 
 @router.get("/mine")

@@ -15,7 +15,9 @@ getting this wrong fails closed rather than silently.
 """
 from __future__ import annotations
 
+import hmac
 import logging
+import os
 from datetime import datetime, timezone
 
 import asyncio
@@ -24,8 +26,9 @@ from contextlib import asynccontextmanager
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 from fastapi import FastAPI, Header, HTTPException, Request
+from pydantic import BaseModel
 
-from vcordbot import announce, commands, config, discord_api, render, storage
+from vcordbot import announce, bridge, commands, config, discord_api, render, storage
 from vcordbot.astro import Astro
 from vcordbot.dispatch import dispatch
 
@@ -122,6 +125,46 @@ async def health() -> dict:
             "watcher": "running" if running else "stopped",
             "store": store,
             "watching": watching}
+
+
+class PracticeIn(BaseModel):
+    """A submission the site is telling us about."""
+
+    id: int
+    author: str = ""
+    title: str = ""
+    signs: list[str] = []
+    opening: str = ""
+
+
+@app.post("/internal/practice")
+async def practice_submitted(
+    body: PracticeIn,
+    x_shruti_internal: str = Header(default="", alias="X-Shruti-Internal"),
+) -> dict:
+    """
+    The site telling the channel that somebody submitted a reading.
+
+    ⚠ **Not public.** It posts to a Discord channel under her bot's name, so an
+    open endpoint here is an open endpoint for putting words in her server. The
+    shared secret is checked in constant time, and a missing secret refuses
+    everything rather than defaulting to open.
+
+    ⚠ Answers ok either way. A Discord outage must not fail somebody's
+    submission — they wrote it, it is saved, and the channel can catch up.
+    """
+    cfg = config.load()
+    secret = os.environ.get("SHRUTI_INTERNAL_SECRET", "").strip()
+    if not secret or not hmac.compare_digest(x_shruti_internal, secret):
+        raise HTTPException(401, "no")
+
+    posted = await bridge.announce_submission(
+        body.model_dump(),
+        channel_id=cfg.practice_channel_id,
+        token=cfg.token,
+        site_url=os.environ.get("SHRUTI_SITE_URL", "https://shrutivtuber.com"),
+    )
+    return {"ok": True, "posted": posted}
 
 
 @app.post("/interactions")

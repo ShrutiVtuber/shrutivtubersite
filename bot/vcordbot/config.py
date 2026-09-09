@@ -43,7 +43,10 @@ class Config:
     # that moving it is a config change.
     bot_url: str
 
-    @property
+    # The channel the practice bridge carries. Empty means no bridge, which is
+    # a working state rather than an error — the site simply does not announce.
+    practice_channel_id: str = ""
+
     def configured(self) -> bool:
         return bool(self.app_id and self.token)
 
@@ -57,6 +60,7 @@ def load() -> Config:
         app_id=_env("SHRUTI_DISCORD_APP_ID"),
         public_key=_env("SHRUTI_DISCORD_PUBLIC_KEY"),
         token=_env("SHRUTI_DISCORD_BOT_TOKEN"),
+        practice_channel_id=_env("SHRUTI_DISCORD_PRACTICE_CHANNEL", ""),
         astro_url=_env("SHRUTI_ASTRO_INTERNAL", "http://shruti-astro:8000").rstrip("/"),
         site_url=_env("SHRUTI_SITE_URL", "https://shrutivtuber.com").rstrip("/"),
         bot_url=_env("VCORDBOT_URL", "https://bot.shrutivtuber.com").rstrip("/"),

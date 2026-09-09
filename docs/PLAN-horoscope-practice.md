@@ -104,6 +104,31 @@ losing one of them is the likely failure.
   The letter values are small enough to bundle. **The corpora are the weight**
   and are what "choose your languages" is really about.
 
+## The bridge, as built
+
+**Outbound works now.** A submission tells the bot over `POST /internal/practice`
+(shared secret, refuses without one), and the bot posts it to the channel. No
+gateway, no intent, nothing to switch on.
+
+**Inbound is written and dormant.** `bot/vcordbot/gateway.py` holds the socket,
+identifies, heartbeats, resumes from the last sequence, refuses its own messages
+and de-duplicates redelivery. It is not started yet, because:
+
+⚠ **MESSAGE_CONTENT is a privileged intent and only she can switch it on** —
+Discord developer portal → the application → Bot → Privileged Gateway Intents.
+Until then Discord sends every message with EMPTY content: no error, no warning,
+a channel that simply looks quiet. The reader counts blanks and says so in the
+log rather than sitting silent, which is the one thing that makes this
+diagnosable.
+
+Also needed from her, in `.env`:
+
+```
+SHRUTI_DISCORD_PRACTICE_CHANNEL=<the #horoscope-practise channel id>
+SHRUTI_INTERNAL_SECRET=<any long random string, same value both services>
+VCORDBOT_INTERNAL_URL=http://bot:8000
+```
+
 ## ⚠ The bot has no gateway today
 
 `bot/vcordbot` is HTTP interactions only — signed slash commands at
