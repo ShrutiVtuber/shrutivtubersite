@@ -159,7 +159,7 @@ const GLYPH: Record<string, string> = {
     </div>
 
     <PeriodSwitcher
-      available={data.availablePeriods.length ? data.availablePeriods : ["monthly"]}
+      available={data.availablePeriods.length ? data.availablePeriods : [period]}
       current={period}
       hrefFor={(p) => `/horoscopes/${sign}/${p}`}
     />

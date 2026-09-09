@@ -23,7 +23,9 @@ import { copy } from "../../lib/copy";
 const say = await copy("horoscopes");
 
 
-const period = Astro.url.searchParams.get("period") ?? "monthly";
+/* Weekly by default. She writes these every week on stream; the monthly set
+   is the newsletter's and is one tap away on the switcher. */
+const period = Astro.url.searchParams.get("period") ?? "weekly";
 /* Readings do not expire. `covers` opens a past month; without it you get the
    current one. */
 const covers = Astro.url.searchParams.get("covers") ?? "";

@@ -26,18 +26,57 @@ interface Archive {
   period: string; sign: string | null; current: string;
   periods: { covers: string; signs: string[]; count: number }[];
 }
+/* Weekly is what she reads on stream; monthly is the newsletter's. The archive
+   asked only for months, so a week's readings were written, published, and
+   reachable at their own address while being invisible from the one page whose
+   job is listing what exists. */
+const PERIODS = ["weekly", "monthly", "yearly", "daily"] as const;
+const period = (PERIODS as readonly string[]).includes(
+  Astro.url.searchParams.get("period") ?? "",
+)
+  ? Astro.url.searchParams.get("period")!
+  : "weekly";
+
 const data = await site<Archive>(
-  `/api/horoscopes/archive?period=monthly${sign ? `&sign=${sign}` : ""}`,
+  `/api/horoscopes/archive?period=${period}${sign ? `&sign=${sign}` : ""}`,
 );
 const periods = data?.periods ?? [];
 
 const NAME = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
-const monthName = (covers: string) => {
-  const m = /^(\d{4})-(\d{2})$/.exec(covers);
-  if (!m) return covers;
-  return new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, 1))
-    .toLocaleDateString("en-GB", { month: "long", year: "numeric", timeZone: "UTC" });
+/* Each period is named the way somebody would say it out loud. A week reads as
+   the date it starts, not as "2026-W38", which is an identifier rather than a
+   thing anybody says. */
+const MONTH_YEAR = { month: "long", year: "numeric", timeZone: "UTC" } as const;
+
+const coversName = (covers: string) => {
+  const month = /^(\d{4})-(\d{2})$/.exec(covers);
+  if (month) {
+    return new Date(Date.UTC(Number(month[1]), Number(month[2]) - 1, 1))
+      .toLocaleDateString("en-GB", MONTH_YEAR);
+  }
+  const week = /^(\d{4})-W(\d{2})$/.exec(covers);
+  if (week) {
+    /* ISO weeks: week 1 is the one holding 4 January, so step back to that
+       week's Monday and forward by whole weeks. Counting sevens from the 1st
+       drifts a week every few years. */
+    const jan4 = new Date(Date.UTC(Number(week[1]), 0, 4));
+    const monday = new Date(
+      jan4.getTime() - ((jan4.getUTCDay() + 6) % 7) * 864e5
+        + (Number(week[2]) - 1) * 7 * 864e5,
+    );
+    return `Week of ${monday.toLocaleDateString("en-GB", {
+      day: "numeric", month: "long", year: "numeric", timeZone: "UTC",
+    })}`;
+  }
+  const day = /^(\d{4})-(\d{2})-(\d{2})$/.exec(covers);
+  if (day) {
+    return new Date(`${covers}T00:00:00Z`).toLocaleDateString("en-GB", {
+      day: "numeric", month: "long", year: "numeric", timeZone: "UTC",
+    });
+  }
+  return covers;   /* a year is already what a person would say */
 };
+const monthName = coversName;
 ---
 
 <BaseLayout
@@ -51,11 +90,32 @@ const monthName = (covers: string) => {
       body={say("text.2", "Readings stay up. Nothing here expires.")}
     />
 
+    {/* Which kind of reading. Weekly first: it is the one she writes on
+        stream every week, and the monthly set is the newsletter's. Before
+        this, a week's readings could be written, published and reachable at
+        their own address while being invisible from the one page whose job is
+        listing what exists. */}
+    <nav class="periods-nav" aria-label={say("text.10", "Kind of reading")}>
+      {
+        PERIODS.map((p) => (
+          <a
+            href={`/horoscopes/archive?period=${p}${sign ? `&sign=${sign}` : ""}`}
+            aria-current={p === period ? "page" : undefined}
+          >
+            {p.charAt(0).toUpperCase() + p.slice(1)}
+          </a>
+        ))
+      }
+    </nav>
+
     <nav class="filter" aria-label={say("text.3", "Filter by sign")}>
       <a href="/horoscopes/archive" aria-current={!sign ? "page" : undefined}>{say("text.6", "All signs")}</a>
       {
         SIGNS.map((s) => (
-          <a href={`/horoscopes/archive?sign=${s}`} aria-current={s === sign ? "page" : undefined}>
+          <a
+            href={`/horoscopes/archive?period=${period}&sign=${s}`}
+            aria-current={s === sign ? "page" : undefined}
+          >
             {NAME(s)}
           </a>
         ))
@@ -67,9 +127,9 @@ const monthName = (covers: string) => {
         <EmptyState
           glyph="○"
           title={say("text.4", "Nothing published yet")}
-          body={say("text.5", "Once a month's twelve readings go up they stay here, and this fills in behind them.")}
+          body={say("text.5", "Once a set of twelve readings goes up they stay here, and this fills in behind them.")}
         >
-          <Button slot="action" variant="secondary" href="/horoscopes">{say("text.7", "This month")}</Button>
+          <Button slot="action" variant="secondary" href={`/horoscopes?period=${period}`}>{say("text.7", "Current")}</Button>
         </EmptyState>
       ) : (
         <ul class="periods">
@@ -84,7 +144,7 @@ const monthName = (covers: string) => {
                 <div class="p-signs">
                   {
                     (sign ? [sign] : p.signs).map((s) => (
-                      <a href={`/horoscopes/${s}/monthly?covers=${p.covers}`}>{NAME(s)}</a>
+                      <a href={`/horoscopes/${s}/${period}/${p.covers}`}>{NAME(s)}</a>
                     ))
                   }
                 </div>
@@ -98,6 +158,29 @@ const monthName = (covers: string) => {
 </BaseLayout>
 
 <style>
+  .periods-nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    margin-bottom: var(--space-3);
+  }
+  .periods-nav a {
+    font: 600 var(--text-xs) var(--font-body);
+    letter-spacing: var(--tracking-eyebrow);
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    text-decoration: none;
+    padding: 6px 12px;
+    border: var(--border-w) solid var(--line);
+    border-radius: var(--radius-pill, 999px);
+  }
+  .periods-nav a:hover { color: var(--ink); border-color: var(--line-strong); }
+  .periods-nav a[aria-current="page"] {
+    color: var(--accent);
+    border-color: var(--accent);
+    background: var(--accent-wash);
+  }
+
   .archive { display: grid; gap: var(--space-5); }
   .filter { display: flex; gap: 4px; flex-wrap: wrap; }
   .filter a {
