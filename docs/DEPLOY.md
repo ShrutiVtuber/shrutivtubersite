@@ -301,3 +301,20 @@ Nothing was lost — the content matched exactly, `git diff` was saved to
 but it means **production files can change without a commit and without a
 deploy**, and a `git pull` will refuse until somebody notices. Worth finding
 what does it before trusting the deploy path.
+
+## The sync, still unexplained (10 September 2026)
+
+Production's working tree held 34 files of uncommitted work identical to the
+laptop's, and nothing has yet explained how they got there. What has been ruled
+out: cron and systemd timers on both machines, rsync/syncthing/lsyncd, a second
+agent session, a network mount on either side, a container with the checkout
+mounted writable, and a webhook receiver on the box.
+
+Two canaries were planted and neither travelled — one an untracked new file,
+one an edit to a tracked file. **Both were uncommitted and unpushed**, which is
+the next thing to test: whether a PUSH is the trigger. If it is, something
+fetches and writes the working tree without moving HEAD — `git checkout
+origin/main -- .` has exactly that shape, and it leaves no reflog entry.
+
+Until it is understood, `scripts/deploy.sh` refuses to run when the tree is
+dirty and prints the difference rather than discarding it.
