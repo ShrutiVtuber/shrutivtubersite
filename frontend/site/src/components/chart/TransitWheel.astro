@@ -242,9 +242,13 @@ const described = [
 
   .r-outer, .r-sign, .r-inner { stroke-width: 0.4; opacity: 0.55; }
   .r-degree { stroke-width: 0.25; opacity: 0.35; }
-  .divider { stroke-width: 0.3; opacity: 0.45; }
-  .tick { stroke-width: 0.2; opacity: 0.35; }
-  .tick-long { stroke-width: 0.35; opacity: 0.6; }
+  /* ⚠ The stroke COLOUR, explicitly. A `<line>` defaults to stroke:none, and
+     setting only a width and an opacity paints nothing at all — these sector
+     lines were invisible on every wheel on this site, which nobody noticed
+     because a wheel without them still looks like a wheel. */
+  .divider { stroke: currentColor; stroke-width: 0.3; opacity: 0.45; }
+  .tick { stroke: currentColor; stroke-width: 0.2; opacity: 0.35; }
+  .tick-long { stroke: currentColor; stroke-width: 0.35; opacity: 0.6; }
 
   .sign-glyph { font-size: 8px; fill: var(--ink-soft); }
   .house-no { font-size: 5px; fill: var(--ink-faint); }

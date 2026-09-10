@@ -152,6 +152,6 @@ Where the polish should go, in order:
 
 ## What "done" looks like
 
-A `lib/theme/` the app can adopt without rewriting screens, a written list of
-artwork with dimensions she can start drawing from today, and one worked screen
-— Home — rendered as a reference so the rest can follow it.
+⚠ **Superseded — see `DESIGN-BRIEF-ASTROLABE-ADDENDUM.md`**, which is handed
+over with this document. The scope is the WHOLE app: every screen, every state,
+every variation, not a direction and one worked sample.
