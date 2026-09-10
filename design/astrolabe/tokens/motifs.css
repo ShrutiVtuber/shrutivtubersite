@@ -1,0 +1,62 @@
+/* Astrolabe — the brand layer. Four motifs, and they are the whole of it.
+   Taken from her artwork: a cloak of night-blue, edged in a thin gold line,
+   with stars and crescents scattered thinly across it. Used sparingly enough
+   to stay special — never more than one motif on a screen at full strength.
+
+   1. .hem      the gold edge-line       — one per screen, at the top of the brand surface
+   2. .scatter  the star field           — brand surfaces only, never behind data
+   3. .rule     a hairline with a mark   — closes a section
+   4. .veil     a protection capsule     — text over a plate or artwork
+*/
+
+/* ── 1. The hem ──────────────────────────────────────────────────────────
+   A 1px line that fades out at both ends, as the trim on the cloak does when
+   the fabric turns. Takes --ornament, so it is gilt normally and --live when
+   the shell is stamped live. */
+.hem{position:relative}
+.hem::before{content:"";position:absolute;left:0;right:0;top:0;height:1px;background:linear-gradient(90deg,transparent 0%,var(--ornament) 18%,var(--ornament) 82%,transparent 100%);opacity:.75;pointer-events:none;z-index:3;transition:background var(--dur-3) var(--ease-in-out),opacity var(--dur-3) var(--ease-in-out)}
+.hem-strong::before{opacity:1;height:1.5px}
+.hem-hour::before{background:linear-gradient(90deg,transparent 0%,var(--hour) 22%,var(--hour) 78%,transparent 100%)}
+.hem-bottom::before{top:auto;bottom:0}
+
+/* ── 2. The scatter ──────────────────────────────────────────────────────
+   Stars, the way they sit on the cloak: about two dozen, four sizes, gold and
+   ink, at fixed positions so the field never shimmers or animates. Dense enough
+   to read as cloth at arm's length, quiet enough to put a heading on.
+   ⚠ Never behind a table. */
+.scatter{position:relative;isolation:isolate}
+.scatter::after{content:"";position:absolute;inset:0;pointer-events:none;z-index:0;opacity:.9;background-image:radial-gradient(2px 2px at 9% 16%,var(--gilt-bright) 48%,transparent 49%),radial-gradient(1px 1px at 17% 41%,rgba(233,230,240,.72) 48%,transparent 49%),radial-gradient(1.5px 1.5px at 24% 8%,var(--gilt) 48%,transparent 49%),radial-gradient(1px 1px at 31% 63%,rgba(233,230,240,.5) 48%,transparent 49%),radial-gradient(2.5px 2.5px at 38% 27%,var(--gilt-bright) 46%,transparent 47%),radial-gradient(1px 1px at 44% 78%,rgba(233,230,240,.42) 48%,transparent 49%),radial-gradient(1px 1px at 47% 11%,rgba(233,230,240,.6) 48%,transparent 49%),radial-gradient(1.5px 1.5px at 55% 47%,var(--gilt) 48%,transparent 49%),radial-gradient(1px 1px at 61% 19%,rgba(233,230,240,.55) 48%,transparent 49%),radial-gradient(2px 2px at 67% 69%,var(--gilt-bright) 47%,transparent 48%),radial-gradient(1px 1px at 72% 34%,rgba(233,230,240,.5) 48%,transparent 49%),radial-gradient(1.5px 1.5px at 79% 13%,var(--gilt) 48%,transparent 49%),radial-gradient(1px 1px at 84% 55%,rgba(233,230,240,.62) 48%,transparent 49%),radial-gradient(2px 2px at 91% 30%,var(--gilt-bright) 47%,transparent 48%),radial-gradient(1px 1px at 95% 74%,rgba(233,230,240,.45) 48%,transparent 49%),radial-gradient(1px 1px at 6% 62%,rgba(233,230,240,.4) 48%,transparent 49%),radial-gradient(1.5px 1.5px at 13% 87%,var(--gilt) 48%,transparent 49%),radial-gradient(1px 1px at 27% 92%,rgba(233,230,240,.38) 48%,transparent 49%),radial-gradient(1px 1px at 52% 86%,rgba(233,230,240,.44) 48%,transparent 49%),radial-gradient(1.5px 1.5px at 74% 90%,var(--gilt-bright) 48%,transparent 49%),radial-gradient(1px 1px at 88% 84%,rgba(233,230,240,.4) 48%,transparent 49%),radial-gradient(1px 1px at 35% 52%,rgba(233,230,240,.3) 48%,transparent 49%),radial-gradient(1px 1px at 64% 5%,rgba(233,230,240,.5) 48%,transparent 49%)}
+.scatter-faint::after{opacity:.42}
+.scatter>*{position:relative;z-index:1}
+
+/* ── 3. The rule ─────────────────────────────────────────────────────────
+   Closes a section. A hairline either side of a small mark set in AstroSymbols.
+   <div class="rule"><span class="t-glyph">☾</span></div> */
+.rule{display:flex;align-items:center;gap:var(--space-3);color:var(--gilt);font-family:var(--font-glyph);font-size:13px;line-height:1}
+.rule::before,.rule::after{content:"";height:1px;flex:1;background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--gilt) 42%,transparent))}
+.rule::after{background:linear-gradient(90deg,color-mix(in srgb,var(--gilt) 42%,transparent),transparent)}
+.rule-plain{color:var(--line-strong)}
+.rule-plain::before,.rule-plain::after{background:var(--line)}
+
+/* ── 4. The veil ─────────────────────────────────────────────────────────
+   Text over the plate or over her artwork sits on a capsule, not a scrim
+   gradient. Blur + a page-tinted fill, so the art stays legible underneath. */
+.veil{background:color-mix(in srgb,var(--page) 72%,transparent);backdrop-filter:var(--blur-veil);-webkit-backdrop-filter:var(--blur-veil);border:var(--border-w) solid color-mix(in srgb,var(--line) 70%,transparent);border-radius:var(--radius-lg)}
+
+/* ── The plate ───────────────────────────────────────────────────────────
+   The one brand-coloured surface in the app: Home's masthead, the live banner,
+   the splash. Cloak navy, not card navy — this is the only place --cloth is
+   used at full area. The radial lift at the top-left is the light the cloak
+   catches in her artwork; without it the flat navy reads as a dead panel. */
+.plate{position:relative;background:radial-gradient(120% 90% at 16% 0%,color-mix(in srgb,var(--cloth) 88%,#8FA6D8 12%) 0%,var(--cloth) 34%,var(--cloth-deep) 66%,#1B2238 100%);border-radius:var(--radius-lg);overflow:hidden}
+.plate-flat{background:var(--cloth-deep)}
+/* The plate's own foot: a gold hairline that closes it against the page. */
+.plate::after{content:"";position:absolute;left:0;right:0;bottom:0;height:1px;background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--gilt) 55%,transparent) 30%,color-mix(in srgb,var(--gilt) 55%,transparent) 70%,transparent);pointer-events:none;z-index:2}
+
+/* ── Card ────────────────────────────────────────────────────────────────
+   The default surface. Hairline, 14px, shadow-1. No lift on press: the fill
+   deepens to --veil and the hairline strengthens. */
+.card{background:var(--card);border:var(--border-w) solid var(--line);border-radius:var(--radius-md);box-shadow:var(--shadow-1)}
+.card-inset{background:var(--inset);border:var(--border-w) solid var(--line);border-radius:var(--radius-md);box-shadow:none}
+.card-tappable{transition:background var(--dur-1) var(--ease-out),border-color var(--dur-1) var(--ease-out)}
+.card-tappable:active{background:var(--veil);border-color:var(--line-strong)}

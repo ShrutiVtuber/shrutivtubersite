@@ -1,0 +1,31 @@
+<!-- @dsCard group="Components" viewport="700x230" name="Marks" subtitle="AstroSymbols glyphs, Material icons, the phase disc" -->
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>Marks</title>
+<link rel="stylesheet" href="../../styles.css">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../_ds_bundle.js"></script>
+<style>body{margin:0;padding:16px;background:var(--page);}.g{display:grid;gap:10px}.r{display:flex;gap:10px;flex-wrap:wrap;align-items:center}.lab{font:600 10px/1 var(--font-body);letter-spacing:.14em;text-transform:uppercase;color:var(--faint)}</style>
+</head><body><div id="root"></div>
+<script type="text/babel">
+const __ns = window.AstrolabeDesignSystem_d3620a;
+if(!__ns){document.getElementById('root').innerHTML='<div style="font:400 14px/1.6 system-ui;color:#B3B9D2;padding:24px">The design-system bundle has not been compiled yet. Reload this card once the project has compiled.</div>';}
+const NS = __ns || new Proxy({}, { get: () => () => null });
+const { Glyph, Icon, MoonDisc, MARKS } = NS;
+const planets=['sun','moon','mercury','venus','mars','jupiter','saturn','uranus','neptune','pluto','node','southnode','retrograde'];
+const signs=['aries','taurus','gemini','cancer','leo','virgo','libra','scorpio','sagittarius','capricorn','aquarius','pisces'];
+function Demo(){return <div className="g" style={{gap:14}}>
+  <div className="r" style={{gap:14}}>{planets.map(p=><Glyph key={p} name={p} size="lg" tone={p==='retrograde'?'rose':'gilt'}/>)}</div>
+  <div className="r" style={{gap:14}}>{signs.map(p=><Glyph key={p} name={p} size="lg" tone="ink"/>)}</div>
+  <div className="r" style={{gap:18,borderTop:'1px solid var(--line)',paddingTop:12}}>
+    {['cottage','clear_night','target','text_fields_alt','group','tune','cloud_off','chevron_right','ios_share','notifications','menu_book','open_in_new'].map(n=><Icon key={n} name={n} size={22} tone="soft"/>)}
+  </div>
+  <div className="r" style={{gap:16,borderTop:'1px solid var(--line)',paddingTop:12}}>
+    {[0,.12,.25,.38,.5,.63,.75,.88].map(p=><MoonDisc key={p} phase={p} size={30}/>)}
+    <MoonDisc phase={.63} size={20} showLabel/>
+  </div>
+</div>}
+if(__ns) ReactDOM.createRoot(document.getElementById('root')).render(<Demo/>);
+</script>
+<script>(function(){if(window.AstrolabeDesignSystem_d3620a)return;var n=0;var t=setInterval(function(){n++;if(n>40){clearInterval(t);return}var s=document.createElement('script');s.src='../../_ds_bundle.js?p='+n;s.onload=function(){if(window.AstrolabeDesignSystem_d3620a){clearInterval(t);location.reload()}};document.head.appendChild(s)},1500)})();</script>
+</body></html>

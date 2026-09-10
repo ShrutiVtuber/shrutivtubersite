@@ -1,0 +1,48 @@
+/* Astrolabe — type. EB Garamond speaks, Commissioner labels, AstroSymbols marks.
+   No third text face: the app bundles its fonts and works offline, so data uses
+   Commissioner with tabular figures rather than paying for a mono. */
+:root{
+  /* ⚠ AstroSymbols leads both stacks on purpose. Its @font-face carries a
+     unicode-range of just its 29 marks, so it claims ☉ ☾ ♄ ℞ ♈…♓ wherever they
+     appear and touches nothing else — no colour-emoji font can take them, in any
+     component, without anybody remembering to ask. */
+  --font-display:"AstroSymbols","EB Garamond",Georgia,"Times New Roman",serif;
+  --font-body:"AstroSymbols","Commissioner",-apple-system,"Segoe UI",system-ui,sans-serif;
+  --font-glyph:"AstroSymbols","EB Garamond",serif;
+
+  /* Scale — phone-first, px because a Flutter theme is px */
+  --size-masthead:34px;  /* Home only */
+  --size-display:28px;   /* screen titles */
+  --size-title:22px;     /* section titles, work titles */
+  --size-heading:17px;   /* card titles */
+  --size-prose:17px;     /* readings and articles */
+  --size-body:16px;
+  --size-label:14px;
+  --size-caption:13px;
+  --size-data:15px;      /* times, degrees, counts */
+  --size-data-dense:13px;/* the stations table, the ephemeris */
+  --size-eyebrow:11px;   /* uppercase only */
+
+  --leading-display:1.12; --leading-title:1.24; --leading-prose:1.65;
+  --leading-body:1.5; --leading-tight:1.32; --leading-data:1.35;
+
+  --weight-display:500; --weight-heading:600; --weight-body:400;
+  --weight-medium:500; --weight-strong:600;
+
+  --tracking-display:-0.012em; --tracking-eyebrow:0.14em; --tracking-caps:0.06em;
+}
+.t-masthead{font:var(--weight-display) var(--size-masthead)/var(--leading-display) var(--font-display);letter-spacing:var(--tracking-display);color:var(--ink)}
+.t-display{font:var(--weight-display) var(--size-display)/var(--leading-display) var(--font-display);letter-spacing:var(--tracking-display);color:var(--ink)}
+.t-title{font:var(--weight-heading) var(--size-title)/var(--leading-title) var(--font-display);color:var(--ink)}
+.t-heading{font:var(--weight-heading) var(--size-heading)/var(--leading-tight) var(--font-body);color:var(--ink)}
+.t-prose{font:var(--weight-body) var(--size-prose)/var(--leading-prose) var(--font-display);color:var(--ink)}
+.t-body{font:var(--weight-body) var(--size-body)/var(--leading-body) var(--font-body);color:var(--soft)}
+.t-label{font:var(--weight-medium) var(--size-label)/1.4 var(--font-body);color:var(--soft)}
+.t-caption{font:var(--weight-body) var(--size-caption)/1.4 var(--font-body);color:var(--faint)}
+.t-eyebrow{font:var(--weight-strong) var(--size-eyebrow)/1 var(--font-body);letter-spacing:var(--tracking-eyebrow);text-transform:uppercase;color:var(--faint)}
+.t-data{font:var(--weight-body) var(--size-data)/var(--leading-data) var(--font-body);font-variant-numeric:tabular-nums lining-nums;color:var(--ink)}
+.t-data-dense{font:var(--weight-body) var(--size-data-dense)/var(--leading-data) var(--font-body);font-variant-numeric:tabular-nums lining-nums;color:var(--ink)}
+.t-tabular{font-variant-numeric:tabular-nums lining-nums}
+/* Marks are type, not emoji. Every glyph in the data carries U+FE0E; this class
+   makes sure the renderer honours it. Never let a colour emoji font win. */
+.t-glyph{font-family:var(--font-glyph);font-variant-emoji:text;font-feature-settings:normal;letter-spacing:0}

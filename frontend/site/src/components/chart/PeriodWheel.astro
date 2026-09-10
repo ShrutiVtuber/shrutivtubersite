@@ -204,14 +204,24 @@ function walk(longitudes: number[], radius: number, spiral: boolean): string {
    ⚠ This ring is TIME, not longitude. The period's first day is at the top and
    it runs clockwise. Saying so in the caption matters: two angular meanings in
    one figure is confusing unless one of them is labelled. */
+/* ⚠ Thinned when there are too many days for the ring to hold.
+   A disc is 2.6 units across a ring of circumference 2π×30 ≈ 188, so about
+   thirty-six fit before they start overlapping. A year is 365, and drawn
+   un-thinned it is not a ring of phases at all — it is a grey smear. The
+   angles come from the ORIGINAL index, so thinning changes the spacing of the
+   discs and never their dates. */
+const RING_DISCS = 36;
+const phaseStep = Math.max(1, Math.ceil(days.length / RING_DISCS));
 const phaseDays = days
   .map((d, i) => ({
     date: d.date,
     // The engine gives illuminated fraction 0..1.
     lit: typeof d.moonPhase === "number" ? d.moonPhase : null,
     at: days.length > 1 ? (i / days.length) * 360 : 0,
+    keep: i % phaseStep === 0,
   }))
-  .filter((d): d is { date: string; lit: number; at: number } => d.lit !== null);
+  .filter((d): d is { date: string; lit: number; at: number; keep: boolean } =>
+    d.lit !== null && d.keep);
 
 const lunations = days.flatMap((d) =>
   (d.events ?? []).filter((e) => e.kind === "lunation" || e.kind === "eclipse"));

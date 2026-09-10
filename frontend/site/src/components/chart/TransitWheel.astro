@@ -1,4 +1,5 @@
 ---
+import { SIGN_GLYPH, BODY_GLYPH } from "../../lib/wheel";
 /* The transit wheel: whole-sign, sign-rotated, drawn on the server.
  *
  * **The rotation is presentation, never computation.** The selected sign sits
@@ -49,12 +50,7 @@ const SIGNS = [
   "Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo",
   "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces",
 ];
-const SIGN_GLYPH = ["♈︎", "♉︎", "♊︎", "♋︎", "♌︎", "♍︎", "♎︎", "♏︎", "♐︎", "♑︎", "♒︎", "♓︎"];
-const BODY_GLYPH: Record<string, string> = {
-  Sun: "☉︎", Moon: "☾︎", Mercury: "☿︎", Venus: "♀︎", Mars: "♂︎",
-  Jupiter: "♃︎", Saturn: "♄︎", Uranus: "♅︎", Neptune: "♆︎", Pluto: "♇︎",
-  Rahu: "☊︎", Ketu: "☋︎",
-};
+
 /* Whose sign it is. The rising sign's ruler is the single most useful readout
    for writing a column, so it is called out rather than left to be worked out. */
 const DOMICILE: Record<string, string> = {

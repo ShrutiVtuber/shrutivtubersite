@@ -1,0 +1,27 @@
+<!-- @dsCard group="Components" viewport="700x400" name="Wheels" subtitle="Transit wheel, period wheel, and the no-birth-time state" -->
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>Wheels</title>
+<link rel="stylesheet" href="../../styles.css">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../_ds_bundle.js"></script>
+<style>body{margin:0;padding:16px;background:var(--page);}.g{display:grid;gap:10px}.r{display:flex;gap:10px;flex-wrap:wrap;align-items:center}.lab{font:600 10px/1 var(--font-body);letter-spacing:.14em;text-transform:uppercase;color:var(--faint)}</style>
+</head><body><div id="root"></div>
+<script type="text/babel">
+const __ns = window.AstrolabeDesignSystem_d3620a;
+if(!__ns){document.getElementById('root').innerHTML='<div style="font:400 14px/1.6 system-ui;color:#B3B9D2;padding:24px">The design-system bundle has not been compiled yet. Reload this card once the project has compiled.</div>';}
+const NS = __ns || new Proxy({}, { get: () => () => null });
+const { ChartWheel } = NS;
+const bodies=[{name:'Sun',mark:'\u2609',lon:166.7},{name:'Moon',mark:'\u263E',lon:287.2},{name:'Mercury',mark:'\u263F',lon:180.9,retro:true},{name:'Venus',mark:'\u2640',lon:150.4},{name:'Mars',mark:'\u2642',lon:192.5},{name:'Jupiter',mark:'\u2643',lon:98.1},{name:'Saturn',mark:'\u2644',lon:349.8,retro:true},{name:'Uranus',mark:'\u2645',lon:62.4},{name:'Neptune',mark:'\u2646',lon:359.1,retro:true},{name:'Pluto',mark:'\u2647',lon:300.6,retro:true}];
+const aspects=[{from:166.7,to:349.8,type:'opposition'},{from:287.2,to:166.7,type:'trine'},{from:150.4,to:62.4,type:'square'},{from:180.9,to:98.1,type:'sextile'},{from:166.7,to:180.9,type:'conjunction'}];
+const cusps=[214.3,244,274,304,334,4,34.3,64,94,124,154,184];
+const phases=Array.from({length:12},(_,i)=>({lon:i*30+15,phase:(i/12+0.2)%1}));
+function Demo(){return <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:18,alignItems:'start'}}>
+  <div className="g" style={{justifyItems:'center'}}><ChartWheel size={200} asc={214.3} mc={128.9} cusps={cusps} bodies={bodies} aspects={aspects}/><span className="lab">Transit \u00b7 one instant</span></div>
+  <div className="g" style={{justifyItems:'center'}}><ChartWheel mode="period" size={200} span="1\u201330 Sep" bodies={bodies.slice(0,6)} phases={phases} housesKnown={false}/><span className="lab">Period \u00b7 with phase ring</span></div>
+  <div className="g" style={{justifyItems:'center'}}><ChartWheel size={200} bodies={bodies} aspects={aspects} housesKnown={false}/><span className="lab" style={{color:'var(--rose)'}}>No birth time \u00b7 angles undefined</span></div>
+</div>}
+if(__ns) ReactDOM.createRoot(document.getElementById('root')).render(<Demo/>);
+</script>
+<script>(function(){if(window.AstrolabeDesignSystem_d3620a)return;var n=0;var t=setInterval(function(){n++;if(n>40){clearInterval(t);return}var s=document.createElement('script');s.src='../../_ds_bundle.js?p='+n;s.onload=function(){if(window.AstrolabeDesignSystem_d3620a){clearInterval(t);location.reload()}};document.head.appendChild(s)},1500)})();</script>
+</body></html>

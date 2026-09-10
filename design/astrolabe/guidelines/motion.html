@@ -1,0 +1,17 @@
+<!-- @dsCard group="Brand" viewport="700x170" name="Motion" subtitle="Fades and small translates. No bounce, no parallax, no scale on press." -->
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><link rel="stylesheet" href="../styles.css">
+<style>body{margin:0;padding:16px;background:var(--page);font-family:var(--font-body)}
+.row{display:flex;gap:10px;flex-wrap:wrap}.col{display:grid;gap:10px}
+.sw{border-radius:var(--radius-sm);border:1px solid var(--line);padding:10px;display:grid;gap:4px;min-width:96px;flex:1}
+.hex{font:400 11px/1 var(--font-body);font-variant-numeric:tabular-nums;letter-spacing:.03em;color:var(--faint)}
+.nm{font:600 11px/1.2 var(--font-body);color:var(--ink)}
+.note{font:400 11px/1.5 var(--font-body);color:var(--faint)}
+.tok{font:400 11px/1 var(--font-body);color:var(--faint);letter-spacing:.02em}
+</style></head><body><div class="col" style="gap:8px">
+<div class="row" style="gap:0;align-items:baseline"><span class="nm" style="width:130px">--dur-1 120ms</span><span class="hex">press, tint, chip · --ease-out</span></div>
+<div class="row" style="gap:0;align-items:baseline"><span class="nm" style="width:130px">--dur-2 240ms</span><span class="hex">segment slide, sheet rise, dialog, snackbar, a vote landing · --ease-out / --ease-sheet</span></div>
+<div class="row" style="gap:0;align-items:baseline"><span class="nm" style="width:130px">--dur-3 600ms</span><span class="hex">atmosphere: the hour tint cross-fade, live arriving · --ease-in-out</span></div>
+<div class="row" style="gap:0;align-items:baseline"><span class="nm" style="width:130px">tab change</span><span class="hex">cross-fade only, no slide — six tabs have no left and right</span></div>
+<div class="row" style="gap:0;align-items:baseline"><span class="nm" style="width:130px">push / pop</span><span class="hex">240ms slide from the right, --ease-sheet</span></div>
+<div class="row" style="gap:0;align-items:baseline"><span class="nm" style="width:130px">reduced motion</span><span class="hex">everything collapses to 1ms; the live dot stops pulsing and the word carries it</span></div>
+</div></body></html>

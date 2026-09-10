@@ -1,0 +1,39 @@
+<!-- @dsCard group="Components" viewport="700x330" name="Data" subtitle="The dense table, dotted-leader rows, the reckoning block" -->
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>Data</title>
+<link rel="stylesheet" href="../../styles.css">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../_ds_bundle.js"></script>
+<style>body{margin:0;padding:16px;background:var(--page);}.g{display:grid;gap:10px}.r{display:flex;gap:10px;flex-wrap:wrap;align-items:center}.lab{font:600 10px/1 var(--font-body);letter-spacing:.14em;text-transform:uppercase;color:var(--faint)}</style>
+</head><body><div id="root"></div>
+<script type="text/babel">
+const __ns = window.AstrolabeDesignSystem_d3620a;
+if(!__ns){document.getElementById('root').innerHTML='<div style="font:400 14px/1.6 system-ui;color:#B3B9D2;padding:24px">The design-system bundle has not been compiled yet. Reload this card once the project has compiled.</div>';}
+const NS = __ns || new Proxy({}, { get: () => () => null });
+const { DataTable, DataRow, CodeBlock } = NS;
+const cols=[{key:'date',label:'Day'},{key:'sun',label:'Sun',mark:'\u2609',numeric:true},{key:'moon',label:'Moon',mark:'\u263E',numeric:true},{key:'mer',label:'Mercury',mark:'\u263F',numeric:true},{key:'ven',label:'Venus',mark:'\u2640',numeric:true},{key:'mar',label:'Mars',mark:'\u2642',numeric:true}];
+const rows=[
+ {id:'7',date:'7 Sep',sun:'14\u00b0\u264D',moon:'21\u00b0\u2650',mer:{value:'02\u00b0\u264E',retro:true},ven:'28\u00b0\u264C',mar:'11\u00b0\u264E'},
+ {id:'8',date:'8 Sep',sun:'15\u00b0\u264D',moon:'04\u00b0\u2651',mer:{value:'01\u00b0\u264E',retro:true},ven:'29\u00b0\u264C',mar:'12\u00b0\u264E'},
+ {id:'9',date:'9 Sep',today:true,sun:'16\u00b0\u264D',moon:'17\u00b0\u2651',mer:{value:'00\u00b0\u264E',retro:true},ven:'00\u00b0\u264D',mar:'12\u00b0\u264E'},
+ {id:'10',date:'10 Sep',sun:'17\u00b0\u264D',moon:'00\u00b0\u2652',mer:'29\u00b0\u264D',ven:'01\u00b0\u264D',mar:'13\u00b0\u264E'},
+ {id:'11',date:'11 Sep',sun:'18\u00b0\u264D',moon:'13\u00b0\u2652',mer:'29\u00b0\u264D',ven:'02\u00b0\u264D',mar:'14\u00b0\u264E'},
+ {id:'12',date:'12 Sep',sun:'19\u00b0\u264D',moon:'26\u00b0\u2652',mer:'29\u00b0\u264D',ven:'03\u00b0\u264D',mar:'14\u00b0\u264E'}];
+function Demo(){return <div style={{display:'grid',gridTemplateColumns:'1.35fr 1fr',gap:16,alignItems:'start'}}>
+  <DataTable caption="Athens \u00b7 GMT+3 \u00b7 geocentric, apparent" columns={cols} rows={rows}/>
+  <div className="g" style={{gap:14}}>
+    <div>
+      <DataRow mark="\u2609" label="Sun" value="16\u00b0 42\u2032 Virgo"/>
+      <DataRow mark="\u263E" label="Moon" value="17\u00b0 09\u2032 Capricorn"/>
+      <DataRow mark="\u263F" label="Mercury" value="00\u00b0 51\u2032 Libra \u211E" tone="rose"/>
+      <DataRow label="Houses" value="Whole sign" tone="soft"/>
+      <DataRow label="Engine" value="Swiss Ephemeris 2.10" small/>
+    </div>
+    <CodeBlock label="Milesian" copyable align="right">{'\u03a3   200\n\u03bf    70\n\u03c6   500\n\u03af    10\n\u03b1     1\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n     781'}</CodeBlock>
+  </div>
+</div>}
+if(__ns) ReactDOM.createRoot(document.getElementById('root')).render(<Demo/>);
+</script>
+<script>(function(){if(window.AstrolabeDesignSystem_d3620a)return;var n=0;var t=setInterval(function(){n++;if(n>40){clearInterval(t);return}var s=document.createElement('script');s.src='../../_ds_bundle.js?p='+n;s.onload=function(){if(window.AstrolabeDesignSystem_d3620a){clearInterval(t);location.reload()}};document.head.appendChild(s)},1500)})();</script>
+</body></html>

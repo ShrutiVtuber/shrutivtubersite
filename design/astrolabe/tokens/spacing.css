@@ -1,0 +1,29 @@
+/* Astrolabe — space, radius, target. 4px base.
+   Two densities: --gutter for reading screens, --gutter-dense for instruments.
+   The stations table is allowed to be tight; Home is not. */
+:root{
+  --space-1:4px; --space-2:8px; --space-3:12px; --space-4:16px; --space-5:20px;
+  --space-6:24px; --space-7:32px; --space-8:40px; --space-9:56px; --space-10:72px;
+
+  --gutter:16px;        /* screen edge padding, reading screens */
+  --gutter-dense:12px;  /* Sky, Chart table, ephemeris */
+  --card-pad:16px;
+  --row-gap:12px;
+
+  /* Material 3 rounder than the site's 4/10/16 — this is a phone, and her line
+     is soft. Divergence is deliberate; see readme.md → Visual foundations. */
+  --radius-sm:8px;      /* chips, buttons, inputs */
+  --radius-md:14px;     /* cards, list groups */
+  --radius-lg:20px;     /* the masthead plate, dialogs */
+  --radius-xl:28px;     /* bottom sheets (M3) */
+  --radius-full:999px;
+
+  --border-w:1px; --border-w-strong:1.5px;
+  --hairline:1px solid var(--line);
+
+  --tap-min:48px;       /* never smaller. Material 3 minimum. */
+  --tap-comfort:56px;   /* list rows, tab bar */
+  --tabbar-h:64px;
+  --appbar-h:56px;
+  --measure-prose:38em;
+}

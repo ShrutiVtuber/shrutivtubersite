@@ -1,0 +1,40 @@
+<!-- @dsCard group="Components" viewport="700x340" name="Surfaces" subtitle="Card tones, the bottom sheet, the confirm dialog" -->
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>Surfaces</title>
+<link rel="stylesheet" href="../../styles.css">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../_ds_bundle.js"></script>
+<style>body{margin:0;padding:16px;background:var(--page);}.g{display:grid;gap:10px}.r{display:flex;gap:10px;flex-wrap:wrap;align-items:center}.lab{font:600 10px/1 var(--font-body);letter-spacing:.14em;text-transform:uppercase;color:var(--faint)}</style>
+</head><body><div id="root"></div>
+<script type="text/babel">
+const __ns = window.AstrolabeDesignSystem_d3620a;
+if(!__ns){document.getElementById('root').innerHTML='<div style="font:400 14px/1.6 system-ui;color:#B3B9D2;padding:24px">The design-system bundle has not been compiled yet. Reload this card once the project has compiled.</div>';}
+const NS = __ns || new Proxy({}, { get: () => () => null });
+const { Card, Sheet, Dialog, Button, ChoiceRow, Glyph } = NS;
+function Demo(){return <div className="g" style={{gap:12}}>
+  <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:10}}>
+    <Card><span className="lab">Plain</span><div style={{marginTop:6,color:'var(--soft)',font:'400 13px/1.5 var(--font-body)'}}>A container.</div></Card>
+    <Card tone="tappable" onClick={()=>{}}><span className="lab">Tappable</span><div style={{marginTop:6,color:'var(--soft)',font:'400 13px/1.5 var(--font-body)'}}>Press deepens the fill.</div></Card>
+    <Card tone="highlighted"><span className="lab" style={{color:'var(--gilt)'}}>Highlighted</span><div style={{marginTop:6,color:'var(--soft)',font:'400 13px/1.5 var(--font-body)'}}>Offers only.</div></Card>
+    <Card tone="warning"><span className="lab" style={{color:'var(--rose)'}}><Glyph name="retrograde" size="sm" tone="rose"/> Warning</span><div style={{marginTop:6,color:'var(--soft)',font:'400 13px/1.5 var(--font-body)'}}>Mercury stations Thursday.</div></Card>
+  </div>
+  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+    <div style={{position:'relative',height:216,border:'1px solid var(--line)',borderRadius:'var(--radius-md)',overflow:'hidden',background:'var(--page)'}}>
+      <Sheet title="Sunrise convention" maxHeight="100%" onClose={()=>{}} actions={<Button full>Done</Button>}>
+        <ChoiceRow type="radio" label="Sunrise" rule="The Sun's upper limb clears the horizon." checked/>
+        <ChoiceRow type="radio" label="Civil dawn" rule="The Sun is 6° below the horizon."/>
+      </Sheet>
+    </div>
+    <div style={{position:'relative',height:216,border:'1px solid var(--line)',borderRadius:'var(--radius-md)',overflow:'hidden',background:'var(--page)'}}>
+      <Dialog title="Delete this draft?" subtitle="This cannot be undone." onClose={()=>{}}
+        actions={<><Button variant="text">Keep</Button><Button variant="outlined" destructive>Delete</Button></>}>
+        Your reading has not been posted, so nobody else has seen it.
+      </Dialog>
+    </div>
+  </div>
+</div>}
+if(__ns) ReactDOM.createRoot(document.getElementById('root')).render(<Demo/>);
+</script>
+<script>(function(){if(window.AstrolabeDesignSystem_d3620a)return;var n=0;var t=setInterval(function(){n++;if(n>40){clearInterval(t);return}var s=document.createElement('script');s.src='../../_ds_bundle.js?p='+n;s.onload=function(){if(window.AstrolabeDesignSystem_d3620a){clearInterval(t);location.reload()}};document.head.appendChild(s)},1500)})();</script>
+</body></html>

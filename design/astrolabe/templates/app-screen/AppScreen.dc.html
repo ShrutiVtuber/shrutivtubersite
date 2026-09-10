@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<!-- @template name="Astrolabe app screen" description="A phone screen in the app's shell: hour-tinted app bar, scrolling body, six-tab bar." -->
+<helmet>
+<script src="./ds-base.js"></script>
+<style>html,body{margin:0;background:#0B0F1A;font-family:"Commissioner",system-ui,sans-serif;min-height:100%}*{box-sizing:border-box}</style>
+</helmet>
+<div style="min-height:100vh;display:grid;place-items:center;padding:32px;background:#0B0F1A">
+<div data-hour="{{ hour }}" data-live="{{ liveAttr }}" style="width:360px;height:800px;display:flex;flex-direction:column;position:relative;overflow:hidden;background:#121829;border:1px solid #485272;border-radius:34px;box-shadow:0 24px 70px -20px rgba(0,0,0,.7)">
+
+<div style="display:flex;align-items:center;justify-content:space-between;padding:0 18px;height:32px;flex:none;font:600 12px/1 Commissioner,sans-serif;color:#B3B9D2;font-variant-numeric:tabular-nums">
+<span>20:41</span><span style="opacity:.7">Astrolabe</span>
+</div>
+
+<x-import component-from-global-scope="AstrolabeDesignSystem_d3620a.AppBar" title="{{ title }}" subtitle="{{ place }}" hint-size="100%,56px"></x-import>
+
+<div style="flex:1;min-height:0;overflow-y:auto;padding:12px 16px 20px;display:grid;gap:14px;align-content:start">
+
+<x-import component-from-global-scope="AstrolabeDesignSystem_d3620a.LiveBanner" status="{{ liveStatus }}" title="Casting charts for the chat" game="Just Chatting" viewers="{{ viewers }}" next-stream="Thursday 20:00 Athens" hint-size="100%,72px"></x-import>
+
+<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+<x-import component-from-global-scope="AstrolabeDesignSystem_d3620a.HourChip" ruler="{{ hour }}" ordinal="7" ends="14:12" hint-size="180px,36px"></x-import>
+<x-import component-from-global-scope="AstrolabeDesignSystem_d3620a.MoonDisc" phase="0.63" size="24" show-label="{{ true }}" hint-size="130px,24px"></x-import>
+</div>
+
+<div style="display:grid;gap:8px;margin-top:2px">
+<span style="font:600 11px/1 Commissioner,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:#8B93AF">Your section</span>
+<h2 style="margin:0;font:600 22px/1.24 'EB Garamond',serif;color:#E9E6F0">Replace this with your content</h2>
+</div>
+
+<div style="background:#1A2138;border:1px solid #2E3752;border-radius:14px;box-shadow:0 1px 2px rgba(0,0,0,.32);padding:16px;display:grid;gap:8px">
+<p style="margin:0;font:400 16px/1.5 Commissioner,sans-serif;color:#B3B9D2;text-wrap:pretty">Cards are <span style="color:#E9E6F0">#1A2138</span> with a 1px <span style="color:#E9E6F0">#2E3752</span> hairline at radius 14. Press deepens the fill; nothing lifts and nothing scales.</p>
+<div style="display:flex;align-items:center;gap:10px;padding-top:4px">
+<x-import component-from-global-scope="AstrolabeDesignSystem_d3620a.Button" variant="filled" size="md" hint-size="140px,48px">Primary action</x-import>
+<x-import component-from-global-scope="AstrolabeDesignSystem_d3620a.Button" variant="text" size="md" hint-size="90px,48px">Not now</x-import>
+</div>
+</div>
+
+<div style="display:flex;align-items:center;gap:12px;color:#C9A15B;font-family:AstroSymbols,'EB Garamond',serif;font-size:13px;line-height:1">
+<span style="height:1px;flex:1;background:linear-gradient(90deg,transparent,rgba(201,161,91,.42))"></span>
+<span>&#9790;&#65038;</span>
+<span style="height:1px;flex:1;background:linear-gradient(90deg,rgba(201,161,91,.42),transparent)"></span>
+</div>
+
+<x-import component-from-global-scope="AstrolabeDesignSystem_d3620a.Banner" tone="offline" title="Her half is out of reach" hint-size="100%,80px">The instruments all still work — they compute on your phone.</x-import>
+
+</div>
+
+<x-import component-from-global-scope="AstrolabeDesignSystem_d3620a.TabBar" active="{{ tab }}" hint-size="100%,64px"></x-import>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:440,&quot;height&quot;:880},&quot;title&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;Home&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Screen&quot;},&quot;place&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;Athens, Greece&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Screen&quot;},&quot;tab&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;home&quot;,&quot;sky&quot;,&quot;chart&quot;,&quot;letters&quot;,&quot;practice&quot;,&quot;settings&quot;],&quot;default&quot;:&quot;home&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Screen&quot;},&quot;live&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;State&quot;},&quot;hour&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;sun&quot;,&quot;moon&quot;,&quot;mars&quot;,&quot;mercury&quot;,&quot;jupiter&quot;,&quot;venus&quot;,&quot;saturn&quot;],&quot;default&quot;:&quot;venus&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;State&quot;}}">
+class Component extends DCLogic {
+  renderVals() {
+    const live = this.props.live ?? false;
+    return {
+      title: this.props.title ?? 'Home',
+      place: this.props.place ?? 'Athens, Greece',
+      hour: this.props.hour ?? 'venus',
+      tab: this.props.tab ?? 'home',
+      liveStatus: live ? 'live' : 'offline',
+      liveAttr: live ? 'true' : undefined,
+      viewers: live ? 412 : undefined
+    };
+  }
+}
+</script>
+</body>
+</html>

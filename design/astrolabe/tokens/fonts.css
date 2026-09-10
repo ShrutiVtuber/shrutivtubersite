@@ -1,0 +1,18 @@
+/* Astrolabe — faces. Two text faces and one 5.6 KB glyph cut. Nothing else ships.
+   ⚠ @import must precede every other rule in a stylesheet, so the CDN lines come
+   first and the local @font-face follows.
+
+   EB Garamond + Commissioner load from Google Fonts here because no licensed
+   binaries were provided to this project; the app bundles them locally
+   (see guidelines/theme-flutter.md).
+   UI icons: Material Symbols Outlined — KEPT, not substituted. It is what the app
+   already draws (Flutter's Icons.*_outlined), Apache-2.0 so it is AGPL-safe, and it
+   costs the app bundle nothing. Web recreations load it here; the app does not. */
+@import url('https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400..700;1,400..600&family=Commissioner:wght@300..700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0&display=block');
+
+/* AstroSymbols.ttf is the real binary from the repo (frontend/site/fonts-render/AstroSymbols.ttf):
+   29 glyphs — ° ′ ″ ℞ ☉ ☊ ☋ ☽ ☾ ☿ ♀ ♂ ♃ ♄ ♅ ♆ ♇ and the twelve signs. */
+@font-face{font-family:"AstroSymbols";src:url("../assets/fonts/AstroSymbols.ttf") format("truetype");font-display:block;unicode-range:U+00B0,U+2032-2033,U+211E,U+2609-260B,U+263D-2653}
+/* The Material Symbols ligature class. */
+.material-symbols-outlined{font-family:"Material Symbols Outlined";font-weight:normal;font-style:normal;line-height:1;letter-spacing:normal;text-transform:none;display:inline-block;white-space:nowrap;word-wrap:normal;direction:ltr;-webkit-font-feature-settings:'liga';-webkit-font-smoothing:antialiased}

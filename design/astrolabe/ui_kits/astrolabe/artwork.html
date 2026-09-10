@@ -1,0 +1,23 @@
+<!-- @dsCard group="Astrolabe app" viewport="1080x900" name="Where your art goes" subtitle="Every drawing the app asks for, at real size, with a drop target in it" -->
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>Astrolabe — where your art goes</title>
+<link rel="stylesheet" href="../../styles.css">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="./image-slot.js"></script>
+<script src="../../_ds_bundle.js" onerror="window.__dsMissing=1"></script>
+<script src="data.js"></script>
+<style>body{scrollbar-width:none;-ms-overflow-style:none}body::-webkit-scrollbar{width:0;height:0;display:none}html{scrollbar-width:none}html::-webkit-scrollbar{display:none}*{scrollbar-width:none}*::-webkit-scrollbar{width:0;height:0;display:none}body{margin:0;background:var(--page);font-family:var(--font-body);color:var(--ink);overflow-x:hidden}
+#miss{display:none;padding:32px;font:400 15px/1.6 var(--font-body);color:var(--soft);max-width:52ch}
+image-slot{--slot-border:color-mix(in srgb,var(--gilt) 46%,transparent)}</style>
+</head><body>
+<div id="miss">The design-system bundle has not been compiled yet. Reload once the project has compiled.</div>
+<div id="root"></div>
+<script type="text/babel" src="Kit.jsx"></script>
+<script type="text/babel" src="Artwork.jsx"></script>
+<script type="text/babel">
+if (!window.AstrolabeDesignSystem_d3620a) { document.getElementById('miss').style.display='block'; }
+else { ReactDOM.createRoot(document.getElementById('root')).render(<ArtworkDoc/>); }
+</script>
+<script>(function(){if(window.AstrolabeDesignSystem_d3620a)return;var n=0;var t=setInterval(function(){n++;if(n>40){clearInterval(t);return}var s=document.createElement('script');s.src='../../_ds_bundle.js?p='+n;s.onload=function(){if(window.AstrolabeDesignSystem_d3620a){clearInterval(t);location.reload()}};document.head.appendChild(s)},1500)})();</script>
+</body></html>

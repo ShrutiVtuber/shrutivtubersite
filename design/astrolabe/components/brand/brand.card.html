@@ -1,0 +1,34 @@
+<!-- @dsCard group="Components" viewport="700x360" name="Brand" subtitle="Live state, ruling hour, section headers, the Home plate" -->
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>Brand</title>
+<link rel="stylesheet" href="../../styles.css">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../_ds_bundle.js"></script>
+<style>body{margin:0;padding:16px;background:var(--page);}.g{display:grid;gap:10px}.r{display:flex;gap:10px;flex-wrap:wrap;align-items:center}.lab{font:600 10px/1 var(--font-body);letter-spacing:.14em;text-transform:uppercase;color:var(--faint)}</style>
+</head><body><div id="root"></div>
+<script type="text/babel">
+const __ns = window.AstrolabeDesignSystem_d3620a;
+if(!__ns){document.getElementById('root').innerHTML='<div style="font:400 14px/1.6 system-ui;color:#B3B9D2;padding:24px">The design-system bundle has not been compiled yet. Reload this card once the project has compiled.</div>';}
+const NS = __ns || new Proxy({}, { get: () => () => null });
+const { LiveBanner, HourChip, SectionHeader, Masthead, DayArc } = NS;
+function Demo(){return <div className="g" style={{gap:12}}>
+  <LiveBanner status="live" title="Casting charts for the chat" game="Just Chatting" viewers={412} onOpen={()=>{}}/>
+  <div className="r" style={{gap:10}}>
+    <div style={{flex:1,minWidth:280}}><LiveBanner status="offline" nextStream="Thu 20:00 Athens" compact/></div>
+    <div style={{flex:1,minWidth:280}}><LiveBanner status="unknown" compact/></div>
+  </div>
+  <div className="r"><HourChip ruler="venus" ordinal={4} diurnal ends="14:38"/><HourChip ruler="saturn" ordinal={2} diurnal={false}/><HourChip ruler="mars" ordinal={9} diurnal/></div>
+  <div style={{borderTop:'1px solid var(--line)',paddingTop:12,display:'grid',gridTemplateColumns:'1fr 1fr',gap:20}}>
+    <div><SectionHeader eyebrow="From Shruti" title="Latest readings" action="See all"/></div>
+    <div><SectionHeader title="What is coming" rule/></div>
+  </div>
+  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+    <Masthead greeting="Good evening" line="Four days from full." height={150} col={110}/>
+    <DayArc sunrise="06:58" sunset="19:51" now="13:42" phase={0.38} ruler="venus" height={150}/>
+  </div>
+</div>}
+if(__ns) ReactDOM.createRoot(document.getElementById('root')).render(<Demo/>);
+</script>
+<script>(function(){if(window.AstrolabeDesignSystem_d3620a)return;var n=0;var t=setInterval(function(){n++;if(n>40){clearInterval(t);return}var s=document.createElement('script');s.src='../../_ds_bundle.js?p='+n;s.onload=function(){if(window.AstrolabeDesignSystem_d3620a){clearInterval(t);location.reload()}};document.head.appendChild(s)},1500)})();</script>
+</body></html>

@@ -1,0 +1,80 @@
+/* Astrolabe — colour. Dark-first and dark-only; a light theme is not required (brief).
+   The night ramp is lifted verbatim from lib/theme/tokens.dart, which is also the site's
+   Dusk hour — the app and shrutivtuber.com are the same sky at the same hour.
+   Everything under "gilt" and "hour" is new: the brand layer the brief asked for. */
+:root{
+  /* ── Night ramp — verbatim from lib/theme/tokens.dart ───────────────────── */
+  --page:#121829;      /* app scaffold. Deliberately not black. */
+  --card:#1A2138;      /* raised surface */
+  --inset:#0D1220;     /* wells: tables, code, input interiors */
+  --veil:#232C48;      /* pressed/hover fill, sheet scrim base */
+  --ink:#E9E6F0;       /* primary text */
+  --soft:#B3B9D2;      /* secondary text */
+  --faint:#8B93AF;     /* tertiary text, disabled, column heads */
+  --line:#2E3752;      /* hairline */
+  --line-strong:#485272;/* hairline, emphasised / hover */
+  --accent:#8FBEE8;    /* interactive. Cold blue. Links, selection, focus. */
+  --accent-hover:#A9CDEF;
+  --accent-wash:#1D2A45;
+  --rose:#E0A4BC;      /* editorial + retrograde tint */
+  --rose-wash:#2C2338;
+  --live:#F07A8C;      /* the stream dot, and only that */
+  --live-wash:#33202B;
+  --on-accent:#10182B;
+
+  /* ── Gilt — the brand layer ─────────────────────────────────────────────
+     Sampled from her artwork: the cloak's edge-line and its scattered stars and
+     crescents. Gold is ORNAMENT, never interactive — blue keeps that job.
+     --gilt on --page is 7.8:1, so it may carry text; --gilt-dim may not. */
+  --gilt:#C9A15B;
+  --gilt-bright:#E0BE7E;   /* star fill on --card */
+  --gilt-dim:#7A6238;      /* hems and hairlines only */
+  --gilt-wash:#241E13;
+
+  /* ── Cloth — the two flats from the artwork, for large brand fields ────── */
+  --cloth:#3E4A6B;         /* cloak navy */
+  --cloth-deep:#2B3450;    /* cloak in shadow */
+  --parchment:#EDE4CE;     /* card stock / the horoscope card she is holding */
+
+  /* ── The ruling hour ─────────────────────────────────────────────────────
+     The app computes the planetary hour on device. One token carries it, and it
+     tints exactly two things: the masthead hem and the hour chip. Never body
+     text, never a whole surface — a practitioner's table must not change colour
+     every 60-odd minutes. */
+  --hour-sun:#C9A15B;
+  --hour-moon:#B9C2DA;
+  --hour-mars:#D08A7C;
+  --hour-mercury:#8FBEE8;
+  --hour-jupiter:#9FC2A8;
+  --hour-venus:#E0A4BC;
+  --hour-saturn:#8B93AF;
+  --hour:var(--hour-sun);       /* runtime re-points this */
+  --hour-wash:#241E13;
+
+  /* ── Semantic aliases — what product code should actually reference ────── */
+  --surface-page:var(--page);
+  --surface-card:var(--card);
+  --surface-inset:var(--inset);
+  --surface-veil:var(--veil);
+  --text-strong:var(--ink);
+  --text-body:var(--soft);
+  --text-muted:var(--faint);
+  --text-link:var(--accent);
+  --border-hairline:var(--line);
+  --border-hairline-strong:var(--line-strong);
+  --ornament:var(--gilt);
+  --retrograde:var(--rose);
+  --status-live:var(--live);
+  --focus-ring:var(--accent);
+  color-scheme:dark;
+}
+/* Ruling-hour scopes. Stamp on the shell: <div data-hour="mars">. */
+[data-hour="sun"]{--hour:var(--hour-sun);--hour-wash:#241E13}
+[data-hour="moon"]{--hour:var(--hour-moon);--hour-wash:#1B2135}
+[data-hour="mars"]{--hour:var(--hour-mars);--hour-wash:#2A1B1A}
+[data-hour="mercury"]{--hour:var(--hour-mercury);--hour-wash:#1D2A45}
+[data-hour="jupiter"]{--hour:var(--hour-jupiter);--hour-wash:#1A2620}
+[data-hour="venus"]{--hour:var(--hour-venus);--hour-wash:#2C2338}
+[data-hour="saturn"]{--hour:var(--hour-saturn);--hour-wash:#1E2233}
+/* The app is a state, not a badge. When she goes live the shell is stamped. */
+[data-live="true"]{--ornament:var(--live)}

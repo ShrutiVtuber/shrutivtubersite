@@ -1,0 +1,22 @@
+/* Astrolabe — elevation, motion, focus.
+   On a #121829 page, shadow barely reads. Hairlines and the --card lift do the
+   structural work; shadow is reserved for things that genuinely float. */
+:root{
+  --shadow-1:0 1px 2px rgba(0,0,0,.32);                                  /* resting card */
+  --shadow-2:0 2px 10px -2px rgba(0,0,0,.46);                            /* pressed / raised */
+  --shadow-3:0 -12px 36px -8px rgba(0,0,0,.62),0 -2px 8px rgba(0,0,0,.4);/* sheets, dialogs */
+  --glow-live:0 0 0 3px color-mix(in srgb,var(--live) 22%,transparent);  /* live dot only */
+
+  --blur-veil:blur(12px); /* @kind other */
+  --ease-out:cubic-bezier(.2,.7,.3,1); /* @kind other */
+  --ease-in-out:cubic-bezier(.45,0,.25,1); /* @kind other */
+  --ease-sheet:cubic-bezier(.32,.72,0,1); /* @kind other */ /* M3 emphasised — sheets and route pushes */
+  --dur-1:120ms; /* @kind other */ /* state change: press, tint, chip */
+  --dur-2:240ms; /* @kind other */ /* enter/exit: card, toast, segment slide */
+  --dur-3:600ms; /* @kind other */ /* atmosphere: hour tint cross-fade, live arrival */
+  --dur-hour:600ms; /* @kind other */
+}
+:where(a,button,input,select,textarea,summary,[tabindex]):focus-visible{outline:2px solid var(--focus-ring);outline-offset:2px;border-radius:var(--radius-sm)}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:1ms!important;animation-iteration-count:1!important;transition-duration:1ms!important;scroll-behavior:auto!important}
+}

@@ -1,0 +1,53 @@
+<!-- @dsCard group="Components" viewport="700x400" name="Forms" subtitle="Buttons, chips, fields, switches, choices — every state" -->
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>Forms</title>
+<link rel="stylesheet" href="../../styles.css">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../_ds_bundle.js"></script>
+<style>body{margin:0;padding:16px;background:var(--page);}.g{display:grid;gap:10px}.r{display:flex;gap:10px;flex-wrap:wrap;align-items:center}.lab{font:600 10px/1 var(--font-body);letter-spacing:.14em;text-transform:uppercase;color:var(--faint)}</style>
+</head><body><div id="root"></div>
+<script type="text/babel">
+const __ns = window.AstrolabeDesignSystem_d3620a;
+if(!__ns){document.getElementById('root').innerHTML='<div style="font:400 14px/1.6 system-ui;color:#B3B9D2;padding:24px">The design-system bundle has not been compiled yet. Reload this card once the project has compiled.</div>';}
+const NS = __ns || new Proxy({}, { get: () => () => null });
+const { Button, IconButton, Chip, Switch, ChoiceRow, TextField, Glyph } = NS;
+function Demo(){
+  const [on,setOn]=React.useState(true); const [c,setC]=React.useState('sunrise'); const [f,setF]=React.useState(true);
+  return <div className="g" style={{gap:14}}>
+  <div className="r">
+    <Button>Cast the chart</Button>
+    <Button variant="outlined">Save a draft</Button>
+    <Button variant="text">Not now</Button>
+    <Button variant="outlined" destructive>Delete</Button>
+    <Button external href="#" variant="outlined">Support her work</Button>
+  </div>
+  <div className="r">
+    <Button size="sm">Small</Button><Button size="md">Medium</Button><Button size="lg">Large</Button>
+    <Button loading>Casting</Button><Button disabled>Disabled</Button>
+    <IconButton icon="ios_share" label="Share"/><IconButton icon="notifications" label="Notifications" badge={3}/><IconButton icon="bookmark" label="Save" variant="outlined"/>
+  </div>
+  <div className="r" style={{borderTop:'1px solid var(--line)',paddingTop:12}}>
+    <Chip kind="choice" selected leading={<Glyph name="scorpio" size="sm" tone="gilt"/>}>Scorpio</Chip>
+    <Chip kind="choice" leading={<Glyph name="leo" size="sm" tone="faint"/>}>Leo</Chip>
+    <Chip kind="filter" selected>Unanswered</Chip>
+    <Chip kind="filter">This week</Chip>
+    <Chip kind="meta" meta="2.1 MB">Greek</Chip>
+    <Chip kind="meta" meta="1.8 MB">Devanagari</Chip>
+  </div>
+  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16,borderTop:'1px solid var(--line)',paddingTop:12}}>
+    <TextField label="Time of birth" mono placeholder="14:05" helper="Local clock time. Blank if unknown."/>
+    <TextField label="Email" defaultValue="soror@" error="That address was not recognised."/>
+  </div>
+  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16}}>
+    <Switch label="Tell me when she goes live" description="Within ninety seconds" checked={on} onChange={setOn}/>
+    <div>
+      <ChoiceRow type="radio" label="Sunrise" rule="The Sun's upper limb clears the horizon." checked={c==='sunrise'} value="sunrise" onChange={setC}/>
+      <ChoiceRow type="checkbox" label="Email me her newsletter" rule="About one a month." checked={f} onChange={setF}/>
+    </div>
+  </div>
+</div>}
+if(__ns) ReactDOM.createRoot(document.getElementById('root')).render(<Demo/>);
+</script>
+<script>(function(){if(window.AstrolabeDesignSystem_d3620a)return;var n=0;var t=setInterval(function(){n++;if(n>40){clearInterval(t);return}var s=document.createElement('script');s.src='../../_ds_bundle.js?p='+n;s.onload=function(){if(window.AstrolabeDesignSystem_d3620a){clearInterval(t);location.reload()}};document.head.appendChild(s)},1500)})();</script>
+</body></html>
