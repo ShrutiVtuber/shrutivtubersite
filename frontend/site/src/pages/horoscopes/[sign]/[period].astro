@@ -7,9 +7,18 @@
  */
 import Reading from "../../../components/horoscope/Reading.astro";
 import { SIGNS } from "../../../lib/signs";
+import { PERIODS, type Period } from "../../../lib/periods";
 
 const sign = String(Astro.params.sign ?? "");
 const period = String(Astro.params.period ?? "monthly");
 if (!SIGNS.includes(sign)) return Astro.rewrite("/404");
+/* ⚠ The period is checked too, not just the sign. Without this every string
+   in the world was a page: /horoscopes/pisces/fortnightly came back 200 with
+   a title reading "Pisces —  — Shruti", because the label for a period that
+   does not exist is the empty string. An unbounded set of 200s that all say
+   nothing is what a crawler eats first. The dated form next door got this for
+   free — SHAPE[period] is undefined and the test never runs — so this was the
+   only address it could happen at. */
+if (!PERIODS.includes(period as Period)) return Astro.rewrite("/404");
 ---
 <Reading sign={sign} period={period} />

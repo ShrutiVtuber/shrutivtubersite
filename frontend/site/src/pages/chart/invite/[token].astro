@@ -71,6 +71,15 @@ if (Astro.request.method === "POST") {
 }
 
 const who = await site<any>(`/api/charts/invite/${token}`).catch(() => null);
+
+/* ⚠ `noindex`, but NOT disallowed in robots.txt — the two halves are a pair,
+ * and robots.txt says so at length. The prefix is left crawlable so this link
+ * unfurls a preview card on Discord and X, which is the entire point of a
+ * share link; `noindex` is the half that keeps it out of a search index.
+ * Blocking the prefix instead would break both: the crawler could not fetch
+ * the page, so it could never read a noindex, and the card would never build.
+ * This page draws two people's birth data, so it must not be searchable. */
+
 ---
 
 <BaseLayout
@@ -78,6 +87,7 @@ const who = await site<any>(`/api/charts/invite/${token}`).catch(() => null);
   description={say("text.6", "Cast your chart and see what the tradition says about the two of you.")}
   ogImage={inviteCard}
   ogImageAlt={who ? `${who.label} wants to compare charts with you` : "An invitation to compare charts"}
+  noindex
 >
   <div class="page invite">
     {

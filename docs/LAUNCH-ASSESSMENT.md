@@ -14,12 +14,13 @@ said is still being written and was skipped.
 | | Method | Result |
 |---|---|---|
 | Every site page | 85 static routes requested as the operator | 77 × 200; the rest are the 404 page, the 500 page and correct sign-in redirects |
+| Every dynamic route | All 19, with real ids and with nonsense | Each renders with real data and 404s on nonsense. Two soft-200s found and fixed (below) |
 | Broken links | Crawled from the homepage, 89 pages | None. The only 404s are route TEMPLATES listed by the copy editor (`/classes/[slug]`), which are not links |
 | The sitemap | All 103 URLs requested | 103 × 200 |
 | Machine endpoints | sitemap, robots, webmanifest, RSS, oEmbed | All correct. oEmbed 400s with no `url` and 200s with one, which is the spec |
 | Security headers | Response headers on a page and an API call | CSP `frame-ancestors`, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy all present |
-| Backend | The whole suite | 755 passing, 14 skipped, 0 failing |
-| The app | Host suite + integration suite on a real phone | 53 host tests pass; the integration suite passes but for two deliberate refusals (below) |
+| Backend | The whole suite | 762 passing, 14 skipped, 0 failing |
+| The app | Host suite + integration suite on a real phone | 53 host tests pass; 84 integration tests pass, with two deliberate refusals (below) |
 | App ↔ site | Every `/api/` path in the Dart, against the routers | All 23 exist. **Now a test**, mutation-checked |
 | Dev leakage | Grep for localhost / 127.0.0.1 in shipped code | None. Every hit is a comment explaining a guard |
 
@@ -46,6 +47,34 @@ Not cosmetic; each was live and silent.
 7. ⚠ **A route-order shadow** (`/bridge/vote` under `/{work_id}/vote`) caught
    by the guard before it shipped. Fourth time in this codebase; first time
    something other than a person found it.
+8. ⚠ **Every period was a page.** `/horoscopes/{sign}/{period}` checked the
+   sign and not the period, so `/horoscopes/pisces/fortnightly` came back 200
+   titled "Pisces —  — Shruti". An unbounded set of 200s that all say nothing
+   is what a crawler eats first. The dated form next door got the check for
+   free, so this was the only address it could happen at.
+9. ⚠ **Two private pages were indexable**, one of them the shared comparison
+   — two people's birth data, drawn. `robots.txt` leaves `/chart/` crawlable
+   ON PURPOSE so share links unfurl on Discord and X, which makes `noindex`
+   the only thing keeping those pages out of search, and these two did not
+   send it. Both halves are now a test.
+
+## ⚠ The running stack was not the code
+
+Worth its own heading, because it invalidated part of this sweep and would
+have invalidated the launch.
+
+The site and backend containers had been built **13 hours** before, and
+neither mounts its source — they run baked code. The backend was serving 206
+routes with **none** of the practice room among them, and the site had no
+`/practice/{id}` at all. A first pass over the dynamic routes read as a wall
+of failures that were nothing but a stale image.
+
+Both were rebuilt and restarted, and everything below was then re-checked
+against the real code. `alembic current` is at `e5c93f27a1d8`, the head.
+
+The lesson for the deploy: **the stack you are looking at is not the code
+until you rebuild it**, and it fails by serving an old version rather than by
+erroring.
 
 ## Two deliberate refusals, not failures
 

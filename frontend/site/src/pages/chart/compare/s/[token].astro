@@ -56,6 +56,15 @@ const cardUrl = c ? `${SITE_URL}/api/charts/compare/s/${token}/card.png` : undef
 const readingHtml = c?.readingMd ? await renderMarkdown(c.readingMd) : "";
 const leftName = c?.left?.label || "The first";
 const rightName = c?.right?.label || "The second";
+
+/* ⚠ `noindex`, but NOT disallowed in robots.txt — the two halves are a pair,
+ * and robots.txt says so at length. The prefix is left crawlable so this link
+ * unfurls a preview card on Discord and X, which is the entire point of a
+ * share link; `noindex` is the half that keeps it out of a search index.
+ * Blocking the prefix instead would break both: the crawler could not fetch
+ * the page, so it could never read a noindex, and the card would never build.
+ * This page draws two people's birth data, so it must not be searchable. */
+
 ---
 
 {/* Deliberately not noindex: this is the page people post, and a share card
@@ -63,7 +72,7 @@ const rightName = c?.right?.label || "The second";
     The address is still unguessable and nothing on the site links to one. */}
 <BaseLayout title={`${c?.label || "Two charts"} — compared`}
             description={say("text.2", "Two charts, read against each other.")}
-            ogImage={cardUrl} ogImageAlt={say("text.7", "Two charts compared")}>
+            ogImage={cardUrl} ogImageAlt={say("text.7", "Two charts compared")} noindex>
   <div class="page shared-compare">
     {
       !c ? (
