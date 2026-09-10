@@ -40,7 +40,7 @@ const work = answer.body as {
   voted: boolean; submittedAt: string | null; mine: boolean;
   hidden: boolean; hiddenBy: string;
   readings: { sign: string; bodyMd: string }[];
-  comments: { id: number; author: string; bodyMd: string; at: string | null;
+  comments: { id: number; author: string; sign: string; bodyMd: string; at: string | null;
               mine: boolean; fromDiscord: boolean }[];
 };
 
@@ -183,11 +183,24 @@ const REASONS = [
         </p>
       )}
       {comments.map((c) => (
-        <article class="pw-said">
+        <article class="pw-said" data-said={c.sign || "all"}>
           <p class="pw-said-by">
             <b>{c.author}</b>
             {c.fromDiscord && (
               <span class="pw-from">{say("from.discord", "from Discord")}</span>
+            )}
+            {work.series && (
+              /* ⚠ Shown even when the remark is about the whole set. Labelling
+                 only the per-sign ones would leave the others looking like
+                 they had simply lost their label. */
+              <span class="pw-about">
+                {c.sign
+                  ? <>
+                      <span aria-hidden="true">{SIGN_GLYPH[signIndex(titled(c.sign))]}</span>
+                      <span>{titled(c.sign)}</span>
+                    </>
+                  : <span>{say("about.all", "the whole set")}</span>}
+              </span>
             )}
           </p>
           <div class="pw-prose" set:html={c.html} />
@@ -197,6 +210,23 @@ const REASONS = [
       {me ? (
         <form class="pw-say" data-say={work.id}>
           <label for="pw-body">{say("say.label", "Say what you think")}</label>
+          {work.series && (
+            /* ⚠ A real control, not a hidden field set by the tabs. Somebody
+               may well want to answer Taurus while reading Aries, and saying
+               "this reads well as a series" is a remark about the set that no
+               tab corresponds to. The script keeps it in step with the tabs;
+               without the script it still works, which is the rule on this
+               page. */
+            <label class="pw-about-say">
+              {say("say.about", "About")}
+              <select name="sign" data-about>
+                <option value="">{say("say.about.all", "the whole set")}</option>
+                {work.readings.map((r) => (
+                  <option value={r.sign}>{titled(r.sign)}</option>
+                ))}
+              </select>
+            </label>
+          )}
           <textarea id="pw-body" name="body_md" rows="4" maxlength="4000"
                     placeholder={say("say.hint",
                       "What worked, and what you would do differently.")}></textarea>
@@ -248,6 +278,45 @@ const REASONS = [
   .pw-glyph { font-size: 1.1em; }
 
   .pw-body { margin: 0 0 var(--space-6); scroll-margin-top: var(--space-6); }
+  /* Which reading a remark answers. Quiet — it is a label, not a heading. */
+  .pw-about {
+    /* ⚠ A gap, not a space in the markup: Astro collapses the whitespace
+       between two expressions and the glyph printed hard against the name. */
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.3rem;
+    margin-left: auto;
+    font-size: 0.8rem;
+    color: var(--ink-faint);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 0.05rem 0.5rem;
+    white-space: nowrap;
+  }
+  .pw-about-say {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.85rem;
+    color: var(--ink-soft);
+    margin-bottom: 0.4rem;
+  }
+  .pw-about-say select {
+    font: inherit;
+    color: inherit;
+    background: var(--inset);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 0.2rem 0.4rem;
+  }
+  .pw-said-by { display: flex; align-items: center; gap: 0.5rem; }
+
+  /* ⚠ The header is sticky, so a browser jumping to #sign-taurus puts the
+     sign's own heading underneath it. Nothing is lost — it scrolls — but the
+     reader lands looking at the middle of a paragraph with no title above it,
+     which reads as a broken link rather than as a deep link. */
+  .pw-body { scroll-margin-top: 5.5rem; }
+
   .pw-sign-head {
     display: flex; gap: 8px; align-items: baseline; margin: 0 0 var(--space-3);
     font: 600 var(--text-h4, 1.05rem) var(--font-display); color: var(--ink);
@@ -299,10 +368,28 @@ const REASONS = [
   const tabs = Array.from(document.querySelectorAll<HTMLAnchorElement>("[data-sign]"));
   const bodies = Array.from(document.querySelectorAll<HTMLElement>("[data-body]"));
   if (tabs.length > 1) {
-    const show = (sign: string) => {
+    const said = Array.from(document.querySelectorAll<HTMLElement>("[data-said]"));
+    const about = document.querySelector<HTMLSelectElement>("[data-about]");
+    const show = (sign: string, remember = true) => {
       for (const b of bodies) b.hidden = b.dataset.body !== sign;
       for (const t of tabs) t.classList.toggle("on", t.dataset.sign === sign);
-      history.replaceState(null, "", `#sign-${sign}`);
+      /* ⚠ Remarks about the WHOLE SET stay visible on every sign. They are
+         about this reading too — it is one of the twelve — and hiding them
+         behind a tab nobody thinks to press would bury the most useful thing
+         anybody says about a series. */
+      for (const r of said) {
+        r.hidden = r.dataset.said !== sign && r.dataset.said !== "all";
+      }
+      /* Answering follows reading, but does not lock to it: the reader can
+         still change it, and choosing the whole set is a real answer. */
+      if (about) about.value = sign;
+      /* ⚠ NOT on first paint. Writing the fragment while the page is loading
+         sends the browser to that anchor, and somebody opening a link from
+         Discord arrived three hundred pixels down the page, past the title and
+         the writer's name. The fragment is still written when a tab is
+         PRESSED, so a sign stays linkable — it is only the arrival that must
+         not move. */
+      if (remember) history.replaceState(null, "", `#sign-${sign}`);
     };
     for (const tab of tabs) {
       tab.addEventListener("click", (event) => {
@@ -311,7 +398,8 @@ const REASONS = [
       });
     }
     const wanted = location.hash.replace("#sign-", "");
-    show(tabs.some((t) => t.dataset.sign === wanted) ? wanted : tabs[0].dataset.sign!);
+    show(tabs.some((t) => t.dataset.sign === wanted) ? wanted : tabs[0].dataset.sign!,
+         false);
   }
 
   const token = () =>
@@ -369,8 +457,9 @@ const REASONS = [
     event.preventDefault();
     const field = say.querySelector<HTMLTextAreaElement>("textarea")!;
     if (!field.value.trim()) return;
+    const about = say.querySelector<HTMLSelectElement>("[data-about]");
     const r = await post(`/api/practice/${say.dataset.say}/comments`,
-                         { body_md: field.value });
+                         { body_md: field.value, sign: about?.value ?? "" });
     if (r.ok) location.reload();
   });
 </script>
