@@ -75,12 +75,19 @@ What stands between here and launch:
 2. **MESSAGE_CONTENT** — until then the Discord bridge only goes outward.
 3. **Her own chart**, so `/compatible-with/shruti` has something behind it.
 
-### The design pass (see `DESIGN-BRIEF-ASTROLABE.md`)
+### The design pass — done (see `design/astrolabe/`)
 
-The app is correct and plain. It does not yet look like hers, and it ships with
-the default Flutter icon. For something whose whole job is to make her audience
-feel closer to her, that is the difference between a utility and a companion —
-and it is the single biggest thing left.
+The system came back on 10 September and is implemented: the gilt layer, the
+ruling hour, the four motifs, the whole component set, every screen rebuilt to
+the kit, and the motion. The launcher icon is no longer Flutter's.
+
+⚠ **What is left of it is the artwork, and only she can make that.**
+`design/astrolabe/guidelines/artwork-spec.md` lists twelve pieces in priority
+order with exact canvases and safe areas; six are essential. Every placement
+has a designed art-absent state and the app ships looking finished without
+them — but the Home portrait is called the highest-leverage drawing in the
+project, and the launcher icon is a geometric stand-in until she draws the
+clasp.
 
 ### Still open, and honest about it
 
@@ -95,6 +102,8 @@ and it is the single biggest thing left.
 ## What I would do first
 
 1. The three setup tasks — they unlock features that are already paid for.
-2. The design pass, because it is the long pole and everything else is done.
-3. Put it in front of ten people from the Discord before a public launch. Not
-   for bugs — for the things a test cannot see.
+2. Put it in front of ten people from the Discord before a public launch. Not
+   for bugs — for the things a test cannot see. ⚠ This is now the long pole:
+   the design pass is done and nobody outside has touched any of it.
+3. The artwork, at her own pace. Six essential pieces, and the app looks
+   finished while it waits for them.
