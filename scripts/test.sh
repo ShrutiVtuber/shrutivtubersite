@@ -19,6 +19,15 @@ cd "$(dirname "$0")/.."
 
 docker build --quiet --target dev -t shruti-backend-test ./backend >/dev/null
 
+# ⚠ The Flutter app is a SEPARATE repository, and one guard compares the
+# endpoints it calls against the ones this backend serves. Mounted when it is
+# checked out beside this one; the guard skips loudly when it is not, rather
+# than inventing a pass.
+APP_SOURCE="$(cd .. 2>/dev/null && pwd)/shruti-tools/lib"
+if [ ! -d "$APP_SOURCE" ]; then
+  APP_SOURCE="$PWD/backend/tests"      # harmless; the guard will skip
+fi
+
 # Mounted read-only, and more than just `shruti`:
 #   frontend/site/src     the page-wrapper and structured-data guards read it
 #   frontend/site/public  the service worker lives there
@@ -50,6 +59,7 @@ exec docker run --rm \
   -v "$PWD/frontend/site/Dockerfile:/app/frontend/site/Dockerfile:ro" \
   -v "$PWD/frontend/site/package.json:/app/frontend/site/package.json:ro" \
   -v "$PWD/frontend/site/scripts:/app/frontend/site/scripts:ro" \
+  -v "$APP_SOURCE:/app/app-source:ro" \
   -e SHRUTI_SECRET_KEY=test-only-not-a-real-key \
   shruti-backend-test \
   python -m pytest tests "$@"
