@@ -630,6 +630,12 @@ async def report_work(
         raise HTTPException(
             403, "to take your own work down, withdraw it rather than report it")
 
+    # ⚠ Read BEFORE the commit that may fail. A rollback expires every loaded
+    # attribute, so `work.hidden` afterwards is a lazy refresh — IO from a
+    # place SQLAlchemy's async layer cannot do it, which surfaces as
+    # MissingGreenlet and a 500. The value is a bool; keep the bool.
+    was_hidden = work.hidden
+
     reason = body.reason if body.reason in REPORT_REASONS else "other"
     session.add(PracticeReport(
         work_id=work_id, user_id=user.id,
@@ -641,10 +647,10 @@ async def report_work(
         # telling somebody "you already reported this" invites them to find a
         # second account, and the honest answer to "is this reported?" is yes.
         await session.rollback()
-        return {"ok": True, "hidden": work.hidden}
+        return {"ok": True, "hidden": was_hidden}
 
     total = await _count_reports(session, work_id=work_id)
-    if total >= REPORTS_TO_HIDE and not work.hidden:
+    if total >= REPORTS_TO_HIDE and not was_hidden:
         work.hidden = True
         work.hidden_by = "reports"
         await session.commit()
@@ -666,6 +672,8 @@ async def report_comment(
     if row.user_id == user.id:
         raise HTTPException(403, "delete your own comment rather than report it")
 
+    was_hidden = row.hidden       # see the note in report_work
+
     reason = body.reason if body.reason in REPORT_REASONS else "other"
     session.add(PracticeReport(
         comment_id=comment_id, user_id=user.id,
@@ -674,10 +682,10 @@ async def report_comment(
         await session.commit()
     except IntegrityError:
         await session.rollback()
-        return {"ok": True, "hidden": row.hidden}
+        return {"ok": True, "hidden": was_hidden}
 
     total = await _count_reports(session, comment_id=comment_id)
-    if total >= REPORTS_TO_HIDE and not row.hidden:
+    if total >= REPORTS_TO_HIDE and not was_hidden:
         row.hidden = True
         row.hidden_by = "reports"
         await session.commit()

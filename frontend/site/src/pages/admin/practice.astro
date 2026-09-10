@@ -1,0 +1,257 @@
+---
+/* The practice room, from her side: what was reported, and what to do about it.
+ *
+ * ⚠ **A report is a queue entry, not a verdict.** Three of them take a thing
+ * off the feed automatically because something staying up for eight hours
+ * because it arrived at 3am is the failure that matters — but nothing is
+ * decided until she looks. This page is where she looks.
+ *
+ * ⚠ **Grouped by the thing reported, never one row per report.** Three people
+ * reporting one reading is ONE decision; a list showing it as three invites
+ * her to make it three times and to disagree with herself.
+ *
+ * ⚠ **Dismissing PUTS IT BACK.** A dismissal that only marked the report read
+ * would leave the auto-hide standing for ever: down because three strangers
+ * said so, and she said they were wrong.
+ */
+import AdminLayout from "../../layouts/AdminLayout.astro";
+import CsrfField from "../../components/forms/CsrfField.astro";
+import Badge from "../../components/navigation/Badge.astro";
+import { asAdmin } from "../../lib/admin";
+import { verifyCsrf } from "../../lib/csrf";
+
+export const prerender = false;
+
+let notice = "";
+let failed = "";
+
+if (Astro.request.method === "POST") {
+  const form = await Astro.request.formData();
+  if (!verifyCsrf(Astro.cookies, form)) {
+    failed = "That did not save. Reload the page and try again.";
+  } else {
+    const action = String(form.get("action") ?? "");
+
+    if (action === "decide") {
+      const kind = String(form.get("kind") ?? "");
+      const id = String(form.get("id") ?? "");
+      const days = String(form.get("suspend_days") ?? "");
+      const r = await asAdmin(Astro, `/api/practice/admin/reports/${kind}/${id}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          outcome: String(form.get("outcome") ?? "dismiss"),
+          suspend_days: days === "" ? null : Number(days),
+          reason: String(form.get("reason") ?? ""),
+        }),
+      });
+      if (r.ok) {
+        notice = r.body?.hidden
+          ? "Kept down." + (r.body?.suspended_until ? " And they cannot post." : "")
+          : "Back on the feed.";
+      } else {
+        failed = "That decision did not save.";
+      }
+    }
+
+    if (action === "lift") {
+      const r = await asAdmin(
+        Astro, `/api/practice/admin/strikes/${String(form.get("id") ?? "")}`,
+        { method: "DELETE" });
+      notice = r.ok ? "They can post again." : "";
+      if (!r.ok) failed = "That did not lift.";
+    }
+  }
+}
+
+const queue = await asAdmin(Astro, "/api/practice/admin/reports");
+const reports: any[] = Array.isArray(queue.body) ? queue.body : [];
+const held = await asAdmin(Astro, "/api/practice/admin/strikes");
+const strikes: any[] = Array.isArray(held.body) ? held.body : [];
+
+const REASONS: Record<string, string> = {
+  abuse: "Aimed at a person",
+  hate: "Aimed at a group",
+  sexual: "Sexual, or a minor",
+  spam: "Spam",
+  "self-harm": "May need help",
+  "not-a-reading": "Not a reading",
+  other: "Something else",
+};
+
+const titled = (s: string) => s ? s.charAt(0).toUpperCase() + s.slice(1) : "";
+---
+
+<AdminLayout title="Practice room">
+  {notice && <p class="adm-ok" role="status">{notice}</p>}
+  {failed && <p class="adm-bad" role="alert">{failed}</p>}
+
+  <section class="adm-card">
+    <header class="mod-head">
+      <h2>Reported</h2>
+      {reports.length > 0 && <Badge tone="rose">{reports.length}</Badge>}
+    </header>
+
+    {reports.length === 0 ? (
+      <p class="mod-quiet">
+        Nothing is waiting. When somebody reports a reading or a comment it
+        appears here — and if a few people report the same thing, it comes off
+        the feed until you have looked.
+      </p>
+    ) : (
+      <ol class="mod-list">
+        {reports.map((r) => (
+          <li class="mod-item">
+            <div class="mod-what">
+              <p class="mod-meta">
+                <b>{r.author}</b>
+                <span aria-hidden="true">·</span>
+                <span>{r.kind === "work" ? "a reading" : "a comment"}</span>
+                {r.from_discord && <span class="mod-tag">from Discord</span>}
+                {r.hidden && (
+                  <span class:list={["mod-tag", r.hidden_by === "reports" && "auto"]}>
+                    {r.hidden_by === "reports"
+                      ? "off the feed automatically"
+                      : "you took it down"}
+                  </span>
+                )}
+              </p>
+              {r.kind === "work" && (
+                <p class="mod-title">
+                  <a href={`/practice/${r.id}`} target="_blank" rel="noreferrer">
+                    {r.title || (r.signs?.length > 1
+                      ? `${r.signs.length} signs`
+                      : titled(r.signs?.[0] ?? "a reading"))}
+                  </a>
+                </p>
+              )}
+              <blockquote class="mod-excerpt">{r.excerpt}</blockquote>
+              <ul class="mod-why">
+                {Object.entries(r.reasons ?? {}).map(([reason, n]) => (
+                  <li>{REASONS[reason] ?? reason}{Number(n) > 1 && ` ×${n}`}</li>
+                ))}
+              </ul>
+              {r.reports?.filter((x: any) => x.detail).map((x: any) => (
+                <p class="mod-detail">“{x.detail}”</p>
+              ))}
+            </div>
+
+            <form method="POST" class="mod-do">
+              <CsrfField />
+              <input type="hidden" name="action" value="decide" />
+              <input type="hidden" name="kind" value={r.kind} />
+              <input type="hidden" name="id" value={r.id} />
+              <label class="mod-susp">
+                Stop them posting for
+                <select name="suspend_days">
+                  <option value="">— not at all —</option>
+                  <option value="7">a week</option>
+                  <option value="14">a fortnight</option>
+                  <option value="30">a month</option>
+                  {/* ⚠ 0 means indefinite. Said in words, because a bare 0 on
+                      a menu reads as "none" and this one means the opposite. */}
+                  <option value="0">until you lift it</option>
+                </select>
+              </label>
+              <input type="text" name="reason" maxlength="500"
+                     placeholder="What you would tell them, if asked" />
+              <div class="mod-buttons">
+                <button type="submit" name="outcome" value="dismiss"
+                        class="mod-back">Put it back</button>
+                <button type="submit" name="outcome" value="uphold"
+                        class="mod-keep">Keep it down</button>
+              </div>
+            </form>
+          </li>
+        ))}
+      </ol>
+    )}
+  </section>
+
+  <section class="adm-card">
+    <header class="mod-head"><h2>Cannot post</h2></header>
+    {strikes.length === 0 ? (
+      <p class="mod-quiet">Nobody is suspended.</p>
+    ) : (
+      <ul class="mod-strikes">
+        {strikes.map((s) => (
+          <li>
+            <div>
+              <b>{s.who}</b>
+              <span class="mod-until">
+                {s.indefinite ? "until you lift it" : `until ${s.until.slice(0, 10)}`}
+              </span>
+              {s.reason && <p class="mod-detail">“{s.reason}”</p>}
+            </div>
+            <form method="POST">
+              <CsrfField />
+              <input type="hidden" name="action" value="lift" />
+              <input type="hidden" name="id" value={s.id} />
+              <button type="submit" class="mod-back">Let them post</button>
+            </form>
+          </li>
+        ))}
+      </ul>
+    )}
+    <p class="mod-quiet">
+      A suspension is not a ban. The account stays, everything they have written
+      stays, and they can still read — they cannot post or comment. Deleting an
+      account and banning the address is on <a href="/admin/users">Users</a>.
+    </p>
+  </section>
+</AdminLayout>
+
+<style>
+  .mod-head { display: flex; gap: 10px; align-items: center; margin-bottom: var(--space-4); }
+  .mod-head h2 { margin: 0; font: 600 var(--text-h3, 1.2rem) var(--font-display); color: var(--ink); }
+  .mod-quiet { margin: 0; font: 400 var(--text-sm) / 1.6 var(--font-body); color: var(--ink-faint); max-width: 62ch; }
+  .mod-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-5); }
+  .mod-item {
+    display: grid; gap: var(--space-4); padding: var(--space-4);
+    border: var(--border-w) solid var(--line); border-radius: var(--radius-md, 10px);
+    background: var(--surface-card);
+  }
+  @media (min-width: 900px) { .mod-item { grid-template-columns: 1fr 22rem; } }
+  .mod-meta { display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline; margin: 0 0 6px; font: 400 var(--text-xs) var(--font-body); color: var(--ink-soft); }
+  .mod-tag {
+    font-size: var(--text-xs); color: var(--ink-faint);
+    border: var(--border-w) solid var(--line); border-radius: 999px; padding: 1px 8px;
+  }
+  .mod-tag.auto { color: var(--rose); border-color: var(--rose); }
+  .mod-title { margin: 0 0 6px; font: 500 var(--text-h4, 1.05rem) var(--font-display); }
+  .mod-title a { color: var(--ink); }
+  .mod-excerpt {
+    margin: 0 0 8px; padding-left: var(--space-3);
+    border-left: 2px solid var(--line); color: var(--ink-soft);
+    font: 400 var(--text-sm) / 1.6 var(--font-body);
+  }
+  .mod-why { list-style: none; display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; }
+  .mod-why li {
+    font: 500 var(--text-xs) var(--font-body); color: var(--rose);
+    border: var(--border-w) solid var(--rose); border-radius: 999px; padding: 2px 9px;
+  }
+  .mod-detail { margin: 8px 0 0; font: italic 400 var(--text-sm) / 1.6 var(--font-body); color: var(--ink-soft); }
+  .mod-do { display: grid; gap: 10px; align-content: start; }
+  .mod-susp { display: grid; gap: 4px; font: 400 var(--text-xs) var(--font-body); color: var(--ink-soft); }
+  .mod-do select, .mod-do input {
+    width: 100%; box-sizing: border-box; padding: 8px 10px;
+    background: var(--surface-inset); color: var(--ink);
+    border: var(--border-w) solid var(--line); border-radius: var(--radius-sm);
+    font: 400 var(--text-sm) var(--font-body); min-height: 40px;
+  }
+  .mod-buttons { display: flex; gap: 8px; }
+  .mod-back, .mod-keep {
+    flex: 1; min-height: 40px; cursor: pointer; border-radius: var(--radius-sm);
+    font: 500 var(--text-sm) var(--font-body);
+    border: var(--border-w) solid var(--line-strong);
+    background: var(--surface-card); color: var(--ink);
+  }
+  .mod-keep { border-color: var(--rose); color: var(--rose); }
+  .mod-strikes { list-style: none; margin: 0 0 var(--space-4); padding: 0; display: grid; gap: var(--space-3); }
+  .mod-strikes li {
+    display: flex; gap: var(--space-4); align-items: center; justify-content: space-between;
+    padding: var(--space-3); border: var(--border-w) solid var(--line);
+    border-radius: var(--radius-sm); background: var(--surface-card);
+  }
+  .mod-until { margin-left: 8px; font: 400 var(--text-xs) var(--font-body); color: var(--ink-faint); }
+</style>
