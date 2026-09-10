@@ -16,6 +16,13 @@ she does, what I do, and how we know each one worked.
 Offer it. She is expecting to be asked about it rather than to have to remember
 which three.
 
+## Is it ready to launch?
+
+`docs/LAUNCH-READINESS.md` answers it properly. Briefly: the ephemeris licence
+is settled (all three repos public and AGPL, and the notice is now inside the
+app), compliance is strong with two decisions that are hers, and it is not
+feature complete until the three setup tasks and one design pass are done.
+
 ## Live
 
 `https://shrutivtuber.com`, deployed from `/srv/shrutivtuber/prod` on
