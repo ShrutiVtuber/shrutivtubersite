@@ -248,3 +248,56 @@ took itself down when the keys changed. No deploy was needed for it.
   values go into `.env` the same way and the backend restarts. Rotating the
   secret key does NOT disturb the prices or products already created.
 - The publishable key needs no rotation — it ships in the page source by design.
+
+## Traps met on 10 September 2026
+
+Four, all of which cost time and none of which announced themselves.
+
+**The repo and `.env` belong to `theourgia`, not `deploy`.** A `git pull` as
+`deploy` fails on `.git/FETCH_HEAD`, and compose cannot read `.env` at all. Run
+the deploy as the owner:
+
+```bash
+sudo -u theourgia -H env SHRUTI_SOURCE_SHA=$SHA docker compose \
+  -f docker-compose.yml -f docker-compose.prod.yml \
+  --profile web --profile bot up -d --build
+```
+
+⚠ `-H`, and `env VAR=…` rather than `sudo -E`. Without `-H` the HOME is still
+`/home/deploy` and docker warns about a config it cannot read; with `-E`, sudo
+swallows the compose flags and docker answers `unknown shorthand flag: 'f'`.
+
+⚠ **A grep against an unreadable `.env` returns nothing and exits quietly.**
+Checking whether a variable is configured that way reports MISSING for a file
+that is merely unreadable — and the fix for a missing variable is to add it,
+which would have overwritten a working config. Ask the running container
+instead: `docker exec shruti-backend-1 printenv NAME`.
+
+⚠ **Never background the deploy over SSH.** A detached `nohup ssh … up -d
+--build &` died with its connection part-way through recreating the containers:
+the images were built, `shruti-site-1` was gone, and the two others were still
+the old ones. The site was down until the command was re-run in the
+foreground. Compose is idempotent, so re-running fixed it, but nothing said
+anything was wrong.
+
+⚠ **Do not print an environment variable to check it is set.**
+`${v:+set}${v:-unset}` prints the VALUE when the variable is non-empty. It put
+the Discord bot token into a transcript and the token had to be reset. Count
+the bytes instead:
+
+```bash
+n=$(docker exec shruti-bot-1 printenv NAME 2>/dev/null | wc -c)
+[ "$n" -gt 1 ] && echo set || echo unset
+```
+
+## What was found in production's working tree
+
+`git pull` refused because **34 files had uncommitted local changes**, and every
+one of them was byte-identical to the laptop's working tree. Something copies
+the working tree onto the box outside of git.
+
+Nothing was lost — the content matched exactly, `git diff` was saved to
+`/tmp/prod-local-*.patch` first, and the tree was then reset to `origin/main` —
+but it means **production files can change without a commit and without a
+deploy**, and a `git pull` will refuse until somebody notices. Worth finding
+what does it before trusting the deploy path.
