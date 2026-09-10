@@ -174,7 +174,7 @@ credential is missing.
 ### 1. Firebase (her, ~15 minutes)
 
 1. Make a Firebase project; add an Android app with the id
-   `com.shrutivtuber.shruti_tools`.
+   `com.shrutivtuber.astrolabe` (renamed from `shruti_tools`).
 2. Download `google-services.json` into `shruti-tools/android/app/`.
 3. Add `firebase_core` and `firebase_messaging` to the app's pubspec.
 4. Fill in `_registrationToken()` in `lib/services/notifications.dart` — the

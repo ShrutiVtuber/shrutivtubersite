@@ -24,8 +24,13 @@ app for — knowing you have gone live.
    exactly:
 
    ```
-   com.shrutivtuber.shruti_tools
+   com.shrutivtuber.astrolabe
    ```
+
+   ⚠ **`astrolabe`, not `shruti_tools`.** The app was renamed after this
+   document was first written, and Firebase matches on this string exactly.
+   Register the old one and nothing errors anywhere — the console accepts it,
+   the app builds, and notifications simply never arrive.
 
    Nickname and SHA-1 are optional; skip both.
 3. It offers **`google-services.json`**. Download it. That is the file I need —
