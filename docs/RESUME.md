@@ -16,6 +16,12 @@ she does, what I do, and how we know each one worked.
 Offer it. She is expecting to be asked about it rather than to have to remember
 which three.
 
+## What is left
+
+`docs/WHAT-IS-LEFT.md` — she asked for it explicitly. Short version: the period
+wheel is done, the design brief and its addendum are handed off, and the three
+setup tasks are hers. Everything else she has asked for is built and deployed.
+
 ## Is it ready to launch?
 
 `docs/LAUNCH-READINESS.md` answers it properly. Briefly: the ephemeris licence

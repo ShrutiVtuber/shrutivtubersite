@@ -104,6 +104,41 @@ function unwrapped(longitudes: number[]): number[] {
   return out;
 }
 
+/* ⚠ Glyphs on ADJACENT bands collide. The bands are about five units apart and
+   a glyph is nine tall, so two bodies ending at the same longitude print on top
+   of each other — which in February, when everything is in Aquarius, is most of
+   them. Nudged apart ALONG their own tracks, deterministically, so the answer
+   never depends on the order the engine happened to return.
+
+   Not the transit wheel's relaxation: that spreads around one ring. These are
+   on different rings and only need separating where both the angle AND the
+   radius are close. */
+const MIN_ANGLE = 11;
+const MIN_RADIUS = 8;
+
+function spread(ends: { name: string; angle: number; radius: number }[]) {
+  const out = ends.map((e) => ({ ...e, shown: e.angle }));
+  for (let pass = 0; pass < 30; pass++) {
+    let moved = false;
+    for (let i = 0; i < out.length; i++) {
+      for (let j = i + 1; j < out.length; j++) {
+        const a = out[i], b = out[j];
+        if (Math.abs(a.radius - b.radius) >= MIN_RADIUS) continue;
+        let gap = b.shown - a.shown;
+        while (gap > 180) gap -= 360;
+        while (gap < -180) gap += 360;
+        if (Math.abs(gap) >= MIN_ANGLE) continue;
+        const push = (MIN_ANGLE - Math.abs(gap)) / 2 * (gap < 0 ? -1 : 1);
+        a.shown -= push;
+        b.shown += push;
+        moved = true;
+      }
+    }
+    if (!moved) break;
+  }
+  return new Map(out.map((e) => [e.name, e.shown]));
+}
+
 const drawn = present.map((name, i) => {
   const path = unwrapped(track(name));
   const radius = bandOf(i);
@@ -127,6 +162,12 @@ const drawn = present.map((name, i) => {
     spiral: laps > 0.98,
   };
 });
+
+const shownAngle = spread(drawn.map((b) => ({
+  name: b.name,
+  angle: relative(b.to),
+  radius: b.spiral ? b.radius - 7 * Math.min(1, b.laps) : b.radius,
+})));
 
 /** The walk, at a fixed radius — or spiralling inward where it laps. */
 function walk(longitudes: number[], radius: number, spiral: boolean): string {
@@ -274,11 +315,26 @@ const described = [
                 </>
               );
             })}
-            {/* Where it ends up, which is where it IS by the end of the period. */}
-            <text x={f(ex)} y={f(ey)} class="body-glyph"
-                  text-anchor="middle" dominant-baseline="central">
-              {BODY_GLYPH[b.name] ?? b.name.slice(0, 2)}
-            </text>
+            {/* Where it ends up, which is where it IS by the end of the
+                period. Nudged off the true angle only where it would otherwise
+                print on top of a neighbour, and joined back by a leader so the
+                nudge never lies about a position. */}
+            {(() => {
+              const shown = shownAngle.get(b.name) ?? relative(b.to);
+              const [gx, gy] = point(shown, endR);
+              const nudged = Math.abs(shown - relative(b.to)) > 0.25;
+              return (
+                <>
+                  {nudged && (
+                    <line x1={f(ex)} y1={f(ey)} x2={f(gx)} y2={f(gy)} class="leader" />
+                  )}
+                  <text x={f(gx)} y={f(gy)} class="body-glyph"
+                        text-anchor="middle" dominant-baseline="central">
+                    {BODY_GLYPH[b.name] ?? b.name.slice(0, 2)}
+                  </text>
+                </>
+              );
+            })()}
           </g>
         );
       })}
@@ -381,7 +437,9 @@ const described = [
     --pw-venus: #B9A6D8;
     --pw-mars: #D98C93;
     --pw-sun: #E0B978;
-    --pw-moon: #D8DCEC;
+    /* ⚠ Mid, not pale. #D8DCEC was picked against a dark ground and vanished
+       completely on the light theme — which is the one the site defaults to. */
+    --pw-moon: #8A93B5;
 
     margin: 0; display: grid; gap: var(--space-3); justify-items: center;
   }
@@ -410,6 +468,7 @@ const described = [
   .station { fill: var(--surface-page); stroke: var(--ink); stroke-width: 0.9; }
   .station.back { stroke: var(--rose); stroke-width: 1.1; }
   .turn { font-size: 3.6px; fill: var(--ink); font-weight: 700; }
+  .leader { stroke: var(--hue); stroke-width: 0.35; opacity: 0.7; }
   .body-glyph {
     font-size: 9px; fill: var(--hue); font-weight: 600;
     paint-order: stroke; stroke: var(--surface-page); stroke-width: 1.6;
