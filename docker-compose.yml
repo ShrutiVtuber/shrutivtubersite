@@ -131,7 +131,11 @@ services:
       # into the working tree, which is public and AGPL — see .gitignore. The
       # backend takes a PATH here rather than the JSON itself, so the secret
       # never passes through an environment variable or a log line.
-      - ${SHRUTI_SECRETS_DIR:-~/.secrets/shruti}:/run/secrets/shruti:ro
+      # ⚠ The default is a RELATIVE path, not `~/...`. Compose does not expand
+      # a tilde in a volume source: it would be taken literally and Docker
+      # would helpfully create a directory called `~` beside this file, mount
+      # that empty thing, and the key would be quietly absent.
+      - ${SHRUTI_SECRETS_DIR:-./secrets}:/run/secrets/shruti:ro
     networks: [shruti, shruti-interop]
 
   postgres:
