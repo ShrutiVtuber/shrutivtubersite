@@ -213,6 +213,13 @@ async def health() -> dict:
             "watching": watching}
 
 
+class Reading(BaseModel):
+    """One sign's writing, as it arrives from the site."""
+
+    sign: str = ""
+    bodyMd: str = ""            # noqa: N815 — the site's JSON spells it this way
+
+
 class PracticeIn(BaseModel):
     """A submission the site is telling us about."""
 
@@ -221,6 +228,11 @@ class PracticeIn(BaseModel):
     title: str = ""
     signs: list[str] = []
     opening: str = ""
+
+    # ⚠ Defaulted to empty, and that is a working state: an older site posts no
+    # readings and gets the announcement alone, with no thread under it. The
+    # bot and the site deploy separately, so one of them is always the newer.
+    readings: list[Reading] = []
 
 
 @app.post("/internal/practice")

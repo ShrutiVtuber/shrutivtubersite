@@ -132,15 +132,18 @@ async def _work_json(
         "hidden": work.hidden,
         "hiddenBy": work.hidden_by,
     }
+    # ⚠ Always, not only in the short form. The Discord announcement needs the
+    # opening for its embed AND the readings for the thread underneath it, and
+    # when this was `else` the bot received a work with no readings, posted the
+    # announcement, and silently opened no thread — a feature that looked
+    # switched off rather than broken.
+    first = by_sign[0] if by_sign else None
+    out["opening"] = (first.body_md or "")[:240] if first else ""
+
     if full:
         out["readings"] = [
             {"sign": r.sign, "bodyMd": r.body_md} for r in by_sign
         ]
-    else:
-        # Enough to decide whether to open it, without shipping a week of prose
-        # for every card in the feed.
-        first = by_sign[0] if by_sign else None
-        out["opening"] = (first.body_md or "")[:240] if first else ""
     return out
 
 
@@ -549,7 +552,9 @@ async def submit(
     # ⚠ After the commit, and it must not be able to fail the submission. They
     # wrote it and it is saved; the channel catching up late — or not at all —
     # is a smaller thing than losing somebody's work to a Discord outage.
-    await _tell_discord(await _work_json(work, session, viewer=user, full=False))
+    # ⚠ full=True: the channel gets a thread with every reading in it, so the
+    # bot needs the prose. The feed listings stay short — this is one work, once.
+    await _tell_discord(await _work_json(work, session, viewer=user, full=True))
 
     return {"ok": True, "id": work.id, "signs": len(written)}
 
@@ -578,6 +583,13 @@ async def _tell_discord(work: dict) -> None:
                     "id": work["id"], "author": work["author"],
                     "title": work.get("title", ""), "signs": work.get("signs", []),
                     "opening": work.get("opening", ""),
+                    # ⚠ The readings themselves, for the thread under the
+                    # announcement. This dict is built field by field rather
+                    # than passed whole — deliberately, so nothing about a
+                    # reader ever reaches the bot — which also means a new
+                    # field is invisible here until it is named. It was, and
+                    # the thread silently never opened.
+                    "readings": work.get("readings", []),
                 },
                 headers={"X-Shruti-Internal": secret},
             )

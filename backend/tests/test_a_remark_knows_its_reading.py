@@ -29,6 +29,22 @@ from shruti.api.routes import practice
 from shruti.models.practice import PracticeBridge, PracticeComment
 
 
+def code_of(function) -> str:
+    """
+    A function's source with its comments and docstring removed.
+
+    ⚠ **Not fussiness — this exact trap has now been walked into twice in one
+    day.** A guard that greps for a token finds it in the paragraph explaining
+    why the token is there, so deleting the code leaves the prose behind and
+    the test goes on passing. The first version of this file asserted
+    "full=True" was present and was satisfied by the comment directly above the
+    line it was checking.
+    """
+    source = inspect.getsource(function)
+    source = re.sub(r'"""..*?"""', " ", source, flags=re.S)
+    return re.sub(r"(?m)#.*$", " ", source)
+
+
 PAGE = SITE / "src" / "pages" / "practice" / "[id].astro"
 
 
@@ -50,7 +66,7 @@ def test_the_sign_is_checked_against_the_work() -> None:
     set, and it is not any sign the reader can select. It would sit in the
     database looking like it worked.
     """
-    source = inspect.getsource(practice._sign_of)
+    source = code_of(practice._sign_of)
     assert "PracticeReading" in source, (
         "the sign is not checked against the readings the work actually has"
     )
@@ -63,7 +79,7 @@ def test_the_sign_is_checked_against_the_work() -> None:
 def test_both_doors_check_it() -> None:
     """The site's comment box and the Discord bridge are two ways in."""
     for name in ("comment", "bridge_message"):
-        source = inspect.getsource(getattr(practice, name))
+        source = code_of(getattr(practice, name))
         assert "_sign_of(" in source, f"{name} takes a sign without checking it"
 
 
@@ -76,7 +92,7 @@ def test_a_bridged_reply_takes_the_sign_of_what_it_answered() -> None:
     asking them to repeat what Discord already knows, and getting it wrong
     whenever they did not.
     """
-    source = inspect.getsource(practice.bridge_comment)
+    source = code_of(practice.bridge_comment)
     assert "sign=link.sign" in source, (
         "a reply from Discord does not inherit the sign of the message it "
         "answered, so every reply lands on the whole set"
@@ -126,4 +142,45 @@ def test_arriving_at_a_practice_link_does_not_scroll_past_the_title() -> None:
     assert "if (remember) history.replaceState" in page, (
         "the fragment is written unconditionally, so arriving at the page "
         "scrolls past its own title"
+    )
+
+
+def test_the_bot_is_actually_sent_the_readings() -> None:
+    """
+    ⚠ Two silent failures, one after the other, both of them "nothing happened".
+
+    The announcement is built from `_work_json`, which omitted `readings`
+    unless asked for the full form — so the bot received a work with no
+    readings, posted the announcement, opened no thread, and returned ok. Then,
+    once that was fixed, `_tell_discord` turned out to build its payload field
+    by field (deliberately, so nothing about a reader can leak to the bot) and
+    the new field was simply not among them. Same symptom both times: an
+    announcement with nothing under it, no error anywhere, a feature that looks
+    switched off.
+    """
+    submit = code_of(practice.submit)
+    assert "full=True" in submit, (
+        "the announcement is built from the short form of the work, which has "
+        "no readings in it — the thread will be empty"
+    )
+
+    teller = code_of(practice._tell_discord)
+    assert '"readings"' in teller, (
+        "the payload names its fields one by one and does not name readings, "
+        "so they never reach the bot"
+    )
+
+
+def test_the_opening_survives_asking_for_the_full_work() -> None:
+    """
+    The announcement embed needs BOTH.
+
+    `opening` used to be the else-branch of `full`, so asking for the readings
+    took the excerpt away and the announcement read "_(no opening)_".
+    """
+    source = code_of(practice._work_json)
+    body = source[source.index("if full:"):]
+    assert 'out["opening"]' not in body, (
+        "the opening is only set when the readings are not, so the "
+        "announcement embed loses its excerpt"
     )

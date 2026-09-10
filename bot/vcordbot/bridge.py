@@ -152,7 +152,12 @@ async def announce_the_readings(
     not post is one reading missing from a thread rather than a submission that
     errored. The work is saved either way; this is presentation.
     """
-    readings = work.get("readings") or []
+    # ⚠ model_dump() gives dicts here, but a caller with pydantic objects is
+    # easy to write by accident; both are read the same way.
+    readings = [
+        r if isinstance(r, dict) else r.model_dump()
+        for r in (work.get("readings") or [])
+    ]
     if not readings:
         return "", []
 
