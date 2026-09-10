@@ -17,6 +17,7 @@
  */
 import ToolLayout from "../../layouts/ToolLayout.astro";
 import TransitWheel from "../../components/chart/TransitWheel.astro";
+import PeriodWheel from "../../components/chart/PeriodWheel.astro";
 import SkyDrawer from "../../components/tools/SkyDrawer.astro";
 import Copy from "../../components/content/Copy.astro";
 import { askAstro } from "../../lib/api";
@@ -68,13 +69,19 @@ interface ChartBody {
 
 /* Both at once. Two round trips in sequence is a second of staring at nothing
    every time somebody changes sign, and the sign changes a lot here. */
-const [eventsRes, chartRes] = await Promise.all([
+const [eventsRes, chartRes, daysRes] = await Promise.all([
   askAstro<{ events: EventRow[] }>(
     `/events?start=${start}T00:00:00Z&end=${end}T23:59:59Z`, 20000),
   askAstro<{ bodies: ChartBody[] }>(
     `/chart?when=${start}T12:00:00Z&lat=51.4779&lon=0` +
     `&tradition=hellenistic&house_system=whole_sign&diagram=false`, 20000),
+  /* Every day of the period, for the movement wheel — where each body starts,
+     where it ends, and what it did on the way. */
+  askAstro<{ days: any[] }>(
+    `/ephemeris?start=${start}&end=${end}&hour=midnight` +
+    `&include_modern=true&events=true`, 20000),
 ]);
+const days = daysRes?.data?.days ?? [];
 
 const events = (eventsRes?.data?.events ?? []).filter((e) =>
   ["ingress", "station", "lunation", "eclipse"].includes(e.kind));
@@ -165,14 +172,23 @@ const eventLine = (e: EventRow) => {
        data-saved={savedHere}>
     <div class="hw-material">
       <div class="hw-sky">
-        <TransitWheel
-          bodies={bodies}
-          rising={Rising}
-          size={360}
-          degreeRing={false}
-          houseNumbers={true}
-          caption=""
-        />
+        {/* ⚠ The MOVEMENT wheel, not the instant. A reading for a week is
+            about what happens across it — where Mercury starts, where it ends,
+            the day it turns, where it crosses a sign — and that is what this
+            draws. The instant chart is below it for the placements. */}
+        {days.length > 1 ? (
+          <PeriodWheel days={days} rising={Rising} size={360}
+                       caption={say("wheel.caption", "Where each body starts, where it ends, and what it does on the way. The Moon has its own ring.")} />
+        ) : (
+          <TransitWheel
+            bodies={bodies}
+            rising={Rising}
+            size={360}
+            degreeRing={false}
+            houseNumbers={true}
+            caption=""
+          />
+        )}
         <h2 class="hw-h">{say("events.heading", "What happens in this period")}</h2>
         {/* The whole sky, behind a button. What is listed below are the loud
             events; the drawer has the daily positions, every aspect, the

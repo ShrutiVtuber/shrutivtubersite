@@ -190,6 +190,13 @@ const describe = (e: EventRow) => {
   return e.kind;
 };
 
+/* What to read on stream: the best practice readings for this period.
+   ⚠ Votes AND comments. A piece nobody voted for but six people argued about
+   is the one worth reading out, and votes alone would bury it. */
+const toRead = await asAdmin(
+  Astro, `/api/practice/admin/to-read?period=${period}&covers=${covers}&limit=5`);
+const bestOfThem: any[] = Array.isArray(toRead.body) ? toRead.body : [];
+
 const link = (over: Record<string, string>) => {
   const p = new URLSearchParams({ period, covers, sign, ...over });
   if (over.period && !over.covers) p.set("covers", currentCovers(asPeriod(over.period)));
@@ -313,6 +320,35 @@ const nextSign = SIGNS[(index + 1) % 12];
           </a>
         ))}
       </nav>
+
+      {bestOfThem.length > 0 && (
+        <section class="to-read">
+          <h2 class="adm-lbl">Worth reading out</h2>
+          <p class="quiet">
+            The practice readings for this period, by votes and comments
+            together. A comment counts double — arguing about a reading is more
+            effort than tapping a heart.
+          </p>
+          <ol>
+            {bestOfThem.map((w: any) => (
+              <li>
+                <div class="tr-head">
+                  <strong>{w.byline}</strong>
+                  <span class="tr-count">
+                    {w.votes} vote{w.votes === 1 ? "" : "s"} ·
+                    {" "}{w.comments} comment{w.comments === 1 ? "" : "s"}
+                  </span>
+                </div>
+                {(w.readings ?? []).map((r: any) => (
+                  <p class="tr-body">
+                    <b>{r.sign}</b> {r.bodyMd}
+                  </p>
+                ))}
+              </li>
+            ))}
+          </ol>
+        </section>
+      )}
 
       {/* The column. */}
       <section class="column">
@@ -526,6 +562,15 @@ const nextSign = SIGNS[(index + 1) % 12];
   /* ── the sky ── */
   .sky { display: grid; gap: var(--space-3); }
   .adm-advanced { margin: 0 0 10px; }
+  .to-read {
+    grid-column: 1 / -1; margin-bottom: var(--space-4);
+    border: var(--border-w) solid var(--line);
+    border-radius: var(--radius-md, 10px); padding: var(--space-4);
+  }
+  .to-read ol { margin: var(--space-3) 0 0; padding-left: 1.2em; display: grid; gap: var(--space-3); }
+  .tr-head { display: flex; gap: 10px; align-items: baseline; }
+  .tr-count { color: var(--ink-faint); font-size: var(--text-xs); }
+  .tr-body { margin: 4px 0 0; color: var(--ink-soft); font: 400 var(--text-sm) / 1.6 var(--font-body); }
   .events {
     list-style: none; margin: 0; padding: 0; display: grid; gap: 1px;
     max-height: 46vh; overflow-y: auto;

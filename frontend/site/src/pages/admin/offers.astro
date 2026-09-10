@@ -1,0 +1,205 @@
+---
+/* Offers: what the app has worth having.
+ *
+ * Her monetisation path for a free app. A sponsor's deal, money off something
+ * in the shop, a discount on a class — made here, made REAL by Stripe where it
+ * is hers, and shown in the app on its own.
+ *
+ * ⚠ Two kinds behind one form, and the difference is not cosmetic. HERS points
+ * at a discount, which is a Stripe coupon and promotion code that exists.
+ * A SPONSOR'S carries their code and their link, and Stripe is never asked
+ * about it — a coupon invented for a code she does not own is a discount
+ * nobody will accept.
+ */
+import AdminLayout from "../../layouts/AdminLayout.astro";
+import CsrfField from "../../components/forms/CsrfField.astro";
+import Button from "../../components/forms/Button.astro";
+import { asAdmin } from "../../lib/admin";
+import { verifyCsrf } from "../../lib/csrf";
+
+let notice = "";
+let failed = "";
+
+if (Astro.request.method === "POST") {
+  const form = await Astro.request.formData();
+  if (!verifyCsrf(Astro.cookies, form)) {
+    failed = "That did not save. Reload the page and try again.";
+  } else {
+    const action = String(form.get("action") ?? "");
+    const id = String(form.get("id") ?? "");
+
+    if (action === "delete" && id) {
+      const r = await asAdmin(Astro, `/api/offers/admin/${id}`, { method: "DELETE" });
+      notice = r.ok ? "Taken down." : "";
+      failed = r.ok ? "" : "That could not be removed.";
+    } else if (action === "save") {
+      const kind = String(form.get("kind") ?? "shop");
+      const discount = String(form.get("discount_id") ?? "").trim();
+      const ends = String(form.get("ends_at") ?? "").trim();
+      const body = {
+        title: String(form.get("title") ?? "").trim(),
+        blurb: String(form.get("blurb") ?? "").trim(),
+        kind,
+        // ⚠ A sponsor's offer never carries one of our discounts. The API
+        // refuses it too; this stops the request being made at all.
+        discount_id: kind === "sponsor" || !discount ? null : Number(discount),
+        code: String(form.get("code") ?? "").trim(),
+        url: String(form.get("url") ?? "").trim(),
+        ends_at: ends ? new Date(ends).toISOString() : null,
+        members_only: form.get("members_only") === "1",
+        visible: form.get("visible") === "1",
+        position: Number(form.get("position") ?? 0),
+      };
+      const where = id ? `/api/offers/admin/${id}` : "/api/offers/admin";
+      const r = await asAdmin(Astro, where, {
+        method: id ? "PATCH" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      notice = r.ok ? "Saved." : "";
+      failed = r.ok ? "" : (r.body?.detail ?? "That could not be saved.");
+    }
+  }
+}
+
+const list = await asAdmin(Astro, "/api/offers/admin");
+const offers: any[] = Array.isArray(list.body) ? list.body : [];
+const discountList = await asAdmin(Astro, "/api/shop/admin/discounts");
+const discounts: any[] = Array.isArray(discountList.body) ? discountList.body : [];
+
+const KINDS = [
+  ["shop", "The shop"],
+  ["classes", "Classes and workshops"],
+  ["membership", "Membership"],
+  ["sponsor", "A sponsor's deal"],
+];
+---
+
+<AdminLayout title="Offers">
+  <h1 class="adm-h">Offers</h1>
+  <p class="quiet">
+    What the app shows as worth having. Yours point at a discount, which is a
+    real Stripe code; a sponsor's carries their own code and their own link.
+  </p>
+
+  {notice && <p class="adm-ok" role="status">{notice}</p>}
+  {failed && <p class="adm-bad" role="alert">{failed}</p>}
+
+  <form method="POST" class="adm-card ofr">
+    <CsrfField />
+    <input type="hidden" name="action" value="save" />
+    <h2 class="h2">A new offer</h2>
+
+    <label>Title
+      <input name="title" required maxlength="120"
+             placeholder="15% off everything in the shop" />
+    </label>
+    <label>What it is
+      <textarea name="blurb" rows="2" maxlength="400"
+                placeholder="Said the way you would say it on stream."></textarea>
+    </label>
+
+    <div class="row">
+      <label>Kind
+        <select name="kind">
+          {KINDS.map(([value, label]) => <option value={value}>{label}</option>)}
+        </select>
+      </label>
+      <label>Your discount
+        <select name="discount_id">
+          <option value="">— none (or a sponsor's) —</option>
+          {discounts.map((d: any) => (
+            <option value={d.id}>{d.code} · {d.note || d.applies_to}</option>
+          ))}
+        </select>
+      </label>
+    </div>
+
+    <div class="row">
+      <label>Their code
+        <input name="code" maxlength="60" placeholder="Only for a sponsor's deal" />
+      </label>
+      <label>Where it goes
+        <input name="url" maxlength="400" placeholder="https://…  or  /shop" />
+      </label>
+    </div>
+
+    <div class="row">
+      <label>Ends
+        <input type="datetime-local" name="ends_at" />
+      </label>
+      <label>Order
+        <input type="number" name="position" value="0" />
+      </label>
+    </div>
+
+    <label class="check">
+      <input type="checkbox" name="members_only" value="1" />
+      Only for members
+      <span class="quiet">— it is left out entirely for everybody else, not shown locked</span>
+    </label>
+    <label class="check">
+      <input type="checkbox" name="visible" value="1" checked />
+      Show it
+    </label>
+
+    <div><Button type="submit">Save</Button></div>
+  </form>
+
+  <h2 class="h2">What is set up</h2>
+  {offers.length === 0 ? (
+    <p class="quiet">Nothing yet.</p>
+  ) : (
+    <ul class="ofr-list">
+      {offers.map((o: any) => (
+        <li>
+          <div>
+            <strong>{o.title}</strong>
+            {o.from && <span class="quiet"> · {o.from}</span>}
+            {!o.running && <span class="off"> · not showing</span>}
+            {o.membersOnly && <span class="quiet"> · members</span>}
+          </div>
+          <div class="quiet">
+            {o.kind}
+            {o.code && <> · <code>{o.code}</code></>}
+            {o.endsAt && <> · until {o.endsAt.slice(0, 10)}</>}
+          </div>
+          <form method="POST">
+            <CsrfField />
+            <input type="hidden" name="action" value="delete" />
+            <input type="hidden" name="id" value={o.id} />
+            <button type="submit" class="link">Take it down</button>
+          </form>
+        </li>
+      ))}
+    </ul>
+  )}
+</AdminLayout>
+
+<style>
+  .ofr { display: grid; gap: var(--space-3); margin-bottom: var(--space-5); }
+  .ofr label { display: grid; gap: 4px; font: 600 var(--text-micro) var(--font-body);
+    letter-spacing: var(--tracking-eyebrow, .08em); text-transform: uppercase;
+    color: var(--ink-faint); }
+  .ofr input, .ofr select, .ofr textarea {
+    font: 400 var(--text-body) var(--font-body); color: var(--ink);
+    background: var(--surface-page); padding: 8px 10px;
+    border: var(--border-w) solid var(--line); border-radius: var(--radius-sm);
+  }
+  .ofr .row { display: grid; gap: var(--space-3);
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+  .ofr .check {
+    display: flex; gap: 8px; align-items: baseline;
+    text-transform: none; letter-spacing: 0; font-weight: 400;
+    color: var(--ink); font-size: var(--text-sm);
+  }
+  .ofr-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-3); }
+  .ofr-list li {
+    border: var(--border-w) solid var(--line);
+    border-radius: var(--radius-sm); padding: 10px 12px;
+  }
+  .off { color: var(--rose); }
+  .link { background: none; border: 0; padding: 0; cursor: pointer;
+    color: var(--ink-faint); text-decoration: underline;
+    font: 400 var(--text-xs) var(--font-body); }
+</style>

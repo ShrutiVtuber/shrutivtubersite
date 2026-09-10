@@ -834,6 +834,53 @@ class Product(TimestampMixin, table=True):
     position: int = Field(default=0)
 
 
+class Offer(TimestampMixin, table=True):
+    """
+    Something worth having, shown in the app.
+
+    Her monetisation path for a free app: a sponsor's deal, a discount on
+    something in the shop, money off a class. She makes it in the admin, Stripe
+    makes it real where it is hers, and it appears in the app on its own.
+
+    **Two kinds behind one row, and the difference matters.**
+
+    - **Hers** — a `discount_id`, which is a real Stripe coupon and promotion
+      code. The app shows the code and a link to her own checkout.
+    - **A sponsor's** — a code and a URL that belong to somebody else. Stripe
+      knows nothing about it and must not be asked to; creating a coupon for
+      a code we do not own would be inventing a discount she cannot honour.
+
+    ⚠ **An offer that has ended must stop showing.** Same failure as the
+    standing tests: one that keeps showing is a discount she has to honour or
+    refuse in public, and refusing in public is worse than never offering.
+    """
+
+    __tablename__ = "offer"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    title: str = ""
+    blurb: str = ""
+    # shop | classes | membership | sponsor
+    kind: str = Field(default="shop", index=True)
+
+    # Hers: the Stripe-backed discount. Null for a sponsor's deal.
+    discount_id: Optional[int] = Field(default=None, foreign_key="discount.id")
+    # A sponsor's: their code and their link. Never sent to Stripe.
+    sponsor_id: Optional[int] = Field(default=None, foreign_key="sponsor.id")
+    code: str = ""
+    url: str = ""
+
+    starts_at: Optional[datetime] = Field(default=None, sa_type=UTC_TS)
+    # ⚠ Null means no end. Checked on every read.
+    ends_at: Optional[datetime] = Field(default=None, sa_type=UTC_TS)
+
+    # Only for people who pay her. The app hides it from everybody else rather
+    # than showing a code that will be refused at the till.
+    members_only: bool = False
+    visible: bool = True
+    position: int = 0
+
+
 class Discount(TimestampMixin, table=True):
     """
     A code somebody types at checkout.

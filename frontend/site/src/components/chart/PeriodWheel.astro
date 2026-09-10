@@ -1,0 +1,340 @@
+---
+/* The sky MOVING through a period, the way you draw it in a notebook.
+ *
+ * A transit wheel shows one instant. Writing a horoscope for a week is about
+ * what happens ACROSS it — where Mercury starts, where it ends, the day it
+ * turns, the moment it crosses into the next sign — and reading that off a
+ * table of numbers is a different act from seeing it.
+ *
+ * Her words: "seeing it move is sometimes helpful… some way of indicating
+ * where a planet will start, where it will stop, if it retrogrades/returns
+ * direct, the moon as it moves through the period and its various lunar
+ * phases… the moon for instance in an inner ring separated from the planets".
+ *
+ * So, per body: an arc along its own band from where it starts to where it
+ * ends, an open mark at the start, its glyph at the end, a tick wherever it
+ * crosses a sign boundary, and a station marked where it turns.
+ *
+ * ⚠ **The Moon needs a spiral, not an arc.** It covers about 13° a day, so a
+ * month is more than a full circle and an arc drawn over 360° lands back on
+ * itself and looks like a week. The radius shrinks as it goes, so the path
+ * never crosses its own tail and you can see it went round.
+ *
+ * ⚠ This is never the only representation. Whoever renders it renders the
+ * events list too — the SVG is aria-hidden.
+ */
+import {
+  BODY_GLYPH, SIGN_GLYPH, WHEEL_SIGNS, f, relativeTo, signIndex, wheelPoint,
+} from "../../lib/wheel";
+
+interface Position {
+  name: string; longitude: number; sign: string; degree: number;
+  retrograde: boolean;
+}
+interface EventRow {
+  kind: string; at: string; bodies: string[]; sign: string; degree: number;
+  detail?: Record<string, any>;
+}
+interface DayRow { date: string; positions: Position[]; events: EventRow[] }
+
+interface Props {
+  days: DayRow[];
+  /** The sign placed in the first house. Empty draws it unrotated. */
+  rising?: string;
+  size?: number;
+  /** Bodies to draw, outermost first. The Moon is always its own inner ring. */
+  bodies?: string[];
+  caption?: string;
+}
+const {
+  days, rising = "", size = 640, caption,
+  bodies = ["Saturn", "Jupiter", "Mars", "Venus", "Mercury", "Sun"],
+} = Astro.props;
+
+const risingIndex = rising ? signIndex(rising) : null;
+const at = (longitude: number) => relativeTo(longitude, risingIndex);
+
+/* The band each body is drawn on, as a fraction of the radius. Outer for the
+   slow ones, inner for the fast, which is roughly how a notebook page ends up
+   arranged anyway. */
+const OUTER = 0.86;
+const INNER = 0.50;
+const bandOf = (i: number, n: number) =>
+  n <= 1 ? OUTER : OUTER - (OUTER - INNER) * (i / (n - 1));
+
+/* The Moon's own ring, well inside the planets so the two never read as one
+   list. */
+const MOON_OUTER = 0.42;
+const MOON_INNER = 0.24;
+
+const cx = 100, cy = 100, R = 92;
+
+/** Every longitude this body takes, in order, across the period. */
+const track = (name: string) =>
+  days
+    .map((d) => d.positions.find((p) => p.name === name))
+    .filter((p): p is Position => Boolean(p))
+    .map((p) => p.longitude);
+
+/** Unwrap a track so 359° → 1° reads as +2 rather than −358. */
+function unwrapped(longitudes: number[]): number[] {
+  const out: number[] = [];
+  let turns = 0;
+  for (let i = 0; i < longitudes.length; i++) {
+    if (i > 0) {
+      const step = longitudes[i] - longitudes[i - 1];
+      // A real day's motion is never more than about 15°, so a jump bigger
+      // than half a circle is the wrap and not the body.
+      if (step < -180) turns += 360;
+      else if (step > 180) turns -= 360;
+    }
+    out.push(longitudes[i] + turns);
+  }
+  return out;
+}
+
+/** The arc a body walks, as an SVG path, at a fixed radius. */
+function arcPath(longitudes: number[], radius: number): string {
+  if (longitudes.length < 2) return "";
+  const points = longitudes.map((lon) => wheelPoint(at(lon), radius, cx, cy));
+  return points
+    .map(([x, y], i) => `${i === 0 ? "M" : "L"}${f(x)} ${f(y)}`)
+    .join(" ");
+}
+
+/** The Moon's path, spiralling inward so more than one lap stays readable. */
+function spiralPath(longitudes: number[]): string {
+  if (longitudes.length < 2) return "";
+  const span = Math.abs(longitudes[longitudes.length - 1] - longitudes[0]) || 1;
+  // Only spiral when it actually laps; a week's worth stays a clean arc.
+  const laps = Math.min(1, span / 360);
+  return longitudes
+    .map((lon, i) => {
+      const along = i / (longitudes.length - 1);
+      const radius = R * (MOON_OUTER - (MOON_OUTER - MOON_INNER) * along * laps);
+      const [x, y] = wheelPoint(at(lon), radius, cx, cy);
+      return `${i === 0 ? "M" : "L"}${f(x)} ${f(y)}`;
+    })
+    .join(" ");
+}
+
+const all = [...bodies];
+const drawn = all
+  .map((name, i) => {
+    const raw = track(name);
+    if (raw.length < 2) return null;
+    const path = unwrapped(raw);
+    const radius = R * bandOf(i, all.length);
+    return {
+      name,
+      radius,
+      path,
+      d: arcPath(path, radius),
+      from: path[0],
+      to: path[path.length - 1],
+      // Where it crossed into a new sign, and where it turned.
+      ingresses: days.flatMap((day) =>
+        (day.events ?? []).filter(
+          (e) => e.kind === "ingress" && e.bodies[0] === name)),
+      stations: days.flatMap((day) =>
+        (day.events ?? []).filter(
+          (e) => e.kind === "station" && e.bodies[0] === name)),
+    };
+  })
+  .filter((b): b is NonNullable<typeof b> => b !== null);
+
+const moonTrack = unwrapped(track("Moon"));
+const moonLaps = moonTrack.length > 1
+  ? Math.abs(moonTrack[moonTrack.length - 1] - moonTrack[0]) / 360
+  : 0;
+/* Past about a lap and a bit the spiral stops being legible and starts being
+   a scribble. Then: the phases and the ingresses, no path. */
+const moonPathIsUseful = moonLaps > 0 && moonLaps < 1.6;
+
+const lunations = days.flatMap((d) =>
+  (d.events ?? []).filter((e) => e.kind === "lunation" || e.kind === "eclipse"));
+
+const PHASE_GLYPH: Record<string, string> = {
+  new: "●︎", "first quarter": "◑︎", full: "○︎", "last quarter": "◐︎",
+};
+
+const when = (iso: string) => iso.slice(5, 10);
+const dm = (d: number) => `${Math.floor(d)}°${String(Math.round((d % 1) * 60)).padStart(2, "0")}'`;
+---
+
+<figure class="pw">
+  <svg viewBox="0 0 200 200" role="img" aria-hidden="true"
+       style={`--pw-size:${size}px`}>
+    {/* The signs. */}
+    <circle cx={cx} cy={cy} r={R} class="pw-rim" />
+    <circle cx={cx} cy={cy} r={R * MOON_OUTER + 2} class="pw-rim pw-faint" />
+    {WHEEL_SIGNS.map((_name, i) => {
+      const start = at(i * 30);
+      const [x1, y1] = wheelPoint(start, R * (MOON_INNER - 0.04), cx, cy);
+      const [x2, y2] = wheelPoint(start, R, cx, cy);
+      const [gx, gy] = wheelPoint(start + 15, R * 0.94, cx, cy);
+      return (
+        <>
+          <line x1={f(x1)} y1={f(y1)} x2={f(x2)} y2={f(y2)} class="pw-spoke" />
+          <text x={f(gx)} y={f(gy)} class="pw-sign">{SIGN_GLYPH[i]}</text>
+        </>
+      );
+    })}
+
+    {/* Each planet's walk. */}
+    {drawn.map((b) => {
+      const [sx, sy] = wheelPoint(at(b.from), b.radius, cx, cy);
+      const [ex, ey] = wheelPoint(at(b.to), b.radius, cx, cy);
+      return (
+        <>
+          <path d={b.d} class="pw-track" />
+          {/* Where it began: open, so it reads as "from here". */}
+          <circle cx={f(sx)} cy={f(sy)} r="1.9" class="pw-start" />
+          {/* Where it crossed a sign — a tick across its own band. */}
+          {b.ingresses.map((e) => {
+            const lon = signIndex(e.sign) * 30;
+            const [ax, ay] = wheelPoint(at(lon), b.radius - 3.4, cx, cy);
+            const [bx, by] = wheelPoint(at(lon), b.radius + 3.4, cx, cy);
+            return <line x1={f(ax)} y1={f(ay)} x2={f(bx)} y2={f(by)} class="pw-ingress" />;
+          })}
+          {/* Where it turned. A station is the whole story of a retrograde. */}
+          {b.stations.map((e) => {
+            const lon = signIndex(e.sign) * 30 + (e.degree ?? 0);
+            const [tx, ty] = wheelPoint(at(lon), b.radius, cx, cy);
+            const back = e.detail?.direction === "retrograde";
+            return (
+              <>
+                <circle cx={f(tx)} cy={f(ty)} r="3.1"
+                        class={back ? "pw-station pw-back" : "pw-station"} />
+                <text x={f(tx)} y={f(ty) + 1.6} class="pw-turn">
+                  {back ? "℞" : "D"}
+                </text>
+              </>
+            );
+          })}
+          {/* Where it ends up — the glyph, because that is where it IS by the
+              end of the period, which is what a reading is about. */}
+          <text x={f(ex)} y={f(ey) + 2} class="pw-body">{BODY_GLYPH[b.name] ?? b.name[0]}</text>
+        </>
+      );
+    })}
+
+    {/* The Moon, on its own ring. */}
+    {moonPathIsUseful && <path d={spiralPath(moonTrack)} class="pw-moon-track" />}
+    {moonTrack.length > 1 && (() => {
+      const [sx, sy] = wheelPoint(at(moonTrack[0]), R * MOON_OUTER, cx, cy);
+      return <circle cx={f(sx)} cy={f(sy)} r="1.4" class="pw-start" />;
+    })()}
+    {lunations.map((e) => {
+      const lon = signIndex(e.sign) * 30 + (e.degree ?? 0);
+      const [px, py] = wheelPoint(at(lon), R * (MOON_OUTER + 0.06), cx, cy);
+      const eclipse = e.kind === "eclipse";
+      return (
+        <text x={f(px)} y={f(py) + 2}
+              class={eclipse ? "pw-phase pw-eclipse" : "pw-phase"}>
+          {eclipse ? "✦︎" : (PHASE_GLYPH[String(e.detail?.phase)] ?? "○︎")}
+        </text>
+      );
+    })}
+  </svg>
+
+  {caption && <figcaption>{caption}</figcaption>}
+
+  {/* ⚠ The wheel is aria-hidden, so this IS the content for anybody not
+      looking at it — and it is a better summary than the picture for anybody
+      who is. */}
+  <dl class="pw-key">
+    {drawn.map((b) => (
+      <>
+        <dt>{BODY_GLYPH[b.name] ?? ""} {b.name}</dt>
+        <dd>
+          {dm(((b.from % 360) + 360) % 360 % 30)}{" "}
+          {WHEEL_SIGNS[Math.floor((((b.from % 360) + 360) % 360) / 30)]}
+          {" → "}
+          {dm(((b.to % 360) + 360) % 360 % 30)}{" "}
+          {WHEEL_SIGNS[Math.floor((((b.to % 360) + 360) % 360) / 30)]}
+          {b.stations.map((e) => (
+            <span class="pw-note">
+              {" · "}{when(e.at)}{" "}
+              {e.detail?.direction === "retrograde" ? "turns ℞" : "turns direct"}
+            </span>
+          ))}
+          {b.ingresses.map((e) => (
+            <span class="pw-note">{" · "}{when(e.at)} enters {e.sign}</span>
+          ))}
+        </dd>
+      </>
+    ))}
+    {lunations.length > 0 && (
+      <>
+        <dt>☾︎ Moon</dt>
+        <dd>
+          {lunations.map((e, i) => (
+            <>
+              {i > 0 && " · "}
+              {when(e.at)}{" "}
+              {e.kind === "eclipse"
+                ? `${e.detail?.type} ${e.detail?.of} eclipse`
+                : `${e.detail?.phase} moon`}
+              {" in "}{e.sign}
+            </>
+          ))}
+        </dd>
+      </>
+    )}
+  </dl>
+</figure>
+
+<style>
+  .pw { margin: 0; display: grid; gap: var(--space-3); justify-items: center; }
+  .pw svg { width: min(100%, var(--pw-size)); height: auto; display: block; }
+
+  .pw-rim { fill: none; stroke: var(--line); stroke-width: .5; }
+  .pw-faint { stroke: var(--line); opacity: .55; }
+  .pw-spoke { stroke: var(--line); stroke-width: .35; }
+  .pw-sign { font-size: 5px; fill: var(--ink-faint); text-anchor: middle; }
+
+  /* The walk itself. Thin, because there are six of them and the marks are
+     what carry the meaning. */
+  .pw-track {
+    fill: none; stroke: var(--accent); stroke-width: 1.6;
+    stroke-linecap: round;
+  }
+  /* Where it began. Hollow, so it reads as "from here" against the filled
+     glyph at the other end. */
+  .pw-start { fill: var(--surface-page); stroke: var(--ink-soft); stroke-width: .9; }
+  /* A sign boundary crossed. Full contrast — this is one of the two things
+     the wheel exists to show. */
+  .pw-ingress { stroke: var(--ink); stroke-width: 1.1; }
+  .pw-station {
+    fill: var(--surface-page); stroke: var(--ink); stroke-width: 1;
+  }
+  .pw-back { stroke: var(--rose); stroke-width: 1.2; }
+  .pw-turn {
+    font-size: 3.6px; fill: var(--ink); text-anchor: middle; font-weight: 700;
+  }
+  .pw-body {
+    font-size: 7px; fill: var(--ink); text-anchor: middle; font-weight: 600;
+  }
+
+  /* Dashed, so the Moon's ring never reads as one more planet track. */
+  .pw-moon-track {
+    fill: none; stroke: var(--ink-soft); stroke-width: 1.1;
+    stroke-linecap: round; stroke-dasharray: 3 2;
+  }
+  .pw-phase { font-size: 5.4px; fill: var(--ink); text-anchor: middle; }
+  .pw-eclipse { fill: var(--rose); font-size: 6.2px; font-weight: 700; }
+
+  .pw figcaption {
+    color: var(--ink-faint); font: 400 var(--text-xs) var(--font-body);
+  }
+
+  .pw-key {
+    display: grid; grid-template-columns: auto 1fr; gap: 2px var(--space-3);
+    margin: 0; width: 100%;
+    font: 400 var(--text-xs) / 1.6 var(--font-body);
+  }
+  .pw-key dt { color: var(--ink); white-space: nowrap; }
+  .pw-key dd { margin: 0; color: var(--ink-soft); }
+  .pw-note { color: var(--ink-faint); }
+</style>

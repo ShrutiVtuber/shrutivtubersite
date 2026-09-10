@@ -211,6 +211,64 @@ async def read_sky(slug: str, session: AsyncSession = Depends(get_session)) -> d
     return _by_kind(rows)
 
 
+@router.get("/recent")
+async def recent(limit: int = 10) -> list[dict]:
+    """
+    Her latest writing, as JSON, for the app.
+
+    ⚠ The site reads these pages directly and the RSS feed is a PAGE, which
+    means the holding page gates it — so the app cannot use either. This is the
+    same synced entries, over the API the app can actually reach.
+
+    Title and opening come out of the HTML BeeRanked wrote; nothing is stored
+    and nothing is recomputed. An entry with no timestamp is left out rather
+    than guessed at, because the order is the whole point of a "recent" list.
+    """
+    import re
+
+    out: list[dict] = []
+    for slug, path in _entry_slugs():
+        try:
+            with open(path, encoding="utf-8") as handle:
+                html = handle.read()
+        except OSError:
+            continue
+        when = _published_at(html)
+        if not when:
+            continue
+        title = ""
+        match = re.search(r"<title[^>]*>(.*?)</title>", html, re.S | re.I)
+        if match:
+            title = re.sub(r"\s+", " ", match.group(1)).strip()
+            # ⚠ BeeRanked appends the site name, and not always with the same
+            # separator. Splitting on one of them leaves ", Shruti" on the end
+            # of every title in the app.
+            title = re.split(r"\s*[—|·]\s*|,\s*Shruti\s*$", title)[0].strip()
+
+        # ⚠ The <meta name="description"> here is the SITE's, identical on every
+        # entry — using it gives a list where every row says the same sentence.
+        # The entry's own opening is its first paragraph.
+        opening = ""
+        body = re.search(r"<article[^>]*>(.*?)</article>", html, re.S | re.I)
+        for para in re.finditer(r"<p[^>]*>(.*?)</p>",
+                                body.group(1) if body else html, re.S | re.I):
+            text = re.sub(r"<[^>]+>", " ", para.group(1))
+            text = re.sub(r"\s+", " ", text).strip()
+            if len(text) > 40:
+                opening = text[:240]
+                break
+        out.append({
+            "slug": slug,
+            "title": title or slug.replace("-", " ").title(),
+            "opening": opening,
+            "publishedAt": when,
+            "url": f"/journal/{slug}",
+        })
+
+    out.sort(key=lambda e: e["publishedAt"], reverse=True)
+    return out[:max(1, min(limit, 50))]
+
+
 @router.get("/skies")
 async def read_skies(
     slugs: str = "", session: AsyncSession = Depends(get_session)

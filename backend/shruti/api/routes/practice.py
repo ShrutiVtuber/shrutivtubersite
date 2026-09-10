@@ -501,6 +501,64 @@ async def remove_comment(
 
 # ── hers ────────────────────────────────────────────────────────────────────
 
+@router.get("/admin/to-read", dependencies=[Depends(require_admin)])
+async def to_read(
+    period: str = "weekly", covers: str = "", limit: int = 10,
+    session: AsyncSession = Depends(get_session),
+) -> list[dict]:
+    """
+    What to read on stream: the best of a period, votes and comments together.
+
+    Her purpose for the votes, in her words — take "the highest voted/most
+    commented each week and read them alongside my weekly horoscope writing
+    streams so the community can hear what others are saying".
+
+    ⚠ **Both counts, not votes alone.** A piece nobody voted for but six people
+    argued about is exactly the one worth reading out; ranking on votes alone
+    would bury it under whatever got shared the widest. A comment counts for
+    two, because writing a sentence about somebody's work is more effort than
+    tapping a heart.
+    """
+    votes = (
+        select(PracticeVote.work_id, func.count().label("n"))
+        .group_by(PracticeVote.work_id).subquery()
+    )
+    remarks = (
+        select(PracticeComment.work_id, func.count().label("n"))
+        .where(PracticeComment.hidden.is_(False))
+        .group_by(PracticeComment.work_id).subquery()
+    )
+    q = (
+        select(
+            PracticeWork,
+            func.coalesce(votes.c.n, 0).label("votes"),
+            func.coalesce(remarks.c.n, 0).label("remarks"),
+        )
+        .join(votes, votes.c.work_id == PracticeWork.id, isouter=True)
+        .join(remarks, remarks.c.work_id == PracticeWork.id, isouter=True)
+        .where(PracticeWork.submitted_at.is_not(None))
+        .where(PracticeWork.hidden.is_(False))
+        .where(PracticeWork.period == period)
+    )
+    if covers:
+        q = q.where(PracticeWork.covers == covers)
+    q = q.order_by(
+        (func.coalesce(votes.c.n, 0) + func.coalesce(remarks.c.n, 0) * 2).desc(),
+        PracticeWork.submitted_at.desc(),
+    ).limit(min(limit, 50))
+
+    out = []
+    for work, vote_count, remark_count in (await session.execute(q)).all():
+        body = await _work_json(work, session, viewer=None, full=True)
+        body["votes"] = vote_count
+        body["comments"] = remark_count
+        # What she would say out loud before reading it.
+        author = await session.get(User, work.user_id)
+        body["byline"] = _name(author)
+        out.append(body)
+    return out
+
+
 @router.post("/{work_id}/hide", dependencies=[Depends(require_admin)])
 async def hide(
     work_id: int, session: AsyncSession = Depends(get_session),
