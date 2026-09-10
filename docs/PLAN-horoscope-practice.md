@@ -195,3 +195,27 @@ project. The backend already sends the `apns` block; nothing changes there.
 
 See above — MESSAGE_CONTENT in the developer portal, plus three environment
 variables.
+
+## Reading her horoscopes in the app — asked for 10 September 2026
+
+Her words: readers "need to be able to read all my horoscopes for the current
+cycle in the app itself — if they want to see an archive one (for a previous
+month or week) then they can be redirected to the website."
+
+**The line is the CURRENT period, not the sign.** Everything for the sky the app
+is already showing — all twelve signs of this week, this month, today — is read
+in the app. Anything dated earlier opens the website.
+
+⚠ This is the same rule as the five tools that stayed off the app, and for the
+same reason: the app carries what somebody wants *now*, and the site is where
+the archive, the search and the back-catalogue live. It is a decision about
+where traffic goes, not a technical limit — the endpoint would serve any period
+just as happily, which is exactly why the boundary has to be deliberate and
+written down.
+
+What it needs:
+- a screen listing the twelve signs for the current period, reading from the
+  same `/api/horoscopes/…` the site uses
+- the period picker limited to what `currentCovers()` says is now
+- an "earlier readings" link that opens the site, saying so plainly — a link
+  that silently leaves the app is worse than one that says where it goes
