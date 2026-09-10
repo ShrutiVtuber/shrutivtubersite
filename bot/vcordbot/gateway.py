@@ -50,8 +50,12 @@ HEARTBEAT_ACK = 11
 # them carry any words. Asking for the first without the second gets a stream of
 # empty messages, which reads exactly like a quiet channel.
 GUILD_MESSAGES = 1 << 9
+# ⚠ Its own intent, and NOT a privileged one — unlike MESSAGE_CONTENT there is
+# nothing to switch on in the developer portal. So votes from the channel work
+# the day the bot connects, even while replies are still waiting on the intent.
+GUILD_MESSAGE_REACTIONS = 1 << 10
 MESSAGE_CONTENT = 1 << 15
-INTENTS = GUILD_MESSAGES | MESSAGE_CONTENT
+INTENTS = GUILD_MESSAGES | GUILD_MESSAGE_REACTIONS | MESSAGE_CONTENT
 
 
 @dataclass
@@ -138,11 +142,13 @@ class Reader:
         *,
         channel_id: str,
         on_message: Callable[[dict], Awaitable[None]],
+        on_reaction: Callable[[dict, bool], Awaitable[None]] | None = None,
         connect: Callable[[str], Any] | None = None,
     ) -> None:
         self.token = token
         self.channel_id = channel_id
         self.on_message = on_message
+        self.on_reaction = on_reaction
         self.session = Session()
         self.bot_user_id = ""
         self._connect = connect
@@ -182,6 +188,21 @@ class Reader:
             self.session.resume_url = (data.get("resume_gateway_url") or "")
             self.bot_user_id = str((data.get("user") or {}).get("id") or "")
             log.info("gateway ready")
+            return
+
+        # ⚠ A reaction, which is a vote. Handled before the MESSAGE_CREATE
+        # gate below, and deliberately not subject to the deduplication there:
+        # adding and removing the same reaction are two real events on the same
+        # message, and treating the second as a redelivery would make a vote
+        # impossible to take back.
+        if name in ("MESSAGE_REACTION_ADD", "MESSAGE_REACTION_REMOVE"):
+            if self.on_reaction is None:
+                return
+            if str(data.get("channel_id") or "") != self.channel_id:
+                return
+            if str((data.get("user_id") or "")) == self.bot_user_id:
+                return          # the bot's own starter reaction
+            await self.on_reaction(data, name.endswith("ADD"))
             return
 
         if name != "MESSAGE_CREATE":
@@ -243,3 +264,71 @@ class Reader:
 
     def stop(self) -> None:
         self._closing = True
+
+
+    async def run(self) -> None:
+        """
+        Hold the socket open for as long as the process lives.
+
+        ⚠ This is the half that was written and never started. Everything above
+        — the protocol, the resume, the deduplication, the intent warning —
+        existed and nothing called it, so the channel could be read from and
+        never was.
+
+        ⚠ Reconnects for ever, with the jittered backoff. A bridge that gives
+        up after five tries is a bridge that is down every time Discord has a
+        bad ten minutes, and nobody notices until somebody asks why their reply
+        never arrived.
+        """
+        import json as _json
+
+        attempt = 0
+        while not self._closing:
+            beat: asyncio.Task | None = None
+            try:
+                url = self.session.resume_url or GATEWAY_URL
+                connect = self._connect or _default_connect
+                async with connect(url) as socket:
+                    attempt = 0
+
+                    async def send(payload: dict) -> None:
+                        await socket.send(_json.dumps(payload))
+
+                    async for raw in socket:
+                        frame = _json.loads(raw)
+                        if frame.get("op") == HELLO and beat is None:
+                            interval = int(
+                                (frame.get("d") or {}).get(
+                                    "heartbeat_interval") or 41250)
+                            beat = asyncio.create_task(send_beats(self, send,
+                                                                  interval))
+                        await self.handle(frame, send)
+                        if frame.get("op") == RECONNECT:
+                            break
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:               # noqa: BLE001
+                log.warning("gateway dropped: %s", type(exc).__name__)
+            finally:
+                if beat is not None:
+                    beat.cancel()
+
+            if self._closing:
+                return
+            attempt += 1
+            await asyncio.sleep(backoff(attempt))
+
+
+async def send_beats(reader: "Reader", send, interval_ms: int) -> None:
+    """The heartbeat task, kept out of `run` so it can be cancelled cleanly."""
+    try:
+        await reader.beat(send, interval_ms)
+    except asyncio.CancelledError:
+        pass
+
+
+def _default_connect(url: str):
+    """Imported here so the module can be tested with no websockets installed."""
+    from websockets.asyncio.client import connect
+
+    return connect(url, max_size=None)

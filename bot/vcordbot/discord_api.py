@@ -21,6 +21,84 @@ class DiscordError(RuntimeError):
     pass
 
 
+async def post_and_tell_id(
+    channel_id: str, token: str, *, content: str = "",
+    embed: dict | None = None, allowed_role: str = "",
+    client: httpx.AsyncClient | None = None,
+) -> str | None:
+    """
+    Send one message and return its id.
+
+    ⚠ `post_message` answers only whether it landed, which is all an
+    announcement needs. A bridge needs the id: a reaction arrives naming a
+    message, and with nothing to match it against it is a number on nothing.
+
+    Returns None on any failure, for the same reason `post_message` returns
+    False — a Discord outage must not fail somebody's submission.
+    """
+    payload: dict = {
+        "allowed_mentions": {"parse": [],
+                             "roles": [allowed_role] if allowed_role else []},
+    }
+    if content:
+        payload["content"] = content
+    if embed:
+        payload["embeds"] = [embed]
+
+    async def _send(c: httpx.AsyncClient) -> str | None:
+        r = await c.post(f"{API}/channels/{channel_id}/messages",
+                         json=payload,
+                         headers={"Authorization": f"Bot {token}",
+                                  "User-Agent": "vcordbot/1.0"},
+                         timeout=10.0)
+        if r.status_code in (403, 404, 429):
+            log.warning("could not post to %s: %s", channel_id, r.status_code)
+            return None
+        r.raise_for_status()
+        return str((r.json() or {}).get("id") or "") or None
+
+    try:
+        if client is not None:
+            return await _send(client)
+        async with httpx.AsyncClient() as c:
+            return await _send(c)
+    except Exception as exc:                       # noqa: BLE001
+        log.warning("could not post: %s", type(exc).__name__)
+        return None
+
+
+async def add_reaction(channel_id: str, message_id: str, token: str,
+                       emoji: str,
+                       client: httpx.AsyncClient | None = None) -> bool:
+    """
+    Put the voting reaction on, so nobody has to know which emoji counts.
+
+    ⚠ A vote that only works if you guess the right emoji is a vote nobody
+    casts. The bot reacts first and the channel taps what is already there.
+    """
+    import urllib.parse
+
+    quoted = urllib.parse.quote(emoji)
+
+    async def _send(c: httpx.AsyncClient) -> bool:
+        r = await c.put(
+            f"{API}/channels/{channel_id}/messages/{message_id}"
+            f"/reactions/{quoted}/@me",
+            headers={"Authorization": f"Bot {token}",
+                     "User-Agent": "vcordbot/1.0"},
+            timeout=10.0)
+        return r.status_code in (200, 204)
+
+    try:
+        if client is not None:
+            return await _send(client)
+        async with httpx.AsyncClient() as c:
+            return await _send(c)
+    except Exception as exc:                       # noqa: BLE001
+        log.warning("could not react: %s", type(exc).__name__)
+        return False
+
+
 async def post_message(channel_id: str, token: str, *, content: str = "",
                        embed: dict | None = None,
                        allowed_role: str = "",

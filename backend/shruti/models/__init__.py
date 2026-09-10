@@ -1403,6 +1403,6 @@ from shruti.models.accounts import (  # noqa: E402,F401
 # with it, and it would have looked like a perfectly ordinary migration.
 from shruti.models.devices import *  # noqa: E402,F403
 from shruti.models.practice import (  # noqa: E402,F401
-    PracticeComment, PracticeReading, PracticeReport, PracticeStrike,
-    PracticeVote, PracticeWork,
+    PracticeBridge, PracticeComment, PracticeReading, PracticeReport,
+    PracticeStrike, PracticeVote, PracticeWork,
 )

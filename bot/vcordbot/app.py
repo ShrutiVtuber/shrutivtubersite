@@ -28,7 +28,8 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 from fastapi import FastAPI, Header, HTTPException, Request
 from pydantic import BaseModel
 
-from vcordbot import announce, bridge, commands, config, discord_api, render, storage
+from vcordbot import (announce, bridge, commands, config, discord_api, gateway,
+                      render, storage)
 from vcordbot.astro import Astro
 from vcordbot.dispatch import dispatch
 
@@ -56,6 +57,66 @@ DEFERRED_CHANNEL_MESSAGE = 5
 CFG = config.load()
 
 
+_reader: "gateway.Reader | None" = None
+_listening: "asyncio.Task | None" = None
+
+
+def _internal_site() -> str:
+    """
+    Where the room is, from in here.
+
+    ⚠ Not the public URL when there is an internal one: the bot and the site
+    are in the same compose network, and going out to the internet and back to
+    reach a container two hops away is a round trip that fails whenever DNS or
+    the proxy has a bad moment.
+    """
+    return (os.environ.get("SHRUTI_INTERNAL_SITE", "").strip()
+            or os.environ.get("SHRUTI_SITE_URL", "").strip()
+            or CFG.site_url)
+
+
+async def _channel_said(message: dict) -> None:
+    """A reply in the channel becomes a comment on the work it answers."""
+    reference = message.get("message_reference") or {}
+    replying_to = str(reference.get("message_id") or "")
+    if not replying_to:
+        # ⚠ Only replies, never every message. The channel is a channel:
+        # sweeping all of it into somebody's reading would fill the room with
+        # conversation that was never about it.
+        return
+
+    author = message.get("author") or {}
+    who = (author.get("global_name") or author.get("username") or "").strip()
+    body = (message.get("content") or "").strip()
+    if not (who and body):
+        return
+
+    await bridge.tell_the_site(
+        "comment",
+        {"message_id": replying_to, "who": who, "body_md": body},
+        site_url=_internal_site(),
+        secret=os.environ.get("SHRUTI_INTERNAL_SECRET", "").strip(),
+    )
+
+
+async def _channel_voted(event: dict, on: bool) -> None:
+    """The star reaction, counted as a vote."""
+    emoji = (event.get("emoji") or {}).get("name") or ""
+    if emoji != bridge.VOTE:
+        return          # somebody reacting with something else is not a vote
+
+    await bridge.tell_the_site(
+        "vote",
+        {
+            "message_id": str(event.get("message_id") or ""),
+            "who": str(event.get("user_id") or ""),
+            "on": on,
+        },
+        site_url=_internal_site(),
+        secret=os.environ.get("SHRUTI_INTERNAL_SECRET", "").strip(),
+    )
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     """
@@ -65,7 +126,7 @@ async def lifespan(_: FastAPI):
     REST — so it is a task, not a process. Cancelled cleanly on shutdown so a
     redeploy does not leave a sweep half-finished.
     """
-    global _watcher
+    global _watcher, _reader, _listening
     storage.setup()
     if CFG.token:
         _watcher = asyncio.create_task(
@@ -73,16 +134,41 @@ async def lifespan(_: FastAPI):
         log.info("watching for streams every %ss", announce.INTERVAL)
     else:
         log.warning("no token — the watcher is NOT running")
+
+    # ⚠ The bridge's inbound half, which was written and never started.
+    #
+    # It needs a channel and a token and nothing else to READ reactions —
+    # GUILD_MESSAGE_REACTIONS is not a privileged intent — so votes from the
+    # channel work the day this deploys. Replies additionally need
+    # MESSAGE_CONTENT switched on in the developer portal, and the reader says
+    # so in the log rather than sitting quiet if it is off.
+    if CFG.token and CFG.practice_channel_id:
+        _reader = gateway.Reader(
+            CFG.token,
+            channel_id=CFG.practice_channel_id,
+            on_message=_channel_said,
+            on_reaction=_channel_voted,
+        )
+        _listening = asyncio.create_task(_reader.run())
+        log.info("listening to the practice channel")
+    else:
+        log.info("no practice channel — the bridge only goes outward")
+
     try:
         yield
     finally:
-        if _watcher:
-            _watcher.cancel()
-            try:
-                await _watcher
-            except asyncio.CancelledError:
-                pass
-            _watcher = None
+        if _reader is not None:
+            _reader.stop()
+        for task in (_watcher, _listening):
+            if task:
+                task.cancel()
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    pass
+        _watcher = None
+        _listening = None
+        _reader = None
 
 
 app = FastAPI(title="vcordbot", docs_url=None, redoc_url=None, openapi_url=None,
@@ -158,13 +244,26 @@ async def practice_submitted(
     if not secret or not hmac.compare_digest(x_shruti_internal, secret):
         raise HTTPException(401, "no")
 
-    posted = await bridge.announce_submission(
+    site_url = os.environ.get("SHRUTI_SITE_URL", "https://shrutivtuber.com")
+    message_id = await bridge.announce_submission(
         body.model_dump(),
         channel_id=cfg.practice_channel_id,
         token=cfg.token,
-        site_url=os.environ.get("SHRUTI_SITE_URL", "https://shrutivtuber.com"),
+        site_url=site_url,
     )
-    return {"ok": True, "posted": posted}
+
+    # ⚠ Tell the room which message it became, or the bridge only goes one
+    # way: a reaction on this message would arrive naming an id the room has
+    # never heard of, and be dropped as a reaction to nothing.
+    if message_id:
+        await bridge.tell_the_site(
+            f"{body.id}/message",
+            {"message_id": message_id, "channel_id": cfg.practice_channel_id},
+            site_url=os.environ.get("SHRUTI_INTERNAL_SITE", site_url),
+            secret=secret,
+        )
+
+    return {"ok": True, "posted": bool(message_id)}
 
 
 @app.post("/interactions")

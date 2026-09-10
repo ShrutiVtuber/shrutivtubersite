@@ -222,4 +222,8 @@ def test_discord_being_down_does_not_fail_a_submission() -> None:
             {"id": 1, "author": "A", "signs": ["leo"], "opening": "x"},
             channel_id="", token="", site_url="https://x")
 
-    assert asyncio.run(go()) is False
+    # ⚠ None, not False. The announcement now returns the MESSAGE ID, because
+    # every vote and reply coming back from the channel names a message and
+    # needs something to be matched against. The claim under test is unchanged:
+    # a failure here is quiet and the submission is already saved.
+    assert asyncio.run(go()) is None

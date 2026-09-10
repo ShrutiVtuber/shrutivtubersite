@@ -84,7 +84,19 @@ class PracticeVote(TimestampMixin, table=True):
 
     id: Optional[int] = Field(default=None, primary_key=True)
     work_id: int = Field(index=True, foreign_key="practice_work.id")
-    user_id: int = Field(index=True, foreign_key="site_user.id")
+
+    # ⚠ Null for a vote arriving over the Discord bridge, where there is no
+    # site account. `from_discord` carries who Discord says it was, and the
+    # uniqueness that makes one vote one vote holds on both halves separately.
+    #
+    # ⚠ Never merged with a site account. Somebody who votes in Discord and
+    # also has an account can vote twice — that is the honest answer, because
+    # the bridge cannot know they are the same person and inventing a link
+    # between a Discord id and an email is a claim about somebody this app
+    # cannot support.
+    user_id: Optional[int] = Field(
+        default=None, index=True, foreign_key="site_user.id")
+    from_discord: str = ""
 
 
 class PracticeComment(TimestampMixin, table=True):
@@ -94,7 +106,11 @@ class PracticeComment(TimestampMixin, table=True):
 
     id: Optional[int] = Field(default=None, primary_key=True)
     work_id: int = Field(index=True, foreign_key="practice_work.id")
-    user_id: int = Field(index=True, foreign_key="site_user.id")
+
+    # ⚠ Null for a comment bridged from Discord — see `from_discord` below.
+    # Exactly one of the two is set, and the database says so.
+    user_id: Optional[int] = Field(
+        default=None, index=True, foreign_key="site_user.id")
     body_md: str = ""
     # She removes a comment; the row stays so the thread keeps its shape.
     hidden: bool = False
@@ -172,3 +188,21 @@ class PracticeStrike(TimestampMixin, table=True):
     until: Optional[datetime] = Field(default=None, sa_type=UTC_TS)
     reason: str = ""
     lifted_at: Optional[datetime] = Field(default=None, sa_type=UTC_TS)
+
+
+class PracticeBridge(TimestampMixin, table=True):
+    """
+    Which Discord message is which piece of work.
+
+    ⚠ Without this a reaction is a number on a message nothing can attribute,
+    and a reply is a comment on nothing. The bot posts the announcement and
+    tells the site the message id; every vote and comment arriving from the
+    channel is matched back through here.
+    """
+
+    __tablename__ = "practice_bridge"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    work_id: int = Field(index=True, foreign_key="practice_work.id")
+    message_id: str = Field(index=True, unique=True)
+    channel_id: str = ""

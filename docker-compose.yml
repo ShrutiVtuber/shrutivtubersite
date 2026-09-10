@@ -114,6 +114,14 @@ services:
       # — the backend is a reader here, the agent owns the volume.
       SHRUTI_JOURNAL_DIR: /srv/journal
       SHRUTI_DATABASE_URL: postgresql+asyncpg://${SHRUTI_POSTGRES_USER:-shruti}:${SHRUTI_POSTGRES_PASSWORD}@postgres:5432/${SHRUTI_POSTGRES_DB:-shruti}
+      # ⚠ The practice bridge, both directions. Neither half can run without
+      # this pair, and the failure is silent at both ends: the site logs "the
+      # practice channel was not told" once and carries on, and the bot's
+      # endpoint refuses everything as though it were being probed.
+      #
+      # Empty is a working state — no bridge, and the room is app-only.
+      SHRUTI_INTERNAL_SECRET: ${SHRUTI_INTERNAL_SECRET:-}
+      VCORDBOT_INTERNAL_URL: ${VCORDBOT_INTERNAL_URL:-http://bot:8000}
     volumes:
       - media:/app/media
       - packs:/app/packs
@@ -156,6 +164,16 @@ services:
       SHRUTI_ASTRO_INTERNAL: http://shruti-astro:8000
       SHRUTI_SITE_URL: ${SHRUTI_SITE_URL:-https://shrutivtuber.com}
       VCORDBOT_URL: ${VCORDBOT_URL:-https://bot.shrutivtuber.com}
+      # The other end of the bridge. ⚠ The bot still holds no site credential:
+      # this secret opens four endpoints that put words in her practice room
+      # and nothing else — it is not a session, and it reads nothing.
+      SHRUTI_INTERNAL_SECRET: ${SHRUTI_INTERNAL_SECRET:-}
+      # ⚠ Over the compose network, not out to the internet and back. Going
+      # the long way to reach a container two hops away fails whenever DNS or
+      # the proxy has a bad moment, and the bridge is the first thing to
+      # notice it.
+      SHRUTI_INTERNAL_SITE: ${SHRUTI_INTERNAL_SITE:-http://caddy:8080}
+      SHRUTI_DISCORD_PRACTICE_CHANNEL: ${SHRUTI_DISCORD_PRACTICE_CHANNEL:-}
     ports:
       # Bound to loopback: Caddy terminates TLS and proxies. Discord must reach
       # it over HTTPS with a valid certificate, so it is never exposed directly.

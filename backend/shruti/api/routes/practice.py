@@ -29,8 +29,8 @@ from shruti.api.deps import require_admin
 from shruti.core.db import get_session
 from shruti.models.accounts import User
 from shruti.models.practice import (
-    PracticeComment, PracticeReading, PracticeReport, PracticeStrike,
-    PracticeVote, PracticeWork,
+    PracticeBridge, PracticeComment, PracticeReading, PracticeReport,
+    PracticeStrike, PracticeVote, PracticeWork,
 )
 
 log = logging.getLogger(__name__)
@@ -251,7 +251,243 @@ async def read_draft(
                 PracticeReading.work_id == work.id, PracticeReading.sign == sign)
         )
     ).scalars().first()
-    return {"bodyMd": reading.body_md if reading else "", "workId": work.id}
+
+    # ⚠ Which signs of this period already have words in them, and how many.
+    #
+    # Somebody writing twelve has no way to tell which four they have done
+    # without opening all twelve and reading them — the sign chips look
+    # identical whether there is a paragraph behind one or nothing. This is the
+    # one fact that turns a row of chips into a piece of work in progress.
+    written = (
+        await session.execute(
+            select(PracticeReading.sign).where(
+                PracticeReading.work_id == work.id,
+                func.length(func.trim(PracticeReading.body_md)) > 0,
+            )
+        )
+    ).scalars().all()
+
+    return {
+        "bodyMd": reading.body_md if reading else "",
+        "workId": work.id,
+        "written": sorted(written, key=lambda x: SIGNS.index(x)
+                          if x in SIGNS else 99),
+    }
+
+
+# ── the Discord bridge, coming back ─────────────────────────────────────────
+#
+# ⚠ **Nothing here has a site account behind it.** Somebody in the channel has
+# not signed up, agreed to anything, or been made bannable. So everything that
+# arrives this way is MARKED as coming from Discord, carries the name Discord
+# gave it, and is never silently attributed to somebody real.
+#
+# ⚠ These endpoints are not public. They post under her name into her room, so
+# an open one is an open one for putting words there. The shared secret is
+# checked in constant time and a missing secret refuses everything rather than
+# defaulting to open — the same rule as the notification endpoint.
+
+
+def _from_the_bot(request: Request) -> None:
+    import hmac
+    import os
+
+    secret = os.environ.get("SHRUTI_INTERNAL_SECRET", "").strip()
+    given = request.headers.get("X-Shruti-Internal", "")
+    if not secret or not hmac.compare_digest(given, secret):
+        raise HTTPException(401, "no")
+
+
+class BridgeMessage(BaseModel):
+    message_id: str = Field(min_length=1, max_length=40)
+    channel_id: str = Field(default="", max_length=40)
+
+
+@router.post("/bridge/{work_id}/message", status_code=201)
+async def bridge_message(
+    work_id: int, body: BridgeMessage, request: Request,
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """The bot saying which message it posted, so replies can find their way."""
+    _from_the_bot(request)
+    work = await session.get(PracticeWork, work_id)
+    if work is None:
+        raise HTTPException(404, "no such work")
+
+    session.add(PracticeBridge(
+        work_id=work_id, message_id=body.message_id,
+        channel_id=body.channel_id))
+    try:
+        await session.commit()
+    except IntegrityError:
+        # Announced twice — the bot restarted mid-post, or Discord redelivered.
+        await session.rollback()
+    return {"ok": True}
+
+
+class BridgeSaid(BaseModel):
+    message_id: str = Field(min_length=1, max_length=40)
+    who: str = Field(min_length=1, max_length=80)
+    body_md: str = Field(min_length=1, max_length=4000)
+
+
+@router.post("/bridge/comment", status_code=201)
+async def bridge_comment(
+    body: BridgeSaid, request: Request,
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """Somebody replied in the channel; it becomes a comment on the work."""
+    _from_the_bot(request)
+    link = (
+        await session.execute(
+            select(PracticeBridge).where(
+                PracticeBridge.message_id == body.message_id)
+        )
+    ).scalars().first()
+    if link is None:
+        # A reply to something that is not a submission. Not an error — most
+        # of the channel is not about a reading.
+        return {"ok": True, "matched": False}
+
+    work = await session.get(PracticeWork, link.work_id)
+    if work is None or work.submitted_at is None or work.hidden:
+        return {"ok": True, "matched": False}
+
+    session.add(PracticeComment(
+        work_id=link.work_id, user_id=None,
+        from_discord=body.who.strip(), body_md=body.body_md.strip()))
+    await session.commit()
+
+    if work.user_id:
+        try:
+            from shruti.core.notify import tell
+
+            await tell(
+                session, "replies",
+                title="Somebody in Discord read your reading",
+                body=f"{body.who.strip()} said something about it.",
+                url=f"/practice/{link.work_id}",
+                to_user=work.user_id,
+            )
+        except Exception as exc:                   # noqa: BLE001
+            log.warning("could not tell the author: %s", type(exc).__name__)
+
+    return {"ok": True, "matched": True}
+
+
+class BridgeVote(BaseModel):
+    message_id: str = Field(min_length=1, max_length=40)
+    who: str = Field(min_length=1, max_length=40)
+    on: bool = True
+
+
+@router.post("/bridge/vote")
+async def bridge_vote(
+    body: BridgeVote, request: Request,
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """
+    A reaction in the channel, counted as a vote.
+
+    ⚠ Half the room reads in Discord. A bridge that carries readings out and
+    comments in but not votes makes the highest-voted list a measurement of
+    which half of the audience happened to be in the app — and that number is
+    the one she picks readings from.
+    """
+    _from_the_bot(request)
+    link = (
+        await session.execute(
+            select(PracticeBridge).where(
+                PracticeBridge.message_id == body.message_id)
+        )
+    ).scalars().first()
+    if link is None:
+        return {"ok": True, "matched": False}
+
+    work = await session.get(PracticeWork, link.work_id)
+    if work is None or work.submitted_at is None or work.hidden:
+        return {"ok": True, "matched": False}
+
+    who = body.who.strip()
+    existing = (
+        await session.execute(
+            select(PracticeVote).where(
+                PracticeVote.work_id == link.work_id,
+                PracticeVote.from_discord == who)
+        )
+    ).scalars().first()
+
+    if body.on and existing is None:
+        session.add(PracticeVote(work_id=link.work_id, from_discord=who))
+        try:
+            await session.commit()
+        except IntegrityError:
+            await session.rollback()
+    elif not body.on and existing is not None:
+        await session.delete(existing)
+        await session.commit()
+
+    total = (
+        await session.execute(
+            select(func.count()).select_from(PracticeVote)
+            .where(PracticeVote.work_id == link.work_id)
+        )
+    ).scalar_one()
+    return {"ok": True, "matched": True, "votes": total}
+
+
+class BridgeReport(BaseModel):
+    message_id: str = Field(min_length=1, max_length=40)
+    who: str = Field(min_length=1, max_length=40)
+    reason: str = Field(default="other", max_length=32)
+    detail: str = Field(default="", max_length=1000)
+
+
+@router.post("/bridge/report", status_code=201)
+async def bridge_report(
+    body: BridgeReport, request: Request,
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """
+    Somebody in the channel saying a reading should not be there.
+
+    ⚠ Without this the bridge is a place where nothing can be said to be
+    wrong — half the room reading and none of them able to report.
+    """
+    _from_the_bot(request)
+    link = (
+        await session.execute(
+            select(PracticeBridge).where(
+                PracticeBridge.message_id == body.message_id)
+        )
+    ).scalars().first()
+    if link is None:
+        return {"ok": True, "matched": False}
+
+    work = await session.get(PracticeWork, link.work_id)
+    if work is None or work.submitted_at is None:
+        return {"ok": True, "matched": False}
+
+    was_hidden = work.hidden
+    reason = body.reason if body.reason in REPORT_REASONS else "other"
+    session.add(PracticeReport(
+        work_id=link.work_id, from_discord=body.who.strip(),
+        reason=reason, detail=body.detail.strip()))
+    try:
+        await session.commit()
+    except IntegrityError:
+        await session.rollback()
+        return {"ok": True, "matched": True, "hidden": was_hidden}
+
+    total = await _count_reports(session, work_id=link.work_id)
+    if total >= REPORTS_TO_HIDE and not was_hidden:
+        work.hidden = True
+        work.hidden_by = "reports"
+        await session.commit()
+        await _tell_her(session, link.work_id, total)
+        was_hidden = True
+
+    return {"ok": True, "matched": True, "hidden": was_hidden}
 
 
 @router.post("/{work_id}/submit")

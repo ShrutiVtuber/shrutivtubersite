@@ -23,13 +23,17 @@ import logging
 
 import httpx
 
-from vcordbot.discord_api import post_message
+from vcordbot.discord_api import add_reaction, post_and_tell_id
 
 log = logging.getLogger("vcordbot.bridge")
 
 # How much of a reading goes into the channel. Enough to decide whether to open
 # it; not so much that a week of readings fills the scrollback.
 OPENING = 400
+
+# ⚠ The one reaction that counts as a vote, and the bot puts it there itself.
+# A vote that only works if you guess the right emoji is a vote nobody casts.
+VOTE = "\u2b50"          # ⭐
 
 
 def submission_message(work: dict, site_url: str) -> tuple[str, dict]:
@@ -61,21 +65,59 @@ def submission_message(work: dict, site_url: str) -> tuple[str, dict]:
 async def announce_submission(
     work: dict, *, channel_id: str, token: str, site_url: str,
     client: httpx.AsyncClient | None = None,
-) -> bool:
+) -> str | None:
     """
-    Put a submission in the channel.
+    Put a submission in the channel, and say which message it became.
 
-    ⚠ Returns False rather than raising. A Discord outage must not fail
+    ⚠ Returns None rather than raising. A Discord outage must not fail
     somebody's submission — they wrote it, it is saved, and the channel can
     catch up. Losing the announcement is a small thing; losing the work is not.
+
+    ⚠ The MESSAGE ID is the return value, not a bool. Every vote and every
+    reply that comes back names a message, and with nothing to match it against
+    it is a number on nothing.
     """
     if not (channel_id and token):
-        return False
+        return None
     content, embed = submission_message(work, site_url)
+    message_id = await post_and_tell_id(
+        channel_id, token, content=content, embed=embed, client=client)
+    if message_id:
+        # The bot votes first so the channel has something to tap.
+        await add_reaction(channel_id, message_id, token, VOTE, client=client)
+    return message_id
+
+
+async def tell_the_site(
+    path: str, payload: dict, *, site_url: str, secret: str,
+    client: httpx.AsyncClient | None = None,
+) -> dict | None:
+    """
+    Hand something from the channel back to the room.
+
+    ⚠ Fails soft and says so in the log. A reply that does not make it across
+    is a comment nobody sees; a raised exception here is the gateway socket
+    dying and the whole bridge going quiet, which is far worse.
+    """
+    if not (site_url and secret):
+        return None
+
+    async def _send(c: httpx.AsyncClient) -> dict | None:
+        r = await c.post(
+            f"{site_url}/api/practice/bridge/{path}",
+            json=payload,
+            headers={"X-Shruti-Internal": secret},
+            timeout=10.0)
+        if r.status_code >= 400:
+            log.warning("the room refused %s: %s", path, r.status_code)
+            return None
+        return r.json()
+
     try:
-        await post_message(channel_id, token, content=content, embed=embed,
-                           client=client)
-        return True
+        if client is not None:
+            return await _send(client)
+        async with httpx.AsyncClient() as c:
+            return await _send(c)
     except Exception as exc:                       # noqa: BLE001
-        log.warning("practice announcement not posted: %s", type(exc).__name__)
-        return False
+        log.warning("could not reach the room: %s", type(exc).__name__)
+        return None
