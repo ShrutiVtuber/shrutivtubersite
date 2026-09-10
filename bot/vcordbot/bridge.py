@@ -104,53 +104,72 @@ def submission_message(work: dict, site_url: str) -> tuple[str, dict]:
     return "", embed
 
 
-async def announce_submission(
+def thread_name(work: dict) -> str:
+    """What the post is called in a list of posts."""
+    author = work.get("author") or "somebody"
+    signs = work.get("signs") or []
+    what = f"{len(signs)} signs" if len(signs) > 1 else (
+        signs[0].title() if signs else "a reading")
+    return (work.get("title") or f"{what} — {author}")[:100]
+
+
+async def announce(
     work: dict, *, channel_id: str, token: str, site_url: str,
     client: httpx.AsyncClient | None = None,
-) -> str | None:
+) -> tuple[str, str] | None:
     """
-    Put a submission in the channel, and say which message it became.
+    Put a submission in the channel and open its thread.
 
-    ⚠ Returns None rather than raising. A Discord outage must not fail
-    somebody's submission — they wrote it, it is saved, and the channel can
-    catch up. Losing the announcement is a small thing; losing the work is not.
+    Returns `(message_id, thread_id)` — the message a vote or a whole-set reply
+    names, and the thread each reading goes into.
 
-    ⚠ The MESSAGE ID is the return value, not a bool. Every vote and every
-    reply that comes back names a message, and with nothing to match it against
-    it is a number on nothing.
+    ⚠ **A thread in a text channel hangs off a message.** There is no other
+    kind here: the message stays in the channel and the thread opens beneath
+    it, which is how a text channel full of threads is built. The message is
+    posted first because a thread needs something to hang from, so the two
+    calls cannot be collapsed into one.
+
+    ⚠ Fails soft, and returns None rather than raising. A Discord outage must
+    not fail somebody's submission — they wrote it, it is saved, and the
+    channel can catch up. A thread that could not be opened leaves the
+    announcement standing and votable. Losing the announcement is a small
+    thing; losing the work is not.
     """
     if not (channel_id and token):
-        return None
+        return None                 # no bridge configured; a working state
+
     content, embed = submission_message(work, site_url)
     message_id = await post_and_tell_id(
         channel_id, token, content=content, embed=embed, client=client)
-    if message_id:
-        # The bot votes first so the channel has something to tap.
-        await add_reaction(channel_id, message_id, token, VOTE, client=client)
-    return message_id
+    if not message_id:
+        return None
+    # The bot votes first so the channel has something to tap.
+    await add_reaction(channel_id, message_id, token, VOTE, client=client)
+    thread_id = await start_thread(
+        channel_id, message_id, token, thread_name(work), client=client) or ""
+    return message_id, thread_id
 
 
 async def announce_the_readings(
-    work: dict, *, message_id: str, channel_id: str, token: str, site_url: str,
+    work: dict, *, thread_id: str, token: str, site_url: str,
     client: httpx.AsyncClient | None = None,
 ) -> tuple[str, list[tuple[str, str]]]:
     """
-    Open a thread under the announcement and put each reading in it.
+    Put each reading into the thread the announcement opened.
 
     Returns the thread id and a list of `(sign, message_id)` — everything the
     site needs to route a reply to the reading it answers.
 
-    ⚠ **This is where the no-nested-threads limit lands.** A thread hangs off a
-    message in a CHANNEL; a message inside a thread cannot have one of its own.
-    So the organisation people expect — a conversation per reading — is made
-    out of REPLIES inside one thread rather than out of threads inside threads.
-    Discord shows the "replying to →" reference either way, and `sign` on the
-    bridge row is what makes it mean something on this side.
+    ⚠ **The organisation is made of REPLIES, not of nested threads.** Discord
+    has no thread inside a thread: one hangs off a message in a channel, and a
+    message already inside a thread cannot have one. So each reading is its own
+    message in the thread, and answering a reading means replying to its
+    message — which Discord shows with a "replying to →" reference. `sign` on
+    the bridge row is what makes that mean something on this side.
 
-    ⚠ Fails soft, one reading at a time. A thread that could not be opened
-    leaves the announcement standing and votable, and a single reading that did
-    not post is one reading missing from a thread rather than a submission that
-    errored. The work is saved either way; this is presentation.
+    ⚠ Fails soft, one reading at a time. A single reading that did not post is
+    one reading missing from a thread rather than a submission that errored.
+    The work is saved either way; this is presentation.
     """
     # ⚠ model_dump() gives dicts here, but a caller with pydantic objects is
     # easy to write by accident; both are read the same way.
@@ -158,13 +177,7 @@ async def announce_the_readings(
         r if isinstance(r, dict) else r.model_dump()
         for r in (work.get("readings") or [])
     ]
-    if not readings:
-        return "", []
-
-    name = work.get("title") or f"{work.get('author') or 'somebody'}'s readings"
-    thread_id = await start_thread(
-        channel_id, message_id, token, name, client=client)
-    if not thread_id:
+    if not (readings and thread_id):
         return "", []
 
     posted: list[tuple[str, str]] = []

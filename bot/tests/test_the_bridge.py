@@ -218,12 +218,13 @@ def test_discord_being_down_does_not_fail_a_submission() -> None:
     losing the work is not.
     """
     async def go():
-        return await bridge.announce_submission(
+        return await bridge.announce(
             {"id": 1, "author": "A", "signs": ["leo"], "opening": "x"},
             channel_id="", token="", site_url="https://x")
 
-    # ⚠ None, not False. The announcement now returns the MESSAGE ID, because
-    # every vote and reply coming back from the channel names a message and
-    # needs something to be matched against. The claim under test is unchanged:
-    # a failure here is quiet and the submission is already saved.
+    # ⚠ None, not False, and not a pair. The announcement returns the message
+    # id and the thread its readings go into, because every vote and reply
+    # coming back from the channel names one of them and needs something to be
+    # matched against. The claim under test is unchanged: a failure here is
+    # quiet and the submission is already saved.
     assert asyncio.run(go()) is None

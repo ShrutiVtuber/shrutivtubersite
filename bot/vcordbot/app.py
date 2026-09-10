@@ -257,12 +257,16 @@ async def practice_submitted(
         raise HTTPException(401, "no")
 
     site_url = os.environ.get("SHRUTI_SITE_URL", "https://shrutivtuber.com")
-    message_id = await bridge.announce_submission(
+    # ⚠ Two values: the message a vote or a whole-set reply names, and the
+    # thread the readings go into. In a forum they are a post and its own id;
+    # in a text channel they are a message and the thread opened beneath it.
+    announced = await bridge.announce(
         body.model_dump(),
         channel_id=cfg.practice_channel_id,
         token=cfg.token,
         site_url=site_url,
     )
+    message_id, thread_id = announced or ("", "")
 
     # ⚠ Tell the room which message it became, or the bridge only goes one
     # way: a reaction on this message would arrive naming an id the room has
@@ -280,10 +284,9 @@ async def practice_submitted(
         # The readings themselves, in a thread under the announcement, one
         # message each. Registered the same way and with their sign, so a reply
         # to one of them is a comment on THAT reading rather than on the week.
-        thread_id, posted = await bridge.announce_the_readings(
+        _, posted = await bridge.announce_the_readings(
             body.model_dump(),
-            message_id=message_id,
-            channel_id=cfg.practice_channel_id,
+            thread_id=thread_id,
             token=cfg.token,
             site_url=site_url,
         )

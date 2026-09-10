@@ -35,16 +35,95 @@ def test_the_announcement_returns_the_message_id() -> None:
     attribute, and is dropped as a reaction to nothing — with no error
     anywhere.
     """
-    source = inspect.getsource(bridge.announce_submission)
-    assert "-> str | None" in source
+    source = inspect.getsource(bridge.announce)
     assert "post_and_tell_id" in source
+    assert "return message_id, thread_id" in source, (
+        "the caller is not told which thread the readings go into"
+    )
 
 
 def test_the_bot_reacts_first() -> None:
     """A vote that only works if you guess the right emoji is a vote nobody
     casts."""
-    source = inspect.getsource(bridge.announce_submission)
-    assert "add_reaction" in source
+    assert "add_reaction" in inspect.getsource(bridge.announce)
+
+
+def test_the_readings_go_into_the_thread() -> None:
+    """
+    ⚠ **This test exists because the function was deleted and nothing noticed.**
+
+    Removing a dead wrapper took `announce_the_readings` with it. Every one of
+    the 146 tests still passed — nothing named it — and the failure surfaced as
+    an AttributeError in the bot's log, after the announcement had already been
+    posted: a thread in the channel with nothing inside it.
+    """
+    posted: list[tuple[str, dict]] = []
+
+    async def fake(channel_id, token, *, content="", embed=None,
+                   allowed_role="", client=None):
+        posted.append((channel_id, embed or {}))
+        return f"m{len(posted)}"
+
+    original = bridge.post_and_tell_id
+    bridge.post_and_tell_id = fake
+    try:
+        thread, said = asyncio.run(bridge.announce_the_readings(
+            {"id": 7, "author": "A",
+             "readings": [{"sign": "leo", "bodyMd": "one"},
+                          {"sign": "virgo", "bodyMd": "two"}]},
+            thread_id="T", token="t", site_url="https://x"))
+    finally:
+        bridge.post_and_tell_id = original
+
+    assert thread == "T"
+    assert [s for s, _ in said] == ["leo", "virgo"], (
+        "the readings did not reach the thread, or lost their signs"
+    )
+    assert all(where == "T" for where, _ in posted), (
+        "a reading was posted somewhere other than the thread — in the channel "
+        "the thread exists to keep clear"
+    )
+
+
+def test_a_reading_with_no_thread_is_not_posted_to_the_channel() -> None:
+    """
+    ⚠ The failure mode worth guarding.
+
+    If opening the thread failed, an empty thread id must mean "post nothing",
+    not "post to the channel" — twelve readings spilling into the channel is
+    the mess the thread exists to prevent.
+    """
+    called: list[str] = []
+
+    async def fake(channel_id, token, **kw):
+        called.append(channel_id)
+        return "m"
+
+    original = bridge.post_and_tell_id
+    bridge.post_and_tell_id = fake
+    try:
+        thread, said = asyncio.run(bridge.announce_the_readings(
+            {"id": 7, "readings": [{"sign": "leo", "bodyMd": "one"}]},
+            thread_id="", token="t", site_url="https://x"))
+    finally:
+        bridge.post_and_tell_id = original
+
+    assert (thread, said) == ("", [])
+    assert called == [], "a reading was posted with no thread to put it in"
+
+
+def test_the_announcement_opens_a_thread() -> None:
+    """
+    ⚠ A text channel full of threads is the shape she asked for, and a thread
+    in a text channel can only hang off a message — so the message goes first
+    and the thread opens beneath it. Without this a submission is a lone
+    message in the channel with its readings nowhere.
+    """
+    source = inspect.getsource(bridge.announce)
+    assert "start_thread" in source, (
+        "the announcement never opens a thread, so the readings have nowhere "
+        "to go and the channel gets a bare message"
+    )
 
 
 def test_only_the_vote_emoji_is_a_vote() -> None:
