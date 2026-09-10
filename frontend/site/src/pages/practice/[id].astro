@@ -1,0 +1,376 @@
+---
+/* One piece of practice work, read in one place.
+ *
+ * This page has been linked from Discord since the bridge was built and it did
+ * not exist: every announcement the bot posted carried a dead link. It is the
+ * address in `_tell_discord`, so it is also where anybody arriving from the
+ * channel lands.
+ *
+ * ⚠ **A week of twelve signs is ONE piece of work.** Her words were that a
+ * series should be "submitted, read and voted on as one", and the reading half
+ * of that is here: the signs are tabs, not twelve pages, so somebody can move
+ * between them without losing their place or their scroll.
+ *
+ * ⚠ The switcher is a plain anchor list with a fragment, and the script only
+ * upgrades it. With no JavaScript every sign is on the page, one after another,
+ * and the links jump to them — which is also what a search engine and a screen
+ * reader get.
+ */
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import { asReader, account } from "../../lib/account";
+import { copy } from "../../lib/copy";
+import { renderMarkdown } from "../../lib/markdown";
+import { SIGN_GLYPH, signIndex } from "../../lib/wheel";
+import { asPeriod, label as periodLabel } from "../../lib/periods";
+
+const say = await copy("practice/[id]");
+const id = Astro.params.id ?? "";
+
+/* ⚠ Numeric or nothing. A route parameter goes straight into an API path, and
+   "1 OR 1=1" is a request the backend should never be asked to reason about. */
+if (!/^\d+$/.test(id)) return Astro.rewrite("/404");
+
+const me = await account(Astro);
+const answer = await asReader(Astro, `/api/practice/${id}`);
+if (!answer.ok) return Astro.rewrite("/404");
+
+const work = answer.body as {
+  id: number; author: string; authorId: number; period: string; covers: string;
+  title: string; series: boolean; signs: string[]; votes: number;
+  voted: boolean; submittedAt: string | null; mine: boolean;
+  hidden: boolean; hiddenBy: string;
+  readings: { sign: string; bodyMd: string }[];
+  comments: { id: number; author: string; bodyMd: string; at: string | null;
+              mine: boolean; fromDiscord: boolean }[];
+};
+
+const heading = work.title?.trim()
+  || (work.series
+    ? `${work.signs.length} signs · ${periodLabel(asPeriod(work.period), work.covers)}`
+    : `${titled(work.signs[0] ?? "")} · ${periodLabel(asPeriod(work.period), work.covers)}`);
+
+function titled(s: string) {
+  return s ? s.charAt(0).toUpperCase() + s.slice(1) : "";
+}
+
+const bodies = await Promise.all(
+  work.readings.map(async (r) => ({ ...r, html: await renderMarkdown(r.bodyMd) })),
+);
+const comments = await Promise.all(
+  work.comments.map(async (c) => ({ ...c, html: await renderMarkdown(c.bodyMd) })),
+);
+
+const when = work.submittedAt
+  ? new Date(work.submittedAt).toLocaleDateString("en-GB",
+      { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" })
+  : "";
+
+const REASONS = [
+  ["abuse", "Aimed at a person"],
+  ["hate", "Aimed at a group"],
+  ["sexual", "Sexual, or involving a minor"],
+  ["spam", "Spam or advertising"],
+  ["self-harm", "Somebody who may need help"],
+  ["not-a-reading", "Not a reading at all"],
+  ["other", "Something else"],
+];
+---
+
+<BaseLayout
+  title={`${heading} — practice`}
+  description={say("meta.description",
+    "A reading written for practice, and what the room made of it.")}
+  noindex={!work.submittedAt || work.hidden}
+>
+  <main class="page pw-wrap">
+    {work.hidden && (
+      <p class="pw-down" role="status">
+        {work.hiddenBy === "reports"
+          ? say("down.reports",
+              "This is off the feed: enough people reported it that it was hidden automatically, and Shruti has not looked at it yet. Nothing has been deleted.")
+          : work.hiddenBy === "author"
+          ? say("down.author", "You took this down. Only you can see it.")
+          : say("down.her", "Shruti took this down.")}
+      </p>
+    )}
+
+    <p class="pw-eyebrow">
+      <a href="/practice">{say("eyebrow", "The practice room")}</a>
+      <span aria-hidden="true">·</span>
+      <span>{periodLabel(asPeriod(work.period), work.covers)}</span>
+    </p>
+    <h1 class="pw-title">{heading}</h1>
+    <p class="pw-by">
+      <span>{work.author}</span>
+      {when && <><span aria-hidden="true">·</span><time>{when}</time></>}
+      <span aria-hidden="true">·</span>
+      <span class="pw-votes" data-votes>{work.votes}</span>
+      <span>{say("votes", "found it worth reading")}</span>
+    </p>
+
+    {work.series && (
+      <nav class="pw-signs" aria-label={say("nav.signs", "The signs in this work")}>
+        {work.readings.map((r, i) => (
+          <a href={`#sign-${r.sign}`} data-sign={r.sign}
+             class:list={["pw-sign", i === 0 && "on"]}>
+            <span class="pw-glyph" aria-hidden="true">{SIGN_GLYPH[signIndex(titled(r.sign))]}</span>
+            {titled(r.sign)}
+          </a>
+        ))}
+      </nav>
+    )}
+
+    {bodies.map((r, i) => (
+      <article id={`sign-${r.sign}`} data-body={r.sign}
+               class:list={["pw-body", work.series && i > 0 && "later"]}>
+        {work.series && (
+          <h2 class="pw-sign-head">
+            <span aria-hidden="true">{SIGN_GLYPH[signIndex(titled(r.sign))]}</span>
+            {titled(r.sign)}
+          </h2>
+        )}
+        <div class="pw-prose" set:html={r.html} />
+      </article>
+    ))}
+
+    <div class="pw-acts">
+      {me && !work.mine && (
+        <button type="button" class="pw-vote" data-vote={work.id}
+                aria-pressed={work.voted}>
+          {work.voted ? say("voted", "Worth reading ✓") : say("vote", "Worth reading")}
+        </button>
+      )}
+      {me && !work.mine && (
+        <details class="pw-report">
+          <summary>{say("report", "Report this")}</summary>
+          <form data-report={work.id}>
+            <fieldset>
+              <legend>{say("report.why", "What is wrong with it?")}</legend>
+              {REASONS.map(([value, label], i) => (
+                <label>
+                  <input type="radio" name="reason" value={value} checked={i === 0} />
+                  {label}
+                </label>
+              ))}
+            </fieldset>
+            <label class="pw-detail">
+              {say("report.detail", "Anything else she should know (optional)")}
+              <textarea name="detail" rows="2" maxlength="1000"></textarea>
+            </label>
+            <button type="submit">{say("report.send", "Send the report")}</button>
+            <p class="pw-note">
+              {say("report.note",
+                "It goes to Shruti. If a few people report the same thing it comes off the feed until she has looked.")}
+            </p>
+          </form>
+        </details>
+      )}
+      {work.mine && !work.hidden && (
+        <button type="button" class="pw-withdraw" data-withdraw={work.id}>
+          {say("withdraw", "Take mine down")}
+        </button>
+      )}
+    </div>
+
+    <section class="pw-room">
+      <h2>{comments.length
+        ? say("room.some", "What the room said")
+        : say("room.none", "Nobody has answered yet")}</h2>
+      {comments.length === 0 && (
+        <p class="pw-quiet">
+          {say("room.quiet",
+            "A reading nobody argued with is a reading nobody read closely. Be the first.")}
+        </p>
+      )}
+      {comments.map((c) => (
+        <article class="pw-said">
+          <p class="pw-said-by">
+            <b>{c.author}</b>
+            {c.fromDiscord && (
+              <span class="pw-from">{say("from.discord", "from Discord")}</span>
+            )}
+          </p>
+          <div class="pw-prose" set:html={c.html} />
+        </article>
+      ))}
+
+      {me ? (
+        <form class="pw-say" data-say={work.id}>
+          <label for="pw-body">{say("say.label", "Say what you think")}</label>
+          <textarea id="pw-body" name="body_md" rows="4" maxlength="4000"
+                    placeholder={say("say.hint",
+                      "What worked, and what you would do differently.")}></textarea>
+          <button type="submit">{say("say.send", "Say it")}</button>
+        </form>
+      ) : (
+        <p class="pw-quiet">
+          <a href="/signin">{say("signin", "Sign in")}</a>
+          {" "}
+          {say("signin.rest",
+            "to vote or answer. Reading needs no account, and never will.")}
+        </p>
+      )}
+    </section>
+  </main>
+</BaseLayout>
+
+<style>
+  .pw-wrap { max-width: 46rem; padding-block: var(--space-6) var(--space-9); }
+  .pw-down {
+    margin: 0 0 var(--space-5); padding: var(--space-3) var(--space-4);
+    border: var(--border-w) solid var(--rose); border-radius: var(--radius-md, 10px);
+    background: var(--rose-wash); color: var(--ink);
+    font: 400 var(--text-sm) / 1.6 var(--font-body);
+  }
+  .pw-eyebrow {
+    display: flex; gap: 8px; margin: 0 0 var(--space-2);
+    font: 600 var(--text-xs) var(--font-body); text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--ink-faint);
+  }
+  .pw-eyebrow a { color: inherit; }
+  .pw-title { margin: 0 0 var(--space-2); font: 500 var(--text-h1, 2rem) / 1.2 var(--font-display); color: var(--ink); }
+  .pw-by {
+    display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline; margin: 0 0 var(--space-5);
+    font: 400 var(--text-sm) var(--font-body); color: var(--ink-soft);
+  }
+  .pw-votes { font-variant-numeric: tabular-nums; font-weight: 600; color: var(--ink); }
+
+  /* The signs, as tabs. ⚠ Wraps rather than scrolls: twelve of these on a
+     phone is two rows, and a row that scrolls hides its own last sign. */
+  .pw-signs { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 var(--space-5); }
+  .pw-sign {
+    display: inline-flex; align-items: center; gap: 6px; padding: 6px 11px;
+    border: var(--border-w) solid var(--line); border-radius: 999px;
+    font: 500 var(--text-xs) var(--font-body); color: var(--ink-soft);
+    text-decoration: none; background: var(--surface-card);
+  }
+  .pw-sign.on { border-color: var(--accent); color: var(--accent); background: var(--accent-wash); }
+  .pw-glyph { font-size: 1.1em; }
+
+  .pw-body { margin: 0 0 var(--space-6); scroll-margin-top: var(--space-6); }
+  .pw-sign-head {
+    display: flex; gap: 8px; align-items: baseline; margin: 0 0 var(--space-3);
+    font: 600 var(--text-h4, 1.05rem) var(--font-display); color: var(--ink);
+  }
+  .pw-prose { font: 400 var(--text-body) / 1.75 var(--font-display); color: var(--ink); }
+  .pw-prose :global(p) { margin: 0 0 1em; }
+
+  .pw-acts { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-start; margin: var(--space-6) 0; }
+  .pw-vote, .pw-withdraw, .pw-say button, .pw-report button[type="submit"] {
+    font: 500 var(--text-sm) var(--font-body); padding: 9px 16px; cursor: pointer;
+    border-radius: var(--radius-sm); border: var(--border-w) solid var(--line-strong);
+    background: var(--surface-card); color: var(--ink); min-height: 40px;
+  }
+  .pw-vote[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); background: var(--accent-wash); }
+  .pw-report > summary {
+    cursor: pointer; font: 400 var(--text-xs) var(--font-body);
+    color: var(--ink-faint); padding: 11px 4px;
+  }
+  .pw-report fieldset { border: 0; margin: 0; padding: 0; display: grid; gap: 6px; }
+  .pw-report legend { font: 600 var(--text-xs) var(--font-body); color: var(--ink-soft); padding: 0 0 6px; }
+  .pw-report label { display: flex; gap: 8px; align-items: center; font: 400 var(--text-sm) var(--font-body); color: var(--ink-soft); }
+  .pw-detail { display: grid; gap: 6px; margin: 10px 0; }
+  .pw-note { margin: 8px 0 0; font: 400 var(--text-xs) / 1.6 var(--font-body); color: var(--ink-faint); max-width: 44ch; }
+
+  .pw-room { margin-top: var(--space-7); border-top: var(--border-w) solid var(--line); padding-top: var(--space-5); }
+  .pw-room h2 { margin: 0 0 var(--space-4); font: 600 var(--text-h3, 1.3rem) var(--font-display); color: var(--ink); }
+  .pw-said { margin: 0 0 var(--space-4); }
+  .pw-said-by { display: flex; gap: 8px; align-items: baseline; margin: 0 0 4px; font: 400 var(--text-xs) var(--font-body); color: var(--ink-soft); }
+  .pw-from {
+    font-size: var(--text-xs); color: var(--ink-faint);
+    border: var(--border-w) solid var(--line); border-radius: 999px; padding: 1px 7px;
+  }
+  .pw-quiet { font: 400 var(--text-sm) / 1.6 var(--font-body); color: var(--ink-faint); max-width: 52ch; }
+  .pw-say { display: grid; gap: 8px; margin-top: var(--space-5); }
+  .pw-say label { font: 600 var(--text-xs) var(--font-body); color: var(--ink-soft); }
+  .pw-say button { justify-self: start; }
+  textarea {
+    width: 100%; box-sizing: border-box; padding: 10px 12px;
+    background: var(--surface-inset); color: var(--ink);
+    border: var(--border-w) solid var(--line); border-radius: var(--radius-sm);
+    font: 400 var(--text-sm) / 1.6 var(--font-body); resize: vertical;
+  }
+</style>
+
+<script>
+  /* ⚠ Progressive, not required. Without this every sign is already on the
+     page and the tabs are anchors that jump to them; this only makes them
+     behave as tabs, showing one at a time. */
+  const tabs = Array.from(document.querySelectorAll<HTMLAnchorElement>("[data-sign]"));
+  const bodies = Array.from(document.querySelectorAll<HTMLElement>("[data-body]"));
+  if (tabs.length > 1) {
+    const show = (sign: string) => {
+      for (const b of bodies) b.hidden = b.dataset.body !== sign;
+      for (const t of tabs) t.classList.toggle("on", t.dataset.sign === sign);
+      history.replaceState(null, "", `#sign-${sign}`);
+    };
+    for (const tab of tabs) {
+      tab.addEventListener("click", (event) => {
+        event.preventDefault();
+        show(tab.dataset.sign!);
+      });
+    }
+    const wanted = location.hash.replace("#sign-", "");
+    show(tabs.some((t) => t.dataset.sign === wanted) ? wanted : tabs[0].dataset.sign!);
+  }
+
+  const token = () =>
+    document.cookie.split("; ").find((c) => c.startsWith("shruti_csrf="))?.split("=")[1] ?? "";
+
+  const post = (path: string, body?: unknown) =>
+    fetch(path, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-csrf-token": token() },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+
+  const vote = document.querySelector<HTMLButtonElement>("[data-vote]");
+  vote?.addEventListener("click", async () => {
+    vote.disabled = true;
+    const r = await post(`/api/practice/${vote.dataset.vote}/vote`);
+    if (r.ok) {
+      const answer = await r.json();
+      vote.setAttribute("aria-pressed", String(answer.voted));
+      const count = document.querySelector("[data-votes]");
+      if (count) count.textContent = String(answer.votes);
+    }
+    vote.disabled = false;
+  });
+
+  const report = document.querySelector<HTMLFormElement>("[data-report]");
+  report?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const data = new FormData(report);
+    const r = await post(`/api/practice/${report.dataset.report}/report`, {
+      reason: String(data.get("reason") ?? "other"),
+      detail: String(data.get("detail") ?? ""),
+    });
+    /* ⚠ The same words whether it was the first report or the fourth. Telling
+       somebody "you already reported this" invites a second account, and
+       telling them "that hid it" tells them exactly how many friends it
+       takes. */
+    report.innerHTML =
+      '<p class="pw-note">Thank you — it has gone to Shruti.</p>';
+    if (!r.ok) {
+      report.innerHTML =
+        '<p class="pw-note">That did not send. Nothing was lost — try again.</p>';
+    }
+  });
+
+  const withdraw = document.querySelector<HTMLButtonElement>("[data-withdraw]");
+  withdraw?.addEventListener("click", async () => {
+    if (!confirm("Take this down? Nobody but you will see it.")) return;
+    const r = await post(`/api/practice/${withdraw.dataset.withdraw}/withdraw`);
+    if (r.ok) location.reload();
+  });
+
+  const say = document.querySelector<HTMLFormElement>("[data-say]");
+  say?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const field = say.querySelector<HTMLTextAreaElement>("textarea")!;
+    if (!field.value.trim()) return;
+    const r = await post(`/api/practice/${say.dataset.say}/comments`,
+                         { body_md: field.value });
+    if (r.ok) location.reload();
+  });
+</script>

@@ -78,8 +78,29 @@ export function range(period: Period, covers: string): [string, string] {
 }
 
 /** What a person would call it out loud. */
+/** The shape a period's id must have, so a bad one is a 404 rather than a
+ *  page that says "not written yet" for every string anybody types. */
+export const SHAPE: Record<Period, RegExp> = {
+  daily: /^\d{4}-\d{2}-\d{2}$/,
+  weekly: /^\d{4}-W\d{2}$/,
+  monthly: /^\d{4}-\d{2}$/,
+  yearly: /^\d{4}$/,
+};
+
+
 export function label(period: Period, covers: string): string {
   const day = { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" } as const;
+
+  /* ⚠ A label NEVER throws. `SHAPE` exists a few lines down and says exactly
+   * what each period's id looks like; anything else reaching here is a row
+   * somebody hand-edited, an old record, or a bug upstream — and turning that
+   * into a RangeError takes the whole page down with a 500.
+   *
+   * This is not hypothetical: a practice work with covers "test-1788994061769028"
+   * did exactly that, because `weekDays` called toISOString on an Invalid Date.
+   * Printing the id back is honest and legible; a 500 is neither. */
+  if (!SHAPE[period]?.test(covers)) return covers || "an unnamed period";
+
   if (period === "yearly") return covers;
   if (period === "monthly") {
     const [y, m] = covers.split("-").map(Number);
@@ -96,11 +117,3 @@ export function label(period: Period, covers: string): string {
   });
 }
 
-/** The shape a period's id must have, so a bad one is a 404 rather than a
- *  page that says "not written yet" for every string anybody types. */
-export const SHAPE: Record<Period, RegExp> = {
-  daily: /^\d{4}-\d{2}-\d{2}$/,
-  weekly: /^\d{4}-W\d{2}$/,
-  monthly: /^\d{4}-\d{2}$/,
-  yearly: /^\d{4}$/,
-};
