@@ -22,10 +22,13 @@ import SectionHeader from "../../components/brand/SectionHeader.astro";
 import Badge from "../../components/navigation/Badge.astro";
 import CsrfField from "../../components/forms/CsrfField.astro";
 import TransitWheel from "../../components/chart/TransitWheel.astro";
+import PeriodWheel from "../../components/chart/PeriodWheel.astro";
 import SkyDrawer from "../../components/tools/SkyDrawer.astro";
 import { SITE_API, askAstro } from "../../lib/api";
+import { BODY_GLYPH, SIGN_GLYPH, signIndex } from "../../lib/wheel";
+import { asAdmin } from "../../lib/admin";
 import {
-  PERIODS, asPeriod, currentCovers, isoWeek, label as periodLabel, range, weekDays,
+  asPeriod, currentCovers, isoWeek, label as periodLabel, range, weekDays,
 } from "../../lib/periods";
 import { verifyCsrf } from "../../lib/csrf";
 import { renderMarkdown } from "../../lib/markdown";
@@ -145,16 +148,23 @@ const kinds = period === "yearly"
   ? "ingress,station,lunation,eclipse"
   : "ingress,station,lunation,eclipse,aspect,void";
 
-const [draftsRes, eventsRes, chartRes] = await Promise.all([
+const [draftsRes, eventsRes, chartRes, daysRes] = await Promise.all([
   fetch(`${SITE_API}/api/horoscopes/drafts?period=${period}&covers=${covers}`, { headers }),
   askAstro<{ events: EventRow[] }>(
     `/events?start=${start}&end=${dayAfter(end)}&kinds=${kinds}&true_node=true`, 25000),
   askAstro<{ bodies: ChartBody[] }>(
     `/chart?when=${encodeURIComponent(`${start}T12:00:00Z`)}&lat=51.4779&lon=0` +
     `&tradition=hellenistic&house_system=whole_sign&diagram=false`, 15000),
+  /* Every day of the period, for the movement wheel. Her desk gets the same
+     instrument the public desk has — she asked for the two to be the same tool
+     with a publish button, and a wheel she cannot see is not that. */
+  askAstro<{ days: any[] }>(
+    `/ephemeris?start=${start}&end=${end}&hour=midnight` +
+    `&include_modern=true&events=true`, 25000),
 ]);
 const data: Drafts | null = draftsRes.ok ? await draftsRes.json() : null;
 const events = eventsRes?.data?.events ?? [];
+const days = daysRes?.data?.days ?? [];
 
 const current = data?.drafts.find((d) => d.sign === sign);
 const bodyMd = current?.bodyMd ?? "";
@@ -189,6 +199,37 @@ const describe = (e: EventRow) => {
   if (e.kind === "void") return `Moon void · ${e.detail?.minutes} min`;
   return e.kind;
 };
+
+/* ⚠ The Moon separated, because it OUTNUMBERS everything else. February 2026
+   returns 85 events; 74 of them involve the Moon, 56 of those are its aspects.
+   In one flat list the six planetary events that a monthly column is actually
+   built around sit somewhere inside eighty lines of lunar traffic, and she has
+   to hunt for them every time she opens the desk.
+
+   ⚠ INCLUDES, not equals: a lunation carries ("Moon", "Sun"). Testing for a
+   lone Moon files every new moon under the planets, backwards.
+
+   The loud lunar events — the phases and the eclipses — keep full rows. The
+   crossings and the aspects become chains, and the aspects fold away, because
+   they are reference rather than material. */
+const lunar = (e: EventRow) => e.bodies.includes("Moon");
+const planetEvents = events.filter((e) => !lunar(e));
+const moonLoud = events.filter(
+  (e) => lunar(e) && (e.kind === "lunation" || e.kind === "eclipse"));
+const moonCrossings = events.filter((e) => lunar(e) && e.kind === "ingress");
+const moonAspects = events.filter((e) => lunar(e) && e.kind === "aspect");
+const moonVoids = events.filter((e) => lunar(e) && e.kind === "void");
+
+/* The wheel's hues, so a body wears one colour everywhere on this desk. */
+const HUES = ["sun", "moon", "mercury", "venus", "mars", "jupiter", "saturn"];
+const hueOf = (e: EventRow) => {
+  const n = e.bodies[0]?.toLowerCase() ?? "";
+  return HUES.includes(n) ? `var(--body-${n})` : "var(--ink-faint)";
+};
+/* What the button drops into the column — unchanged in shape, so anything she
+   has already written against it still matches. */
+const insert = (e: EventRow) =>
+  `${e.at.slice(5, 10)} ${e.at.slice(11, 16)} — ${describe(e)}`;
 
 /* What to read on stream: the best practice readings for this period.
    ⚠ Votes AND comments. A piece nobody voted for but six people argued about
@@ -276,32 +317,128 @@ const nextSign = SIGNS[(index + 1) % 12];
       {/* The same drawer the public desk has. She asked that the two tools be
           "pretty much exactly the same except the ones I write get published"
           — this is the same component, given the same period. */}
+      <div class="sky-figure">
       <p class="adm-advanced">
         <SkyDrawer start={start} end={end} heading={label} />
       </p>
-      {wheelBodies.length > 0 && (
+      {/* The movement wheel when there is a period to move through, the moment
+          wheel when there is not — the same choice the public desk makes. */}
+      {days.length > 1 ? (
+        <PeriodWheel days={days} rising={risingName} size={300} keyOpen={false}
+                     caption="Where each body starts, where it ends, and what it does on the way." />
+      ) : wheelBodies.length > 0 && (
         <TransitWheel bodies={wheelBodies} rising={risingName} size={300}
                       caption={`${start} 12:00 UT`} />
       )}
-      <ol class="events">
-        {events.map((e) => {
-          const house = houseOf(e.sign);
-          return (
-            <li class={`k-${e.kind}`}>
-              <button type="button" class="ins" data-insert={
-                `${e.at.slice(5, 10)} ${e.at.slice(11, 16)} — ${describe(e)}`
-              } title="Insert into the column">
-                <span class="when">{e.at.slice(5, 10)} {e.at.slice(11, 16)}</span>
-                <span class="what">{describe(e)}</span>
-                <span class:list={["hs", AVERSE.has(house) && "averse"]}>
-                  {house}{AVERSE.has(house) ? "⊘" : ""}
-                </span>
-              </button>
-            </li>
-          );
-        })}
-        {events.length === 0 && <li class="quiet">Nothing exact in this period.</li>}
-      </ol>
+
+      </div>
+
+      <div class="sky-events">
+      {events.length === 0 && <p class="quiet">Nothing exact in this period.</p>}
+
+      {planetEvents.length > 0 && (
+        <>
+          <h3 class="ev-sub">The planets</h3>
+          <ol class="events">
+            {planetEvents.map((e) => {
+              const house = houseOf(e.sign);
+              return (
+                <li class={`k-${e.kind}`} style={`--hue:${hueOf(e)}`}>
+                  <button type="button" class="ins" data-insert={insert(e)}
+                          title="Insert into the column">
+                    <span class="when">{e.at.slice(5, 10)} {e.at.slice(11, 16)}</span>
+                    <span class="what">{describe(e)}</span>
+                    <span class:list={["hs", AVERSE.has(house) && "averse"]}>
+                      {house}{AVERSE.has(house) ? "⊘" : ""}
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+          </ol>
+        </>
+      )}
+
+      {(moonLoud.length + moonCrossings.length + moonAspects.length + moonVoids.length) > 0 && (
+        <>
+          <h3 class="ev-sub">The Moon</h3>
+          {moonLoud.length > 0 && (
+            <ol class="events">
+              {moonLoud.map((e) => {
+                const house = houseOf(e.sign);
+                return (
+                  <li class={`k-${e.kind}`} style="--hue: var(--body-moon)">
+                    <button type="button" class="ins" data-insert={insert(e)}
+                            title="Insert into the column">
+                      <span class="when">{e.at.slice(5, 10)} {e.at.slice(11, 16)}</span>
+                      <span class="what">{describe(e)}</span>
+                      <span class:list={["hs", AVERSE.has(house) && "averse"]}>
+                        {house}{AVERSE.has(house) ? "⊘" : ""}
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ol>
+          )}
+          {moonCrossings.length > 0 && (
+            <>
+              <p class="ev-chain-label">and it crosses</p>
+              <ol class="ev-chain">
+                {moonCrossings.map((e) => (
+                  <li>
+                    <button type="button" class="chip" data-insert={insert(e)}
+                            title={`${e.sign} · insert into the column`}>
+                      <span class="cs" aria-hidden="true">{SIGN_GLYPH[signIndex(e.sign)]}</span>
+                      <span class="cw">{e.at.slice(8, 10)}</span>
+                      <span class="sr">{e.sign} on the {e.at.slice(8, 10)}</span>
+                    </button>
+                  </li>
+                ))}
+              </ol>
+            </>
+          )}
+          {moonVoids.length > 0 && (
+            <>
+              <p class="ev-chain-label">void of course</p>
+              <ol class="ev-chain">
+                {moonVoids.map((e) => (
+                  <li>
+                    <button type="button" class="chip" data-insert={insert(e)}
+                            title="Insert into the column">
+                      <span class="cw">{e.at.slice(8, 10)}</span>
+                      <span class="cn">{e.detail?.minutes}m</span>
+                    </button>
+                  </li>
+                ))}
+              </ol>
+            </>
+          )}
+          {moonAspects.length > 0 && (
+            /* Folded. Fifty-six lunar aspects in a month are reference, not
+               material — she needs them findable, not in the way. */
+            <details class="ev-more">
+              <summary>{moonAspects.length} lunar aspects</summary>
+              <ol class="ev-chain">
+                {moonAspects.map((e) => (
+                  <li>
+                    <button type="button" class="chip" data-insert={insert(e)}
+                            title="Insert into the column">
+                      <span class="cw">{e.at.slice(8, 10)}</span>
+                      <span class="cs" aria-hidden="true">
+                        {BODY_GLYPH[e.bodies[1]] ?? e.bodies[1]}
+                      </span>
+                      <span class="cn">{e.detail?.aspect}</span>
+                      <span class="sr">Moon {e.detail?.aspect} {e.bodies[1]}</span>
+                    </button>
+                  </li>
+                ))}
+              </ol>
+            </details>
+          )}
+        </>
+      )}
+      </div>
     </section>
     </div>
 
@@ -536,6 +673,11 @@ const nextSign = SIGNS[(index + 1) % 12];
     display: grid; gap: var(--space-4); align-items: start;
     grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
   }
+  /* ⚠ Two cells, not nine. The band is a grid of its direct children, so every
+     list and chain added below would take a column of its own and the sky
+     would come apart across the width. */
+  .sky-band .sky > .adm-lbl { grid-column: 1 / -1; }
+  .sky-figure, .sky-events { display: grid; gap: var(--space-2, 8px); align-content: start; }
 
   /* ── the rail ── */
   .rail { display: grid; gap: 2px; position: sticky; top: var(--space-4); }
@@ -571,16 +713,52 @@ const nextSign = SIGNS[(index + 1) % 12];
   .tr-head { display: flex; gap: 10px; align-items: baseline; }
   .tr-count { color: var(--ink-faint); font-size: var(--text-xs); }
   .tr-body { margin: 4px 0 0; color: var(--ink-soft); font: 400 var(--text-sm) / 1.6 var(--font-body); }
+  .ev-sub {
+    font: 600 var(--text-xs) var(--font-body); color: var(--ink-faint);
+    text-transform: uppercase; letter-spacing: 0.08em;
+    margin: var(--space-3) 0 6px;
+  }
   .events {
-    list-style: none; margin: 0; padding: 0; display: grid; gap: 1px;
-    max-height: 46vh; overflow-y: auto;
+    list-style: none; margin: 0; padding: 0; display: grid; gap: 2px;
+    max-height: 34vh; overflow-y: auto;
   }
   .ins {
     display: grid; grid-template-columns: 9ch 1fr 3.5ch; gap: 8px; width: 100%;
-    text-align: left; background: none; border: 0; cursor: pointer;
+    text-align: left; background: none; cursor: pointer;
+    /* The hue on the left edge only — colour that can be scanned down a column
+       without ever being the thing that carries the meaning. */
+    border: 0; border-left: 3px solid var(--hue, transparent);
     padding: 5px 7px; border-radius: var(--radius-sm);
     font: 400 var(--text-xs) var(--font-body); color: var(--ink-soft);
   }
+  .ev-chain-label {
+    margin: 8px 0 4px; font: 400 var(--text-xs) var(--font-body);
+    color: var(--ink-faint);
+  }
+  .ev-chain {
+    list-style: none; margin: 0; padding: 0;
+    display: flex; flex-wrap: wrap; gap: 4px;
+  }
+  .chip {
+    display: inline-flex; align-items: baseline; gap: 5px; cursor: pointer;
+    padding: 3px 8px; border: var(--border-w) solid var(--line);
+    border-radius: 999px; background: var(--surface-card);
+    font: 400 var(--text-xs) var(--font-body); color: var(--ink-soft);
+  }
+  .chip:hover { border-color: var(--body-moon); color: var(--ink); }
+  .chip:focus-visible { outline: 2px solid var(--focus-ring, var(--accent)); outline-offset: 1px; }
+  .chip .cs { color: var(--body-moon); font-size: 1.05em; }
+  .chip .cw { font-variant-numeric: tabular-nums; }
+  .chip .cn { color: var(--ink-faint); }
+  .ev-more { margin-top: 8px; }
+  .ev-more > summary {
+    cursor: pointer; font: 400 var(--text-xs) var(--font-body);
+    color: var(--ink-faint); padding: 3px 0;
+  }
+  .ev-more > summary:hover { color: var(--ink); }
+  .ev-more[open] > summary { margin-bottom: 6px; }
+  .ev-more .ev-chain { max-height: 24vh; overflow-y: auto; }
+  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
   .ins:hover { background: var(--surface-veil); color: var(--ink); }
   .ins:focus-visible { outline: 2px solid var(--focus-ring, var(--accent)); outline-offset: -2px; }
   .ins .when { color: var(--ink-faint); font-variant-numeric: tabular-nums; }

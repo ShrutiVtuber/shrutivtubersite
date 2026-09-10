@@ -46,6 +46,18 @@
   --sky-zenith:var(--dawn-sky-zenith); --sky-mid:var(--dawn-sky-mid); --sky-horizon:var(--dawn-sky-horizon); --horizon-line:var(--dawn-horizon-line);
   --sky:linear-gradient(180deg,var(--sky-zenith) 0%,var(--sky-mid) 58%,var(--sky-horizon) 100%);
   --focus-ring:var(--accent);
+  /* The seven bodies, cold to warm in the order the wheel bands them, so
+     colour repeats the ordering rather than adding a second thing to learn.
+     Anywhere a body is named — a wheel band, an event row, a legend — it is
+     THIS hue, so a reader learns the association once.
+
+     ⚠ No dusk variant, deliberately. These are mid-tone, chosen to hold at
+     4.5:1 or better on both grounds; a second ramp would be two sets of seven
+     to keep in agreement for no gain. Do not pale them — #D8DCEC vanished
+     completely on the light theme, which is the one the site defaults to. */
+  --body-saturn:#7C86A8; --body-jupiter:#6E93C4; --body-mercury:#86BFD6;
+  --body-venus:#B9A6D8; --body-mars:#D98C93; --body-sun:#E0B978;
+  --body-moon:#8A93B5;
   color-scheme:light dark;
 }
 /* System preference — un-stamped documents follow the OS */

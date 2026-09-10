@@ -40,8 +40,24 @@ interface Props {
   rising?: string;
   size?: number;
   caption?: string;
+  /** The house each sign is, from the rising sign. On unless there is none. */
+  houseNumbers?: boolean;
+  /** Show the key open, or folded behind a summary.
+   *
+   * ⚠ Folded is NOT hidden. The key is the figure's alternative — it is what a
+   * screen reader and a printer get instead of an SVG — so it stays in the
+   * document either way. Fold it on a page that already lists the same events
+   * beside the wheel, where leaving it open says everything twice. */
+  keyOpen?: boolean;
 }
-const { days, rising = "", size = 640, caption } = Astro.props;
+const {
+  days, rising = "", size = 640, caption, houseNumbers = true, keyOpen = true,
+} = Astro.props;
+
+/* ⚠ The 2nd, 6th, 8th and 12th cannot see the rising sign. Marked, because a
+   reading written without noticing an aversion is a reading about a
+   conversation that is not happening. */
+const AVERSE = new Set([2, 6, 8, 12]);
 
 const R = 100;
 const rotated = rising !== "";
@@ -267,13 +283,27 @@ const described = [
         const [x2, y2] = point(start, 96);
         const [gx, gy] = point(start + 15, 88);
         const zodiac = (risingIndex + i) % 12;
+        const house = i + 1;
+        const averse = rotated && AVERSE.has(house);
         return (
           <>
             <line x1={f(x1)} y1={f(y1)} x2={f(x2)} y2={f(y2)} class="divider" />
-            <text x={f(gx)} y={f(gy)} class="sign-glyph"
+            <text x={f(gx)} y={f(gy)}
+                  class:list={["sign-glyph", averse && "averse"]}
                   text-anchor="middle" dominant-baseline="central">
               {SIGN_GLYPH[zodiac]}
             </text>
+            {/* ⚠ Which house this sign IS. It moves with the rising sign, and
+                that movement is the whole reason a reading for Leo differs
+                from the same sky read for Aries — without it you are looking
+                at the zodiac rather than at a chart. */}
+            {houseNumbers && rotated && (
+              <text x={f(point(start + 15, 47)[0])} y={f(point(start + 15, 47)[1])}
+                    class:list={["house-no", averse && "averse"]}
+                    text-anchor="middle" dominant-baseline="central">
+                {house}
+              </text>
+            )}
           </>
         );
       })}
@@ -379,8 +409,26 @@ const described = [
 
   {caption && <figcaption>{caption}</figcaption>}
 
+  {rotated && (
+    <p class="pw-houses">
+      <b>{rising} rising.</b>{" "}
+      {SIGN_GLYPH.map((_, i) => {
+        const house = i + 1;
+        const zodiac = (risingIndex + i) % 12;
+        return (
+          <span class:list={["h", AVERSE.has(house) && "averse"]}>
+            {house}{" "}{SIGN_GLYPH[zodiac]}{AVERSE.has(house) ? "⊘" : ""}{" "}
+          </span>
+        );
+      })}
+      <span class="note">⊘ averse to the rising sign</span>
+    </p>
+  )}
+
   {/* ⚠ The wheel is one representation. This is the other, and it is what a
       screen reader gets — and what anybody printing this would rather have. */}
+  <details class="pw-fold" open={keyOpen}>
+  <summary>The same thing in numbers</summary>
   <dl class="pw-key">
     {drawn.map((b) => (
       <>
@@ -425,25 +473,42 @@ const described = [
       </>
     )}
   </dl>
+  </details>
 </figure>
 
 <style>
-  /* Cold to warm, in band order, so the colour repeats the ordering rather
-     than adding a second thing to remember. All within her palette. */
+  /* ⚠ Aliases, not values. The seven hues live in the shared palette as
+     --body-*, because the event lists beside this wheel colour their rows by
+     the same table — a second copy here would drift, and a wheel whose Mars is
+     a different red from the list's Mars teaches the reader nothing. */
   .pw {
-    --pw-saturn: #7C86A8;
-    --pw-jupiter: #6E93C4;
-    --pw-mercury: #86BFD6;
-    --pw-venus: #B9A6D8;
-    --pw-mars: #D98C93;
-    --pw-sun: #E0B978;
-    /* ⚠ Mid, not pale. #D8DCEC was picked against a dark ground and vanished
-       completely on the light theme — which is the one the site defaults to. */
-    --pw-moon: #8A93B5;
+    --pw-saturn: var(--body-saturn);
+    --pw-jupiter: var(--body-jupiter);
+    --pw-mercury: var(--body-mercury);
+    --pw-venus: var(--body-venus);
+    --pw-mars: var(--body-mars);
+    --pw-sun: var(--body-sun);
+    --pw-moon: var(--body-moon);
 
     margin: 0; display: grid; gap: var(--space-3); justify-items: center;
   }
   .pw svg { width: 100%; max-width: 640px; height: auto; color: var(--ink); }
+
+  /* ⚠ A disclosure, not a hiding place. The key inside is the figure's
+     alternative; folded it is still in the document, still read, still
+     printed — it simply stops saying, twice over, what the list beside the
+     wheel already says. */
+  .pw-fold { width: 100%; }
+  .pw-fold > summary {
+    cursor: pointer; list-style: none;
+    font: 400 var(--text-xs) var(--font-body); color: var(--ink-faint);
+    padding: 2px 0;
+  }
+  .pw-fold > summary::-webkit-details-marker { display: none; }
+  .pw-fold > summary::before { content: "▸ "; }
+  .pw-fold[open] > summary::before { content: "▾ "; }
+  .pw-fold > summary:hover { color: var(--ink); }
+  .pw-fold[open] > summary { margin-bottom: 6px; }
 
   .r-outer, .r-sign, .r-inner { stroke-width: 0.4; opacity: 0.55; }
   .r-phase { stroke-width: 0.25; opacity: 0.3; }
@@ -453,6 +518,9 @@ const described = [
      because a wheel without them still looks like a wheel. */
   .divider { stroke: currentColor; stroke-width: 0.3; opacity: 0.45; }
   .sign-glyph { font-size: 8px; fill: var(--ink-soft); }
+  .house-no { font-size: 5px; fill: var(--ink-faint); }
+  /* Aversion is weight, never colour alone — and it is in the key as well. */
+  .averse { opacity: 0.45; }
 
   .walk {
     fill: none; stroke: var(--hue); stroke-width: 1.5;
@@ -492,6 +560,13 @@ const described = [
     font: 400 var(--text-sm) / 1.6 var(--font-body);
     color: var(--ink-soft); text-align: center; max-width: 56ch;
   }
+
+  .pw-houses {
+    margin: 0; max-width: 640px; text-align: center;
+    font: 400 var(--text-sm) / 1.9 var(--font-body); color: var(--ink-soft);
+  }
+  .pw-houses .h { white-space: nowrap; margin-right: 6px; }
+  .pw-houses .note { color: var(--ink-faint); font-size: var(--text-xs); }
 
   .pw-key {
     display: grid; grid-template-columns: auto 1fr; gap: 3px var(--space-3);
