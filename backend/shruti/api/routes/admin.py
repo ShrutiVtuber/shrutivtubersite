@@ -14,6 +14,7 @@ import hashlib
 import re
 import json
 import logging
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -93,18 +94,96 @@ async def login(
         raise HTTPException(401, "email or password is wrong")
 
     token = issue_token(payload.email, await session_stamp(session))
+    secure = get_settings().is_production
     response.set_cookie(
         "shruti_session", token,
         httponly=True, samesite="lax",
-        secure=get_settings().is_production,
+        secure=secure,
         max_age=12 * 3600, path="/",
     )
+    await _also_a_reader(session, response, payload.email, secure)
     return {"token": token, "expiresInHours": 12}
+
+
+async def _also_a_reader(
+    session: AsyncSession, response: Response, email: str, secure: bool,
+) -> None:
+    """
+    Sign the operator in as a MEMBER too, on the same click.
+
+    ⚠ **Two cookies, two systems, one person.** The admin session and the
+    reader session are deliberately separate — one is scoped to the desk and
+    lasts twelve hours, the other belongs to a visitor and lasts months — and
+    holding one has never implied the other. Which meant she could sign in,
+    open the site she owns, and be a stranger to it: no account menu, no kept
+    charts, no practice room. She could administer the room and not post in it.
+
+    The fix is not to merge the two. It is to notice that whoever proved they
+    are the operator has also, necessarily, proved they are that email's owner,
+    and to hand them the reader session that follows from it.
+
+    ⚠ **One password, by her decision.** The member account is given the
+    operator's own password hash, so the address she already knows and the
+    password she already types work at the ordinary sign-in form too — on her
+    phone, in the app, anywhere the desk is not.
+
+    The cost, stated because it is real: the member sign-in form becomes a
+    second place her password can be tried. It is a strictly smaller prize —
+    guessing it yields a reader session, never the desk, which needs the admin
+    cookie and its own stamp — but it is another door and should be counted as
+    one.
+
+    The hash is COPIED, never re-derived, so changing the admin password
+    propagates by itself at her next sign-in and nothing here ever holds the
+    plaintext.
+    """
+    from shruti.core.sessions import SESSION_COOKIE, SESSION_DAYS, issue_session
+    from shruti.core.operator import KEY_HASH, _get
+
+    address = email.strip().lower()
+
+    # The operator's stored hash, or the environment one a deployment still
+    # runs on before it has been claimed. Same argon2 parameters either way, so
+    # the reader's verifier reads it without needing to know where it came from.
+    stored = (await _get(session, KEY_HASH)) or os.environ.get(
+        "SHRUTI_ADMIN_PASSWORD_HASH", "").strip()
+
+    user = (
+        await session.execute(select(User).where(func.lower(User.email) == address))
+    ).scalar_one_or_none()
+
+    if user is None:
+        user = User(
+            email=address,
+            display_name="",
+            # She owns the mailbox the site sends FROM; asking her to click a
+            # link to prove it would be a loop with one participant.
+            email_verified_at=datetime.now(timezone.utc),
+        )
+        session.add(user)
+
+    if stored and user.password_hash != stored:
+        user.password_hash = stored
+
+    await session.commit()
+    await session.refresh(user)
+
+    response.set_cookie(
+        SESSION_COOKIE, issue_session(user.id, user.email),
+        max_age=SESSION_DAYS * 86400, httponly=True, samesite="lax",
+        secure=secure, path="/",
+    )
 
 
 @router.post("/logout")
 async def logout(response: Response) -> dict:
+    from shruti.core.sessions import SESSION_COOKIE
+
     response.delete_cookie("shruti_session", path="/")
+    # ⚠ Both, because signing in gave her both. Leaving the reader cookie
+    # behind would mean "sign out" left her signed in as herself on the site,
+    # which is the opposite of what the word promises.
+    response.delete_cookie(SESSION_COOKIE, path="/")
     return {"status": "signed out"}
 
 
@@ -709,10 +788,12 @@ async def claim_site(
         raise HTTPException(400, "that setup token is not valid, or the site is already claimed")
 
     token = issue_token(body.email, await session_stamp(session))
+    secure = get_settings().is_production
     response.set_cookie(
         "shruti_session", token, httponly=True, samesite="lax",
-        secure=get_settings().is_production, max_age=12 * 3600, path="/",
+        secure=secure, max_age=12 * 3600, path="/",
     )
+    await _also_a_reader(session, response, body.email, secure)
     return {"ok": True}
 
 
@@ -772,10 +853,12 @@ async def do_reset(
 
     await set_password(session, body.password)
     token = issue_token(email, await session_stamp(session))
+    secure = get_settings().is_production
     response.set_cookie(
         "shruti_session", token, httponly=True, samesite="lax",
-        secure=get_settings().is_production, max_age=12 * 3600, path="/",
+        secure=secure, max_age=12 * 3600, path="/",
     )
+    await _also_a_reader(session, response, email, secure)
     return {"ok": True}
 
 @router.get("/media")
