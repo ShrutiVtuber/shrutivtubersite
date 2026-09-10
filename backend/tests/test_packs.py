@@ -18,15 +18,7 @@ import re
 from pathlib import Path
 
 
-def _root() -> Path:
-    here = Path(__file__).resolve()
-    for base in (here.parents[1], here.parents[2]):
-        if (base / "docker-compose.yml").is_file():
-            return base
-    return here.parents[2]
-
-
-ROOT = _root()
+from conftest import BACKEND, ROOT   # noqa: E402  (see conftest for why)
 
 
 def test_no_pack_is_committed_anywhere() -> None:
@@ -92,7 +84,7 @@ def test_the_sync_is_a_script_rather_than_a_habit() -> None:
 def test_the_index_reads_the_manifest_rather_than_a_list() -> None:
     """A list kept beside the files is a second place for a version to be
     wrong. The sizes come from the files themselves for the same reason."""
-    route = (ROOT / "backend" / "shruti" / "api" / "routes" / "packs.py").read_text(
+    route = (BACKEND / "api" / "routes" / "packs.py").read_text(
         encoding="utf-8"
     )
     assert "manifest.json" in route

@@ -24,17 +24,9 @@ import struct
 from pathlib import Path
 
 
-def _root() -> Path:
-    here = Path(__file__).resolve()
-    for base in (here.parents[1], here.parents[2]):
-        if (base / "frontend" / "site" / "src").is_dir():
-            return base
-    return here.parents[2]
-
-
-ROOT = _root()
-SRC = ROOT / "frontend" / "site" / "src"
-FONTS = ROOT / "frontend" / "site" / "fonts-render"
+from conftest import ROOT, SITE   # noqa: E402  (see conftest for why)
+SRC = SITE / "src"
+FONTS = SITE / "fonts-render"
 CARD = SRC / "pages" / "horoscopes" / "[sign]" / "[period]" / "[covers]" / "og.png.ts"
 
 
@@ -133,7 +125,7 @@ def test_the_text_fonts_carry_latin():
 
 def test_the_fonts_are_reproducible():
     """Built by a script that is in the repo, not decompressed by hand once."""
-    script = ROOT / "frontend" / "site" / "scripts" / "build-render-fonts.py"
+    script = SITE / "scripts" / "build-render-fonts.py"
     assert script.is_file()
     body = script.read_text(encoding="utf-8")
     assert "instantiateVariableFont" in body, (
@@ -215,7 +207,7 @@ def test_no_wheel_draws_the_zodiac_backwards():
 
 # ── the runtime image ────────────────────────────────────────────────────────
 
-DOCKERFILE = ROOT / "frontend" / "site" / "Dockerfile"
+DOCKERFILE = SITE / "Dockerfile"
 
 
 def test_the_image_ships_the_fonts_and_a_real_node_modules():
@@ -235,5 +227,5 @@ def test_the_image_ships_the_fonts_and_a_real_node_modules():
 
 def test_the_rasteriser_is_declared():
     import json
-    pkg = json.loads((ROOT / "frontend" / "site" / "package.json").read_text())
+    pkg = json.loads((SITE / "package.json").read_text())
     assert "@resvg/resvg-js" in pkg.get("dependencies", {})

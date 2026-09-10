@@ -53,6 +53,12 @@ class PracticeWork(TimestampMixin, table=True):
     # Kept rather than deleted so a comment thread does not lose its subject.
     hidden: bool = False
 
+    # ⚠ WHY it went, not just that it did. A takedown by three strangers and a
+    # decision of hers are undone differently — the first is provisional and
+    # waiting for her, the second is settled — and "hidden" alone cannot tell
+    # them apart. Empty while it is up.
+    hidden_by: str = ""          # reports | her | author
+
 
 class PracticeReading(TimestampMixin, table=True):
     """One sign's worth of writing, inside a work."""
@@ -92,3 +98,77 @@ class PracticeComment(TimestampMixin, table=True):
     body_md: str = ""
     # She removes a comment; the row stays so the thread keeps its shape.
     hidden: bool = False
+    hidden_by: str = ""          # reports | her | author
+
+    # ⚠ A comment bridged from Discord has no site account behind it: nobody
+    # signed up, agreed to anything, or can be suspended. It carries the name
+    # Discord gave it and is marked as what it is — never silently attributed
+    # to somebody real.
+    from_discord: str = ""
+
+
+class PracticeReport(TimestampMixin, table=True):
+    """
+    Somebody said a piece of work, or a comment, should not be there.
+
+    ⚠ **A report is not a verdict.** Three of them take the thing off view
+    automatically, because leaving something up for hours while she sleeps is
+    the failure that matters — but the row is a QUEUE ENTRY, not a decision.
+    She sees every one, and either agrees or puts the work straight back.
+
+    ⚠ **One report per person per thing**, enforced in the database. Otherwise
+    one determined person is a takedown, and the auto-hide becomes a weapon
+    rather than a stopgap.
+
+    A reporter from Discord has no site account, so `user_id` is null and
+    `from_discord` carries who it was. They still count — the alternative is a
+    room where half the readers cannot say anything is wrong.
+    """
+
+    __tablename__ = "practice_report"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+
+    # Exactly one of these is set. A report is about a work OR a comment.
+    work_id: Optional[int] = Field(
+        default=None, index=True, foreign_key="practice_work.id")
+    comment_id: Optional[int] = Field(
+        default=None, index=True, foreign_key="practice_comment.id")
+
+    user_id: Optional[int] = Field(
+        default=None, index=True, foreign_key="site_user.id")
+    from_discord: str = ""
+
+    # Chosen from a short list, so the queue can be read at a glance rather
+    # than as a hundred free-text paragraphs.
+    reason: str = Field(default="other", index=True)
+    detail: str = ""
+
+    # ⚠ Set when SHE has looked, never by the auto-hide. A report that hid
+    # something and was never reviewed is exactly the state this column exists
+    # to make visible.
+    reviewed_at: Optional[datetime] = Field(default=None, sa_type=UTC_TS)
+    outcome: str = ""            # upheld | dismissed
+
+
+class PracticeStrike(TimestampMixin, table=True):
+    """
+    A suspension: this person may read, and may not post.
+
+    ⚠ Deliberately not a ban. A ban is `BannedEmail` and follows a deletion; a
+    suspension leaves the account and its writing intact and stops it adding
+    more. Most moderation is a fortnight of silence, not an erasure, and having
+    only the erasure available makes every decision too big to take.
+
+    ⚠ **`until` is nullable and null means indefinite.** Same convention as the
+    standing tests, and the same warning: read it as "not suspended" and a
+    permanent suspension silently lifts itself.
+    """
+
+    __tablename__ = "practice_strike"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(index=True, foreign_key="site_user.id")
+    until: Optional[datetime] = Field(default=None, sa_type=UTC_TS)
+    reason: str = ""
+    lifted_at: Optional[datetime] = Field(default=None, sa_type=UTC_TS)

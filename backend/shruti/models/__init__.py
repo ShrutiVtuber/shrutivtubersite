@@ -1395,3 +1395,14 @@ from shruti.models.accounts import (  # noqa: E402,F401
     BannedEmail, ConsentRecord, Horoscope, Issue, JournalSky, Nativity, Passkey,
     Subscriber, Supporter, User,
 )
+
+# ⚠ These two were missing, and the failure mode is not "autogenerate forgets
+# them" — it is that autogenerate compares the database against this metadata
+# and writes a DROP for every table it cannot see. A revision generated while
+# these were absent would have taken the practice room and the app's devices
+# with it, and it would have looked like a perfectly ordinary migration.
+from shruti.models.devices import *  # noqa: E402,F403
+from shruti.models.practice import (  # noqa: E402,F401
+    PracticeComment, PracticeReading, PracticeReport, PracticeStrike,
+    PracticeVote, PracticeWork,
+)

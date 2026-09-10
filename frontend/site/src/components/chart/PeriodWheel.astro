@@ -21,6 +21,7 @@
  * in the first version: it made the Moon's phase look like a position and its
  * position impossible to find.
  */
+import { copy } from "../../lib/copy";
 import { BODY_GLYPH, SIGN_GLYPH, f, signIndex } from "../../lib/wheel";
 
 interface Position {
@@ -53,6 +54,12 @@ interface Props {
 const {
   days, rising = "", size = 640, caption, houseNumbers = true, keyOpen = true,
 } = Astro.props;
+
+// ⚠ Through `say`, like every other visible string on this site. She writes
+// the copy and must be able to change it from the page editor; a literal in a
+// component is a string only a developer can reach, and a guard exists
+// precisely because one had already slipped in here.
+const say = await copy("component:PeriodWheel");
 
 /* ⚠ The 2nd, 6th, 8th and 12th cannot see the rising sign. Marked, because a
    reading written without noticing an aversion is a reading about a
@@ -438,7 +445,7 @@ const described = [
   {/* ⚠ The wheel is one representation. This is the other, and it is what a
       screen reader gets — and what anybody printing this would rather have. */}
   <details class="pw-fold" open={keyOpen}>
-  <summary>The same thing in numbers</summary>
+  <summary>{say("key.open", "The same thing in numbers")}</summary>
   <dl class="pw-key">
     {drawn.map((b) => (
       <>

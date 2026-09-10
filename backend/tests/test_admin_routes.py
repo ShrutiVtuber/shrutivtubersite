@@ -86,9 +86,22 @@ def test_no_router_anywhere_shadows_one_of_its_own_routes():
     the accident that one was GET and the other PATCH kept them apart. The
     reader routes are declared last there now, so it does not depend on that.
     """
-    from shruti.api.routes import (
-        accounts, admin, billing, classes, content, media, shop,
-    )
+    # ⚠ EVERY router with a catch-all, not a list somebody remembered to add
+    # to. The practice room grew `/admin/reports` under an existing
+    # `/{work_id}` while this list did not name it, and a guard that only
+    # covers the routers it was written for is a guard that stops covering the
+    # code as the code grows.
+    import importlib
+    import pkgutil
+
+    import shruti.api.routes as routes_pkg
+
+    modules = []
+    for info in pkgutil.iter_modules(routes_pkg.__path__):
+        module = importlib.import_module(f"shruti.api.routes.{info.name}")
+        if hasattr(module, "router"):
+            modules.append(module)
+    assert len(modules) >= 8, "the router sweep found almost nothing"
 
     def segments(path: str) -> list[str]:
         return [p for p in path.strip("/").split("/") if p]
@@ -99,7 +112,7 @@ def test_no_router_anywhere_shadows_one_of_its_own_routes():
             return False
         return all(x.startswith("{") or x == y for x, y in zip(a, b))
 
-    for module in (accounts, admin, billing, classes, content, media, shop):
+    for module in modules:
         routes = _routes(module.router)
         for i, (method, path) in enumerate(routes):
             for earlier_method, earlier_path in routes[:i]:

@@ -21,7 +21,7 @@ from pathlib import Path
 from shruti.api.routes.accounts import consent_wording
 from shruti.core.consents import ALL, CONSENT_VERSION
 
-ROOT = Path(__file__).resolve().parents[2]
+from conftest import ROOT   # noqa: E402  (see conftest for why)
 
 
 def test_the_website_and_the_backend_still_say_the_same_thing() -> None:

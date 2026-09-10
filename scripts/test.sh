@@ -27,6 +27,13 @@ docker build --quiet --target dev -t shruti-backend-test ./backend >/dev/null
 #   the two Caddyfiles    who may frame the site is a proxy fact, and the
 #                         answer differing between local and production is
 #                         exactly how the preview shipped broken
+#   docker-compose.yml    where the packs volume and the caddy routes are said
+#   fonts-render          the share-card fonts
+#
+# ⚠ And `tests/conftest.py` resolves the root by looking for a marker rather
+# than by counting `parents[2]`, which is the repository on a laptop and `/`
+# inside this container. Eleven guards had been failing on the missing file
+# rather than on the thing they guard.
 # A guard that cannot read the file it guards passes on an empty string, which
 # is the way this kind of check usually lies.
 exec docker run --rm \
@@ -38,6 +45,11 @@ exec docker run --rm \
   -v "$PWD/Caddyfile.internal:/app/Caddyfile.internal:ro" \
   -v "$PWD/deploy:/app/deploy:ro" \
   -v "$PWD/scripts:/app/scripts:ro" \
+  -v "$PWD/docker-compose.yml:/app/docker-compose.yml:ro" \
+  -v "$PWD/frontend/site/fonts-render:/app/frontend/site/fonts-render:ro" \
+  -v "$PWD/frontend/site/Dockerfile:/app/frontend/site/Dockerfile:ro" \
+  -v "$PWD/frontend/site/package.json:/app/frontend/site/package.json:ro" \
+  -v "$PWD/frontend/site/scripts:/app/frontend/site/scripts:ro" \
   -e SHRUTI_SECRET_KEY=test-only-not-a-real-key \
   shruti-backend-test \
   python -m pytest tests "$@"

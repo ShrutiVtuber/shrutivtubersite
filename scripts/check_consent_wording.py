@@ -16,8 +16,27 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-BACKEND = ROOT / "backend/shruti/core/consents.py"
-SITE = ROOT / "frontend/site/src/lib/consents.ts"
+
+
+def _find(*candidates: str) -> Path:
+    """
+    The file, wherever this happens to be running.
+
+    ⚠ On a laptop the tree is `backend/shruti/...`; in the test container
+    `shruti` is mounted at `/app/shruti` and there is no `backend/`. Assuming
+    one layout made this script exit 2 on a missing file, and the test that
+    runs it reported "the consent wording has drifted" — which is a different
+    and much more alarming sentence than "I could not find the file".
+    """
+    for candidate in candidates:
+        path = ROOT / candidate
+        if path.is_file():
+            return path
+    return ROOT / candidates[0]
+
+
+BACKEND = _find("backend/shruti/core/consents.py", "shruti/core/consents.py")
+SITE = _find("frontend/site/src/lib/consents.ts")
 
 
 def norm(text: str) -> str:
