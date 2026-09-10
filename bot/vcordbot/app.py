@@ -255,15 +255,37 @@ async def practice_submitted(
     # ⚠ Tell the room which message it became, or the bridge only goes one
     # way: a reaction on this message would arrive naming an id the room has
     # never heard of, and be dropped as a reaction to nothing.
+    internal = os.environ.get("SHRUTI_INTERNAL_SITE", site_url)
+    readings_posted = 0
     if message_id:
         await bridge.tell_the_site(
             f"{body.id}/message",
             {"message_id": message_id, "channel_id": cfg.practice_channel_id},
-            site_url=os.environ.get("SHRUTI_INTERNAL_SITE", site_url),
+            site_url=internal,
             secret=secret,
         )
 
-    return {"ok": True, "posted": bool(message_id)}
+        # The readings themselves, in a thread under the announcement, one
+        # message each. Registered the same way and with their sign, so a reply
+        # to one of them is a comment on THAT reading rather than on the week.
+        thread_id, posted = await bridge.announce_the_readings(
+            body.model_dump(),
+            message_id=message_id,
+            channel_id=cfg.practice_channel_id,
+            token=cfg.token,
+            site_url=site_url,
+        )
+        for sign, said in posted:
+            await bridge.tell_the_site(
+                f"{body.id}/message",
+                {"message_id": said, "channel_id": thread_id,
+                 "sign": sign, "thread_id": thread_id},
+                site_url=internal,
+                secret=secret,
+            )
+        readings_posted = len(posted)
+
+    return {"ok": True, "posted": bool(message_id), "readings": readings_posted}
 
 
 @app.post("/interactions")

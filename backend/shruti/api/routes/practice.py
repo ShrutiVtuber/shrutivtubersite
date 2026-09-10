@@ -301,6 +301,10 @@ def _from_the_bot(request: Request) -> None:
 class BridgeMessage(BaseModel):
     message_id: str = Field(min_length=1, max_length=40)
     channel_id: str = Field(default="", max_length=40)
+    #: Which reading this message carries. Empty is the announcement itself.
+    sign: str = Field(default="", max_length=16)
+    #: The thread the per-sign messages live in.
+    thread_id: str = Field(default="", max_length=40)
 
 
 @router.post("/bridge/{work_id}/message", status_code=201)
@@ -308,7 +312,15 @@ async def bridge_message(
     work_id: int, body: BridgeMessage, request: Request,
     session: AsyncSession = Depends(get_session),
 ) -> dict:
-    """The bot saying which message it posted, so replies can find their way."""
+    """
+    The bot saying which message it posted, so replies can find their way.
+
+    ⚠ Called once for the announcement and once per sign. Discord cannot nest
+    threads — a thread hangs off a message in a channel, and a message inside a
+    thread cannot have one of its own — so a submission is one announcement,
+    one thread, and one message per sign inside it. `sign` is what makes a
+    reply to the Taurus message a comment on Taurus rather than on the week.
+    """
     _from_the_bot(request)
     work = await session.get(PracticeWork, work_id)
     if work is None:
@@ -316,7 +328,9 @@ async def bridge_message(
 
     session.add(PracticeBridge(
         work_id=work_id, message_id=body.message_id,
-        channel_id=body.channel_id))
+        channel_id=body.channel_id,
+        sign=await _sign_of(session, work_id, body.sign),
+        thread_id=body.thread_id))
     try:
         await session.commit()
     except IntegrityError:
@@ -353,8 +367,12 @@ async def bridge_comment(
     if work is None or work.submitted_at is None or work.hidden:
         return {"ok": True, "matched": False}
 
+    # ⚠ The sign comes from the MESSAGE that was replied to, never from the
+    # reply. Somebody answering the Taurus message is talking about Taurus
+    # whatever they typed, and asking them to say so as well would be asking
+    # them to repeat what Discord already knows.
     session.add(PracticeComment(
-        work_id=link.work_id, user_id=None,
+        work_id=link.work_id, user_id=None, sign=link.sign,
         from_discord=body.who.strip(), body_md=body.body_md.strip()))
     await session.commit()
 
@@ -669,6 +687,9 @@ async def one(
             # suspended.
             "author": c.from_discord or _name(u),
             "fromDiscord": bool(c.from_discord),
+            # ⚠ Empty means the whole set, not "unknown". A reader filtering to
+            # one sign must still see the remarks about the series.
+            "sign": c.sign or "",
             "bodyMd": c.body_md,
             "at": c.created_at.isoformat() if c.created_at else None,
             "mine": viewer is not None and viewer.id == c.user_id,
@@ -729,6 +750,29 @@ async def vote(
 
 class CommentIn(BaseModel):
     body_md: str = Field(min_length=1, max_length=4000)
+    #: Which reading this is about. Empty is the whole set.
+    sign: str = Field(default="", max_length=16)
+
+
+async def _sign_of(session: AsyncSession, work_id: int, sign: str) -> str:
+    """
+    The sign this comment is about, checked against the work.
+
+    ⚠ Unchecked, this is a free-text column addressed by anybody: a comment
+    filed under "aeries" is a comment nothing will ever show, sitting in the
+    database looking like it worked. Falling back to the whole set is the right
+    failure — the remark is still there and still readable — where a 400 would
+    lose what somebody wrote to a typo they cannot see.
+    """
+    wanted = (sign or "").strip().lower()
+    if not wanted:
+        return ""
+    has = (
+        await session.execute(
+            select(PracticeReading.sign).where(PracticeReading.work_id == work_id)
+        )
+    ).scalars().all()
+    return wanted if wanted in {h.lower() for h in has} else ""
 
 
 @router.post("/{work_id}/comments", status_code=201)
@@ -743,7 +787,8 @@ async def comment(
         raise HTTPException(404, "no such work")
 
     row = PracticeComment(
-        work_id=work_id, user_id=user.id, body_md=body.body_md.strip())
+        work_id=work_id, user_id=user.id, body_md=body.body_md.strip(),
+        sign=await _sign_of(session, work_id, body.sign))
     session.add(row)
     await session.commit()
 

@@ -111,6 +111,17 @@ class PracticeComment(TimestampMixin, table=True):
     # Exactly one of the two is set, and the database says so.
     user_id: Optional[int] = Field(
         default=None, index=True, foreign_key="site_user.id")
+
+    # ⚠ **Which reading this is about, or the whole work.** Empty means the
+    # set: "this week reads well as a series", which is a real thing to say
+    # about twelve signs and is not the same as saying it about Aries.
+    #
+    # A sign rather than a reading id, deliberately. A writer who deletes their
+    # Aries draft and writes a new one has not made the comments about Aries
+    # into comments about nothing — the reading is a new row, but the subject
+    # of the conversation did not change.
+    sign: str = Field(default="", index=True)
+
     body_md: str = ""
     # She removes a comment; the row stays so the thread keeps its shape.
     hidden: bool = False
@@ -206,3 +217,18 @@ class PracticeBridge(TimestampMixin, table=True):
     work_id: int = Field(index=True, foreign_key="practice_work.id")
     message_id: str = Field(index=True, unique=True)
     channel_id: str = ""
+
+    # ⚠ **Which sign's message this is, or the announcement itself.** Empty is
+    # the announcement — a reply to it is about the whole set.
+    #
+    # Discord cannot nest threads: a thread hangs off a message in a CHANNEL,
+    # and a message inside a thread cannot have one of its own. So a submission
+    # is one announcement, one thread, and one message per sign inside it, and
+    # this column is what makes a reply to the Taurus message a comment on
+    # Taurus rather than on the week.
+    sign: str = Field(default="", index=True)
+
+    # The thread the per-sign messages live in. Kept so a later reading added
+    # to an existing work can be posted into the thread that already exists
+    # rather than starting a second one.
+    thread_id: str = Field(default="", index=True)

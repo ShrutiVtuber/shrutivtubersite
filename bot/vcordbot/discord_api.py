@@ -67,6 +67,107 @@ async def post_and_tell_id(
         return None
 
 
+#: Which channel a thread hangs under, remembered so Discord is asked once.
+#: A plain channel maps to itself; anything unreachable maps to "" and is not
+#: asked about again, so a message from a channel we cannot see does not become
+#: an API call per message for the life of the process.
+_parents: dict[str, str] = {}
+
+
+async def parent_of(channel_id: str, token: str,
+                    client: httpx.AsyncClient | None = None) -> str:
+    """
+    The channel a thread belongs to, or the channel itself.
+
+    ⚠ **A message posted in a thread carries the THREAD's id as its
+    `channel_id`.** Nothing in the payload names the parent. So a reader that
+    only compares `channel_id` against the channel it watches drops every reply
+    inside every thread — including the threads the bot opened itself, which is
+    exactly where the conversation was moved to.
+
+    Asked once per channel and cached. The answer cannot change: a thread does
+    not migrate to another parent.
+    """
+    if not channel_id:
+        return ""
+    if channel_id in _parents:
+        return _parents[channel_id]
+
+    async def _ask(c: httpx.AsyncClient) -> str:
+        r = await c.get(f"{API}/channels/{channel_id}",
+                        headers={"Authorization": f"Bot {token}",
+                                 "User-Agent": "vcordbot/1.0"},
+                        timeout=10.0)
+        if r.status_code != 200:
+            return ""
+        data = r.json() or {}
+        # `parent_id` is set on a thread and on a channel inside a category.
+        # A thread's type is 10, 11 or 12; a channel in a category is not one
+        # of those and is its own parent for this purpose.
+        if data.get("type") in (10, 11, 12):
+            return str(data.get("parent_id") or "")
+        return str(data.get("id") or "")
+
+    try:
+        if client is not None:
+            found = await _ask(client)
+        else:
+            async with httpx.AsyncClient() as c:
+                found = await _ask(c)
+    except Exception as exc:                       # noqa: BLE001
+        log.warning("could not ask about %s: %s", channel_id, type(exc).__name__)
+        return ""
+
+    _parents[channel_id] = found
+    return found
+
+
+async def start_thread(
+    channel_id: str, message_id: str, token: str, name: str,
+    client: httpx.AsyncClient | None = None,
+) -> str | None:
+    """
+    Open a thread under a message, and say which channel it became.
+
+    ⚠ **A thread IS a channel.** Its id is what you post to, and it is not the
+    id of the message it hangs from — posting to the message id instead is a
+    404 that reads like a permissions problem.
+
+    ⚠ **Discord cannot nest threads.** This only works on a message sitting in
+    a real channel; a message already inside a thread has no thread of its own,
+    and there is no setting that changes it. That limit is why a submission is
+    one announcement, one thread, and one message per sign inside it, rather
+    than a thread per reading.
+
+    `auto_archive_duration` is in minutes and 10080 is the week Discord allows.
+    A thread that archives itself mid-conversation is not gone, but it drops
+    out of the sidebar, and a practice room where last week's readings vanish
+    from view is one nobody goes back to.
+    """
+    async def _send(c: httpx.AsyncClient) -> str | None:
+        r = await c.post(
+            f"{API}/channels/{channel_id}/messages/{message_id}/threads",
+            json={"name": name[:100], "auto_archive_duration": 10080},
+            headers={"Authorization": f"Bot {token}",
+                     "User-Agent": "vcordbot/1.0"},
+            timeout=10.0)
+        if r.status_code in (400, 403, 404, 429):
+            log.warning("could not open a thread on %s: %s",
+                        message_id, r.status_code)
+            return None
+        r.raise_for_status()
+        return str((r.json() or {}).get("id") or "") or None
+
+    try:
+        if client is not None:
+            return await _send(client)
+        async with httpx.AsyncClient() as c:
+            return await _send(c)
+    except Exception as exc:                       # noqa: BLE001
+        log.warning("could not open a thread: %s", type(exc).__name__)
+        return None
+
+
 async def add_reaction(channel_id: str, message_id: str, token: str,
                        emoji: str,
                        client: httpx.AsyncClient | None = None) -> bool:

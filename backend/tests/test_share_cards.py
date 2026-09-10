@@ -29,6 +29,18 @@ SRC = SITE / "src"
 FONTS = SITE / "fonts-render"
 CARD = SRC / "pages" / "horoscopes" / "[sign]" / "[period]" / "[covers]" / "og.png.ts"
 
+# ⚠ The drawing itself was EXTRACTED here when the practice room needed the
+# same wheel for its Discord announcements. Everything about how a card is
+# rasterised — the fonts, the resvg options — now lives in one place and is
+# checked there; what stays on each endpoint is what it draws and what it
+# refuses to draw.
+RENDER = SRC / "lib" / "skycard.ts"
+
+#: The practice room's two cards: the sky a set was written from, and the same
+#: sky turned to one sign for that sign's own reading.
+PRACTICE_SET = SRC / "pages" / "practice" / "[id]" / "sky.png.ts"
+PRACTICE_SIGN = SRC / "pages" / "practice" / "[id]" / "sky" / "[sign].png.ts"
+
 
 def code_of(path: Path) -> str:
     """Source with comments stripped — this file's own prose names both the
@@ -141,7 +153,7 @@ def test_the_card_endpoint_exists():
 
 
 def test_the_card_passes_font_paths_not_buffers():
-    code = code_of(CARD)
+    code = code_of(RENDER)
     assert "fontFiles" in code
     assert "fontBuffers" not in code, (
         "resvg accepts fontBuffers, ignores it, and returns a card with no text"
@@ -153,7 +165,56 @@ def test_the_card_does_not_load_system_fonts():
     Otherwise it renders differently depending on what the base image happens
     to ship, and the failure only appears once the image is rebuilt.
     """
-    assert re.search(r"loadSystemFonts\s*:\s*false", code_of(CARD))
+    assert re.search(r"loadSystemFonts\s*:\s*false", code_of(RENDER))
+
+
+def test_every_card_rasterises_through_the_one_place():
+    """
+    ⚠ The whole point of extracting it.
+
+    An endpoint that reaches for Resvg itself gets its own font settings, and
+    the two guards above stop applying to it — silently, because nothing about
+    a card with no text looks like a font problem.
+    """
+    for card in (CARD, PRACTICE_SET, PRACTICE_SIGN):
+        code = code_of(card)
+        assert "rasterise" in code, f"{card.name} does not use the shared renderer"
+        assert "Resvg" not in code, (
+            f"{card.name} rasterises on its own, so the font guards no longer "
+            "cover it"
+        )
+
+
+def test_the_practice_cards_refuse_what_is_not_theirs():
+    """An endpoint that renders any string is an unbounded image generator."""
+    for card in (PRACTICE_SET, PRACTICE_SIGN):
+        code = code_of(card)
+        assert "404" in code, f"{card.name} never refuses anything"
+        assert re.search(r"\^\\d\+\$", code), (
+            f"{card.name} puts its id straight into an API path without "
+            "checking it is a number"
+        )
+
+    sign = code_of(PRACTICE_SIGN)
+    assert "ZODIAC.includes" in sign, "any string is accepted as a sign"
+    assert "work.signs" in sign, (
+        "a chart is drawn for a sign the work does not contain, so a thread "
+        "can show a reading nobody wrote"
+    )
+
+
+def test_a_heading_is_measured_before_it_is_drawn():
+    """
+    ⚠ A practice title is the writer's own text, not one of twelve sign names.
+
+    SVG text neither wraps nor complains: an unfitted title runs past the edge
+    and the PNG is cropped where it was asked to end. The behaviour of the
+    fitter itself is tested in the site's own suite, which can run it; this
+    only checks that the card bothers to call it.
+    """
+    assert "fitLines" in code_of(PRACTICE_SET), (
+        "the set card draws a free-text title without measuring it"
+    )
 
 
 def test_the_card_validates_what_it_is_asked_to_draw():
@@ -164,10 +225,13 @@ def test_the_card_validates_what_it_is_asked_to_draw():
 
 
 def test_the_card_shares_the_wheel_geometry():
-    code = code_of(CARD)
-    assert "lib/wheel" in code, (
-        "the card must import the geometry, not carry a fifth copy of it"
+    assert "./wheel" in code_of(RENDER), (
+        "the renderer must import the geometry, not carry a fifth copy of it"
     )
+    for card in (CARD, PRACTICE_SET, PRACTICE_SIGN):
+        assert "skycard" in code_of(card), (
+            f"{card.name} does not draw through the shared wheel"
+        )
 
 
 def test_the_reading_points_at_its_own_card():

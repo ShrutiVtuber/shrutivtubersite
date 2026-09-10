@@ -109,15 +109,24 @@ def backoff(attempt: int) -> float:
     return min(60.0, (1.5 ** min(attempt, 10)) * (0.5 + random.random()))
 
 
-def is_ours(message: dict, *, channel_id: str, bot_user_id: str) -> bool:
+def is_ours(message: dict, *, channel_id: str, bot_user_id: str,
+            here: str = "") -> bool:
     """
     Whether this message is one the bridge should carry.
 
     ⚠ Three refusals, and the middle one matters most: a message from THIS bot
     must never come back in, or announcing a submission would relay it to the
     site as a comment on itself, which would announce again.
+
+    ⚠ `here` is the channel this message BELONGS to once threads are taken into
+    account — the parent for a message in a thread, and the channel itself
+    otherwise. It has to be resolved by the caller because finding it may mean
+    asking Discord, and this function is pure so it can be tested without a
+    network. Passing nothing falls back to the message's own channel, which is
+    the right answer for a message posted directly in the channel.
     """
-    if str(message.get("channel_id") or "") != str(channel_id):
+    belongs = str(here or message.get("channel_id") or "")
+    if belongs != str(channel_id):
         return False
     author = message.get("author") or {}
     if str(author.get("id") or "") == str(bot_user_id):
@@ -153,6 +162,20 @@ class Reader:
         self.bot_user_id = ""
         self._connect = connect
         self._closing = False
+
+    async def _where(self, channel_id: str) -> str:
+        """
+        The channel an event really belongs to, threads resolved.
+
+        ⚠ Overridable and cached in `discord_api`, so a test can drive the
+        whole state machine without a network and a running bot asks Discord
+        once per thread rather than once per message.
+        """
+        if not channel_id or channel_id == self.channel_id:
+            return channel_id
+        from vcordbot.discord_api import parent_of
+
+        return await parent_of(channel_id, self.token)
 
     async def handle(self, frame: dict, send: Callable[[dict], Awaitable[None]]) -> None:
         """One frame off the socket. The whole protocol, in one place."""
@@ -198,7 +221,10 @@ class Reader:
         if name in ("MESSAGE_REACTION_ADD", "MESSAGE_REACTION_REMOVE"):
             if self.on_reaction is None:
                 return
-            if str(data.get("channel_id") or "") != self.channel_id:
+            # ⚠ A star on a reading inside the thread counts too. The thread's
+            # id arrives here, not the channel's, so this has to resolve the
+            # parent exactly as the message path does.
+            if await self._where(str(data.get("channel_id") or "")) != self.channel_id:
                 return
             if str((data.get("user_id") or "")) == self.bot_user_id:
                 return          # the bot's own starter reaction
@@ -209,7 +235,8 @@ class Reader:
             return
 
         if not is_ours(data, channel_id=self.channel_id,
-                       bot_user_id=self.bot_user_id):
+                       bot_user_id=self.bot_user_id,
+                       here=await self._where(str(data.get("channel_id") or ""))):
             return
 
         # ⚠ Discord redelivers on resume. Without this, one message becomes two
