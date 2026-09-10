@@ -126,6 +126,12 @@ services:
       - media:/app/media
       - packs:/app/packs
       - journal:/srv/journal:ro
+      # ⚠ The Firebase service-account key, mounted read-only from OUTSIDE the
+      # repo. It lives in ~/.secrets/shruti because it arrived as a download
+      # into the working tree, which is public and AGPL — see .gitignore. The
+      # backend takes a PATH here rather than the JSON itself, so the secret
+      # never passes through an environment variable or a log line.
+      - ${SHRUTI_SECRETS_DIR:-~/.secrets/shruti}:/run/secrets/shruti:ro
     networks: [shruti, shruti-interop]
 
   postgres:

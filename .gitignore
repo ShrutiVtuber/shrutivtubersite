@@ -30,3 +30,29 @@ docs/RESEARCH_BRIEF.md
 
 # Server layout, users and paths — useful locally, not for a public repo.
 SERVER-ACCESS.md
+
+# ── credentials that arrive as FILES ──────────────────────────────────────
+#
+# ⚠ This repo is public and AGPL. `.env` was covered; a downloaded credential
+# was not, and a browser puts one wherever you last saved something.
+#
+# On 10 September 2026 a Firebase service-account key — a file that can send
+# notifications as her — was downloaded straight into this directory. It was
+# untracked, so nothing had happened yet; but every commit here is made with
+# `git add -A`, which would have swept it into the next one and pushed it to a
+# public remote. There is no undo for that: the key is burned the moment it
+# lands, and the only fix is to revoke it at Google and issue another.
+#
+# So the patterns below are deliberately broad. A credential that is ignored
+# by mistake costs nothing — you notice it is missing and move it. A
+# credential committed by mistake costs a revocation and a redeploy.
+*service-account*.json
+*serviceaccount*.json
+*-adminsdk-*.json
+google-services.json
+GoogleService-Info.plist
+*.pem
+*.p8
+*.p12
+*.keystore
+*.jks
