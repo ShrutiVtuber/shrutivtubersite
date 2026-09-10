@@ -41,6 +41,30 @@ say "Is the working tree on the server clean?"
 dirty=$(on "$AS git status --porcelain" || true)
 if [ -n "$dirty" ]; then
   echo "$dirty" | head -40
+
+  # ⚠ Capture EVERYTHING before anybody is tempted to clean it up.
+  #
+  # The first time this happened the evidence was destroyed by the fix: the
+  # tree was reset, which rewrote every mtime, and the questions that came up
+  # afterwards — when were these files written, had anything fetched, who had
+  # connected — could no longer be answered. The one measurement that mattered
+  # could not be re-run.
+  #
+  # So this takes the diff, the untracked list, the file times, the reflog and
+  # the recent logins, and writes them somewhere they will survive. It costs a
+  # second and it is the difference between solving this and guessing again.
+  stamp=$(date +%Y%m%d-%H%M%S)
+  where="/tmp/prod-dirty-$stamp"
+  echo
+  echo "Capturing evidence to $where.* on the server…"
+  on "$AS git diff > $where.patch 2>/dev/null || true"
+  on "$AS git status --porcelain > $where.status 2>/dev/null || true"
+  on "$AS git ls-files --others --exclude-standard > $where.untracked 2>/dev/null || true"
+  on "$AS git status --porcelain | awk '{print \$2}' | xargs -r stat -c '%y %n' > $where.times 2>/dev/null || true"
+  on "sudo cp .git/logs/refs/remotes/origin/main $where.fetches 2>/dev/null || true"
+  on "sudo journalctl -u ssh --since '2 days ago' --no-pager 2>/dev/null | grep 'Accepted publickey' | tail -80 > $where.logins || true"
+  echo "  the diff, the untracked files, their mtimes, the fetch log and recent logins"
+  echo
   cat <<'WHY'
 
 The server's working tree has changes that are not in git.
