@@ -128,6 +128,14 @@ const charts: any[] = Array.isArray(chartCall.body) ? chartCall.body : [];
 const keys = await asReader(Astro, "/api/passkeys");
 const passkeys: PasskeyRow[] = keys.ok ? (keys.body?.passkeys ?? []) : [];
 
+/* ⚠ Who they have blocked, and the only place to undo it. The button is
+   pressed in the practice room, in irritation, about a name that may not be
+   remembered an hour later — so the undo cannot live beside the thing that is
+   now invisible. It lives here, where somebody thinks to look. */
+const blockCall = await asReader(Astro, "/api/practice/blocks");
+const blocked: { id: number; name: string }[] =
+  Array.isArray(blockCall.body) ? blockCall.body : [];
+
 /* Support, if there is any. A 404 here means "not a supporter", which is the
    ordinary case and not a failure — so the card simply does not render. */
 const supportRead = await asReader(Astro, "/api/billing/me");
@@ -332,6 +340,25 @@ const TRADITIONS = [
     </section>
 
     <section class="card">
+      <h2>{say("blocked.1", "Blocked")}</h2>
+      <p class="quiet">
+        {say("blocked.2", "Blocking is yours alone. Nobody was told, nothing went to Shruti, and no one else's feed changed. Unblocking brings their writing back and lets them answer yours again.")}
+      </p>
+      {blocked.length === 0 ? (
+        <p class="quiet">{say("blocked.none", "You have not blocked anybody.")}</p>
+      ) : (
+        <ul class="acc-blocked">
+          {blocked.map((b) => (
+            <li>
+              <span>{b.name}</span>
+              <button type="button" data-unblock={b.id}>{say("blocked.undo", "Unblock")}</button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+
+    <section class="card">
       <h2>{say("signing-out.1", "Signing out")}</h2>
       <p class="quiet">{say("signing-out.2", "Ends this session in this browser. Your account and everything in it stay exactly as they are — this is not deleting anything.")}</p>
       <form method="POST">
@@ -451,6 +478,19 @@ const TRADITIONS = [
   .lists ul { margin: 0; padding-left: 1.2em; font: 400 var(--text-sm) / 1.7 var(--font-body); color: var(--ink-soft); }
   .modal-note { font: 500 var(--text-sm) var(--font-body); color: var(--live); margin: var(--space-4) 0 0; }
   .modal-actions { display: flex; gap: 10px; align-items: center; margin-top: var(--space-4); }
+
+  .acc-blocked { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+  .acc-blocked li {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 10px 0; border-bottom: var(--border-w) solid var(--line);
+    font: 400 var(--text-body) var(--font-body); color: var(--ink);
+  }
+  .acc-blocked li:last-child { border-bottom: 0; }
+  .acc-blocked button {
+    font: 400 var(--text-sm) var(--font-body); color: var(--ink-faint);
+    background: none; border: 0; padding: 4px 0; cursor: pointer;
+  }
+  .acc-blocked button:hover { color: var(--ink); text-decoration: underline; }
 </style>
 
 <script is:inline>
@@ -462,6 +502,34 @@ const TRADITIONS = [
     });
     document.querySelector("[data-close-delete]")?.addEventListener("click", function (e) {
       e.preventDefault(); modal.close();
+    });
+  })();
+
+  /* Unblocking. ⚠ DELETE with the CSRF token, the same as every other
+     state-changing call from this page — the cookie alone is not enough. */
+  (function () {
+    var rows = document.querySelectorAll("[data-unblock]");
+    if (!rows.length) return;
+    function token() {
+      var c = document.cookie.split("; ").find(function (x) {
+        return x.indexOf("shruti_csrf=") === 0;
+      });
+      return c ? c.split("=")[1] : "";
+    }
+    rows.forEach(function (button) {
+      button.addEventListener("click", async function () {
+        button.disabled = true;
+        var r = await fetch("/api/practice/blocks/" + button.dataset.unblock, {
+          method: "DELETE",
+          headers: { "x-csrf-token": token() },
+        });
+        if (r.ok) {
+          button.closest("li").remove();
+        } else {
+          button.disabled = false;
+          button.textContent = "That did not work";
+        }
+      });
     });
   })();
 </script>

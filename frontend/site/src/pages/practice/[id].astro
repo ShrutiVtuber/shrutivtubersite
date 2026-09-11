@@ -165,6 +165,12 @@ const REASONS = [
           </form>
         </details>
       )}
+      {me && !work.mine && work.authorId && (
+        <button type="button" class="pw-block"
+                data-block={work.authorId} data-who={work.author}>
+          {say("block", `Block ${work.author}`)}
+        </button>
+      )}
       {work.mine && !work.hidden && (
         <button type="button" class="pw-withdraw" data-withdraw={work.id}>
           {say("withdraw", "Take mine down")}
@@ -331,6 +337,20 @@ const REASONS = [
     background: var(--surface-card); color: var(--ink); min-height: 40px;
   }
   .pw-vote[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); background: var(--accent-wash); }
+  /* ⚠ Quieter than Report on purpose. Reporting asks her to look at somebody;
+     blocking asks nobody anything and moves nothing for anyone else. Giving
+     them the same weight would suggest they are the same kind of act. */
+  .pw-block {
+    font: 400 var(--text-sm) var(--font-body);
+    color: var(--ink-faint);
+    background: none;
+    border: 0;
+    padding: 6px 0;
+    cursor: pointer;
+    text-align: left;
+  }
+  .pw-block:hover { color: var(--ink); text-decoration: underline; }
+
   .pw-report > summary {
     cursor: pointer; font: 400 var(--text-xs) var(--font-body);
     color: var(--ink-faint); padding: 11px 4px;
@@ -423,6 +443,29 @@ const REASONS = [
       if (count) count.textContent = String(answer.votes);
     }
     vote.disabled = false;
+  });
+
+  const block = document.querySelector<HTMLButtonElement>("[data-block]");
+  block?.addEventListener("click", async () => {
+    const who = block.dataset.who ?? "this person";
+    /* ⚠ Confirmed, because the undo lives somewhere else — on the account
+       page, which is the right place for it and not the place anybody will
+       look in the next five seconds. */
+    if (!confirm(
+      `Block ${who}?\n\nTheir writing goes from your feed, and they can no ` +
+      `longer comment on yours. They are not told. You can undo it on your ` +
+      `account page.`
+    )) return;
+    block.disabled = true;
+    const r = await post("/api/practice/blocks", { user_id: Number(block.dataset.block) });
+    if (r.ok) {
+      /* ⚠ Away from here. This page is now a 404 for this reader, so staying
+         and reloading would answer the block with an error. */
+      location.href = "/practice";
+    } else {
+      block.disabled = false;
+      block.textContent = "That did not work — try again";
+    }
   });
 
   const report = document.querySelector<HTMLFormElement>("[data-report]");

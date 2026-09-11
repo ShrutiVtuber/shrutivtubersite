@@ -24,6 +24,7 @@ import inspect
 import re
 from pathlib import Path
 
+from conftest import SITE
 from shruti.api.routes import practice
 from shruti.models.practice import PracticeBlock
 
@@ -158,6 +159,42 @@ def test_a_comment_says_who_wrote_it() -> None:
     """
     body = code_of(practice.one)
     assert '"authorId": c.user_id' in body
+
+
+# ── and the same on the website, because it is the same room ────────────────
+
+
+def test_the_website_offers_it_too() -> None:
+    """
+    ⚠ Her words: "it should exist on the website as well yeah and blocks on one
+    should work on the other."
+
+    The second half was already true and is what makes the first half worth
+    doing: the filtering is server-side, so somebody blocked from the app is
+    hidden on the site and the other way round. Only the BUTTON was app-only,
+    which left a site-only reader unable to block anybody at all.
+    """
+    page = (SITE / "src" / "pages" / "practice" / "[id].astro").read_text()
+    assert "data-block" in page, "the site has no block button"
+    assert "/api/practice/blocks" in page
+    # ⚠ Drawn only when the server said who wrote it, as in the app.
+    assert "work.authorId" in page
+
+
+def test_the_website_has_the_way_back() -> None:
+    """A block undone only in the app is a trap for somebody who has neither."""
+    account = (SITE / "src" / "pages" / "account.astro").read_text()
+    assert "data-unblock" in account, "no unblock on the account page"
+    assert "/api/practice/blocks" in account
+    # ⚠ DELETE needs the token like every other state-changing call from a
+    # page; the cookie alone is not enough and the failure would be a 403 that
+    # looks like the block refusing to lift.
+    assert "x-csrf-token" in account
+
+
+def test_the_website_says_a_block_is_not_a_report() -> None:
+    account = (SITE / "src" / "pages" / "account.astro").read_text()
+    assert "Nobody was told" in account
 
 
 def test_the_model_indexes_both_directions() -> None:
