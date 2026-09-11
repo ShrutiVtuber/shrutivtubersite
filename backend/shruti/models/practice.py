@@ -232,3 +232,41 @@ class PracticeBridge(TimestampMixin, table=True):
     # to an existing work can be posted into the thread that already exists
     # rather than starting a second one.
     thread_id: str = Field(default="", index=True)
+
+
+class PracticeBlock(TimestampMixin, table=True):
+    """
+    One person deciding they are done with another.
+
+    ⚠ **This exists because the practice room is user-generated content.**
+    Apple's guideline 1.2 requires an app carrying other people's writing to
+    offer a filter, a way to report, published contact details — and the
+    ability to block an abusive user. The first three were already here; this
+    was the missing one, and it is the kind of gap that is found by a reviewer
+    rather than by a test.
+
+    It is not a moderation tool and it is not a strike. Nobody is told they
+    have been blocked, nothing is hidden from anybody else, and she is not
+    notified — a block is one reader's own decision about their own room, which
+    is precisely what makes it worth having alongside the report queue rather
+    than folded into it.
+
+    ⚠ It cuts both ways deliberately. Blocking somebody hides their writing
+    from you AND stops them commenting on yours; a block that only covered the
+    first would leave the person you blocked still able to reach you, which is
+    the one thing somebody reaching for this button actually wants stopped.
+
+    ⚠ Discord has no row here. A bridged comment has no site account behind it
+    to block, so those are filtered by nothing and cannot be — said plainly in
+    the app rather than quietly failing.
+    """
+
+    __tablename__ = "practice_block"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+
+    # Who decided. The pair is what matters, and both halves are indexed
+    # because both directions are asked: "whose writing do I hide" on every
+    # read, and "who has blocked this person" before they may comment.
+    user_id: int = Field(index=True, foreign_key="site_user.id")
+    blocked_id: int = Field(index=True, foreign_key="site_user.id")

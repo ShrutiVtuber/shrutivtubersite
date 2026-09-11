@@ -29,8 +29,8 @@ from shruti.api.deps import require_admin
 from shruti.core.db import get_session
 from shruti.models.accounts import User
 from shruti.models.practice import (
-    PracticeBridge, PracticeComment, PracticeReading, PracticeReport,
-    PracticeStrike, PracticeVote, PracticeWork,
+    PracticeBlock, PracticeBridge, PracticeComment, PracticeReading,
+    PracticeReport, PracticeStrike, PracticeVote, PracticeWork,
 )
 
 log = logging.getLogger(__name__)
@@ -76,6 +76,29 @@ def _name(user: User | None) -> str:
     if user is None:
         return "somebody"
     return (user.display_name or "").strip() or user.email.split("@")[0]
+
+
+async def _hidden_from(session: AsyncSession, viewer: User | None) -> set[int]:
+    """Whose writing this reader has chosen not to see."""
+    if viewer is None:
+        return set()
+    rows = (await session.execute(
+        select(PracticeBlock.blocked_id)
+        .where(PracticeBlock.user_id == viewer.id)
+    )).scalars().all()
+    return set(rows)
+
+
+async def _blocked_by(
+    session: AsyncSession, *, author_id: int, speaker_id: int,
+) -> bool:
+    """Whether [author_id] has blocked [speaker_id] from answering them."""
+    return (await session.execute(
+        select(PracticeBlock.id).where(
+            PracticeBlock.user_id == author_id,
+            PracticeBlock.blocked_id == speaker_id,
+        )
+    )).scalars().first() is not None
 
 
 async def _work_json(
@@ -597,6 +620,71 @@ async def _tell_discord(work: dict) -> None:
         log.warning("practice channel not told: %s", type(exc).__name__)
 
 
+# ── being done with somebody ────────────────────────────────────────────────
+#
+# ⚠ **These MUST be declared before `/{work_id}`.** FastAPI matches in
+# definition order, so a `/blocks` written below the catch-all is read as a
+# work whose id is the word "blocks" — a 422 about integer parsing, which names
+# nothing that would lead anybody here.
+
+class BlockIn(BaseModel):
+    user_id: int
+
+
+@router.get("/blocks")
+async def my_blocks(
+    request: Request, session: AsyncSession = Depends(get_session),
+) -> list[dict]:
+    """Who this person has blocked, so they can undo it."""
+    user = await _reader(request, session)
+    rows = (await session.execute(
+        select(PracticeBlock, User)
+        .join(User, User.id == PracticeBlock.blocked_id)
+        .where(PracticeBlock.user_id == user.id)
+        .order_by(PracticeBlock.created_at.desc())
+    )).all()
+    return [{"id": b.blocked_id, "name": _name(u)} for b, u in rows]
+
+
+@router.post("/blocks", status_code=201)
+async def block(
+    body: BlockIn, request: Request,
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    user = await _reader(request, session)
+    if body.user_id == user.id:
+        raise HTTPException(400, "you cannot block yourself")
+    if await session.get(User, body.user_id) is None:
+        raise HTTPException(404, "no such person")
+
+    session.add(PracticeBlock(user_id=user.id, blocked_id=body.user_id))
+    try:
+        await session.commit()
+    except IntegrityError:
+        # ⚠ Already blocked is a success, not an error. The button is pressed
+        # from a list that may be a few seconds stale, and "that failed" for
+        # something that is already true teaches people to press it again.
+        await session.rollback()
+    return {"ok": True}
+
+
+@router.delete("/blocks/{user_id}", status_code=204)
+async def unblock(
+    user_id: int, request: Request,
+    session: AsyncSession = Depends(get_session),
+) -> None:
+    user = await _reader(request, session)
+    row = (await session.execute(
+        select(PracticeBlock).where(
+            PracticeBlock.user_id == user.id,
+            PracticeBlock.blocked_id == user_id,
+        )
+    )).scalars().first()
+    if row is not None:
+        await session.delete(row)
+        await session.commit()
+
+
 @router.get("/mine")
 async def mine(
     request: Request, session: AsyncSession = Depends(get_session),
@@ -639,6 +727,12 @@ async def feed(
         .where(PracticeWork.submitted_at.is_not(None))
         .where(PracticeWork.hidden.is_(False))
     )
+    # ⚠ Before the limit, not after. Filtering a page of thirty down to
+    # twenty-six would quietly shorten the feed for somebody who has blocked
+    # people, and they would scroll into a gap rather than more writing.
+    hidden = await _hidden_from(session, viewer)
+    if hidden:
+        q = q.where(PracticeWork.user_id.not_in(hidden))
     if period:
         q = q.where(PracticeWork.period == period)
     if covers:
@@ -680,6 +774,14 @@ async def one(
     if work.hidden and not mine:
         raise HTTPException(404, "no such work")
 
+    # ⚠ 404, the same answer as anything else this reader may not see. A
+    # distinct "you blocked this person" would be honest and would also mean
+    # every blocked author's page still confirms the block exists, which is a
+    # thing somebody who blocked a stalker should not have to hand back.
+    hidden = await _hidden_from(session, viewer)
+    if work.user_id in hidden:
+        raise HTTPException(404, "no such work")
+
     out = await _work_json(work, session, viewer=viewer, full=True)
     comments = (
         await session.execute(
@@ -698,6 +800,10 @@ async def one(
             # one behind it — nobody signed up, agreed to anything, or can be
             # suspended.
             "author": c.from_discord or _name(u),
+            # ⚠ Null for a bridged comment, and that is the signal the app
+            # reads: no id, no account, nothing to block. Without this the
+            # app can show who said a thing but not act on it.
+            "authorId": c.user_id,
             "fromDiscord": bool(c.from_discord),
             # ⚠ Empty means the whole set, not "unknown". A reader filtering to
             # one sign must still see the remarks about the series.
@@ -707,6 +813,11 @@ async def one(
             "mine": viewer is not None and viewer.id == c.user_id,
         }
         for c, u in comments
+        # ⚠ A bridged comment has `user_id` None and so is never in `hidden` —
+        # correct, and worth saying out loud: there is no site account behind
+        # it to block. The app says so rather than offering a button that
+        # would do nothing.
+        if c.user_id not in hidden
     ]
     return out
 
@@ -796,6 +907,13 @@ async def comment(
     await _refuse_if_suspended(session, user)
     work = await session.get(PracticeWork, work_id)
     if work is None or work.submitted_at is None or work.hidden:
+        raise HTTPException(404, "no such work")
+
+    # ⚠ 404, not 403. "You have been blocked" tells somebody exactly who has
+    # had enough of them, which is a gift to the sort of person a block is for.
+    # The work simply is not there for them, which is the same answer they get
+    # for anything else they may not reach.
+    if await _blocked_by(session, author_id=work.user_id, speaker_id=user.id):
         raise HTTPException(404, "no such work")
 
     row = PracticeComment(
