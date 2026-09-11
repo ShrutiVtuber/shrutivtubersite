@@ -219,3 +219,26 @@ What it needs:
 - the period picker limited to what `currentCovers()` says is now
 - an "earlier readings" link that opens the site, saying so plainly — a link
   that silently leaves the app is worse than one that says where it goes
+
+## Where the app stands — 11 September 2026
+
+**Both platforms build, and they agree with the website.**
+
+Android carries the Swiss Ephemeris as it always has. iOS cannot — AGPL and
+Apple's App Store terms cannot both be satisfied, and that library is not hers
+to relicense — so it computes the sky from published theory instead. ⚠ Temporary:
+when the commercial licence is bought, iOS returns to the same engine and
+`docs/THE-IOS-EPHEMERIS.md` in shruti-tools says exactly what to delete.
+
+⚠ **Three disagreements were found and fixed on the way, none of them iOS's.**
+
+1. The site used the MEAN node and the app the TRUE one — 1.8° apart, and in
+   five of 108 sampled moments in a different SIGN.
+2. The site disagreed with ITSELF: `/chart` mean, `/ephemeris` true. Its own
+   chart page and its own ephemeris page put Rahu in different places.
+3. The app drew ten bodies where the site draws seven. Her practice is
+   Hellenistic; the outer three are gone.
+
+All three are now held by a test that generates its fixture from the site's own
+engine — so "the app agrees with the website" is measured across 864 positions
+and three centuries rather than believed.
