@@ -25,9 +25,10 @@ from shruti.models import Section                                # noqa: E402
 
 PRIVACY = [
     ("what", "What this covers", 10, """
-This policy covers shrutivtuber.com. The tools on this site compute against an
-ephemeris server run by the same person, and the journal is served from
-BeeRanked; both are named below where they apply.
+This policy covers shrutivtuber.com and **Shruti's Astrolabe**, the app for
+Android and iPhone. The tools on this site compute against an ephemeris server
+run by the same person, and the journal is served from BeeRanked; both are
+named below where they apply.
 
 **The controller** is the entity named in the imprint at the foot of every
 page. Contact for anything in this policy: business@shrutivtuber.com.
@@ -188,6 +189,42 @@ waiting. It deletes the birth data with it. If you later make an account, a
 chart you already kept can be moved onto it rather than cast again, and the
 expiry lifts.
 """),
+    ("app", "If you use the app", 47, """
+The app is the same tools, on a phone. It talks to **this site and nowhere
+else**, apart from the notification services named below, and it has no
+analytics, no advertising and no tracking in it of any kind.
+
+**The sky is computed on the phone.** A chart, a station table, the planetary
+hours — the arithmetic happens on the device, from tables built into the app.
+What you type to cast a chart is used there and then and is **not sent to any
+server**, including this one.
+
+**What the app keeps on your phone**, and nowhere else:
+
+- the place you chose, so it does not have to ask again
+- whether you count sunrise by the disc's edge or its centre
+- whether you asked for notifications, and this phone's notification address
+- if you signed in, the token that keeps you signed in
+
+All of it goes when the app does. Deleting the app deletes the lot; there is
+no copy of it here.
+
+**If you sign in**, the app uses the account you already have, under the
+section above. It is the same account and the same data — there is not a
+separate app one.
+
+**If you turn notifications on**, the phone is given an address by Google's
+Firebase Cloud Messaging, and that address is registered here so a notice can
+be sent to it. Turning notifications off deletes the registration, and so does
+signing out. Nothing is sent to a phone that has not asked.
+
+**The limit of that, said plainly.** A phone can only be woken by Google's
+service or Apple's, and using either means that service knows this app is
+installed on your phone and holds the address notices go to. That is inherent
+in push notifications rather than a choice made here, and the only way to
+avoid it entirely is to leave notifications off — which costs you nothing else
+in the app.
+"""),
     ("newsletter", "The monthly letter", 50, """
 Subscribing is **double opt-in**: an address that has not confirmed is never
 sent to. Every issue carries a one-click unsubscribe that needs no login, and
@@ -229,6 +266,9 @@ You also have the right to complain to a supervisory authority.
 - **Google Fonts** — serves the typefaces. This is a request your browser makes
   directly, so it does see your IP; self-hosting the fonts would remove that and
   is a known open item.
+- **Google (Firebase Cloud Messaging)** — carries notifications to Android
+  phones, and holds the address of the phone each one goes to.
+- **Apple (Push Notification service)** — the same, for iPhones.
 
 **No analytics company is on this list**, and that is not an omission. How much
 the site is used is counted by the site itself, on the same server, and the
