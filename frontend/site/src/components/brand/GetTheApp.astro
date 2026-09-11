@@ -1,0 +1,128 @@
+---
+/* Where to get the app, asked of the stores rather than declared.
+ *
+ * ⚠ **Nothing here is switched on by hand.** A badge put up on submission day
+ * is a dead link for two days; a badge put up on approval day waits for
+ * somebody to notice an email. The backend asks Apple and Google directly —
+ * see shruti/core/stores.py — so this appears by itself the hour each store
+ * starts carrying it, and disappears again if either ever stops.
+ *
+ * ⚠ Which means it renders NOTHING at all until then, deliberately. An empty
+ * "coming soon" band is a promise with a date attached, and the date is not
+ * ours to make: it belongs to Apple's reviewers and, for Android, to a Play
+ * organisation account that waits on a company being registered.
+ *
+ * No store badge artwork. Apple's and Google's badges come with brand rules
+ * about size, clear space and pairing, and a plain button in her own design
+ * breaks none of them and looks like the rest of the site.
+ */
+import Button from "../forms/Button.astro";
+import { site } from "../../lib/api";
+
+interface Props {
+  /** A tighter version for inside a page, rather than the band under a hero. */
+  compact?: boolean;
+}
+const { compact = false } = Astro.props;
+
+interface Store {
+  url: string;
+  name?: string;
+  version?: string;
+}
+
+/* ⚠ Never lets a store outage take the page down with it. A band that does
+   not render is a missing badge; a page that throws is a missing page. */
+let stores: { ios: Store | null; android: Store | null } | null = null;
+try {
+  stores = await site<{ ios: Store | null; android: Store | null }>("/api/app/stores");
+} catch {
+  stores = null;
+}
+
+const ios = stores?.ios ?? null;
+const android = stores?.android ?? null;
+const any = Boolean(ios || android);
+
+/* Both, one, or the other — said plainly rather than with a stock phrase. */
+const where = ios && android ? "iPhone and Android" : ios ? "iPhone" : "Android";
+---
+
+{
+  any && (
+    <section class="app-band" data-compact={compact ? "true" : "false"}>
+      <div class="app-inner">
+        <div class="app-words">
+          <p class="app-eyebrow">The instruments, on your phone</p>
+          <p class="app-line">
+            Every tool on this site, computed on the device — no account, no
+            advertising, nothing to buy. Free on {where}.
+          </p>
+        </div>
+        <div class="app-actions">
+          {ios && (
+            <Button href={ios.url} size={compact ? "md" : "lg"}>
+              Download on the App Store
+            </Button>
+          )}
+          {android && (
+            <Button href={android.url} size={compact ? "md" : "lg"}
+                    variant={ios ? "secondary" : "primary"}>
+              Get it on Google Play
+            </Button>
+          )}
+        </div>
+      </div>
+    </section>
+  )
+}
+
+<style>
+  .app-band {
+    border-block: var(--border-w) solid var(--line);
+    background: color-mix(in srgb, var(--surface-veil) 55%, transparent);
+  }
+  .app-band[data-compact="true"] {
+    border-radius: var(--radius-md);
+    border: var(--border-w) solid var(--line);
+    background: var(--surface-veil);
+  }
+
+  .app-inner {
+    max-width: var(--measure-page, 1080px);
+    margin-inline: auto;
+    padding: var(--space-5) var(--space-4);
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-4);
+  }
+  .app-band[data-compact="true"] .app-inner { padding: var(--space-4); }
+
+  .app-words { display: grid; gap: 6px; min-width: 0; }
+
+  .app-eyebrow {
+    margin: 0;
+    font: 600 var(--text-micro) var(--font-body);
+    letter-spacing: var(--tracking-eyebrow);
+    text-transform: uppercase;
+    color: var(--ink-faint);
+  }
+  .app-line {
+    margin: 0;
+    font: 400 var(--text-body) / var(--leading-body) var(--font-body);
+    color: var(--ink-soft);
+    max-width: 54ch;
+  }
+
+  .app-actions { display: flex; flex-wrap: wrap; gap: var(--space-3); }
+
+  /* ⚠ The buttons go full width before they go two-per-row on a narrow
+     screen: two half-width buttons side by side put "Download on the App
+     Store" onto three lines each. */
+  @media (max-width: 560px) {
+    .app-inner { align-items: stretch; }
+    .app-actions { flex-direction: column; }
+  }
+</style>

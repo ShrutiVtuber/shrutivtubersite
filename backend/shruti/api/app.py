@@ -16,7 +16,7 @@ from shruti.api.routes import (
     horoscopes,
     insight, journal, live, media, newsletter, packs, passkeys, places,
     offers, practice, standing,
-    public, overlay, shop, twitch, videos
+    public, overlay, shop, stores, twitch, videos,
 )
 from shruti.core.config import get_settings
 from shruti.core.db import SessionLocal
@@ -152,6 +152,7 @@ app.include_router(standing.router)
 app.include_router(devices.router)
 app.include_router(offers.router)
 app.include_router(journal.router)
+app.include_router(stores.router)
 app.include_router(passkeys.router)
 app.include_router(billing.router)
 app.include_router(media.router)

@@ -8,6 +8,7 @@
  */
 import BaseLayout from "../layouts/BaseLayout.astro";
 import Hero from "../components/brand/Hero.astro";
+import GetTheApp from "../components/brand/GetTheApp.astro";
 import SectionHeader from "../components/brand/SectionHeader.astro";
 import SupportBand from "../components/blocks/SupportBand.astro";
 import LiveBadge from "../components/brand/LiveBadge.astro";
@@ -234,6 +235,11 @@ const INSTRUMENTS = [
         </div>
       </Fragment>
   </Hero>
+
+  {/* ⚠ Directly under the hero, because it is a major feature and not a
+      footnote — her words. It renders nothing at all until a store actually
+      carries the app, so it costs the page nothing in the meantime. */}
+  <GetTheApp />
 
   <div class="page">
     <SupportBand block={swaraBlock} tiers={billing?.tiers ?? []} />

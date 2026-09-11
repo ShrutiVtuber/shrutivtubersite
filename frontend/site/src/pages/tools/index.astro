@@ -20,6 +20,7 @@
  */
 import BaseLayout from "../../layouts/BaseLayout.astro";
 import SectionHeader from "../../components/brand/SectionHeader.astro";
+import GetTheApp from "../../components/brand/GetTheApp.astro";
 import Prose from "../../components/content/Prose.astro";
 import { instruments, categories } from "../../lib/instruments";
 import { pageSections } from "../../lib/content";
@@ -95,6 +96,12 @@ const jsonLd = {
       title={say("text.4", "The instruments")}
       body={say("text.5", "Nine of them, all free, none of them asking for an account. They are built on stream and the working is shown — every one says which rule it followed and where the numbers came from, because a figure you cannot check is a figure you have to take on faith.")}
     />
+
+    {/* ⚠ Above the list, not below it. Somebody who has just read "nine of
+        them, all free" is exactly the person who wants them on a phone, and
+        a band under nine cards is a band nobody reaches. Renders nothing
+        until a store carries the app. */}
+    <GetTheApp compact />
 
     {GROUPS.map((group) => {
       const of = all.filter((i) => i.category === group);
