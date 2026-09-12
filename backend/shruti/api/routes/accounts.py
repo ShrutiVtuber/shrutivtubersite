@@ -825,7 +825,13 @@ async def _send_verification(email: str) -> None:
     """
     token = issue_link(email, purpose="verify")
     url = f"{_site_url()}/verify?token={token}"
-    await send_mail(
+    # ⚠ **This is the one mail whose failure strands somebody.** `send` never
+    # raises, deliberately — a failed message must not fail the request that
+    # triggered it. That was harmless when signing up also signed you in; now
+    # the account exists, cannot be used, and no link is coming. The way out is
+    # the resend button, which is why it sits on the very screen that says to
+    # check your email — but a silent failure should still be loud in the log.
+    result = await send_mail(
         subject="Confirm your address",
         body=(
             "Welcome. Follow this link and your shrutivtuber.com account "
@@ -837,6 +843,11 @@ async def _send_verification(email: str) -> None:
         ),
         to=email,
     )
+    if not result.sent:
+        log.error(
+            "the confirmation mail did not send (%s) — that account cannot be "
+            "used until somebody asks for the link again", result.error,
+        )
 
 
 async def _send_magic_link(email: str) -> None:
