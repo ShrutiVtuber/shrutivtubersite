@@ -61,8 +61,8 @@ if (Astro.request.method === "POST") {
           }),
         });
         if (response.ok) {
-          const cookie = response.headers.get("set-cookie");
-          if (cookie) Astro.response.headers.append("set-cookie", cookie);
+          // ⚠ No cookie to forward any more: signing up no longer signs you
+          // in, because the address has not been proved yet.
           done = true;
         } else {
           const body = await response.json().catch(() => null);
@@ -83,12 +83,26 @@ if (Astro.request.method === "POST") {
       body={say("text.4", "For keeping your own chart and reading your own horoscope. Nothing here is public — no profile, no avatar, no follower count.")}
     />
 
+    {/* ⚠ NEW copy keys below, not the old ones. This used to say "You're in"
+        and offer to add a nativity, which is now false — the account does not
+        work until the address is confirmed. Reusing the old keys would let an
+        admin override written for the old wording put "You're in" back on a
+        page that means the opposite.
+
+        ⚠ And this comment sits HERE, outside the expression, not inside the
+        `done ? (` that follows. Inside a returned element's parentheses it is
+        not a comment at all: Astro accepts it and silently drops the element's
+        attributes. There is a test for this, it has caught the same mistake
+        three times now, and this is the third. */}
     {
       done ? (
-        <EmptyState glyph="☾︎" title={say("text.11", "You're in")} body={say("text.5", "The account is made. Where would you like to start?")}>
+        <EmptyState
+          glyph="☾︎"
+          title={say("confirm.title", "Check your email")}
+          body={say("confirm.body", "The account is made, and a link is on its way to confirm the address. Follow it and you are signed in. It lasts twenty minutes; if it expires, ask for another from the sign-in page.")}
+        >
           <div slot="action" class="auth-actions">
-            <Button href="/nativity">{say("text.8", "Add a nativity")}</Button>
-            <Button variant="secondary" href="/today">{say("text.9", "See today")}</Button>
+            <Button href="/signin">{say("confirm.signin", "Go to sign in")}</Button>
           </div>
         </EmptyState>
       ) : (

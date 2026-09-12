@@ -1,0 +1,58 @@
+---
+/* Where the confirmation email lands.
+ *
+ * ⚠ Consumes the token and signs them in. Somebody who has just proved they
+ * hold the address has done everything sign-in asks for, and making them type
+ * a password they set ninety seconds ago protects nobody.
+ *
+ * ⚠ This page is also opened on a PHONE, by somebody who made their account in
+ * the app. They confirm here, then go back to the app and sign in — which is
+ * why the failure text says where to ask for another link rather than assuming
+ * a browser is where they live.
+ */
+import BaseLayout from "../layouts/BaseLayout.astro";
+import EmptyState from "../components/feedback/EmptyState.astro";
+import Button from "../components/forms/Button.astro";
+import { SITE_API } from "../lib/api";
+import { redirectWithCookies } from "../lib/redirect";
+import { copy } from "../lib/copy";
+
+const say = await copy("verify");
+
+const token = Astro.url.searchParams.get("token") ?? "";
+let failed = "";
+
+if (token) {
+  try {
+    const response = await fetch(
+      `${SITE_API}/api/account/verify?token=${encodeURIComponent(token)}`,
+    );
+    if (response.ok) return redirectWithCookies("/account?confirmed=1", response);
+    const body = await response.json().catch(() => null);
+    failed = body?.detail ?? say("error.failed2", "That link did not work.");
+  } catch {
+    failed = say("error.failed", "That link did not work.");
+  }
+} else {
+  failed = say("error.token", "That link is missing its token.");
+}
+---
+
+<BaseLayout
+  title={say("text.1", "Confirm your address — Shruti")}
+  description={say("text.2", "Confirming your address.")}
+  noindex
+>
+  <div class="page">
+    <EmptyState
+      glyph="◐"
+      as="h1"
+      title={say("text.3", "That link has expired")}
+      body={`${failed} ${say("text.5", "Confirmation links last twenty minutes. Ask for another from the sign-in screen, on the site or in the app, and it will send straight away.")}`}
+    >
+      <Button slot="action" variant="secondary" href="/signin">
+        {say("text.4", "Ask for a new link")}
+      </Button>
+    </EmptyState>
+  </div>
+</BaseLayout>

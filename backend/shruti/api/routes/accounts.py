@@ -204,13 +204,17 @@ async def sign_up(
 
     await session.commit()
 
-    secure = request.url.scheme == "https" or \
-        request.headers.get("x-forwarded-proto") == "https"
-    _set_session(response, user, secure)
-    out = {"ok": True, "id": user.id, "email": user.email}
-    if body.bearer:
-        out["token"] = issue_session(user.id, user.email)
-    return out
+    # ⚠ **No session yet.** An account is not usable until the address behind
+    # it has been proved, and proving it is following a link sent to it. The
+    # practice room carries other people's writing, and an unproved address is
+    # how that gets abused — somebody banned makes another account in seconds
+    # with an address nobody can reach.
+    #
+    # ⚠ The answer here is the SAME as the answer for an address that already
+    # has an account, deliberately. A form does not get to be an oracle about
+    # who is already here.
+    await _send_verification(email)
+    return {"ok": True, "checkEmail": True}
 
 
 # ── signing in ──────────────────────────────────────────────────────────────
@@ -236,6 +240,20 @@ async def sign_in(
         # costs the same as a wrong password.
         if not verify_password(user.password_hash if user else None, body.password):
             raise HTTPException(401, "that email and password do not match")
+        # ⚠ Checked AFTER the password, never before. Refusing an unverified
+        # address before the password is checked would tell a stranger which
+        # addresses have accounts here, which is the thing every other answer
+        # in this file is careful not to say.
+        #
+        # ⚠ 403 with a code the app can act on, rather than a 401 that reads as
+        # "wrong password" — somebody typing the right password and being told
+        # it is wrong will change it, and still not get in.
+        if user is not None and user.email_verified_at is None:
+            raise HTTPException(
+                403,
+                "that address has not been confirmed yet — follow the link in "
+                "your email, or ask for a new one",
+            )
         secure = request.url.scheme == "https" or \
             request.headers.get("x-forwarded-proto") == "https"
         _set_session(response, user, secure)
@@ -271,6 +289,68 @@ async def use_link(
         request.headers.get("x-forwarded-proto") == "https"
     _set_session(response, user, secure)
     return {"ok": True, "signedIn": True}
+
+
+class ResendIn(BaseModel):
+    email: EmailStr
+
+
+@router.post("/verify/resend", status_code=202)
+async def resend_verification(
+    body: ResendIn, session: AsyncSession = Depends(get_session)
+) -> dict:
+    """
+    Send the confirmation link again.
+
+    ⚠ The same answer either way, like every other address-shaped question
+    here: whether an address has an account, and whether it is confirmed, are
+    both things a stranger does not get to learn from a form.
+    """
+    email = body.email.lower().strip()
+    user = (
+        await session.execute(select(User).where(User.email == email))
+    ).scalar_one_or_none()
+    if user is not None and user.email_verified_at is None:
+        await _send_verification(email)
+    return {"ok": True, "checkEmail": True}
+
+
+@router.get("/verify")
+async def confirm_address(
+    token: str, request: Request, response: Response,
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """
+    Follow the link from the email, and the account starts working.
+
+    ⚠ Signs them in as well. Somebody who has just proved they hold the address
+    has done everything sign-in asks for, and making them type a password they
+    set ninety seconds ago is a step that protects nobody.
+
+    ⚠ Already-confirmed is a SUCCESS, not an error. Mail clients follow links
+    to check them, people press back, and a second visit saying "that link has
+    expired" for an account that is perfectly fine is a support request.
+    """
+    email = read_link(token, purpose="verify")
+    if not email:
+        raise HTTPException(
+            400, "that link has expired — ask for a new one and it will send"
+        )
+    user = (
+        await session.execute(select(User).where(User.email == email))
+    ).scalar_one_or_none()
+    if user is None:
+        raise HTTPException(
+            400, "that link has expired — ask for a new one and it will send"
+        )
+
+    user.email_verified_at = user.email_verified_at or datetime.now(timezone.utc)
+    await session.commit()
+
+    secure = request.url.scheme == "https" or \
+        request.headers.get("x-forwarded-proto") == "https"
+    _set_session(response, user, secure)
+    return {"ok": True, "confirmed": True, "email": user.email}
 
 
 @router.post("/signout")
@@ -734,6 +814,30 @@ async def erase(user: User, session: AsyncSession) -> dict:
 
 
 # ── mail ────────────────────────────────────────────────────────────────────
+
+async def _send_verification(email: str) -> None:
+    """
+    The one email an account cannot start without.
+
+    ⚠ Twenty minutes, like every other link here. That is short for a
+    confirmation, which is why `/verify/resend` exists and why the app offers
+    it on the very screen that says to check your email.
+    """
+    token = issue_link(email, purpose="verify")
+    url = f"{_site_url()}/verify?token={token}"
+    await send_mail(
+        subject="Confirm your address",
+        body=(
+            "Welcome. Follow this link and your shrutivtuber.com account "
+            "starts working — it also signs you in.\n\n"
+            f"{url}\n\n"
+            "It expires in 20 minutes; if it has, ask for another from the "
+            "sign-in screen. If you did not make an account, nothing has "
+            "happened and you can ignore this."
+        ),
+        to=email,
+    )
+
 
 async def _send_magic_link(email: str) -> None:
     token = issue_link(email, purpose="signin")
