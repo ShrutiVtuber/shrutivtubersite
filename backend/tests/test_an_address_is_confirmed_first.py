@@ -130,3 +130,40 @@ def test_the_confirmation_page_exists() -> None:
     page = (SITE / "src" / "pages" / "verify.astro").read_text()
     assert "/api/account/verify?token=" in page
     assert "redirectWithCookies" in page, "confirming does not carry the session"
+
+
+def test_a_short_password_is_refused_in_our_own_words() -> None:
+    """
+    ⚠ **Pydantic's message reached a screen, and then a video.**
+
+    A length constraint on the schema produces "String should have at least 10
+    characters". The app shows the server's `detail` verbatim — deliberately,
+    so the server can say the useful thing — and that sentence appeared in the
+    recording made for App Review. A reviewer reading developer output
+    concludes the app is unfinished, and would not be wrong.
+
+    ⚠ Checked against the source with COMMENTS STRIPPED. The fifth time in this
+    project that a guard has failed on correct code by finding the forbidden
+    token in the prose explaining why it is forbidden.
+    """
+    source = re.sub(r"(?m)#.*$", " ", inspect.getsource(accounts))
+    source = re.sub(r'"""..*?"""', " ", source, flags=re.S)
+    assert "min_length=10" not in source, (
+        "the schema still words its own failure"
+    )
+    assert accounts.PASSWORD_TOO_SHORT == "A password needs ten characters or more."
+    # ⚠ Both doors: making an account, and setting a new password from a link.
+    assert "_refuse_a_short_password" in code_of(accounts.sign_up)
+    assert "_refuse_a_short_password" in code_of(accounts.do_reset)
+
+
+def test_the_rule_is_still_enforced() -> None:
+    """Moving the check out of the schema must not move it out of existence."""
+    import pytest
+    from fastapi import HTTPException
+    with pytest.raises(HTTPException) as caught:
+        accounts._refuse_a_short_password("short")
+    assert caught.value.status_code == 422
+    # And a good one passes, and None passes — accounts may have no password.
+    accounts._refuse_a_short_password("a-long-enough-one")
+    accounts._refuse_a_short_password(None)

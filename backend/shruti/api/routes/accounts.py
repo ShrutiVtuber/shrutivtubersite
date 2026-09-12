@@ -90,6 +90,23 @@ def _set_session(response: Response, user: User, secure: bool) -> None:
 
 # ── signing up ──────────────────────────────────────────────────────────────
 
+#: What a password has to be, said once, in words meant for a person.
+#:
+#: ⚠ **Pydantic's own message reached a screen.** `min_length=10` on the schema
+#: produces "String should have at least 10 characters", which the app shows
+#: verbatim because it trusts the server to say the useful thing. It appeared
+#: in the video recorded for App Review on 12 September 2026, which is where it
+#: was caught — a reviewer reading developer output concludes the app is not
+#: finished, and they would not be wrong.
+PASSWORD_MINIMUM = 10
+PASSWORD_TOO_SHORT = "A password needs ten characters or more."
+
+
+def _refuse_a_short_password(password: str | None) -> None:
+    if password is not None and len(password) < PASSWORD_MINIMUM:
+        raise HTTPException(422, PASSWORD_TOO_SHORT)
+
+
 class ConsentIn(BaseModel):
     kind: str
     granted: bool = False
@@ -97,7 +114,10 @@ class ConsentIn(BaseModel):
 
 class SignUpIn(BaseModel):
     email: EmailStr
-    password: str | None = Field(default=None, min_length=10, max_length=200)
+    # ⚠ No min_length here on purpose — see the check in `sign_up`. Pydantic
+    # words its own failures, and "String should have at least 10
+    # characters" is developer output that was shown to a person.
+    password: str | None = Field(default=None, max_length=200)
     display_name: str = Field(default="", max_length=120)
     consents: list[ConsentIn] = Field(default_factory=list)
     # ⚠ Opt-in, so the website's behaviour does not change. A browser gets the
@@ -165,6 +185,7 @@ async def sign_up(
 ) -> dict:
     email = body.email.lower().strip()
     given = {c.kind: c.granted for c in body.consents}
+    _refuse_a_short_password(body.password)
 
     # Only the contract consent can ever be required. A special-category
     # consent that blocked a submit would not be freely given.
@@ -397,7 +418,8 @@ async def request_reset(
 
 class ResetIn(BaseModel):
     token: str
-    password: str = Field(min_length=10, max_length=200)
+    # ⚠ Same reasoning as SignUpIn — the sentence is ours.
+    password: str = Field(max_length=200)
 
 
 @router.post("/reset")
@@ -411,6 +433,7 @@ async def do_reset(
     A reset link cannot be used as a sign-in link and vice versa: the purpose
     is claimed in the token and checked, so one cannot stand in for the other.
     """
+    _refuse_a_short_password(body.password)
     email = read_link(body.token, purpose="reset")
     if not email:
         raise HTTPException(400, "that link has expired or has already been used")
