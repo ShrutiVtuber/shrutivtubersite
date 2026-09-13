@@ -320,7 +320,7 @@ const themeWord = (t: string) => t === "grimoire" ? say("tokens.theme.grimoire",
           </p>
           <p class="quiet">{say("hosting.what", "She runs the server that draws your overlays while you stream. That is the part that costs real processing, and it is the only thing on this site that costs anything.")}</p>
           {hosting.canManage && (
-            <form method="POST"><input type="hidden" name="csrf" value={csrf} /><input type="hidden" name="action" value="portal" />
+            <form method="POST"><CsrfField /><input type="hidden" name="action" value="portal" />
               <Button type="submit" variant="secondary">{say("hosting.manage", "Manage billing or cancel")}</Button></form>
           )}
         </div>
@@ -335,8 +335,8 @@ const themeWord = (t: string) => t === "grimoire" ? say("tokens.theme.grimoire",
           <p class="quiet">{say("hosting.free", "Without it, overlays are free for {n} hours on air a month.").replace("{n}", String(allowance?.hoursLimit ?? 100))}</p>
           {hosting?.configured ? (
             <div class="row">
-              {monthly && <form method="POST"><input type="hidden" name="csrf" value={csrf} /><input type="hidden" name="action" value="hosting" /><input type="hidden" name="tier" value={monthly.tier} /><Button type="submit">{say("hosting.buy_month", "Host monthly")}</Button></form>}
-              {yearly && <form method="POST"><input type="hidden" name="csrf" value={csrf} /><input type="hidden" name="action" value="hosting" /><input type="hidden" name="tier" value={yearly.tier} /><Button type="submit" variant="secondary">{say("hosting.buy_year", "Host yearly")}</Button></form>}
+              {monthly && <form method="POST"><CsrfField /><input type="hidden" name="action" value="hosting" /><input type="hidden" name="tier" value={monthly.tier} /><Button type="submit">{say("hosting.buy_month", "Host monthly")}</Button></form>}
+              {yearly && <form method="POST"><CsrfField /><input type="hidden" name="action" value="hosting" /><input type="hidden" name="tier" value={yearly.tier} /><Button type="submit" variant="secondary">{say("hosting.buy_year", "Host yearly")}</Button></form>}
             </div>
           ) : (
             <p class="quiet">{say("hosting.not_yet", "Not on sale yet.")}</p>
@@ -346,7 +346,7 @@ const themeWord = (t: string) => t === "grimoire" ? say("tokens.theme.grimoire",
       )}
       <div class="self">
         <h3>{say("self.1", "Or run it yourself")}</h3>
-        <p class="quiet">{say("self.2", "The server, the overlays and the MCP are AGPL-3.0. A Docker image and a compose file are in the hosting notes; a self-hosted instance downloads public guides from here.")} <a href="/guides/hosting">{say("self.3", "Hosting notes")}</a></p>
+        <p class="quiet">{say("self.2", "The server, the overlays and the MCP are AGPL-3.0. A Docker image and a compose file are in the hosting notes; a self-hosted instance downloads public guides from here.")} <a href="/tracker">{say("self.3", "Hosting notes")}</a></p>
       </div>
     </section>
 

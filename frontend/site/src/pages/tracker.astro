@@ -1,14 +1,14 @@
 ---
-/* The hosting notes: the server, the overlays and the MCP are AGPL-3.0, and
+/* The hosting notes, at /tracker so they are never behind the guides section's gate: the server, the overlays and the MCP are AGPL-3.0, and
  * anybody may run the tracker for nothing. Hosting on shrutivtuber.com is
  * the same software, run and looked after by Shruti — the service, not the
  * code. The price lives on the account page and nowhere else.
  */
-import BaseLayout from "../../layouts/BaseLayout.astro";
-import SectionHeader from "../../components/brand/SectionHeader.astro";
-import { copy } from "../../lib/copy";
+import BaseLayout from "../layouts/BaseLayout.astro";
+import SectionHeader from "../components/brand/SectionHeader.astro";
+import { copy } from "../lib/copy";
 
-const say = await copy("guides/hosting");
+const say = await copy("tracker");
 ---
 
 <BaseLayout title={say("meta.title", "Run your own tracker — Shruti's Guides")} description={say("meta.description", "The tracker is AGPL-3.0: a Docker image, a compose file, and your runs on your own machine.")}>
