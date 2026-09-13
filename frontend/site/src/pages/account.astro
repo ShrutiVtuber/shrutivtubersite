@@ -170,7 +170,7 @@ const allowance = allowanceRead.ok ? allowanceRead.body as { tier: string; token
 const money = (cents: number, currency: string) => (currency === "EUR" ? "€" : currency + " ") + (cents % 100 === 0 ? String(cents / 100) : (cents / 100).toFixed(2));
 const monthly = hosting?.tiers.find((t) => t.interval === "month") ?? null;
 const yearly = hosting?.tiers.find((t) => t.interval === "year") ?? null;
-const renews = hosting?.currentPeriodEnd ? new Date(hosting.currentPeriodEnd).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" }) : "";
+const hostingRenews = hosting?.currentPeriodEnd ? new Date(hosting.currentPeriodEnd).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" }) : "";
 const hostingStarted = Astro.url.searchParams.get("hosting") === "started";
 const tokensRead = await asReader(Astro, "/api/overlay/mine");
 const guideTokens: { id: number; kind: string; label: string; showing: string; href: string; theme: string; live: boolean; hoursThisMonth: number }[] =
@@ -315,7 +315,7 @@ const themeWord = (t: string) => t === "grimoire" ? say("tokens.theme.grimoire",
         <div class="stack">
           <p class="status">
             <span class="live">{hosting.cancelAtPeriodEnd ? say("hosting.ending", "ends") : say("hosting.active", "active")}</span>
-            {renews && <span class="faint"> · {hosting.cancelAtPeriodEnd ? say("hosting.ends_on", "on {date}") .replace("{date}", renews) : say("hosting.renews", "renews {date}").replace("{date}", renews)}</span>}
+            {hostingRenews && <span class="faint"> · {hosting.cancelAtPeriodEnd ? say("hosting.ends_on", "on {date}").replace("{date}", hostingRenews) : say("hosting.renews", "renews {date}").replace("{date}", hostingRenews)}</span>}
             {hosting.tier && <span class="faint"> · {hosting.tier === "hosting-yearly" ? say("hosting.yearly_word", "yearly") : say("hosting.monthly_word", "monthly")}</span>}
           </p>
           <p class="quiet">{say("hosting.what", "She runs the server that draws your overlays while you stream. That is the part that costs real processing, and it is the only thing on this site that costs anything.")}</p>
