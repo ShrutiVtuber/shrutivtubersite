@@ -1,0 +1,274 @@
+---
+/* The desk: where a guide is written.
+ *
+ * Any account can write. Everything written is a draft until Shruti has read
+ * it, and the desk says so where the author will see it. Reading needs no
+ * account and never will; writing needs one because a guide is published
+ * under a name.
+ *
+ * ⚠ A new guide is created by SAVING a skeleton, not by a create endpoint:
+ * the server has one rule for filing a draft (guide.id, title, game.id) and
+ * this page uses it rather than growing a second one.
+ */
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import SectionHeader from "../../components/brand/SectionHeader.astro";
+import EmptyState from "../../components/feedback/EmptyState.astro";
+import { site } from "../../lib/api";
+import { account, asReader } from "../../lib/account";
+import { copy } from "../../lib/copy";
+
+const say = await copy("guides/write");
+
+interface Game { id: number; slug: string; name: string; variants: { id: string; name: string }[]; guides: number }
+interface Mine {
+  id: number; slug: string; title: string; game: { slug: string; name: string };
+  published: number | null; hidden: boolean; hiddenBy: string;
+  versions: { id: number; number: number; state: string; note: string; problems: number }[];
+}
+
+const me = await account(Astro);
+const [games, mineRead] = await Promise.all([
+  site<Game[]>("/api/guides/games"),
+  me ? asReader(Astro, "/api/guides/mine") : Promise.resolve({ ok: false, status: 0, body: null }),
+]);
+const mine: Mine[] = mineRead.ok && Array.isArray(mineRead.body) ? mineRead.body : [];
+
+const STATE: Record<string, string> = {
+  draft: say("state.draft", "draft"),
+  submitted: say("state.submitted", "waiting for Shruti"),
+  published: say("state.published", "published"),
+  sent_back: say("state.sent_back", "sent back"),
+  superseded: say("state.superseded", "replaced"),
+};
+const openDraft = (g: Mine) => g.versions.find((v) => v.state === "draft" || v.state === "sent_back");
+---
+
+<BaseLayout
+  title={say("meta.title", "The desk — Shruti's Guides")}
+  description={say("meta.description", "Write a game guide as a path: phases, steps, routines and a codex.")}
+  noindex
+>
+  <div class="page dk-wrap">
+    <div class="section-head">
+      <SectionHeader
+        as="h1" glyph="✎"
+        eyebrow={say("eyebrow", "Shruti's Guides")}
+        title={say("title", "The desk")}
+        body={say("lede",
+          "Write a guide as a path: the phases, the steps in each, the routines that reset and the systems behind them. Everything you write is a draft until Shruti has read it.")}
+      />
+    </div>
+
+    {!me ? (
+      <EmptyState as="h2" glyph="○"
+        title={say("signin.title", "Sign in to write")}
+        body={say("signin.body", "A guide goes up under a name, so writing needs an account. Reading never will.")}>
+        <a slot="action" class="dk-btn" href="/signin">{say("signin.cta", "Sign in")}</a>
+      </EmptyState>
+    ) : (
+      <div class="dk-grid" data-desk data-author={me.displayName}>
+        <section class="dk-section">
+          <h2 class="dk-h2">{say("mine", "Your guides")}</h2>
+          {mine.length === 0 ? (
+            <p class="dk-quiet">{say("mine.none", "Nothing yet. Start one below, or import a guide file.")}</p>
+          ) : (
+            <ul class="dk-list">
+              {mine.map((g) => (
+                <li class="dk-guide">
+                  <p class="dk-guide-title">
+                    {g.published
+                      ? <a href={`/guides/${g.game.slug}/${g.slug}`}>{g.title}</a>
+                      : <span>{g.title}</span>}
+                    <span class="dk-game">{g.game.name}</span>
+                  </p>
+                  {g.hidden && (
+                    <p class="dk-quiet">
+                      {g.hiddenBy === "author"
+                        ? say("hidden.author", "You took this down. Readers cannot see it.")
+                        : g.hiddenBy === "reports"
+                        ? say("hidden.reports", "Off the catalogue until Shruti has looked at the reports.")
+                        : say("hidden.her", "Shruti took this down.")}
+                    </p>
+                  )}
+                  <ul class="dk-versions">
+                    {g.versions.map((v) => (
+                      <li class="dk-version" data-state={v.state}>
+                        <span class="dk-vnum t-tabular">{say("version", "version")} {v.number}</span>
+                        <span class="dk-chip">{STATE[v.state] ?? v.state}</span>
+                        {(v.state === "draft" || v.state === "sent_back") && v.problems > 0 && (
+                          <span class="dk-chip warn t-tabular">{v.problems} {say("problems", "to fix")}</span>
+                        )}
+                        {(v.state === "draft" || v.state === "sent_back") && (
+                          <a class="dk-edit" href={`/guides/write/${v.id}`}>{say("edit", "Open")}</a>
+                        )}
+                        {v.state === "sent_back" && v.note && (
+                          <span class="dk-note">{say("note", "Shruti wrote:")} “{v.note}”</span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                  {g.published && !openDraft(g) && (
+                    <button type="button" class="dk-btn ghost" data-new-version={g.id}
+                            data-game={g.game.slug} data-slug={g.slug}>
+                      {say("new_version", "Start a new version")}
+                    </button>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
+        <section class="dk-section">
+          <h2 class="dk-h2">{say("new", "Start a new guide")}</h2>
+          <form class="dk-form" data-new>
+            <label>
+              {say("new.title", "Title")}
+              <input name="title" type="text" required maxlength="140"
+                     placeholder={say("new.title.hint", "Shruti's Diablo IV Squirrel Guide for Warlocks")} />
+            </label>
+            <label>
+              {say("new.game", "Game")}
+              <input name="game" type="text" required maxlength="80" list="dk-games"
+                     placeholder={say("new.game.hint", "Diablo IV")} />
+              <datalist id="dk-games">
+                {(games ?? []).map((g) => <option value={g.name} data-slug={g.slug} />)}
+              </datalist>
+            </label>
+            <label>
+              {say("new.variants", "Ways a run can differ, if any")}
+              <input name="variants" type="text" maxlength="200"
+                     placeholder={say("new.variants.hint", "Eternal, Seasonal")} />
+            </label>
+            <button type="submit" class="dk-btn">{say("new.go", "Open the desk")}</button>
+            <p class="dk-quiet" data-new-status></p>
+          </form>
+        </section>
+
+        <section class="dk-section">
+          <h2 class="dk-h2">{say("import", "Or import a guide file")}</h2>
+          <p class="dk-quiet">
+            {say("import.note",
+              "The same file the tracker reads and any guide's page offers to download. Importing one whose address matches a guide of yours opens it as the next draft.")}
+          </p>
+          <label class="dk-file">
+            {say("import.pick", "Choose a .guide.json file")}
+            <input type="file" accept=".json,application/json" data-import />
+          </label>
+          <p class="dk-quiet" data-import-status></p>
+        </section>
+
+        <p class="dk-foot">
+          {say("foot",
+            "What you write is yours. It goes up under your name once Shruti has read it, readers can say it was useful, and anyone can download the file.")}
+        </p>
+      </div>
+    )}
+  </div>
+</BaseLayout>
+
+<style>
+  .dk-wrap { padding-block: var(--space-6) var(--space-9); display: grid; gap: var(--space-7); font-family: var(--font-body); }
+  .dk-grid { display: grid; gap: var(--space-7); max-width: 46rem; }
+  .dk-h2 { margin: 0 0 var(--space-3); font-family: var(--font-display); font-weight: 600; font-size: var(--text-h3); color: var(--ink); }
+  .dk-quiet { margin: 0; font-size: var(--text-sm); color: var(--ink-faint); }
+  .dk-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-4); }
+  .dk-guide { display: grid; gap: 6px; padding: var(--space-4); border: var(--border-w) solid var(--line); border-radius: var(--radius-md); background: var(--surface-card); }
+  .dk-guide-title { margin: 0; display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; font-weight: 600; color: var(--ink); }
+  .dk-guide-title a { color: inherit; }
+  .dk-game { font-size: var(--text-micro); font-weight: 600; letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; color: var(--ink-faint); }
+  .dk-versions { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+  .dk-version { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: var(--text-sm); color: var(--ink-soft); }
+  .dk-vnum { color: var(--ink-faint); }
+  .dk-chip { font-size: var(--text-micro); font-weight: 600; letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; border: var(--border-w) solid var(--line); border-radius: var(--radius-full); padding: 1px 8px; color: var(--ink-faint); }
+  .dk-version[data-state="published"] .dk-chip { color: var(--accent); border-color: var(--accent); }
+  .dk-version[data-state="sent_back"] .dk-chip { color: var(--rose); border-color: var(--rose); }
+  .dk-chip.warn { color: var(--rose); border-color: var(--rose); }
+  .dk-edit { font-weight: 500; color: var(--accent); }
+  .dk-note { flex-basis: 100%; font-style: italic; }
+  .dk-form { display: grid; gap: 10px; max-width: 28rem; }
+  .dk-form label, .dk-file { display: grid; gap: 4px; font-size: var(--text-sm); color: var(--ink-soft); }
+  .dk-form input { font: inherit; padding: 8px 10px; border: var(--border-w) solid var(--line); border-radius: var(--radius-sm); background: var(--surface-page); color: var(--ink); }
+  .dk-btn { justify-self: start; font: 500 var(--text-sm) var(--font-body); padding: 8px 16px; border-radius: var(--radius-full); border: var(--border-w) solid var(--accent); background: var(--accent); color: var(--on-accent); cursor: pointer; text-decoration: none; }
+  .dk-btn.ghost { background: var(--surface-card); color: var(--ink); border-color: var(--line-strong); }
+  .dk-foot { margin: 0; max-width: var(--measure-ui); font-size: var(--text-sm); color: var(--ink-faint); }
+</style>
+
+<script>
+  const desk = document.querySelector<HTMLElement>("[data-desk]");
+  if (desk) {
+    const author = desk.dataset.author || "";
+    const slugOf = (s: string) =>
+      s.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 80);
+    const token = () =>
+      document.cookie.split("; ").find((c) => c.startsWith("shruti_csrf="))?.split("=")[1] ?? "";
+
+    /* Saving a skeleton IS creating a guide: the server files it and answers
+       with the version to open. */
+    const file = async (body: unknown): Promise<{ ok: boolean; versionId?: number; detail?: string }> => {
+      const r = await fetch("/api/guides/draft", {
+        method: "PUT",
+        headers: { "content-type": "application/json", "x-csrf-token": token() },
+        body: JSON.stringify({ version_id: null, body }),
+      });
+      const answer = await r.json().catch(() => ({}));
+      return r.ok ? { ok: true, versionId: answer.versionId } : { ok: false, detail: answer.detail };
+    };
+
+    const form = desk.querySelector<HTMLFormElement>("[data-new]");
+    const status = desk.querySelector<HTMLElement>("[data-new-status]");
+    form?.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const data = new FormData(form);
+      const title = String(data.get("title") ?? "").trim();
+      const gameName = String(data.get("game") ?? "").trim();
+      const known = Array.from(document.querySelectorAll<HTMLOptionElement>("#dk-games option"))
+        .find((o) => o.value.toLowerCase() === gameName.toLowerCase());
+      const variants = String(data.get("variants") ?? "").split(",").map((v) => v.trim()).filter(Boolean)
+        .map((name) => ({ id: slugOf(name).replace(/-/g, "_"), name }));
+      const skeleton = {
+        format: 1,
+        game: { id: known?.dataset.slug || slugOf(gameName), name: gameName, variants },
+        guide: { id: slugOf(title), title, authors: [author], version: "1.0", game_patch: "", summary: "", caveats: [] },
+        checkin: [],
+        phases: [{ id: "p1", name: "Getting started", order: 1 }],
+        steps: [], routines: [], codex: [], codex_notes: [], tracks: [],
+      };
+      if (status) status.textContent = "Filing it…";
+      const r = await file(skeleton);
+      if (r.ok && r.versionId) location.href = `/guides/write/${r.versionId}`;
+      else if (status) status.textContent = r.detail || "That did not save. Try again.";
+    });
+
+    const pick = desk.querySelector<HTMLInputElement>("[data-import]");
+    const importStatus = desk.querySelector<HTMLElement>("[data-import-status]");
+    pick?.addEventListener("change", async () => {
+      const chosen = pick.files?.[0];
+      if (!chosen) return;
+      let body: unknown;
+      try {
+        body = JSON.parse(await chosen.text());
+      } catch {
+        if (importStatus) importStatus.textContent = "That file is not JSON.";
+        return;
+      }
+      if (importStatus) importStatus.textContent = "Filing it…";
+      const r = await file(body);
+      if (r.ok && r.versionId) location.href = `/guides/write/${r.versionId}`;
+      else if (importStatus) importStatus.textContent = r.detail || "That did not save. The file needs guide.id, guide.title and game.id at least.";
+    });
+
+    /* A new version starts from what is live, fetched from the reader API. */
+    for (const button of desk.querySelectorAll<HTMLButtonElement>("[data-new-version]")) {
+      button.addEventListener("click", async () => {
+        button.disabled = true;
+        const r = await fetch(`/api/guides/${button.dataset.game}/${button.dataset.slug}`);
+        if (!r.ok) { button.disabled = false; return; }
+        const live = await r.json();
+        const filed = await file(live.body);
+        if (filed.ok && filed.versionId) location.href = `/guides/write/${filed.versionId}`;
+        else button.disabled = false;
+      });
+    }
+  }
+</script>

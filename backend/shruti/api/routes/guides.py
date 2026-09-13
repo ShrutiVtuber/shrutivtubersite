@@ -213,6 +213,34 @@ async def mine(request: Request, session: AsyncSession = Depends(get_session)) -
 
 # ── writing ──────────────────────────────────────────────────────────────────
 
+@router.get("/mine/by-id/{version_id}")
+async def my_version(
+    version_id: int, request: Request, session: AsyncSession = Depends(get_session),
+) -> dict:
+    """
+    One of the author's own versions, in full — what the desk opens.
+
+    ⚠ Author or 404, never 403: a stranger learns nothing about whether the
+    id exists. Any state is readable; only draft and sent_back are editable,
+    and the desk reads `state` to know which it is.
+    """
+    user = await _reader(request, session)
+    version = await session.get(GuideVersion, version_id)
+    guide = await session.get(Guide, version.guide_id) if version else None
+    if version is None or guide is None or guide.created_by != user.id:
+        raise HTTPException(404, "no such draft")
+    game = await session.get(Game, guide.game_id)
+    return {
+        "id": version.id, "number": version.number, "state": version.state, "note": version.note,
+        "editable": version.state in ("draft", "sent_back"),
+        "guide": {"id": guide.id, "slug": guide.slug, "title": guide.title,
+                  "published": guide.published_version_id,
+                  "game": {"slug": game.slug, "name": game.name} if game else None},
+        "body": version.body,
+        "problems": _problems(version.body),
+    }
+
+
 class DraftIn(BaseModel):
     # ⚠ Absent means "make a new guide"; present means "this draft".
     version_id: int | None = None

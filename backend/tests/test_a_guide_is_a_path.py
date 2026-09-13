@@ -39,7 +39,8 @@ def test_literal_paths_come_before_the_reader() -> None:
     reader = SOURCE.index('@router.get("/{game}/{slug}")')
     # ⚠ Substrings of the path, not whole decorators: the admin ones carry a
     # dependencies= argument and a whole-decorator match silently misses them.
-    for literal in ('"/games"', '"/mine"', '"/draft"', '"/admin/queue"', '/by-id/{guide_id}/download'):
+    for literal in ('"/games"', '"/mine"', '"/mine/by-id/{version_id}"', '"/draft"', '"/admin/queue"',
+                    '"/admin/guides"', '/by-id/{guide_id}/download'):
         assert SOURCE.index(literal) < reader, f"{literal} is declared after the reader"
 
 
