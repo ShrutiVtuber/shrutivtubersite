@@ -14,6 +14,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import update
 from sqlmodel import delete, select
 
 from shruti.core.consents import BY_KIND, CONSENT_VERSION
@@ -813,6 +814,7 @@ async def erase(user: User, session: AsyncSession) -> dict:
     email = user.email
     uid = user.id
 
+    await _erase_guides(session, uid)
     await session.execute(delete(Nativity).where(Nativity.user_id == uid))
 
     # Deletion must reach the newsletter list too, not only the account.
@@ -837,6 +839,69 @@ async def erase(user: User, session: AsyncSession) -> dict:
 
 
 # ── mail ────────────────────────────────────────────────────────────────────
+
+async def _erase_guides(session: AsyncSession, uid: int) -> None:
+    """
+    Everything Shruti's Guides holds about a person goes with the account:
+    runs and their overlays, groups they made and joined, what they gave to
+    a goal, the vote, the report, hosting. What they WROTE is not theirs
+    alone to take from the people following it: a published guide stays in
+    the catalogue, taken down and kept by the operator; a draft is deleted;
+    a suggested change loses its name and keeps its words.
+    """
+    from shruti.core.operator import operator_email
+    from shruti.models import Hosting, OverlayToken, Supporter
+    from shruti.models.guides import (
+        Group, GroupContribution, GroupMember, Guide, GuideReport, GuideRun, GuideVersion, GuideVote,
+    )
+    runs = [r for (r,) in (await session.execute(select(GuideRun.id).where(GuideRun.user_id == uid))).all()]
+    if runs:
+        await session.execute(delete(OverlayToken).where(OverlayToken.run_id.in_(runs)))
+        await session.execute(delete(GuideRun).where(GuideRun.id.in_(runs)))
+    await session.execute(delete(OverlayToken).where(OverlayToken.user_id == uid))
+    mine = [g for (g,) in (await session.execute(select(Group.id).where(Group.created_by == uid))).all()]
+    if mine:
+        await session.execute(delete(OverlayToken).where(OverlayToken.group_id.in_(mine)))
+        await session.execute(delete(GroupContribution).where(GroupContribution.group_id.in_(mine)))
+        await session.execute(delete(GroupMember).where(GroupMember.group_id.in_(mine)))
+        await session.execute(delete(Group).where(Group.id.in_(mine)))
+    await session.execute(delete(GroupContribution).where(GroupContribution.user_id == uid))
+    await session.execute(delete(GroupMember).where(GroupMember.user_id == uid))
+    await session.execute(delete(GuideVote).where(GuideVote.user_id == uid))
+    await session.execute(delete(GuideReport).where(GuideReport.user_id == uid))
+    await session.execute(update(GuideVersion).where(GuideVersion.contributed_by == uid).values(contributed_by=None))
+    keeper = None
+    her = await operator_email(session)
+    if her:
+        keeper = (await session.execute(select(User).where(User.email == her))).scalar_one_or_none()
+    if keeper is not None and keeper.id == uid:
+        keeper = None
+    guides = (await session.execute(select(Guide).where(Guide.created_by == uid))).scalars().all()
+    for g in guides:
+        if g.published_version_id and keeper is not None:
+            g.created_by = keeper.id
+            g.hidden = True
+            g.hidden_by = "author"
+        else:
+            await session.execute(delete(GuideVersion).where(GuideVersion.guide_id == g.id))
+            await session.execute(delete(GuideVote).where(GuideVote.guide_id == g.id))
+            await session.execute(delete(GuideReport).where(GuideReport.guide_id == g.id))
+            runs_of = [r for (r,) in (await session.execute(select(GuideRun.id).where(GuideRun.guide_id == g.id))).all()]
+            if runs_of:
+                await session.execute(delete(OverlayToken).where(OverlayToken.run_id.in_(runs_of)))
+                await session.execute(delete(GuideRun).where(GuideRun.id.in_(runs_of)))
+            await session.delete(g)
+    await session.flush()
+    if keeper is not None:
+        await session.execute(update(GuideVersion).where(GuideVersion.created_by == uid).values(created_by=keeper.id))
+    else:
+        left = [g for (g,) in (await session.execute(select(GuideVersion.guide_id).where(GuideVersion.created_by == uid))).all()]
+        if left:
+            await session.execute(delete(GuideVersion).where(GuideVersion.created_by == uid))
+    await session.execute(update(Hosting).where(Hosting.user_id == uid).values(user_id=None))
+    await session.execute(update(Supporter).where(Supporter.user_id == uid).values(user_id=None))
+    await session.flush()
+
 
 async def _send_verification(email: str) -> None:
     """
