@@ -16,7 +16,7 @@
  */
 import AdminLayout from "../../layouts/AdminLayout.astro";
 import { asReader } from "../../lib/account";
-import { SITE_URL } from "../../lib/api";
+import { SITE_URL, site } from "../../lib/api";
 
 export const prerender = false;
 
@@ -28,12 +28,17 @@ for (const r of runs) {
   if (o.ok && Array.isArray(o.body)) for (const t of o.body) tokens.push({ ...t, runId: r.id, runName: r.name });
 }
 const layouts = tokens.filter((t) => t.kind === "guide-layout");
+const themesRead = await site<{ themes: Record<string, Record<string, string>>; editable: string[]; css: string }>("/api/overlay/themes");
+const themeOverrides = themesRead?.themes ?? {};
+const editableTokens: string[] = themesRead?.editable ?? [];
+const themeStyle = themesRead?.css ?? "";
 const wanted = String(Astro.url.searchParams.get("layout") ?? "");
 const selected = layouts.find((t) => String(t.id) === wanted) ?? layouts[0] ?? null;
 const signedIn = runsRead.status !== 401 && runsRead.status !== 0;
 ---
 
 <AdminLayout title="Overlay designer">
+  <style set:html={themeStyle} data-theme-css></style>
   {!signedIn ? (
     <section class="adm-card">
       <p class="od-quiet">The designer works on your own runs, and those belong to your reader account. Sign in on the site as yourself (the same browser), then come back here.</p>
@@ -87,6 +92,16 @@ const signedIn = runsRead.status !== 401 && runsRead.status !== 0;
             <button type="button" class="od-theme" data-theme-pick="grimoire"><span class="od-swatches"><i style="background:#1A1210"></i><i style="background:#8C2F21"></i><i style="background:#C9A227"></i></span><span><b>Grimoire</b><small>Diablo IV</small></span></button>
             <button type="button" class="od-theme" data-theme-pick="almanac"><span class="od-swatches"><i style="background:#121829"></i><i style="background:#8FBEE8"></i><i style="background:#E0A4BC"></i></span><span><b>Almanac</b><small>her house theme</small></span></button>
             <button type="button" class="od-theme" data-theme-pick="plain"><span class="od-swatches"><i style="background:#000"></i><i style="background:#fff"></i><i style="background:#9AA0AE"></i></span><span><b>Plain</b><small>no theme at all</small></span></button>
+            <details class="od-adjust" data-adjust data-editable={JSON.stringify(editableTokens)} data-overrides={JSON.stringify(themeOverrides)}>
+              <summary>Adjust this theme</summary>
+              <p class="od-mono">Colours as #hex or rgba(), radius and left rule in px, stroke and weight as a number. The four state colours are not here, on purpose.</p>
+              <div class="od-adjust-grid" data-adjust-grid></div>
+              <div class="od-adjust-row">
+                <button type="button" class="od-btn" data-save-theme>Save theme</button>
+                <button type="button" class="od-btn ghost" data-reset-theme>Back to the design</button>
+                <span class="od-mono" data-theme-status></span>
+              </div>
+            </details>
           </div>
           <p class="od-mono">A theme may change palette, type, ornament and the sigil's stroke. It may not change layout, legibility or the four state colours.</p>
 
@@ -143,6 +158,12 @@ const signedIn = runsRead.status !== 401 && runsRead.status !== 0;
   .od-placed .gov-sigil { align-items: flex-start; }
   .od-share { display: flex; gap: 8px; align-items: flex-start; font-size: 12px; color: var(--ink-soft); line-height: 1.4; }
   .od-share input { width: auto; margin-top: 2px; }
+  .od-adjust { border-top: var(--border-w) solid var(--line); padding-top: 8px; }
+  .od-adjust summary { cursor: pointer; font-size: 12.5px; font-weight: 600; }
+  .od-adjust-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px; margin: 8px 0; }
+  .od-adjust-grid label { display: grid; gap: 2px; }
+  .od-adjust-grid input.set { border-color: var(--accent); }
+  .od-adjust-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
   .od-props { border-left: var(--border-w) solid var(--line); background: var(--surface-card); padding: 16px 20px; display: flex; flex-direction: column; gap: 10px; }
   .od-themes { display: flex; flex-direction: column; gap: 8px; }
   .od-theme { display: flex; align-items: center; gap: 12px; border: var(--border-w) solid var(--line); border-radius: 6px; padding: 10px 12px; background: var(--surface-card); cursor: pointer; text-align: left; color: var(--ink); font: inherit; }
@@ -199,7 +220,35 @@ const signedIn = runsRead.status !== 401 && runsRead.status !== 0;
     const drawPalette = () => {
       $("[data-palette]").innerHTML = KINDS.map(([k, name]) => { const on = layout.some((e) => e.kind === k); return `<button type="button" class="od-el ${on ? "on" : "off"}" data-add="${k}"><span>${name}</span><span class="od-mono">${on ? "on" : "off"}</span></button>`; }).join("");
     };
-    const drawThemes = () => { for (const b of root.querySelectorAll<HTMLElement>("[data-theme-pick]")) b.classList.toggle("on", b.dataset.themePick === theme); canvas.dataset.theme = theme; };
+    const drawThemes = () => { for (const b of root.querySelectorAll<HTMLElement>("[data-theme-pick]")) b.classList.toggle("on", b.dataset.themePick === theme); canvas.dataset.theme = theme; drawAdjust(); };
+    /* Her adjustments: the grid reads the canvas's live tokens, so a saved value and the design's default look the same until she types. */
+    const adjust = $("[data-adjust]");
+    const editable: string[] = JSON.parse(adjust?.dataset.editable || "[]");
+    let overrides: Record<string, Record<string, string>> = JSON.parse(adjust?.dataset.overrides || "{}");
+    const drawAdjust = () => {
+      const grid = $("[data-adjust-grid]"); if (!grid) return;
+      const live = getComputedStyle(canvas);
+      grid.innerHTML = editable.map((t) => { const v = (overrides[theme]?.[t] ?? live.getPropertyValue(`--gt-${t}`)).trim(); return `<label><span class="od-mono">${t}</span><input type="text" data-token="${t}" value="${esc(v)}" ${overrides[theme]?.[t] ? 'class="set"' : ""} /></label>`; }).join("");
+    };
+    const applyThemeCss = (css: string) => { const el = document.querySelector<HTMLStyleElement>("[data-theme-css]"); if (el) el.textContent = css; };
+    $("[data-save-theme]")?.addEventListener("click", async () => {
+      const block: Record<string, string> = {};
+      for (const input of root.querySelectorAll<HTMLInputElement>("[data-token]")) { const v = input.value.trim(); if (v) block[input.dataset.token!] = v; }
+      const next = { ...overrides, [theme]: block };
+      const r = await fetch("/api/overlay/admin/themes", { method: "PUT", headers: { "content-type": "application/json", "x-csrf-token": token() }, body: JSON.stringify({ themes: next }) });
+      const status = $("[data-theme-status]");
+      if (!r.ok) { if (status) status.textContent = "That did not save."; return; }
+      const a = await r.json(); overrides = a.themes ?? {}; applyThemeCss(a.css ?? ""); drawAdjust(); await drawCanvas();
+      if (status) status.textContent = "Saved. Every overlay in this theme wears it now.";
+    });
+    $("[data-reset-theme]")?.addEventListener("click", async () => {
+      const next = { ...overrides }; delete next[theme];
+      const r = await fetch("/api/overlay/admin/themes", { method: "PUT", headers: { "content-type": "application/json", "x-csrf-token": token() }, body: JSON.stringify({ themes: next }) });
+      const status = $("[data-theme-status]");
+      if (!r.ok) { if (status) status.textContent = "That did not save."; return; }
+      const a = await r.json(); overrides = a.themes ?? {}; applyThemeCss(a.css ?? ""); drawAdjust(); await drawCanvas();
+      if (status) status.textContent = "Back to the design.";
+    });
     const drawProps = () => {
       const box = $("[data-selected-props]");
       const e = layout[selected];

@@ -10,8 +10,11 @@ import "../../styles/global.css";
 import "../../styles/overlay.css";
 import "../../styles/overlay-guides.css";
 import { SITE_API } from "../../lib/api";
+import { themeCss } from "../../lib/overlay-theme";
 
 export const prerender = false;
+
+const themeStyle = await themeCss();
 
 const token = Astro.url.searchParams.get("t") ?? "";
 let data: any = null;
@@ -33,6 +36,7 @@ const initial = JSON.stringify({ version: data?.version ?? "", element: el });
     <meta charset="utf-8" />
     <title>guide · now</title>
     <meta name="robots" content="noindex, nofollow" />
+    <style set:html={themeStyle}></style>
   </head>
   <body>
     <div class="gov" data-theme={theme} data-motion={motion} data-token={token} data-initial={initial} data-kind="guide-now">

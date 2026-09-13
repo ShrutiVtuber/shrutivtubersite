@@ -15,6 +15,9 @@ which theme the token wears.
 """
 from __future__ import annotations
 
+import json
+import re
+
 import secrets
 from datetime import datetime, timezone
 
@@ -125,6 +128,82 @@ async def _fill_goals(session: AsyncSession, elements: list[dict]) -> None:
 
 
 PRIVATE_FIELDS = ("routine_id", "group", "counter_id", "text", "url")
+
+# ── the themes' tokens, editable by her ──────────────────────────────────────
+#
+# ⚠ A theme may change palette, type, ornament and the sigil's stroke. It may
+# not change layout, legibility or the four state colours — so the editable
+# set is exactly these, and nothing beginning with st-.
+EDITABLE = ("panel", "panel-dim", "border", "ink", "soft", "faint", "eyebrow", "rule",
+            "radius", "display-weight", "stroke", "left-rule", "ring")
+THEMES_KEY = "overlay.themes"
+_COLOUR = re.compile(r"^(#[0-9a-fA-F]{3,8}|rgba?\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}\s*(,\s*(0|1|0?\.\d+))?\s*\)|transparent)$")
+_LENGTH = re.compile(r"^\d{1,3}px$")
+_NUMBER = re.compile(r"^\d{1,3}$")
+
+
+def css_value(token: str, value: str) -> str:
+    """The value if it is a colour, a length or a number as the token wants; empty otherwise."""
+    v = str(value or "").strip()
+    if token in ("radius", "left-rule"):
+        return v if _LENGTH.match(v) else ""
+    if token in ("stroke", "display-weight"):
+        return v if _NUMBER.match(v) else ""
+    return v if _COLOUR.match(v) else ""
+
+
+def clean_themes(raw) -> dict[str, dict[str, str]]:
+    out: dict[str, dict[str, str]] = {}
+    if not isinstance(raw, dict):
+        return out
+    for name in THEMES:
+        block = raw.get(name)
+        if not isinstance(block, dict):
+            continue
+        kept = {t: css_value(t, block.get(t)) for t in EDITABLE if block.get(t) not in (None, "")}
+        kept = {t: v for t, v in kept.items() if v}
+        if kept:
+            out[name] = kept
+    return out
+
+
+def theme_css(themes: dict[str, dict[str, str]]) -> str:
+    """One rule per theme that has overrides, re-pointing only its own tokens."""
+    rules = []
+    for name, block in themes.items():
+        if name in THEMES and block:
+            rules.append(f'.gov[data-theme="{name}"]{{' + "".join(f"--gt-{t}:{v};" for t, v in block.items() if t in EDITABLE) + "}")
+    return "\n".join(rules)
+
+
+async def _themes(session: AsyncSession) -> dict[str, dict[str, str]]:
+    from shruti.core.settings_store import get_many
+    raw = (await get_many(session, (THEMES_KEY,))).get(THEMES_KEY, "")
+    try:
+        return clean_themes(json.loads(raw)) if raw else {}
+    except ValueError:
+        return {}
+
+
+@router.get("/themes")
+async def themes(session: AsyncSession = Depends(get_session)) -> dict:
+    """Her adjustments to the three themes, and the stylesheet they make. Public: every overlay wears them."""
+    overrides = await _themes(session)
+    return {"themes": overrides, "editable": list(EDITABLE), "css": theme_css(overrides)}
+
+
+class ThemesIn(BaseModel):
+    themes: dict
+
+
+@router.put("/admin/themes", dependencies=[Depends(require_admin)])
+async def set_themes(body: ThemesIn, session: AsyncSession = Depends(get_session)) -> dict:
+    """Replace her adjustments. Anything that is not a colour, a length or a number is dropped, not saved."""
+    from shruti.core.settings_store import put_many
+    cleaned = clean_themes(body.themes)
+    await put_many(session, {THEMES_KEY: json.dumps(cleaned)})
+    await session.commit()
+    return {"ok": True, "themes": cleaned, "css": theme_css(cleaned)}
 
 
 @router.get("/gallery")
