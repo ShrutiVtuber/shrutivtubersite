@@ -1,0 +1,211 @@
+---
+/* One submitted version, read before it goes up.
+ *
+ * What she sees: the problems the validator found (a version with any cannot
+ * be published, even by her), what changed against the version that is live,
+ * and the path itself phase by phase. Then two buttons — publish, or send it
+ * back with a note, because "rejected" with no reason is the practice room's
+ * lesson again.
+ */
+import AdminLayout from "../../../layouts/AdminLayout.astro";
+import CsrfField from "../../../components/forms/CsrfField.astro";
+import { asAdmin } from "../../../lib/admin";
+import { verifyCsrf } from "../../../lib/csrf";
+import { type GuideDoc, type Step, phasesOf, stepsOf } from "../../../lib/guides";
+
+export const prerender = false;
+
+const id = Astro.params.version ?? "";
+if (!/^\d+$/.test(id)) return Astro.rewrite("/404");
+
+let notice = "";
+let failed = "";
+
+if (Astro.request.method === "POST") {
+  const form = await Astro.request.formData();
+  if (!verifyCsrf(Astro.cookies, form)) {
+    failed = "That did not save. Reload the page and try again.";
+  } else {
+    const action = String(form.get("action") ?? "");
+    if (action === "publish") {
+      const r = await asAdmin(Astro, `/api/guides/admin/by-id/${id}/publish`, { method: "POST" });
+      if (r.ok) return Astro.redirect("/admin/guides?published=1");
+      failed = r.status === 422
+        ? "It has problems the validator will not let through — they are listed below."
+        : "That did not publish.";
+    }
+    if (action === "sendback") {
+      const note = String(form.get("note") ?? "").trim();
+      if (!note) {
+        failed = "Say why. A draft sent back with no note is the practice room's lesson again.";
+      } else {
+        const r = await asAdmin(Astro, `/api/guides/admin/by-id/${id}/send-back`, {
+          method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ note }),
+        });
+        if (r.ok) return Astro.redirect("/admin/guides?sentback=1");
+        failed = "That did not send back.";
+      }
+    }
+  }
+}
+
+const read = await asAdmin(Astro, `/api/guides/admin/by-id/${id}`);
+if (!read.ok) return Astro.rewrite("/404");
+
+const version = read.body.version as { id: number; number: number; state: string; note: string; body: GuideDoc };
+const published = read.body.published as { id: number; number: number; body: GuideDoc } | null;
+const problems = (read.body.problems ?? []) as { path: string; message: string }[];
+const doc = version.body;
+const phases = phasesOf(doc);
+const title = doc.guide?.title ?? "";
+const game = doc.game?.name ?? "";
+
+/* A structural diff, by step id — the format's whole reason for stable ids. */
+const stepMap = (d: GuideDoc | undefined) => new Map((d?.steps ?? []).map((s) => [s.id, s]));
+const before = stepMap(published?.body);
+const after = stepMap(doc);
+const added = [...after.keys()].filter((k) => !before.has(k));
+const removed = [...before.keys()].filter((k) => !after.has(k));
+const same = (a: Step, b: Step) =>
+  a.title === b.title && a.do === b.do && a.done_when === b.done_when && a.why === b.why
+  && JSON.stringify(a.gate ?? {}) === JSON.stringify(b.gate ?? {}) && a.phase === b.phase
+  && a.kind === b.kind && a.minutes === b.minutes && !!a.ongoing === !!b.ongoing;
+const changed = [...after.keys()].filter((k) => before.has(k) && !same(before.get(k)!, after.get(k)!));
+const publishable = version.state === "submitted" || version.state === "draft" || version.state === "sent_back";
+---
+
+<AdminLayout title={title ? `Read: ${title}` : "Read a guide"}>
+  {notice && <p class="adm-ok" role="status">{notice}</p>}
+  {failed && <p class="adm-bad" role="alert">{failed}</p>}
+
+  <section class="adm-card">
+    <p class="gv-eyebrow"><a href="/admin/guides">Guides</a> · {game} · version {version.number} · {version.state.replace("_", " ")}</p>
+    <h2 class="gv-title">{title}</h2>
+    <p class="gv-meta">
+      {phases.length} phases · {(doc.steps ?? []).length} steps · {(doc.routines ?? []).length} routines · {(doc.codex ?? []).length} codex entries
+      {(doc.guide?.caveats ?? []).length > 0 && <> · {doc.guide!.caveats!.length} caveats</>}
+    </p>
+    {version.note && <p class="gv-note">Last note to the author: “{version.note}”</p>}
+
+    {problems.length > 0 ? (
+      <div class="gv-problems">
+        <h3>{problems.length} problem{problems.length === 1 ? "" : "s"} — cannot be published until they are fixed</h3>
+        <ul>{problems.map((p) => <li><code>{p.path}</code> {p.message}</li>)}</ul>
+      </div>
+    ) : (
+      <p class="gv-ok">Validates clean. The tracker can run it.</p>
+    )}
+
+    {published && published.id === version.id ? (
+      <p class="gv-quiet">This is the version that is live.</p>
+    ) : published ? (
+      <div class="gv-diff">
+        <h3>Against version {published.number}, which is live</h3>
+        <p>
+          <b class="t-tabular">{added.length}</b> steps added
+          {added.length > 0 && <span class="gv-ids"> ({added.join(", ")})</span>} ·
+          <b class="t-tabular">{removed.length}</b> removed
+          {removed.length > 0 && <span class="gv-ids"> ({removed.join(", ")})</span>} ·
+          <b class="t-tabular">{changed.length}</b> changed
+          {changed.length > 0 && <span class="gv-ids"> ({changed.join(", ")})</span>}
+        </p>
+        {removed.length > 0 && (
+          <p class="gv-warn">
+            Removing a step never deletes anybody's progress on it — the tracker keeps
+            unknown ids and stops showing them. But a step that comes back later under
+            a new id starts from nothing.
+          </p>
+        )}
+      </div>
+    ) : (
+      <p class="gv-quiet">Nothing is live yet — this would be the first version.</p>
+    )}
+
+    {publishable && (
+      <div class="gv-acts">
+        <form method="POST">
+          <CsrfField />
+          <input type="hidden" name="action" value="publish" />
+          <button type="submit" class="gv-publish" disabled={problems.length > 0}>
+            {published ? `Publish as version ${version.number}` : "Publish"}
+          </button>
+        </form>
+        <form method="POST" class="gv-sendback">
+          <CsrfField />
+          <input type="hidden" name="action" value="sendback" />
+          <label>
+            Send it back with a note
+            <textarea name="note" rows="2" maxlength="2000" required
+                      placeholder="What to change, in your words. The author sees this on their draft."></textarea>
+          </label>
+          <button type="submit" class="gv-back">Send it back</button>
+        </form>
+      </div>
+    )}
+  </section>
+
+  <section class="adm-card">
+    <header class="gv-head"><h2>The path</h2></header>
+    {phases.map((p) => (
+      <details class="gv-phase" open={phases.length <= 3}>
+        <summary>
+          <b>{p.name}</b>
+          {p.band && <span class="gv-band">{p.band}</span>}
+          {p.track && <span class="gv-band">track {p.track}</span>}
+          <span class="gv-count t-tabular">{stepsOf(doc, p).length} steps</span>
+        </summary>
+        <ol class="gv-steps">
+          {stepsOf(doc, p).map((s) => (
+            <li class:list={[added.includes(s.id) && "added", changed.includes(s.id) && "changed"]}>
+              <span class="gv-id t-tabular">{s.id}</span>
+              <span class="gv-step-title">{s.title}</span>
+              <span class="gv-kind">{s.kind}{s.ongoing ? " · ongoing" : s.minutes ? ` · ${s.minutes} min` : ""}</span>
+              {s.do && <p class="gv-do">{s.do}</p>}
+              {s.done_when && <p class="gv-do"><i>Done when</i> {s.done_when}</p>}
+              {s.gate && Object.keys(s.gate).length > 0 && <p class="gv-gate">gate {JSON.stringify(s.gate)}</p>}
+            </li>
+          ))}
+        </ol>
+      </details>
+    ))}
+  </section>
+</AdminLayout>
+
+<style>
+  .gv-eyebrow { margin: 0 0 4px; font-size: var(--text-micro); font-weight: 600; letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; color: var(--ink-faint); }
+  .gv-eyebrow a { color: inherit; }
+  .gv-title { margin: 0 0 6px; }
+  .gv-meta, .gv-quiet, .gv-note { margin: 0 0 8px; font-size: var(--text-sm); color: var(--ink-soft); }
+  .gv-note { font-style: italic; }
+  .gv-ok { margin: 8px 0; font-size: var(--text-sm); color: var(--accent); font-weight: 500; }
+  .gv-problems { margin: 8px 0; padding: 10px 14px; border-left: 3px solid var(--rose); background: var(--rose-wash); border-radius: 0 var(--radius-sm) var(--radius-sm) 0; }
+  .gv-problems h3 { margin: 0 0 6px; font-size: var(--text-sm); color: var(--rose); }
+  .gv-problems ul { margin: 0; padding-left: 1.1em; font-size: var(--text-sm); display: grid; gap: 4px; }
+  .gv-problems code { font-family: var(--font-mono); font-size: var(--text-xs); }
+  .gv-diff { margin: 8px 0; font-size: var(--text-sm); color: var(--ink-soft); }
+  .gv-diff h3 { margin: 0 0 4px; font-size: var(--text-sm); color: var(--ink); }
+  .gv-diff p { margin: 0; }
+  .gv-ids { color: var(--ink-faint); }
+  .gv-warn { margin-top: 6px !important; color: var(--rose); }
+  .gv-acts { display: grid; gap: var(--space-4); margin-top: var(--space-4); padding-top: var(--space-4); border-top: var(--border-w) solid var(--line); max-width: 36rem; }
+  .gv-publish, .gv-back { font: 500 var(--text-sm) var(--font-body); padding: 8px 16px; border-radius: var(--radius-full); border: var(--border-w) solid var(--accent); background: var(--accent); color: var(--on-accent); cursor: pointer; }
+  .gv-publish:disabled { opacity: .5; cursor: not-allowed; }
+  .gv-back { background: var(--surface-card); color: var(--ink); border-color: var(--line-strong); }
+  .gv-sendback { display: grid; gap: 8px; }
+  .gv-sendback label { display: grid; gap: 4px; font-size: var(--text-sm); color: var(--ink-soft); }
+  .gv-sendback textarea { font: inherit; padding: 8px; border: var(--border-w) solid var(--line); border-radius: var(--radius-sm); background: var(--surface-page); color: var(--ink); }
+  .gv-head h2 { margin: 0 0 var(--space-3); }
+  .gv-phase { border-top: var(--border-w) solid var(--line); padding: 8px 0; }
+  .gv-phase > summary { cursor: pointer; display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+  .gv-band, .gv-count { font-size: var(--text-xs); color: var(--ink-faint); }
+  .gv-count { margin-left: auto; }
+  .gv-steps { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 8px; }
+  .gv-steps li { display: grid; grid-template-columns: 4rem 1fr auto; gap: 2px 10px; padding: 6px 8px; border-radius: var(--radius-sm); font-size: var(--text-sm); }
+  .gv-steps li.added { background: var(--accent-wash); }
+  .gv-steps li.changed { background: var(--rose-wash); }
+  .gv-id { color: var(--ink-faint); font-size: var(--text-xs); }
+  .gv-step-title { font-weight: 600; color: var(--ink); }
+  .gv-kind { font-size: var(--text-xs); color: var(--ink-faint); }
+  .gv-do, .gv-gate { grid-column: 2 / -1; margin: 0; color: var(--ink-soft); white-space: pre-line; }
+  .gv-gate { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--ink-faint); }
+</style>

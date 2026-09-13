@@ -1,0 +1,259 @@
+---
+/* Shruti's Guides, from her side: what is waiting to be read, what was
+ * reported, and every guide with its switches.
+ *
+ * ⚠ **Publishing is reading.** A draft is published from its own page, where
+ * the problems and the changes are in front of her — not from this list.
+ * The list only says what is waiting and for how long.
+ *
+ * ⚠ **A report is a queue entry, not a verdict**, grouped by the guide and
+ * never one row per report. "Put it back" dismisses them and un-hides;
+ * "Keep it down" upholds them and hides it under her name.
+ */
+import AdminLayout from "../../layouts/AdminLayout.astro";
+import CsrfField from "../../components/forms/CsrfField.astro";
+import Badge from "../../components/navigation/Badge.astro";
+import { asAdmin } from "../../lib/admin";
+import { verifyCsrf } from "../../lib/csrf";
+
+export const prerender = false;
+
+let notice = "";
+let failed = "";
+
+if (Astro.request.method === "POST") {
+  const form = await Astro.request.formData();
+  if (!verifyCsrf(Astro.cookies, form)) {
+    failed = "That did not save. Reload the page and try again.";
+  } else {
+    const action = String(form.get("action") ?? "");
+    const id = String(form.get("id") ?? "");
+    const json = (body: unknown) => ({
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+    });
+    if (/^\d+$/.test(id)) {
+      if (action === "feature") {
+        const on = String(form.get("on") ?? "") === "1";
+        const r = await asAdmin(Astro, `/api/guides/admin/by-id/${id}/feature`, json({ featured: on }));
+        notice = r.ok ? (on ? "Featured. It leads the landing page now." : "No longer featured.") : "";
+        if (!r.ok) failed = "That did not save.";
+      }
+      if (action === "hide") {
+        const on = String(form.get("on") ?? "") === "1";
+        const r = await asAdmin(Astro, `/api/guides/admin/by-id/${id}/hide`, json({ hidden: on }));
+        notice = r.ok ? (on ? "Kept down. The reports are settled." : "Back in the catalogue. The reports are settled.") : "";
+        if (!r.ok) failed = "That did not save.";
+      }
+    }
+  }
+}
+
+const [queueRead, allRead] = await Promise.all([
+  asAdmin(Astro, "/api/guides/admin/queue"),
+  asAdmin(Astro, "/api/guides/admin/guides"),
+]);
+const queue: any[] = Array.isArray(queueRead.body) ? queueRead.body : [];
+const guides: any[] = Array.isArray(allRead.body) ? allRead.body : [];
+const reported = guides.filter((g) => g.reports?.open > 0);
+
+const REASONS: Record<string, string> = {
+  abuse: "Aimed at a person",
+  hate: "Aimed at a group",
+  sexual: "Sexual, or a minor",
+  spam: "Spam",
+  "self-harm": "May need help",
+  "not-a-reading": "Not a guide",
+  other: "Something else",
+};
+
+const ago = (iso: string | null) => {
+  if (!iso) return "";
+  const hours = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 3_600_000));
+  if (hours < 1) return "just now";
+  if (hours < 48) return `${hours} h ago`;
+  return `${Math.round(hours / 24)} days ago`;
+};
+---
+
+<AdminLayout title="Guides">
+  {notice && <p class="adm-ok" role="status">{notice}</p>}
+  {failed && <p class="adm-bad" role="alert">{failed}</p>}
+
+  <section class="adm-card">
+    <header class="gq-head">
+      <h2>Waiting to be read</h2>
+      {queue.length > 0 && <Badge tone="rose">{queue.length}</Badge>}
+    </header>
+    {queue.length === 0 ? (
+      <p class="gq-quiet">
+        Nothing is waiting. When somebody submits a guide, or a new version of
+        one, it appears here — oldest first, so the one that has waited longest
+        is on top.
+      </p>
+    ) : (
+      <ol class="gq-list">
+        {queue.map((v) => (
+          <li class="gq-item">
+            <div>
+              <p class="gq-title">
+                <a href={`/admin/guides/${v.versionId}`}>{v.title}</a>
+                <span class="gq-tag">{v.isUpdate ? `version ${v.number}` : "new"}</span>
+              </p>
+              <p class="gq-meta">
+                <b>{v.author}</b>
+                <span aria-hidden="true">·</span>
+                <span>{v.game}</span>
+                <span aria-hidden="true">·</span>
+                <span>{v.steps} steps</span>
+                <span aria-hidden="true">·</span>
+                <span>{ago(v.submittedAt)}</span>
+              </p>
+            </div>
+            <a class="gq-read" href={`/admin/guides/${v.versionId}`}>Read it</a>
+          </li>
+        ))}
+      </ol>
+    )}
+  </section>
+
+  <section class="adm-card">
+    <header class="gq-head">
+      <h2>Reported</h2>
+      {reported.length > 0 && <Badge tone="rose">{reported.length}</Badge>}
+    </header>
+    {reported.length === 0 ? (
+      <p class="gq-quiet">
+        Nothing is waiting. If a few people report the same guide it comes off
+        the catalogue until you have looked; one report only lands here.
+      </p>
+    ) : (
+      <ol class="gq-list">
+        {reported.map((g) => (
+          <li class="gq-item">
+            <div>
+              <p class="gq-title">
+                <a href={`/guides/${g.game.slug}/${g.slug}`} target="_blank" rel="noreferrer">{g.title}</a>
+                {g.hidden && (
+                  <span class:list={["gq-tag", g.hiddenBy === "reports" && "auto"]}>
+                    {g.hiddenBy === "reports" ? "off the catalogue automatically" : "you took it down"}
+                  </span>
+                )}
+              </p>
+              <p class="gq-meta"><b>{g.author}</b> <span aria-hidden="true">·</span> <span>{g.game.name}</span></p>
+              <ul class="gq-why">
+                {Object.entries(g.reports.reasons ?? {}).map(([reason, n]) => (
+                  <li>{REASONS[reason] ?? reason}{Number(n) > 1 && ` ×${n}`}</li>
+                ))}
+              </ul>
+              {(g.reports.details ?? []).map((d: string) => <p class="gq-detail">“{d}”</p>)}
+            </div>
+            <div class="gq-buttons">
+              <form method="POST">
+                <CsrfField />
+                <input type="hidden" name="action" value="hide" />
+                <input type="hidden" name="id" value={g.id} />
+                <input type="hidden" name="on" value="0" />
+                <button type="submit" class="gq-back">Put it back</button>
+              </form>
+              <form method="POST">
+                <CsrfField />
+                <input type="hidden" name="action" value="hide" />
+                <input type="hidden" name="id" value={g.id} />
+                <input type="hidden" name="on" value="1" />
+                <button type="submit" class="gq-keep">Keep it down</button>
+              </form>
+            </div>
+          </li>
+        ))}
+      </ol>
+    )}
+  </section>
+
+  <section class="adm-card">
+    <header class="gq-head"><h2>Every guide</h2></header>
+    {guides.length === 0 ? (
+      <p class="gq-quiet">No guide has been started yet.</p>
+    ) : (
+      <div class="gq-scroll">
+        <table class="gq-table">
+          <thead>
+            <tr><th>Guide</th><th>Game</th><th>Author</th><th>Useful</th><th>State</th><th>Featured</th><th>Hidden</th></tr>
+          </thead>
+          <tbody>
+            {guides.map((g) => (
+              <tr>
+                <td>
+                  {g.published
+                    ? <a href={`/guides/${g.game.slug}/${g.slug}`} target="_blank" rel="noreferrer">{g.title}</a>
+                    : <span>{g.title}</span>}
+                </td>
+                <td>{g.game.name}</td>
+                <td>{g.author}</td>
+                <td class="t-tabular">{g.votes}</td>
+                <td>{g.published ? "published" : "draft only"}</td>
+                <td>
+                  {g.published && (
+                    <form method="POST">
+                      <CsrfField />
+                      <input type="hidden" name="action" value="feature" />
+                      <input type="hidden" name="id" value={g.id} />
+                      <input type="hidden" name="on" value={g.featured ? "0" : "1"} />
+                      <button type="submit" class="gq-switch" aria-pressed={g.featured}>
+                        {g.featured ? "Featured ✓" : "Feature"}
+                      </button>
+                    </form>
+                  )}
+                </td>
+                <td>
+                  {g.published && (
+                    <form method="POST">
+                      <CsrfField />
+                      <input type="hidden" name="action" value="hide" />
+                      <input type="hidden" name="id" value={g.id} />
+                      <input type="hidden" name="on" value={g.hidden ? "0" : "1"} />
+                      <button type="submit" class="gq-switch" aria-pressed={g.hidden}>
+                        {g.hidden ? (g.hiddenBy === "author" ? "Author took it down" : "Hidden ✓") : "Hide"}
+                      </button>
+                    </form>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    )}
+    <p class="gq-quiet">
+      Featuring leads the landing page with it. Hiding takes it off the
+      catalogue under your name and settles any open reports; a guide the
+      author took down stays down until they put it back.
+    </p>
+  </section>
+</AdminLayout>
+
+<style>
+  .gq-head { display: flex; align-items: center; gap: 10px; margin-bottom: var(--space-3); }
+  .gq-head h2 { margin: 0; }
+  .gq-quiet { margin: 8px 0 0; font-size: var(--text-sm); color: var(--ink-faint); max-width: 60ch; }
+  .gq-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-4); }
+  .gq-item { display: grid; grid-template-columns: 1fr auto; gap: var(--space-4); align-items: start; padding-top: var(--space-3); border-top: var(--border-w) solid var(--line); }
+  .gq-title { margin: 0 0 2px; font-weight: 600; display: flex; gap: 8px; flex-wrap: wrap; align-items: baseline; }
+  .gq-title a { color: var(--ink); }
+  .gq-meta { margin: 0; display: flex; gap: 8px; flex-wrap: wrap; font-size: var(--text-sm); color: var(--ink-soft); }
+  .gq-tag { font-size: var(--text-micro); font-weight: 600; letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; color: var(--ink-faint); border: var(--border-w) solid var(--line); border-radius: var(--radius-full); padding: 1px 8px; }
+  .gq-tag.auto { color: var(--rose); border-color: var(--rose); }
+  .gq-why { margin: 6px 0 0; padding-left: 1.1em; font-size: var(--text-sm); color: var(--ink-soft); }
+  .gq-detail { margin: 4px 0 0; font-size: var(--text-sm); color: var(--ink-soft); font-style: italic; }
+  .gq-read, .gq-back, .gq-keep, .gq-switch {
+    font: 500 var(--text-sm) var(--font-body); padding: 6px 12px; border-radius: var(--radius-full);
+    border: var(--border-w) solid var(--line-strong); background: var(--surface-card); color: var(--ink); cursor: pointer; text-decoration: none; white-space: nowrap;
+  }
+  .gq-keep { border-color: var(--rose); color: var(--rose); }
+  .gq-switch[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); background: var(--accent-wash); }
+  .gq-buttons { display: grid; gap: 6px; }
+  .gq-scroll { overflow-x: auto; }
+  .gq-table { width: 100%; border-collapse: collapse; font-size: var(--text-sm); }
+  .gq-table th { text-align: left; font-size: var(--text-micro); letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; color: var(--ink-faint); padding: 6px 8px; border-bottom: var(--border-w) solid var(--line); }
+  .gq-table td { padding: 8px; border-bottom: var(--border-w) solid var(--line); vertical-align: middle; }
+  .gq-table form { margin: 0; }
+</style>

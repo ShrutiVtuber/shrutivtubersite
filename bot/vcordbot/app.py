@@ -235,6 +235,45 @@ class PracticeIn(BaseModel):
     readings: list[Reading] = []
 
 
+class GuideIn(BaseModel):
+    """A guide the site says it just published."""
+
+    id: int
+    slug: str = ""
+    gameSlug: str = ""
+    title: str = ""
+    game: str = ""
+    author: str = ""
+    steps: int = 0
+    phases: int = 0
+    summary: str = ""
+    isUpdate: bool = False
+
+
+@app.post("/internal/guides")
+async def guide_published(
+    body: GuideIn,
+    x_shruti_internal: str = Header(default="", alias="X-Shruti-Internal"),
+) -> dict:
+    """
+    The site telling the channel that a guide went up.
+
+    ⚠ **Not public**, for the same reason as /internal/practice: it posts under
+    her bot's name. The shared secret is checked in constant time and a
+    missing secret refuses everything. Answers ok either way — the guide is
+    published whatever Discord does.
+    """
+    cfg = config.load()
+    secret = os.environ.get("SHRUTI_INTERNAL_SECRET", "").strip()
+    if not secret or not hmac.compare_digest(x_shruti_internal, secret):
+        raise HTTPException(401, "no")
+    site_url = os.environ.get("SHRUTI_SITE_URL", "https://shrutivtuber.com")
+    message_id = await bridge.announce_guide(
+        body.model_dump(), channel_id=cfg.guides_channel_id, token=cfg.token, site_url=site_url,
+    )
+    return {"ok": True, "announced": bool(message_id)}
+
+
 @app.post("/internal/practice")
 async def practice_submitted(
     body: PracticeIn,

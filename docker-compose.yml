@@ -184,6 +184,7 @@ services:
       # notice it.
       SHRUTI_INTERNAL_SITE: ${SHRUTI_INTERNAL_SITE:-http://caddy:8080}
       SHRUTI_DISCORD_PRACTICE_CHANNEL: ${SHRUTI_DISCORD_PRACTICE_CHANNEL:-}
+      SHRUTI_DISCORD_GUIDES_CHANNEL: ${SHRUTI_DISCORD_GUIDES_CHANNEL:-}
     ports:
       # Bound to loopback: Caddy terminates TLS and proxies. Discord must reach
       # it over HTTPS with a valid certificate, so it is never exposed directly.

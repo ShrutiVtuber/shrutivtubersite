@@ -449,7 +449,8 @@ async def publish(version_id: int, session: AsyncSession = Depends(get_session))
     if problems:
         return JSONResponse(status_code=422, content={"ok": False, "problems": problems})
     g = await session.get(Guide, v.guide_id)
-    if g.published_version_id and g.published_version_id != v.id:
+    was_update = bool(g.published_version_id) and g.published_version_id != v.id
+    if was_update:
         old = await session.get(GuideVersion, g.published_version_id)
         if old is not None:
             old.state = "superseded"
@@ -463,7 +464,43 @@ async def publish(version_id: int, session: AsyncSession = Depends(get_session))
     if g.hidden and g.hidden_by == "reports":
         g.hidden, g.hidden_by = False, ""
     await session.commit()
+    game = await session.get(Game, g.game_id)
+    author = await session.get(User, g.created_by)
+    await _tell_discord({
+        "id": g.id, "slug": g.slug, "title": g.title,
+        "game": game.name if game else "", "gameSlug": game.slug if game else "",
+        "author": _name(author),
+        "steps": len(v.body.get("steps", [])), "phases": len(v.body.get("phases", [])),
+        "summary": str(v.body.get("guide", {}).get("summary") or ""),
+        "isUpdate": was_update,
+    })
     return {"ok": True, "guideId": g.id, "versionId": v.id}
+
+
+async def _tell_discord(guide: dict) -> None:
+    """
+    Let the channel know a guide went up, if there is one.
+
+    The bot owns every fact about Discord; this says only that something was
+    published, to an endpoint that refuses anybody without the shared secret.
+    Built field by field so nothing about a reader ever reaches the bot.
+    ⚠ After the commit, never before: a Discord outage must not fail her
+    publish — the guide is up, and the channel can catch up.
+    """
+    import os
+
+    import httpx
+
+    bot = os.environ.get("VCORDBOT_INTERNAL_URL", "").strip()
+    secret = os.environ.get("SHRUTI_INTERNAL_SECRET", "").strip()
+    if not (bot and secret):
+        return                      # no bridge configured; a working state
+    try:
+        async with httpx.AsyncClient(timeout=5) as client:
+            await client.post(f"{bot}/internal/guides", json=guide,
+                              headers={"X-Shruti-Internal": secret})
+    except Exception as exc:                       # noqa: BLE001
+        log.warning("guides channel not told: %s", type(exc).__name__)
 
 
 class SendBackIn(BaseModel):
@@ -510,14 +547,56 @@ async def hide(guide_id: int, body: HideIn, session: AsyncSession = Depends(get_
         raise HTTPException(404, "no such guide")
     g.hidden = body.hidden
     g.hidden_by = "her" if body.hidden else ""
-    if not body.hidden:
-        # Her decision settles the open reports.
-        for r in (await session.execute(
-            select(GuideReport).where(GuideReport.guide_id == guide_id, GuideReport.reviewed_at.is_(None))
-        )).scalars().all():
-            r.reviewed_at, r.outcome = _now(), "dismissed"
+    # ⚠ Her decision settles the open reports EITHER way. Keeping it down
+    # without reviewing them left them open for ever — still counting, still
+    # listed as waiting for a look she had already given.
+    for r in (await session.execute(
+        select(GuideReport).where(GuideReport.guide_id == guide_id, GuideReport.reviewed_at.is_(None))
+    )).scalars().all():
+        r.reviewed_at, r.outcome = _now(), ("upheld" if body.hidden else "dismissed")
     await session.commit()
     return {"ok": True, "hidden": g.hidden}
+
+
+@router.get("/admin/guides", dependencies=[Depends(require_admin)])
+async def admin_guides(session: AsyncSession = Depends(get_session)) -> list[dict]:
+    """
+    Every guide, hers to feature, hide or put back — with what is open against
+    it. Reports are grouped by the guide, never one row per report: three
+    people reporting one guide is ONE decision.
+    """
+    rows = (await session.execute(
+        select(Guide, Game, User)
+        .join(Game, Game.id == Guide.game_id)
+        .join(User, User.id == Guide.created_by, isouter=True)
+        .order_by(Guide.featured.desc(), Guide.updated_at.desc())
+    )).all()
+    ids = [g.id for g, _, _ in rows]
+    votes = await _votes_for(session, ids)
+    open_reports = (await session.execute(
+        select(GuideReport).where(GuideReport.guide_id.in_(ids), GuideReport.reviewed_at.is_(None))
+    )).scalars().all() if ids else []
+    by_guide: dict[int, list[GuideReport]] = {}
+    for r in open_reports:
+        by_guide.setdefault(r.guide_id, []).append(r)
+    out = []
+    for g, game, u in rows:
+        reps = by_guide.get(g.id, [])
+        reasons: dict[str, int] = {}
+        for r in reps:
+            reasons[r.reason] = reasons.get(r.reason, 0) + 1
+        out.append({
+            "id": g.id, "slug": g.slug, "title": g.title,
+            "game": {"slug": game.slug, "name": game.name},
+            "author": _name(u), "authorId": g.created_by,
+            "published": g.published_version_id is not None,
+            "featured": g.featured, "hidden": g.hidden, "hiddenBy": g.hidden_by,
+            "votes": votes.get(g.id, 0),
+            "reports": {"open": len(reps), "reasons": reasons,
+                        "details": [r.detail for r in reps if r.detail]},
+            "updatedAt": g.updated_at.isoformat() if g.updated_at else None,
+        })
+    return out
 
 
 # ── the reader, and the pack ─────────────────────────────────────────────────

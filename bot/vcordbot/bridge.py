@@ -104,6 +104,49 @@ def submission_message(work: dict, site_url: str) -> tuple[str, dict]:
     return "", embed
 
 
+def guide_message(guide: dict, site_url: str) -> tuple[str, dict]:
+    """
+    What a published guide looks like in the channel.
+
+    ⚠ Only what the site chose to send: title, game, author, the size of the
+    path and the summary. Nothing about any reader, and no step text — the
+    guide is a page, and the page is the link.
+    """
+    author = guide.get("author") or "somebody"
+    game = guide.get("game") or "a game"
+    where = f"{site_url}/guides/{guide.get('gameSlug', '')}/{guide.get('slug', '')}"
+    steps = int(guide.get("steps") or 0)
+    phases = int(guide.get("phases") or 0)
+    summary = (guide.get("summary") or "").strip()
+    if len(summary) > OPENING:
+        summary = summary[:OPENING].rsplit(" ", 1)[0] + "…"
+    what = "updated" if guide.get("isUpdate") else "new"
+    embed = {
+        "title": guide.get("title") or f"A guide for {game}",
+        "description": summary or f"_{phases} phases, {steps} steps._",
+        "url": where,
+        "footer": {"text": f"{author} · {game} · {what} guide · {steps} steps"},
+    }
+    return "", embed
+
+
+async def announce_guide(
+    guide: dict, *, channel_id: str, token: str, site_url: str,
+    client: httpx.AsyncClient | None = None,
+) -> str:
+    """
+    Put a published guide in the channel. One message, no thread: a guide
+    is read on the site, and the discussion belongs under the game.
+
+    Fails soft and returns "" rather than raising — the guide is published
+    whatever Discord does.
+    """
+    if not (channel_id and token):
+        return ""                   # no bridge configured; a working state
+    content, embed = guide_message(guide, site_url)
+    return await post_and_tell_id(channel_id, token, content=content, embed=embed, client=client) or ""
+
+
 def thread_name(work: dict) -> str:
     """What the post is called in a list of posts."""
     author = work.get("author") or "somebody"

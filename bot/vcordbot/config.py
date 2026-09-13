@@ -47,6 +47,10 @@ class Config:
     # a working state rather than an error — the site simply does not announce.
     practice_channel_id: str = ""
 
+    # The channel a published guide is announced in. Empty means it is not,
+    # which is a working state — the site publishes either way.
+    guides_channel_id: str = ""
+
     def configured(self) -> bool:
         return bool(self.app_id and self.token)
 
@@ -61,6 +65,7 @@ def load() -> Config:
         public_key=_env("SHRUTI_DISCORD_PUBLIC_KEY"),
         token=_env("SHRUTI_DISCORD_BOT_TOKEN"),
         practice_channel_id=_env("SHRUTI_DISCORD_PRACTICE_CHANNEL", ""),
+        guides_channel_id=_env("SHRUTI_DISCORD_GUIDES_CHANNEL", ""),
         astro_url=_env("SHRUTI_ASTRO_INTERNAL", "http://shruti-astro:8000").rstrip("/"),
         site_url=_env("SHRUTI_SITE_URL", "https://shrutivtuber.com").rstrip("/"),
         bot_url=_env("VCORDBOT_URL", "https://bot.shrutivtuber.com").rstrip("/"),
