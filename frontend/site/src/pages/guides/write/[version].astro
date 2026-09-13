@@ -72,6 +72,8 @@ const WORDS = {
     licence: say("g.licence", "Licence"), licenceHint: say("g.licence_hint", "Your writing, your choice. It is shown on the guide's page."),
     licUnsaid: say("g.lic_unsaid", "— not stated —"), licReserved: say("g.lic_reserved", "All rights reserved"),
     game: say("g.game", "Game"), gameId: say("g.game_id", "Game address"),
+    theme: say("g.theme", "Overlay theme"), themeUnsaid: say("g.theme_unsaid", "Not stated — the Almanac"), themeAlmanac: say("g.theme_almanac", "Almanac"), themeGrimoire: say("g.theme_grimoire", "Grimoire"), themePlain: say("g.theme_plain", "Plain"),
+    themeHint: say("g.theme_hint", "What this game's overlays look like unless the person picks another. A theme is a skin, never a layout."),
     variants: say("g.variants", "Ways a run can differ"), variantId: say("g.variant_id", "id"), variantName: say("g.variant_name", "name"),
     variantsHint: say("g.variants_hint", "Most games have none. Diablo has Eternal and Seasonal."),
   },
@@ -490,6 +492,7 @@ const WORDS = {
       `<div class="ed-row">${field("guide.authors", W.guide.authors, "lines")}${field("guide.caveats", W.guide.caveats, "lines")}</div>` +
       select("guide.licence", W.guide.licence, [["", W.guide.licUnsaid], ["CC-BY-SA-4.0", "CC BY-SA 4.0"], ["CC-BY-4.0", "CC BY 4.0"], ["CC0-1.0", "CC0"], ["All-Rights-Reserved", W.guide.licReserved]], W.guide.licenceHint) +
       `<div class="ed-row">${field("game.name", W.guide.game)}${field("game.id", W.guide.gameId)}</div>` +
+      select("game.theme", W.guide.theme, [["", W.guide.themeUnsaid], ["almanac", W.guide.themeAlmanac], ["grimoire", W.guide.themeGrimoire], ["plain", W.guide.themePlain]], W.guide.themeHint) +
       `<div class="ed-field"><span>${esc(W.guide.variants)}</span><span class="hint">${esc(W.guide.variantsHint)}</span><div class="ed-sub">` +
       variants().map((_, j) => `<div class="ed-sub-row">${field(`game.variants.${j}.id`, W.guide.variantId)}${field(`game.variants.${j}.name`, W.guide.variantName)}<div class="ed-tools" style="border:0;padding:0"><button type="button" data-remove="game.variants:${j}">${esc(W.common.remove)}</button></div></div>`).join("") +
       `<button type="button" class="ed-add" data-add="game.variants" data-blank="variant">+</button></div></div></div>`;

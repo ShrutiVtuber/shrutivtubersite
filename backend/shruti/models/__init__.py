@@ -567,6 +567,8 @@ class OverlayToken(TimestampMixin, table=True):
     group_id: Optional[int] = Field(default=None, foreign_key="guide_group.id")
     # Who minted a goal token (a run's tokens belong to the run's owner).
     user_id: Optional[int] = Field(default=None, foreign_key="site_user.id")
+    # A layout of hers, shown in the gallery for anybody to start from.
+    shared: bool = Field(default=False)
 
     last_seen: Optional[datetime] = Field(default=None, sa_type=UTC_TS)
 

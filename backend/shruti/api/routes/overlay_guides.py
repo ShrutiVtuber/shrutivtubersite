@@ -124,6 +124,37 @@ async def _fill_goals(session: AsyncSession, elements: list[dict]) -> None:
             e["element"] = _counter_element(c, await counters.progress(session, c)) if c is not None and c.visible else {}
 
 
+PRIVATE_FIELDS = ("routine_id", "group", "counter_id", "text", "url")
+
+
+@router.get("/gallery")
+async def gallery(session: AsyncSession = Depends(get_session)) -> list[dict]:
+    """
+    Her shared layouts, for anybody to start from: the kinds and their
+    places, the theme and the motion. Never her tokens, and never the
+    fields that name her routines, groups or counters — a person fills
+    those with their own.
+    """
+    from shruti.core.operator import operator_email
+    from shruti.models.accounts import User
+    email = await operator_email(session)
+    her = (await session.execute(select(User).where(User.email == email))).scalar_one_or_none() if email else None
+    if her is None:
+        return []
+    runs = [r.id for r in (await session.execute(select(GuideRun).where(GuideRun.user_id == her.id))).scalars().all()]
+    if not runs:
+        return []
+    rows = (await session.execute(
+        select(OverlayToken).where(OverlayToken.kind == "guide-layout", OverlayToken.shared.is_(True), OverlayToken.run_id.in_(runs))
+        .order_by(OverlayToken.id)
+    )).scalars().all()
+    out = []
+    for o in rows:
+        layout = [{k: v for k, v in e.items() if k not in PRIVATE_FIELDS} for e in progress.clean_layout(o.layout)]
+        out.append({"id": o.id, "label": o.label, "theme": o.theme, "motion": o.motion, "layout": layout})
+    return out
+
+
 @router.get("/mine")
 async def my_tokens(request: Request, session: AsyncSession = Depends(get_session)) -> list[dict]:
     """
@@ -187,7 +218,7 @@ async def list_tokens(run_id: int, request: Request, session: AsyncSession = Dep
     run = await _mine(session, request, run_id)
     rows = (await session.execute(select(OverlayToken).where(OverlayToken.run_id == run.id).order_by(OverlayToken.id))).scalars().all()
     return [{"id": o.id, "kind": o.kind, "label": o.label, "theme": o.theme, "motion": o.motion,
-             "routineId": o.routine_id, "layout": o.layout or [],
+             "routineId": o.routine_id, "layout": o.layout or [], "shared": o.shared,
              "lastSeen": o.last_seen.isoformat() if o.last_seen else None} for o in rows]
 
 
@@ -218,6 +249,8 @@ class LayoutIn(BaseModel):
     theme: str | None = None
     motion: str | None = None
     label: str | None = None
+    # Hers only takes effect: the gallery shows the operator's shared layouts.
+    shared: bool | None = None
 
 
 @runs_router.put("/{run_id}/overlays/{token_id}/layout")
@@ -235,8 +268,10 @@ async def set_layout(run_id: int, token_id: int, body: LayoutIn, request: Reques
         row.motion = body.motion
     if body.label is not None:
         row.label = body.label.strip()[:80]
+    if body.shared is not None:
+        row.shared = bool(body.shared)
     await session.commit()
-    return {"ok": True, "layout": row.layout}
+    return {"ok": True, "layout": row.layout, "shared": row.shared}
 
 
 class RebindIn(BaseModel):

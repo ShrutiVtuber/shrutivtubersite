@@ -46,6 +46,8 @@ const overlays = overlaysRead?.ok && Array.isArray(overlaysRead.body) ? overlays
 const origin = Astro.url.origin;
 
 const variants = doc.game.variants ?? [];
+// The theme this game brings: what a new overlay wears unless the person picks another.
+const gameTheme = ["almanac", "grimoire", "plain"].includes(String((doc.game as any).theme ?? "")) ? String((doc.game as any).theme) : "almanac";
 const skipGroups = [...new Set(phasesOf(doc).map((p) => p.skip_group).filter(Boolean))] as string[];
 const groupNames = (g: string) => phasesOf(doc).filter((p) => p.skip_group === g).map((p) => p.name).join(", ");
 
@@ -234,13 +236,18 @@ const WORDS = {
               <select name="routine_id">{(doc.routines ?? []).map((r) => <option value={r.id}>{r.name}</option>)}</select></label>
           )}
           <label class="tk-field"><span class="tk-eyebrow">{say("ov.theme", "Theme")}</span>
-            <select name="theme"><option value="almanac">{say("ov.almanac", "Almanac")}</option><option value="grimoire">{say("ov.grimoire", "Grimoire")}</option><option value="plain">{say("ov.plain", "Plain")}</option></select></label>
+            <select name="theme">
+              <option value="almanac" selected={gameTheme === "almanac"}>{say("ov.almanac", "Almanac")}</option>
+              <option value="grimoire" selected={gameTheme === "grimoire"}>{say("ov.grimoire", "Grimoire")}</option>
+              <option value="plain" selected={gameTheme === "plain"}>{say("ov.plain", "Plain")}</option>
+            </select></label>
           <label class="tk-field"><span class="tk-eyebrow">{say("ov.motion", "Motion")}</span>
             <select name="motion"><option value="reduced">{say("ov.reduced", "Reduced motion")}</option><option value="full">{say("ov.full", "Full motion")}</option><option value="still">{say("ov.still", "Still")}</option></select></label>
           <label class="tk-field"><span class="tk-eyebrow">{say("ov.label", "Label, for you")}</span><input type="text" name="label" maxlength="80" /></label>
           <button type="submit" class="tk-secondary sm">{say("ov.make", "New overlay")}</button>
         </form>
         <p class="tk-quiet">{say("ov.theme_note", "A theme changes palette, type and ornament. It never changes the layout or the four state colours, so chat learns them once.")}</p>
+        <p class="tk-quiet"><a href="/guides/overlays">{say("ov.gallery", "Or start from one of Shruti's layouts")}</a></p>
         <div class="tk-ov-minted" data-minted hidden></div>
       </section>
       <section class="tk-section" id="note">
