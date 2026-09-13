@@ -147,6 +147,11 @@ const day = (iso: string | null) =>
       </div>
     )}
 
+    <p class="gd-also">
+      <a href="/groups">{say("also.groups", "Groups — a shared goal, filled by a crew")}</a>
+      <span aria-hidden="true"> · </span>
+      <a href="/guides/overlays">{say("also.overlays", "Overlay layouts to start from")}</a>
+    </p>
     <p class="gd-foot">
       {say("foot",
         "Every guide carries report and block, as in the practice room: a reported guide hides at the same threshold, and a blocked author's guides leave your lists. Featured is chosen by hand — nothing on this page is ranked by an algorithm.")}
@@ -195,5 +200,7 @@ const day = (iso: string | null) =>
   .gd-game-name { font-family: var(--font-display); font-size: 22px; font-weight: 600; color: var(--ink); }
   .gd-game-ask { font-family: var(--font-display); font-size: 17px; color: var(--ink-soft); }
   .gd-game-how { font-size: var(--text-xs); line-height: 1.5; color: var(--ink-faint); }
+  .gd-also { margin: 0; padding-top: 32px; font-family: var(--font-mono); font-size: 13.5px; line-height: 1.8; color: var(--ink-soft); }
+  .gd-also a { color: inherit; }
   .gd-foot { margin: 0; padding-top: 40px; border-top: var(--border-w) solid var(--line); max-width: 70ch; font-family: var(--font-mono); font-size: 13.5px; line-height: 1.7; color: var(--ink-faint); }
 </style>
