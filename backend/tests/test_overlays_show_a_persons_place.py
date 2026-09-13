@@ -103,7 +103,7 @@ def test_a_source_that_shows_this_version_is_told_so_and_nothing_is_computed() -
     unchanged = body.index('base["unchanged"] = True')
     assert body.index("await _doc(session") > unchanged, "the document is loaded before the cheap answer"
     assert body.index("progress.layout_elements(") > unchanged
-    assert "if v and v == version:" in body
+    assert 'if v and v.replace(" ", "+") == version:' in body
     tracker = (ROOT / "backend" / "shrutisguides" / "tracker" / "app.py").read_text(encoding="utf-8")
     assert 'base["unchanged"] = True' in tracker, "the tracker keeps the same contract"
 

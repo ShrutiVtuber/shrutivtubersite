@@ -179,7 +179,7 @@ async def tiers(session: AsyncSession = Depends(get_session)) -> dict:
     s = get_settings()
     rows = (
         await session.execute(
-            select(Tier).where(Tier.visible.is_(True)).order_by(Tier.position, Tier.id)
+            select(Tier).where(Tier.visible.is_(True), Tier.kind == "support").order_by(Tier.position, Tier.id)
         )
     ).scalars().all()
 
@@ -315,7 +315,29 @@ async def _line_items(tier: str, amount: int | None,
     """
     if tier == "one-off":
         return _one_off_line_items(amount)
+    row = await _tier_row(tier, session)
+    if row is not None and row.kind == "hosting":
+        return _hosting_line_items(await _price_id(tier, session), tier)
     return _subscription_line_items(await _price_id(tier, session), tier)
+
+
+def _hosting_line_items(price_id: str, tier: str) -> dict[str, Any]:
+    """
+    Overlay hosting: a standing arrangement at the price Stripe holds, with
+    no name to read on stream — hosting is a service, not a membership, and
+    nobody is thanked on air for paying for a server.
+    """
+    return {
+        "mode": "subscription",
+        "line_items": [{"price": price_id, "quantity": 1}],
+        "subscription_data": {"metadata": {"tier": tier, "kind": "hosting"}},
+        "allow_promotion_codes": True,
+    }
+
+
+def _is_hosting(subscription: dict | None) -> bool:
+    meta = (subscription or {}).get("metadata") or {}
+    return meta.get("kind") == "hosting" or str(meta.get("tier", "")).startswith("hosting")
 
 
 # ── tiers, as she manages them ──────────────────────────────────────────────
@@ -323,6 +345,7 @@ async def _line_items(tier: str, amount: int | None,
 class TierIn(BaseModel):
     key: str
     name: str
+    kind: str = "support"                 # support | hosting
     tagline: str = ""
     perks: str = ""
     cta: str = ""
@@ -366,6 +389,8 @@ async def create_tier(
 
     if body.interval not in {"month", "year"}:
         raise HTTPException(422, "interval must be month or year")
+    if body.kind not in {"support", "hosting"}:
+        raise HTTPException(422, "kind is support or hosting")
     row = Tier(**body.model_dump())
     session.add(row)
     await session.commit()
@@ -483,6 +508,12 @@ async def checkout(
         common["client_reference_id"] = str(user.id)
 
     params = {**common, **await _line_items(body.tier, body.amount, session)}
+    if params.get("subscription_data", {}).get("metadata", {}).get("kind") == "hosting":
+        # Bought on the account page; it returns there, where the status shows.
+        if not user:
+            raise HTTPException(401, "sign in first — hosting belongs to an account")
+        params["success_url"] = f"{here}/account?hosting=started"
+        params["cancel_url"] = f"{here}/account"
 
     try:
         checkout_session = client.checkout.Session.create(**params)
@@ -543,6 +574,70 @@ def _portal_configuration(client: Any) -> str:
     return created.id
 
 
+async def _upsert_hosting(
+    session: AsyncSession, *, customer_id: str, subscription: dict | None,
+    email: str = "", user_id: int | None = None,
+) -> None:
+    """Hosting, one row per account. A person may also be a member; the two never share a row."""
+    from shruti.models import Hosting
+    row = (await session.execute(select(Hosting).where(Hosting.stripe_customer_id == customer_id))).scalars().first()
+    if row is None and user_id is not None:
+        row = (await session.execute(select(Hosting).where(Hosting.user_id == user_id))).scalars().first()
+    if row is None and email:
+        row = (await session.execute(select(Hosting).where(Hosting.email == email))).scalars().first()
+    if row is None:
+        row = Hosting()
+        session.add(row)
+    row.stripe_customer_id = customer_id or row.stripe_customer_id
+    if user_id is not None:
+        row.user_id = user_id
+    if email:
+        row.email = email
+    if row.user_id is None and (email or row.email):
+        who = (await session.execute(select(User).where(User.email == (email or row.email)))).scalar_one_or_none()
+        if who is not None:
+            row.user_id = who.id
+    if subscription is not None:
+        row.stripe_subscription_id = subscription.get("id", "")
+        row.status = subscription.get("status", "")
+        row.cancel_at_period_end = bool(subscription.get("cancel_at_period_end"))
+        row.current_period_end = _moment(_period_end(subscription))
+        tier = (subscription.get("metadata") or {}).get("tier", "")
+        if tier:
+            row.tier = tier
+
+
+@router.get("/hosting")
+async def hosting_offer(request: Request, session: AsyncSession = Depends(get_session)) -> dict:
+    """
+    Overlay hosting, as sold on the account page and nowhere else: the two
+    prices Stripe holds, and where this account stands. The app never asks.
+    """
+    from shruti.api.routes.accounts import current_user
+    from shruti.models import Hosting, Tier
+    s = get_settings()
+    rows = (await session.execute(
+        select(Tier).where(Tier.visible.is_(True), Tier.kind == "hosting").order_by(Tier.position, Tier.id)
+    )).scalars().all()
+    if s.stripe_secret_key:
+        for row in rows:
+            await _ensure_price(row, session)
+    user = await current_user(request, session)
+    mine = (await session.execute(select(Hosting).where(Hosting.user_id == user.id))).scalars().first() if user else None
+    return {
+        "configured": bool(s.stripe_secret_key) and bool(rows),
+        "testMode": s.stripe_is_test,
+        "tiers": [{"tier": t.key, "name": t.name, "tagline": t.tagline, "amount": t.price_cents,
+                   "currency": (t.currency or "eur").upper(), "interval": t.interval} for t in rows],
+        "active": bool(mine and mine.status in {"active", "trialing", "past_due"}),
+        "status": mine.status if mine else "",
+        "tier": mine.tier if mine else "",
+        "cancelAtPeriodEnd": bool(mine.cancel_at_period_end) if mine else False,
+        "currentPeriodEnd": mine.current_period_end.isoformat() if mine and mine.current_period_end else None,
+        "canManage": bool(mine and mine.stripe_customer_id),
+    }
+
+
 @router.post("/portal")
 async def portal(
     request: Request, session: AsyncSession = Depends(get_session)
@@ -567,12 +662,17 @@ async def portal(
             select(Supporter).where(Supporter.user_id == user.id)
         )
     ).scalars().first()
-    if row is None or not row.stripe_customer_id:
+    customer = row.stripe_customer_id if row is not None else ""
+    if not customer:
+        from shruti.models import Hosting
+        hosting = (await session.execute(select(Hosting).where(Hosting.user_id == user.id))).scalars().first()
+        customer = hosting.stripe_customer_id if hosting is not None else ""
+    if not customer:
         raise HTTPException(404, "there is no subscription on this account")
 
     try:
         portal_session = client.billing_portal.Session.create(
-            customer=row.stripe_customer_id,
+            customer=customer,
             configuration=_portal_configuration(client),
             return_url=f"{_site_url(request)}/account",
         )
@@ -799,6 +899,9 @@ async def _upsert(
 ) -> None:
     """One row per Stripe customer. Found by customer id, then by account, then
     by email — in that order, because the ids are exact and the email is not."""
+    if _is_hosting(subscription):
+        await _upsert_hosting(session, customer_id=customer_id, subscription=subscription, email=email, user_id=user_id)
+        return
     row = (
         await session.execute(
             select(Supporter).where(Supporter.stripe_customer_id == customer_id)

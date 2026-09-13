@@ -1013,6 +1013,10 @@ class Tier(TimestampMixin, table=True):
 
     visible: bool = Field(default=False)
     position: int = Field(default=0)
+    # "support" — a membership, listed on the support page and read out on
+    # stream; "hosting" — overlay hosting, sold on the account page and
+    # nowhere else. The app never sees either.
+    kind: str = Field(default="support", index=True)
 
 
 class ProductPhoto(TimestampMixin, table=True):
@@ -1434,6 +1438,7 @@ class LessonProgress(TimestampMixin, table=True):
 from shruti.models.accounts import (  # noqa: E402,F401
     BannedEmail, ConsentRecord, Horoscope, Issue, JournalSky, Nativity, Passkey,
     Subscriber, Supporter, User,
+    Hosting,
 )
 
 # ⚠ These two were missing, and the failure mode is not "autogenerate forgets

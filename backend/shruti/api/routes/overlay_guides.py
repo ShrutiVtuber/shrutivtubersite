@@ -373,6 +373,74 @@ async def gallery(session: AsyncSession = Depends(get_session)) -> list[dict]:
     return out
 
 
+# ── the free tier's fair use, and hosting ────────────────────────────────────
+#
+# Her decision of 13 September 2026: reading and tracking are free and
+# unlimited; overlays are free for 100 hours on air a month; hosting is €5 a
+# month or €50 a year. The token counts are fair use, hers to change.
+FREE_HOURS = 100
+FREE_TOKENS = 5
+HOSTED_TOKENS = 20
+
+
+async def _hosting_active(session: AsyncSession, user_id: int) -> tuple[bool, object]:
+    from shruti.models import Hosting
+    row = (await session.execute(select(Hosting).where(Hosting.user_id == user_id))).scalars().first()
+    return (row is not None and row.status in {"active", "trialing", "past_due"}), row
+
+
+async def allowance(session: AsyncSession, user) -> dict:
+    """
+    Where this account stands: tokens held, hours on air this month, and the
+    line each is measured against. The operator's own account is never
+    limited — she runs the server.
+
+    ⚠ Going past a limit never cuts anybody off mid-stream. An overlay that
+    exists keeps drawing; only minting a NEW one waits — for next month, or
+    for hosting. The account page says so.
+    """
+    from shruti.core.operator import operator_email
+    hosted, row = await _hosting_active(session, user.id)
+    operator = (await operator_email(session) or "").lower() == (user.email or "").lower()
+    runs = [r.id for r in (await session.execute(select(GuideRun).where(GuideRun.user_id == user.id))).scalars().all()]
+    tokens = (await session.execute(
+        select(OverlayToken).where(
+            OverlayToken.kind.in_(SITE_KINDS),
+            (OverlayToken.run_id.in_(runs) if runs else False) | (OverlayToken.user_id == user.id),
+        )
+    )).scalars().all()
+    hours = sum((await hours_this_month(session, [t.id for t in tokens])).values()) if tokens else 0.0
+    hours = round(hours, 1)
+    tokens_limit = None if operator else (HOSTED_TOKENS if hosted else FREE_TOKENS)
+    hours_limit = None if (operator or hosted) else FREE_HOURS
+    return {
+        "tier": "operator" if operator else ("hosting" if hosted else "free"),
+        "tokens": len(tokens), "tokensLimit": tokens_limit,
+        "hoursThisMonth": hours, "hoursLimit": hours_limit,
+        "over": hours_limit is not None and hours >= hours_limit,
+        "tokensFull": tokens_limit is not None and len(tokens) >= tokens_limit,
+        "status": row.status if row else "", "hostingTier": row.tier if row else "",
+        "cancelAtPeriodEnd": bool(row.cancel_at_period_end) if row else False,
+        "currentPeriodEnd": row.current_period_end.isoformat() if row and row.current_period_end else None,
+        "canManage": bool(row and row.stripe_customer_id),
+    }
+
+
+async def refuse_if_out_of_allowance(session: AsyncSession, user) -> None:
+    """Said plainly, at the one place it applies: minting a new overlay."""
+    a = await allowance(session, user)
+    if a["tokensFull"]:
+        raise HTTPException(409, f"You hold {a['tokens']} overlays, which is this account's fair use. Revoke one you no longer stream with, or move to hosting for more.")
+    if a["over"]:
+        raise HTTPException(409, f"Past the free {FREE_HOURS} hours on air this month. Your overlays keep drawing; a new one waits for next month, or for hosting.")
+
+
+@router.get("/allowance")
+async def my_allowance(request: Request, session: AsyncSession = Depends(get_session)) -> dict:
+    from shruti.api.routes.practice import _reader
+    return await allowance(session, await _reader(request, session))
+
+
 @router.get("/mine")
 async def my_tokens(request: Request, session: AsyncSession = Depends(get_session)) -> list[dict]:
     """
@@ -452,6 +520,8 @@ async def mint_token(run_id: int, body: TokenIn, request: Request, session: Asyn
     run = await _mine(session, request, run_id)
     if body.kind not in GUIDE_KINDS:
         raise HTTPException(422, "kind is guide-now, guide-sigil, guide-path, guide-routine or guide-layout")
+    from shruti.api.routes.practice import _reader
+    await refuse_if_out_of_allowance(session, await _reader(request, session))
     token = secrets.token_urlsafe(24)
     row = OverlayToken(token=token, kind=body.kind, label=body.label.strip()[:80], run_id=run.id,
                        routine_id=body.routine_id.strip()[:80],

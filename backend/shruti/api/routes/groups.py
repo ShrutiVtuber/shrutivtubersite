@@ -228,6 +228,8 @@ async def mint_goal_token(code: str, body: GoalTokenIn, request: Request, sessio
     member = (await session.execute(select(GroupMember).where(GroupMember.group_id == g.id, GroupMember.user_id == user.id))).scalar_one_or_none()
     if member is None:
         raise HTTPException(403, "join the group first")
+    from shruti.api.routes.overlay_guides import refuse_if_out_of_allowance
+    await refuse_if_out_of_allowance(session, user)
     token = secrets.token_urlsafe(24)
     row = OverlayToken(token=token, kind="guide-goal", label=body.label.strip()[:80] or g.name, user_id=user.id, group_id=g.id,
                        theme=body.theme if body.theme in THEMES else "almanac",

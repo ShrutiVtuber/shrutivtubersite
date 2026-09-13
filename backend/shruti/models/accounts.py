@@ -371,6 +371,29 @@ class Supporter(TimestampMixin, table=True):
     stream_name: str = ""
 
 
+class Hosting(TimestampMixin, table=True):
+    """
+    Overlay hosting on this account: a standing arrangement with Stripe,
+    separate from a membership because a person may hold both, and one row
+    per customer would make the second overwrite the first.
+
+    Stripe is the ledger; this is the minimum to answer "is hosting active"
+    without a round trip on every page load.
+    """
+
+    __tablename__ = "hosting"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: Optional[int] = Field(default=None, foreign_key="site_user.id", index=True)
+    email: str = Field(default="", index=True)
+    stripe_customer_id: str = Field(default="", index=True)
+    stripe_subscription_id: str = Field(default="", index=True)
+    status: str = ""                       # Stripe's word, verbatim
+    tier: str = ""                         # hosting-monthly | hosting-yearly
+    cancel_at_period_end: bool = False
+    current_period_end: Optional[datetime] = Field(default=None, sa_type=UTC_TS)
+
+
 class StandingTest(TimestampMixin, table=True):
     """
     A compatibility test that stands at its own address.

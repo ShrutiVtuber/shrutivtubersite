@@ -1,0 +1,55 @@
+---
+/* The hosting notes: the server, the overlays and the MCP are AGPL-3.0, and
+ * anybody may run the tracker for nothing. Hosting on shrutivtuber.com is
+ * the same software, run and looked after by Shruti — the service, not the
+ * code. The price lives on the account page and nowhere else.
+ */
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import SectionHeader from "../../components/brand/SectionHeader.astro";
+import { copy } from "../../lib/copy";
+
+const say = await copy("guides/hosting");
+---
+
+<BaseLayout title={say("meta.title", "Run your own tracker — Shruti's Guides")} description={say("meta.description", "The tracker is AGPL-3.0: a Docker image, a compose file, and your runs on your own machine.")}>
+  <article class="page hosting">
+    <SectionHeader as="h1" eyebrow={say("head.eyebrow", "Shruti's Guides")} title={say("head.title", "Run your own tracker")} />
+    <p class="lede">{say("head.lede", "The server, the overlays and the MCP are AGPL-3.0. You can run the tracker yourself, for nothing: it keeps your runs on your machine and draws your overlays from there. Reading guides and tracking your progress never need anything else.")}</p>
+
+    <h2>{say("run.title", "Run it")}</h2>
+    <pre><code>{say("run.docker", "cd server\ndocker compose up -d\nopen http://localhost:8210")}</code></pre>
+    <p class="quiet">{say("run.or", "Or without Docker:")}</p>
+    <pre><code>{say("run.python", "cd server\npython -m venv .venv && .venv/bin/pip install \".[tracker]\"\n.venv/bin/uvicorn shrutisguides.tracker.app:app --host 127.0.0.1 --port 8210")}</code></pre>
+
+    <h2>{say("settings.title", "Settings")}</h2>
+    <dl class="settings">
+      <div><dt><code>SHRUTI_SITE_URL</code></dt><dd>{say("settings.site", "Where guides are pulled from, by address. Default: this site.")}</dd></div>
+      <div><dt><code>TRACKER_DATA</code></dt><dd>{say("settings.data", "Where the database lives. /data in Docker, ./data otherwise.")}</dd></div>
+      <div><dt><code>TRACKER_SECRET</code></dt><dd>{say("settings.secret", "A bearer token every write needs. Unset means open, for one machine and one person. If anything but your own machine can reach the tracker, set one.")}</dd></div>
+      <div><dt><code>TRACKER_TZ</code></dt><dd>{say("settings.tz", "Your timezone, for daily and weekly routine resets. Default: UTC.")}</dd></div>
+    </dl>
+
+    <h2>{say("serves.title", "What it serves")}</h2>
+    <ul>
+      <li>{say("serves.home", "A small page: pull a guide by its address, import a guide file, start a run, mint an overlay.")}</li>
+      <li>{say("serves.api", "The same API shapes as this site's guides, runs and overlays, so the phone app points at either.")}</li>
+      <li>{say("serves.overlays", "The browser sources — now card, sigil, path strip, routine, and layouts of several — in the three themes.")}</li>
+    </ul>
+
+    <h2>{say("hosted.title", "Or let Shruti host it")}</h2>
+    <p class="quiet">{say("hosted.text", "Hosting on this site is the same software, run and looked after by her, with your overlays drawn from here while you stream. It is arranged on your account page.")} <a href="/account">{say("hosted.link", "Your account")}</a></p>
+  </article>
+</BaseLayout>
+
+<style>
+  .hosting { max-width: 680px; margin: 0 auto; padding: var(--space-6) var(--space-4); display: grid; gap: var(--space-4); }
+  .lede { color: var(--ink-soft); max-width: 62ch; }
+  h2 { font-size: 1.1rem; margin: var(--space-3) 0 0; }
+  pre { margin: 0; padding: var(--space-3) var(--space-4); border: 1px solid var(--rule); background: var(--surface-inset, transparent); overflow-x: auto; font-family: var(--font-mono); font-size: .9rem; line-height: 1.6; }
+  .quiet { color: var(--ink-soft); }
+  .settings { margin: 0; display: grid; gap: var(--space-2); }
+  .settings div { display: grid; grid-template-columns: 11rem 1fr; gap: var(--space-3); align-items: baseline; }
+  .settings dd { margin: 0; color: var(--ink-soft); }
+  @media (max-width: 560px) { .settings div { grid-template-columns: 1fr; } }
+  ul { margin: 0; padding-left: 1.2rem; display: grid; gap: var(--space-1); }
+</style>

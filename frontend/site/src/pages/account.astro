@@ -80,6 +80,17 @@ if (Astro.request.method === "POST") {
       }
     }
 
+    if (action === "hosting") {
+      /* Stripe's own checkout; the price is the tier's, never the form's. */
+      const r = await asReader(Astro, "/api/billing/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tier: String(form.get("tier") ?? "") }),
+      });
+      if (r.ok && r.body?.url) return Astro.redirect(r.body.url);
+      failed = r.body?.detail ?? say("error.hosting", "That could not be started. Try again in a moment.");
+    }
+
     if (action === "portal") {
       /* A redirect into Stripe's own portal. Building a cancel screen here
          would mean maintaining a worse copy of one Stripe keeps correct — and
@@ -153,6 +164,14 @@ const TRADITIONS = [
   { value: "hellenistic", label: "Hellenistic" },
   { value: "vedic", label: "Vedic" },
 ];
+const [hostingRead, allowanceRead] = await Promise.all([asReader(Astro, "/api/billing/hosting"), asReader(Astro, "/api/overlay/allowance")]);
+const hosting = hostingRead.ok ? hostingRead.body as { configured: boolean; testMode: boolean; tiers: { tier: string; name: string; amount: number; currency: string; interval: string }[]; active: boolean; status: string; tier: string; cancelAtPeriodEnd: boolean; currentPeriodEnd: string | null; canManage: boolean } : null;
+const allowance = allowanceRead.ok ? allowanceRead.body as { tier: string; tokens: number; tokensLimit: number | null; hoursThisMonth: number; hoursLimit: number | null; over: boolean; tokensFull: boolean } : null;
+const money = (cents: number, currency: string) => (currency === "EUR" ? "€" : currency + " ") + (cents % 100 === 0 ? String(cents / 100) : (cents / 100).toFixed(2));
+const monthly = hosting?.tiers.find((t) => t.interval === "month") ?? null;
+const yearly = hosting?.tiers.find((t) => t.interval === "year") ?? null;
+const renews = hosting?.currentPeriodEnd ? new Date(hosting.currentPeriodEnd).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" }) : "";
+const hostingStarted = Astro.url.searchParams.get("hosting") === "started";
 const tokensRead = await asReader(Astro, "/api/overlay/mine");
 const guideTokens: { id: number; kind: string; label: string; showing: string; href: string; theme: string; live: boolean; hoursThisMonth: number }[] =
   tokensRead.ok && Array.isArray(tokensRead.body) ? tokensRead.body : [];
@@ -273,6 +292,62 @@ const themeWord = (t: string) => t === "grimoire" ? say("tokens.theme.grimoire",
           </div>
         )
       }
+    </section>
+
+    <section class="card">
+      <h2>{say("limits.1", "Limits")}</h2>
+      <p class="quiet">{say("limits.2", "Fair use, stated plainly.")}</p>
+      {allowance && (
+        <dl class="limits">
+          <div><dt>{say("limits.tokens", "Overlay tokens")}</dt><dd class="t-tabular">{allowance.tokensLimit === null ? say("limits.unlimited", "unlimited") : say("limits.of", "{n} of {m}").replace("{n}", String(allowance.tokens)).replace("{m}", String(allowance.tokensLimit))}</dd></div>
+          <div><dt>{say("limits.hours", "Hours on air this month")}</dt><dd class="t-tabular">{allowance.hoursLimit === null ? say("limits.hours_free", "{n}, no limit").replace("{n}", String(allowance.hoursThisMonth)) : say("limits.of", "{n} of {m}").replace("{n}", String(allowance.hoursThisMonth)).replace("{m}", String(allowance.hoursLimit))}</dd></div>
+          <div><dt>{say("limits.reading", "Reading and tracking")}</dt><dd>{say("limits.reading_value", "unlimited, and free")}</dd></div>
+        </dl>
+      )}
+      {allowance?.over && <p class="over">{say("limits.over", "You are past the free hours for this month. Going past a limit does not cut you off mid-stream: the overlay keeps drawing, and this page says so until it is sorted — next month, or with hosting.")}</p>}
+      {allowance?.tokensFull && !allowance.over && <p class="over">{say("limits.full", "Every overlay slot is in use. Revoke one you no longer stream with, or move to hosting for more.")}</p>}
+    </section>
+
+    <section class="card hosting" data-hosting>
+      <h2>{say("hosting.1", "Overlay hosting")}</h2>
+      {hostingStarted && <p class="notice">{say("hosting.started", "Thank you. Hosting shows here as soon as Stripe confirms it, usually within a minute.")}</p>}
+      {hosting?.active ? (
+        <div class="stack">
+          <p class="status">
+            <span class="live">{hosting.cancelAtPeriodEnd ? say("hosting.ending", "ends") : say("hosting.active", "active")}</span>
+            {renews && <span class="faint"> · {hosting.cancelAtPeriodEnd ? say("hosting.ends_on", "on {date}") .replace("{date}", renews) : say("hosting.renews", "renews {date}").replace("{date}", renews)}</span>}
+            {hosting.tier && <span class="faint"> · {hosting.tier === "hosting-yearly" ? say("hosting.yearly_word", "yearly") : say("hosting.monthly_word", "monthly")}</span>}
+          </p>
+          <p class="quiet">{say("hosting.what", "She runs the server that draws your overlays while you stream. That is the part that costs real processing, and it is the only thing on this site that costs anything.")}</p>
+          {hosting.canManage && (
+            <form method="POST"><input type="hidden" name="csrf" value={csrf} /><input type="hidden" name="action" value="portal" />
+              <Button type="submit" variant="secondary">{say("hosting.manage", "Manage billing or cancel")}</Button></form>
+          )}
+        </div>
+      ) : (
+        <div class="stack">
+          <p class="price">
+            {monthly && <span class="t-tabular"><strong>{money(monthly.amount, monthly.currency)}</strong> {say("hosting.per_month", "a month")}</span>}
+            {monthly && yearly && <span class="faint"> · </span>}
+            {yearly && <span class="t-tabular"><strong>{money(yearly.amount, yearly.currency)}</strong> {say("hosting.per_year", "a year — two months free")}</span>}
+          </p>
+          <p class="quiet">{say("hosting.what", "She runs the server that draws your overlays while you stream. That is the part that costs real processing, and it is the only thing on this site that costs anything.")}</p>
+          <p class="quiet">{say("hosting.free", "Without it, overlays are free for {n} hours on air a month.").replace("{n}", String(allowance?.hoursLimit ?? 100))}</p>
+          {hosting?.configured ? (
+            <div class="row">
+              {monthly && <form method="POST"><input type="hidden" name="csrf" value={csrf} /><input type="hidden" name="action" value="hosting" /><input type="hidden" name="tier" value={monthly.tier} /><Button type="submit">{say("hosting.buy_month", "Host monthly")}</Button></form>}
+              {yearly && <form method="POST"><input type="hidden" name="csrf" value={csrf} /><input type="hidden" name="action" value="hosting" /><input type="hidden" name="tier" value={yearly.tier} /><Button type="submit" variant="secondary">{say("hosting.buy_year", "Host yearly")}</Button></form>}
+            </div>
+          ) : (
+            <p class="quiet">{say("hosting.not_yet", "Not on sale yet.")}</p>
+          )}
+          {hosting?.testMode && <p class="quiet">{say("hosting.test", "Test mode: cards are not charged.")}</p>}
+        </div>
+      )}
+      <div class="self">
+        <h3>{say("self.1", "Or run it yourself")}</h3>
+        <p class="quiet">{say("self.2", "The server, the overlays and the MCP are AGPL-3.0. A Docker image and a compose file are in the hosting notes; a self-hosted instance downloads public guides from here.")} <a href="/guides/hosting">{say("self.3", "Hosting notes")}</a></p>
+      </div>
     </section>
 
     <section class="card">
@@ -538,6 +613,19 @@ const themeWord = (t: string) => t === "grimoire" ? say("tokens.theme.grimoire",
   .tokens .live { color: var(--rose, #E0A4BC); }
   .tokens .right { text-align: right; }
   .tokens .quiet { margin-top: var(--space-3); }
+  .limits { margin: 0; display: grid; gap: 6px; }
+  .limits div { display: flex; align-items: baseline; gap: var(--space-2); }
+  .limits div::after { content: ""; order: 2; flex: 1; border-bottom: 1px dotted var(--rule); transform: translateY(-.3em); }
+  .limits dt { order: 1; margin: 0; }
+  .limits dd { order: 3; margin: 0; color: var(--ink-soft); }
+  .over { border-left: 2px solid var(--rose, #E0A4BC); padding-left: var(--space-3); }
+  .hosting { border-color: var(--rose, #E0A4BC); }
+  .hosting .price { margin: 0; font-size: 1.15rem; }
+  .hosting .price strong { font-size: 1.5rem; }
+  .hosting .row { display: flex; gap: var(--space-3); flex-wrap: wrap; }
+  .hosting .self { margin-top: var(--space-4); padding-top: var(--space-3); border-top: 1px solid var(--rule); }
+  .hosting .self h3 { font-size: 1rem; margin: 0 0 var(--space-1); }
+  .hosting .status .live { color: var(--rose, #E0A4BC); }
 </style>
 
 <script is:inline>
