@@ -540,6 +540,11 @@ def overlay_page(kind: str):
     return FileResponse(STATIC / f"{kind}.html", media_type="text/html")
 
 
+@app.get("/overlay-elements.js")
+def overlay_js():
+    return FileResponse(STATIC / "overlay-elements.js", media_type="text/javascript")
+
+
 @app.get("/overlay-guides.css")
 def overlay_css():
     return FileResponse(STATIC / "overlay-guides.css", media_type="text/css")

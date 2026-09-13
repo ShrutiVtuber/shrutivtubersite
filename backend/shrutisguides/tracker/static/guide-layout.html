@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>guide · layout</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="stylesheet" href="/overlay-guides.css">
+<style>.gov-placed{position:absolute}.gov-placed .gov-plate,.gov-placed .gov-sigil{position:relative;left:auto;top:auto;right:auto;bottom:auto;width:100%}.gov-placed .gov-sigil{align-items:flex-start}</style>
+<script src="/overlay-elements.js"></script>
+</head>
+<body>
+<div class="gov" data-theme="almanac" data-motion="reduced">
+  <div data-elements></div>
+  <div class="gov-plate gov-empty" data-empty><span class="gov-eyebrow">Shruti's Guides</span><span class="say">No run selected.</span></div>
+  <span class="gov-done-line" data-done-line hidden></span>
+</div>
+<script>
+  const root = document.querySelector(".gov"), token = new URLSearchParams(location.search).get("t") || "";
+  let last = { version: "", elements: [] }, still = false, reduced = false;
+  const holder = root.querySelector("[data-elements]"), empty = root.querySelector("[data-empty]"), line = root.querySelector("[data-done-line]");
+  const paintAll = async (prev, next) => {
+    if (holder.children.length !== next.length) holder.innerHTML = next.map((e, i) => `<div class="gov-placed" data-slot="${i}" style="left:${e.x}px;top:${e.y}px;width:${e.w}px"></div>`).join("");
+    empty.hidden = next.length > 0;
+    await Promise.all(next.map((e, i) => { const slot = holder.querySelector(`[data-slot="${i}"]`); slot.style.left = `${e.x}px`; slot.style.top = `${e.y}px`; slot.style.width = `${e.w}px`; return drawElement(slot, e.kind, prev?.[i]?.element ?? null, e.element, { still, reduced, line }); }));
+  };
+  const tick = async () => {
+    if (!token) return;
+    try {
+      const r = await fetch(`/api/overlay/guide?t=${encodeURIComponent(token)}`, { cache: "no-store" });
+      if (!r.ok) return;
+      const next = await r.json();
+      root.dataset.theme = next.theme; root.dataset.motion = next.motion; still = next.motion === "still"; reduced = next.motion === "reduced";
+      if (next.version !== last.version || (next.elements ?? []).length !== last.elements.length) { await paintAll(last.elements, next.elements ?? []); last = { version: next.version, elements: next.elements ?? [] }; }
+    } catch { /* offline: the last frame stands */ }
+  };
+  tick(); window.setInterval(tick, 2000);
+</script>
+</body>
+</html>

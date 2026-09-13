@@ -1,0 +1,289 @@
+---
+/* The overlay designer (board W7).
+ *
+ * Elements on the left, a 1920 × 1080 transparent canvas in the middle with
+ * centre guides and snap-to-halves, properties and the theme on the right.
+ * The theme panel states what a theme may and may not change, next to the
+ * three themes. The canvas preview runs against a real run — hers — so what
+ * she places is what chat sees.
+ *
+ * ⚠ The token is the secret. It is shown once, when a layout is minted, and
+ * never again: the preview is fetched by the layout's id as the operator,
+ * not by its token.
+ *
+ * ⚠ Her runs are hers as a READER: the operator session opens this page,
+ * the reader cookie names the runs. Both are forwarded.
+ */
+import AdminLayout from "../../layouts/AdminLayout.astro";
+import { asReader } from "../../lib/account";
+import { SITE_URL } from "../../lib/api";
+
+export const prerender = false;
+
+const runsRead = await asReader(Astro, "/api/runs");
+const runs: any[] = runsRead.ok && Array.isArray(runsRead.body) ? runsRead.body : [];
+const tokens: any[] = [];
+for (const r of runs) {
+  const o = await asReader(Astro, `/api/runs/${r.id}/overlays`);
+  if (o.ok && Array.isArray(o.body)) for (const t of o.body) tokens.push({ ...t, runId: r.id, runName: r.name });
+}
+const layouts = tokens.filter((t) => t.kind === "guide-layout");
+const wanted = String(Astro.url.searchParams.get("layout") ?? "");
+const selected = layouts.find((t) => String(t.id) === wanted) ?? layouts[0] ?? null;
+const signedIn = runsRead.status !== 401 && runsRead.status !== 0;
+---
+
+<AdminLayout title="Overlay designer">
+  {!signedIn ? (
+    <section class="adm-card">
+      <p class="od-quiet">The designer works on your own runs, and those belong to your reader account. Sign in on the site as yourself (the same browser), then come back here.</p>
+    </section>
+  ) : runs.length === 0 ? (
+    <section class="adm-card">
+      <p class="od-quiet">No runs yet. Start one from a guide's page, then design an overlay for it here.</p>
+    </section>
+  ) : (
+    <section class="adm-card od" data-designer data-runs={JSON.stringify(runs.map((r) => ({ id: r.id, name: r.name })))} data-layouts={JSON.stringify(layouts.map((t) => ({ id: t.id, runId: t.runId, runName: t.runName, label: t.label, theme: t.theme, motion: t.motion, layout: t.layout })))} data-selected={selected ? String(selected.id) : ""} data-origin={SITE_URL}>
+      <header class="od-bar">
+        <div class="od-bar-left">
+          <label class="od-pick">
+            <span class="od-eyebrow">Layout</span>
+            <select data-pick>
+              {layouts.map((t) => <option value={t.id} selected={selected && t.id === selected.id}>{t.label || `Layout ${t.id}`} · {t.runName}</option>)}
+              <option value="new">New layout…</option>
+            </select>
+          </label>
+          <span class="od-mono" data-size>1920 × 1080</span>
+        </div>
+        <div class="od-bar-right">
+          <button type="button" class="od-btn" data-import>Import</button>
+          <button type="button" class="od-btn" data-export>Export</button>
+          <button type="button" class="od-btn primary" data-save>Save layout</button>
+          <span class="od-mono" data-status></span>
+        </div>
+      </header>
+
+      <div class="od-grid">
+        <aside class="od-elements">
+          <span class="od-eyebrow">Elements</span>
+          <div data-palette></div>
+          <p class="od-mono od-foot">Tap to add. Each element draws where the layout puts it; a theme never moves it.</p>
+        </aside>
+
+        <div class="od-stage">
+          <div class="od-stage-head"><span class="od-eyebrow">Canvas · shown at <span data-scale>37</span>%</span><span class="od-mono">live against a real run</span></div>
+          <div class="od-frame" data-frame>
+            <div class="od-canvas gov" data-canvas data-theme={selected?.theme ?? "almanac"} data-motion="still">
+              <span class="od-guide h"></span><span class="od-guide v"></span>
+              <div data-elements></div>
+            </div>
+          </div>
+          <div class="od-stage-foot"><span class="od-mono">Guides at 1080p; everything on this canvas must also read at 720p.</span><span class="od-mono">snap to halves · on</span></div>
+        </div>
+
+        <aside class="od-props">
+          <span class="od-eyebrow">Theme</span>
+          <div class="od-themes" data-themes>
+            <button type="button" class="od-theme" data-theme-pick="grimoire"><span class="od-swatches"><i style="background:#1A1210"></i><i style="background:#8C2F21"></i><i style="background:#C9A227"></i></span><span><b>Grimoire</b><small>Diablo IV</small></span></button>
+            <button type="button" class="od-theme" data-theme-pick="almanac"><span class="od-swatches"><i style="background:#121829"></i><i style="background:#8FBEE8"></i><i style="background:#E0A4BC"></i></span><span><b>Almanac</b><small>her house theme</small></span></button>
+            <button type="button" class="od-theme" data-theme-pick="plain"><span class="od-swatches"><i style="background:#000"></i><i style="background:#fff"></i><i style="background:#9AA0AE"></i></span><span><b>Plain</b><small>no theme at all</small></span></button>
+          </div>
+          <p class="od-mono">A theme may change palette, type, ornament and the sigil's stroke. It may not change layout, legibility or the four state colours.</p>
+
+          <span class="od-eyebrow">Selected</span>
+          <div class="od-selected" data-selected-props><p class="od-mono">Nothing selected. Tap an element on the canvas.</p></div>
+
+          <span class="od-eyebrow">Run</span>
+          <select data-run>{runs.map((r) => <option value={r.id}>{r.name}</option>)}</select>
+          <span class="od-eyebrow">Motion</span>
+          <select data-motion><option value="reduced">Reduced</option><option value="full">Full</option><option value="still">Still</option></select>
+          <span class="od-eyebrow">Label</span>
+          <input type="text" data-label maxlength="80" placeholder="Main scene" />
+
+          <span class="od-eyebrow">Browser source URL</span>
+          <div class="od-url" data-url>Shown once, when a new layout is made.</div>
+          <button type="button" class="od-btn" data-copy hidden>Copy for OBS</button>
+          <p class="od-mono">The token is the secret. Anyone with the URL sees the overlay; nobody with it can change your run.</p>
+        </aside>
+      </div>
+      <input type="file" accept=".json,application/json" data-import-file hidden />
+    </section>
+  )}
+</AdminLayout>
+
+<style>
+  .od { padding: 0 !important; overflow: hidden; }
+  .od-eyebrow { display: block; font-size: var(--text-micro); font-weight: 600; letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; color: var(--ink-faint); margin-bottom: 8px; }
+  .od-mono { font-family: var(--font-mono); font-size: 11.5px; color: var(--ink-faint); line-height: 1.7; }
+  .od-quiet { margin: 0; font-size: var(--text-sm); color: var(--ink-soft); }
+  .od-bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; padding: 12px 20px; border-bottom: var(--border-w) solid var(--line); background: var(--surface-card); }
+  .od-bar-left, .od-bar-right { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .od-pick { display: flex; flex-direction: column; }
+  .od-pick select, .od-props select, .od-props input { font: inherit; padding: 7px 10px; border: var(--border-w) solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-page); color: var(--ink); width: 100%; box-sizing: border-box; }
+  .od-btn { font: 500 var(--text-sm) var(--font-body); padding: 7px 14px; border-radius: var(--radius-sm); border: var(--border-w) solid var(--line-strong); background: var(--surface-card); color: var(--ink); cursor: pointer; }
+  .od-btn.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+  .od-grid { display: grid; grid-template-columns: 200px minmax(0, 1fr) 300px; min-height: 620px; }
+  .od-elements { border-right: var(--border-w) solid var(--line); background: var(--surface-card); padding: 16px 0 16px; display: flex; flex-direction: column; }
+  .od-elements .od-eyebrow { padding: 0 18px; }
+  .od-el { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 11px 18px; background: none; border: 0; border-left: 2px solid transparent; cursor: pointer; font: 400 14.5px var(--font-body); color: var(--ink); text-align: left; }
+  .od-el.on { background: var(--accent-wash); border-left-color: var(--accent); font-weight: 600; }
+  .od-el.off { color: var(--ink-faint); }
+  .od-foot { margin: auto 18px 0; padding-top: 14px; border-top: var(--border-w) solid var(--line); }
+  .od-stage { padding: 22px; display: flex; flex-direction: column; gap: 14px; background: var(--surface-inset); min-width: 0; }
+  .od-stage-head, .od-stage-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .od-frame { width: 100%; aspect-ratio: 16 / 9; border: var(--border-w) solid var(--line-strong); border-radius: 6px; position: relative; overflow: hidden; background: var(--dusk-inset, #0D1220); }
+  .od-canvas { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; transform-origin: top left; }
+  .od-guide { position: absolute; background: rgba(139, 147, 175, .35); pointer-events: none; }
+  .od-guide.h { left: 0; right: 0; top: 50%; height: 1px; }
+  .od-guide.v { top: 0; bottom: 0; left: 50%; width: 1px; }
+  .od-placed { position: absolute; cursor: grab; outline: 2px solid transparent; outline-offset: 4px; }
+  .od-placed.on { outline-color: var(--accent, #8FBEE8); }
+  .od-placed .gov-plate, .od-placed .gov-sigil { position: relative; left: auto; top: auto; right: auto; bottom: auto; width: 100%; }
+  .od-placed .gov-sigil { align-items: flex-start; }
+  .od-props { border-left: var(--border-w) solid var(--line); background: var(--surface-card); padding: 16px 20px; display: flex; flex-direction: column; gap: 10px; }
+  .od-themes { display: flex; flex-direction: column; gap: 8px; }
+  .od-theme { display: flex; align-items: center; gap: 12px; border: var(--border-w) solid var(--line); border-radius: 6px; padding: 10px 12px; background: var(--surface-card); cursor: pointer; text-align: left; color: var(--ink); font: inherit; }
+  .od-theme.on { border-color: var(--accent); background: var(--accent-wash); }
+  .od-theme span:last-child { display: flex; flex-direction: column; gap: 2px; }
+  .od-theme b { font-size: 14px; } .od-theme small { font-family: var(--font-mono); font-size: 10.5px; color: var(--ink-soft); }
+  .od-swatches { display: flex; gap: 4px; } .od-swatches i { width: 14px; height: 14px; border-radius: 3px; display: block; }
+  .od-selected { display: grid; grid-template-columns: auto 1fr; gap: 8px 12px; align-items: center; font-family: var(--font-mono); font-size: 12px; color: var(--ink-soft); }
+  .od-selected input, .od-selected select { font: inherit; padding: 5px 8px; border: var(--border-w) solid var(--line); border-radius: var(--radius-sm); background: var(--surface-page); color: var(--ink); width: 100%; box-sizing: border-box; }
+  .od-selected .rm { grid-column: 1 / -1; justify-self: start; color: var(--rose); background: none; border: 0; cursor: pointer; font: inherit; padding: 0; }
+  .od-url { border: var(--border-w) solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-page); padding: 10px 12px; font-family: var(--font-mono); font-size: 11.5px; color: var(--ink); word-break: break-all; }
+  @media (max-width: 1100px) { .od-grid { grid-template-columns: 1fr; } .od-elements, .od-props { border: 0; } }
+</style>
+
+<script>
+  import "../../styles/overlay-guides.css";
+  import { drawElement } from "../../lib/overlay-elements";
+
+  const root = document.querySelector<HTMLElement>("[data-designer]");
+  if (root) {
+    type El = { kind: string; x: number; y: number; w: number; routine_id: string; shows: string };
+    const KINDS: [string, string][] = [["guide-now", "Now card"], ["guide-sigil", "Sigil"], ["guide-path", "Path strip"], ["guide-routine", "Routine"]];
+    const PLACES: Record<string, El> = {
+      "guide-now": { kind: "guide-now", x: 72, y: 72, w: 900, routine_id: "", shows: "" },
+      "guide-sigil": { kind: "guide-sigil", x: 1620, y: 72, w: 224, routine_id: "", shows: "" },
+      "guide-path": { kind: "guide-path", x: 72, y: 936, w: 1776, routine_id: "", shows: "" },
+      "guide-routine": { kind: "guide-routine", x: 72, y: 640, w: 760, routine_id: "", shows: "" },
+    };
+    const runs: { id: number; name: string }[] = JSON.parse(root.dataset.runs || "[]");
+    const layouts: any[] = JSON.parse(root.dataset.layouts || "[]");
+    const origin = root.dataset.origin || location.origin;
+    const token = () => document.cookie.split("; ").find((c) => c.startsWith("shruti_csrf="))?.split("=")[1] ?? "";
+    const $ = <T extends HTMLElement>(s: string) => root.querySelector<T>(s)!;
+
+    let current: any = layouts.find((l) => String(l.id) === root.dataset.selected) ?? null;
+    let layout: El[] = current ? [...current.layout] : [PLACES["guide-now"], PLACES["guide-sigil"], PLACES["guide-path"]];
+    let theme = current?.theme ?? "almanac";
+    let motion = current?.motion ?? "reduced";
+    let runId: number = current?.runId ?? runs[0]?.id;
+    let selected = -1;
+    let preview: any = null;
+    let dirty = false;
+
+    const canvas = $("[data-canvas]"), frame = $("[data-frame]"), holder = $("[data-elements]"), status = $("[data-status]");
+    const scale = () => { const s = frame.clientWidth / 1920; canvas.style.transform = `scale(${s})`; $("[data-scale]").textContent = String(Math.round(s * 100)); return s; };
+    window.addEventListener("resize", scale);
+
+    const tell = (t: string) => { status.textContent = t; };
+    const drawPalette = () => {
+      $("[data-palette]").innerHTML = KINDS.map(([k, name]) => { const on = layout.some((e) => e.kind === k); return `<button type="button" class="od-el ${on ? "on" : "off"}" data-add="${k}"><span>${name}</span><span class="od-mono">${on ? "on" : "off"}</span></button>`; }).join("");
+    };
+    const drawThemes = () => { for (const b of root.querySelectorAll<HTMLElement>("[data-theme-pick]")) b.classList.toggle("on", b.dataset.themePick === theme); canvas.dataset.theme = theme; };
+    const drawProps = () => {
+      const box = $("[data-selected-props]");
+      const e = layout[selected];
+      if (!e) { box.innerHTML = `<p class="od-mono">Nothing selected. Tap an element on the canvas.</p>`; return; }
+      box.innerHTML = `<span>x · y</span><span><input type="number" data-prop="x" value="${e.x}" /> <input type="number" data-prop="y" value="${e.y}" /></span>` +
+        `<span>width</span><input type="number" data-prop="w" value="${e.w}" />` +
+        (e.kind === "guide-routine" ? `<span>routine</span><input type="text" data-prop="routine_id" value="${e.routine_id}" placeholder="routine id, or the first" />` : "") +
+        `<span>shows</span><span class="od-mono">${e.kind === "guide-now" ? "phase · title · one line" : e.kind === "guide-path" ? "the last two, the current, the next three" : e.kind === "guide-sigil" ? "one arc per phase" : "the checklist"}</span>` +
+        `<span>on done</span><span class="od-mono">${e.kind === "guide-now" ? "the transition plays" : e.kind === "guide-sigil" ? "the arc extends" : "the window advances"}</span>` +
+        `<button type="button" class="rm" data-remove>Remove from the canvas</button>`;
+    };
+    const drawCanvas = async () => {
+      if (holder.children.length !== layout.length) holder.innerHTML = layout.map((e, i) => `<div class="od-placed" data-slot="${i}" style="left:${e.x}px;top:${e.y}px;width:${e.w}px"></div>`).join("");
+      await Promise.all(layout.map((e, i) => {
+        const slot = holder.querySelector<HTMLElement>(`[data-slot="${i}"]`)!;
+        slot.style.left = `${e.x}px`; slot.style.top = `${e.y}px`; slot.style.width = `${e.w}px`; slot.classList.toggle("on", i === selected);
+        const el = preview?.elements?.find((p: any, j: number) => j === i && p.kind === e.kind)?.element ?? sample(e.kind);
+        return drawElement(slot, e.kind, null, el, { still: true, reduced: true });
+      }));
+    };
+    const sample = (kind: string) => kind === "guide-now" ? { id: "P0.1", phase: "The first phase", title: "The current step", line: "What it asks, in one line.", count: "0 of 5" }
+      : kind === "guide-sigil" ? { parts: [{ pct: 1, state: "done" }, { pct: .4, state: "now" }, { pct: 0 }, { pct: 0 }, { pct: 0 }], count: "2 of 5" }
+      : kind === "guide-path" ? { strip: [{ title: "Done before", state: "done" }, { title: "Also done", state: "done" }, { title: "The current step", state: "current" }, { title: "Next", state: "available" }, { title: "Then", state: "locked" }, { title: "Later", state: "locked" }] }
+      : { routine: { name: "A routine", count: "1 / 3", items: [{ text: "Done already", done: true }, { text: "Still to do", done: false }, { text: "And this", done: false }] } };
+    const draw = async () => { drawPalette(); drawThemes(); drawProps(); await drawCanvas(); $<HTMLSelectElement>("[data-run]").value = String(runId); $<HTMLSelectElement>("[data-motion]").value = motion; $<HTMLInputElement>("[data-label]").value = current?.label ?? ""; };
+
+    const livePreview = async () => {
+      if (!current) return;
+      try { const r = await fetch(`/api/overlay/admin/guide-preview/${current.id}`); if (r.ok) { preview = await r.json(); await drawCanvas(); } } catch {}
+    };
+    window.setInterval(livePreview, 3000);
+
+    // ── the canvas: drag, snap to halves, select ──────────────────────────
+    let drag: { i: number; ox: number; oy: number; sx: number; sy: number } | null = null;
+    holder.addEventListener("pointerdown", (ev) => {
+      const slot = (ev.target as HTMLElement).closest<HTMLElement>("[data-slot]"); if (!slot) return;
+      selected = Number(slot.dataset.slot); const e = layout[selected];
+      drag = { i: selected, ox: e.x, oy: e.y, sx: ev.clientX, sy: ev.clientY }; slot.setPointerCapture(ev.pointerId); drawProps(); drawCanvas();
+    });
+    holder.addEventListener("pointermove", (ev) => {
+      if (!drag) return; const s = scale(); const e = layout[drag.i];
+      let x = Math.round(drag.ox + (ev.clientX - drag.sx) / s), y = Math.round(drag.oy + (ev.clientY - drag.sy) / s);
+      const snap = (v: number, to: number, size: number) => Math.abs(v - to) < 24 ? to : Math.abs(v + size / 2 - to) < 24 ? to - size / 2 : v;
+      x = snap(x, 960, e.w); y = snap(y, 540, 0);
+      e.x = Math.max(0, Math.min(1920 - 40, x)); e.y = Math.max(0, Math.min(1080 - 40, y)); dirty = true; tell("unsaved"); drawCanvas();
+    });
+    holder.addEventListener("pointerup", () => { drag = null; drawProps(); });
+
+    root.addEventListener("click", async (ev) => {
+      const b = (ev.target as HTMLElement).closest<HTMLElement>("button"); if (!b) return;
+      if (b.dataset.add) { const i = layout.findIndex((e) => e.kind === b.dataset.add); if (i >= 0) selected = i; else { layout.push({ ...PLACES[b.dataset.add] }); selected = layout.length - 1; dirty = true; } await draw(); return; }
+      if (b.dataset.themePick) { theme = b.dataset.themePick; dirty = true; tell("unsaved"); await draw(); return; }
+      if (b.matches("[data-remove]")) { if (selected >= 0) { layout.splice(selected, 1); selected = -1; dirty = true; tell("unsaved"); await draw(); } return; }
+      if (b.matches("[data-export]")) { const blob = new Blob([JSON.stringify({ theme, motion, layout }, null, 2)], { type: "application/json" }); const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `${current?.label || "layout"}.overlay.json`; a.click(); URL.revokeObjectURL(a.href); return; }
+      if (b.matches("[data-import]")) { $<HTMLInputElement>("[data-import-file]").click(); return; }
+      if (b.matches("[data-copy]")) { const url = $("[data-url]").textContent || ""; try { await navigator.clipboard.writeText(url); tell("copied"); } catch {} return; }
+      if (b.matches("[data-save]")) { await save(); return; }
+    });
+    root.addEventListener("input", (ev) => {
+      const el = ev.target as HTMLInputElement;
+      if (el.dataset.prop && selected >= 0) { const e: any = layout[selected]; e[el.dataset.prop] = el.dataset.prop === "routine_id" ? el.value : Number(el.value); dirty = true; tell("unsaved"); drawCanvas(); }
+    });
+    root.addEventListener("change", async (ev) => {
+      const el = ev.target as HTMLSelectElement | HTMLInputElement;
+      if (el.matches("[data-pick]")) { const v = (el as HTMLSelectElement).value; location.href = v === "new" ? "/admin/overlays?layout=new" : `/admin/overlays?layout=${v}`; return; }
+      if (el.matches("[data-run]")) { runId = Number(el.value); dirty = true; tell("unsaved"); return; }
+      if (el.matches("[data-motion]")) { motion = el.value; dirty = true; tell("unsaved"); return; }
+      if (el.matches("[data-import-file]")) {
+        const f = (el as HTMLInputElement).files?.[0]; if (!f) return;
+        try { const j = JSON.parse(await f.text()); if (Array.isArray(j.layout)) { layout = j.layout; theme = j.theme ?? theme; motion = j.motion ?? motion; dirty = true; tell("unsaved"); await draw(); } } catch { tell("that file is not a layout"); }
+      }
+    });
+
+    const save = async () => {
+      const label = $<HTMLInputElement>("[data-label]").value.trim();
+      tell("saving…");
+      if (current && current.runId === runId) {
+        const r = await fetch(`/api/runs/${runId}/overlays/${current.id}/layout`, { method: "PUT", headers: { "content-type": "application/json", "x-csrf-token": token() }, body: JSON.stringify({ layout, theme, motion, label }) });
+        tell(r.ok ? "saved" : "that did not save"); if (r.ok) dirty = false; return;
+      }
+      // A new layout, or one moved to another run: minted for that run, URL shown once.
+      const r = await fetch(`/api/runs/${runId}/overlays`, { method: "POST", headers: { "content-type": "application/json", "x-csrf-token": token() }, body: JSON.stringify({ kind: "guide-layout", theme, motion, label, layout }) });
+      if (!r.ok) { tell("that did not save"); return; }
+      const made = await r.json();
+      current = { id: made.id, runId, label, theme, motion, layout };
+      $("[data-url]").textContent = `${origin}/overlay/guide-layout?t=${made.token}`; $("[data-copy]").hidden = false;
+      history.replaceState(null, "", `/admin/overlays?layout=${made.id}`);
+      dirty = false; tell("saved — the URL above is shown once");
+    };
+
+    window.addEventListener("beforeunload", (ev) => { if (dirty) { ev.preventDefault(); ev.returnValue = ""; } });
+    if (root.dataset.selected === "" && location.search.includes("layout=new")) current = null;
+    draw().then(() => { scale(); livePreview(); });
+  }
+</script>

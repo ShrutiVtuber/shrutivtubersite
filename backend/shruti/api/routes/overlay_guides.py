@@ -24,6 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
 from shruti.api.deps import get_session
+from shruti.api.deps import require_admin
 from shruti.api.routes.practice import _reader
 from shruti.models import OverlayToken
 from shruti.models.guides import Game, Guide, GuideRun, GuideVersion
@@ -179,3 +180,28 @@ async def revoke_token(run_id: int, token_id: int, request: Request, session: As
     if row is not None and row.run_id == run.id:
         await session.delete(row)
         await session.commit()
+
+
+@router.get("/admin/guide-preview/{token_id}", dependencies=[Depends(require_admin)])
+async def admin_preview(token_id: int, session: AsyncSession = Depends(get_session)) -> dict:
+    """
+    The designer's live preview: what the overlay at this id draws right
+    now, WITHOUT its token. Same shape as /guide, so the designer's canvas is
+    the overlay, not a lookalike.
+    """
+    token = await session.get(OverlayToken, token_id)
+    if token is None or token.kind not in GUIDE_KINDS:
+        raise HTTPException(404, "no such overlay")
+    base = {"id": token.id, "kind": token.kind, "theme": token.theme, "motion": token.motion, "label": token.label,
+            "layout": progress.clean_layout(token.layout), "run": None, "elements": [], "version": ""}
+    run = await session.get(GuideRun, token.run_id) if token.run_id else None
+    if run is None:
+        return base
+    g = await session.get(Guide, run.guide_id)
+    v = await session.get(GuideVersion, g.published_version_id) if g and g.published_version_id else None
+    if g is None or v is None:
+        return base
+    base["run"] = {"id": run.id, "name": run.name, "guide": g.title}
+    base["elements"] = progress.layout_elements(base["layout"], _stored(run), v.body)
+    base["version"] = run.updated_at.isoformat() if run.updated_at else ""
+    return base
