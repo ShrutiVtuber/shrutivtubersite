@@ -127,6 +127,16 @@
 .gov-path .it.skipped span:last-child { text-decoration: line-through; }
 
 /* ── the routine · 760 wide at left 72, bottom 72 ──────────────────────── */
+/* The goal — 860px: title 34, count 30 mono, tier bars 14px tall, the crew at 24. */
+.gov-goal { left: 72px; top: 300px; width: 860px; padding: 28px 32px; display: flex; flex-direction: column; gap: 14px; }
+.gov-goal .title { font-size: 34px; line-height: 1.15; font-weight: 600; }
+.gov-goal .count { font-size: 30px; }
+.gov-goal .tiers { display: flex; gap: 8px; margin-top: 6px; }
+.gov-goal .tier { flex: 1; height: 14px; background: var(--gt-faint); opacity: .9; position: relative; overflow: hidden; }
+.gov-goal .tier .fill { position: absolute; inset: 0 auto 0 0; background: var(--st-now); }
+.gov-goal .tier.done .fill { background: var(--st-done); }
+.gov-goal .crew { font-size: 24px; color: var(--gt-ink-soft, inherit); }
+.gov-placed .gov-goal { left: auto; top: auto; }
 .gov-routine { left: 72px; bottom: 72px; width: 760px; padding: 28px 32px; display: flex; flex-direction: column; gap: 18px; }
 .gov-routine .head { display: flex; align-items: baseline; justify-content: space-between; }
 .gov-routine .name { font: 600 32px var(--gt-display); color: var(--gt-ink); }

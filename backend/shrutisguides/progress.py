@@ -23,7 +23,7 @@ from shrutisguides import engine
 REENTRY_AFTER = timedelta(hours=6)
 STATES = ("done", "skipped", "later", "open")
 GUIDE_KINDS = ("guide-now", "guide-sigil", "guide-path", "guide-routine", "guide-layout")
-ELEMENT_KINDS = ("guide-now", "guide-sigil", "guide-path", "guide-routine")
+ELEMENT_KINDS = ("guide-now", "guide-sigil", "guide-path", "guide-routine", "guide-goal")
 # Where each element sits when nobody has moved it: the boards' positions at
 # 1920 × 1080, so a layout with no coordinates is the frame the design shows.
 DEFAULT_PLACES = {
@@ -31,6 +31,7 @@ DEFAULT_PLACES = {
     "guide-sigil": {"x": 1620, "y": 72, "w": 224},
     "guide-path": {"x": 72, "y": 936, "w": 1776},
     "guide-routine": {"x": 72, "y": 640, "w": 760},
+    "guide-goal": {"x": 72, "y": 300, "w": 860},
 }
 THEMES = ("almanac", "grimoire", "plain")
 MOTIONS = ("full", "reduced", "still")
@@ -303,10 +304,14 @@ def clean_layout(layout: Any) -> list[dict]:
             "w": num("w", place["w"], 120, 1920),
             "routine_id": str(e.get("routine_id") or "")[:80],
             "shows": str(e.get("shows") or "")[:40],
+            # A goal element draws a group, not the run: the group's join code.
+            "group": str(e.get("group") or "")[:12].upper(),
         })
     return out[:12]
 
 
 def layout_elements(layout: list[dict], stored: dict, doc: dict) -> list[dict]:
     """Every element of a layout, drawn: the placement plus what the element shows."""
-    return [{**e, "element": element(e["kind"], stored, doc, e.get("routine_id", ""))} for e in layout]
+    # A goal element is a group's, not the run's; the host fills it in (the
+    # site knows groups, the self-hosted tracker has none and draws it empty).
+    return [{**e, "element": {} if e["kind"] == "guide-goal" else element(e["kind"], stored, doc, e.get("routine_id", ""))} for e in layout]

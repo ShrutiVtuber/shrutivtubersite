@@ -563,6 +563,10 @@ class OverlayToken(TimestampMixin, table=True):
     # kind guide-layout: several elements in one browser source, placed on
     # the 1920 × 1080 canvas — [{kind, x, y, w, routine_id, shows}].
     layout: list = Field(default_factory=list, sa_column=Column(JSONB, nullable=False, server_default="[]"))
+    # kind guide-goal: a group's goal rather than a run.
+    group_id: Optional[int] = Field(default=None, foreign_key="guide_group.id")
+    # Who minted a goal token (a run's tokens belong to the run's owner).
+    user_id: Optional[int] = Field(default=None, foreign_key="site_user.id")
 
     last_seen: Optional[datetime] = Field(default=None, sa_type=UTC_TS)
 

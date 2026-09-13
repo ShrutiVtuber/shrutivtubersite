@@ -1,0 +1,108 @@
+---
+/* Groups: the ones a person is in, a code to join by, and a way to start one.
+ *
+ * A group has a goal and nothing else — no path, no steps, no schedule.
+ * Nothing here counts anyone's absence; a group lists its crew by size
+ * with "and N others", never by rank.
+ */
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import SectionHeader from "../../components/brand/SectionHeader.astro";
+import EmptyState from "../../components/feedback/EmptyState.astro";
+import { account, asReader } from "../../lib/account";
+import { copy } from "../../lib/copy";
+
+const say = await copy("groups");
+const me = await account(Astro);
+if (!me) return Astro.redirect("/signin?next=%2Fgroups");
+
+const read = await asReader(Astro, "/api/groups/mine");
+type GroupView = { code: string; name: string; goal: string; total: number; target: number; tier: number; tiers: number; members: number; closed: boolean };
+const groups: GroupView[] = read.ok && Array.isArray(read.body) ? read.body : [];
+const n = (v: number) => v.toLocaleString("en-GB");
+const WORDS = {
+  sixLetters: say("words.six_letters", "A join code is six letters."),
+  noSuchGroup: say("words.no_such_group", "No group has that code."),
+  closed: say("words.closed", "That group is closed."),
+  needsName: say("words.needs_name", "A group needs a name."),
+  failed: say("words.failed", "That did not go through. Try again."),
+};
+---
+
+<BaseLayout
+  title={say("meta.title", "Groups — Shruti's Guides")}
+  description={say("meta.description", "A group has a goal and nothing else: a shared target, filled by contributions.")}
+  noindex
+>
+  <section class="page groups" data-groups data-words={JSON.stringify(WORDS)}>
+    <SectionHeader as="h1" eyebrow={say("head.eyebrow", "Shruti's Guides")} title={say("head.title", "Groups")} />
+    <p class="lede">{say("head.lede", "A group has a goal and nothing else — no path, no steps, no schedule. Contributions fill its tiers, and nobody is ranked.")}</p>
+
+    <p class="note" data-note hidden></p>
+
+    {groups.length === 0 ? (
+      <EmptyState title={say("empty.title", "You are in no group yet.")} text={say("empty.text", "Join one with a six-letter code, or start your own.")} />
+    ) : (
+      <ul class="list">
+        {groups.map((g) => (
+          <li>
+            <a href={`/groups/${g.code}`}>
+              <span class="name">{g.name}</span>
+              <span class="goal">{g.goal}</span>
+              <span class="mono">{say("row.count", "{total} of {target} · tier {tier} of {tiers}").replace("{total}", n(g.total)).replace("{target}", n(g.target)).replace("{tier}", String(g.tier)).replace("{tiers}", String(g.tiers))}</span>
+              <span class="mono code">{g.code}</span>
+            </a>
+          </li>
+        ))}
+      </ul>
+    )}
+
+    <div class="two">
+      <form class="card" data-join-form>
+        <h2>{say("join.title", "Join with a code")}</h2>
+        <label>
+          <span>{say("join.code", "Six letters, spoken on stream")}</span>
+          <input type="text" name="code" maxlength="6" autocapitalize="characters" spellcheck="false" placeholder="HEKATE" data-join-code />
+        </label>
+        <button type="submit" class="button">{say("join.button", "Join")}</button>
+      </form>
+      <form class="card" data-start-form>
+        <h2>{say("start.title", "Start a group")}</h2>
+        <label><span>{say("start.name", "Name")}</span><input type="text" name="name" maxlength="80" placeholder={say("start.name_hint", "Squirrel stream crew")} data-name /></label>
+        <label><span>{say("start.goal", "The goal")}</span><input type="text" name="goal" maxlength="120" placeholder={say("start.goal_hint", "Empire to tier 5")} data-goal /></label>
+        <div class="row">
+          <label><span>{say("start.target", "Target")}</span><input type="number" name="target" min="0" step="1" value="1200" data-target /></label>
+          <label><span>{say("start.tiers", "Tiers")}</span><input type="number" name="tiers" min="1" max="12" step="1" value="5" data-tiers /></label>
+        </div>
+        <p class="hint">{say("start.hint", "The tiers are the sigil's arcs, filled as the crew contributes.")}</p>
+        <button type="submit" class="button">{say("start.button", "Start")}</button>
+      </form>
+    </div>
+  </section>
+</BaseLayout>
+
+<style>
+  .groups { max-width: 620px; margin: 0 auto; padding: var(--space-6) var(--space-4); display: grid; gap: var(--space-5); }
+  .lede { color: var(--ink-soft); max-width: 60ch; }
+  .note { color: var(--ink); border-left: 2px solid var(--accent); padding-left: var(--space-3); }
+  .list { list-style: none; margin: 0; padding: 0; display: grid; gap: 1px; background: var(--rule); border: 1px solid var(--rule); }
+  .list a { display: grid; grid-template-columns: 1fr auto; gap: var(--space-1) var(--space-3); padding: var(--space-3) var(--space-4); background: var(--paper); color: inherit; text-decoration: none; }
+  .list .name { font-weight: 600; }
+  .list .goal { grid-column: 1; color: var(--ink-soft); }
+  .list .mono { font-family: var(--font-mono); font-size: .85rem; color: var(--ink-soft); }
+  .list .code { grid-column: 2; grid-row: 1; letter-spacing: .12em; }
+  .two { display: grid; gap: var(--space-4); grid-template-columns: 1fr 1fr; }
+  @media (max-width: 640px) { .two { grid-template-columns: 1fr; } }
+  .card { border: 1px solid var(--rule); padding: var(--space-4); display: grid; gap: var(--space-3); align-content: start; }
+  .card h2 { font-size: 1.1rem; margin: 0; }
+  label { display: grid; gap: var(--space-1); }
+  label span { font-size: .85rem; color: var(--ink-soft); }
+  input { font: inherit; padding: .5rem .6rem; border: 1px solid var(--rule); background: var(--paper); color: var(--ink); }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); }
+  .hint { font-size: .85rem; color: var(--ink-soft); margin: 0; }
+</style>
+
+<script>
+  import { mountGroups } from "../../lib/groups";
+  const root = document.querySelector<HTMLElement>("[data-groups]");
+  if (root) mountGroups(root);
+</script>

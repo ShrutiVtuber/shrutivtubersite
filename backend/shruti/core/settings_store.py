@@ -64,7 +64,7 @@ SECTION_PATHS = {
     "shop": ("/shop",),
     "horoscopes": ("/horoscopes",),
     "classes": ("/classes",),
-    "guides": ("/guides",),
+    "guides": ("/guides", "/groups"),
 }
 
 

@@ -179,3 +179,47 @@ class GuideRun(TimestampMixin, table=True):
     last_done: str = ""
     last_done_at: Optional[datetime] = Field(default=None, sa_type=UTC_TS)
     last_seen_at: Optional[datetime] = Field(default=None, sa_type=UTC_TS)
+
+
+class Group(TimestampMixin, table=True):
+    """
+    A group has a goal and nothing else — no path, no steps, no schedule.
+    The worked example is a stream crew pushing an empire to tier 5: a
+    target, contributions, and the sigil's arcs as the tiers.
+
+    ⚠ **Nobody is ranked and nobody is reminded.** Contributions are listed by
+    size with "and N others" so a small one is never the bottom of a
+    leaderboard; nothing here measures absence.
+    """
+
+    __tablename__ = "guide_group"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    # The join code: six letters, spoken on stream. HEKATE.
+    code: str = Field(index=True, unique=True)
+    name: str
+    goal: str = ""
+    target: int = 0
+    tiers: int = 5
+    created_by: int = Field(index=True, foreign_key="site_user.id")
+    closed: bool = False
+
+
+class GroupMember(TimestampMixin, table=True):
+    __tablename__ = "guide_group_member"
+    __table_args__ = (UniqueConstraint("group_id", "user_id", name="uq_group_member"),)
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    group_id: int = Field(index=True, foreign_key="guide_group.id")
+    user_id: int = Field(index=True, foreign_key="site_user.id")
+
+
+class GroupContribution(TimestampMixin, table=True):
+    """One number, given once. Never edited, never ranked."""
+
+    __tablename__ = "guide_group_contribution"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    group_id: int = Field(index=True, foreign_key="guide_group.id")
+    user_id: int = Field(index=True, foreign_key="site_user.id")
+    amount: int = 0

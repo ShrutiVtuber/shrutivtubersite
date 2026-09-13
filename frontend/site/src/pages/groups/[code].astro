@@ -1,0 +1,169 @@
+---
+/* A group (board W9): the goal's tiers are the sigil's parts. The crew is
+ * listed by size with "and N others" — no rank numbers and no medals, so a
+ * small contribution is never the bottom of a leaderboard. Contribute is
+ * one stepper and one button. Reading needs no account; joining and
+ * contributing do.
+ */
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import { account, asReader } from "../../lib/account";
+import { copy } from "../../lib/copy";
+import { sigilSvg } from "../../lib/overlay-elements";
+
+const say = await copy("groups/[code]");
+const code = (Astro.params.code ?? "").toUpperCase();
+if (!/^[A-Z]{6}$/.test(code)) return Astro.rewrite("/404");
+
+const me = await account(Astro);
+const read = await asReader(Astro, `/api/groups/${code}`);
+if (!read.ok) return Astro.rewrite("/404");
+type Row = { who: string; amount: number };
+const g = read.body as {
+  code: string; name: string; goal: string; target: number; tiers: number; total: number; tier: number; members: number; closed: boolean;
+  contributions: Row[]; others: { count: number; amount: number }; sigil: { pct: number; state: string }[]; member: boolean; owner: boolean; since: string | null;
+};
+const tokensRead = me && g.member ? await asReader(Astro, `/api/groups/${code}/overlays`) : null;
+const tokens: { id: number; theme: string; label: string }[] = tokensRead?.ok && Array.isArray(tokensRead.body) ? tokensRead.body : [];
+
+const n = (v: number) => v.toLocaleString("en-GB");
+const SMALL = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve"];
+const few = (v: number) => (v >= 0 && v < SMALL.length ? SMALL[v] : String(v));
+const since = g.since ? new Date(g.since).toLocaleDateString("en-GB", { day: "numeric", month: "long" }) : "";
+const meta = say("head.meta", "{total} of {target} · {members} members · tier {tier} of {tiers}")
+  .replace("{total}", n(g.total)).replace("{target}", n(g.target)).replace("{members}", String(g.members))
+  .replace("{tier}", String(g.tier)).replace("{tiers}", String(g.tiers));
+const othersLine = (g.others.count === 1 ? say("crew.one_other", "and one other") : say("crew.others", "and {n} others").replace("{n}", few(g.others.count)));
+const WORDS = {
+  closed: say("words.closed", "This group is closed."),
+  failed: say("words.failed", "That did not go through. Try again."),
+  oneNumber: say("words.one_number", "One number, one or more."),
+  joinFirst: say("words.join_first", "Join the group first."),
+  copied: say("words.copied", "Copied."),
+  goalOverlay: say("words.goal_overlay", "Goal overlay"),
+  revoke: say("words.revoke", "Revoke"),
+};
+---
+
+<BaseLayout title={`${g.name} — ${say("meta.title", "Shruti's Guides")}`} description={g.goal || g.name} noindex>
+  <article class="page group" data-group data-code={g.code} data-words={JSON.stringify(WORDS)}>
+    <header class="head">
+      <div class="sigil" set:html={sigilSvg(g.sigil, 12, 160)} />
+      <div>
+        <p class="eyebrow">{g.name}</p>
+        <h1>{g.goal || g.name}</h1>
+        <p class="mono meta">{meta}</p>
+        {g.closed && <p class="mono closed">{say("head.closed", "closed")}</p>}
+      </div>
+    </header>
+
+    <p class="note" data-note hidden></p>
+
+    <section class="crew">
+      <h2>{say("crew.title", "Contributions")}{since && <span class="mono since"> · {say("crew.since", "since {date}").replace("{date}", since)}</span>}</h2>
+      {g.contributions.length === 0 && g.others.count === 0 ? (
+        <p class="soft">{say("crew.none", "Nothing yet. The first number opens the first tier.")}</p>
+      ) : (
+        <dl>
+          {g.contributions.map((c) => (<div><dt>{c.who}</dt><dd class="mono">{n(c.amount)}</dd></div>))}
+          {g.others.count > 0 && <div><dt class="soft">{othersLine}</dt><dd class="mono">{n(g.others.amount)}</dd></div>}
+        </dl>
+      )}
+    </section>
+
+    {me && g.member && !g.closed && (
+      <section class="give">
+        <h2>{say("give.title", "Contribute")}</h2>
+        <div class="stepper">
+          <button type="button" class="step" data-less aria-label={say("give.less", "One less")}>−</button>
+          <input type="number" min="1" step="1" value="10" data-amount aria-label={say("give.amount", "Amount")} />
+          <button type="button" class="step" data-more aria-label={say("give.more", "One more")}>+</button>
+          <button type="button" class="button" data-contribute>{say("give.button", "Contribute")}</button>
+        </div>
+        <p class="soft">{say("give.rule", "One number. Nobody is ranked, and nobody is reminded.")}</p>
+      </section>
+    )}
+
+    <section class="join">
+      {!me && (
+        <p>
+          <a class="button" href={`/signin?next=${encodeURIComponent(`/groups/${g.code}`)}`}>{say("join.signin", "Sign in to join")}</a>
+          <span class="soft"> {say("join.code_line", "Join with the code {code}.").replace("{code}", g.code)}</span>
+        </p>
+      )}
+      {me && !g.member && !g.closed && (
+        <p>
+          <button type="button" class="button" data-join>{say("join.button", "Join")}</button>
+          <span class="soft"> {say("join.code_line", "Join with the code {code}.").replace("{code}", g.code)}</span>
+        </p>
+      )}
+      <p class="soft">{say("join.nothing_else", "A group has a goal and nothing else — no path, no steps, no schedule.")}</p>
+      {me && g.member && !g.owner && <button type="button" class="link" data-leave>{say("join.leave", "Leave the group")}</button>}
+      {me && g.owner && (
+        <button type="button" class="link" data-close={g.closed ? "0" : "1"}>{g.closed ? say("join.reopen", "Reopen the group") : say("join.close", "Close the group")}</button>
+      )}
+    </section>
+
+    {me && g.member && (
+      <section class="overlay">
+        <h2>{say("overlay.title", "The goal on stream")}</h2>
+        <p class="soft">{say("overlay.text", "A browser source that draws this goal — the title, the count, one bar per tier, the crew. The URL is shown once.")}</p>
+        <div class="mint">
+          <label><span>{say("overlay.theme", "Theme")}</span>
+            <select data-theme><option value="almanac">{say("overlay.almanac", "Almanac")}</option><option value="grimoire">{say("overlay.grimoire", "Grimoire")}</option><option value="plain">{say("overlay.plain", "Plain")}</option></select>
+          </label>
+          <label><span>{say("overlay.motion", "Motion")}</span>
+            <select data-motion><option value="reduced">{say("overlay.reduced", "Reduced")}</option><option value="full">{say("overlay.full", "Full")}</option><option value="still">{say("overlay.still", "Still")}</option></select>
+          </label>
+          <button type="button" class="button" data-mint>{say("overlay.mint", "Make an overlay")}</button>
+        </div>
+        <div class="minted" data-minted hidden>
+          <label><span>{say("overlay.url", "Browser source URL — shown once")}</span><input type="text" readonly data-url /></label>
+          <button type="button" class="link" data-copy>{say("overlay.copy", "Copy the URL")}</button>
+        </div>
+        <div class="tokens" data-tokens hidden={tokens.length === 0}>
+          {tokens.map((t) => (<div class="gp-token"><span>{t.label} · {t.theme}</span><button type="button" class="link" data-revoke={t.id}>{say("overlay.revoke", "Revoke")}</button></div>))}
+        </div>
+      </section>
+    )}
+  </article>
+</BaseLayout>
+
+<style>
+  .group { max-width: 620px; margin: 0 auto; padding: var(--space-6) var(--space-4); display: grid; gap: var(--space-5); }
+  .head { display: grid; grid-template-columns: 160px 1fr; gap: var(--space-4); align-items: center; }
+  @media (max-width: 480px) { .head { grid-template-columns: 1fr; } }
+  .sigil :global(svg) { display: block; --gt-faint: var(--rule); --st-done: #E0A4BC; --st-now: #8FBEE8; }
+  .eyebrow { font-size: .8rem; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft); margin: 0 0 var(--space-1); }
+  h1 { font-size: 1.9rem; line-height: 1.15; margin: 0; text-wrap: balance; }
+  h2 { font-size: 1.05rem; margin: 0 0 var(--space-3); }
+  .mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+  .meta { color: var(--ink-soft); margin: var(--space-2) 0 0; }
+  .closed { color: var(--ink-soft); margin: var(--space-1) 0 0; }
+  .soft { color: var(--ink-soft); }
+  .since { font-weight: 400; font-size: .85rem; color: var(--ink-soft); }
+  .note { border-left: 2px solid var(--accent); padding-left: var(--space-3); }
+  dl { margin: 0; display: grid; gap: var(--space-2); }
+  dl div { display: flex; align-items: baseline; gap: var(--space-2); }
+  dl div::after { content: ""; order: 2; flex: 1; border-bottom: 1px dotted var(--rule); transform: translateY(-.3em); }
+  dt { order: 1; margin: 0; }
+  dd { order: 3; margin: 0; }
+  .stepper { display: flex; gap: var(--space-2); align-items: stretch; }
+  .stepper input { width: 6.5rem; font: inherit; font-family: var(--font-mono); text-align: center; padding: .5rem; border: 1px solid var(--rule); background: var(--paper); color: var(--ink); }
+  .step { font: inherit; width: 2.6rem; border: 1px solid var(--rule); background: var(--paper); color: var(--ink); cursor: pointer; }
+  .join { display: grid; gap: var(--space-2); }
+  .link { font: inherit; background: none; border: 0; padding: 0; color: var(--accent); text-decoration: underline; cursor: pointer; justify-self: start; }
+  .mint { display: grid; grid-template-columns: 1fr 1fr auto; gap: var(--space-3); align-items: end; }
+  @media (max-width: 480px) { .mint { grid-template-columns: 1fr; } }
+  label { display: grid; gap: var(--space-1); }
+  label span { font-size: .85rem; color: var(--ink-soft); }
+  select, .minted input { font: inherit; padding: .5rem .6rem; border: 1px solid var(--rule); background: var(--paper); color: var(--ink); width: 100%; }
+  .minted { display: grid; gap: var(--space-2); margin-top: var(--space-3); }
+  .tokens { display: grid; gap: var(--space-2); margin-top: var(--space-3); }
+  .gp-token { display: flex; justify-content: space-between; gap: var(--space-3); border-top: 1px solid var(--rule); padding-top: var(--space-2); }
+</style>
+
+<script>
+  import { mountGroup } from "../../lib/groups";
+  const root = document.querySelector<HTMLElement>("[data-group]");
+  if (root) mountGroup(root);
+</script>

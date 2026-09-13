@@ -113,6 +113,6 @@ def test_a_layout_is_several_elements_in_one_source_placed_on_the_canvas() -> No
     assert "guide-layout" in progress.GUIDE_KINDS and "guide-layout" not in progress.ELEMENT_KINDS
     assert set(progress.DEFAULT_PLACES) == set(progress.ELEMENT_KINDS)
     cleaned = progress.clean_layout([{"kind": "guide-now", "x": -50, "y": 5000, "w": 10}, {"kind": "nope"}])
-    assert cleaned == [{"kind": "guide-now", "x": 0, "y": 1080, "w": 120, "routine_id": "", "shows": ""}]
+    assert cleaned == [{"kind": "guide-now", "x": 0, "y": 1080, "w": 120, "routine_id": "", "shows": "", "group": ""}]
     assert "progress.layout_elements(" in code_of(og.guide)
     assert 'left:${e.x}px;top:${e.y}px;width:${e.w}px' in LAYOUT

@@ -62,6 +62,17 @@ export async function drawElement(slot: HTMLElement, kind: string, prev: any, ne
     slot.innerHTML = next ? `<div class="gov-plate gov-path">${(next.strip ?? []).map((it: any) => `<span class="it ${esc(it.state)}"><span class="dot ${esc(it.state)}"></span><span>${esc(it.title)}</span></span>`).join("")}</div>` : "";
     return;
   }
+  if (kind === "guide-goal") {
+    /* A group's goal: the title, the count, one bar per tier, the crew by
+     * size with "and N others" — no ranks and no medals, by design. */
+    const g = next && next.parts ? next : null;
+    if (!g) { slot.innerHTML = ""; return; }
+    const crew = [...(g.contributors ?? [])];
+    const others = Number(g.others || 0);
+    const line = crew.join(" · ") + (others > 0 ? `${crew.length ? " · " : ""}and ${others} ${others === 1 ? "other" : "others"}` : "");
+    slot.innerHTML = `<div class="gov-plate gov-goal"><span class="gov-eyebrow">${esc(g.name)}</span><span class="title">${esc(g.goal)}</span><span class="gov-mono count">${esc(g.count)}${g.tiers ? ` · tier ${esc(g.tier)} of ${esc(g.tiers)}` : ""}</span><div class="tiers">${(g.parts ?? []).map((p: any) => `<span class="tier ${esc(p.state)}"><span class="fill" style="width:${(Math.max(0, Math.min(1, p.pct || 0)) * 100).toFixed(1)}%"></span></span>`).join("")}</div><span class="crew">${esc(line)}</span></div>`;
+    return;
+  }
   if (kind === "guide-routine") {
     const r = next?.routine;
     slot.innerHTML = r ? `<div class="gov-plate gov-routine"><div class="head"><span class="name">${esc(r.name)}</span><span class="gov-mono count">${esc(r.count)}</span></div><div>${(r.items ?? []).map((i: any) => `<div class="item ${i.done ? "done" : ""}"><span class="dot ${i.done ? "done" : "available"}"></span><span>${esc(i.text)}</span></div>`).join("")}</div></div>` : "";

@@ -34,6 +34,8 @@ router = APIRouter(prefix="/api/overlay", tags=["overlay"])
 runs_router = APIRouter(prefix="/api/runs", tags=["runs"])
 
 GUIDE_KINDS, THEMES, MOTIONS = progress.GUIDE_KINDS, progress.THEMES, progress.MOTIONS
+# The site's one extra kind: a group's goal, bound to a group rather than a run.
+SITE_KINDS = GUIDE_KINDS + ("guide-goal",)
 
 
 def _stored(row: GuideRun) -> dict:
@@ -54,12 +56,14 @@ async def guide(t: str, session: AsyncSession = Depends(get_session)) -> dict:
     an overlay never blanks and never says "connecting".
     """
     token = (await session.execute(select(OverlayToken).where(OverlayToken.token == t))).scalar_one_or_none()
-    if token is None or token.kind not in GUIDE_KINDS:
+    if token is None or token.kind not in SITE_KINDS:
         raise HTTPException(404, "no such overlay")
     token.last_seen = datetime.now(timezone.utc)
     await session.commit()
     base = {"kind": token.kind, "theme": token.theme if token.theme in THEMES else "almanac",
             "motion": token.motion, "run": None, "element": None, "version": ""}
+    if token.kind == "guide-goal":
+        return await _goal_frame(session, token, base)
     run = await session.get(GuideRun, token.run_id) if token.run_id else None
     if run is None:
         return base
@@ -71,10 +75,33 @@ async def guide(t: str, session: AsyncSession = Depends(get_session)) -> dict:
     base["run"] = {"name": run.name, "guide": g.title, "game": game.name if game else ""}
     if token.kind == "guide-layout":
         base["elements"] = progress.layout_elements(progress.clean_layout(token.layout), _stored(run), v.body)
+        await _fill_goals(session, base["elements"])
     else:
         base["element"] = progress.element(token.kind, _stored(run), v.body, token.routine_id)
     base["version"] = run.updated_at.isoformat() if run.updated_at else ""
     return base
+
+
+async def _goal_frame(session: AsyncSession, token: OverlayToken, base: dict) -> dict:
+    """A goal token draws its group; a group that is gone is an empty frame, like a run."""
+    from shruti.api.routes.groups import _view, goal_element
+    from shruti.models.guides import Group
+    group = await session.get(Group, token.group_id) if token.group_id else None
+    if group is None:
+        return base
+    view = await _view(session, group, None)
+    base["element"] = goal_element(view)
+    base["run"] = {"name": group.name, "guide": group.goal, "game": ""}
+    base["version"] = f"{view['total']}:{view['members']}:{group.updated_at.isoformat() if group.updated_at else ''}"
+    return base
+
+
+async def _fill_goals(session: AsyncSession, elements: list[dict]) -> None:
+    """The goal elements of a layout name a group by its code; the site draws them."""
+    from shruti.api.routes.groups import goal_by_code
+    for e in elements:
+        if e.get("kind") == "guide-goal" and e.get("group"):
+            e["element"] = (await goal_by_code(session, e["group"])) or {}
 
 
 # ── the person's own tokens ──────────────────────────────────────────────────

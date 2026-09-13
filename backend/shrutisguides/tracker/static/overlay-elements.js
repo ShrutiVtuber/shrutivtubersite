@@ -17,14 +17,16 @@ var OverlayElements = (() => {
     return to;
   };
   var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
+
+  // ../../../../../../home/sophia/Documents/development/shurtiwebsite/frontend/site/src/lib/overlay-elements.ts
   var overlay_elements_exports = {};
   __export(overlay_elements_exports, {
     drawElement: () => drawElement,
     sigilSvg: () => sigilSvg
   });
-  const esc = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
-  const wait = (ms) => new Promise((r) => window.setTimeout(r, ms));
-  const arcD = (r, a0, a1) => {
+  var esc = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
+  var wait = (ms) => new Promise((r) => window.setTimeout(r, ms));
+  var arcD = (r, a0, a1) => {
     const R = (d) => (d - 90) * Math.PI / 180;
     const x0 = 50 + r * Math.cos(R(a0)), y0 = 50 + r * Math.sin(R(a0)), x1 = 50 + r * Math.cos(R(a1)), y1 = 50 + r * Math.sin(R(a1));
     return `M ${x0.toFixed(2)} ${y0.toFixed(2)} A ${r} ${r} 0 ${a1 - a0 > 180 ? 1 : 0} 1 ${x1.toFixed(2)} ${y1.toFixed(2)}`;
@@ -109,6 +111,18 @@ var OverlayElements = (() => {
     }
     if (kind === "guide-path") {
       slot.innerHTML = next ? `<div class="gov-plate gov-path">${(next.strip ?? []).map((it) => `<span class="it ${esc(it.state)}"><span class="dot ${esc(it.state)}"></span><span>${esc(it.title)}</span></span>`).join("")}</div>` : "";
+      return;
+    }
+    if (kind === "guide-goal") {
+      const g = next && next.parts ? next : null;
+      if (!g) {
+        slot.innerHTML = "";
+        return;
+      }
+      const crew = [...g.contributors ?? []];
+      const others = Number(g.others || 0);
+      const line = crew.join(" \xB7 ") + (others > 0 ? `${crew.length ? " \xB7 " : ""}and ${others} ${others === 1 ? "other" : "others"}` : "");
+      slot.innerHTML = `<div class="gov-plate gov-goal"><span class="gov-eyebrow">${esc(g.name)}</span><span class="title">${esc(g.goal)}</span><span class="gov-mono count">${esc(g.count)}${g.tiers ? ` \xB7 tier ${esc(g.tier)} of ${esc(g.tiers)}` : ""}</span><div class="tiers">${(g.parts ?? []).map((p) => `<span class="tier ${esc(p.state)}"><span class="fill" style="width:${(Math.max(0, Math.min(1, p.pct || 0)) * 100).toFixed(1)}%"></span></span>`).join("")}</div><span class="crew">${esc(line)}</span></div>`;
       return;
     }
     if (kind === "guide-routine") {
