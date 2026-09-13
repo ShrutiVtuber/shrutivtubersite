@@ -1,0 +1,170 @@
+---
+/* Shruti's Guides: the catalogue.
+ *
+ * Featured first — her choice, from the admin — then what the room found
+ * useful, then what is newest; and a row of games to narrow by. Reading needs
+ * no account. The list is fetched AS the reader when there is one, so a
+ * blocked author's guides are not on it, which is the practice room's rule.
+ *
+ * ⚠ Nothing here links to the desk yet. The page that writes a guide is the
+ * next thing to build, and a link to a page that is not there is the worst
+ * kind of promise.
+ */
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import SectionHeader from "../../components/brand/SectionHeader.astro";
+import EmptyState from "../../components/feedback/EmptyState.astro";
+import GuideCard, { type GuideSummary } from "../../components/cards/GuideCard.astro";
+import { site } from "../../lib/api";
+import { asReader } from "../../lib/account";
+import { copy } from "../../lib/copy";
+
+const say = await copy("guides");
+
+interface Game { id: number; slug: string; name: string; variants: { id: string; name: string }[]; guides: number }
+
+/* ⚠ Query parameters go into an API path, so they are a slug or nothing, and
+   the sort is one of three words or the default. */
+const wantedGame = Astro.url.searchParams.get("game") ?? "";
+const gameSlug = /^[a-z0-9-]{1,80}$/.test(wantedGame) ? wantedGame : "";
+const SORT_KEYS = ["featured", "top", "new"] as const;
+type Sort = (typeof SORT_KEYS)[number];
+const wantedSort = Astro.url.searchParams.get("sort") ?? "";
+const sort: Sort = (SORT_KEYS as readonly string[]).includes(wantedSort) ? (wantedSort as Sort) : "featured";
+
+const query = new URLSearchParams({ sort, limit: "60" });
+if (gameSlug) query.set("game", gameSlug);
+
+const [games, listed] = await Promise.all([
+  site<Game[]>("/api/guides/games"),
+  asReader(Astro, `/api/guides?${query.toString()}`),
+]);
+const all: GuideSummary[] = listed.ok && Array.isArray(listed.body) ? listed.body : [];
+const gameName = (games ?? []).find((g) => g.slug === gameSlug)?.name ?? "";
+
+/* A featured band only on the default view: filtered or re-sorted, the list
+   is what was asked for and nothing is pulled out of it. */
+const featured = sort === "featured" && !gameSlug ? all.filter((g) => g.featured) : [];
+const rest = all.filter((g) => !featured.includes(g));
+
+const withParams = (change: { game?: string; sort?: Sort }) => {
+  const q = new URLSearchParams();
+  const g = change.game ?? gameSlug;
+  const s = change.sort ?? sort;
+  if (g) q.set("game", g);
+  if (s !== "featured") q.set("sort", s);
+  const qs = q.toString();
+  return qs ? `/guides?${qs}` : "/guides";
+};
+
+const SORTS: [Sort, string][] = [
+  ["featured", say("sort.featured", "Featured first")],
+  ["top", say("sort.top", "Most useful")],
+  ["new", say("sort.new", "Newest")],
+];
+const words = {
+  by: say("card.by", "by"),
+  steps: say("card.steps", "steps"),
+  votes: say("card.votes", "found it useful"),
+  featured: say("card.featured", "Featured"),
+  patch: say("card.patch", "patch"),
+};
+---
+
+<BaseLayout
+  title={say("meta.title", "Shruti's Guides")}
+  description={say("meta.description",
+    "Game guides you can follow one step at a time — written by Shruti and by anyone with an account, read by everyone.")}
+>
+  <div class="page gd-index">
+    <div class="section-head">
+      <SectionHeader
+        as="h1" glyph="⌖"
+        eyebrow={say("eyebrow", "Shruti's Guides")}
+        title={say("title", "A game, one step at a time")}
+        body={say("lede",
+          "Each guide is a path: the phases, the steps, and the systems behind them, in the order you meet them. Read any of them here.")}
+      />
+    </div>
+
+    <nav class="gd-filters" aria-label={say("filters.label", "Games and order")}>
+      <ul class="gd-chips">
+        <li>
+          <a href={withParams({ game: "" })} aria-current={!gameSlug ? "page" : undefined}>
+            {say("games.all", "All games")}
+          </a>
+        </li>
+        {(games ?? []).map((g) => (
+          <li>
+            <a href={withParams({ game: g.slug })} aria-current={gameSlug === g.slug ? "page" : undefined}>
+              {g.name} <span class="gd-count t-tabular">{g.guides}</span>
+            </a>
+          </li>
+        ))}
+      </ul>
+      <ul class="gd-chips gd-sorts">
+        {SORTS.map(([key, label]) => (
+          <li>
+            <a href={withParams({ sort: key })} aria-current={sort === key ? "page" : undefined}>{label}</a>
+          </li>
+        ))}
+      </ul>
+    </nav>
+
+    {featured.length > 0 && (
+      <section class="gd-section">
+        <h2 class="gd-h2">{say("featured", "Featured")}</h2>
+        <div class="grid-2">
+          {featured.map((g) => <GuideCard guide={g} words={words} wide />)}
+        </div>
+      </section>
+    )}
+
+    {rest.length > 0 ? (
+      <section class="gd-section">
+        <h2 class="gd-h2">
+          {featured.length > 0
+            ? say("rest", "Everything else")
+            : gameSlug ? gameName : say("all", "All guides")}
+        </h2>
+        <div class="grid-3">
+          {rest.map((g) => <GuideCard guide={g} words={words} />)}
+        </div>
+      </section>
+    ) : featured.length === 0 && (
+      <EmptyState
+        as="h2" glyph="○"
+        title={gameSlug ? say("empty.game", "Nothing for this game yet") : say("empty", "Nothing published yet")}
+        body={say("empty.body",
+          "Guides go up here once Shruti has read them. Nothing is hidden; there is simply nothing published yet.")}
+      />
+    )}
+
+    <p class="gd-foot">
+      {say("foot",
+        "Every guide can be downloaded as a file from its own page — the same file the tracker reads, so a guide you like is yours to keep.")}
+    </p>
+  </div>
+</BaseLayout>
+
+<style>
+  .gd-index { padding-block: var(--space-6) var(--space-9); display: grid; gap: var(--space-7); }
+  .gd-filters { display: grid; gap: var(--space-3); }
+  .gd-chips { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+  .gd-chips a {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 12px; border-radius: var(--radius-full);
+    border: var(--border-w) solid var(--line);
+    font: 500 var(--text-sm) var(--font-body); color: var(--ink-soft);
+    text-decoration: none; background: var(--surface-card);
+  }
+  .gd-chips a:hover { border-color: var(--line-strong); color: var(--ink); }
+  .gd-chips a[aria-current="page"] { border-color: var(--accent); color: var(--accent); background: var(--accent-wash); }
+  .gd-count { color: var(--ink-faint); font-size: var(--text-xs); }
+  .gd-sorts a { border-style: dashed; }
+  .gd-section { display: grid; gap: var(--space-4); }
+  .gd-h2 {
+    margin: 0; font-family: var(--font-body); font-size: var(--text-micro); font-weight: 600;
+    letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; color: var(--ink-faint);
+  }
+  .gd-foot { margin: 0; max-width: var(--measure-ui); font-size: var(--text-sm); color: var(--ink-faint); }
+</style>

@@ -1,0 +1,75 @@
+---
+/* One guide in the catalogue.
+ *
+ * Words come in as props rather than through copy(): the card is drawn many
+ * times on one page and the page's own copy() is where its words are edited.
+ * A featured guide is marked in type — the rose glyph the section headers
+ * use — never with a badge image.
+ */
+export interface GuideSummary {
+  id: number; slug: string; title: string;
+  game: { slug: string; name: string };
+  author: string; authorId: number;
+  version: string; gamePatch: string; summary: string;
+  phases: number; steps: number; votes: number; voted: boolean;
+  featured: boolean; mine: boolean; hidden: boolean; hiddenBy: string;
+  publishedAt: string | null;
+}
+interface Props {
+  guide: GuideSummary;
+  words: { by: string; steps: string; votes: string; featured: string; patch: string };
+  wide?: boolean;
+}
+const { guide, words, wide = false } = Astro.props;
+const href = `/guides/${guide.game.slug}/${guide.slug}`;
+---
+
+<a class="sh-guide" href={href} data-featured={guide.featured || undefined} data-wide={wide || undefined}>
+  <span class="sh-guide-game">
+    {guide.featured && <span class="sh-guide-star t-glyph" aria-hidden="true">✦</span>}
+    {guide.game.name}
+    {guide.featured && <span class="sh-guide-feat">{words.featured}</span>}
+  </span>
+  <h2 class="sh-guide-title">{guide.title}</h2>
+  {guide.summary && <p class="sh-guide-sum">{guide.summary}</p>}
+  <span class="sh-guide-meta">
+    <span>{words.by} {guide.author}</span>
+    <span class="t-tabular">{guide.steps} {words.steps}</span>
+    <span class="t-tabular">{guide.votes} {words.votes}</span>
+    {guide.gamePatch && <span>{words.patch} {guide.gamePatch}</span>}
+  </span>
+</a>
+
+<style>
+  .sh-guide {
+    display: grid; gap: 8px; align-content: start;
+    padding: var(--space-5);
+    border: var(--border-w) solid var(--line);
+    border-radius: var(--radius-md);
+    background: var(--surface-card);
+    text-decoration: none; color: inherit; font-family: var(--font-body);
+    transition: border-color var(--dur-1) var(--ease-out), box-shadow var(--dur-1) var(--ease-out);
+    outline-offset: 4px;
+  }
+  .sh-guide:hover, .sh-guide:focus-visible { border-color: var(--line-strong); box-shadow: var(--shadow-1); }
+  .sh-guide[data-featured] { border-color: color-mix(in srgb, var(--rose) 45%, var(--line)); }
+  .sh-guide[data-wide] { padding: var(--space-6); }
+  .sh-guide-game {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-size: var(--text-micro); font-weight: 600; letter-spacing: var(--tracking-eyebrow);
+    text-transform: uppercase; color: var(--ink-faint);
+  }
+  .sh-guide-star { font-family: var(--font-display); color: var(--rose); font-size: 1.1em; }
+  .sh-guide-feat { color: var(--rose); }
+  .sh-guide-title {
+    margin: 0; font-family: var(--font-display); font-weight: 600;
+    font-size: var(--text-h3); line-height: var(--leading-heading); color: var(--ink);
+    text-wrap: balance;
+  }
+  .sh-guide[data-wide] .sh-guide-title { font-size: var(--text-h2); }
+  .sh-guide-sum { margin: 0; font-size: var(--text-sm); line-height: var(--leading-body); color: var(--ink-soft); }
+  .sh-guide-meta {
+    display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 4px;
+    font-size: var(--text-xs); color: var(--ink-faint);
+  }
+</style>

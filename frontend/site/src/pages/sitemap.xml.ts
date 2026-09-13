@@ -44,6 +44,7 @@ const STATIC: [path: string, priority: string, changefreq: string][] = [
      likely to earn a link from somebody else's site. */
   ["/collab", "0.7", "monthly"],
   ["/horoscopes", "0.8", "weekly"],
+  ["/guides", "0.8", "weekly"],
   ["/horoscopes/archive", "0.6", "weekly"],
   ["/fan-works", "0.5", "monthly"],
   ["/press", "0.4", "yearly"],
@@ -130,6 +131,17 @@ export const GET: APIRoute = async () => {
     for (const r of readings) {
       add(`/horoscopes/${r.sign}/${r.period}/${r.covers}`, "0.6", "never",
           r.publishedAt ?? undefined);
+    }
+  }
+
+  if (reachable("/guides")) {
+    /* Every published guide at its own address, newest first. A hidden one is
+       not in this list because the catalogue does not serve it. */
+    const guides = (await site<{ game: { slug: string }; slug: string;
+                                 publishedAt: string | null }[]>(
+      "/api/guides?sort=new&limit=500")) ?? [];
+    for (const g of guides) {
+      add(`/guides/${g.game.slug}/${g.slug}`, "0.7", "weekly", g.publishedAt ?? undefined);
     }
   }
 

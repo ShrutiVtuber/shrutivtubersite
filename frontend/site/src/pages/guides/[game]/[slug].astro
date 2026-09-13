@@ -1,0 +1,581 @@
+---
+/* One guide, read as the path it is.
+ *
+ * Everything on this page is somebody's writing, so everything is a text
+ * node: no markdown, no set:html. A guide that needs a link carries it as
+ * data and the page draws the anchor itself — and only for http(s).
+ *
+ * ⚠ Reading needs no account. Voting, reporting and blocking do, and follow
+ * the practice room to the letter: the same words, and the same rule that a
+ * report gets the same reply whether it was the first or the fourth.
+ *
+ * Tracking is NOT here yet. Nothing on this page claims progress can be
+ * kept; the download link is the honest version of that promise — the file
+ * is the format the tracker reads.
+ */
+import BaseLayout from "../../../layouts/BaseLayout.astro";
+import { account, asReader } from "../../../lib/account";
+import { copy } from "../../../lib/copy";
+import type { GuideSummary } from "../../../components/cards/GuideCard.astro";
+import {
+  type Gate, type GuideDoc, type Link, type Step,
+  codexGroups, gateWords, phasesOf, safeUrl, stepsOf, titled, variantNames,
+} from "../../../lib/guides";
+
+const say = await copy("guides/[game]/[slug]");
+const game = Astro.params.game ?? "";
+const slug = Astro.params.slug ?? "";
+
+/* ⚠ Slugs or nothing. Both go straight into an API path. */
+if (!/^[a-z0-9-]{1,80}$/.test(game) || !/^[a-z0-9-]{1,160}$/.test(slug)) {
+  return Astro.rewrite("/404");
+}
+
+const me = await account(Astro);
+const answer = await asReader(Astro, `/api/guides/${game}/${slug}`);
+if (!answer.ok) return Astro.rewrite("/404");
+
+const guide = answer.body as GuideSummary & { body: GuideDoc };
+const doc = guide.body;
+const phases = phasesOf(doc);
+const tracks = doc.tracks ?? [];
+const routines = doc.routines ?? [];
+const groups = codexGroups(doc);
+const notes = doc.codex_notes ?? [];
+const fields = doc.checkin ?? [];
+const caveats = doc.guide.caveats ?? [];
+const variants = doc.game.variants ?? [];
+const stepCount = (doc.steps ?? []).length;
+const pathPhases = phases.filter((p) => !p.track);
+
+const words = {
+  min: say("gate.min", "{what} {n} or more"),
+  max: say("gate.max", "{what} {n} at most"),
+  atLeast: say("gate.at_least", "{what}: {value} or later"),
+  is: say("gate.is", "{what}: {value}"),
+  variant: say("gate.variant", "{name} only"),
+  after: say("gate.after", "after {ids}"),
+  once: say("gate.once", "once {names} is in play"),
+};
+const gate = (g: Gate | undefined) => gateWords(g, doc, words);
+const codexName = (id: string) => (doc.codex ?? []).find((c) => c.id === id)?.name ?? id;
+const trackName = (id: string) => tracks.find((t) => t.id === id)?.name ?? id;
+const length = (s: Step) =>
+  s.ongoing ? say("step.ongoing", "ongoing")
+  : s.minutes ? [String(s.minutes), say("step.min", "min")].join(" ")
+  : "";
+const kindWord: Record<string, string> = {
+  optional: say("kind.optional", "optional"),
+  system: say("kind.system", "system"),
+};
+const resetsWord: Record<string, string> = {
+  session: say("resets.session", "resets each session"),
+  daily: say("resets.daily", "resets daily"),
+  weekly: say("resets.weekly", "resets weekly"),
+  manual: say("resets.manual", "reset it yourself"),
+};
+const linkLabel = (l: Link) => l.label || l.url;
+
+const when = guide.publishedAt
+  ? new Date(guide.publishedAt).toLocaleDateString("en-GB",
+      { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" })
+  : "";
+
+/* The backend's list of reasons, with words for a guide rather than a reading. */
+const REASONS: [string, string][] = [
+  ["abuse", say("reason.abuse", "Aimed at a person")],
+  ["hate", say("reason.hate", "Aimed at a group")],
+  ["sexual", say("reason.sexual", "Sexual, or involving a minor")],
+  ["spam", say("reason.spam", "Spam or advertising")],
+  ["self-harm", say("reason.self-harm", "Somebody who may need help")],
+  ["not-a-reading", say("reason.not-a-guide", "Not a guide at all")],
+  ["other", say("reason.other", "Something else")],
+];
+
+/* HowTo is what a step-by-step guide IS to a search engine. Only for a
+   published, visible guide — a draft or a hidden one asserts nothing. */
+const jsonLd = guide.publishedAt && !guide.hidden
+  ? {
+      "@context": "https://schema.org",
+      "@type": "HowTo",
+      name: guide.title,
+      description: doc.guide.summary || undefined,
+      author: { "@type": "Person", name: guide.author },
+      datePublished: guide.publishedAt,
+      about: { "@type": "VideoGame", name: doc.game.name },
+      step: pathPhases.flatMap((p) => stepsOf(doc, p)).map((s) => ({
+        "@type": "HowToStep",
+        name: `${s.id} ${s.title}`,
+        text: s.do || s.title,
+      })),
+    }
+  : null;
+---
+
+<BaseLayout
+  title={`${guide.title} — ${doc.game.name}`}
+  description={doc.guide.summary || say("meta.description", "A guide you can follow one step at a time.")}
+  noindex={guide.hidden || !guide.publishedAt}
+  jsonLd={jsonLd}
+>
+  <main class="page gd-wrap">
+    {guide.hidden && (
+      <p class="gd-down" role="status">
+        {guide.hiddenBy === "reports"
+          ? say("down.reports",
+              "This is off the catalogue: enough people reported it that it was hidden automatically, and Shruti has not looked at it yet. Nothing has been deleted.")
+          : guide.hiddenBy === "author"
+          ? say("down.author", "You took this down. Only you can see it.")
+          : say("down.her", "Shruti took this down.")}
+      </p>
+    )}
+    {!guide.hidden && !guide.publishedAt && (
+      <p class="gd-down" role="status">
+        {say("draft", "This is your draft. Only you can see it until it is published.")}
+      </p>
+    )}
+
+    <p class="gd-eyebrow">
+      <a href="/guides">{say("eyebrow", "Shruti's Guides")}</a>
+      <span aria-hidden="true">·</span>
+      <a href={`/guides?game=${guide.game.slug}`}>{doc.game.name}</a>
+    </p>
+    <h1 class="gd-title">{guide.title}</h1>
+    <p class="gd-by">
+      <span>{say("by", "by")} {guide.author}</span>
+      {doc.guide.version && <><span aria-hidden="true">·</span><span>{say("version", "version")} {doc.guide.version}</span></>}
+      {doc.guide.game_patch && <><span aria-hidden="true">·</span><span>{say("patch", "written for patch")} {doc.guide.game_patch}</span></>}
+      {when && <><span aria-hidden="true">·</span><time datetime={guide.publishedAt ?? undefined}>{when}</time></>}
+      <span aria-hidden="true">·</span>
+      <span class="gd-votes" data-votes>{guide.votes}</span>
+      <span>{say("votes", "found it useful")}</span>
+    </p>
+    {doc.guide.summary && <p class="gd-summary">{doc.guide.summary}</p>}
+
+    <dl class="gd-facts">
+      <div>
+        <dt>{say("facts.path", "The path")}</dt>
+        <dd class="t-tabular">{phases.length} {say("facts.phases", "phases")} · {stepCount} {say("facts.steps", "steps")}</dd>
+      </div>
+      {variants.length > 0 && (
+        <div>
+          <dt>{say("facts.variants", "Written for")}</dt>
+          <dd>{variants.map((v) => v.name).join(" · ")}</dd>
+        </div>
+      )}
+      {fields.length > 0 && (
+        <div>
+          <dt>{say("facts.checkin", "It asks you to keep track of")}</dt>
+          <dd>{fields.map((f) => f.label).join(", ")}</dd>
+        </div>
+      )}
+      {tracks.length > 0 && (
+        <div>
+          <dt>{say("facts.tracks", "Alongside the path")}</dt>
+          <dd>{tracks.map((t) => t.name).join(", ")}</dd>
+        </div>
+      )}
+    </dl>
+
+    {caveats.length > 0 && (
+      <aside class="gd-caveats">
+        <h2>{say("caveats", "Not confirmed yet")}</h2>
+        <ul>{caveats.map((c) => <li>{c}</li>)}</ul>
+      </aside>
+    )}
+
+    <nav class="gd-phasenav" aria-label={say("nav.phases", "The phases")}>
+      <ol>
+        {phases.map((p) => (
+          <li>
+            <a href={`#phase-${p.id}`}>{p.name}</a>
+            {p.band && <span class="gd-band t-tabular">{p.band}</span>}
+          </li>
+        ))}
+        {routines.length > 0 && <li><a href="#routines">{say("nav.routines", "Routines")}</a></li>}
+        {(groups.length > 0 || notes.length > 0) && <li><a href="#codex">{say("nav.codex", "Codex")}</a></li>}
+      </ol>
+    </nav>
+
+    {phases.map((p) => (
+      <section class="gd-phase" id={`phase-${p.id}`}>
+        {p.track && <p class="gd-track-eyebrow">{trackName(p.track)}</p>}
+        <h2 class="gd-phase-name">
+          {p.name}
+          {p.band && <span class="gd-band t-tabular">{p.band}</span>}
+        </h2>
+        <ol class="gd-steps">
+          {stepsOf(doc, p).map((s) => (
+            <li class="gd-step" id={`step-${s.id}`} data-kind={s.kind}>
+              <p class="gd-step-head">
+                <span class="gd-step-id t-tabular">{s.id}</span>
+                <span class="gd-step-title">{s.title}</span>
+                {kindWord[s.kind] && <span class="gd-tag">{kindWord[s.kind]}</span>}
+                {variantNames(s.applies_to, doc).map((n) => <span class="gd-tag">{n}</span>)}
+                {length(s) && <span class="gd-length t-tabular">{length(s)}</span>}
+              </p>
+              {s.do && <p class="gd-do">{s.do}</p>}
+              {s.done_when && <p class="gd-done"><b>{say("step.done", "Done when")}</b> {s.done_when}</p>}
+              {gate(s.gate).length > 0 && (
+                <p class="gd-gate"><b>{say("step.needs", "Needs")}</b> {gate(s.gate).join(" · ")}</p>
+              )}
+              {(s.why || s.codex || (s.links ?? []).length > 0) && (
+                <details class="gd-more">
+                  <summary>{say("step.more", "Why, and more")}</summary>
+                  {s.why && <p>{s.why}</p>}
+                  {s.codex && (
+                    <p><a href={`#codex-${s.codex}`}>{say("step.codex", "In the codex:")} {codexName(s.codex)}</a></p>
+                  )}
+                  {(s.links ?? []).length > 0 && (
+                    <ul class="gd-links">
+                      {s.links!.map((l) => (
+                        <li>
+                          {safeUrl(l.url)
+                            ? <a href={safeUrl(l.url)} rel="nofollow noopener" target="_blank">{linkLabel(l)}</a>
+                            : <span>{linkLabel(l)}</span>}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </details>
+              )}
+            </li>
+          ))}
+        </ol>
+      </section>
+    ))}
+
+    {tracks.map((t) => (
+      <section class="gd-track" id={`track-${t.id}`}>
+        <h2>{t.name}</h2>
+        {variantNames(t.applies_to, doc).length > 0 && (
+          <p class="gd-quiet">{variantNames(t.applies_to, doc).join(" · ")} {say("track.only", "only")}</p>
+        )}
+        {(t.day_one ?? []).length > 0 && (
+          <p class="gd-dayone"><b>{say("track.dayone", "On day one")}</b> {t.day_one!.join(", ")}</p>
+        )}
+        {(t.ranks ?? []).length > 0 && (
+          <ol class="gd-ranks">
+            {t.ranks!.map((r) => (
+              <li>
+                <b class="t-tabular">{say("track.rank", "Rank")} {r.n}</b> {r.capstone}
+                {r.when && <span class="gd-quiet"> — {r.when}</span>}
+              </li>
+            ))}
+          </ol>
+        )}
+        {(t.counters ?? []).map((c) => (
+          <p class="gd-counter">
+            <b>{c.label}</b>
+            {c.max !== undefined && <span class="t-tabular"> {say("track.cap", "cap")} {c.max}</span>}
+            {c.nudge && <span class="gd-quiet"> — {c.nudge}</span>}
+          </p>
+        ))}
+        {(t.sections ?? []).map((sec) => (
+          <div class="gd-tsec">
+            <h3>{sec.title}</h3>
+            <p class="gd-pre">{sec.body}</p>
+          </div>
+        ))}
+      </section>
+    ))}
+
+    {routines.length > 0 && (
+      <section class="gd-routines" id="routines">
+        <h2>{say("routines", "Routines")}</h2>
+        <p class="gd-quiet">
+          {say("routines.note", "Checklists that reset. In the tracker they tick themselves back to empty; here they are the list.")}
+        </p>
+        {routines.map((r) => (
+          <div class="gd-routine">
+            <h3>{r.name} <span class="gd-tag">{resetsWord[r.resets] ?? r.resets}</span></h3>
+            {gate(r.gate).length > 0 && (
+              <p class="gd-gate"><b>{say("step.needs", "Needs")}</b> {gate(r.gate).join(" · ")}</p>
+            )}
+            <ul>{r.items.map((i) => <li>{i.text}</li>)}</ul>
+          </div>
+        ))}
+      </section>
+    )}
+
+    {(groups.length > 0 || notes.length > 0) && (
+      <section class="gd-codex" id="codex">
+        <h2>{say("codex", "Codex")}</h2>
+        <p class="gd-quiet">
+          {say("codex.note", "The systems the path leans on. In the tracker each appears when it becomes relevant; here they are all open.")}
+        </p>
+        {notes.map((n) => (
+          <div class="gd-note">
+            <h3>{n.title}</h3>
+            <ul>{n.items.map((i) => <li>{i}</li>)}</ul>
+          </div>
+        ))}
+        {groups.map(([group, entries]) => (
+          <div class="gd-group">
+            {group && <h3 class="gd-group-name">{titled(group)}</h3>}
+            {entries.map((c) => (
+              <details class="gd-entry" id={`codex-${c.id}`}>
+                <summary>
+                  {c.name}
+                  {c.ignore_until && <span class="gd-tag">{say("codex.ignore", "ignore until")} {c.ignore_until}</span>}
+                </summary>
+                {c.what && <p><b>{say("codex.what", "What")}</b> {c.what}</p>}
+                {c.when && <p><b>{say("codex.when", "When")}</b> {c.when}</p>}
+                {c.how && <p><b>{say("codex.how", "How")}</b> {c.how}</p>}
+                {gate(c.show_when).length > 0 && (
+                  <p class="gd-gate"><b>{say("codex.appears", "Appears when")}</b> {gate(c.show_when).join(" · ")}</p>
+                )}
+                {(c.caveats ?? []).length > 0 && <ul class="gd-cav">{c.caveats!.map((x) => <li>{x}</li>)}</ul>}
+                {(c.links ?? []).length > 0 && (
+                  <ul class="gd-links">
+                    {c.links!.map((l) => (
+                      <li>
+                        {safeUrl(l.url)
+                          ? <a href={safeUrl(l.url)} rel="nofollow noopener" target="_blank">{linkLabel(l)}</a>
+                          : <span>{linkLabel(l)}</span>}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </details>
+            ))}
+          </div>
+        ))}
+      </section>
+    )}
+
+    <div class="gd-acts">
+      <a class="gd-download" href={`/api/guides/by-id/${guide.id}/download`} download>
+        {say("download", "Download the guide file")}
+      </a>
+      {me && !guide.mine && (
+        <button type="button" class="gd-vote" data-vote={guide.id} aria-pressed={guide.voted}>
+          {guide.voted ? say("voted", "Useful ✓") : say("vote", "Useful")}
+        </button>
+      )}
+      {me && !guide.mine && (
+        <details class="gd-report">
+          <summary>{say("report", "Report this")}</summary>
+          <form data-report={guide.id}>
+            <fieldset>
+              <legend>{say("report.why", "What is wrong with it?")}</legend>
+              {REASONS.map(([value, label], i) => (
+                <label>
+                  <input type="radio" name="reason" value={value} checked={i === 0} />
+                  {label}
+                </label>
+              ))}
+            </fieldset>
+            <label class="gd-detail">
+              {say("report.detail", "Anything else she should know (optional)")}
+              <textarea name="detail" rows="2" maxlength="1000"></textarea>
+            </label>
+            <button type="submit">{say("report.send", "Send the report")}</button>
+            <p class="gd-note-p">
+              {say("report.note",
+                "It goes to Shruti. If a few people report the same thing it comes off the catalogue until she has looked.")}
+            </p>
+          </form>
+        </details>
+      )}
+      {me && !guide.mine && guide.authorId && (
+        <button type="button" class="gd-block" data-block={guide.authorId} data-who={guide.author}>
+          {say("block", "Block")} {guide.author}
+        </button>
+      )}
+      {guide.mine && !guide.hidden && guide.publishedAt && (
+        <button type="button" class="gd-withdraw" data-withdraw={guide.id}>
+          {say("withdraw", "Take mine down")}
+        </button>
+      )}
+      {!me && (
+        <p class="gd-quiet">
+          <a href="/signin">{say("signin", "Sign in")}</a>
+          {" "}
+          {say("signin.rest", "to say it was useful, or to report it. Reading needs no account, and never will.")}
+        </p>
+      )}
+    </div>
+  </main>
+</BaseLayout>
+
+<style>
+  .gd-wrap { max-width: 46rem; padding-block: var(--space-6) var(--space-9); font-family: var(--font-body); }
+  .gd-down {
+    margin: 0 0 var(--space-5); padding: 12px 14px; border-radius: var(--radius-md);
+    border: var(--border-w) solid var(--line-strong); background: var(--surface-inset);
+    font-size: var(--text-sm); color: var(--ink-soft);
+  }
+  .gd-eyebrow {
+    display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 8px;
+    font-size: var(--text-micro); font-weight: 600; letter-spacing: var(--tracking-eyebrow);
+    text-transform: uppercase; color: var(--ink-faint);
+  }
+  .gd-eyebrow a { color: inherit; text-decoration: none; }
+  .gd-eyebrow a:hover { color: var(--ink); }
+  .gd-title {
+    margin: 0 0 10px; font-family: var(--font-display); font-weight: 600;
+    font-size: var(--text-h1); line-height: var(--leading-heading); color: var(--ink); text-wrap: balance;
+  }
+  .gd-by { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 var(--space-4); font-size: var(--text-sm); color: var(--ink-soft); }
+  .gd-votes { font-variant-numeric: tabular-nums; font-weight: 600; color: var(--ink); }
+  .gd-summary { margin: 0 0 var(--space-5); font-size: var(--text-prose); line-height: var(--leading-prose); color: var(--ink); max-width: var(--measure-prose); }
+
+  .gd-facts {
+    display: grid; gap: 10px 24px; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+    margin: 0 0 var(--space-6); padding: var(--space-4) 0; border-block: var(--border-w) solid var(--line);
+  }
+  .gd-facts div { display: grid; gap: 2px; }
+  .gd-facts dt { font-size: var(--text-micro); font-weight: 600; letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; color: var(--ink-faint); }
+  .gd-facts dd { margin: 0; font-size: var(--text-sm); color: var(--ink); }
+
+  .gd-caveats {
+    margin: 0 0 var(--space-6); padding: 12px 16px; border-left: 3px solid var(--rose);
+    background: var(--rose-wash); border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  }
+  .gd-caveats h2 { margin: 0 0 6px; font: 600 var(--text-xs) var(--font-body); letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; color: var(--rose); }
+  .gd-caveats ul { margin: 0; padding-left: 1.1em; font-size: var(--text-sm); color: var(--ink-soft); display: grid; gap: 4px; }
+
+  .gd-phasenav { margin: 0 0 var(--space-7); }
+  .gd-phasenav ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; counter-reset: phase; }
+  .gd-phasenav li { display: flex; gap: 10px; align-items: baseline; font-size: var(--text-sm); }
+  .gd-phasenav a { color: var(--ink); text-decoration: none; }
+  .gd-phasenav a:hover { text-decoration: underline; }
+  .gd-band { font-size: var(--text-xs); color: var(--ink-faint); }
+
+  .gd-phase { margin: 0 0 var(--space-7); }
+  .gd-track-eyebrow { margin: 0 0 4px; font-size: var(--text-micro); font-weight: 600; letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; color: var(--rose); }
+  .gd-phase-name {
+    display: flex; flex-wrap: wrap; gap: 12px; align-items: baseline; margin: 0 0 var(--space-4);
+    font-family: var(--font-display); font-weight: 600; font-size: var(--text-h2); line-height: var(--leading-heading); color: var(--ink);
+    padding-top: var(--space-4); border-top: var(--border-w) solid var(--line);
+  }
+  .gd-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-4); }
+  .gd-step { display: grid; gap: 6px; padding-left: 4.2rem; position: relative; }
+  .gd-step[data-kind="optional"] .gd-step-title { color: var(--ink-soft); }
+  .gd-step-head { margin: 0; display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline; }
+  .gd-step-id { position: absolute; left: 0; top: 0; width: 3.6rem; font-size: var(--text-xs); font-weight: 600; color: var(--ink-faint); }
+  .gd-step-title { font-weight: 600; font-size: var(--text-body); color: var(--ink); }
+  .gd-tag {
+    font-size: var(--text-micro); font-weight: 600; letter-spacing: var(--tracking-eyebrow); text-transform: uppercase;
+    color: var(--ink-faint); border: var(--border-w) solid var(--line); border-radius: var(--radius-full); padding: 1px 8px;
+  }
+  .gd-length { margin-left: auto; font-size: var(--text-xs); color: var(--ink-faint); }
+  .gd-do, .gd-done, .gd-gate, .gd-more p { margin: 0; font-size: var(--text-sm); line-height: var(--leading-body); color: var(--ink-soft); white-space: pre-line; }
+  .gd-do { color: var(--ink); }
+  .gd-done b, .gd-gate b, .gd-entry b, .gd-dayone b, .gd-counter b { font-weight: 600; color: var(--ink); }
+  .gd-gate { color: var(--ink-faint); }
+  .gd-more { font-size: var(--text-sm); }
+  .gd-more > summary { cursor: pointer; color: var(--accent); font-weight: 500; list-style: none; }
+  .gd-more > summary::-webkit-details-marker { display: none; }
+  .gd-more > summary::before { content: "▸ "; }
+  .gd-more[open] > summary::before { content: "▾ "; }
+  .gd-more[open] > summary { margin-bottom: 6px; }
+  .gd-more > * + * { margin-top: 6px; }
+  .gd-links { margin: 0; padding-left: 1.1em; display: grid; gap: 4px; }
+
+  .gd-track, .gd-routines, .gd-codex { margin: 0 0 var(--space-7); padding-top: var(--space-4); border-top: var(--border-w) solid var(--line); }
+  .gd-track h2, .gd-routines h2, .gd-codex h2 { margin: 0 0 8px; font-family: var(--font-display); font-weight: 600; font-size: var(--text-h2); color: var(--ink); }
+  .gd-track h3, .gd-routines h3, .gd-codex h3 { margin: var(--space-4) 0 6px; font-family: var(--font-display); font-weight: 600; font-size: var(--text-h4); color: var(--ink); display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+  .gd-quiet { margin: 0; font-size: var(--text-sm); color: var(--ink-faint); }
+  .gd-dayone, .gd-counter { margin: 8px 0 0; font-size: var(--text-sm); color: var(--ink-soft); }
+  .gd-ranks { margin: 8px 0 0; padding-left: 1.2em; display: grid; gap: 4px; font-size: var(--text-sm); color: var(--ink-soft); }
+  .gd-pre { margin: 0; font-size: var(--text-sm); line-height: var(--leading-body); color: var(--ink-soft); white-space: pre-line; }
+  .gd-routine ul, .gd-note ul, .gd-cav { margin: 0; padding-left: 1.2em; display: grid; gap: 4px; font-size: var(--text-sm); color: var(--ink-soft); }
+  .gd-group-name { text-transform: none; }
+  .gd-entry { padding: 8px 0; border-top: var(--border-w) solid var(--line); font-size: var(--text-sm); }
+  .gd-entry > summary { cursor: pointer; font-weight: 600; color: var(--ink); display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+  .gd-entry > * + * { margin-top: 6px; }
+  .gd-entry p { margin: 0; color: var(--ink-soft); line-height: var(--leading-body); white-space: pre-line; }
+
+  .gd-acts { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; padding-top: var(--space-5); border-top: var(--border-w) solid var(--line); }
+  .gd-download, .gd-vote, .gd-withdraw, .gd-report button[type="submit"] {
+    font: 500 var(--text-sm) var(--font-body); color: var(--ink); background: var(--surface-card);
+    border: var(--border-w) solid var(--line-strong); border-radius: var(--radius-full); padding: 8px 16px; cursor: pointer; text-decoration: none;
+  }
+  .gd-vote[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); background: var(--accent-wash); }
+  .gd-block { font: 400 var(--text-sm) var(--font-body); color: var(--ink-faint); background: none; border: 0; padding: 8px 4px; cursor: pointer; }
+  .gd-block:hover { color: var(--ink); text-decoration: underline; }
+  .gd-report > summary { cursor: pointer; font-size: var(--text-sm); color: var(--ink-faint); }
+  .gd-report form { display: grid; gap: 10px; margin-top: 10px; max-width: 28rem; }
+  .gd-report fieldset { border: 0; margin: 0; padding: 0; display: grid; gap: 6px; }
+  .gd-report legend { font: 600 var(--text-xs) var(--font-body); color: var(--ink-soft); padding: 0 0 6px; }
+  .gd-report label { display: flex; gap: 8px; align-items: center; font: 400 var(--text-sm) var(--font-body); color: var(--ink-soft); }
+  .gd-detail { display: grid !important; gap: 4px; }
+  .gd-detail textarea { font: inherit; padding: 8px; border: var(--border-w) solid var(--line); border-radius: var(--radius-sm); background: var(--surface-page); color: var(--ink); }
+  .gd-note-p { margin: 0; font-size: var(--text-xs); color: var(--ink-faint); }
+  @media (max-width: 640px) {
+    .gd-step { padding-left: 0; }
+    .gd-step-id { position: static; width: auto; }
+  }
+</style>
+
+<script>
+  const token = () =>
+    document.cookie.split("; ").find((c) => c.startsWith("shruti_csrf="))?.split("=")[1] ?? "";
+
+  const post = (path: string, body?: unknown) =>
+    fetch(path, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-csrf-token": token() },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+
+  const vote = document.querySelector<HTMLButtonElement>("[data-vote]");
+  vote?.addEventListener("click", async () => {
+    vote.disabled = true;
+    const r = await post(`/api/guides/by-id/${vote.dataset.vote}/vote`);
+    if (r.ok) {
+      const answer = await r.json();
+      vote.setAttribute("aria-pressed", String(answer.voted));
+      vote.textContent = answer.voted ? "Useful ✓" : "Useful";
+      const count = document.querySelector("[data-votes]");
+      if (count) count.textContent = String(answer.votes);
+    }
+    vote.disabled = false;
+  });
+
+  const block = document.querySelector<HTMLButtonElement>("[data-block]");
+  block?.addEventListener("click", async () => {
+    const who = block.dataset.who ?? "this person";
+    /* Confirmed, because the undo lives on the account page — the right
+       place for it, and not the place anybody will look in the next five
+       seconds. */
+    if (!confirm(
+      `Block ${who}?\n\nTheir guides go from your catalogue and they can no ` +
+      `longer comment on your work. They are not told. You can undo it on ` +
+      `your account page.`
+    )) return;
+    block.disabled = true;
+    const r = await post("/api/practice/blocks", { user_id: Number(block.dataset.block) });
+    if (r.ok) {
+      /* Away from here: this page is now a 404 for this reader. */
+      location.href = "/guides";
+    } else {
+      block.disabled = false;
+      block.textContent = "That did not work — try again";
+    }
+  });
+
+  const report = document.querySelector<HTMLFormElement>("[data-report]");
+  report?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const data = new FormData(report);
+    const r = await post(`/api/guides/by-id/${report.dataset.report}/report`, {
+      reason: String(data.get("reason") ?? "other"),
+      detail: String(data.get("detail") ?? ""),
+    });
+    /* The same words whether it was the first report or the fourth. */
+    report.innerHTML = '<p class="gd-note-p">Thank you — it has gone to Shruti.</p>';
+    if (!r.ok) {
+      report.innerHTML = '<p class="gd-note-p">That did not send. Nothing was lost — try again.</p>';
+    }
+  });
+
+  const withdraw = document.querySelector<HTMLButtonElement>("[data-withdraw]");
+  withdraw?.addEventListener("click", async () => {
+    if (!confirm("Take this down? Nobody but you will see it.")) return;
+    const r = await post(`/api/guides/by-id/${withdraw.dataset.withdraw}/withdraw`);
+    if (r.ok) location.reload();
+  });
+</script>

@@ -56,8 +56,14 @@ def test_a_missing_setting_means_published():
     assert 'get(key, "1") != "0"' in source
 
 
-def test_all_three_sections_are_toggleable():
-    assert set(settings_store.SECTIONS) == {"shop", "horoscopes", "classes"}
+def test_every_section_is_toggleable():
+    """
+    Guides joined on 2026-09-13. It is the one section that starts HIDDEN —
+    a migration writes the row — because it was new on a live site and her
+    words were that the links appear "when it's ready".
+    """
+    assert set(settings_store.SECTIONS) == {"shop", "horoscopes", "classes", "guides"}
+    assert set(settings_store.SECTION_PATHS) == set(settings_store.SECTIONS)
 
 
 # ── the gate ────────────────────────────────────────────────────────────────

@@ -53,6 +53,9 @@ SECTIONS = {
     "shop": "page.shop",
     "horoscopes": "page.horoscopes",
     "classes": "page.classes",
+    # Shruti's Guides. Starts HIDDEN (migration d7f2a4c9e0b1 writes the row):
+    # her words were that the links appear "when it's ready".
+    "guides": "page.guides",
 }
 
 # Which URL prefixes belong to each, so the middleware and the sitemap agree
@@ -61,6 +64,7 @@ SECTION_PATHS = {
     "shop": ("/shop",),
     "horoscopes": ("/horoscopes",),
     "classes": ("/classes",),
+    "guides": ("/guides",),
 }
 
 
