@@ -1,0 +1,95 @@
+---
+/* A layout: several elements in one browser source, each at its own place
+ * on the 1920 × 1080 canvas (board W7's canvas, as OBS sees it).
+ *
+ * The same elements as the single-element sources, drawn by the same rules
+ * and the same theme sheet; positions come from the layout and a theme may
+ * never move them. The Done moment plays on the now card inside the layout
+ * exactly as it does alone.
+ */
+import "../../styles/global.css";
+import "../../styles/overlay.css";
+import "../../styles/overlay-guides.css";
+import { SITE_API } from "../../lib/api";
+
+export const prerender = false;
+
+const token = Astro.url.searchParams.get("t") ?? "";
+let data: any = null;
+if (token) {
+  try {
+    const r = await fetch(`${SITE_API}/api/overlay/guide?t=${encodeURIComponent(token)}`);
+    if (r.ok) data = await r.json();
+  } catch {
+    /* Held, not blanked. */
+  }
+}
+const theme = data?.theme ?? "almanac";
+const motion = data?.motion ?? "reduced";
+const elements: any[] = data?.elements ?? [];
+const initial = JSON.stringify({ version: data?.version ?? "", elements });
+---
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>guide · layout</title>
+    <meta name="robots" content="noindex, nofollow" />
+  </head>
+  <body>
+    <div class="gov" data-theme={theme} data-motion={motion} data-token={token} data-initial={initial} data-kind="guide-layout">
+      <div data-elements>
+        {elements.map((e: any, i: number) => (
+          <div class="gov-placed" data-slot={i} style={`left:${e.x}px;top:${e.y}px;width:${e.w}px`}></div>
+        ))}
+      </div>
+      <div class="gov-plate gov-empty" data-empty hidden={!!data?.run}>
+        <span class="gov-eyebrow">Shruti's Guides</span>
+        <span class="say">No run selected.</span>
+      </div>
+      <span class="gov-done-line" data-done-line hidden></span>
+    </div>
+    <style>
+      .gov-placed { position: absolute; }
+      /* Inside a layout, each element sits where the slot puts it, not where its own rule would. */
+      .gov-placed .gov-plate, .gov-placed .gov-sigil { position: relative; left: auto; top: auto; right: auto; bottom: auto; width: 100%; }
+      .gov-placed .gov-sigil { align-items: flex-start; }
+    </style>
+  </body>
+</html>
+
+<script>
+  import { drawElement } from "../../lib/overlay-elements";
+  const root = document.querySelector<HTMLElement>(".gov")!;
+  const token = root.dataset.token || "";
+  let last: any = JSON.parse(root.dataset.initial || "{}");
+  const still = root.dataset.motion === "still", reduced = root.dataset.motion === "reduced";
+  const holder = root.querySelector<HTMLElement>("[data-elements]")!;
+  const empty = root.querySelector<HTMLElement>("[data-empty]")!;
+  const line = root.querySelector<HTMLElement>("[data-done-line]")!;
+  const paintAll = async (prev: any[], next: any[]) => {
+    if (holder.children.length !== next.length) {
+      holder.innerHTML = next.map((e: any, i: number) => `<div class="gov-placed" data-slot="${i}" style="left:${e.x}px;top:${e.y}px;width:${e.w}px"></div>`).join("");
+    }
+    empty.hidden = next.length > 0;
+    await Promise.all(next.map((e: any, i: number) => {
+      const slot = holder.querySelector<HTMLElement>(`[data-slot="${i}"]`)!;
+      slot.style.left = `${e.x}px`; slot.style.top = `${e.y}px`; slot.style.width = `${e.w}px`;
+      return drawElement(slot, e.kind, prev?.[i]?.element ?? null, e.element, { still, reduced, line });
+    }));
+  };
+  paintAll([], last.elements ?? []);
+  const tick = async () => {
+    if (!token) return;
+    try {
+      const r = await fetch(`/api/overlay/guide?t=${encodeURIComponent(token)}`, { cache: "no-store" });
+      if (!r.ok) return;
+      const next = await r.json();
+      if (next.version !== last.version || (next.elements ?? []).length !== (last.elements ?? []).length) {
+        await paintAll(last.elements ?? [], next.elements ?? []);
+        last = { version: next.version, elements: next.elements ?? [] };
+      }
+    } catch { /* offline: the last frame stands */ }
+  };
+  window.setInterval(tick, 2000);
+</script>

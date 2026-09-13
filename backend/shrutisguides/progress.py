@@ -22,7 +22,16 @@ from shrutisguides import engine
 
 REENTRY_AFTER = timedelta(hours=6)
 STATES = ("done", "skipped", "later", "open")
-GUIDE_KINDS = ("guide-now", "guide-sigil", "guide-path", "guide-routine")
+GUIDE_KINDS = ("guide-now", "guide-sigil", "guide-path", "guide-routine", "guide-layout")
+ELEMENT_KINDS = ("guide-now", "guide-sigil", "guide-path", "guide-routine")
+# Where each element sits when nobody has moved it: the boards' positions at
+# 1920 × 1080, so a layout with no coordinates is the frame the design shows.
+DEFAULT_PLACES = {
+    "guide-now": {"x": 72, "y": 72, "w": 900},
+    "guide-sigil": {"x": 1620, "y": 72, "w": 224},
+    "guide-path": {"x": 72, "y": 936, "w": 1776},
+    "guide-routine": {"x": 72, "y": 640, "w": 760},
+}
 THEMES = ("almanac", "grimoire", "plain")
 MOTIONS = ("full", "reduced", "still")
 
@@ -268,3 +277,36 @@ def from_export(r: dict, doc: dict, fallback_name: str) -> dict:
         "link_overrides": {str(k): v for k, v in (r.get("linkOverrides") or {}).items() if isinstance(v, list)},
         "last_done": str(r.get("lastDone") or ""),
     }
+
+
+def clean_layout(layout: Any) -> list[dict]:
+    """
+    A layout as stored: [{kind, x, y, w, routine_id, shows}], clamped to the
+    1920 × 1080 canvas. Unknown kinds are dropped; nothing else is invented.
+    """
+    out: list[dict] = []
+    if not isinstance(layout, list):
+        return out
+    for e in layout:
+        if not isinstance(e, dict) or e.get("kind") not in ELEMENT_KINDS:
+            continue
+        place = DEFAULT_PLACES[e["kind"]]
+        def num(key: str, default: float, lo: float, hi: float) -> int:
+            try:
+                v = float(e.get(key, default))
+            except (TypeError, ValueError):
+                v = default
+            return int(min(hi, max(lo, v)))
+        out.append({
+            "kind": e["kind"],
+            "x": num("x", place["x"], 0, 1920), "y": num("y", place["y"], 0, 1080),
+            "w": num("w", place["w"], 120, 1920),
+            "routine_id": str(e.get("routine_id") or "")[:80],
+            "shows": str(e.get("shows") or "")[:40],
+        })
+    return out[:12]
+
+
+def layout_elements(layout: list[dict], stored: dict, doc: dict) -> list[dict]:
+    """Every element of a layout, drawn: the placement plus what the element shows."""
+    return [{**e, "element": element(e["kind"], stored, doc, e.get("routine_id", ""))} for e in layout]

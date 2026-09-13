@@ -18,6 +18,8 @@ from typing import Optional
 
 from sqlalchemy import DateTime
 from sqlalchemy import UniqueConstraint
+from sqlalchemy import Column
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import Field, SQLModel
 
 
@@ -558,6 +560,9 @@ class OverlayToken(TimestampMixin, table=True):
     run_id: Optional[int] = Field(default=None, foreign_key="guide_run.id", index=True)
     routine_id: str = ""
     theme: str = "almanac"
+    # kind guide-layout: several elements in one browser source, placed on
+    # the 1920 × 1080 canvas — [{kind, x, y, w, routine_id, shows}].
+    layout: list = Field(default_factory=list, sa_column=Column(JSONB, nullable=False, server_default="[]"))
 
     last_seen: Optional[datetime] = Field(default=None, sa_type=UTC_TS)
 

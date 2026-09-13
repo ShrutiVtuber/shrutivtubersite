@@ -60,8 +60,13 @@ def db() -> sqlite3.Connection:
         CREATE TABLE IF NOT EXISTS overlay (
             id INTEGER PRIMARY KEY, token TEXT NOT NULL UNIQUE, kind TEXT NOT NULL, run_id INTEGER NOT NULL REFERENCES run(id),
             routine_id TEXT NOT NULL DEFAULT '', theme TEXT NOT NULL DEFAULT 'almanac', motion TEXT NOT NULL DEFAULT 'reduced',
-            label TEXT NOT NULL DEFAULT '', last_seen TEXT);
+            label TEXT NOT NULL DEFAULT '', last_seen TEXT, layout TEXT NOT NULL DEFAULT '[]');
     """)
+    try:
+        con.execute("ALTER TABLE overlay ADD COLUMN layout TEXT NOT NULL DEFAULT '[]'")
+        con.commit()
+    except sqlite3.OperationalError:
+        pass                                   # already there
     return con
 
 
@@ -247,6 +252,28 @@ def create(body: RunIn) -> dict:
 def one(run_id: int) -> dict:
     con = db()
     return _answer(con, _run_row(con, run_id))
+
+
+class LayoutIn(BaseModel):
+    layout: list
+    theme: str | None = None
+    motion: str | None = None
+    label: str | None = None
+
+
+@app.put("/api/runs/{run_id}/overlays/{token_id}", dependencies=[Depends(owner)])
+def set_layout(run_id: int, token_id: int, body: LayoutIn) -> dict:
+    """Save a layout — the designer's one write."""
+    con = db(); o = con.execute("SELECT * FROM overlay WHERE id = ? AND run_id = ?", (token_id, run_id)).fetchone()
+    if o is None:
+        raise HTTPException(404, "no such overlay")
+    con.execute("UPDATE overlay SET layout = ?, theme = ?, motion = ?, label = ? WHERE id = ?",
+                (json.dumps(progress.clean_layout(body.layout)),
+                 body.theme if body.theme in progress.THEMES else o["theme"],
+                 body.motion if body.motion in progress.MOTIONS else o["motion"],
+                 (body.label or o["label"]).strip()[:80], token_id))
+    con.commit()
+    return {"ok": True}
 
 
 class RunPatch(BaseModel):
@@ -453,13 +480,14 @@ class TokenIn(BaseModel):
     motion: str = "reduced"
     routine_id: str = ""
     label: str = ""
+    layout: list = []
 
 
 @app.get("/api/runs/{run_id}/overlays", dependencies=[Depends(owner)])
 def list_tokens(run_id: int) -> list[dict]:
     con = db(); _run_row(con, run_id)
     return [{"id": o["id"], "kind": o["kind"], "label": o["label"], "theme": o["theme"], "motion": o["motion"],
-             "routineId": o["routine_id"], "lastSeen": o["last_seen"]}
+             "routineId": o["routine_id"], "lastSeen": o["last_seen"], "layout": json.loads(o["layout"] or "[]")}
             for o in con.execute("SELECT * FROM overlay WHERE run_id = ? ORDER BY id", (run_id,)).fetchall()]
 
 
@@ -469,9 +497,10 @@ def mint(run_id: int, body: TokenIn) -> dict:
     if body.kind not in progress.GUIDE_KINDS:
         raise HTTPException(422, "kind is guide-now, guide-sigil, guide-path or guide-routine")
     token = secrets.token_urlsafe(24)
-    cur = con.execute("INSERT INTO overlay (token, kind, run_id, routine_id, theme, motion, label) VALUES (?, ?, ?, ?, ?, ?, ?)",
+    cur = con.execute("INSERT INTO overlay (token, kind, run_id, routine_id, theme, motion, label, layout) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                       (token, body.kind, run_id, body.routine_id.strip()[:80], body.theme if body.theme in progress.THEMES else "almanac",
-                       body.motion if body.motion in progress.MOTIONS else "reduced", body.label.strip()[:80]))
+                       body.motion if body.motion in progress.MOTIONS else "reduced", body.label.strip()[:80],
+                       json.dumps(progress.clean_layout(body.layout))))
     con.commit()
     return {"id": cur.lastrowid, "token": token, "kind": body.kind}
 
@@ -495,7 +524,10 @@ def overlay_guide(t: str) -> dict:
         return base
     g = _guide_row(con, row["guide_id"]); doc = json.loads(g["body"]); stored = _stored(row)
     base["run"] = {"name": stored.get("name", ""), "guide": g["title"], "game": g["game_name"]}
-    base["element"] = progress.element(o["kind"], stored, doc, o["routine_id"])
+    if o["kind"] == "guide-layout":
+        base["elements"] = progress.layout_elements(json.loads(o["layout"] or "[]"), stored, doc)
+    else:
+        base["element"] = progress.element(o["kind"], stored, doc, o["routine_id"])
     base["version"] = row["updated_at"]
     return base
 

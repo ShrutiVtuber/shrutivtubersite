@@ -68,7 +68,10 @@ async def guide(t: str, session: AsyncSession = Depends(get_session)) -> dict:
         return base
     game = await session.get(Game, g.game_id)
     base["run"] = {"name": run.name, "guide": g.title, "game": game.name if game else ""}
-    base["element"] = progress.element(token.kind, _stored(run), v.body, token.routine_id)
+    if token.kind == "guide-layout":
+        base["elements"] = progress.layout_elements(progress.clean_layout(token.layout), _stored(run), v.body)
+    else:
+        base["element"] = progress.element(token.kind, _stored(run), v.body, token.routine_id)
     base["version"] = run.updated_at.isoformat() if run.updated_at else ""
     return base
 
@@ -81,6 +84,7 @@ class TokenIn(BaseModel):
     motion: str = "reduced"
     routine_id: str = ""
     label: str = ""
+    layout: list = []
 
 
 async def _mine(session: AsyncSession, request: Request, run_id: int) -> GuideRun:
@@ -97,7 +101,8 @@ async def list_tokens(run_id: int, request: Request, session: AsyncSession = Dep
     run = await _mine(session, request, run_id)
     rows = (await session.execute(select(OverlayToken).where(OverlayToken.run_id == run.id).order_by(OverlayToken.id))).scalars().all()
     return [{"id": o.id, "kind": o.kind, "label": o.label, "theme": o.theme, "motion": o.motion,
-             "routineId": o.routine_id, "lastSeen": o.last_seen.isoformat() if o.last_seen else None} for o in rows]
+             "routineId": o.routine_id, "layout": o.layout or [],
+             "lastSeen": o.last_seen.isoformat() if o.last_seen else None} for o in rows]
 
 
 @runs_router.post("/{run_id}/overlays", status_code=201)
@@ -109,16 +114,43 @@ async def mint_token(run_id: int, body: TokenIn, request: Request, session: Asyn
     """
     run = await _mine(session, request, run_id)
     if body.kind not in GUIDE_KINDS:
-        raise HTTPException(422, "kind is guide-now, guide-sigil, guide-path or guide-routine")
+        raise HTTPException(422, "kind is guide-now, guide-sigil, guide-path, guide-routine or guide-layout")
     token = secrets.token_urlsafe(24)
     row = OverlayToken(token=token, kind=body.kind, label=body.label.strip()[:80], run_id=run.id,
                        routine_id=body.routine_id.strip()[:80],
                        theme=body.theme if body.theme in THEMES else "almanac",
-                       motion=body.motion if body.motion in MOTIONS else "reduced")
+                       motion=body.motion if body.motion in MOTIONS else "reduced",
+                       layout=progress.clean_layout(body.layout))
     session.add(row)
     await session.commit()
     await session.refresh(row)
     return {"id": row.id, "token": token, "kind": row.kind, "theme": row.theme, "motion": row.motion}
+
+
+class LayoutIn(BaseModel):
+    layout: list
+    theme: str | None = None
+    motion: str | None = None
+    label: str | None = None
+
+
+@runs_router.put("/{run_id}/overlays/{token_id}/layout")
+async def set_layout(run_id: int, token_id: int, body: LayoutIn, request: Request,
+                     session: AsyncSession = Depends(get_session)) -> dict:
+    """Save a layout — the designer's one write. Positions are clamped to the canvas."""
+    run = await _mine(session, request, run_id)
+    row = await session.get(OverlayToken, token_id)
+    if row is None or row.run_id != run.id:
+        raise HTTPException(404, "no such overlay")
+    row.layout = progress.clean_layout(body.layout)
+    if body.theme in THEMES:
+        row.theme = body.theme
+    if body.motion in MOTIONS:
+        row.motion = body.motion
+    if body.label is not None:
+        row.label = body.label.strip()[:80]
+    await session.commit()
+    return {"ok": True, "layout": row.layout}
 
 
 class RebindIn(BaseModel):

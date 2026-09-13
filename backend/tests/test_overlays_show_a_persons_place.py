@@ -15,6 +15,7 @@ ROOT = Path(__file__).resolve().parents[2]
 SRC = ROOT / "frontend" / "site" / "src"
 CSS = (SRC / "styles" / "overlay-guides.css").read_text(encoding="utf-8")
 PAGES = {k: (SRC / "pages" / "overlay" / f"{k}.astro").read_text(encoding="utf-8") for k in og.GUIDE_KINDS}
+LAYOUT = PAGES["guide-layout"]
 
 
 def code_of(function) -> str:
@@ -104,3 +105,14 @@ def test_each_element_carries_only_what_it_draws() -> None:
     assert 'if kind == "guide-now":' in body and '"finished"' in body
     assert 'path[max(0, i - 2): i + 4]' in body                      # the six-item window
     assert "engine.sigil_parts" in body
+
+
+def test_a_layout_is_several_elements_in_one_source_placed_on_the_canvas() -> None:
+    """Positions come from the layout; a theme may never move them."""
+    from shrutisguides import progress
+    assert "guide-layout" in progress.GUIDE_KINDS and "guide-layout" not in progress.ELEMENT_KINDS
+    assert set(progress.DEFAULT_PLACES) == set(progress.ELEMENT_KINDS)
+    cleaned = progress.clean_layout([{"kind": "guide-now", "x": -50, "y": 5000, "w": 10}, {"kind": "nope"}])
+    assert cleaned == [{"kind": "guide-now", "x": 0, "y": 1080, "w": 120, "routine_id": "", "shows": ""}]
+    assert "progress.layout_elements(" in code_of(og.guide)
+    assert 'left:${e.x}px;top:${e.y}px;width:${e.w}px' in LAYOUT
