@@ -1,0 +1,256 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://shrutivtuber.com/guides/format/1/guide.schema.json",
+  "title": "Shruti's Guides — a guide, format 1",
+  "description": "A game guide as a path: phases, steps, routines, a codex, and optional time-boxed tracks. Generalised from the Diablo IV Grimoire spec so it is not Diablo-shaped: check-in fields and variants are declared per guide, and the gate language refers to them by name.",
+  "type": "object",
+  "required": ["format", "game", "guide", "checkin", "phases", "steps"],
+  "additionalProperties": false,
+  "properties": {
+    "format": { "const": 1 },
+
+    "game": {
+      "type": "object",
+      "required": ["id", "name", "variants"],
+      "additionalProperties": false,
+      "properties": {
+        "id":   { "$ref": "#/$defs/slug" },
+        "name": { "type": "string", "minLength": 1 },
+        "variants": {
+          "description": "The ways a run of this game can differ that content cares about. Diablo: eternal and seasonal. A guide's applies_to lists are drawn from these ids.",
+          "type": "array", "minItems": 1,
+          "items": {
+            "type": "object", "required": ["id", "name"], "additionalProperties": false,
+            "properties": { "id": { "$ref": "#/$defs/ident" }, "name": { "type": "string", "minLength": 1 } }
+          }
+        }
+      }
+    },
+
+    "guide": {
+      "type": "object",
+      "required": ["id", "title", "version"],
+      "additionalProperties": false,
+      "properties": {
+        "id":         { "$ref": "#/$defs/slug" },
+        "title":      { "type": "string", "minLength": 1 },
+        "authors":    { "type": "array", "items": { "type": "string" } },
+        "version":    { "type": "string", "minLength": 1, "description": "A date or a tag. Loading a new version must never delete progress: progress is keyed by step id." },
+        "game_patch": { "type": "string" },
+        "summary":    { "type": "string" },
+        "caveats":    { "type": "array", "items": { "type": "string" }, "description": "Things the author is not sure of yet — the spec's [S15 PTR — confirm at launch]." }
+      }
+    },
+
+    "checkin": {
+      "description": "The fields a check-in sheet asks for, declared by the guide. Gates refer to these by id. Never more than a handful; the sheet has to fit one screen.",
+      "type": "array", "maxItems": 8,
+      "items": {
+        "type": "object",
+        "required": ["id", "label", "type"],
+        "additionalProperties": false,
+        "properties": {
+          "id":         { "$ref": "#/$defs/ident" },
+          "label":      { "type": "string", "minLength": 1 },
+          "type":       { "enum": ["number", "ordered"] },
+          "min":        { "type": "integer" },
+          "max":        { "type": "integer" },
+          "options":    { "type": "array", "minItems": 2, "items": { "$ref": "#/$defs/ident" }, "description": "For an ordered field: its values, least to greatest. Gates compare positions in this list." },
+          "labels":     { "type": "object", "additionalProperties": { "type": "string" }, "description": "Optional display names for options." },
+          "show_when":  { "$ref": "#/$defs/gate" },
+          "applies_to": { "$ref": "#/$defs/applies_to" }
+        }
+      }
+    },
+
+    "phases": {
+      "type": "array", "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "order"],
+        "additionalProperties": false,
+        "properties": {
+          "id":         { "$ref": "#/$defs/ident" },
+          "name":       { "type": "string", "minLength": 1 },
+          "band":       { "type": "string", "description": "A rough label such as a level range. Never gates anything." },
+          "order":      { "type": "integer" },
+          "applies_to": { "$ref": "#/$defs/applies_to" },
+          "skip_group": { "$ref": "#/$defs/ident", "description": "Phases sharing a skip_group can be bulk-skipped when a run is created — the spec's 'have you finished the campaign before?'" },
+          "track":      { "$ref": "#/$defs/ident", "description": "Set when this phase is a time-boxed track (a season) rather than part of the main path. Refers to tracks[].id." }
+        }
+      }
+    },
+
+    "steps": {
+      "type": "array", "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "phase", "kind", "order", "title", "do"],
+        "additionalProperties": false,
+        "properties": {
+          "id":         { "$ref": "#/$defs/step_id" },
+          "phase":      { "$ref": "#/$defs/ident" },
+          "kind":       { "enum": ["milestone", "optional", "routine", "system"] },
+          "order":      { "type": "integer" },
+          "title":      { "type": "string", "minLength": 1 },
+          "oneliner":   { "type": "string", "description": "The sentence the overwhelm view shows. Empty means: use the title." },
+          "do":         { "type": "string", "minLength": 1 },
+          "done_when":  { "type": "string" },
+          "why":        { "type": "string" },
+          "minutes":    { "type": "integer", "minimum": 0 },
+          "ongoing":    { "type": "boolean", "description": "No fixed duration — a repeatable push such as 'Push glyphs with the Pit'. Set instead of minutes, never with it." },
+          "gate":       { "$ref": "#/$defs/gate" },
+          "auto_done":  { "$ref": "#/$defs/gate", "description": "When true, the step is PROPOSED as done — never applied silently." },
+          "applies_to": { "$ref": "#/$defs/applies_to" },
+          "codex":      { "$ref": "#/$defs/ident", "description": "A codex entry that becomes Active when this step is done." },
+          "links":      { "$ref": "#/$defs/links" }
+        }
+      }
+    },
+
+    "routines": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "resets", "items"],
+        "additionalProperties": false,
+        "properties": {
+          "id":         { "$ref": "#/$defs/ident" },
+          "name":       { "type": "string", "minLength": 1 },
+          "resets":     { "enum": ["session", "daily", "weekly", "manual"] },
+          "gate":       { "$ref": "#/$defs/gate" },
+          "applies_to": { "$ref": "#/$defs/applies_to" },
+          "items": {
+            "type": "array", "minItems": 1,
+            "items": {
+              "type": "object", "required": ["id", "text"], "additionalProperties": false,
+              "properties": { "id": { "$ref": "#/$defs/step_id" }, "text": { "type": "string", "minLength": 1 } }
+            }
+          }
+        }
+      }
+    },
+
+    "codex": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "group"],
+        "additionalProperties": false,
+        "properties": {
+          "id":           { "$ref": "#/$defs/ident" },
+          "name":         { "type": "string", "minLength": 1 },
+          "group":        { "$ref": "#/$defs/ident" },
+          "show_when":    { "$ref": "#/$defs/gate", "description": "Empty means always. Until true the entry is hidden or greyed with ignore_until." },
+          "ignore_until": { "type": "string", "description": "Shown greyed with 'ignore until …' before show_when is met." },
+          "what":         { "type": "string" },
+          "when":         { "type": "string" },
+          "how":          { "type": "string" },
+          "caveats":      { "type": "array", "items": { "type": "string" } },
+          "links":        { "$ref": "#/$defs/links" }
+        }
+      }
+    },
+
+    "codex_notes": {
+      "description": "Free-standing notes pinned at the top of the codex — the spec's Warlock notes.",
+      "type": "array",
+      "items": {
+        "type": "object", "required": ["id", "title", "items"], "additionalProperties": false,
+        "properties": {
+          "id":    { "$ref": "#/$defs/ident" },
+          "title": { "type": "string", "minLength": 1 },
+          "items": { "type": "array", "minItems": 1, "items": { "type": "string" } }
+        }
+      }
+    },
+
+    "tracks": {
+      "description": "A time-boxed parallel path — the spec's Season, generalised. Its steps live in phases whose `track` names it.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "name"],
+        "additionalProperties": false,
+        "properties": {
+          "id":         { "$ref": "#/$defs/ident" },
+          "name":       { "type": "string", "minLength": 1 },
+          "applies_to": { "$ref": "#/$defs/applies_to" },
+          "start_date": { "type": "string" },
+          "end_date":   { "type": "string" },
+          "day_one":    { "type": "array", "items": { "$ref": "#/$defs/step_id" }, "description": "Steps to surface together on the first day." },
+          "ranks": {
+            "type": "array",
+            "items": {
+              "type": "object", "required": ["n"], "additionalProperties": false,
+              "properties": {
+                "n":        { "type": "integer", "minimum": 1 },
+                "capstone": { "type": "string", "description": "Editable per run — it changes each season." },
+                "when":     { "type": "string" }
+              }
+            }
+          },
+          "counters": {
+            "description": "Manual counters with a cap and a nudge — the spec's Favor Tokens.",
+            "type": "array",
+            "items": {
+              "type": "object", "required": ["id", "label"], "additionalProperties": false,
+              "properties": {
+                "id":       { "$ref": "#/$defs/ident" },
+                "label":    { "type": "string" },
+                "max":      { "type": "integer" },
+                "nudge_at": { "type": "integer" },
+                "nudge":    { "type": "string" }
+              }
+            }
+          },
+          "sections": {
+            "type": "array",
+            "items": {
+              "type": "object", "required": ["id", "title", "body"], "additionalProperties": false,
+              "properties": {
+                "id":    { "$ref": "#/$defs/ident" },
+                "title": { "type": "string" },
+                "body":  { "type": "string" },
+                "caveats": { "type": "array", "items": { "type": "string" } }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+
+  "$defs": {
+    "ident":   { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+    "slug":    { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+    "step_id": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9]*(\\.[0-9]+)+$", "description": "P2.7, S1.3, R1.4 — a phase or routine prefix and a dotted number." },
+    "applies_to": {
+      "description": "Which variants this applies to. Absent means all of them.",
+      "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/ident" }
+    },
+    "links": {
+      "type": "array",
+      "items": {
+        "type": "object", "required": ["label", "url", "type"], "additionalProperties": false,
+        "properties": {
+          "label": { "type": "string" },
+          "url":   { "type": "string" },
+          "type":  { "enum": ["video", "text"] }
+        }
+      }
+    },
+    "gate": {
+      "description": "Conditions ANDed together, evaluated against a run's check-in values. Keys are <field>_min / <field>_max (number fields), <field>_at_least / <field>_is (ordered fields), and the built-ins variant, steps_done, codex_active. An empty gate is always true. The validator checks that every key names a declared field of the right type.",
+      "type": "object",
+      "propertyNames": { "pattern": "^([a-z][a-z0-9_]*_(min|max|at_least|is)|variant|steps_done|codex_active)$" },
+      "additionalProperties": {
+        "anyOf": [
+          { "type": "integer" },
+          { "type": "string" },
+          { "type": "array", "items": { "type": "string" }, "minItems": 1 }
+        ]
+      }
+    }
+  }
+}

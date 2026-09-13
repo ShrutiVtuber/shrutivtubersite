@@ -1406,3 +1406,4 @@ from shruti.models.practice import (  # noqa: E402,F401
     PracticeBridge, PracticeComment, PracticeReading, PracticeReport,
     PracticeStrike, PracticeVote, PracticeWork,
 )
+from shruti.models.guides import *  # noqa: E402,F403

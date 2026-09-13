@@ -13,6 +13,8 @@ RUN apt-get update \
 
 COPY pyproject.toml ./
 COPY shruti ./shruti
+# ⚠ Vendored guide format — see shrutisguides/VENDORED.md.
+COPY shrutisguides ./shrutisguides
 RUN pip install --upgrade pip && pip install .
 
 # ── dev ─────────────────────────────────────────────────────────────────────
