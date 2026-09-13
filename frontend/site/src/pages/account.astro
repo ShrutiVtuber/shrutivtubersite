@@ -154,7 +154,7 @@ const TRADITIONS = [
   { value: "vedic", label: "Vedic" },
 ];
 const tokensRead = await asReader(Astro, "/api/overlay/mine");
-const guideTokens: { id: number; kind: string; label: string; showing: string; href: string; theme: string; live: boolean }[] =
+const guideTokens: { id: number; kind: string; label: string; showing: string; href: string; theme: string; live: boolean; hoursThisMonth: number }[] =
   tokensRead.ok && Array.isArray(tokensRead.body) ? tokensRead.body : [];
 const kindWord = (k: string) =>
   k === "guide-now" ? say("tokens.kind.now", "now card") : k === "guide-sigil" ? say("tokens.kind.sigil", "sigil")
@@ -257,6 +257,7 @@ const themeWord = (t: string) => t === "grimoire" ? say("tokens.theme.grimoire",
               <span role="columnheader">{say("tokens.col.showing", "Showing")}</span>
               <span role="columnheader">{say("tokens.col.theme", "Theme")}</span>
               <span role="columnheader">{say("tokens.col.state", "State")}</span>
+              <span role="columnheader" class="right">{say("tokens.col.hours", "On air this month")}</span>
             </div>
             {guideTokens.map((t) => (
               <div class="tokens-row" role="row">
@@ -264,8 +265,10 @@ const themeWord = (t: string) => t === "grimoire" ? say("tokens.theme.grimoire",
                 <span role="cell">{t.href ? <a href={t.href}>{t.showing}</a> : t.showing}</span>
                 <span role="cell" class="faint">{themeWord(t.theme)}</span>
                 <span role="cell" class={`t-tabular ${t.live ? "live" : "faint"}`}>{t.live ? say("tokens.live", "live") : say("tokens.idle", "idle")}</span>
+                <span role="cell" class="t-tabular faint right">{say("tokens.hours", "{n} h").replace("{n}", String(t.hoursThisMonth ?? 0))}</span>
               </div>
             ))}
+            <p class="quiet t-tabular">{say("tokens.total", "{n} hours on air this month, all overlays together.").replace("{n}", String(Math.round(guideTokens.reduce((a, t) => a + (t.hoursThisMonth ?? 0), 0) * 10) / 10))}</p>
             <p class="quiet">{say("tokens.4", "A token's URL is shown once, when it is minted. Revoke one from the page it was minted on.")}</p>
           </div>
         )
@@ -530,9 +533,10 @@ const themeWord = (t: string) => t === "grimoire" ? say("tokens.theme.grimoire",
   }
   .acc-blocked button:hover { color: var(--ink); text-decoration: underline; }
   .tokens { display: grid; gap: 0; }
-  .tokens-row { display: grid; grid-template-columns: 1.4fr 1.2fr .8fr .5fr; gap: var(--space-3); padding: .55rem 0; border-bottom: 1px solid var(--rule); align-items: baseline; }
+  .tokens-row { display: grid; grid-template-columns: 1.4fr 1.2fr .8fr .5fr .7fr; gap: var(--space-3); padding: .55rem 0; border-bottom: 1px solid var(--rule); align-items: baseline; }
   .tokens-head { font-size: .78rem; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); }
   .tokens .live { color: var(--rose, #E0A4BC); }
+  .tokens .right { text-align: right; }
   .tokens .quiet { margin-top: var(--space-3); }
 </style>
 

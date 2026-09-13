@@ -97,10 +97,21 @@ def test_tokens_belong_to_the_runs_owner() -> None:
     assert "await session.delete(row)" in code_of(og.revoke_token)
 
 
+def test_a_source_that_shows_this_version_is_told_so_and_nothing_is_computed() -> None:
+    """Nineteen polls in twenty change nothing; those must not load the guide."""
+    body = code_of(og.guide)
+    unchanged = body.index('base["unchanged"] = True')
+    assert body.index("await _doc(session") > unchanged, "the document is loaded before the cheap answer"
+    assert body.index("progress.layout_elements(") > unchanged
+    assert "if v and v == version:" in body
+    tracker = (ROOT / "backend" / "shrutisguides" / "tracker" / "app.py").read_text(encoding="utf-8")
+    assert 'base["unchanged"] = True' in tracker, "the tracker keeps the same contract"
+
+
 def test_each_element_carries_only_what_it_draws() -> None:
     """Computed by the shared function, so a self-hosted overlay draws the same thing."""
     from shrutisguides import progress
-    assert "progress.element(token.kind, _stored(run), v.body, token.routine_id)" in code_of(og.guide)
+    assert "progress.element(token.kind, _stored(run), doc, token.routine_id)" in code_of(og.guide)
     body = code_of(progress.element)
     assert 'if kind == "guide-now":' in body and '"finished"' in body
     assert 'path[max(0, i - 2): i + 4]' in body                      # the six-item window

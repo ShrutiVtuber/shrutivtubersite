@@ -16,6 +16,8 @@ which theme the token wears.
 from __future__ import annotations
 
 import logging
+import time
+from collections import OrderedDict
 
 import json
 import re
@@ -54,7 +56,7 @@ def _stored(row: GuideRun) -> dict:
 
 
 @router.get("/guide")
-async def guide(t: str, session: AsyncSession = Depends(get_session)) -> dict:
+async def guide(t: str, v: str = "", session: AsyncSession = Depends(get_session)) -> dict:
     """
     The run as this token's element draws it. Polled; `version` changes when
     the run changes, so a page can compare and play the Done moment once.
@@ -65,8 +67,13 @@ async def guide(t: str, session: AsyncSession = Depends(get_session)) -> dict:
     token = (await session.execute(select(OverlayToken).where(OverlayToken.token == t))).scalar_one_or_none()
     if token is None or token.kind not in SITE_KINDS:
         raise HTTPException(404, "no such overlay")
-    token.last_seen = datetime.now(timezone.utc)
-    await session.commit()
+    # ⚠ Seen-at is written at most once a minute: a source polls every two
+    # seconds, and a row update per poll is the most expensive thing here.
+    now = datetime.now(timezone.utc)
+    if token.last_seen is None or (now - _aware(token.last_seen)).total_seconds() > 60:
+        token.last_seen = now
+        await _count_minute(session, token.id, now)
+        await session.commit()
     base = {"kind": token.kind, "theme": token.theme if token.theme in THEMES else "almanac",
             "motion": token.motion, "run": None, "element": None, "version": ""}
     if token.kind == "guide-goal":
@@ -74,21 +81,90 @@ async def guide(t: str, session: AsyncSession = Depends(get_session)) -> dict:
     run = await session.get(GuideRun, token.run_id) if token.run_id else None
     if run is None:
         return base
+    layout = progress.clean_layout(token.layout) if token.kind == "guide-layout" else []
+    version = run.updated_at.isoformat() if run.updated_at else ""
+    if token.kind == "guide-layout":
+        version += await _instrument_stamp(session, layout)
+    base["version"] = version
+    # The cheap answer: the source already shows this version. Nothing is
+    # loaded, nothing is computed — and this is nineteen polls in twenty.
+    # A plus in an ISO time survives a browser's encoding; a hand-typed URL
+    # turns it into a space. Both mean the same version.
+    if v and v.replace(" ", "+") == version:
+        base["unchanged"] = True
+        return base
     g = await session.get(Guide, run.guide_id)
-    v = await session.get(GuideVersion, g.published_version_id) if g and g.published_version_id else None
-    if g is None or v is None:
+    doc = await _doc(session, g.published_version_id) if g and g.published_version_id else None
+    if g is None or doc is None:
         return base
     game = await session.get(Game, g.game_id)
     base["run"] = {"name": run.name, "guide": g.title, "game": game.name if game else ""}
     if token.kind == "guide-layout":
-        base["elements"] = progress.layout_elements(progress.clean_layout(token.layout), _stored(run), v.body)
+        base["elements"] = progress.layout_elements(layout, _stored(run), doc)
         await _fill_goals(session, base["elements"])
     else:
-        base["element"] = progress.element(token.kind, _stored(run), v.body, token.routine_id)
-    base["version"] = run.updated_at.isoformat() if run.updated_at else ""
-    if token.kind == "guide-layout":
-        base["version"] += await _instrument_stamp(session, base["elements"])
+        base["element"] = progress.element(token.kind, _stored(run), doc, token.routine_id)
     return base
+
+
+async def _count_minute(session: AsyncSession, token_id: int, now: datetime) -> None:
+    """One more minute on air today — the basis for hours streamed this month."""
+    from sqlalchemy.dialects.postgresql import insert
+    from shruti.models import OverlayUsage
+    stmt = insert(OverlayUsage).values(token_id=token_id, day=now.date(), minutes=1)
+    await session.execute(stmt.on_conflict_do_update(constraint="uq_overlay_usage_day", set_={"minutes": OverlayUsage.minutes + 1}))
+
+
+async def hours_this_month(session: AsyncSession, token_ids: list[int]) -> dict[int, float]:
+    """Hours on air since the first of the month, per token."""
+    from shruti.models import OverlayUsage
+    if not token_ids:
+        return {}
+    first = datetime.now(timezone.utc).date().replace(day=1)
+    rows = (await session.execute(
+        select(OverlayUsage.token_id, func.sum(OverlayUsage.minutes)).where(OverlayUsage.token_id.in_(token_ids), OverlayUsage.day >= first)
+        .group_by(OverlayUsage.token_id)
+    )).all()
+    return {tid: round(int(m) / 60, 1) for tid, m in rows}
+
+
+def _aware(t: datetime) -> datetime:
+    return t if t.tzinfo is not None else t.replace(tzinfo=timezone.utc)
+
+
+# A published version never changes; its document is decoded once per process.
+_DOCS: "OrderedDict[int, dict]" = OrderedDict()
+
+
+async def _doc(session: AsyncSession, version_id: int) -> dict | None:
+    if version_id in _DOCS:
+        _DOCS.move_to_end(version_id)
+        return _DOCS[version_id]
+    row = await session.get(GuideVersion, version_id)
+    if row is None:
+        return None
+    _DOCS[version_id] = row.body
+    while len(_DOCS) > 64:
+        _DOCS.popitem(last=False)
+    return row.body
+
+
+# The instruments' answers, kept a little while: the sky and the hours move
+# by the minute, support by the second at most; nobody needs them per poll.
+_INSTRUMENTS: dict[str, tuple[float, object]] = {}
+
+
+async def _cached(key: str, ttl: float, compute):
+    now = time.monotonic()
+    hit = _INSTRUMENTS.get(key)
+    if hit and now - hit[0] < ttl:
+        return hit[1]
+    value = await compute()
+    _INSTRUMENTS[key] = (now, value)
+    if len(_INSTRUMENTS) > 256:
+        for k in sorted(_INSTRUMENTS, key=lambda k: _INSTRUMENTS[k][0])[:64]:
+            _INSTRUMENTS.pop(k, None)
+    return value
 
 
 async def _instrument_stamp(session: AsyncSession, elements: list[dict]) -> str:
@@ -99,11 +175,17 @@ async def _instrument_stamp(session: AsyncSession, elements: list[dict]) -> str:
     """
     kinds = {e.get("kind") for e in elements}
     stamp = ""
-    if kinds & {"alerts", "ticker", "counter", "guide-goal"}:
+    if kinds & {"alerts", "ticker", "counter"}:
         from shruti.models import SupportEvent
-        latest = (await session.execute(select(func.max(SupportEvent.id)))).scalar() or 0
-        totals = ":".join(str(e.get("element", {}).get("total", "")) for e in elements if e.get("kind") == "guide-goal")
-        stamp += f":e{latest}:{totals}"
+
+        async def latest_event() -> int:
+            return (await session.execute(select(func.max(SupportEvent.id)))).scalar() or 0
+        stamp += f":e{await _cached('events:max', 2.0, latest_event)}"
+    if kinds & {"guide-goal"}:
+        from shruti.models.guides import GroupContribution
+        codes = sorted({e.get("group", "") for e in elements if e.get("kind") == "guide-goal"})
+        latest = (await session.execute(select(func.max(GroupContribution.id)))).scalar() or 0
+        stamp += f":g{latest}:{','.join(codes)}"
     if kinds & {"sky", "hours", "countdown"}:
         stamp += f":t{int(datetime.now(timezone.utc).timestamp() // 300)}"
     return stamp
@@ -159,11 +241,12 @@ async def _fill_goals(session: AsyncSession, elements: list[dict]) -> None:
                 c = await counter_of(e)
                 e["element"] = _counter_element(c, await counters.progress(session, c)) if c is not None else {}
             elif kind == "ticker":
-                e["element"] = await instruments.ticker_payload(session, await counter_of(e), 18)
+                c = await counter_of(e)
+                e["element"] = await _cached(f"ticker:{c.id if c else 0}", 5.0, lambda: instruments.ticker_payload(session, c, 18))
             elif kind == "sky":
-                e["element"] = await instruments.sky_now(e.get("lat", 37.9838), e.get("lon", 23.7275))
+                e["element"] = await _cached(f"sky:{e.get('lat')}:{e.get('lon')}", 60.0, lambda: instruments.sky_now(e.get("lat", 37.9838), e.get("lon", 23.7275)))
             elif kind == "hours":
-                e["element"] = await instruments.hours_now(e.get("lat", 37.9838), e.get("lon", 23.7275))
+                e["element"] = await _cached(f"hours:{e.get('lat')}:{e.get('lon')}", 60.0, lambda: instruments.hours_now(e.get("lat", 37.9838), e.get("lon", 23.7275)))
             elif kind == "countdown":
                 c = await counter_of(e)
                 e["element"] = ({"name": c.name, "note": c.note, "now": now.isoformat(),
@@ -308,6 +391,7 @@ async def my_tokens(request: Request, session: AsyncSession = Depends(get_sessio
         ).order_by(OverlayToken.id)
     )).scalars().all()
     now = datetime.now(timezone.utc)
+    hours = await hours_this_month(session, [o.id for o in rows])
     out = []
     for o in rows:
         if o.kind == "guide-goal":
@@ -324,6 +408,7 @@ async def my_tokens(request: Request, session: AsyncSession = Depends(get_sessio
         out.append({"id": o.id, "kind": o.kind, "label": o.label, "theme": o.theme, "motion": o.motion,
                     "showing": showing, "href": href,
                     "live": bool(seen and (now - seen).total_seconds() < 15),
+                    "hoursThisMonth": hours.get(o.id, 0.0),
                     "lastSeen": o.last_seen.isoformat() if o.last_seen else None})
     return out
 

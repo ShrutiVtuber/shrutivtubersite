@@ -511,16 +511,28 @@ def revoke(run_id: int, token_id: int) -> None:
 
 
 @app.get("/api/overlay/guide")
-def overlay_guide(t: str) -> dict:
-    """The run as this token's element draws it. Public by token; a gone run is an empty frame."""
+def overlay_guide(t: str, v: str = "") -> dict:
+    """
+    The run as this token's element draws it. Public by token; a gone run is
+    an empty frame. A source sends the version it shows as `v`; when nothing
+    has changed the answer says so and computes nothing — the same contract
+    as the site's, so a page works against either.
+    """
     con = db()
     o = con.execute("SELECT * FROM overlay WHERE token = ?", (t,)).fetchone()
     if o is None:
         raise HTTPException(404, "no such overlay")
-    con.execute("UPDATE overlay SET last_seen = ? WHERE id = ?", (_now().isoformat(), o["id"])); con.commit()
+    # Seen-at is written at most once a minute; a source polls every two seconds.
+    seen = o["last_seen"] or ""
+    if not seen or (_now() - datetime.fromisoformat(seen)).total_seconds() > 60:
+        con.execute("UPDATE overlay SET last_seen = ? WHERE id = ?", (_now().isoformat(), o["id"])); con.commit()
     base = {"kind": o["kind"], "theme": o["theme"], "motion": o["motion"], "run": None, "element": None, "version": ""}
     row = con.execute("SELECT * FROM run WHERE id = ?", (o["run_id"],)).fetchone()
     if row is None:
+        return base
+    base["version"] = row["updated_at"]
+    if v and v == row["updated_at"]:
+        base["unchanged"] = True
         return base
     g = _guide_row(con, row["guide_id"]); doc = json.loads(g["body"]); stored = _stored(row)
     base["run"] = {"name": stored.get("name", ""), "guide": g["title"], "game": g["game_name"]}

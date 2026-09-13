@@ -34,9 +34,10 @@
   const tick = async () => {
     if (!token) return;
     try {
-      const r = await fetch(`/api/overlay/guide?t=${encodeURIComponent(token)}`, { cache: "no-store" });
+      const r = await fetch(`/api/overlay/guide?t=${encodeURIComponent(token)}&v=${encodeURIComponent(last.version ?? "")}`, { cache: "no-store" });
       if (!r.ok) return;                       /* held, not blanked */
       const next = await r.json();
+      if (next.unchanged) return;
       root.dataset.theme = next.theme; root.dataset.motion = next.motion;
       still = next.motion === "still"; reduced = next.motion === "reduced";
       if (next.version !== last.version || (!last.element && next.element)) {

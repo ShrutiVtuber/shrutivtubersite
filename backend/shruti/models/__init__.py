@@ -13,7 +13,7 @@ correctly with no art at all; you add it later and unhide the block.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import Optional
 
 from sqlalchemy import DateTime
@@ -571,6 +571,25 @@ class OverlayToken(TimestampMixin, table=True):
     shared: bool = Field(default=False)
 
     last_seen: Optional[datetime] = Field(default=None, sa_type=UTC_TS)
+
+
+
+class OverlayUsage(SQLModel, table=True):
+    """
+    Minutes an overlay was on air, per day — the honest basis for "hours
+    streamed this month". A source polls every two seconds and seen-at is
+    written once a minute, so each write is one minute of stream and costs
+    nothing extra to count. Nothing here measures a person's absence: a day
+    with no row is a day with no stream, and it is never listed.
+    """
+
+    __tablename__ = "overlay_usage"
+    __table_args__ = (UniqueConstraint("token_id", "day", name="uq_overlay_usage_day"),)
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    token_id: int = Field(index=True, foreign_key="overlay_token.id")
+    day: date = Field(index=True)
+    minutes: int = 0
 
 
 class AlertSound(TimestampMixin, table=True):
