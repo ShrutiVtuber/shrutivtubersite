@@ -112,6 +112,12 @@ const actions = !preview;
         <span class="rd-mono">{say("rail.votes", "votes")}</span>
         <span class="rd-votes"><span class="rd-glyph" aria-hidden="true">●</span><span data-votes>{guide.votes}</span></span>
       </div>
+      {(doc.guide.authors ?? []).length > 0 && (
+        <div class="rd-fact">
+          <span class="rd-mono">{say("rail.by", "by")}</span>
+          <span class="rd-mono soft">{(doc.guide.authors ?? []).join(", ")}</span>
+        </div>
+      )}
       <div class="rd-fact">
         <span class="rd-mono">{say("rail.licence", "licence")}</span>
         <span class="rd-mono soft">{licence || say("licence.unsaid", "not stated")}</span>
