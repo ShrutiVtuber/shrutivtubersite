@@ -80,8 +80,10 @@ def _schema_problems(guide: Any) -> Iterable[Problem]:
 # ── everything the schema cannot say ─────────────────────────────────────────
 
 def _semantic_problems(g: dict) -> Iterable[Problem]:
-    variants = {v["id"] for v in g["game"]["variants"]}
-    yield from _unique("$.game.variants", (v["id"] for v in g["game"]["variants"]))
+    # ⚠ Absent or empty means one way to play — the common case. Requiring a
+    # variant made every single-mode game invent one.
+    variants = {v["id"] for v in g["game"].get("variants", [])}
+    yield from _unique("$.game.variants", (v["id"] for v in g["game"].get("variants", [])))
 
     fields = {f["id"]: f for f in g["checkin"]}
     yield from _unique("$.checkin", (f["id"] for f in g["checkin"]))
