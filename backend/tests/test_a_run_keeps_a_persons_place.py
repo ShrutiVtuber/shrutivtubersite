@@ -88,3 +88,12 @@ def test_the_view_says_when_the_guide_moved_on() -> None:
     body = code_of(progress.view)
     assert '"stale": bool(version_id) and version_id != published_version_id' in body
     assert '"orphaned": progress.orphaned' in body
+
+
+# ── a newer version of the guide never takes anybody's progress ─────────────
+
+def test_following_a_newer_version_keeps_the_progress_untouched() -> None:
+    body = code_of(runs.follow)
+    assert "row.version_id = guide.published_version_id" in body
+    for field in ("row.steps", "row.checkin", "row.routines", "row.tracks", "row.later", "row.note"):
+        assert field not in body, f"{field} touched while following a newer version"

@@ -176,7 +176,11 @@ const WORDS = {
         </div>
       </header>
       <p class="tk-errorbar" data-error hidden><span data-error-text></span> <button type="button" class="tk-ghost sm" data-retry>{say("error.retry", "Try again")}</button></p>
-      <p class="tk-stale" data-stale hidden>{say("stale", "This guide has a newer version. Your progress is kept, including steps that no longer exist.")}</p>
+      <p class="tk-stale" data-stale hidden>
+        <span>{say("stale", "This guide has a newer version. Your progress is kept, including steps that no longer exist.")}</span>
+        <button type="button" class="tk-link" data-follow>{say("stale.follow", "Update to it")}</button>
+        <button type="button" class="tk-link quiet" data-stale-dismiss>{say("stale.dismiss", "Not now")}</button>
+      </p>
 
       <div class="tk-grid">
         <section class="tk-main">
@@ -304,6 +308,9 @@ const WORDS = {
   .tk-grid { display: grid; grid-template-columns: minmax(0, 1fr) 380px; }
   .tk[data-folded="1"] .tk-grid { grid-template-columns: minmax(0, 1fr) 260px; }
   .tk-main { padding: 40px var(--page-pad) 40px; display: flex; flex-direction: column; gap: 26px; border-right: var(--border-w) solid var(--line); min-width: 0; }
+  .tk-stale { display: flex; gap: 12px; flex-wrap: wrap; align-items: baseline; }
+  .tk-link { font: inherit; background: none; border: 0; padding: 0; color: var(--accent); text-decoration: underline; cursor: pointer; }
+  .tk-link.quiet { color: var(--ink-faint); }
   .tk-file { display: flex; gap: 10px; flex-wrap: wrap; }
   .tk-btn-quiet { cursor: pointer; }
   .tk-side { padding: 40px 32px; display: flex; flex-direction: column; gap: 26px; background: var(--surface-card); }

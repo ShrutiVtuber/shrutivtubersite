@@ -112,7 +112,11 @@ export function mountTrack(root: HTMLElement) {
         (view.reentry.note ? `<p class="tk-re-note">${esc(view.reentry.note)}</p>` : "") +
         (view.reentry.next ? `<p class="tk-mono">${esc(W.reentry.next)} ${esc(view.reentry.next.title)}</p>` : "");
     } else re.hidden = true;
-    const stale = $("[data-stale]")!; stale.hidden = !view.stale;
+    /* Dismissed per run and per newer version, in this browser; a newer one still shows. */
+    const stale = $("[data-stale]")!;
+    let dismissed = "";
+    try { dismissed = localStorage.getItem(`shruti.guides.stale.${view.id}`) || ""; } catch { /* no storage */ }
+    stale.hidden = !view.stale || dismissed === String(view.publishedVersionId ?? "");
   };
   let reentryDismissed = false;
 
@@ -250,6 +254,14 @@ export function mountTrack(root: HTMLElement) {
   };
   const drawNote = () => { const el = $<HTMLTextAreaElement>("[data-note]"); if (el && document.activeElement !== el) el.value = view.note ?? ""; };
 
+  $("[data-follow]")?.addEventListener("click", async () => {
+    const r = await api("POST", `/api/runs/${view.id}/follow`);
+    if (r.ok) { view = r.body; draw(); }
+  });
+  $("[data-stale-dismiss]")?.addEventListener("click", () => {
+    try { localStorage.setItem(`shruti.guides.stale.${view.id}`, String(view.publishedVersionId ?? "")); } catch { /* no storage */ }
+    $("[data-stale]")!.hidden = true;
+  });
   $("[data-import]")?.addEventListener("change", async (ev) => {
     const input = ev.currentTarget as HTMLInputElement;
     const note = $("[data-file-note]");

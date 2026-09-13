@@ -228,6 +228,22 @@ async def rename(run_id: int, body: RunPatch, request: Request, session: AsyncSe
     return await _answer(session, user, row)
 
 
+@router.post("/{run_id}/follow")
+async def follow(run_id: int, request: Request, session: AsyncSession = Depends(get_session)) -> dict:
+    """
+    Move the run to the guide's newer published version. Progress is kept
+    as it is — a step the new version no longer has stays as orphaned
+    progress, never deleted — and nothing is marked or unmarked here.
+    """
+    user = await _reader(request, session)
+    row = await _run_of(session, user, run_id)
+    guide = await session.get(Guide, row.guide_id)
+    if guide is None or not guide.published_version_id:
+        raise HTTPException(404, "no such guide")
+    row.version_id = guide.published_version_id
+    return await _answer(session, user, row)
+
+
 @router.delete("/{run_id}")
 async def delete(run_id: int, request: Request, session: AsyncSession = Depends(get_session)) -> dict:
     user = await _reader(request, session)
