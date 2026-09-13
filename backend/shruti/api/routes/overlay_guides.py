@@ -104,6 +104,44 @@ async def _fill_goals(session: AsyncSession, elements: list[dict]) -> None:
             e["element"] = (await goal_by_code(session, e["group"])) or {}
 
 
+@router.get("/mine")
+async def my_tokens(request: Request, session: AsyncSession = Depends(get_session)) -> list[dict]:
+    """
+    Every guide overlay this person holds — the runs' and the groups' —
+    WITHOUT their tokens (board W8's table: name, what it shows, theme,
+    live or idle). A token is readable once, when minted.
+    """
+    from shruti.api.routes.practice import _reader
+    from shruti.models.guides import Group
+    user = await _reader(request, session)
+    runs = {r.id: r for r in (await session.execute(select(GuideRun).where(GuideRun.user_id == user.id))).scalars().all()}
+    rows = (await session.execute(
+        select(OverlayToken).where(
+            OverlayToken.kind.in_(SITE_KINDS),
+            (OverlayToken.run_id.in_(list(runs)) if runs else False) | (OverlayToken.user_id == user.id),
+        ).order_by(OverlayToken.id)
+    )).scalars().all()
+    now = datetime.now(timezone.utc)
+    out = []
+    for o in rows:
+        if o.kind == "guide-goal":
+            group = await session.get(Group, o.group_id) if o.group_id else None
+            showing, href = (group.name if group else ""), (f"/groups/{group.code}" if group else "")
+        else:
+            run = runs.get(o.run_id)
+            showing, href = (run.name if run else ""), ""
+            if run:
+                g = await session.get(Guide, run.guide_id)
+                game = await session.get(Game, g.game_id) if g else None
+                href = f"/guides/{game.slug}/{g.slug}/track?run={run.id}" if g and game else ""
+        seen = o.last_seen.replace(tzinfo=timezone.utc) if o.last_seen and o.last_seen.tzinfo is None else o.last_seen
+        out.append({"id": o.id, "kind": o.kind, "label": o.label, "theme": o.theme, "motion": o.motion,
+                    "showing": showing, "href": href,
+                    "live": bool(seen and (now - seen).total_seconds() < 15),
+                    "lastSeen": o.last_seen.isoformat() if o.last_seen else None})
+    return out
+
+
 # ── the person's own tokens ──────────────────────────────────────────────────
 
 class TokenIn(BaseModel):

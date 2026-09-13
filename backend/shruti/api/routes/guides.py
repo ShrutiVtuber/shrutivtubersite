@@ -646,6 +646,52 @@ async def admin_guides(session: AsyncSession = Depends(get_session)) -> list[dic
     return out
 
 
+# ── an author's page (board W10) ─────────────────────────────────────────────
+
+@router.get("/by/{user_id}")
+async def by_author(user_id: int, request: Request, session: AsyncSession = Depends(get_session)) -> dict:
+    """
+    What an author has published: each guide with its licence, its state and
+    its votes. Drafts stay private; a hidden guide shows as hidden only to
+    its author. The name is the same one the catalogue prints.
+    """
+    author = await session.get(User, user_id)
+    if author is None:
+        raise HTTPException(404, "no such author")
+    from shruti.api.routes.accounts import current_user
+    viewer = await current_user(request, session)
+    own = viewer is not None and viewer.id == user_id
+    rows = (await session.execute(
+        select(Guide, Game).join(Game, Game.id == Guide.game_id).where(Guide.created_by == user_id).order_by(Guide.updated_at.desc())
+    )).all()
+    ids = [g.id for g, _ in rows]
+    votes = dict((await session.execute(
+        select(GuideVote.guide_id, func.count()).where(GuideVote.guide_id.in_(ids)).group_by(GuideVote.guide_id)
+    )).all()) if ids else {}
+    pending = set((await session.execute(
+        select(GuideVersion.guide_id).where(GuideVersion.guide_id.in_(ids), GuideVersion.state == "submitted")
+    )).scalars().all()) if ids else set()
+    guides = []
+    for g, game in rows:
+        version = await session.get(GuideVersion, g.published_version_id) if g.published_version_id else None
+        if version is None and g.id not in pending:
+            continue                      # a draft nobody has submitted is nobody's business
+        if g.hidden and not own:
+            continue
+        meta = (version.body if version else {}).get("guide", {})
+        status = "hidden" if g.hidden else ("published" if version else "in review")
+        if version and g.id in pending:
+            status = "update in review"
+        guides.append({"id": g.id, "slug": g.slug, "title": g.title, "game": {"slug": game.slug, "name": game.name},
+                       "licence": str(meta.get("licence") or ""), "status": status, "votes": int(votes.get(g.id, 0))})
+    return {
+        "id": author.id, "name": _name(author), "own": own,
+        "published": sum(1 for g in guides if g["status"] in ("published", "update in review")),
+        "votes": sum(g["votes"] for g in guides),
+        "guides": guides,
+    }
+
+
 # ── the reader, and the pack ─────────────────────────────────────────────────
 
 @router.get("/by-id/{guide_id}/download")

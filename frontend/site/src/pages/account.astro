@@ -153,6 +153,14 @@ const TRADITIONS = [
   { value: "hellenistic", label: "Hellenistic" },
   { value: "vedic", label: "Vedic" },
 ];
+const tokensRead = await asReader(Astro, "/api/overlay/mine");
+const guideTokens: { id: number; kind: string; label: string; showing: string; href: string; theme: string; live: boolean }[] =
+  tokensRead.ok && Array.isArray(tokensRead.body) ? tokensRead.body : [];
+const kindWord = (k: string) =>
+  k === "guide-now" ? say("tokens.kind.now", "now card") : k === "guide-sigil" ? say("tokens.kind.sigil", "sigil")
+  : k === "guide-path" ? say("tokens.kind.path", "path strip") : k === "guide-routine" ? say("tokens.kind.routine", "routine")
+  : k === "guide-goal" ? say("tokens.kind.goal", "goal") : say("tokens.kind.layout", "layout");
+const themeWord = (t: string) => t === "grimoire" ? say("tokens.theme.grimoire", "Grimoire") : t === "plain" ? say("tokens.theme.plain", "Plain") : say("tokens.theme.almanac", "Almanac");
 ---
 
 <BaseLayout title={say("text.1", "Your account — Shruti")} description={say("text.2", "Profile, consents and your data.")} noindex>
@@ -230,6 +238,36 @@ const TRADITIONS = [
               </li>
             ))}
           </ul>
+        )
+      }
+    </section>
+
+    <section class="card">
+      <h2>{say("tokens.1", "Overlay tokens")}</h2>
+      {
+        guideTokens.length === 0 ? (
+          <div class="stack">
+            <p class="quiet">{say("tokens.2", "None yet. An overlay is minted from a run's track page, or from a group's page; the URL is shown once, there.")}</p>
+            <div><Button variant="secondary" href="/guides">{say("tokens.3", "Open the guides")}</Button></div>
+          </div>
+        ) : (
+          <div class="tokens" role="table">
+            <div class="tokens-row tokens-head" role="row">
+              <span role="columnheader">{say("tokens.col.name", "Name")}</span>
+              <span role="columnheader">{say("tokens.col.showing", "Showing")}</span>
+              <span role="columnheader">{say("tokens.col.theme", "Theme")}</span>
+              <span role="columnheader">{say("tokens.col.state", "State")}</span>
+            </div>
+            {guideTokens.map((t) => (
+              <div class="tokens-row" role="row">
+                <span role="cell">{t.label || kindWord(t.kind)}<span class="faint"> — {kindWord(t.kind)}</span></span>
+                <span role="cell">{t.href ? <a href={t.href}>{t.showing}</a> : t.showing}</span>
+                <span role="cell" class="faint">{themeWord(t.theme)}</span>
+                <span role="cell" class={`t-tabular ${t.live ? "live" : "faint"}`}>{t.live ? say("tokens.live", "live") : say("tokens.idle", "idle")}</span>
+              </div>
+            ))}
+            <p class="quiet">{say("tokens.4", "A token's URL is shown once, when it is minted. Revoke one from the page it was minted on.")}</p>
+          </div>
         )
       }
     </section>
@@ -491,6 +529,11 @@ const TRADITIONS = [
     background: none; border: 0; padding: 4px 0; cursor: pointer;
   }
   .acc-blocked button:hover { color: var(--ink); text-decoration: underline; }
+  .tokens { display: grid; gap: 0; }
+  .tokens-row { display: grid; grid-template-columns: 1.4fr 1.2fr .8fr .5fr; gap: var(--space-3); padding: .55rem 0; border-bottom: 1px solid var(--rule); align-items: baseline; }
+  .tokens-head { font-size: .78rem; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); }
+  .tokens .live { color: var(--rose, #E0A4BC); }
+  .tokens .quiet { margin-top: var(--space-3); }
 </style>
 
 <script is:inline>
