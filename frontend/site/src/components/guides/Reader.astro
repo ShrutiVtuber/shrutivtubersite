@@ -1,0 +1,453 @@
+---
+/* The reader: one guide as a document, in the site's clothes (board W3).
+ *
+ * A 264px rail — the path as an index, the facts, report and block — beside
+ * a 66ch prose column. Step bodies are set in the display face at prose
+ * size: this is her writing, and it reads like the journal. There are no
+ * state dots anywhere, on purpose: nothing has a state until there is a
+ * run, so a signed-out reader sees a document, not a checklist with
+ * everything unticked.
+ *
+ * Everything on this page is somebody's writing, so everything is a text
+ * node: no markdown, no set:html. A link in a guide is drawn only for
+ * http(s); anything else is shown as text.
+ *
+ * Used by the public reader and by the desk's preview, which passes
+ * `preview` so the actions stay off and a notice says what it is.
+ */
+import { copy } from "../../lib/copy";
+import {
+  type GuideSummary,  type Gate, type GuideDoc, type Link, type Step,
+  codexGroups, gateWords, phasesOf, safeUrl, stepsOf, titled, variantNames,
+} from "../../lib/guides";
+
+interface Props {
+  guide: GuideSummary & { body: GuideDoc };
+  signedIn: boolean;
+  preview?: boolean;
+}
+const { guide, signedIn, preview = false } = Astro.props;
+const say = await copy("component:GuideReader");
+
+const doc = guide.body;
+const phases = phasesOf(doc);
+const pathPhases = phases.filter((p) => !p.track);
+const tracks = doc.tracks ?? [];
+const routines = doc.routines ?? [];
+const groups = codexGroups(doc);
+const notes = doc.codex_notes ?? [];
+const caveats = doc.guide.caveats ?? [];
+const stepCount = (doc.steps ?? []).length;
+const hours = Math.round((doc.steps ?? []).reduce((n, s) => n + (Number(s.minutes) || 0), 0) / 60);
+const trackName = (id: string) => tracks.find((t) => t.id === id)?.name ?? id;
+const codexOf = (id: string) => (doc.codex ?? []).find((c) => c.id === id);
+
+/* The gate as the board prints it: a mono line, "opens at level 15". */
+const words = {
+  min: say("gate.min", "at {what} {n}"),
+  max: say("gate.max", "up to {what} {n}"),
+  atLeast: say("gate.at_least", "from {value}"),
+  is: say("gate.is", "when {what} is {value}"),
+  variant: say("gate.variant", "in {name}"),
+  after: say("gate.after", "after {ids}"),
+  once: say("gate.once", "once {names} is in play"),
+};
+const lower = (doc2: GuideDoc): GuideDoc => ({
+  ...doc2, checkin: (doc2.checkin ?? []).map((f) => ({ ...f, label: (f.label || f.id).toLowerCase() })),
+});
+const lowered = lower(doc);
+const opens = (g: Gate | undefined) => gateWords(g, lowered, words);
+const isVideo = (l: Link) =>
+  l.type === "video" || /youtube\.com|youtu\.be|twitch\.tv|vimeo\.com/i.test(String(l.url ?? ""));
+const linkLabel = (l: Link) => l.label || l.url;
+
+const LICENCES: Record<string, string> = {
+  "CC-BY-SA-4.0": "CC BY-SA 4.0", "CC-BY-4.0": "CC BY 4.0", "CC0-1.0": "CC0",
+  "All-Rights-Reserved": say("licence.reserved", "all rights reserved"),
+};
+const licence = doc.guide.licence ? (LICENCES[doc.guide.licence] ?? doc.guide.licence) : "";
+const RESETS: Record<string, string> = {
+  session: say("resets.session", "resets each session"), daily: say("resets.daily", "resets daily"),
+  weekly: say("resets.weekly", "resets weekly"), manual: say("resets.manual", "reset by hand"),
+};
+
+const REASONS: [string, string][] = [
+  ["abuse", say("reason.abuse", "Aimed at a person")],
+  ["hate", say("reason.hate", "Aimed at a group")],
+  ["sexual", say("reason.sexual", "Sexual, or involving a minor")],
+  ["spam", say("reason.spam", "Spam or advertising")],
+  ["self-harm", say("reason.self-harm", "Somebody who may need help")],
+  ["not-a-reading", say("reason.not-a-guide", "Not a guide at all")],
+  ["other", say("reason.other", "Something else")],
+];
+const actions = !preview;
+---
+
+<div class="rd" data-reader>
+  <aside class="rd-rail">
+    <div class="rd-rail-block">
+      <span class="rd-eyebrow">{say("rail.path", "The path")}</span>
+      <nav class="rd-index" aria-label={say("rail.path", "The path")}>
+        {pathPhases.map((p) => <a href={`#phase-${p.id}`}>{p.name}</a>)}
+        {(tracks.length > 0 || routines.length > 0 || groups.length > 0) && <span class="rd-index-rule"></span>}
+        {tracks.map((t) => <a href={`#track-${t.id}`}>{t.name}</a>)}
+        {routines.length > 0 && <a href="#routines">{say("rail.routines", "Routines")} · {routines.length}</a>}
+        {(groups.length > 0 || notes.length > 0) && <a href="#codex">{say("rail.codex", "Codex")} · {(doc.codex ?? []).length}</a>}
+      </nav>
+    </div>
+
+    <div class="rd-rail-block rd-facts">
+      <div class="rd-fact">
+        <span class="rd-mono">{say("rail.votes", "votes")}</span>
+        <span class="rd-votes"><span class="rd-glyph" aria-hidden="true">●</span><span data-votes>{guide.votes}</span></span>
+      </div>
+      <div class="rd-fact">
+        <span class="rd-mono">{say("rail.licence", "licence")}</span>
+        <span class="rd-mono soft">{licence || say("licence.unsaid", "not stated")}</span>
+      </div>
+      {actions && signedIn && !guide.mine && (
+        <button type="button" class="rd-vote" data-vote={guide.id} aria-pressed={guide.voted}>
+          {guide.voted ? say("vote.done", "Useful ✓") : say("vote", "Useful")}
+        </button>
+      )}
+      {actions && (
+        <div class="rd-rail-links">
+          {signedIn && !guide.mine && (
+            <details class="rd-report">
+              <summary>{say("report", "Report")}</summary>
+              <form data-report={guide.id}>
+                <fieldset>
+                  <legend>{say("report.why", "What is wrong with it?")}</legend>
+                  {REASONS.map(([value, label], i) => (
+                    <label><input type="radio" name="reason" value={value} checked={i === 0} /> {label}</label>
+                  ))}
+                </fieldset>
+                <label class="rd-detail">
+                  {say("report.detail", "Anything else she should know (optional)")}
+                  <textarea name="detail" rows="2" maxlength="1000"></textarea>
+                </label>
+                <button type="submit">{say("report.send", "Send the report")}</button>
+                <p class="rd-note">
+                  {say("report.note", "It goes to Shruti. If a few people report the same thing it comes off the catalogue until she has looked.")}
+                </p>
+              </form>
+            </details>
+          )}
+          {signedIn && !guide.mine && guide.authorId && (
+            <button type="button" class="rd-block" data-block={guide.authorId} data-who={guide.author}>
+              {say("block", "Block author")}
+            </button>
+          )}
+          {guide.mine && !guide.hidden && guide.publishedAt && (
+            <button type="button" class="rd-block" data-withdraw={guide.id}>{say("withdraw", "Take mine down")}</button>
+          )}
+          <a class="rd-download" href={`/api/guides/by-id/${guide.id}/download`} download>{say("download", "Download")}</a>
+        </div>
+      )}
+      {actions && !signedIn && (
+        <p class="rd-quiet">
+          <a href="/signin">{say("signin", "Sign in")}</a>
+          {" "}
+          {say("signin.rest", "to say it was useful, or to report it. Reading needs no account, and never will.")}
+        </p>
+      )}
+    </div>
+  </aside>
+
+  <article class="rd-column">
+    {preview && (
+      <p class="rd-preview" role="status">{say("preview", "This is how your draft reads. Nobody else can see it yet.")}</p>
+    )}
+    <header class="rd-head">
+      <span class="rd-eyebrow">
+        {doc.game.name}
+        {doc.guide.game_patch && <> · {say("head.patch", "written for patch")} {doc.guide.game_patch}</>}
+        {tracks.length > 0 && <> {say("head.and", "and")} {tracks.map((t) => t.name).join(", ")}</>}
+      </span>
+      <h1 class="rd-title">{guide.title}</h1>
+      {doc.guide.summary && <p class="rd-summary">{doc.guide.summary}</p>}
+      <div class="rd-chips">
+        <span class="rd-chip">{guide.author}</span>
+        <span class="rd-chip">{pathPhases.length} {say("chips.phases", "phases")} · {stepCount} {say("chips.steps", "steps")}</span>
+        {hours > 0 && <span class="rd-chip">{say("chips.about", "about")} {hours} {say("chips.hours", "hours")}</span>}
+      </div>
+    </header>
+
+    {caveats.length > 0 && (
+      <aside class="rd-caveats">
+        <span class="rd-eyebrow rose">{say("caveats", "Not confirmed yet")}</span>
+        <ul>{caveats.map((c) => <li>{c}</li>)}</ul>
+      </aside>
+    )}
+
+    <span class="rd-horizon" aria-hidden="true"></span>
+
+    {phases.map((p, i) => (
+      <section class="rd-phase" id={`phase-${p.id}`}>
+        <div class="rd-phase-head">
+          <span class="rd-eyebrow">
+            {p.track ? trackName(p.track) : <>{say("phase", "Phase")} {pathPhases.indexOf(p) + 1}</>}
+            {p.band && <> · {p.band}</>}
+          </span>
+          <h2 class="rd-phase-name">{p.name}</h2>
+        </div>
+        <ol class="rd-steps">
+          {stepsOf(doc, p).map((s: Step) => {
+            const entry = s.codex ? codexOf(s.codex) : undefined;
+            const gate = opens(s.gate);
+            const only = variantNames(s.applies_to, doc);
+            return (
+              <li class="rd-step" id={`step-${s.id}`}>
+                <span class="rd-id">{s.id}</span>
+                <div class="rd-step-body">
+                  <h3 class="rd-step-title">{s.title}</h3>
+                  {s.do && <p class="rd-do">{s.do}</p>}
+                  {s.done_when && <p class="rd-line"><b>{say("step.done", "Done when")} · </b>{s.done_when}</p>}
+                  {s.why && <p class="rd-line"><b>{say("step.why", "Why")} · </b>{s.why}</p>}
+                  {(s.links ?? []).length > 0 && (
+                    <div class="rd-links">
+                      {s.links!.map((l) => safeUrl(l.url)
+                        ? <a class="rd-pill" href={safeUrl(l.url)} rel="nofollow noopener" target="_blank" data-video={isVideo(l) || undefined}>
+                            {isVideo(l) ? <span class="rd-play" aria-hidden="true"><span></span></span> : <span class="rd-mono faint" aria-hidden="true">↗</span>}
+                            <span>{linkLabel(l)}</span>
+                          </a>
+                        : <span class="rd-pill"><span>{linkLabel(l)}</span></span>)}
+                    </div>
+                  )}
+                  {entry && (
+                    <div class="rd-codex">
+                      <span class="rd-eyebrow rose">{say("step.codex", "Opens a codex entry")}</span>
+                      <a href={`#codex-${entry.id}`}>{entry.name}{entry.what && <> — {entry.what}</>}</a>
+                    </div>
+                  )}
+                  {(gate.length > 0 || s.kind === "optional" || s.ongoing || only.length > 0) && (
+                    <p class="rd-gate">
+                      {s.kind === "optional" && <span>{say("step.optional", "optional")}</span>}
+                      {s.ongoing && <span>{say("step.ongoing", "ongoing")}</span>}
+                      {only.length > 0 && <span>{only.join(", ")} {say("step.only", "only")}</span>}
+                      {gate.length > 0 && <span>{say("step.opens", "opens")} {gate.join(", ")}</span>}
+                    </p>
+                  )}
+                </div>
+              </li>
+            );
+          })}
+        </ol>
+      </section>
+    ))}
+
+    {tracks.map((t) => (
+      <section class="rd-phase rd-track" id={`track-${t.id}`}>
+        <div class="rd-phase-head">
+          <span class="rd-eyebrow">{say("track", "Track")}{variantNames(t.applies_to, doc).length > 0 && <> · {variantNames(t.applies_to, doc).join(", ")} {say("step.only", "only")}</>}</span>
+          <h2 class="rd-phase-name">{t.name}</h2>
+        </div>
+        {(t.day_one ?? []).length > 0 && <p class="rd-line"><b>{say("track.dayone", "On day one")} · </b>{t.day_one!.join(", ")}</p>}
+        {(t.ranks ?? []).length > 0 && (
+          <ol class="rd-ranks">
+            {t.ranks!.map((r) => (
+              <li><b>{say("track.rank", "Rank")} {r.n} · </b>{r.capstone}{r.when && <span class="rd-mono faint"> — {r.when}</span>}</li>
+            ))}
+          </ol>
+        )}
+        {(t.counters ?? []).map((c) => (
+          <p class="rd-line"><b>{c.label}</b>{c.max !== undefined && <> · {say("track.cap", "cap")} {c.max}</>}{c.nudge && <> — {c.nudge}</>}</p>
+        ))}
+        {(t.sections ?? []).map((sec) => (
+          <div class="rd-tsec"><h3 class="rd-step-title">{sec.title}</h3><p class="rd-do pre">{sec.body}</p></div>
+        ))}
+      </section>
+    ))}
+
+    {routines.length > 0 && (
+      <section class="rd-phase" id="routines">
+        <div class="rd-phase-head">
+          <span class="rd-eyebrow">{say("routines.eyebrow", "Checklists that reset")}</span>
+          <h2 class="rd-phase-name">{say("routines", "Routines")}</h2>
+        </div>
+        {routines.map((r) => (
+          <div class="rd-routine">
+            <h3 class="rd-step-title">{r.name} <span class="rd-mono faint">· {RESETS[r.resets] ?? r.resets}</span></h3>
+            <ul>{r.items.map((i) => <li>{i.text}</li>)}</ul>
+            {opens(r.gate).length > 0 && <p class="rd-gate"><span>{say("step.opens", "opens")} {opens(r.gate).join(", ")}</span></p>}
+          </div>
+        ))}
+      </section>
+    )}
+
+    {(groups.length > 0 || notes.length > 0) && (
+      <section class="rd-phase" id="codex">
+        <div class="rd-phase-head">
+          <span class="rd-eyebrow">{say("codex.eyebrow", "The systems the path leans on")}</span>
+          <h2 class="rd-phase-name">{say("codex", "Codex")}</h2>
+        </div>
+        {notes.map((n) => (
+          <div class="rd-notes">
+            <span class="rd-eyebrow rose">{n.title}</span>
+            <ul>{n.items.map((i) => <li>{i}</li>)}</ul>
+          </div>
+        ))}
+        {groups.map(([group, entries]) => (
+          <div class="rd-group">
+            {group && <h3 class="rd-group-name">{titled(group)}</h3>}
+            {entries.map((c) => (
+              <div class="rd-entry" id={`codex-${c.id}`}>
+                <h4 class="rd-step-title">{c.name}{c.ignore_until && <span class="rd-mono faint"> · {say("codex.ignore", "ignore until")} {c.ignore_until}</span>}</h4>
+                {c.what && <p class="rd-line"><b>{say("codex.what", "What")} · </b>{c.what}</p>}
+                {c.when && <p class="rd-line"><b>{say("codex.when", "When")} · </b>{c.when}</p>}
+                {c.how && <p class="rd-line"><b>{say("codex.how", "How")} · </b>{c.how}</p>}
+                {(c.caveats ?? []).length > 0 && <ul class="rd-cav">{c.caveats!.map((x) => <li>{x}</li>)}</ul>}
+                {(c.links ?? []).length > 0 && (
+                  <div class="rd-links">
+                    {c.links!.map((l) => safeUrl(l.url)
+                      ? <a class="rd-pill" href={safeUrl(l.url)} rel="nofollow noopener" target="_blank">{isVideo(l) ? <span class="rd-play" aria-hidden="true"><span></span></span> : <span class="rd-mono faint" aria-hidden="true">↗</span>}<span>{linkLabel(l)}</span></a>
+                      : <span class="rd-pill"><span>{linkLabel(l)}</span></span>)}
+                  </div>
+                )}
+                {opens(c.show_when).length > 0 && <p class="rd-gate"><span>{say("codex.appears", "appears")} {opens(c.show_when).join(", ")}</span></p>}
+              </div>
+            ))}
+          </div>
+        ))}
+      </section>
+    )}
+  </article>
+</div>
+
+<style>
+  .rd { display: grid; grid-template-columns: 264px minmax(0, 1fr); font-family: var(--font-body); color: var(--ink); }
+  .rd-rail { border-right: var(--border-w) solid var(--line); padding: var(--space-6) var(--space-5); display: flex; flex-direction: column; gap: 22px; background: var(--surface-card); align-self: start; position: sticky; top: 0; max-height: 100vh; overflow-y: auto; }
+  .rd-rail-block { display: flex; flex-direction: column; gap: 8px; }
+  .rd-facts { border-top: var(--border-w) solid var(--line); padding-top: 18px; }
+  .rd-eyebrow { font-size: var(--text-micro); font-weight: 600; letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; color: var(--ink-faint); }
+  .rd-eyebrow.rose { color: var(--rose); }
+  .rd-index { display: flex; flex-direction: column; }
+  .rd-index a { padding: 7px 0; font-size: var(--text-sm); color: var(--ink-soft); text-decoration: none; }
+  .rd-index a:hover { color: var(--ink); }
+  .rd-index-rule { border-top: var(--border-w) solid var(--line); margin: 8px 0 4px; }
+  .rd-fact { display: flex; align-items: center; justify-content: space-between; }
+  .rd-mono { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--ink-faint); }
+  .rd-mono.soft { color: var(--ink-soft); }
+  .rd-mono.faint { color: var(--ink-faint); }
+  .rd-votes { display: inline-flex; align-items: center; gap: 6px; font-family: var(--font-mono); font-size: 12.5px; color: var(--rose); font-variant-numeric: tabular-nums; }
+  .rd-glyph { font-family: var(--font-display); font-size: 13px; }
+  .rd-vote { margin-top: 4px; font: 500 var(--text-sm) var(--font-body); padding: 7px 14px; border-radius: var(--radius-full); border: var(--border-w) solid var(--line-strong); background: var(--surface-card); color: var(--ink); cursor: pointer; align-self: start; }
+  .rd-vote[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); background: var(--accent-wash); }
+  .rd-rail-links { display: flex; flex-wrap: wrap; gap: 14px; padding-top: 6px; align-items: baseline; }
+  .rd-block, .rd-report > summary, .rd-download { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--ink-faint); background: none; border: 0; padding: 0; cursor: pointer; text-decoration: none; }
+  .rd-block:hover, .rd-report > summary:hover, .rd-download:hover { color: var(--ink); }
+  .rd-report { flex-basis: 100%; order: 9; }
+  .rd-report form { display: grid; gap: 10px; margin-top: 10px; }
+  .rd-report fieldset { border: 0; margin: 0; padding: 0; display: grid; gap: 6px; }
+  .rd-report legend { font: 600 var(--text-xs) var(--font-body); color: var(--ink-soft); padding: 0 0 6px; }
+  .rd-report label { display: flex; gap: 8px; align-items: center; font: 400 var(--text-sm) var(--font-body); color: var(--ink-soft); }
+  .rd-report button[type="submit"] { font: 500 var(--text-sm) var(--font-body); padding: 7px 14px; border-radius: var(--radius-full); border: var(--border-w) solid var(--line-strong); background: var(--surface-card); color: var(--ink); cursor: pointer; justify-self: start; }
+  .rd-detail { display: grid !important; gap: 4px; }
+  .rd-detail textarea { font: inherit; padding: 8px; border: var(--border-w) solid var(--line); border-radius: var(--radius-sm); background: var(--surface-page); color: var(--ink); }
+  .rd-note, .rd-quiet { margin: 0; font-size: var(--text-xs); color: var(--ink-faint); line-height: var(--leading-body); }
+  .rd-quiet { font-size: 12.5px; }
+
+  .rd-column { padding: 44px 56px 56px; display: flex; flex-direction: column; gap: 30px; min-width: 0; }
+  .rd-preview { margin: 0; max-width: 66ch; padding: 10px 14px; border: var(--border-w) solid var(--line-strong); background: var(--surface-inset); border-radius: var(--radius-md); font-size: var(--text-sm); color: var(--ink-soft); }
+  .rd-head { display: flex; flex-direction: column; gap: 14px; max-width: 66ch; }
+  .rd-title { margin: 0; font-family: var(--font-display); font-size: 40px; line-height: 1.1; font-weight: 500; color: var(--ink); text-wrap: pretty; }
+  .rd-summary { margin: 0; font-family: var(--font-display); font-size: var(--text-prose); line-height: var(--leading-prose); color: var(--ink); }
+  .rd-chips { display: flex; gap: 10px; flex-wrap: wrap; padding-top: 4px; }
+  .rd-chip { font-family: var(--font-mono); font-size: var(--text-micro); color: var(--ink-soft); border: var(--border-w) solid var(--line); border-radius: var(--radius-full); padding: 5px 12px; }
+  .rd-caveats { max-width: 66ch; border-left: 2px solid var(--rose); padding: 4px 0 4px 16px; display: flex; flex-direction: column; gap: 6px; }
+  .rd-caveats ul { margin: 0; padding-left: 1.1em; font-size: var(--text-sm); color: var(--ink-soft); display: grid; gap: 4px; }
+  .rd-horizon { display: block; height: 1px; background: var(--horizon-line); max-width: 66ch; }
+  .rd-phase { display: flex; flex-direction: column; gap: 28px; max-width: 66ch; }
+  .rd-phase-head { display: flex; flex-direction: column; gap: 6px; }
+  .rd-phase-name { margin: 0; font-family: var(--font-display); font-size: 30px; line-height: 1.15; font-weight: 600; color: var(--ink); }
+  .rd-steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 28px; }
+  .rd-step { display: flex; gap: 20px; }
+  .rd-id { flex: none; font-family: var(--font-mono); font-size: 12.5px; color: var(--ink-faint); width: 44px; padding-top: 6px; }
+  .rd-step-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+  .rd-step-title { margin: 0; font-family: var(--font-display); font-size: 22px; line-height: 1.2; font-weight: 600; color: var(--ink); }
+  .rd-do { margin: 0; font-family: var(--font-display); font-size: 18px; line-height: 1.72; color: var(--ink); }
+  .rd-do.pre { white-space: pre-line; }
+  .rd-line { margin: 0; font-size: 14.5px; line-height: 1.65; color: var(--ink-soft); white-space: pre-line; }
+  .rd-line b { color: var(--ink); font-weight: 600; }
+  .rd-links { display: flex; flex-wrap: wrap; gap: 10px; padding-top: 4px; }
+  .rd-pill { display: inline-flex; align-items: center; gap: 8px; border: var(--border-w) solid var(--line); border-radius: var(--radius-full); padding: 6px 14px; font-size: 13.5px; color: var(--accent); text-decoration: none; }
+  .rd-pill[data-video] { padding-left: 7px; }
+  .rd-play { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: var(--radius-full); background: var(--accent-wash); flex: none; }
+  .rd-play span { display: block; width: 0; height: 0; border-left: 7px solid var(--accent); border-top: 5px solid transparent; border-bottom: 5px solid transparent; margin-left: 2px; }
+  .rd-codex { margin-top: 6px; border-left: 2px solid var(--rose); padding: 4px 0 4px 16px; display: flex; flex-direction: column; gap: 4px; }
+  .rd-codex a { font-family: var(--font-display); font-size: 17px; color: var(--ink); text-decoration: none; }
+  .rd-codex a:hover { text-decoration: underline; }
+  .rd-gate { margin: 0; display: flex; flex-wrap: wrap; gap: 12px; font-family: var(--font-mono); font-size: 13.5px; line-height: 1.6; color: var(--ink-faint); }
+  .rd-ranks { margin: 0; padding-left: 1.2em; display: grid; gap: 6px; font-size: 14.5px; line-height: 1.65; color: var(--ink-soft); }
+  .rd-ranks b { color: var(--ink); font-weight: 600; }
+  .rd-tsec, .rd-routine, .rd-entry, .rd-notes { display: flex; flex-direction: column; gap: 8px; }
+  .rd-routine ul, .rd-notes ul, .rd-cav { margin: 0; padding-left: 1.2em; display: grid; gap: 4px; font-size: 14.5px; line-height: 1.65; color: var(--ink-soft); }
+  .rd-group { display: flex; flex-direction: column; gap: 22px; }
+  .rd-group-name { margin: 0; font-family: var(--font-display); font-size: var(--text-h4); font-weight: 600; color: var(--ink-soft); }
+  @media (max-width: 860px) {
+    .rd { grid-template-columns: 1fr; }
+    .rd-rail { position: static; max-height: none; border-right: 0; border-bottom: var(--border-w) solid var(--line); }
+    .rd-column { padding: var(--space-6) var(--page-pad) var(--space-8); }
+  }
+</style>
+
+<script>
+  const root = document.querySelector<HTMLElement>("[data-reader]");
+  if (root) {
+    const token = () =>
+      document.cookie.split("; ").find((c) => c.startsWith("shruti_csrf="))?.split("=")[1] ?? "";
+    const post = (path: string, body?: unknown) =>
+      fetch(path, {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-csrf-token": token() },
+        body: body === undefined ? undefined : JSON.stringify(body),
+      });
+
+    const vote = root.querySelector<HTMLButtonElement>("[data-vote]");
+    vote?.addEventListener("click", async () => {
+      vote.disabled = true;
+      const r = await post(`/api/guides/by-id/${vote.dataset.vote}/vote`);
+      if (r.ok) {
+        const answer = await r.json();
+        vote.setAttribute("aria-pressed", String(answer.voted));
+        vote.textContent = answer.voted ? "Useful ✓" : "Useful";
+        const count = root.querySelector("[data-votes]");
+        if (count) count.textContent = String(answer.votes);
+      }
+      vote.disabled = false;
+    });
+
+    const block = root.querySelector<HTMLButtonElement>("[data-block]");
+    block?.addEventListener("click", async () => {
+      const who = block.dataset.who ?? "this person";
+      if (!confirm(
+        `Block ${who}?\n\nTheir guides go from your lists and they can no longer ` +
+        `comment on your work. They are not told. You can undo it on your account page.`
+      )) return;
+      block.disabled = true;
+      const r = await post("/api/practice/blocks", { user_id: Number(block.dataset.block) });
+      if (r.ok) location.href = "/guides";
+      else { block.disabled = false; block.textContent = "That did not work — try again"; }
+    });
+
+    const report = root.querySelector<HTMLFormElement>("[data-report]");
+    report?.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const data = new FormData(report);
+      const r = await post(`/api/guides/by-id/${report.dataset.report}/report`, {
+        reason: String(data.get("reason") ?? "other"),
+        detail: String(data.get("detail") ?? ""),
+      });
+      /* The same words whether it was the first report or the fourth. */
+      report.innerHTML = '<p class="rd-note">Thank you — it has gone to Shruti.</p>';
+      if (!r.ok) report.innerHTML = '<p class="rd-note">That did not send. Nothing was lost — try again.</p>';
+    });
+
+    const withdraw = root.querySelector<HTMLButtonElement>("[data-withdraw]");
+    withdraw?.addEventListener("click", async () => {
+      if (!confirm("Take this down? Nobody but you will see it.")) return;
+      const r = await post(`/api/guides/by-id/${withdraw.dataset.withdraw}/withdraw`);
+      if (r.ok) location.reload();
+    });
+  }
+</script>

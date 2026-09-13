@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 """
-Shruti's Guides are read on the site: the catalogue and the reader.
+Shruti's Guides are read on the site: the front door, a game's almanac, and
+the reader — boards W1, W2 and W3 of the 13 September 2026 handoff.
 
 Source-level guards, as everywhere in this suite. The routes have their own
 file (test_a_guide_is_a_path.py); these hold the pages, the section gate that
@@ -15,9 +16,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 SRC = ROOT / "frontend" / "site" / "src"
 INDEX = (SRC / "pages" / "guides" / "index.astro").read_text(encoding="utf-8")
-READER = (SRC / "pages" / "guides" / "[game]" / "[slug].astro").read_text(encoding="utf-8")
+GAME = (SRC / "pages" / "guides" / "[game]" / "index.astro").read_text(encoding="utf-8")
+PAGE = (SRC / "pages" / "guides" / "[game]" / "[slug].astro").read_text(encoding="utf-8")
+READER = (SRC / "components" / "guides" / "Reader.astro").read_text(encoding="utf-8")
+PREVIEW = (SRC / "pages" / "guides" / "write" / "[version]" / "preview.astro").read_text(encoding="utf-8")
 LIB = (SRC / "lib" / "guides.ts").read_text(encoding="utf-8")
-CARD = (SRC / "components" / "cards" / "GuideCard.astro").read_text(encoding="utf-8")
 
 
 def without_comments(text: str) -> str:
@@ -45,10 +48,6 @@ def test_the_section_is_declared_everywhere_a_section_must_be() -> None:
 
 
 def test_guides_start_hidden_without_overriding_her_choice() -> None:
-    """
-    Absent means live is the rule, and it is the wrong default for a section
-    that is new — so a migration writes the hiding row once, and only once.
-    """
     migration = next((ROOT / "backend" / "alembic" / "versions").glob("*_guides_start_hidden.py"))
     body = migration.read_text(encoding="utf-8")
     assert "'page.guides', '0'" in body
@@ -63,61 +62,98 @@ def test_the_nav_and_the_sitemap_carry_the_catalogue() -> None:
     assert '["/guides", "Guides"]' in header
     assert '["/guides", "Guides"]' in footer
     assert '["/guides", "0.8", "weekly"]' in sitemap
-    # Every published guide, and only when the section is reachable.
     assert 'reachable("/guides")' in sitemap
     assert "/api/guides?sort=new&limit=500" in sitemap
     assert "add(`/guides/${g.game.slug}/${g.slug}`" in sitemap
+    assert "add(`/guides/${g.slug}`" in sitemap             # each game's almanac
 
 
-# ── the reader ───────────────────────────────────────────────────────────────
+# ── the front door (W1) ──────────────────────────────────────────────────────
+
+def test_the_front_door_is_the_boards_front_door() -> None:
+    """One sky, three featured by hand, two almanac indices, a by-game grid."""
+    body = without_comments(INDEX)
+    assert body.count('class="sky gd-hero"') == 1 and body.count("sky-horizon") == 1, "the page has exactly one sky"
+    assert ".filter((g) => g.featured).slice(0, 3)" in body
+    assert '"/api/guides?sort=top&limit=5"' in body and '"/api/guides?sort=new&limit=5"' in body
+    assert 'class="gd-leader"' in body                         # dotted leaders, not cards
+    assert "href={`/guides/${g.slug}`}" in body                # the by-game tiles
+    assert """say("games.yours", "Your game isn't here")""" in body
+
+
+def test_the_front_door_is_fetched_as_the_reader() -> None:
+    """A blocked author's guides leave your lists — so the lists need the session."""
+    body = without_comments(INDEX)
+    assert body.count("asReader(Astro, \"/api/guides?") == 3
+
+
+def test_nothing_on_the_front_door_is_ranked_by_an_algorithm() -> None:
+    body = without_comments(INDEX)
+    assert "nothing on this page is ranked by an algorithm" in body
+    assert "/guides/write" not in body                          # the desk is not advertised here
+
+
+# ── a game's almanac (W2) ────────────────────────────────────────────────────
+
+def test_a_games_page_is_an_almanac_table() -> None:
+    body = without_comments(GAME)
+    assert re.search(r"/\^\[a-z0-9-\]\{1,80\}\$/\.test\(slug\)", body)
+    assert 'return Astro.rewrite("/404")' in body
+    for col in ("col.guide", "col.author", "col.published", "col.patch", "col.path", "col.votes"):
+        assert f'say("{col}"' in body
+    assert "the patch it was written for is a column, and you decide" in body
+
+
+# ── the reader (W3) ──────────────────────────────────────────────────────────
+
+def test_the_reader_is_one_component_for_the_page_and_the_preview() -> None:
+    """A preview that is a lookalike drifts."""
+    assert "<Reader guide={guide} signedIn={!!me} />" in PAGE
+    assert "<Reader guide={guide} signedIn preview />" in PREVIEW
+    assert "const actions = !preview;" in READER
+
 
 def test_the_reader_renders_text_never_html() -> None:
-    """A guide is other people's writing. Text nodes, no markdown, no set:html."""
-    body = without_comments(READER)
-    assert "set:html" not in body
-    assert "renderMarkdown" not in body
+    for body in (without_comments(READER), without_comments(PAGE), without_comments(PREVIEW)):
+        assert "set:html" not in body
+        assert "renderMarkdown" not in body
 
 
 def test_a_link_in_a_guide_is_only_drawn_for_http() -> None:
     assert re.search(r"/\^https\?:\\/\\/", LIB), "safeUrl does not pin the scheme"
     body = without_comments(READER)
-    # Every anchor whose href comes from the document goes through safeUrl.
     assert "href={safeUrl(l.url)}" in body
     assert "href={l.url}" not in body
 
 
+def test_the_reader_has_no_state_dots() -> None:
+    """Nothing has a state until there is a run: a document, not a checklist."""
+    body = without_comments(READER)
+    assert "state-dot" not in body and "data-state" not in body and 'type="checkbox"' not in body
+
+
 def test_the_route_parameters_are_slugs_or_nothing() -> None:
-    assert re.search(r"/\^\[a-z0-9-\]\{1,80\}\$/\.test\(game\)", READER)
-    assert re.search(r"/\^\[a-z0-9-\]\{1,160\}\$/\.test\(slug\)", READER)
-    assert 'return Astro.rewrite("/404")' in READER
-    assert re.search(r"/\^\[a-z0-9-\]\{1,80\}\$/\.test\(wantedGame\)", INDEX)
+    assert re.search(r"/\^\[a-z0-9-\]\{1,80\}\$/\.test\(game\)", PAGE)
+    assert re.search(r"/\^\[a-z0-9-\]\{1,160\}\$/\.test\(slug\)", PAGE)
+    assert 'return Astro.rewrite("/404")' in PAGE
 
 
 def test_a_hidden_or_unpublished_guide_is_not_indexed() -> None:
-    assert "noindex={guide.hidden || !guide.publishedAt}" in READER
-    # And asserts nothing to a search engine either.
-    assert "guide.publishedAt && !guide.hidden" in READER
+    assert "noindex={guide.hidden || !guide.publishedAt}" in PAGE
+    assert "guide.publishedAt && !guide.hidden" in PAGE       # and asserts no HowTo
 
 
 def test_the_reader_is_fetched_as_the_reader() -> None:
-    """
-    Hidden is 404 except for the author, and `mine`/`voted` need the session —
-    so the page forwards it rather than asking anonymously.
-    """
-    assert "asReader(Astro, `/api/guides/${game}/${slug}`)" in READER
-    assert "asReader(Astro, `/api/guides?${query.toString()}`)" in INDEX
+    assert "asReader(Astro, `/api/guides/${game}/${slug}`)" in PAGE
+    assert "asReader(Astro, `/api/guides/mine/by-id/${id}`)" in PREVIEW
 
 
-def test_the_gates_are_worded_from_the_pages_copy() -> None:
-    """
-    ⚠ No English in lib/guides.ts. The vocabulary comes from the page's own
-    say(), so "or later" is editable like every other sentence a reader sees.
-    """
+def test_the_gates_are_worded_from_the_components_copy() -> None:
+    """⚠ No English in lib/guides.ts; the reader's "opens at level 15" is editable."""
     lib = without_comments(LIB)
-    assert not re.search(r"[\"'`][^\"'`]*\b(or later|at most|or more|only)\b[^\"'`]*[\"'`]", lib), \
-        "gate wording is hard-coded in the library"
-    assert 'say("gate.at_least", ' in READER
-    assert "gateWords(g, doc, words)" in READER
+    assert not re.search(r"[\"'`][^\"'`]*\b(or later|at most|or more|only)\b[^\"'`]*[\"'`]", lib)
+    assert 'say("gate.min", "at {what} {n}")' in READER
+    assert "gateWords(g, lowered, words)" in READER
 
 
 def test_the_actions_follow_the_practice_room() -> None:
@@ -125,40 +161,19 @@ def test_the_actions_follow_the_practice_room() -> None:
     assert "/api/guides/by-id/${vote.dataset.vote}/vote" in body
     assert "/api/guides/by-id/${report.dataset.report}/report" in body
     assert "/api/guides/by-id/${withdraw.dataset.withdraw}/withdraw" in body
-    # A block is a block whatever they were reading: the room's endpoint.
-    assert '"/api/practice/blocks"' in body
-    # The same words for the first report and the fourth.
-    assert body.count("it has gone to Shruti") == 1
+    assert '"/api/practice/blocks"' in body                    # a block is a block
+    assert body.count("it has gone to Shruti") == 1            # the same words, first or fourth
 
 
 def test_the_reader_does_not_promise_tracking() -> None:
-    """
-    Nothing on the page claims progress can be kept until it can. The download
-    link is the honest version of that promise — the file the tracker reads.
-    """
+    """Nothing on the page claims progress can be kept until it can."""
+    for body in (without_comments(READER), without_comments(PAGE)):
+        assert "Track this" not in body and "keeps your place" not in body and "remembers which step" not in body
+    assert "/download" in without_comments(READER)
+
+
+def test_the_licence_is_stated_or_said_to_be_missing() -> None:
+    """Never guessed: a guide with no licence says "not stated"."""
     body = without_comments(READER)
-    assert "/download" in body
-    assert "data-track" not in body and "Track this" not in body
-
-
-def test_the_catalogue_does_not_link_to_the_desk_yet() -> None:
-    """A link to a page that is not there is the worst kind of promise."""
-    body = without_comments(INDEX)
-    assert "/guides/write" not in body
-
-
-def test_the_featured_band_only_on_the_default_view() -> None:
-    assert 'sort === "featured" && !gameSlug ? all.filter((g) => g.featured) : []' in INDEX
-
-
-def test_the_card_takes_its_words_from_the_page() -> None:
-    """
-    Drawn many times; the page's copy() is where the words are edited.
-
-    ⚠ Comments stripped first: the card's own doc comment says "copy()" while
-    explaining why it does not call it, and this guard matched that sentence
-    the first time it ran.
-    """
-    card = without_comments(CARD)
-    assert "copy(" not in card
-    assert "words: {" in card
+    assert 'say("licence.unsaid", "not stated")' in body
+    assert "CC-BY-SA-4.0" in body

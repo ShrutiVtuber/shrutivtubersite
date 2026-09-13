@@ -38,7 +38,8 @@
         "version":    { "type": "string", "minLength": 1, "description": "A date or a tag. Loading a new version must never delete progress: progress is keyed by step id." },
         "game_patch": { "type": "string" },
         "summary":    { "type": "string" },
-        "caveats":    { "type": "array", "items": { "type": "string" }, "description": "Things the author is not sure of yet — the spec's [S15 PTR — confirm at launch]." }
+        "caveats":    { "type": "array", "items": { "type": "string" }, "description": "Things the author is not sure of yet — the spec's [S15 PTR — confirm at launch]." },
+        "licence":    { "type": "string", "description": "The author's choice for their own writing, as an SPDX identifier: CC-BY-SA-4.0, CC-BY-4.0, CC0-1.0, or All-Rights-Reserved. Shown on the guide's page." }
       }
     },
 

@@ -1,25 +1,30 @@
 ---
-/* Shruti's Guides, from her side: what is waiting to be read, what was
- * reported, and every guide with its switches.
+/* Shruti's Guides, from her side: the review queue (board W6), and below
+ * it what was reported and every guide's switches.
  *
- * ⚠ **Publishing is reading.** A draft is published from its own page, where
- * the problems and the changes are in front of her — not from this list.
- * The list only says what is waiting and for how long.
+ * Queue on the left, the selected version on the right with the validator's
+ * problems and a diff by step id against the version that is live. The diff
+ * carries its marks in mono — + ~ − — with surface tint as reinforcement,
+ * never colour alone: there is no green and no red, because this palette
+ * spends colour on state. The rose block says what a review queue usually
+ * forgets: what publishing does to people who are mid-run.
  *
- * ⚠ **A report is a queue entry, not a verdict**, grouped by the guide and
- * never one row per report. "Put it back" dismisses them and un-hides;
- * "Keep it down" upholds them and hides it under her name.
+ * ⚠ A version with problems cannot be published, even by her. Sending back
+ * needs a note, because "rejected" with no reason is the practice room's
+ * lesson again. Agents may draft and submit; nothing an agent does publishes.
  */
 import AdminLayout from "../../layouts/AdminLayout.astro";
 import CsrfField from "../../components/forms/CsrfField.astro";
 import Badge from "../../components/navigation/Badge.astro";
 import { asAdmin } from "../../lib/admin";
 import { verifyCsrf } from "../../lib/csrf";
+import { type GuideDoc, type Step, phasesOf, stepsOf } from "../../lib/guides";
 
 export const prerender = false;
 
-let notice = "";
+let notice = String(Astro.url.searchParams.get("notice") ?? "");
 let failed = "";
+const json = (body: unknown) => ({ method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
 
 if (Astro.request.method === "POST") {
   const form = await Astro.request.formData();
@@ -28,10 +33,21 @@ if (Astro.request.method === "POST") {
   } else {
     const action = String(form.get("action") ?? "");
     const id = String(form.get("id") ?? "");
-    const json = (body: unknown) => ({
-      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
-    });
     if (/^\d+$/.test(id)) {
+      if (action === "publish") {
+        const r = await asAdmin(Astro, `/api/guides/admin/by-id/${id}/publish`, { method: "POST" });
+        if (r.ok) return Astro.redirect("/admin/guides?notice=Published.");
+        failed = r.status === 422 ? "It has problems the validator will not let through — they are listed on the right." : "That did not publish.";
+      }
+      if (action === "sendback") {
+        const note = String(form.get("note") ?? "").trim();
+        if (!note) failed = "Say why. A draft sent back with no note is the practice room's lesson again.";
+        else {
+          const r = await asAdmin(Astro, `/api/guides/admin/by-id/${id}/send-back`, json({ note }));
+          if (r.ok) return Astro.redirect("/admin/guides?notice=Sent back with your note.");
+          failed = "That did not send back.";
+        }
+      }
       if (action === "feature") {
         const on = String(form.get("on") ?? "") === "1";
         const r = await asAdmin(Astro, `/api/guides/admin/by-id/${id}/feature`, json({ featured: on }));
@@ -56,64 +72,181 @@ const queue: any[] = Array.isArray(queueRead.body) ? queueRead.body : [];
 const guides: any[] = Array.isArray(allRead.body) ? allRead.body : [];
 const reported = guides.filter((g) => g.reports?.open > 0);
 
-const REASONS: Record<string, string> = {
-  abuse: "Aimed at a person",
-  hate: "Aimed at a group",
-  sexual: "Sexual, or a minor",
-  spam: "Spam",
-  "self-harm": "May need help",
-  "not-a-reading": "Not a guide",
-  other: "Something else",
-};
+/* The selected version: asked for, else the one that has waited longest. */
+const wanted = String(Astro.url.searchParams.get("version") ?? "");
+const selectedId = /^\d+$/.test(wanted) ? Number(wanted) : (queue[0]?.versionId ?? null);
+const selected = queue.find((v) => v.versionId === selectedId) ?? null;
+const detail = selectedId ? await asAdmin(Astro, `/api/guides/admin/by-id/${selectedId}`) : null;
+const version = detail?.ok ? (detail.body.version as { id: number; number: number; state: string; note: string; body: GuideDoc }) : null;
+const published = detail?.ok ? (detail.body.published as { id: number; number: number; body: GuideDoc } | null) : null;
+const problems: { path: string; message: string }[] = detail?.ok ? (detail.body.problems ?? []) : [];
 
+/* A structural diff, by step id — the format's whole reason for stable ids. */
+const stepMap = (d: GuideDoc | undefined | null) => new Map((d?.steps ?? []).map((s) => [s.id, s]));
+const before = stepMap(published?.body);
+const after = stepMap(version?.body);
+const same = (a: Step, b: Step) =>
+  a.title === b.title && a.do === b.do && a.done_when === b.done_when && a.why === b.why
+  && JSON.stringify(a.gate ?? {}) === JSON.stringify(b.gate ?? {}) && a.phase === b.phase
+  && a.kind === b.kind && a.minutes === b.minutes && !!a.ongoing === !!b.ongoing;
+type Change = { mark: "+" | "~" | "−"; step: Step; was?: Step };
+const changes: Change[] = [];
+if (version && published && published.id !== version.id) {
+  for (const [id, s] of after) {
+    if (!before.has(id)) changes.push({ mark: "+", step: s });
+    else if (!same(before.get(id)!, s)) changes.push({ mark: "~", step: s, was: before.get(id)! });
+  }
+  for (const [id, s] of before) if (!after.has(id)) changes.push({ mark: "−", step: s });
+}
+const phaseName = (id: string) => (version?.body.phases ?? []).find((p) => p.id === id)?.name
+  ?? (published?.body.phases ?? []).find((p) => p.id === id)?.name ?? id;
+const byPhase = new Map<string, Change[]>();
+for (const c of changes) { const k = c.step.phase; if (!byPhase.has(k)) byPhase.set(k, []); byPhase.get(k)!.push(c); }
+const added = changes.filter((c) => c.mark === "+").length;
+const removed = changes.filter((c) => c.mark === "−").length;
+const reworded = changes.filter((c) => c.mark === "~").length;
+const gateText = (g: Record<string, unknown> | undefined) => Object.entries(g ?? {}).map(([k, v]) => {
+  const m = /^(.+)_(min|max|at_least|is)$/.exec(k);
+  const val = Array.isArray(v) ? v.join(", ") : String(v);
+  if (k === "steps_done") return `after ${val}`;
+  if (k === "codex_active") return `codex ${val}`;
+  if (k === "variant") return `variant ${val}`;
+  if (!m) return `${k} ${val}`;
+  return `${m[1]} ${m[2] === "max" ? "≤" : m[2] === "is" ? "=" : "≥"} ${val}`;
+}).join(" · ");
+
+const REASONS: Record<string, string> = {
+  abuse: "Aimed at a person", hate: "Aimed at a group", sexual: "Sexual, or a minor", spam: "Spam",
+  "self-harm": "May need help", "not-a-reading": "Not a guide", other: "Something else",
+};
 const ago = (iso: string | null) => {
   if (!iso) return "";
   const hours = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 3_600_000));
-  if (hours < 1) return "just now";
-  if (hours < 48) return `${hours} h ago`;
-  return `${Math.round(hours / 24)} days ago`;
+  if (hours < 1) return "submitted just now";
+  if (hours < 24) return `submitted ${hours} h ago`;
+  const days = Math.round(hours / 24);
+  return days === 1 ? "submitted yesterday" : `submitted ${days} days ago`;
 };
+const oldest = queue.length ? Math.max(0, Math.round((Date.now() - new Date(queue[0].submittedAt).getTime()) / 86_400_000)) : 0;
 ---
 
 <AdminLayout title="Guides">
   {notice && <p class="adm-ok" role="status">{notice}</p>}
   {failed && <p class="adm-bad" role="alert">{failed}</p>}
 
-  <section class="adm-card">
-    <header class="gq-head">
-      <h2>Waiting to be read</h2>
-      {queue.length > 0 && <Badge tone="rose">{queue.length}</Badge>}
+  <section class="adm-card gq-queue">
+    <header class="gq-bar">
+      <h2>Review queue</h2>
+      <span class="gq-mono">{queue.length} waiting{queue.length > 0 && <> · oldest {oldest === 0 ? "today" : oldest === 1 ? "1 day" : `${oldest} days`}</>}</span>
     </header>
-    {queue.length === 0 ? (
-      <p class="gq-quiet">
-        Nothing is waiting. When somebody submits a guide, or a new version of
-        one, it appears here — oldest first, so the one that has waited longest
-        is on top.
-      </p>
-    ) : (
-      <ol class="gq-list">
+    <div class="gq-panes">
+      <div class="gq-list">
+        <div class="gq-list-head"><span class="gq-eyebrow">Waiting for review</span></div>
+        {queue.length === 0 && (
+          <p class="gq-quiet">Nothing is waiting. When somebody submits a guide, or a new version of one, it appears here — oldest first.</p>
+        )}
         {queue.map((v) => (
-          <li class="gq-item">
-            <div>
-              <p class="gq-title">
-                <a href={`/admin/guides/${v.versionId}`}>{v.title}</a>
-                <span class="gq-tag">{v.isUpdate ? `version ${v.number}` : "new"}</span>
-              </p>
-              <p class="gq-meta">
-                <b>{v.author}</b>
-                <span aria-hidden="true">·</span>
-                <span>{v.game}</span>
-                <span aria-hidden="true">·</span>
-                <span>{v.steps} steps</span>
-                <span aria-hidden="true">·</span>
-                <span>{ago(v.submittedAt)}</span>
-              </p>
-            </div>
-            <a class="gq-read" href={`/admin/guides/${v.versionId}`}>Read it</a>
-          </li>
+          <a class:list={["gq-item", v.versionId === selectedId && "on"]} href={`/admin/guides?version=${v.versionId}`}>
+            <span class="gq-item-title">{v.title}</span>
+            <span class="gq-mono soft">{v.author} · {v.isUpdate ? `v${v.number} against v${v.against ?? "?"}` : "new guide"}</span>
+            <span class="gq-mono">{ago(v.submittedAt)}</span>
+            {v.source === "agent" && <span class="gq-mono rose">drafted by an agent</span>}
+          </a>
         ))}
-      </ol>
-    )}
+        <p class="gq-list-foot">Agents may draft and submit. Nothing an agent does publishes.</p>
+      </div>
+
+      <div class="gq-detail">
+        {!version ? (
+          <p class="gq-quiet gq-pad">Pick a version on the left, and it opens here with its changes.</p>
+        ) : (
+          <>
+            <div class="gq-detail-head">
+              <div class="gq-detail-titles">
+                <span class="gq-eyebrow">{selected?.game} · {selected?.author}</span>
+                <span class="gq-title">{version.body.guide?.title ?? selected?.title}</span>
+                <span class="gq-mono soft">
+                  {published && published.id !== version.id
+                    ? `v${version.number} against published v${published.number} · ${changes.length} ${changes.length === 1 ? "change" : "changes"} in ${byPhase.size} ${byPhase.size === 1 ? "phase" : "phases"}`
+                    : `new guide · ${(version.body.steps ?? []).length} steps in ${(version.body.phases ?? []).length} phases`}
+                </span>
+              </div>
+              <div class="gq-actions">
+                <a class="gq-btn" href="#sendback">Send back with a note</a>
+                <form method="POST">
+                  <CsrfField />
+                  <input type="hidden" name="action" value="publish" />
+                  <input type="hidden" name="id" value={version.id} />
+                  <button type="submit" class="gq-btn primary" disabled={problems.length > 0}>Publish</button>
+                </form>
+              </div>
+            </div>
+
+            <div class="gq-body">
+              {problems.length > 0 && (
+                <div class="gq-block rose">
+                  <span class="gq-eyebrow rose">{problems.length} {problems.length === 1 ? "problem" : "problems"} — cannot be published until they are fixed</span>
+                  <ul class="gq-problems">{problems.map((p) => <li><code>{p.path}</code> {p.message}</li>)}</ul>
+                </div>
+              )}
+
+              {published && published.id !== version.id ? (
+                <>
+                  <div class="gq-rule"><span class="gq-eyebrow">Changes</span><span class="gq-line"></span><span class="gq-mono">{added} added · {removed} removed · {reworded} reworded</span></div>
+                  {changes.length === 0 && <p class="gq-quiet">No step changed. The difference is elsewhere — the guide's own fields, routines, codex or tracks.</p>}
+                  {[...byPhase.entries()].map(([phaseId, list]) => (
+                    <div class="gq-diff">
+                      <div class="gq-diff-head"><span class="gq-diff-phase">{phaseName(phaseId)}</span><span class="gq-mono">{list.length} {list.length === 1 ? "change" : "changes"}</span></div>
+                      {list.map((c) => (
+                        <div class:list={["gq-change", c.mark === "+" && "added", c.mark === "−" && "removed"]}>
+                          <span class="gq-mark">{c.mark}</span>
+                          <span class="gq-change-body">
+                            <span class:list={["gq-change-title", c.mark === "−" && "struck"]}>{c.step.id} · {c.step.title}</span>
+                            {c.mark === "~" && c.was && c.was.do !== c.step.do && <span class="gq-change-do struck">{c.was.do}</span>}
+                            {c.mark !== "−" && c.step.do && <span class="gq-change-do">{c.step.do}</span>}
+                            {c.mark === "+" && <span class="gq-mono">new step{Object.keys(c.step.gate ?? {}).length > 0 && <> · gate: {gateText(c.step.gate as any)}</>}</span>}
+                            {c.mark === "~" && c.was && JSON.stringify(c.was.gate ?? {}) !== JSON.stringify(c.step.gate ?? {}) && <span class="gq-mono">gate: {gateText(c.step.gate as any) || "always"}</span>}
+                            {c.mark === "−" && <span class="gq-mono">removed</span>}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                  {removed > 0 && (
+                    <div class="gq-block rose">
+                      <span class="gq-eyebrow rose">Worth saying out loud</span>
+                      <span>Removing a step does not delete anybody's progress — runs keep the step and it stays on their path, marked done and greyed. Nothing a publish does can lose a person's place.</span>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div class="gq-path">
+                  {phasesOf(version.body).map((p) => (
+                    <details class="gq-phase" open={phasesOf(version.body).length <= 3}>
+                      <summary><b>{p.name}</b>{p.band && <span class="gq-mono"> {p.band}</span>}<span class="gq-mono gq-count">{stepsOf(version.body, p).length} steps</span></summary>
+                      <ol class="gq-steps">
+                        {stepsOf(version.body, p).map((s) => (
+                          <li><span class="gq-mono">{s.id}</span><span class="gq-step-title">{s.title}</span>{s.do && <span class="gq-change-do">{s.do}</span>}{Object.keys(s.gate ?? {}).length > 0 && <span class="gq-mono">gate: {gateText(s.gate as any)}</span>}</li>
+                        ))}
+                      </ol>
+                    </details>
+                  ))}
+                </div>
+              )}
+
+              <form method="POST" class="gq-block" id="sendback">
+                <CsrfField />
+                <input type="hidden" name="action" value="sendback" />
+                <input type="hidden" name="id" value={version.id} />
+                <span class="gq-eyebrow">Send back with a note</span>
+                <textarea name="note" rows="3" maxlength="2000" required placeholder="What needs to change, in your own words. The author sees this and nothing else."></textarea>
+                <button type="submit" class="gq-btn">Send it back</button>
+              </form>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
   </section>
 
   <section class="adm-card">
@@ -122,46 +255,23 @@ const ago = (iso: string | null) => {
       {reported.length > 0 && <Badge tone="rose">{reported.length}</Badge>}
     </header>
     {reported.length === 0 ? (
-      <p class="gq-quiet">
-        Nothing is waiting. If a few people report the same guide it comes off
-        the catalogue until you have looked; one report only lands here.
-      </p>
+      <p class="gq-quiet">Nothing is waiting. If a few people report the same guide it comes off the catalogue until you have looked; one report only lands here.</p>
     ) : (
-      <ol class="gq-list">
+      <ol class="gq-rep-list">
         {reported.map((g) => (
-          <li class="gq-item">
+          <li class="gq-rep">
             <div>
-              <p class="gq-title">
+              <p class="gq-rep-title">
                 <a href={`/guides/${g.game.slug}/${g.slug}`} target="_blank" rel="noreferrer">{g.title}</a>
-                {g.hidden && (
-                  <span class:list={["gq-tag", g.hiddenBy === "reports" && "auto"]}>
-                    {g.hiddenBy === "reports" ? "off the catalogue automatically" : "you took it down"}
-                  </span>
-                )}
+                {g.hidden && <span class:list={["gq-tag", g.hiddenBy === "reports" && "auto"]}>{g.hiddenBy === "reports" ? "off the catalogue automatically" : "you took it down"}</span>}
               </p>
-              <p class="gq-meta"><b>{g.author}</b> <span aria-hidden="true">·</span> <span>{g.game.name}</span></p>
-              <ul class="gq-why">
-                {Object.entries(g.reports.reasons ?? {}).map(([reason, n]) => (
-                  <li>{REASONS[reason] ?? reason}{Number(n) > 1 && ` ×${n}`}</li>
-                ))}
-              </ul>
-              {(g.reports.details ?? []).map((d: string) => <p class="gq-detail">“{d}”</p>)}
+              <p class="gq-mono soft">{g.author} · {g.game.name}</p>
+              <ul class="gq-why">{Object.entries(g.reports.reasons ?? {}).map(([reason, n]) => <li>{REASONS[reason] ?? reason}{Number(n) > 1 && ` ×${n}`}</li>)}</ul>
+              {(g.reports.details ?? []).map((d: string) => <p class="gq-detail-q">“{d}”</p>)}
             </div>
             <div class="gq-buttons">
-              <form method="POST">
-                <CsrfField />
-                <input type="hidden" name="action" value="hide" />
-                <input type="hidden" name="id" value={g.id} />
-                <input type="hidden" name="on" value="0" />
-                <button type="submit" class="gq-back">Put it back</button>
-              </form>
-              <form method="POST">
-                <CsrfField />
-                <input type="hidden" name="action" value="hide" />
-                <input type="hidden" name="id" value={g.id} />
-                <input type="hidden" name="on" value="1" />
-                <button type="submit" class="gq-keep">Keep it down</button>
-              </form>
+              <form method="POST"><CsrfField /><input type="hidden" name="action" value="hide" /><input type="hidden" name="id" value={g.id} /><input type="hidden" name="on" value="0" /><button type="submit" class="gq-btn">Put it back</button></form>
+              <form method="POST"><CsrfField /><input type="hidden" name="action" value="hide" /><input type="hidden" name="id" value={g.id} /><input type="hidden" name="on" value="1" /><button type="submit" class="gq-btn keep">Keep it down</button></form>
             </div>
           </li>
         ))}
@@ -176,84 +286,108 @@ const ago = (iso: string | null) => {
     ) : (
       <div class="gq-scroll">
         <table class="gq-table">
-          <thead>
-            <tr><th>Guide</th><th>Game</th><th>Author</th><th>Useful</th><th>State</th><th>Featured</th><th>Hidden</th></tr>
-          </thead>
+          <thead><tr><th>Guide</th><th>Game</th><th>Author</th><th>Useful</th><th>State</th><th>Featured</th><th>Hidden</th></tr></thead>
           <tbody>
             {guides.map((g) => (
               <tr>
-                <td>
-                  {g.published
-                    ? <a href={`/guides/${g.game.slug}/${g.slug}`} target="_blank" rel="noreferrer">{g.title}</a>
-                    : <span>{g.title}</span>}
-                </td>
+                <td>{g.published ? <a href={`/guides/${g.game.slug}/${g.slug}`} target="_blank" rel="noreferrer">{g.title}</a> : <span>{g.title}</span>}</td>
                 <td>{g.game.name}</td>
                 <td>{g.author}</td>
                 <td class="t-tabular">{g.votes}</td>
                 <td>{g.published ? "published" : "draft only"}</td>
-                <td>
-                  {g.published && (
-                    <form method="POST">
-                      <CsrfField />
-                      <input type="hidden" name="action" value="feature" />
-                      <input type="hidden" name="id" value={g.id} />
-                      <input type="hidden" name="on" value={g.featured ? "0" : "1"} />
-                      <button type="submit" class="gq-switch" aria-pressed={g.featured}>
-                        {g.featured ? "Featured ✓" : "Feature"}
-                      </button>
-                    </form>
-                  )}
-                </td>
-                <td>
-                  {g.published && (
-                    <form method="POST">
-                      <CsrfField />
-                      <input type="hidden" name="action" value="hide" />
-                      <input type="hidden" name="id" value={g.id} />
-                      <input type="hidden" name="on" value={g.hidden ? "0" : "1"} />
-                      <button type="submit" class="gq-switch" aria-pressed={g.hidden}>
-                        {g.hidden ? (g.hiddenBy === "author" ? "Author took it down" : "Hidden ✓") : "Hide"}
-                      </button>
-                    </form>
-                  )}
-                </td>
+                <td>{g.published && (
+                  <form method="POST"><CsrfField /><input type="hidden" name="action" value="feature" /><input type="hidden" name="id" value={g.id} /><input type="hidden" name="on" value={g.featured ? "0" : "1"} /><button type="submit" class="gq-switch" aria-pressed={g.featured}>{g.featured ? "Featured ✓" : "Feature"}</button></form>
+                )}</td>
+                <td>{g.published && (
+                  <form method="POST"><CsrfField /><input type="hidden" name="action" value="hide" /><input type="hidden" name="id" value={g.id} /><input type="hidden" name="on" value={g.hidden ? "0" : "1"} /><button type="submit" class="gq-switch" aria-pressed={g.hidden}>{g.hidden ? (g.hiddenBy === "author" ? "Author took it down" : "Hidden ✓") : "Hide"}</button></form>
+                )}</td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
     )}
-    <p class="gq-quiet">
-      Featuring leads the landing page with it. Hiding takes it off the
-      catalogue under your name and settles any open reports; a guide the
-      author took down stays down until they put it back.
-    </p>
+    <p class="gq-quiet">Featuring leads the landing page with it — three at most are shown. Hiding takes it off the catalogue under your name and settles any open reports; a guide the author took down stays down until they put it back.</p>
   </section>
 </AdminLayout>
 
 <style>
+  .gq-queue { padding: 0 !important; overflow: hidden; }
+  .gq-bar { display: flex; align-items: center; justify-content: space-between; padding: 14px 28px; border-bottom: var(--border-w) solid var(--line); }
+  .gq-bar h2 { margin: 0; font-family: var(--font-display); font-size: 20px; font-weight: 600; }
+  .gq-mono { font-family: var(--font-mono); font-size: 11.5px; color: var(--ink-faint); }
+  .gq-mono.soft { color: var(--ink-soft); }
+  .gq-mono.rose { color: var(--rose); }
+  .gq-eyebrow { font-size: var(--text-micro); font-weight: 600; letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; color: var(--ink-faint); }
+  .gq-eyebrow.rose { color: var(--rose); }
+  .gq-panes { display: grid; grid-template-columns: 300px minmax(0, 1fr); min-height: 420px; }
+  .gq-list { border-right: var(--border-w) solid var(--line); background: var(--surface-card); display: flex; flex-direction: column; }
+  .gq-list-head { padding: 14px 18px 10px; border-bottom: var(--border-w) solid var(--line); }
+  .gq-item { display: flex; flex-direction: column; gap: 4px; padding: 14px 18px; border-bottom: var(--border-w) solid var(--line); border-left: 2px solid transparent; text-decoration: none; color: inherit; }
+  .gq-item.on { background: var(--accent-wash); border-left-color: var(--accent); }
+  .gq-item-title { font-size: 15px; color: var(--ink); }
+  .gq-item.on .gq-item-title { font-weight: 600; }
+  .gq-list-foot { margin-top: auto; padding: 16px 18px; border-top: var(--border-w) solid var(--line); font-family: var(--font-mono); font-size: 11.5px; line-height: 1.7; color: var(--ink-faint); }
+  .gq-detail { display: flex; flex-direction: column; min-width: 0; }
+  .gq-pad { padding: 22px 30px; }
+  .gq-detail-head { padding: 22px 30px 18px; border-bottom: var(--border-w) solid var(--line); display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; flex-wrap: wrap; }
+  .gq-detail-titles { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+  .gq-title { font-family: var(--font-display); font-size: 26px; font-weight: 600; color: var(--ink); }
+  .gq-actions { display: flex; gap: 10px; flex: none; align-items: center; }
+  .gq-actions form { margin: 0; }
+  .gq-btn { font: 500 var(--text-sm) var(--font-body); padding: 9px 16px; border-radius: var(--radius-sm); border: var(--border-w) solid var(--line-strong); background: var(--surface-card); color: var(--ink); cursor: pointer; text-decoration: none; display: inline-block; }
+  .gq-btn.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+  .gq-btn.primary:disabled { opacity: .5; cursor: not-allowed; }
+  .gq-btn.keep { border-color: var(--rose); color: var(--rose); }
+  .gq-body { padding: 22px 30px; display: flex; flex-direction: column; gap: 18px; }
+  .gq-rule { display: flex; align-items: center; gap: 16px; }
+  .gq-line { flex: 1; height: 1px; background: var(--line); }
+  .gq-diff { border: var(--border-w) solid var(--line); border-radius: var(--radius-md); overflow: hidden; }
+  .gq-diff-head { padding: 10px 16px; background: var(--surface-inset); border-bottom: var(--border-w) solid var(--line); display: flex; align-items: baseline; justify-content: space-between; }
+  .gq-diff-phase { font-family: var(--font-display); font-size: 15px; font-weight: 600; color: var(--ink); }
+  .gq-change { display: flex; gap: 14px; padding: 14px 16px; border-bottom: var(--border-w) solid var(--line); }
+  .gq-change:last-child { border-bottom: 0; }
+  .gq-change.added { background: var(--accent-wash); }
+  .gq-change.removed { background: var(--surface-inset); }
+  .gq-mark { font-family: var(--font-mono); font-size: 13px; color: var(--ink-faint); flex: none; width: 16px; }
+  .gq-change.added .gq-mark { color: var(--accent); }
+  .gq-change-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+  .gq-change-title { font-family: var(--font-display); font-size: 16px; font-weight: 600; color: var(--ink); }
+  .gq-change-do { font-size: 13.5px; line-height: 1.55; color: var(--ink); white-space: pre-line; }
+  .struck { text-decoration: line-through; color: var(--ink-faint) !important; }
+  .gq-block { border: var(--border-w) solid var(--line); border-radius: var(--radius-md); background: var(--surface-card); padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; font-size: 14px; line-height: 1.6; color: var(--ink); }
+  .gq-block.rose { border-color: var(--rose); background: var(--rose-wash); }
+  .gq-block textarea { font: inherit; padding: 12px 14px; border: var(--border-w) solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-page); color: var(--ink); min-height: 62px; }
+  .gq-block button { align-self: flex-start; }
+  .gq-problems { margin: 0; padding-left: 1.1em; font-size: var(--text-sm); display: grid; gap: 4px; }
+  .gq-problems code { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--ink-faint); }
+  .gq-path { display: flex; flex-direction: column; gap: 6px; }
+  .gq-phase { border-top: var(--border-w) solid var(--line); padding: 8px 0; }
+  .gq-phase > summary { cursor: pointer; display: flex; gap: 10px; align-items: baseline; }
+  .gq-count { margin-left: auto; }
+  .gq-steps { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 8px; }
+  .gq-steps li { display: grid; grid-template-columns: 4rem 1fr; gap: 2px 10px; font-size: var(--text-sm); }
+  .gq-steps .gq-change-do, .gq-steps .gq-mono:last-child { grid-column: 2; }
+  .gq-step-title { font-weight: 600; color: var(--ink); }
   .gq-head { display: flex; align-items: center; gap: 10px; margin-bottom: var(--space-3); }
   .gq-head h2 { margin: 0; }
   .gq-quiet { margin: 8px 0 0; font-size: var(--text-sm); color: var(--ink-faint); max-width: 60ch; }
-  .gq-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-4); }
-  .gq-item { display: grid; grid-template-columns: 1fr auto; gap: var(--space-4); align-items: start; padding-top: var(--space-3); border-top: var(--border-w) solid var(--line); }
-  .gq-title { margin: 0 0 2px; font-weight: 600; display: flex; gap: 8px; flex-wrap: wrap; align-items: baseline; }
-  .gq-title a { color: var(--ink); }
-  .gq-meta { margin: 0; display: flex; gap: 8px; flex-wrap: wrap; font-size: var(--text-sm); color: var(--ink-soft); }
+  .gq-rep-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-4); }
+  .gq-rep { display: grid; grid-template-columns: 1fr auto; gap: var(--space-4); align-items: start; padding-top: var(--space-3); border-top: var(--border-w) solid var(--line); }
+  .gq-rep-title { margin: 0 0 2px; font-weight: 600; display: flex; gap: 8px; flex-wrap: wrap; align-items: baseline; }
+  .gq-rep-title a { color: var(--ink); }
   .gq-tag { font-size: var(--text-micro); font-weight: 600; letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; color: var(--ink-faint); border: var(--border-w) solid var(--line); border-radius: var(--radius-full); padding: 1px 8px; }
   .gq-tag.auto { color: var(--rose); border-color: var(--rose); }
   .gq-why { margin: 6px 0 0; padding-left: 1.1em; font-size: var(--text-sm); color: var(--ink-soft); }
-  .gq-detail { margin: 4px 0 0; font-size: var(--text-sm); color: var(--ink-soft); font-style: italic; }
-  .gq-read, .gq-back, .gq-keep, .gq-switch {
-    font: 500 var(--text-sm) var(--font-body); padding: 6px 12px; border-radius: var(--radius-full);
-    border: var(--border-w) solid var(--line-strong); background: var(--surface-card); color: var(--ink); cursor: pointer; text-decoration: none; white-space: nowrap;
-  }
-  .gq-keep { border-color: var(--rose); color: var(--rose); }
-  .gq-switch[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); background: var(--accent-wash); }
+  .gq-detail-q { margin: 4px 0 0; font-size: var(--text-sm); color: var(--ink-soft); font-style: italic; }
   .gq-buttons { display: grid; gap: 6px; }
+  .gq-buttons form { margin: 0; }
   .gq-scroll { overflow-x: auto; }
   .gq-table { width: 100%; border-collapse: collapse; font-size: var(--text-sm); }
   .gq-table th { text-align: left; font-size: var(--text-micro); letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; color: var(--ink-faint); padding: 6px 8px; border-bottom: var(--border-w) solid var(--line); }
   .gq-table td { padding: 8px; border-bottom: var(--border-w) solid var(--line); vertical-align: middle; }
   .gq-table form { margin: 0; }
+  .gq-switch { font: 500 var(--text-sm) var(--font-body); padding: 6px 12px; border-radius: var(--radius-full); border: var(--border-w) solid var(--line-strong); background: var(--surface-card); color: var(--ink); cursor: pointer; white-space: nowrap; }
+  .gq-switch[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); background: var(--accent-wash); }
+  @media (max-width: 900px) { .gq-panes { grid-template-columns: 1fr; } .gq-list { border-right: 0; border-bottom: var(--border-w) solid var(--line); } }
 </style>

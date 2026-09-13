@@ -36,6 +36,11 @@ PAGES = _pages_dir()
 # Pages that lay themselves out and mean to: the reader carries an outline
 # beside the lesson and is deliberately wider than a column of prose.
 LAYS_ITSELF_OUT = {
+    # The guide reader, its preview and the editor are laid out to the edge —
+    # a rail beside a prose column, three columns — on BaseLayout's `bare`.
+    "guides/[game]/[slug].astro",
+    "guides/write/[version].astro",
+    "guides/write/[version]/preview.astro",
     "classes/[slug]/[lesson].astro",
     # The compatibility page opens on a full-bleed sky panel that has to reach
     # both edges of the window, so it cannot sit inside a fixed-width wrapper.

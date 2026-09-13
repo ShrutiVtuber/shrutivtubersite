@@ -101,8 +101,14 @@ def _card(g: Guide, game: Game, author: User | None, version: GuideVersion | Non
         "version": meta.get("version", ""),
         "gamePatch": meta.get("game_patch", ""),
         "summary": meta.get("summary", ""),
+        "licence": str(meta.get("licence") or ""),
         "phases": len(body.get("phases", [])),
         "steps": len(body.get("steps", [])),
+        # The boards print "8 · ~30 h": the path's declared minutes, in hours.
+        "hours": round(sum(int(s.get("minutes") or 0) for s in body.get("steps", [])
+                           if isinstance(s, dict)) / 60),
+        # Which publication this is — "new" on the landing page, then v2, v3.
+        "number": version.number if version else None,
         "votes": votes,
         "voted": voted,
         "featured": g.featured,
@@ -241,10 +247,15 @@ async def my_version(
     }
 
 
+SOURCES = ("desk", "agent", "file")
+
+
 class DraftIn(BaseModel):
     # ⚠ Absent means "make a new guide"; present means "this draft".
     version_id: int | None = None
     body: dict
+    # Which tool is saving: desk | agent | file. Anything else is the desk.
+    source: str = "desk"
 
 
 async def _open_draft(session: AsyncSession, guide_id: int) -> GuideVersion | None:
@@ -321,6 +332,7 @@ async def save_draft(
 
     version.body = doc
     version.state = "draft"
+    version.source = body.source if body.source in SOURCES else "desk"
     guide.title = title
     await session.commit()
     return {"ok": True, "guideId": guide.id, "versionId": version.id,
@@ -441,11 +453,18 @@ async def queue(session: AsyncSession = Depends(get_session)) -> list[dict]:
         .where(GuideVersion.state == "submitted")
         .order_by(GuideVersion.submitted_at)
     )).all()
+    live_ids = [g.published_version_id for _, g, _, _ in rows if g.published_version_id]
+    live = {lv.id: lv.number for lv in (await session.execute(
+        select(GuideVersion).where(GuideVersion.id.in_(live_ids)))).scalars().all()} if live_ids else {}
     return [{
         "versionId": v.id, "number": v.number, "guideId": g.id, "title": g.title,
         "game": game.name, "author": _name(u), "submittedAt": v.submitted_at.isoformat() if v.submitted_at else None,
         "isUpdate": g.published_version_id is not None,
+        # "v4 against v3": the number of the version that is live, if any.
+        "against": live.get(g.published_version_id) if g.published_version_id else None,
         "steps": len(v.body.get("steps", [])),
+        "phases": len(v.body.get("phases", [])),
+        "source": v.source,
     } for v, g, game, u in rows]
 
 

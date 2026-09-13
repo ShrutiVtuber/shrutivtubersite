@@ -1,24 +1,25 @@
 ---
-/* The editor: one version of a guide, edited as forms.
+/* The editor: one step at a time, never JSON (board W5).
  *
- * Form-based, one step at a time, never a code editor. The document lives in
- * the browser while it is being edited and goes to the server whole on every
- * save; the server's validator — the same package the tracker trusts — answers
- * with problems, each with a path, and the page turns the path into a place
- * to click. A draft may be saved with problems. It may not be submitted with
- * any.
+ * Three columns: the outline, the form for the one thing selected, and a
+ * preview that IS the reader beside the validation. The gate builder is the
+ * whole argument of the page — three dropdowns and a number, with the
+ * sentence it produces and the string a locked row will show, both printed
+ * underneath. An author never sees a brace.
  *
- * ⚠ The words for the form live in WORDS below, passed to the script as
- * data, so every label an author reads is editable from the admin like any
- * other sentence on the site — the script itself carries none.
+ * The document lives in the browser while it is being edited and goes to
+ * the server whole on every save; the server's validator — the package the
+ * tracker trusts — answers with problems, each with a path. A draft may be
+ * saved with problems. It may not be submitted with any. Word counts are
+ * worth knowing and never block.
+ *
+ * ⚠ Every word the form shows lives in WORDS below and is passed to the
+ * script as data, so it is editable from the admin like any other sentence
+ * on the site — the script carries none. The document rides in a data
+ * attribute rather than a script block (see the copy sweep's note).
  *
  * ⚠ Inputs bind to paths in the document ("steps.3.do") and only structural
- * changes re-render, so typing never loses the caret.
- *
- * ⚠ The document rides in a data attribute, not a JSON block in a script
- * tag: the copy sweep reads a self-closing script tag as opening a block that
- * runs to the next closing one, and reported every say() on the page as
- * inside it. (Naming the tag literally in this comment did the same.)
+ * changes redraw, so typing never loses the caret.
  */
 import BaseLayout from "../../../layouts/BaseLayout.astro";
 import { account, asReader } from "../../../lib/account";
@@ -43,7 +44,6 @@ const version = read.body as {
 };
 const doc = version.body;
 const title = String((doc.guide as any)?.title ?? version.guide.title);
-const gameName = String((doc.game as any)?.name ?? version.guide.game?.name ?? "");
 
 const STATE: Record<string, string> = {
   draft: say("state.draft", "draft"),
@@ -55,121 +55,138 @@ const STATE: Record<string, string> = {
 
 /* Every word the script draws. */
 const WORDS = {
-  sections: {
-    guide: say("s.guide", "The guide"), checkin: say("s.checkin", "Check-in"),
-    phases: say("s.phases", "Phases"), steps: say("s.steps", "Steps"),
-    routines: say("s.routines", "Routines"), codex: say("s.codex", "Codex"),
-    notes: say("s.notes", "Pinned notes"), tracks: say("s.tracks", "Tracks"),
+  outline: {
+    title: say("o.title", "Outline"), guide: say("o.guide", "The guide"), addPhase: say("o.add_phase", "+ phase"),
+    addStep: say("o.add_step", "+ step"), checkin: say("o.checkin", "Check-in fields"), routines: say("o.routines", "Routines"),
+    codex: say("o.codex", "Codex"), notes: say("o.notes", "Pinned notes"), tracks: say("o.tracks", "Tracks"),
+    file: say("o.file", "File"), download: say("o.download", "Download the file"), replace: say("o.replace", "Replace from a file"),
   },
   guide: {
-    title: say("g.title", "Title"), id: say("g.id", "Address (letters, digits and dashes)"),
+    eyebrow: say("g.eyebrow", "The guide"), title: say("g.title", "Title"), id: say("g.id", "Address"),
+    idHint: say("g.id_hint", "Letters, digits and dashes. It is the end of the guide's web address."),
     version: say("g.version", "Version"), patch: say("g.patch", "Written for game patch"),
-    summary: say("g.summary", "Summary, a few sentences"), authors: say("g.authors", "Authors, one per line"),
-    caveats: say("g.caveats", "Not confirmed yet, one per line"),
-    gameName: say("g.game", "Game"), gameId: say("g.game_id", "Game address"),
-    variants: say("g.variants", "Ways a run can differ"), variantId: say("g.variant_id", "id"),
-    variantName: say("g.variant_name", "name"),
+    summary: say("g.summary", "Summary"), summaryHint: say("g.summary_hint", "A few sentences. The reader shows it under the title."),
+    authors: say("g.authors", "Authors, one per line"), caveats: say("g.caveats", "Not confirmed yet, one per line"),
+    licence: say("g.licence", "Licence"), licenceHint: say("g.licence_hint", "Your writing, your choice. It is shown on the guide's page."),
+    licUnsaid: say("g.lic_unsaid", "— not stated —"), licReserved: say("g.lic_reserved", "All rights reserved"),
+    game: say("g.game", "Game"), gameId: say("g.game_id", "Game address"),
+    variants: say("g.variants", "Ways a run can differ"), variantId: say("g.variant_id", "id"), variantName: say("g.variant_name", "name"),
+    variantsHint: say("g.variants_hint", "Most games have none. Diablo has Eternal and Seasonal."),
   },
   checkin: {
-    intro: say("c.intro", "What the check-in sheet asks for. Four is plenty; never more than eight."),
+    eyebrow: say("c.eyebrow", "Check-in field"), intro: say("c.intro", "What the check-in sheet asks for. Four is plenty; never more than eight."),
     id: say("c.id", "id"), label: say("c.label", "Label"), type: say("c.type", "Type"),
     number: say("c.number", "a number"), ordered: say("c.ordered", "one of an ordered list"),
     min: say("c.min", "Least"), max: say("c.max", "Most"),
     options: say("c.options", "Options in order, least first, one per line"),
     labels: say("c.labels", "Display names, one per line as id = name"),
-    showWhen: say("c.show_when", "Only asked when"), add: say("c.add", "Add a field"),
+    showWhen: say("c.show_when", "Only asked when"), add: say("c.add", "+ field"), new: say("c.new", "New field"),
   },
-  phases: {
-    intro: say("p.intro", "The path in order. A phase with a track belongs to that track rather than the main path."),
-    id: say("p.id", "id"), name: say("p.name", "Name"), band: say("p.band", "Band, a label like 5–20"),
-    skip: say("p.skip", "Skip group"), track: say("p.track", "Track"), add: say("p.add", "Add a phase"),
-    none: say("p.none", "— main path —"),
+  phase: {
+    eyebrow: say("p.eyebrow", "Phase"), id: say("p.id", "id"), name: say("p.name", "Name"),
+    band: say("p.band", "Band"), bandHint: say("p.band_hint", "A label like 5–20. It gates nothing."),
+    skip: say("p.skip", "Skip group"), skipHint: say("p.skip_hint", "Phases sharing a group are offered as one bulk skip when a run starts."),
+    track: say("p.track", "Belongs to a track"), none: say("p.none", "— the main path —"), new: say("p.new", "New phase"),
   },
-  steps: {
-    intro: say("t.intro", "Each step in its phase. The first available step in order is the current one."),
-    id: say("t.id", "id, like P2.3"), title: say("t.title", "Title"), kind: say("t.kind", "Kind"),
-    milestone: say("t.milestone", "milestone — counts"), optional: say("t.optional", "optional — skip-safe"),
-    system: say("t.system", "system — opens a codex entry"),
+  step: {
+    eyebrow: say("t.eyebrow", "Step"), id: say("t.id", "id"), idHint: say("t.id_hint", "Like P2.3. Progress is keyed by it, so never reuse one."),
+    title: say("t.title", "Title"), titleHint: say("t.title_hint", "Read from arm's length. Around six words."),
     oneliner: say("t.oneliner", "One line, for the overwhelm view"),
-    do: say("t.do", "What to do, three short lines at most"), done: say("t.done", "Done when"),
-    why: say("t.why", "Why, behind 'Why / more'"), minutes: say("t.minutes", "Minutes"),
-    ongoing: say("t.ongoing", "Ongoing — no fixed length"), codex: say("t.codex", "Codex entry it opens"),
-    appliesTo: say("t.applies", "Only for"), gate: say("t.gate", "Available when"),
-    autoDone: say("t.auto", "Propose as done when"), links: say("t.links", "Links"),
-    linkLabel: say("t.link_label", "label"), linkUrl: say("t.link_url", "https://…"),
-    add: say("t.add", "Add a step"), addTo: say("t.add_to", "Add a step to"),
-    noPhases: say("t.no_phases", "Add a phase first."),
+    do: say("t.do", "Do"), doOver: say("t.do_over", "✕ {n} words — three short lines is about 28. It will wrap to four on a phone."),
+    doOk: say("t.do_ok", "{n} words"), done: say("t.done", "Done when"), minutes: say("t.minutes", "Minutes"),
+    ongoing: say("t.ongoing", "Ongoing — no fixed length"), why: say("t.why", "Why"), whyHint: say("t.why_hint", "Behind “Why / more” in the app; shown in full on the site."),
+    kind: say("t.kind", "Kind"), milestone: say("t.milestone", "milestone — counts toward the phase"), optional: say("t.optional", "optional — skip-safe, does not count"),
+    system: say("t.system", "system — counts, and opens a codex entry"),
+    gate: say("t.gate", "Gate — when this step becomes available"), noJson: say("t.no_json", "no JSON, ever"),
+    codex: say("t.codex", "Opens a codex entry"), codexNone: say("t.codex_none", "— none —"),
+    auto: say("t.auto", "Marks itself done when"), autoNone: say("t.auto_none", "nothing — the person taps Done"), autoSome: say("t.auto_some", "these hold (proposed, never applied silently)"),
+    appliesTo: say("t.applies", "Only for"), links: say("t.links", "Links"), linkLabel: say("t.link_label", "label"), linkUrl: say("t.link_url", "https://…"),
+    addLink: say("t.add_link", "+ link"), new: say("t.new", "New step"), kindStep: say("t.kind_step", "{kind} step"),
   },
-  routines: {
-    intro: say("r.intro", "Checklists that reset."), id: say("r.id", "id"), name: say("r.name", "Name"),
-    resets: say("r.resets", "Resets"), session: say("r.session", "each session"),
-    daily: say("r.daily", "daily"), weekly: say("r.weekly", "weekly"), manual: say("r.manual", "by hand"),
-    items: say("r.items", "Items, one per line"), add: say("r.add", "Add a routine"),
+  routine: {
+    eyebrow: say("r.eyebrow", "Routine"), intro: say("r.intro", "A checklist that resets."), id: say("r.id", "id"), name: say("r.name", "Name"),
+    resets: say("r.resets", "Resets"), session: say("r.session", "each session"), daily: say("r.daily", "daily"),
+    weekly: say("r.weekly", "weekly"), manual: say("r.manual", "by hand"), items: say("r.items", "Items, one per line"),
+    gate: say("r.gate", "Available when"), new: say("r.new", "New routine"),
   },
   codex: {
-    intro: say("x.intro", "The systems the path leans on. Five lines each at most."),
-    id: say("x.id", "id"), name: say("x.name", "Name"), group: say("x.group", "Group"),
-    what: say("x.what", "What"), when: say("x.when", "When"), how: say("x.how", "How"),
-    ignore: say("x.ignore", "Ignore until"), showWhen: say("x.show_when", "Appears when"),
-    caveats: say("x.caveats", "Not confirmed, one per line"), add: say("x.add", "Add an entry"),
-    noteTitle: say("x.note_title", "Title"), noteItems: say("x.note_items", "Lines, one per line"),
-    addNote: say("x.add_note", "Add a pinned note"),
+    eyebrow: say("x.eyebrow", "Codex entry"), intro: say("x.intro", "A system the path leans on. Five lines at most."),
+    id: say("x.id", "id"), name: say("x.name", "Name"), group: say("x.group", "Group"), what: say("x.what", "What"),
+    when: say("x.when", "When"), how: say("x.how", "How"), ignore: say("x.ignore", "Ignore until"),
+    showWhen: say("x.show_when", "Appears when"), caveats: say("x.caveats", "Not confirmed, one per line"), new: say("x.new", "New entry"),
+    noteEyebrow: say("x.note_eyebrow", "Pinned note"), noteTitle: say("x.note_title", "Title"), noteItems: say("x.note_items", "Lines, one per line"), newNote: say("x.new_note", "New pinned note"),
   },
-  tracks: {
-    intro: say("k.intro", "A time-boxed parallel path — a season — with ranks and counters."),
+  track: {
+    eyebrow: say("k.eyebrow", "Track"), intro: say("k.intro", "A time-boxed parallel path — a season — with ranks and counters."),
     id: say("k.id", "id"), name: say("k.name", "Name"), dayOne: say("k.day_one", "Day-one step ids, one per line"),
-    ranks: say("k.ranks", "Ranks"), rankN: say("k.rank_n", "n"), capstone: say("k.capstone", "Capstone"),
-    when: say("k.when", "When"), counters: say("k.counters", "Counters"), counterLabel: say("k.counter_label", "Label"),
-    max: say("k.max", "Cap"), nudgeAt: say("k.nudge_at", "Nudge at"), nudge: say("k.nudge", "Nudge text"),
-    sections: say("k.sections", "Sections"), sectionTitle: say("k.section_title", "Title"),
-    body: say("k.body", "Body"), add: say("k.add", "Add a track"),
+    ranks: say("k.ranks", "Ranks"), rankN: say("k.rank_n", "n"), capstone: say("k.capstone", "Capstone"), when: say("k.when", "When"),
+    counters: say("k.counters", "Counters"), counterLabel: say("k.counter_label", "Label"), max: say("k.max", "Cap"),
+    nudgeAt: say("k.nudge_at", "Nudge at"), nudge: say("k.nudge", "Nudge text"), sections: say("k.sections", "Sections"),
+    sectionTitle: say("k.section_title", "Title"), body: say("k.body", "Body"), new: say("k.new", "New track"),
   },
   gate: {
-    key: say("gate.key", "condition"), value: say("gate.value", "value"), add: say("gate.add", "Add a condition"),
-    variant: say("gate.variant", "variant is"), stepsDone: say("gate.steps_done", "steps done (ids, comma-separated)"),
-    codexActive: say("gate.codex_active", "codex active (ids, comma-separated)"),
-    min: say("gate.min", "{label} at least"), max: say("gate.max", "{label} at most"),
-    atLeast: say("gate.at_least", "{label} is at least"), is: say("gate.is", "{label} is"),
+    field: say("gate.field", "field"), atLeast: say("gate.cmp_at_least", "is at least"), atMost: say("gate.cmp_at_most", "is at most"),
+    is: say("gate.cmp_is", "is"), variant: say("gate.variant", "variant"), stepsDone: say("gate.steps_done", "steps done"),
+    codexActive: say("gate.codex_active", "codex active"), add: say("gate.add", "add a condition"), and: say("gate.and", "and"),
+    readsAs: say("gate.reads_as", "reads as"), locked: say("gate.locked", "locked row"),
+    always: say("gate.always", "“Always available.”"), opens: say("gate.opens", "“Opens {phrases}.”"),
+    ids: say("gate.ids", "ids, comma-separated"),
+    words: {
+      min: say("gate.w_min", "at {what} {n}"), max: say("gate.w_max", "up to {what} {n}"), atLeast: say("gate.w_at_least", "from {value}"),
+      is: say("gate.w_is", "when {what} is {value}"), variant: say("gate.w_variant", "in {name}"), after: say("gate.w_after", "after {ids}"),
+      once: say("gate.w_once", "once {names} is in play"),
+    },
+    short: {
+      min: say("gate.s_min", "at {n}"), max: say("gate.s_max", "up to {n}"), atLeast: say("gate.s_at_least", "from {value}"),
+      is: say("gate.s_is", "{value}"), variant: say("gate.s_variant", "{name}"), after: say("gate.s_after", "after {ids}"),
+      once: say("gate.s_once", "with {names}"),
+    },
+  },
+  preview: {
+    title: say("pv.title", "Preview — this is the reader"), done: say("pv.done", "Done when · "), why: say("pv.why", "Why · "),
+    codex: say("pv.codex", "Opens a codex entry"), opens: say("pv.opens", "opens"), validation: say("pv.validation", "Validation"),
+    idsUnique: say("pv.ids_unique", "Every step id is unique."), gatesNamed: say("pv.gates_named", "Every gate names a field the guide declares."),
+    phasesFilled: say("pv.phases_filled", "Every phase has at least one step."),
+    doLong: say("pv.do_long", "“Do” of {id} is four lines on a phone. Shorten it, or move a sentence into Why."),
+    countBlocking: say("pv.count", "{n} to fix. You can save a draft with problems; you cannot submit one."),
+    countOne: say("pv.count_one", "One thing to fix. You can save a draft with problems; you cannot submit one."),
+    clean: say("pv.clean", "No problems. It can be submitted."), worthKnowing: say("pv.worth", "worth knowing, not blocking"),
   },
   common: {
-    remove: say("common.remove", "Remove"), up: say("common.up", "Up"), down: say("common.down", "Down"),
-    add: say("common.add", "Add"), all: say("common.all", "all"),
+    remove: say("common.remove", "Remove"), up: say("common.up", "Move up"), down: say("common.down", "Move down"), all: say("common.all", "all"),
+    removeThis: say("common.remove_this", "Remove this {thing}"), sure: say("common.sure", "Remove {what}? Progress on it is never deleted by the tracker; the id simply stops showing."),
   },
   status: {
-    saving: say("status.saving", "Saving…"), saved: say("status.saved", "Saved."),
-    savedProblems: say("status.saved_problems", "Saved, with {n} to fix."),
+    saving: say("status.saving", "Saving…"), saved: say("status.saved", "saved just now"),
+    savedAgo: say("status.saved_ago", "saved {n} s ago"), savedProblems: say("status.saved_problems", "Saved, with {n} to fix."),
     failed: say("status.failed", "That did not save. Nothing was lost — try again."),
-    submitted: say("status.submitted", "Sent to Shruti."),
-    submitFailed: say("status.submit_failed", "Fix the problems first."),
-    unsaved: say("status.unsaved", "Unsaved changes."),
-    readOnly: say("status.read_only", "This version is {state} and cannot be edited."),
+    submitted: say("status.submitted", "Sent to Shruti."), submitFailed: say("status.submit_failed", "Fix the problems first."),
+    unsaved: say("status.unsaved", "unsaved changes"), readOnly: say("status.read_only", "cannot be edited"),
   },
 };
 ---
 
-<BaseLayout title={`${say("meta.prefix", "Editing:")} ${title}`} description={say("meta.description", "The desk.")} noindex>
-  <main class="page ed-wrap" data-editor data-version={String(version.id)}
+<BaseLayout title={`${say("meta.prefix", "Editing:")} ${title}`} description={say("meta.description", "The desk.")} noindex bare>
+  <main class="ed" data-editor data-version={String(version.id)}
         data-editable={version.editable ? "1" : "0"} data-state={version.state}
         data-words={JSON.stringify(WORDS)} data-doc={JSON.stringify(doc)}>
 
-    <p class="ed-eyebrow">
-      <a href="/guides/write">{say("eyebrow", "The desk")}</a>
-      <span aria-hidden="true">·</span>
-      <span>{gameName}</span>
-    </p>
-    <h1 class="ed-title" data-title>{title}</h1>
-    <p class="ed-state">
-      <span class="t-tabular">{say("version", "version")} {version.number}</span>
-      <span aria-hidden="true">·</span>
-      <span class="ed-chip" data-state-chip>{STATE[version.state] ?? version.state}</span>
-      {version.guide.published && version.guide.game && (
-        <a href={`/guides/${version.guide.game.slug}/${version.guide.slug}`}>{say("live", "Read the live version")}</a>
-      )}
-    </p>
+    <div class="ed-bar">
+      <div class="ed-bar-left">
+        <a class="ed-back" href="/guides/write">{say("back", "The desk")}</a>
+        <h1 class="ed-bar-title" data-title>{title}</h1>
+        <span class="ed-chip" data-state-chip>{STATE[version.state] ?? version.state} <span class="t-tabular">v{version.number}</span></span>
+        <span class="ed-status" data-status aria-live="polite"></span>
+      </div>
+      <div class="ed-bar-right">
+        <a class="ed-btn ghost" href={`/guides/write/${version.id}/preview`}>{say("preview", "Preview as reader")}</a>
+        <button type="button" class="ed-btn" data-save disabled={!version.editable}>{say("save", "Save draft")}</button>
+        <button type="button" class="ed-btn primary" data-submit disabled={!version.editable}>{say("submit", "Submit for review")}</button>
+      </div>
+    </div>
+
     {version.state === "sent_back" && version.note && (
-      <aside class="ed-note">
-        <b>{say("note", "Shruti wrote:")}</b> {version.note}
-      </aside>
+      <aside class="ed-note"><b>{say("note", "Shruti wrote:")}</b> {version.note}</aside>
     )}
     {!version.editable && (
       <p class="ed-readonly" role="status">
@@ -179,101 +196,161 @@ const WORDS = {
       </p>
     )}
 
-    <div class="ed-bar" role="toolbar" aria-label={say("toolbar", "Saving and submitting")}>
-      <button type="button" class="ed-btn" data-save disabled={!version.editable}>{say("save", "Save draft")}</button>
-      <button type="button" class="ed-btn primary" data-submit disabled={!version.editable}>{say("submit", "Submit for review")}</button>
-      <button type="button" class="ed-btn ghost" data-download>{say("download", "Download file")}</button>
-      <label class="ed-btn ghost ed-import">
-        {say("import", "Replace from file")}
-        <input type="file" accept=".json,application/json" data-import disabled={!version.editable} hidden />
-      </label>
-      <span class="ed-status" data-status aria-live="polite"></span>
+    <div class="ed-grid">
+      <nav class="ed-outline" aria-label={say("outline.label", "Outline")}>
+        <div class="ed-outline-list" data-outline></div>
+        <div class="ed-outline-foot">
+          <div class="ed-outline-groups" data-groups></div>
+          <div class="ed-outline-file">
+            <span class="ed-eyebrow">{say("o.file", "File")}</span>
+            <button type="button" class="ed-link" data-download>{say("o.download", "Download the file")}</button>
+            <label class="ed-link">
+              {say("o.replace", "Replace from a file")}
+              <input type="file" accept=".json,application/json" data-import disabled={!version.editable} hidden />
+            </label>
+          </div>
+        </div>
+      </nav>
+
+      <div class="ed-form" data-sections></div>
+
+      <aside class="ed-side">
+        <div class="ed-side-head"><span class="ed-eyebrow">{say("pv.title", "Preview — this is the reader")}</span></div>
+        <div class="ed-preview" data-preview></div>
+        <div class="ed-validation">
+          <span class="ed-eyebrow">{say("pv.validation", "Validation")}</span>
+          <ul class="ed-checks" data-checks></ul>
+          <p class="ed-verdict" data-verdict></p>
+        </div>
+      </aside>
     </div>
-
-    <section class="ed-problems" data-problems hidden>
-      <h2>{say("problems", "To fix before it can be submitted")}</h2>
-      <ul data-problem-list></ul>
-    </section>
-
-    <nav class="ed-nav" aria-label={say("nav", "Parts of the guide")}>
-      <ul data-nav></ul>
-    </nav>
-
-    <div class="ed-sections" data-sections></div>
-
-    <p class="ed-foot">
-      {say("foot", "Saving keeps a draft. Submitting sends it to Shruti; it goes up under your name once she has read it. Nothing is published by saving.")}
-    </p>
   </main>
 </BaseLayout>
 
 <style>
-  .ed-wrap { max-width: 52rem; padding-block: var(--space-6) var(--space-9); font-family: var(--font-body); display: grid; gap: var(--space-4); }
-  .ed-eyebrow { margin: 0; display: flex; gap: 8px; font-size: var(--text-micro); font-weight: 600; letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; color: var(--ink-faint); }
-  .ed-eyebrow a { color: inherit; text-decoration: none; }
-  .ed-title { margin: 0; font-family: var(--font-display); font-weight: 600; font-size: var(--text-h1); line-height: var(--leading-heading); color: var(--ink); text-wrap: balance; }
-  .ed-state { margin: 0; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: var(--text-sm); color: var(--ink-soft); }
-  .ed-chip { font-size: var(--text-micro); font-weight: 600; letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; border: var(--border-w) solid var(--line); border-radius: var(--radius-full); padding: 1px 8px; color: var(--ink-faint); }
-  .ed-note { margin: 0; padding: 10px 14px; border-left: 3px solid var(--rose); background: var(--rose-wash); border-radius: 0 var(--radius-sm) var(--radius-sm) 0; font-size: var(--text-sm); color: var(--ink); white-space: pre-line; }
-  .ed-readonly { margin: 0; padding: 10px 14px; border: var(--border-w) solid var(--line-strong); background: var(--surface-inset); border-radius: var(--radius-md); font-size: var(--text-sm); color: var(--ink-soft); }
-  .ed-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; position: sticky; top: 0; z-index: 2; padding: 10px 0; background: var(--surface-page); border-bottom: var(--border-w) solid var(--line); }
-  .ed-btn { font: 500 var(--text-sm) var(--font-body); padding: 7px 14px; border-radius: var(--radius-full); border: var(--border-w) solid var(--line-strong); background: var(--surface-card); color: var(--ink); cursor: pointer; }
-  .ed-btn.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
-  .ed-btn.ghost { border-style: dashed; }
-  .ed-btn:disabled { opacity: .5; cursor: not-allowed; }
-  .ed-status { font-size: var(--text-sm); color: var(--ink-faint); margin-left: auto; }
+  .ed { font-family: var(--font-body); color: var(--ink); display: flex; flex-direction: column; min-height: 80vh; }
+  .ed-bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; padding: 12px var(--page-pad); border-bottom: var(--border-w) solid var(--line); background: var(--surface-card); position: sticky; top: 0; z-index: 3; }
+  .ed-bar-left, .ed-bar-right { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+  .ed-back { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--ink-faint); text-decoration: none; }
+  .ed-back:hover { color: var(--ink); }
+  .ed-bar-title { margin: 0; font-family: var(--font-display); font-size: 19px; font-weight: 600; color: var(--ink); }
+  .ed-chip { font-family: var(--font-mono); font-size: 11.5px; color: var(--rose); border: var(--border-w) solid var(--rose); border-radius: var(--radius-full); padding: 3px 10px; }
+  .ed-status { font-family: var(--font-mono); font-size: 11.5px; color: var(--ink-faint); }
   .ed-status[data-tone="bad"] { color: var(--rose); }
-  .ed-problems { padding: 10px 14px; border-left: 3px solid var(--rose); background: var(--rose-wash); border-radius: 0 var(--radius-sm) var(--radius-sm) 0; }
-  .ed-problems h2 { margin: 0 0 6px; font: 600 var(--text-xs) var(--font-body); letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; color: var(--rose); }
-  .ed-problems ul { margin: 0; padding-left: 1.1em; display: grid; gap: 4px; font-size: var(--text-sm); }
-  .ed-problems button { font: inherit; background: none; border: 0; padding: 0; color: var(--ink); text-align: left; cursor: pointer; text-decoration: underline; }
-  .ed-problems code { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--ink-faint); }
-  .ed-nav ul { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
-  .ed-nav button { font: 500 var(--text-sm) var(--font-body); padding: 5px 12px; border-radius: var(--radius-full); border: var(--border-w) solid var(--line); background: var(--surface-card); color: var(--ink-soft); cursor: pointer; }
-  .ed-nav button[aria-current="true"] { border-color: var(--accent); color: var(--accent); background: var(--accent-wash); }
-  .ed-nav .n { font-size: var(--text-xs); color: var(--ink-faint); margin-left: 4px; }
-  .ed-sections { display: grid; gap: var(--space-6); }
-  .ed-section { display: grid; gap: var(--space-3); padding-top: var(--space-4); border-top: var(--border-w) solid var(--line); }
-  .ed-section > h2 { margin: 0; font-family: var(--font-display); font-weight: 600; font-size: var(--text-h2); color: var(--ink); }
-  .ed-intro { margin: 0; font-size: var(--text-sm); color: var(--ink-faint); }
-  .ed-fields { display: grid; gap: 10px; }
-  .ed-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)); gap: 10px; }
-  .ed-field { display: grid; gap: 4px; font-size: var(--text-sm); color: var(--ink-soft); }
-  .ed-field.wide { grid-column: 1 / -1; }
+  .ed-btn { font: 500 var(--text-sm) var(--font-body); padding: 7px 14px; border-radius: var(--radius-sm); border: var(--border-w) solid var(--line-strong); background: var(--surface-card); color: var(--ink); cursor: pointer; text-decoration: none; }
+  .ed-btn.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+  .ed-btn.ghost { border-color: transparent; color: var(--accent); }
+  .ed-btn:disabled { opacity: .5; cursor: not-allowed; }
+  .ed-note { margin: 0; padding: 10px var(--page-pad); border-bottom: var(--border-w) solid var(--line); background: var(--rose-wash); font-size: var(--text-sm); color: var(--ink); white-space: pre-line; }
+  .ed-readonly { margin: 0; padding: 10px var(--page-pad); border-bottom: var(--border-w) solid var(--line); background: var(--surface-inset); font-size: var(--text-sm); color: var(--ink-soft); }
+  .ed-grid { display: grid; grid-template-columns: 250px minmax(0, 1fr) 340px; flex: 1; min-height: 0; }
+  .ed-eyebrow { font-size: var(--text-micro); font-weight: 600; letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; color: var(--ink-faint); }
+
+  .ed-outline { border-right: var(--border-w) solid var(--line); background: var(--surface-card); display: flex; flex-direction: column; position: sticky; top: 58px; max-height: calc(100vh - 58px); overflow-y: auto; }
+  .ed-outline-list { display: flex; flex-direction: column; padding: 10px 0; }
+  .ed-o-head { padding: 16px 18px 10px; display: flex; align-items: baseline; justify-content: space-between; border-bottom: var(--border-w) solid var(--line); }
+  .ed-o-add { font-family: var(--font-mono); font-size: 11px; color: var(--accent); background: none; border: 0; cursor: pointer; padding: 0; }
+  .ed-o-add.step { color: var(--rose); padding: 6px 18px 6px 30px; text-align: left; font-size: 13.5px; font-family: var(--font-body); }
+  .ed-o-item { display: block; width: 100%; text-align: left; background: none; border: 0; border-left: 2px solid transparent; cursor: pointer; font: 600 14.5px var(--font-display); color: var(--ink-soft); padding: 8px 18px; }
+  .ed-o-item.guide { font-family: var(--font-body); font-size: 14px; }
+  .ed-o-item.open { color: var(--ink); background: var(--surface-inset); border-top: var(--border-w) solid var(--line); border-bottom: var(--border-w) solid var(--line); }
+  .ed-o-item.on { color: var(--accent); border-left-color: var(--accent); }
+  .ed-o-step { display: block; width: 100%; text-align: left; background: none; border: 0; border-left: 2px solid transparent; cursor: pointer; font: 400 13.5px var(--font-body); color: var(--ink-soft); padding: 6px 18px 6px 30px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ed-o-step.on { color: var(--accent); font-weight: 600; border-left-color: var(--accent); }
+  .ed-o-step.bad::after, .ed-o-item.bad::after { content: " !"; color: var(--rose); }
+  .ed-outline-foot { margin-top: auto; border-top: var(--border-w) solid var(--line); padding: 12px 0; display: flex; flex-direction: column; gap: 12px; }
+  .ed-o-group { display: flex; align-items: baseline; justify-content: space-between; width: 100%; background: none; border: 0; border-left: 2px solid transparent; padding: 8px 18px; cursor: pointer; font: 400 14px var(--font-body); color: var(--ink); text-align: left; }
+  .ed-o-group.on { color: var(--accent); border-left-color: var(--accent); }
+  .ed-o-group .n { font-family: var(--font-mono); font-size: 11.5px; color: var(--ink-faint); }
+  .ed-outline-file { padding: 8px 18px 0; border-top: var(--border-w) solid var(--line); display: flex; flex-direction: column; gap: 6px; padding-top: 12px; }
+  .ed-link { font-family: var(--font-mono); font-size: 11.5px; color: var(--accent); background: none; border: 0; padding: 0; cursor: pointer; text-align: left; }
+
+  .ed-form { padding: 26px 32px 48px; display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+  .ed-form-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  .ed-mono { font-family: var(--font-mono); font-size: 11.5px; color: var(--ink-faint); }
+  .ed-mono.rose { color: var(--rose); }
+  .ed-fields { display: grid; gap: 18px; }
+  .ed-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 18px; }
+  .ed-field { display: flex; flex-direction: column; gap: 7px; font-size: 14px; font-weight: 600; color: var(--ink); min-width: 0; }
   .ed-field input[type="text"], .ed-field input[type="number"], .ed-field textarea, .ed-field select {
-    font: inherit; padding: 7px 10px; border: var(--border-w) solid var(--line); border-radius: var(--radius-sm);
-    background: var(--surface-page); color: var(--ink); width: 100%; box-sizing: border-box;
+    font: 400 14.5px var(--font-body); padding: 11px 14px; border: var(--border-w) solid var(--line-strong); border-radius: var(--radius-sm);
+    background: var(--surface-card); color: var(--ink); width: 100%; box-sizing: border-box; line-height: 1.55;
   }
-  .ed-field textarea { min-height: 4.5em; resize: vertical; }
+  .ed-field textarea { min-height: 82px; resize: vertical; }
+  .ed-field .hint { font: 400 12.5px var(--font-body); color: var(--ink-faint); }
+  .ed-field .hint.rose { color: var(--rose); font-family: var(--font-mono); font-size: 11.5px; }
   .ed-field.bad input, .ed-field.bad textarea, .ed-field.bad select { border-color: var(--rose); }
-  .ed-check { display: flex; gap: 8px; align-items: center; font-size: var(--text-sm); color: var(--ink-soft); }
-  .ed-checks { display: flex; flex-wrap: wrap; gap: 12px; }
-  .ed-item { border: var(--border-w) solid var(--line); border-radius: var(--radius-md); background: var(--surface-card); }
-  .ed-item > summary { cursor: pointer; padding: 10px 14px; display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; font-weight: 600; color: var(--ink); list-style: none; }
-  .ed-item > summary::-webkit-details-marker { display: none; }
-  .ed-item > summary::before { content: "▸"; color: var(--ink-faint); }
-  .ed-item[open] > summary::before { content: "▾"; }
-  .ed-item > summary .id { font-size: var(--text-xs); color: var(--ink-faint); font-weight: 500; }
-  .ed-item > summary .kind { font-size: var(--text-micro); font-weight: 600; letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; color: var(--ink-faint); margin-left: auto; }
-  .ed-item.bad > summary::after { content: "!"; color: var(--rose); font-weight: 700; }
-  .ed-item > .ed-body { padding: 0 14px 14px; display: grid; gap: 10px; }
-  .ed-tools { display: flex; flex-wrap: wrap; gap: 6px; }
-  .ed-tools button, .ed-add { font: 500 var(--text-xs) var(--font-body); padding: 4px 10px; border-radius: var(--radius-full); border: var(--border-w) solid var(--line-strong); background: var(--surface-card); color: var(--ink); cursor: pointer; }
-  .ed-add { font-size: var(--text-sm); justify-self: start; border-style: dashed; }
-  .ed-sub { display: grid; gap: 8px; padding: 10px; border: var(--border-w) dashed var(--line); border-radius: var(--radius-sm); }
-  .ed-sub > .ed-label { font-size: var(--text-micro); font-weight: 600; letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; color: var(--ink-faint); }
-  .ed-gate-row { display: grid; grid-template-columns: 1fr 1fr auto; gap: 6px; align-items: center; }
-  .ed-gate-row select, .ed-gate-row input { font: inherit; padding: 6px 8px; border: var(--border-w) solid var(--line); border-radius: var(--radius-sm); background: var(--surface-page); color: var(--ink); }
-  .ed-phase-head { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; margin: 0; font-family: var(--font-display); font-weight: 600; font-size: var(--text-h4); color: var(--ink); }
-  .ed-phase-head .n { font-size: var(--text-xs); color: var(--ink-faint); font-weight: 500; }
-  .ed-list { display: grid; gap: 8px; }
-  .ed-foot { margin: 0; font-size: var(--text-sm); color: var(--ink-faint); }
-  [data-editable="0"] input, [data-editable="0"] textarea, [data-editable="0"] select, [data-editable="0"] .ed-tools, [data-editable="0"] .ed-add { pointer-events: none; opacity: .7; }
+  .ed-count { display: flex; justify-content: space-between; gap: 10px; font-family: var(--font-mono); font-size: 11.5px; color: var(--ink-faint); }
+  .ed-count.over { color: var(--rose); }
+  .ed-check { display: flex; gap: 8px; align-items: center; font: 400 14px var(--font-body); color: var(--ink-soft); }
+  .ed-checks-row { display: flex; flex-wrap: wrap; gap: 14px; }
+  .ed-card { border: var(--border-w) solid var(--line); border-radius: var(--radius-md); background: var(--surface-card); padding: 18px 20px; display: flex; flex-direction: column; gap: 14px; }
+  .ed-card-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+  .ed-gate-rows { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  .ed-gate-rows select, .ed-gate-rows input { font: 400 14px var(--font-body); padding: 9px 12px; border: var(--border-w) solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-page); color: var(--ink); }
+  .ed-gate-rows input[type="number"], .ed-gate-rows input[type="text"].val { font-family: var(--font-mono); border-color: var(--accent); max-width: 10rem; }
+  .ed-gate-rows .and { font-family: var(--font-mono); font-size: 12px; color: var(--ink-faint); padding: 0 4px; }
+  .ed-gate-rows .add { border-style: dashed; color: var(--ink-faint); background: transparent; }
+  .ed-gate-rows .x { background: none; border: 0; color: var(--ink-faint); cursor: pointer; font-family: var(--font-mono); font-size: 12px; }
+  .ed-reads { border-top: var(--border-w) solid var(--line); padding-top: 12px; display: grid; grid-template-columns: auto 1fr; gap: 8px 10px; align-items: baseline; }
+  .ed-reads .sentence { font-family: var(--font-display); font-size: 16px; color: var(--ink); }
+  .ed-reads .short { font-family: var(--font-mono); font-size: 12.5px; color: var(--ink-soft); }
+  .ed-sub { display: grid; gap: 10px; }
+  .ed-sub-row { display: grid; grid-template-columns: 1fr 2fr auto; gap: 10px; align-items: end; }
+  .ed-tools { display: flex; flex-wrap: wrap; gap: 8px; padding-top: 8px; border-top: var(--border-w) solid var(--line); }
+  .ed-tools button { font: 500 var(--text-xs) var(--font-body); padding: 5px 12px; border-radius: var(--radius-full); border: var(--border-w) solid var(--line-strong); background: var(--surface-card); color: var(--ink); cursor: pointer; }
+  .ed-tools button.rm { margin-left: auto; color: var(--rose); border-color: transparent; }
+  .ed-add { font: 500 var(--text-sm) var(--font-body); padding: 7px 14px; border-radius: var(--radius-sm); border: var(--border-w) dashed var(--line-strong); background: transparent; color: var(--ink-soft); cursor: pointer; justify-self: start; }
+  .ed-list { display: grid; gap: 4px; }
+  .ed-list button { display: flex; justify-content: space-between; gap: 10px; width: 100%; text-align: left; background: var(--surface-card); border: var(--border-w) solid var(--line); border-radius: var(--radius-sm); padding: 10px 14px; cursor: pointer; font: 400 14.5px var(--font-body); color: var(--ink); }
+  .ed-list button.bad { border-color: var(--rose); }
+  .ed-list button:hover { border-color: var(--line-strong); }
+  .ed-intro { margin: 0; font-size: var(--text-sm); color: var(--ink-faint); }
+
+  .ed-side { border-left: var(--border-w) solid var(--line); background: var(--surface-card); display: flex; flex-direction: column; position: sticky; top: 58px; max-height: calc(100vh - 58px); overflow-y: auto; }
+  .ed-side-head { padding: 16px 20px 12px; border-bottom: var(--border-w) solid var(--line); }
+  .ed-preview { padding: 22px 20px; display: flex; flex-direction: column; gap: 8px; border-bottom: var(--border-w) solid var(--line); }
+  .pv-id { font-family: var(--font-mono); font-size: 12px; color: var(--accent); }
+  .pv-title { margin: 0; font-family: var(--font-display); font-size: 20px; line-height: 1.2; font-weight: 600; color: var(--ink); }
+  .pv-big { font-size: 26px; font-weight: 500; }
+  .pv-do { margin: 0; font-family: var(--font-display); font-size: 16px; line-height: 1.7; color: var(--ink); white-space: pre-line; }
+  .pv-line { margin: 0; font-size: 13.5px; line-height: 1.6; color: var(--ink-soft); white-space: pre-line; }
+  .pv-line b { color: var(--ink); font-weight: 600; }
+  .pv-pills { display: flex; flex-wrap: wrap; gap: 8px; }
+  .pv-pill { display: inline-flex; align-items: center; gap: 6px; border: var(--border-w) solid var(--line); border-radius: var(--radius-full); padding: 4px 10px; font-size: 12.5px; color: var(--accent); }
+  .pv-codex { border-left: 2px solid var(--rose); padding: 4px 0 4px 12px; display: flex; flex-direction: column; gap: 3px; }
+  .pv-codex span:last-child { font-family: var(--font-display); font-size: 15px; color: var(--ink); }
+  .pv-gate { margin: 0; font-family: var(--font-mono); font-size: 12px; color: var(--ink-faint); }
+  .pv-eyebrow { font-size: var(--text-micro); font-weight: 600; letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; color: var(--ink-faint); }
+  .pv-eyebrow.rose { color: var(--rose); }
+  .pv-list { margin: 0; padding-left: 1.1em; font-size: 13.5px; color: var(--ink-soft); display: grid; gap: 3px; }
+  .ed-validation { padding: 18px 20px; display: flex; flex-direction: column; gap: 12px; }
+  .ed-checks { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+  .ed-checks li { display: flex; align-items: flex-start; gap: 9px; font-size: 13.5px; line-height: 1.5; color: var(--ink); }
+  .ed-checks li .m { font-family: var(--font-mono); font-size: 13px; flex: none; color: var(--ink-faint); }
+  .ed-checks li.bad .m { color: var(--rose); }
+  .ed-checks li.bad button { font: inherit; background: none; border: 0; padding: 0; color: var(--ink); text-align: left; cursor: pointer; text-decoration: underline; text-decoration-color: var(--line-strong); }
+  .ed-checks li.warn .m { color: var(--rose); }
+  .ed-checks li.warn { color: var(--ink-soft); }
+  .ed-checks li.ok { color: var(--ink-soft); }
+  .ed-verdict { margin: 0; border-top: var(--border-w) solid var(--line); padding-top: 12px; font-family: var(--font-mono); font-size: 11.5px; line-height: 1.7; color: var(--ink-faint); }
+  [data-editable="0"] .ed-form input, [data-editable="0"] .ed-form textarea, [data-editable="0"] .ed-form select, [data-editable="0"] .ed-tools, [data-editable="0"] .ed-add, [data-editable="0"] .ed-o-add { pointer-events: none; opacity: .7; }
+  @media (max-width: 1080px) {
+    .ed-grid { grid-template-columns: 220px minmax(0, 1fr); }
+    .ed-side { grid-column: 1 / -1; position: static; max-height: none; border-left: 0; border-top: var(--border-w) solid var(--line); }
+  }
+  @media (max-width: 760px) {
+    .ed-grid { grid-template-columns: 1fr; }
+    .ed-outline { position: static; max-height: none; border-right: 0; border-bottom: var(--border-w) solid var(--line); }
+    .ed-form { padding: 20px var(--page-pad) 32px; }
+  }
 </style>
 
 <script>
+  import { gateWords, optionLabel, phasesOf, stepsOf, fill } from "../../../lib/guides";
+
   /* The editor. Vanilla, no framework: one document, path-bound inputs,
-     structural re-renders only. */
+     one thing selected at a time, structural redraws only. */
   const root = document.querySelector<HTMLElement>("[data-editor]");
   if (root) {
     type Doc = any;
@@ -283,200 +360,312 @@ const WORDS = {
     let doc: Doc = JSON.parse(root.dataset.doc || "{}");
     let problems: { path: string; message: string }[] = [];
     let dirty = false;
-    let current = "guide";
+    let savedAt = 0;
+    let sel: { kind: string; index: number } = { kind: "guide", index: -1 };
+    let openPhase = "";
 
+    const outline = root.querySelector<HTMLElement>("[data-outline]")!;
+    const groupsEl = root.querySelector<HTMLElement>("[data-groups]")!;
     const sections = root.querySelector<HTMLElement>("[data-sections]")!;
-    const nav = root.querySelector<HTMLElement>("[data-nav]")!;
+    const preview = root.querySelector<HTMLElement>("[data-preview]")!;
+    const checks = root.querySelector<HTMLElement>("[data-checks]")!;
+    const verdict = root.querySelector<HTMLElement>("[data-verdict]")!;
     const status = root.querySelector<HTMLElement>("[data-status]")!;
-    const problemsBox = root.querySelector<HTMLElement>("[data-problems]")!;
-    const problemList = root.querySelector<HTMLElement>("[data-problem-list]")!;
     const titleEl = root.querySelector<HTMLElement>("[data-title]")!;
 
     /* ── document helpers ─────────────────────────────────────────────── */
     const get = (path: string): any => path.split(".").reduce((o, k) => (o == null ? undefined : o[k]), doc);
     const set = (path: string, value: any) => {
       const keys = path.split("."); let o = doc;
-      for (const k of keys.slice(0, -1)) { if (o[k] == null) o[k] = /^\d+$/.test(keys[keys.indexOf(k) + 1]) ? [] : {}; o = o[k]; }
+      for (let i = 0; i < keys.length - 1; i++) { const k = keys[i]; if (o[k] == null) o[k] = /^\d+$/.test(keys[i + 1]) ? [] : {}; o = o[k]; }
       const last = keys[keys.length - 1];
       if (value === undefined || value === "" || (Array.isArray(value) && value.length === 0)) delete o[last];
       else o[last] = value;
       dirty = true; tell(W.status.unsaved);
     };
     const list = (key: string): any[] => { if (!Array.isArray(doc[key])) doc[key] = []; return doc[key]; };
-    const say = (text: string, tone = "") => { status.textContent = text; status.dataset.tone = tone; };
-    const fill = (t: string, vars: Record<string, string>) => String(t || "").replace(/\{(\w+)\}/g, (_, k) => vars[k] ?? "");
+    const tell = (text: string, tone = "") => { status.textContent = text; status.dataset.tone = tone; };
     const esc = (s: unknown) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
     const lines = (arr: unknown) => (Array.isArray(arr) ? arr.join("\n") : "");
     const fromLines = (s: string) => s.split("\n").map((x) => x.trim()).filter(Boolean);
-    const phases = () => list("phases");
+    const phases = () => phasesOf(doc);
     const variants = (): { id: string; name: string }[] => (doc.game?.variants ?? []);
     const fields = (): any[] => list("checkin");
-    const badPaths = () => new Set(problems.map((p) => p.path.replace(/^\$\.?/, "").replace(/\[(\d+)\]/g, ".$1").replace(/ \([^)]*\)/g, "")));
+    const wordsIn = (s: string) => (s || "").trim().split(/\s+/).filter(Boolean).length;
+    const norm = (p: string) => p.replace(/^\$\.?/, "").replace(/\[(\d+)\]/g, ".$1").replace(/ \([^)]*\)/g, "");
+    const badPaths = () => problems.map((p) => norm(p.path));
+    const isBad = (path: string) => badPaths().some((b) => b === path || b.startsWith(path + "."));
+    const stepIndex = (id: string) => list("steps").findIndex((s) => s.id === id);
+    const lowered = () => ({ ...doc, checkin: fields().map((f) => ({ ...f, label: (f.label || f.id).toLowerCase() })) });
 
-    /* ── form atoms (return HTML; binding happens by delegation) ─────── */
-    const field = (path: string, label: string, kind = "text", extra = "") =>
-      `<label class="ed-field ${kind === "textarea" ? "wide" : ""}" data-for="${esc(path)}"><span>${esc(label)}</span>` +
-      (kind === "textarea"
-        ? `<textarea data-path="${esc(path)}" ${extra}>${esc(get(path))}</textarea>`
-        : kind === "number"
-        ? `<input type="number" data-path="${esc(path)}" data-kind="number" value="${esc(get(path))}" ${extra} />`
-        : kind === "lines"
-        ? `<textarea data-path="${esc(path)}" data-kind="lines" ${extra}>${esc(lines(get(path)))}</textarea>`
-        : `<input type="text" data-path="${esc(path)}" value="${esc(get(path))}" ${extra} />`) +
-      `</label>`;
-    const select = (path: string, label: string, options: [string, string][]) =>
-      `<label class="ed-field" data-for="${esc(path)}"><span>${esc(label)}</span><select data-path="${esc(path)}">` +
+    /* ── form atoms ───────────────────────────────────────────────────── */
+    const field = (path: string, label: string, kind = "text", hint = "", extra = "") => {
+      const bad = isBad(path) ? " bad" : "";
+      const input = kind === "textarea" ? `<textarea data-path="${esc(path)}" ${extra}>${esc(get(path))}</textarea>`
+        : kind === "lines" ? `<textarea data-path="${esc(path)}" data-kind="lines" ${extra}>${esc(lines(get(path)))}</textarea>`
+        : kind === "number" ? `<input type="number" data-path="${esc(path)}" data-kind="number" value="${esc(get(path))}" ${extra} />`
+        : `<input type="text" data-path="${esc(path)}" value="${esc(get(path))}" ${extra} />`;
+      return `<label class="ed-field${bad}" data-for="${esc(path)}"><span>${esc(label)}</span>${input}${hint ? `<span class="hint">${esc(hint)}</span>` : ""}</label>`;
+    };
+    const select = (path: string, label: string, options: [string, string][], hint = "") =>
+      `<label class="ed-field${isBad(path) ? " bad" : ""}" data-for="${esc(path)}"><span>${esc(label)}</span><select data-path="${esc(path)}">` +
       options.map(([v, l]) => `<option value="${esc(v)}" ${String(get(path) ?? "") === v ? "selected" : ""}>${esc(l)}</option>`).join("") +
-      `</select></label>`;
-    const checks = (path: string, label: string) => {
-      const chosen: string[] = get(path) ?? [];
-      const all = variants();
+      `</select>${hint ? `<span class="hint">${esc(hint)}</span>` : ""}</label>`;
+    const checksFor = (path: string, label: string) => {
+      const chosen: string[] = get(path) ?? []; const all = variants();
       if (all.length === 0) return "";
-      return `<div class="ed-field"><span>${esc(label)}</span><div class="ed-checks">` +
+      return `<div class="ed-field"><span>${esc(label)}</span><div class="ed-checks-row">` +
         all.map((v) => `<label class="ed-check"><input type="checkbox" data-check="${esc(path)}" value="${esc(v.id)}" ${chosen.includes(v.id) ? "checked" : ""}/> ${esc(v.name)}</label>`).join("") +
         `<span class="ed-check">(${esc(W.common.all)})</span></div></div>`;
     };
-    const tools = (key: string, i: number, n: number) =>
-      `<div class="ed-tools">` +
-      `<button type="button" data-move="${key}:${i}:-1" ${i === 0 ? "disabled" : ""}>${esc(W.common.up)}</button>` +
-      `<button type="button" data-move="${key}:${i}:1" ${i === n - 1 ? "disabled" : ""}>${esc(W.common.down)}</button>` +
-      `<button type="button" data-remove="${key}:${i}">${esc(W.common.remove)}</button></div>`;
-    const links = (path: string) => {
+    const linksEditor = (path: string) => {
       const arr: any[] = get(path) ?? [];
-      return `<div class="ed-sub"><span class="ed-label">${esc(W.steps.links)}</span>` +
-        arr.map((_, j) => `<div class="ed-row">${field(`${path}.${j}.label`, W.steps.linkLabel)}${field(`${path}.${j}.url`, W.steps.linkUrl)}` +
-          `<div class="ed-tools"><button type="button" data-remove="${esc(path)}:${j}">${esc(W.common.remove)}</button></div></div>`).join("") +
-        `<button type="button" class="ed-add" data-add="${esc(path)}" data-blank="link">${esc(W.common.add)}</button></div>`;
+      return `<div class="ed-field"><span>${esc(W.step.links)}</span><div class="ed-sub">` +
+        arr.map((_, j) => `<div class="ed-sub-row">${field(`${path}.${j}.label`, W.step.linkLabel)}${field(`${path}.${j}.url`, W.step.linkUrl)}<div class="ed-tools" style="border:0;padding:0"><button type="button" data-remove="${esc(path)}:${j}">${esc(W.common.remove)}</button></div></div>`).join("") +
+        `<button type="button" class="ed-add" data-add="${esc(path)}" data-blank="link">${esc(W.step.addLink)}</button></div></div>`;
     };
+    const tools = (key: string, i: number, n: number, thing: string, what: string) =>
+      `<div class="ed-tools"><button type="button" data-move="${key}:${i}:-1" ${i === 0 ? "disabled" : ""}>${esc(W.common.up)}</button>` +
+      `<button type="button" data-move="${key}:${i}:1" ${i === n - 1 ? "disabled" : ""}>${esc(W.common.down)}</button>` +
+      `<button type="button" class="rm" data-remove="${key}:${i}" data-what="${esc(what)}">${esc(fill(W.common.removeThis, { thing }))}</button></div>`;
 
-    /* A gate: rows of condition + value. Keys come from the check-in fields. */
-    const gateKeys = (): [string, string][] => {
-      const out: [string, string][] = [];
+    /* ── the gate builder ─────────────────────────────────────────────── */
+    const gateKeys = (): { key: string; field: string; cmp: string; label: string }[] => {
+      const out: { key: string; field: string; cmp: string; label: string }[] = [];
       for (const f of fields()) {
-        if (f.type === "number") { out.push([`${f.id}_min`, fill(W.gate.min, { label: f.label || f.id })], [`${f.id}_max`, fill(W.gate.max, { label: f.label || f.id })]); }
-        else { out.push([`${f.id}_at_least`, fill(W.gate.atLeast, { label: f.label || f.id })], [`${f.id}_is`, fill(W.gate.is, { label: f.label || f.id })]); }
+        const label = f.label || f.id;
+        if (f.type === "number") out.push({ key: `${f.id}_min`, field: f.id, cmp: W.gate.atLeast, label }, { key: `${f.id}_max`, field: f.id, cmp: W.gate.atMost, label });
+        else out.push({ key: `${f.id}_at_least`, field: f.id, cmp: W.gate.atLeast, label }, { key: `${f.id}_is`, field: f.id, cmp: W.gate.is, label });
       }
-      if (variants().length) out.push(["variant", W.gate.variant]);
-      out.push(["steps_done", W.gate.stepsDone], ["codex_active", W.gate.codexActive]);
+      if (variants().length) out.push({ key: "variant", field: "variant", cmp: W.gate.is, label: W.gate.variant });
+      out.push({ key: "steps_done", field: "steps_done", cmp: W.gate.after, label: W.gate.stepsDone });
+      out.push({ key: "codex_active", field: "codex_active", cmp: W.gate.is, label: W.gate.codexActive });
       return out;
     };
-    const gate = (path: string, label: string) => {
+    const gate = (path: string, label: string, opts: { none?: string; some?: string } = {}) => {
       const g: Record<string, any> = get(path) ?? {};
       const keys = gateKeys();
-      const rows = Object.entries(g).map(([k, v]) => {
-        const f = fields().find((x) => k === `${x.id}_at_least` || k === `${x.id}_is`);
+      const byField = new Map<string, typeof keys>();
+      for (const k of keys) { if (!byField.has(k.field)) byField.set(k.field, []); byField.get(k.field)!.push(k); }
+      const rows = Object.entries(g).map(([k, v], i) => {
+        const me = keys.find((x) => x.key === k) ?? { key: k, field: k, cmp: "", label: k };
+        const cmps = byField.get(me.field) ?? [me];
+        const f = fields().find((x) => x.id === me.field);
         const value = Array.isArray(v) ? v.join(", ") : String(v);
         let input: string;
         if (k === "variant") input = `<select data-gate="${esc(path)}" data-key="${esc(k)}">` + variants().map((x) => `<option value="${esc(x.id)}" ${x.id === v ? "selected" : ""}>${esc(x.name)}</option>`).join("") + `</select>`;
-        else if (f && Array.isArray(f.options)) input = `<select data-gate="${esc(path)}" data-key="${esc(k)}">` + f.options.map((o: string) => `<option value="${esc(o)}" ${o === v ? "selected" : ""}>${esc(f.labels?.[o] ?? o)}</option>`).join("") + `</select>`;
+        else if (f && Array.isArray(f.options)) input = `<select data-gate="${esc(path)}" data-key="${esc(k)}">` + f.options.map((o: string) => `<option value="${esc(o)}" ${o === v ? "selected" : ""}>${esc(optionLabel(f, o))}</option>`).join("") + `</select>`;
         else if (/_(min|max)$/.test(k)) input = `<input type="number" data-gate="${esc(path)}" data-key="${esc(k)}" value="${esc(value)}" />`;
-        else input = `<input type="text" data-gate="${esc(path)}" data-key="${esc(k)}" value="${esc(value)}" />`;
-        return `<div class="ed-gate-row"><span>${esc(keys.find(([kk]) => kk === k)?.[1] ?? k)}</span>${input}<button type="button" data-ungate="${esc(path)}:${esc(k)}">${esc(W.common.remove)}</button></div>`;
+        else input = `<input type="text" class="val" data-gate="${esc(path)}" data-key="${esc(k)}" value="${esc(value)}" placeholder="${esc(W.gate.ids)}" />`;
+        return (i > 0 ? `<span class="and">${esc(W.gate.and)}</span>` : "") +
+          `<select data-gate-field="${esc(path)}" data-key="${esc(k)}">` + [...byField.entries()].map(([fid, ks]) => `<option value="${esc(ks[0].key)}" ${fid === me.field ? "selected" : ""}>${esc(ks[0].label)}</option>`).join("") + `</select>` +
+          (cmps.length > 1 ? `<select data-gate-cmp="${esc(path)}" data-key="${esc(k)}">` + cmps.map((c) => `<option value="${esc(c.key)}" ${c.key === k ? "selected" : ""}>${esc(c.cmp)}</option>`).join("") + `</select>` : `<span class="and">${esc(me.cmp)}</span>`) +
+          input + `<button type="button" class="x" data-ungate="${esc(path)}:${esc(k)}" aria-label="${esc(W.common.remove)}">✕</button>`;
       }).join("");
-      const unused = keys.filter(([k]) => !(k in g));
-      return `<div class="ed-sub" data-for="${esc(path)}"><span class="ed-label">${esc(label)}</span>${rows}` +
-        (unused.length ? `<div class="ed-gate-row"><select data-gate-new="${esc(path)}"><option value="">${esc(W.gate.add)}</option>` + unused.map(([k, l]) => `<option value="${esc(k)}">${esc(l)}</option>`).join("") + `</select><span></span><span></span></div>` : "") +
-        `</div>`;
+      const unused = [...byField.entries()].filter(([, ks]) => !ks.some((k) => k.key in g));
+      const phrases = gateWords(g, lowered() as any, W.gate.words);
+      const shorts = gateWords(g, lowered() as any, W.gate.short);
+      const sentence = phrases.length ? fill(W.gate.opens, { phrases: phrases.join(", ") }) : (opts.none ?? W.gate.always);
+      return `<div class="ed-card" data-for="${esc(path)}"><div class="ed-card-head"><span class="ed-eyebrow">${esc(label)}</span><span class="ed-mono">${esc(W.step.noJson)}</span></div>` +
+        `<div class="ed-gate-rows">${rows}` +
+        (unused.length ? (rows ? `<span class="and">${esc(W.gate.and)}</span>` : "") + `<select class="add" data-gate-new="${esc(path)}"><option value="">${esc(W.gate.add)}</option>` + unused.map(([, ks]) => `<option value="${esc(ks[0].key)}">${esc(ks[0].label)}</option>`).join("") + `</select>` : "") +
+        `</div><div class="ed-reads"><span class="ed-mono">${esc(W.gate.readsAs)}</span><span class="sentence">${esc(sentence)}</span>` +
+        (phrases.length ? `<span class="ed-mono">${esc(W.gate.locked)}</span><span class="short">${esc(shorts.join(" · "))}</span>` : "") + `</div></div>`;
     };
 
-    /* ── sections ─────────────────────────────────────────────────────── */
-    const render: Record<string, () => string> = {
-      guide: () => `<div class="ed-fields"><div class="ed-row">${field("guide.title", W.guide.title)}${field("guide.id", W.guide.id)}</div>` +
-        `<div class="ed-row">${field("game.name", W.guide.gameName)}${field("game.id", W.guide.gameId)}${field("guide.version", W.guide.version)}${field("guide.game_patch", W.guide.patch)}</div>` +
-        `${field("guide.summary", W.guide.summary, "textarea")}<div class="ed-row">${field("guide.authors", W.guide.authors, "lines")}${field("guide.caveats", W.guide.caveats, "lines")}</div>` +
-        `<div class="ed-sub"><span class="ed-label">${esc(W.guide.variants)}</span>` +
-        variants().map((_, j) => `<div class="ed-row">${field(`game.variants.${j}.id`, W.guide.variantId)}${field(`game.variants.${j}.name`, W.guide.variantName)}<div class="ed-tools"><button type="button" data-remove="game.variants:${j}">${esc(W.common.remove)}</button></div></div>`).join("") +
-        `<button type="button" class="ed-add" data-add="game.variants" data-blank="variant">${esc(W.common.add)}</button></div></div>`,
-      checkin: () => `<p class="ed-intro">${esc(W.checkin.intro)}</p><div class="ed-list">` +
-        fields().map((f, i) => `<details class="ed-item" data-item="checkin.${i}"><summary><span class="id">${esc(f.id)}</span> ${esc(f.label || "")}<span class="kind">${esc(f.type || "")}</span></summary><div class="ed-body">` +
-          `<div class="ed-row">${field(`checkin.${i}.id`, W.checkin.id)}${field(`checkin.${i}.label`, W.checkin.label)}${select(`checkin.${i}.type`, W.checkin.type, [["number", W.checkin.number], ["ordered", W.checkin.ordered]])}</div>` +
-          (f.type === "ordered"
-            ? `<div class="ed-row">${field(`checkin.${i}.options`, W.checkin.options, "lines")}${field(`checkin.${i}.labels`, W.checkin.labels, "textarea")}</div>`
-            : `<div class="ed-row">${field(`checkin.${i}.min`, W.checkin.min, "number")}${field(`checkin.${i}.max`, W.checkin.max, "number")}</div>`) +
-          gate(`checkin.${i}.show_when`, W.checkin.showWhen) + checks(`checkin.${i}.applies_to`, W.steps.appliesTo) + tools("checkin", i, fields().length) +
-          `</div></details>`).join("") +
-        `</div><button type="button" class="ed-add" data-add="checkin" data-blank="field">${esc(W.checkin.add)}</button>`,
-      phases: () => `<p class="ed-intro">${esc(W.phases.intro)}</p><div class="ed-list">` +
-        phases().map((p, i) => `<details class="ed-item" data-item="phases.${i}"><summary><span class="id">${esc(p.id)}</span> ${esc(p.name || "")}${p.track ? `<span class="kind">${esc(p.track)}</span>` : ""}</summary><div class="ed-body">` +
-          `<div class="ed-row">${field(`phases.${i}.id`, W.phases.id)}${field(`phases.${i}.name`, W.phases.name)}${field(`phases.${i}.band`, W.phases.band)}${field(`phases.${i}.skip_group`, W.phases.skip)}` +
-          select(`phases.${i}.track`, W.phases.track, [["", W.phases.none], ...list("tracks").map((t: any) => [t.id, t.name || t.id] as [string, string])]) + `</div>` +
-          tools("phases", i, phases().length) + `</div></details>`).join("") +
-        `</div><button type="button" class="ed-add" data-add="phases" data-blank="phase">${esc(W.phases.add)}</button>`,
-      steps: () => {
-        const ps = phases();
-        if (ps.length === 0) return `<p class="ed-intro">${esc(W.steps.noPhases)}</p>`;
-        const steps: any[] = list("steps");
-        const codexOptions: [string, string][] = [["", "—"], ...list("codex").map((c: any) => [c.id, c.name || c.id] as [string, string])];
-        return `<p class="ed-intro">${esc(W.steps.intro)}</p>` + ps.map((p) => {
-          const here = steps.map((s, i) => [s, i] as [any, number]).filter(([s]) => s.phase === p.id).sort((a, b) => (a[0].order ?? 0) - (b[0].order ?? 0));
-          return `<h3 class="ed-phase-head">${esc(p.name || p.id)} <span class="n">${here.length}</span></h3><div class="ed-list">` +
-            here.map(([s, i], j) => `<details class="ed-item" data-item="steps.${i}"><summary><span class="id">${esc(s.id)}</span> ${esc(s.title || "")}<span class="kind">${esc(s.kind || "")}${s.ongoing ? " · ∞" : s.minutes ? ` · ${esc(s.minutes)} min` : ""}</span></summary><div class="ed-body">` +
-              `<div class="ed-row">${field(`steps.${i}.id`, W.steps.id)}${field(`steps.${i}.title`, W.steps.title)}${select(`steps.${i}.kind`, W.steps.kind, [["milestone", W.steps.milestone], ["optional", W.steps.optional], ["system", W.steps.system]])}</div>` +
-              `${field(`steps.${i}.do`, W.steps.do, "textarea")}<div class="ed-row">${field(`steps.${i}.done_when`, W.steps.done)}${field(`steps.${i}.oneliner`, W.steps.oneliner)}</div>${field(`steps.${i}.why`, W.steps.why, "textarea")}` +
-              `<div class="ed-row">${field(`steps.${i}.minutes`, W.steps.minutes, "number", s.ongoing ? "disabled" : "")}<label class="ed-check"><input type="checkbox" data-flag="steps.${i}.ongoing" ${s.ongoing ? "checked" : ""}/> ${esc(W.steps.ongoing)}</label>${select(`steps.${i}.codex`, W.steps.codex, codexOptions)}</div>` +
-              checks(`steps.${i}.applies_to`, W.steps.appliesTo) + gate(`steps.${i}.gate`, W.steps.gate) + gate(`steps.${i}.auto_done`, W.steps.autoDone) + links(`steps.${i}.links`) +
-              `<div class="ed-tools"><button type="button" data-step-move="${i}:-1" ${j === 0 ? "disabled" : ""}>${esc(W.common.up)}</button><button type="button" data-step-move="${i}:1" ${j === here.length - 1 ? "disabled" : ""}>${esc(W.common.down)}</button><button type="button" data-remove="steps:${i}">${esc(W.common.remove)}</button></div>` +
-              `</div></details>`).join("") +
-            `</div><button type="button" class="ed-add" data-add-step="${esc(p.id)}">${esc(W.steps.addTo)} ${esc(p.name || p.id)}</button>`;
-        }).join("");
-      },
-      routines: () => `<p class="ed-intro">${esc(W.routines.intro)}</p><div class="ed-list">` +
-        list("routines").map((r: any, i: number) => `<details class="ed-item" data-item="routines.${i}"><summary><span class="id">${esc(r.id)}</span> ${esc(r.name || "")}<span class="kind">${esc(r.resets || "")}</span></summary><div class="ed-body">` +
-          `<div class="ed-row">${field(`routines.${i}.id`, W.routines.id)}${field(`routines.${i}.name`, W.routines.name)}${select(`routines.${i}.resets`, W.routines.resets, [["session", W.routines.session], ["daily", W.routines.daily], ["weekly", W.routines.weekly], ["manual", W.routines.manual]])}</div>` +
-          `<label class="ed-field wide" data-for="routines.${i}.items"><span>${esc(W.routines.items)}</span><textarea data-items="routines.${i}.items">${esc((r.items ?? []).map((x: any) => x.text).join("\n"))}</textarea></label>` +
-          checks(`routines.${i}.applies_to`, W.steps.appliesTo) + gate(`routines.${i}.gate`, W.steps.gate) + tools("routines", i, list("routines").length) + `</div></details>`).join("") +
-        `</div><button type="button" class="ed-add" data-add="routines" data-blank="routine">${esc(W.routines.add)}</button>`,
-      codex: () => `<p class="ed-intro">${esc(W.codex.intro)}</p><div class="ed-list">` +
-        list("codex").map((c: any, i: number) => `<details class="ed-item" data-item="codex.${i}"><summary><span class="id">${esc(c.id)}</span> ${esc(c.name || "")}<span class="kind">${esc(c.group || "")}</span></summary><div class="ed-body">` +
-          `<div class="ed-row">${field(`codex.${i}.id`, W.codex.id)}${field(`codex.${i}.name`, W.codex.name)}${field(`codex.${i}.group`, W.codex.group)}${field(`codex.${i}.ignore_until`, W.codex.ignore)}</div>` +
-          `${field(`codex.${i}.what`, W.codex.what, "textarea")}${field(`codex.${i}.when`, W.codex.when, "textarea")}${field(`codex.${i}.how`, W.codex.how, "textarea")}${field(`codex.${i}.caveats`, W.codex.caveats, "lines")}` +
-          gate(`codex.${i}.show_when`, W.codex.showWhen) + links(`codex.${i}.links`) + tools("codex", i, list("codex").length) + `</div></details>`).join("") +
-        `</div><button type="button" class="ed-add" data-add="codex" data-blank="codex">${esc(W.codex.add)}</button>`,
-      notes: () => `<div class="ed-list">` +
-        list("codex_notes").map((n: any, i: number) => `<details class="ed-item" data-item="codex_notes.${i}"><summary><span class="id">${esc(n.id)}</span> ${esc(n.title || "")}</summary><div class="ed-body">` +
-          `<div class="ed-row">${field(`codex_notes.${i}.id`, W.codex.id)}${field(`codex_notes.${i}.title`, W.codex.noteTitle)}</div>${field(`codex_notes.${i}.items`, W.codex.noteItems, "lines")}` +
-          tools("codex_notes", i, list("codex_notes").length) + `</div></details>`).join("") +
-        `</div><button type="button" class="ed-add" data-add="codex_notes" data-blank="note">${esc(W.codex.addNote)}</button>`,
-      tracks: () => `<p class="ed-intro">${esc(W.tracks.intro)}</p><div class="ed-list">` +
-        list("tracks").map((t: any, i: number) => `<details class="ed-item" data-item="tracks.${i}"><summary><span class="id">${esc(t.id)}</span> ${esc(t.name || "")}</summary><div class="ed-body">` +
-          `<div class="ed-row">${field(`tracks.${i}.id`, W.tracks.id)}${field(`tracks.${i}.name`, W.tracks.name)}</div>${checks(`tracks.${i}.applies_to`, W.steps.appliesTo)}${field(`tracks.${i}.day_one`, W.tracks.dayOne, "lines")}` +
-          `<div class="ed-sub"><span class="ed-label">${esc(W.tracks.ranks)}</span>` + (t.ranks ?? []).map((_: any, j: number) => `<div class="ed-row">${field(`tracks.${i}.ranks.${j}.n`, W.tracks.rankN, "number")}${field(`tracks.${i}.ranks.${j}.capstone`, W.tracks.capstone)}${field(`tracks.${i}.ranks.${j}.when`, W.tracks.when)}<div class="ed-tools"><button type="button" data-remove="tracks.${i}.ranks:${j}">${esc(W.common.remove)}</button></div></div>`).join("") + `<button type="button" class="ed-add" data-add="tracks.${i}.ranks" data-blank="rank">${esc(W.common.add)}</button></div>` +
-          `<div class="ed-sub"><span class="ed-label">${esc(W.tracks.counters)}</span>` + (t.counters ?? []).map((_: any, j: number) => `<div class="ed-row">${field(`tracks.${i}.counters.${j}.id`, W.tracks.id)}${field(`tracks.${i}.counters.${j}.label`, W.tracks.counterLabel)}${field(`tracks.${i}.counters.${j}.max`, W.tracks.max, "number")}${field(`tracks.${i}.counters.${j}.nudge_at`, W.tracks.nudgeAt, "number")}${field(`tracks.${i}.counters.${j}.nudge`, W.tracks.nudge)}<div class="ed-tools"><button type="button" data-remove="tracks.${i}.counters:${j}">${esc(W.common.remove)}</button></div></div>`).join("") + `<button type="button" class="ed-add" data-add="tracks.${i}.counters" data-blank="counter">${esc(W.common.add)}</button></div>` +
-          `<div class="ed-sub"><span class="ed-label">${esc(W.tracks.sections)}</span>` + (t.sections ?? []).map((_: any, j: number) => `<div class="ed-fields"><div class="ed-row">${field(`tracks.${i}.sections.${j}.id`, W.tracks.id)}${field(`tracks.${i}.sections.${j}.title`, W.tracks.sectionTitle)}</div>${field(`tracks.${i}.sections.${j}.body`, W.tracks.body, "textarea")}<div class="ed-tools"><button type="button" data-remove="tracks.${i}.sections:${j}">${esc(W.common.remove)}</button></div></div>`).join("") + `<button type="button" class="ed-add" data-add="tracks.${i}.sections" data-blank="section">${esc(W.common.add)}</button></div>` +
-          tools("tracks", i, list("tracks").length) + `</div></details>`).join("") +
-        `</div><button type="button" class="ed-add" data-add="tracks" data-blank="track">${esc(W.tracks.add)}</button>`,
+    /* ── the forms, one thing at a time ───────────────────────────────── */
+    const guideForm = () => `<div class="ed-form-head"><span class="ed-eyebrow">${esc(W.guide.eyebrow)}</span></div><div class="ed-fields">` +
+      field("guide.title", W.guide.title) + `<div class="ed-row">${field("guide.id", W.guide.id, "text", W.guide.idHint)}${field("guide.version", W.guide.version)}${field("guide.game_patch", W.guide.patch)}</div>` +
+      field("guide.summary", W.guide.summary, "textarea", W.guide.summaryHint) +
+      `<div class="ed-row">${field("guide.authors", W.guide.authors, "lines")}${field("guide.caveats", W.guide.caveats, "lines")}</div>` +
+      select("guide.licence", W.guide.licence, [["", W.guide.licUnsaid], ["CC-BY-SA-4.0", "CC BY-SA 4.0"], ["CC-BY-4.0", "CC BY 4.0"], ["CC0-1.0", "CC0"], ["All-Rights-Reserved", W.guide.licReserved]], W.guide.licenceHint) +
+      `<div class="ed-row">${field("game.name", W.guide.game)}${field("game.id", W.guide.gameId)}</div>` +
+      `<div class="ed-field"><span>${esc(W.guide.variants)}</span><span class="hint">${esc(W.guide.variantsHint)}</span><div class="ed-sub">` +
+      variants().map((_, j) => `<div class="ed-sub-row">${field(`game.variants.${j}.id`, W.guide.variantId)}${field(`game.variants.${j}.name`, W.guide.variantName)}<div class="ed-tools" style="border:0;padding:0"><button type="button" data-remove="game.variants:${j}">${esc(W.common.remove)}</button></div></div>`).join("") +
+      `<button type="button" class="ed-add" data-add="game.variants" data-blank="variant">+</button></div></div></div>`;
+
+    const stepForm = (i: number) => {
+      const s = list("steps")[i]; const p = phases().find((x) => x.id === s.phase);
+      const n = wordsIn(s.do); const over = n > 28;
+      const codexOptions: [string, string][] = [["", W.step.codexNone], ...list("codex").map((c: any) => [c.id, c.name || c.id] as [string, string])];
+      return `<div class="ed-form-head"><span class="ed-eyebrow">${esc(W.step.eyebrow)} ${esc(s.id)} · ${esc(p?.name ?? s.phase)}</span><span class="ed-mono">${esc(fill(W.step.kindStep, { kind: s.kind || "" }))}</span></div><div class="ed-fields">` +
+        field(`steps.${i}.title`, W.step.title, "text", W.step.titleHint) +
+        field(`steps.${i}.oneliner`, W.step.oneliner) +
+        `<div class="ed-field${isBad(`steps.${i}.do`) ? " bad" : ""}" data-for="steps.${i}.do"><span>${esc(W.step.do)}</span><textarea data-path="steps.${i}.do">${esc(s.do)}</textarea>` +
+        `<div class="ed-count${over ? " over" : ""}" data-count="${i}"><span>${esc(over ? fill(W.step.doOver, { n: String(n) }) : fill(W.step.doOk, { n: String(n) }))}</span><span>${n} / 28</span></div></div>` +
+        `<div class="ed-row">${field(`steps.${i}.done_when`, W.step.done)}${field(`steps.${i}.minutes`, W.step.minutes, "number", "", s.ongoing ? "disabled" : "")}</div>` +
+        `<label class="ed-check"><input type="checkbox" data-flag="steps.${i}.ongoing" ${s.ongoing ? "checked" : ""}/> ${esc(W.step.ongoing)}</label>` +
+        gate(`steps.${i}.gate`, W.step.gate) +
+        `<div class="ed-row">${select(`steps.${i}.codex`, W.step.codex, codexOptions)}${select(`steps.${i}.kind`, W.step.kind, [["milestone", W.step.milestone], ["optional", W.step.optional], ["system", W.step.system]])}</div>` +
+        `<div class="ed-field"><span>${esc(W.step.auto)}</span><span class="hint">${esc(Object.keys(s.auto_done ?? {}).length ? W.step.autoSome : W.step.autoNone)}</span></div>` +
+        gate(`steps.${i}.auto_done`, W.step.auto, { none: W.step.autoNone }) +
+        field(`steps.${i}.why`, W.step.why, "textarea", W.step.whyHint) +
+        checksFor(`steps.${i}.applies_to`, W.step.appliesTo) + linksEditor(`steps.${i}.links`) +
+        `<div class="ed-row">${field(`steps.${i}.id`, W.step.id, "text", W.step.idHint)}</div>` +
+        `<div class="ed-tools"><button type="button" data-step-move="${i}:-1">${esc(W.common.up)}</button><button type="button" data-step-move="${i}:1">${esc(W.common.down)}</button><button type="button" class="rm" data-remove="steps:${i}" data-what="${esc(s.id)}">${esc(fill(W.common.removeThis, { thing: W.step.eyebrow.toLowerCase() }))}</button></div></div>`;
     };
-    const counts: Record<string, () => number> = {
-      guide: () => 0, checkin: () => fields().length, phases: () => phases().length, steps: () => list("steps").length,
-      routines: () => list("routines").length, codex: () => list("codex").length, notes: () => list("codex_notes").length, tracks: () => list("tracks").length,
+
+    const phaseForm = (i: number) => {
+      const p = phases()[i]; const idx = list("phases").indexOf(p);
+      return `<div class="ed-form-head"><span class="ed-eyebrow">${esc(W.phase.eyebrow)} ${idx + 1}</span></div><div class="ed-fields">` +
+        `<div class="ed-row">${field(`phases.${idx}.name`, W.phase.name)}${field(`phases.${idx}.id`, W.phase.id)}</div>` +
+        `<div class="ed-row">${field(`phases.${idx}.band`, W.phase.band, "text", W.phase.bandHint)}${field(`phases.${idx}.skip_group`, W.phase.skip, "text", W.phase.skipHint)}</div>` +
+        select(`phases.${idx}.track`, W.phase.track, [["", W.phase.none], ...list("tracks").map((t: any) => [t.id, t.name || t.id] as [string, string])]) +
+        tools("phases", idx, list("phases").length, W.phase.eyebrow.toLowerCase(), p.name || p.id) + `</div>`;
     };
+
+    const fieldForm = (i: number) => {
+      const f = fields()[i];
+      return `<div class="ed-form-head"><span class="ed-eyebrow">${esc(W.checkin.eyebrow)}</span><span class="ed-mono">${esc(W.checkin.intro)}</span></div><div class="ed-fields">` +
+        `<div class="ed-row">${field(`checkin.${i}.label`, W.checkin.label)}${field(`checkin.${i}.id`, W.checkin.id)}${select(`checkin.${i}.type`, W.checkin.type, [["number", W.checkin.number], ["ordered", W.checkin.ordered]])}</div>` +
+        (f.type === "ordered" ? `<div class="ed-row">${field(`checkin.${i}.options`, W.checkin.options, "lines")}${field(`checkin.${i}.labels`, W.checkin.labels, "textarea")}</div>`
+                              : `<div class="ed-row">${field(`checkin.${i}.min`, W.checkin.min, "number")}${field(`checkin.${i}.max`, W.checkin.max, "number")}</div>`) +
+        gate(`checkin.${i}.show_when`, W.checkin.showWhen) + checksFor(`checkin.${i}.applies_to`, W.step.appliesTo) +
+        tools("checkin", i, fields().length, W.checkin.eyebrow.toLowerCase(), f.label || f.id) + `</div>`;
+    };
+
+    const routineForm = (i: number) => {
+      const r = list("routines")[i];
+      return `<div class="ed-form-head"><span class="ed-eyebrow">${esc(W.routine.eyebrow)}</span><span class="ed-mono">${esc(W.routine.intro)}</span></div><div class="ed-fields">` +
+        `<div class="ed-row">${field(`routines.${i}.name`, W.routine.name)}${field(`routines.${i}.id`, W.routine.id)}${select(`routines.${i}.resets`, W.routine.resets, [["session", W.routine.session], ["daily", W.routine.daily], ["weekly", W.routine.weekly], ["manual", W.routine.manual]])}</div>` +
+        `<label class="ed-field" data-for="routines.${i}.items"><span>${esc(W.routine.items)}</span><textarea data-items="routines.${i}.items">${esc((r.items ?? []).map((x: any) => x.text).join("\n"))}</textarea></label>` +
+        gate(`routines.${i}.gate`, W.routine.gate) + checksFor(`routines.${i}.applies_to`, W.step.appliesTo) +
+        tools("routines", i, list("routines").length, W.routine.eyebrow.toLowerCase(), r.name || r.id) + `</div>`;
+    };
+
+    const codexForm = (i: number) => {
+      const c = list("codex")[i];
+      return `<div class="ed-form-head"><span class="ed-eyebrow">${esc(W.codex.eyebrow)}</span><span class="ed-mono">${esc(W.codex.intro)}</span></div><div class="ed-fields">` +
+        `<div class="ed-row">${field(`codex.${i}.name`, W.codex.name)}${field(`codex.${i}.id`, W.codex.id)}${field(`codex.${i}.group`, W.codex.group)}</div>` +
+        field(`codex.${i}.what`, W.codex.what, "textarea") + `<div class="ed-row">${field(`codex.${i}.when`, W.codex.when, "textarea")}${field(`codex.${i}.how`, W.codex.how, "textarea")}</div>` +
+        `<div class="ed-row">${field(`codex.${i}.ignore_until`, W.codex.ignore)}${field(`codex.${i}.caveats`, W.codex.caveats, "lines")}</div>` +
+        gate(`codex.${i}.show_when`, W.codex.showWhen) + linksEditor(`codex.${i}.links`) +
+        tools("codex", i, list("codex").length, W.codex.eyebrow.toLowerCase(), c.name || c.id) + `</div>`;
+    };
+
+    const noteForm = (i: number) => {
+      const n = list("codex_notes")[i];
+      return `<div class="ed-form-head"><span class="ed-eyebrow">${esc(W.codex.noteEyebrow)}</span></div><div class="ed-fields">` +
+        `<div class="ed-row">${field(`codex_notes.${i}.title`, W.codex.noteTitle)}${field(`codex_notes.${i}.id`, W.codex.id)}</div>` +
+        field(`codex_notes.${i}.items`, W.codex.noteItems, "lines") +
+        tools("codex_notes", i, list("codex_notes").length, W.codex.noteEyebrow.toLowerCase(), n.title || n.id) + `</div>`;
+    };
+
+    const trackForm = (i: number) => {
+      const t = list("tracks")[i];
+      const sub = (key: string, label: string, blank: string, render: (j: number) => string) =>
+        `<div class="ed-field"><span>${esc(label)}</span><div class="ed-sub">` +
+        ((t[key] ?? []) as any[]).map((_, j) => `<div class="ed-sub-row" style="grid-template-columns:1fr">${render(j)}<div class="ed-tools" style="border:0;padding:0"><button type="button" data-remove="tracks.${i}.${key}:${j}">${esc(W.common.remove)}</button></div></div>`).join("") +
+        `<button type="button" class="ed-add" data-add="tracks.${i}.${key}" data-blank="${blank}">+</button></div></div>`;
+      return `<div class="ed-form-head"><span class="ed-eyebrow">${esc(W.track.eyebrow)}</span><span class="ed-mono">${esc(W.track.intro)}</span></div><div class="ed-fields">` +
+        `<div class="ed-row">${field(`tracks.${i}.name`, W.track.name)}${field(`tracks.${i}.id`, W.track.id)}</div>` +
+        checksFor(`tracks.${i}.applies_to`, W.step.appliesTo) + field(`tracks.${i}.day_one`, W.track.dayOne, "lines") +
+        sub("ranks", W.track.ranks, "rank", (j) => `<div class="ed-row">${field(`tracks.${i}.ranks.${j}.n`, W.track.rankN, "number")}${field(`tracks.${i}.ranks.${j}.capstone`, W.track.capstone)}${field(`tracks.${i}.ranks.${j}.when`, W.track.when)}</div>`) +
+        sub("counters", W.track.counters, "counter", (j) => `<div class="ed-row">${field(`tracks.${i}.counters.${j}.label`, W.track.counterLabel)}${field(`tracks.${i}.counters.${j}.id`, W.track.id)}${field(`tracks.${i}.counters.${j}.max`, W.track.max, "number")}${field(`tracks.${i}.counters.${j}.nudge_at`, W.track.nudgeAt, "number")}${field(`tracks.${i}.counters.${j}.nudge`, W.track.nudge)}</div>`) +
+        sub("sections", W.track.sections, "section", (j) => `<div class="ed-fields"><div class="ed-row">${field(`tracks.${i}.sections.${j}.title`, W.track.sectionTitle)}${field(`tracks.${i}.sections.${j}.id`, W.track.id)}</div>${field(`tracks.${i}.sections.${j}.body`, W.track.body, "textarea")}</div>`) +
+        tools("tracks", i, list("tracks").length, W.track.eyebrow.toLowerCase(), t.name || t.id) + `</div>`;
+    };
+
+    const groupForm = (key: string, label: string, name: (x: any) => string, blank: string, newLabel: string, intro: string) => {
+      const arr = list(key);
+      return `<div class="ed-form-head"><span class="ed-eyebrow">${esc(label)}</span><span class="ed-mono">${arr.length}</span></div><p class="ed-intro">${esc(intro)}</p><div class="ed-list">` +
+        arr.map((x, i) => `<button type="button" class="${isBad(`${key}.${i}`) ? "bad" : ""}" data-select="${key}:${i}"><span>${esc(name(x) || x.id || "—")}</span><span class="ed-mono">${esc(x.id ?? "")}</span></button>`).join("") +
+        `</div><button type="button" class="ed-add" data-add="${key}" data-blank="${blank}" data-then-select="1">${esc(newLabel)}</button>`;
+    };
+
     const blanks: Record<string, () => any> = {
       variant: () => ({ id: "", name: "" }), field: () => ({ id: "", label: "", type: "number" }),
-      phase: () => ({ id: `p${phases().length + 1}`, name: "", order: phases().length + 1 }),
+      phase: () => ({ id: `p${list("phases").length + 1}`, name: "", order: list("phases").length + 1 }),
       routine: () => ({ id: `r${list("routines").length + 1}`, name: "", resets: "manual", items: [] }),
       codex: () => ({ id: "", name: "", what: "" }), note: () => ({ id: "notes", title: "", items: [] }),
       track: () => ({ id: "", name: "", ranks: [], counters: [], sections: [] }),
       rank: () => ({ n: 1, capstone: "" }), counter: () => ({ id: "", label: "", max: 0 }),
       section: () => ({ id: "", title: "", body: "" }), link: () => ({ label: "", url: "" }),
     };
+    const KINDS: Record<string, string> = { checkin: "field", routines: "routine", codex: "codex", codex_notes: "note", tracks: "track" };
+
+    /* ── the preview: this is the reader ──────────────────────────────── */
+    const previewOf = (): string => {
+      const opens = (g: any) => gateWords(g, lowered() as any, W.gate.words);
+      if (sel.kind === "steps") {
+        const s = list("steps")[sel.index]; if (!s) return "";
+        const entry = list("codex").find((c: any) => c.id === s.codex);
+        const g = opens(s.gate);
+        return `<span class="pv-id">${esc(s.id)}</span><h4 class="pv-title">${esc(s.title)}</h4>` + (s.do ? `<p class="pv-do">${esc(s.do)}</p>` : "") +
+          (s.done_when ? `<p class="pv-line"><b>${esc(W.preview.done)}</b>${esc(s.done_when)}</p>` : "") + (s.why ? `<p class="pv-line"><b>${esc(W.preview.why)}</b>${esc(s.why)}</p>` : "") +
+          ((s.links ?? []).length ? `<div class="pv-pills">${s.links.map((l: any) => `<span class="pv-pill">${esc(l.label || l.url)}</span>`).join("")}</div>` : "") +
+          (entry ? `<div class="pv-codex"><span class="pv-eyebrow rose">${esc(W.preview.codex)}</span><span>${esc(entry.name)}${entry.what ? " — " + esc(entry.what) : ""}</span></div>` : "") +
+          (g.length ? `<p class="pv-gate">${esc(W.preview.opens)} ${esc(g.join(", "))}</p>` : "");
+      }
+      if (sel.kind === "guide") {
+        const gd = doc.guide ?? {};
+        return `<span class="pv-eyebrow">${esc(doc.game?.name ?? "")}${gd.game_patch ? " · " + esc(gd.game_patch) : ""}</span><h4 class="pv-title pv-big">${esc(gd.title)}</h4>` + (gd.summary ? `<p class="pv-do">${esc(gd.summary)}</p>` : "") +
+          `<div class="pv-pills"><span class="pv-pill">${list("phases").length} · ${list("steps").length}</span>${gd.licence ? `<span class="pv-pill">${esc(gd.licence)}</span>` : ""}</div>`;
+      }
+      if (sel.kind === "phases") { const p = phases()[sel.index]; return p ? `<span class="pv-eyebrow">${esc(p.band ?? "")}</span><h4 class="pv-title pv-big">${esc(p.name)}</h4><p class="pv-gate">${stepsOf(doc, p).length}</p>` : ""; }
+      if (sel.kind === "codex") { const c = list("codex")[sel.index]; return c ? `<h4 class="pv-title">${esc(c.name)}</h4>` + ["what", "when", "how"].filter((k) => c[k]).map((k) => `<p class="pv-line"><b>${esc(W.codex[k])} · </b>${esc(c[k])}</p>`).join("") + (opens(c.show_when).length ? `<p class="pv-gate">${esc(opens(c.show_when).join(", "))}</p>` : "") : ""; }
+      if (sel.kind === "routines") { const r = list("routines")[sel.index]; return r ? `<h4 class="pv-title">${esc(r.name)}</h4><ul class="pv-list">${(r.items ?? []).map((x: any) => `<li>${esc(x.text)}</li>`).join("")}</ul>` : ""; }
+      if (sel.kind === "codex_notes") { const n = list("codex_notes")[sel.index]; return n ? `<span class="pv-eyebrow rose">${esc(n.title)}</span><ul class="pv-list">${(n.items ?? []).map((x: string) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""; }
+      if (sel.kind === "tracks") { const t = list("tracks")[sel.index]; return t ? `<h4 class="pv-title">${esc(t.name)}</h4><ul class="pv-list">${(t.ranks ?? []).map((r: any) => `<li>${esc(r.n)} · ${esc(r.capstone)}</li>`).join("")}</ul>` : ""; }
+      if (sel.kind === "checkin") { const f = fields()[sel.index]; return f ? `<h4 class="pv-title">${esc(f.label)}</h4><p class="pv-gate">${esc(f.type)}${f.type === "number" ? ` · ${esc(f.min ?? "")}–${esc(f.max ?? "")}` : ` · ${(f.options ?? []).length}`}</p>` : ""; }
+      return "";
+    };
+
+    /* ── validation: the server's problems, then what is worth knowing ── */
+    const validation = () => {
+      const items: string[] = [];
+      for (const p of problems) items.push(`<li class="bad"><span class="m">✕</span><button type="button" data-problem="${esc(p.path)}">${esc(p.message)} <span class="ed-mono">${esc(p.path)}</span></button></li>`);
+      const long = list("steps").filter((s) => wordsIn(s.do) > 28);
+      for (const s of long) items.push(`<li class="warn"><span class="m">~</span><button type="button" data-problem="$.steps[${stepIndex(s.id)}].do">${esc(fill(W.preview.doLong, { id: s.id }))} <span class="ed-mono">${esc(W.preview.worthKnowing)}</span></button></li>`);
+      const ids = list("steps").map((s) => s.id); const unique = new Set(ids).size === ids.length;
+      const declared = new Set(fields().map((f) => f.id));
+      const gatesOk = list("steps").every((s) => Object.keys(s.gate ?? {}).every((k) => ["variant", "steps_done", "codex_active"].includes(k) || [...declared].some((id) => k.startsWith(id + "_"))));
+      const filled = phases().every((p) => stepsOf(doc, p).length > 0);
+      for (const [ok, text] of [[unique, W.preview.idsUnique], [gatesOk, W.preview.gatesNamed], [filled, W.preview.phasesFilled]] as [boolean, string][]) {
+        if (ok) items.push(`<li class="ok"><span class="m">✓</span><span>${esc(text)}</span></li>`);
+      }
+      checks.innerHTML = items.join("");
+      verdict.textContent = problems.length === 0 ? W.preview.clean : problems.length === 1 ? W.preview.countOne : fill(W.preview.countBlocking, { n: String(problems.length) });
+    };
 
     /* ── drawing ──────────────────────────────────────────────────────── */
-    const draw = () => {
-      const bad = badPaths();
-      nav.innerHTML = Object.entries(W.sections).map(([key, label]) =>
-        `<li><button type="button" data-goto="${key}" aria-current="${key === current}">${esc(label as string)}${counts[key]() ? `<span class="n">${counts[key]()}</span>` : ""}</button></li>`).join("");
-      sections.innerHTML = `<section class="ed-section" data-section="${current}"><h2>${esc(W.sections[current])}</h2>${render[current]()}</section>`;
-      for (const el of sections.querySelectorAll<HTMLElement>("[data-for]")) {
-        const p = el.dataset.for!;
-        if ([...bad].some((b) => b === p || b.startsWith(p + "."))) el.classList.add("bad");
+    const drawOutline = () => {
+      const ps = phases();
+      let html = `<div class="ed-o-head"><span class="ed-eyebrow">${esc(W.outline.title)}</span><button type="button" class="ed-o-add" data-add="phases" data-blank="phase" data-then-select="1">${esc(W.outline.addPhase)}</button></div>`;
+      html += `<button type="button" class="ed-o-item guide${sel.kind === "guide" ? " on" : ""}${isBad("guide") || isBad("game") ? " bad" : ""}" data-select="guide:-1">${esc(W.outline.guide)}</button>`;
+      for (const p of ps) {
+        const idx = list("phases").indexOf(p); const open = openPhase === p.id;
+        html += `<button type="button" class="ed-o-item${open ? " open" : ""}${sel.kind === "phases" && sel.index === ps.indexOf(p) ? " on" : ""}${isBad(`phases.${idx}`) ? " bad" : ""}" data-select="phases:${ps.indexOf(p)}" data-phase="${esc(p.id)}">${esc(p.name || p.id)}</button>`;
+        if (open) {
+          for (const s of stepsOf(doc, p)) { const si = stepIndex(s.id); html += `<button type="button" class="ed-o-step${sel.kind === "steps" && sel.index === si ? " on" : ""}${isBad(`steps.${si}`) ? " bad" : ""}" data-select="steps:${si}">${esc(s.id)} ${esc(s.title || "")}</button>`; }
+          html += `<button type="button" class="ed-o-add step" data-add-step="${esc(p.id)}">${esc(W.outline.addStep)}</button>`;
+        }
       }
-      for (const el of sections.querySelectorAll<HTMLElement>("[data-item]")) {
-        const p = el.dataset.item!;
-        if ([...bad].some((b) => b === p || b.startsWith(p + "."))) el.classList.add("bad");
-      }
+      outline.innerHTML = html;
+      groupsEl.innerHTML = ([["checkin", W.outline.checkin], ["routines", W.outline.routines], ["codex", W.outline.codex], ["codex_notes", W.outline.notes], ["tracks", W.outline.tracks]] as [string, string][])
+        .map(([key, label]) => `<button type="button" class="ed-o-group${sel.kind === key ? " on" : ""}" data-select="${key}:-1"><span>${esc(label)}</span><span class="n">${list(key).length}</span></button>`).join("");
+    };
+    const drawForm = () => {
+      const k = sel.kind, i = sel.index;
+      sections.innerHTML =
+        k === "guide" ? guideForm()
+        : k === "phases" ? (phases()[i] ? phaseForm(i) : "")
+        : k === "steps" ? (list("steps")[i] ? stepForm(i) : "")
+        : k === "checkin" ? (i >= 0 && fields()[i] ? fieldForm(i) : groupForm("checkin", W.outline.checkin, (x) => x.label, "field", W.checkin.add, W.checkin.intro))
+        : k === "routines" ? (i >= 0 && list("routines")[i] ? routineForm(i) : groupForm("routines", W.outline.routines, (x) => x.name, "routine", W.routine.new, W.routine.intro))
+        : k === "codex" ? (i >= 0 && list("codex")[i] ? codexForm(i) : groupForm("codex", W.outline.codex, (x) => x.name, "codex", W.codex.new, W.codex.intro))
+        : k === "codex_notes" ? (i >= 0 && list("codex_notes")[i] ? noteForm(i) : groupForm("codex_notes", W.outline.notes, (x) => x.title, "note", W.codex.newNote, ""))
+        : k === "tracks" ? (i >= 0 && list("tracks")[i] ? trackForm(i) : groupForm("tracks", W.outline.tracks, (x) => x.name, "track", W.track.new, W.track.intro))
+        : "";
+      preview.innerHTML = previewOf();
       titleEl.textContent = doc.guide?.title || titleEl.textContent;
-      problemsBox.hidden = problems.length === 0;
-      problemList.innerHTML = problems.map((p) => `<li><button type="button" data-problem="${esc(p.path)}"><code>${esc(p.path)}</code> ${esc(p.message)}</button></li>`).join("");
+    };
+    const draw = () => { drawOutline(); drawForm(); validation(); };
+    const selectThing = (kind: string, index: number) => {
+      sel = { kind, index };
+      if (kind === "steps") { const s = list("steps")[index]; if (s) openPhase = s.phase; }
+      if (kind === "phases") { const p = phases()[index]; if (p) openPhase = p.id; }
+      draw();
     };
 
     /* ── events, by delegation ────────────────────────────────────────── */
@@ -492,106 +681,122 @@ const WORDS = {
           set(el.dataset.path, Object.keys(out).length ? out : undefined);
         } else set(el.dataset.path, el.value);
         if (el.dataset.path === "guide.title") titleEl.textContent = el.value;
-        const summary = el.closest("details")?.querySelector("summary");
-        if (summary && (el.dataset.path.endsWith(".title") || el.dataset.path.endsWith(".name") || el.dataset.path.endsWith(".id"))) {
-          const item = el.closest<HTMLElement>("[data-item]")!.dataset.item!; const o = get(item);
-          summary.innerHTML = `<span class="id">${esc(o.id)}</span> ${esc(o.title || o.name || "")}<span class="kind">${esc(o.kind || o.type || o.resets || o.group || o.track || "")}</span>`;
+        if (el.dataset.path.endsWith(".do")) {
+          const i = Number(el.dataset.path.split(".")[1]); const n = wordsIn(el.value); const over = n > 28;
+          const c = sections.querySelector<HTMLElement>(`[data-count="${i}"]`);
+          if (c) { c.classList.toggle("over", over); c.innerHTML = `<span>${esc(over ? fill(W.step.doOver, { n: String(n) }) : fill(W.step.doOk, { n: String(n) }))}</span><span>${n} / 28</span>`; }
         }
+        preview.innerHTML = previewOf();
       }
-      if (el.dataset.items) set(el.dataset.items, fromLines(el.value).map((text, j) => ({ id: `${get(el.dataset.items!.replace(/\.items$/, ".id")) || "r"}.${j + 1}`, text })));
+      if (el.dataset.items) { const base = el.dataset.items.replace(/\.items$/, ".id"); set(el.dataset.items, fromLines(el.value).map((text, j) => ({ id: `${(get(base) || "r").toUpperCase()}.${j + 1}`, text }))); preview.innerHTML = previewOf(); }
       if (el.dataset.gate && el.dataset.key) {
         const k = el.dataset.key; const g = get(el.dataset.gate) ?? {};
         g[k] = k === "steps_done" || k === "codex_active" ? el.value.split(",").map((x) => x.trim()).filter(Boolean)
              : /_(min|max)$/.test(k) ? Number(el.value) : el.value;
         set(el.dataset.gate, g);
+        const card = el.closest<HTMLElement>(".ed-card");
+        if (card) { const phrases = gateWords(g, lowered() as any, W.gate.words); const shorts = gateWords(g, lowered() as any, W.gate.short);
+          const s = card.querySelector(".sentence"); const sh = card.querySelector(".short");
+          if (s) s.textContent = phrases.length ? fill(W.gate.opens, { phrases: phrases.join(", ") }) : W.gate.always; if (sh) sh.textContent = shorts.join(" · "); }
+        preview.innerHTML = previewOf();
       }
     });
     sections.addEventListener("change", (event) => {
       const el = event.target as HTMLInputElement | HTMLSelectElement;
-      if (el.dataset.check) {
-        const chosen = Array.from(sections.querySelectorAll<HTMLInputElement>(`[data-check="${el.dataset.check}"]:checked`)).map((x) => x.value);
-        set(el.dataset.check, chosen); return;
-      }
-      if (el.dataset.flag) { set(el.dataset.flag, (el as HTMLInputElement).checked ? true : undefined); if ((el as HTMLInputElement).checked) set(el.dataset.flag.replace(/\.ongoing$/, ".minutes"), undefined); draw(); return; }
+      if (el.dataset.check) { set(el.dataset.check, Array.from(sections.querySelectorAll<HTMLInputElement>(`[data-check="${el.dataset.check}"]:checked`)).map((x) => x.value)); return; }
+      if (el.dataset.flag) { const on = (el as HTMLInputElement).checked; set(el.dataset.flag, on ? true : undefined); if (on) set(el.dataset.flag.replace(/\.ongoing$/, ".minutes"), undefined); drawForm(); return; }
       if (el.dataset.gateNew) {
         const k = (el as HTMLSelectElement).value; if (!k) return;
         const g = get(el.dataset.gateNew) ?? {};
         g[k] = k === "steps_done" || k === "codex_active" ? [] : k === "variant" ? (variants()[0]?.id ?? "") : /_(min|max)$/.test(k) ? 0 : (fields().find((f) => k.startsWith(f.id + "_"))?.options?.[0] ?? "");
-        set(el.dataset.gateNew, g); draw(); return;
+        set(el.dataset.gateNew, g); drawForm(); return;
       }
-      if (el.dataset.path && el.dataset.path.endsWith(".type")) draw();
+      if (el.dataset.gateField || el.dataset.gateCmp) {
+        const path = (el.dataset.gateField ?? el.dataset.gateCmp)!; const old = el.dataset.key!; const next = (el as HTMLSelectElement).value;
+        const g = get(path) ?? {}; if (next === old) return;
+        const carried = /_(min|max)$/.test(next) ? (typeof g[old] === "number" ? g[old] : 0) : next === "variant" ? (variants()[0]?.id ?? "") : next === "steps_done" || next === "codex_active" ? [] : (fields().find((f) => next.startsWith(f.id + "_"))?.options?.[0] ?? "");
+        const rebuilt: Record<string, any> = {}; for (const [k, v] of Object.entries(g)) rebuilt[k === old ? next : k] = k === old ? carried : v;
+        set(path, rebuilt); drawForm(); return;
+      }
+      if (el.dataset.path && (el.dataset.path.endsWith(".type") || el.dataset.path.endsWith(".kind") || el.dataset.path.endsWith(".codex") || el.dataset.path.endsWith(".track"))) { drawForm(); if (el.dataset.path.endsWith(".track")) drawOutline(); }
     });
     sections.addEventListener("click", (event) => {
       const b = (event.target as HTMLElement).closest<HTMLElement>("button"); if (!b) return;
-      const open = Array.from(sections.querySelectorAll<HTMLDetailsElement>("details[open]")).map((d) => d.dataset.item);
-      const reopen = () => { draw(); for (const d of sections.querySelectorAll<HTMLDetailsElement>("details")) if (open.includes(d.dataset.item)) d.open = true; };
-      if (b.dataset.add) { const arr = get(b.dataset.add) ?? []; arr.push(blanks[b.dataset.blank!]()); set(b.dataset.add, arr); reopen(); (sections.querySelector<HTMLDetailsElement>(`[data-item="${b.dataset.add}.${arr.length - 1}"]`) ?? { open: false }).open = true; }
-      if (b.dataset.addStep) {
-        const p = phases().find((x) => x.id === b.dataset.addStep); const steps = list("steps");
-        const n = steps.filter((s) => s.phase === p.id).length + 1;
-        steps.push({ id: `P${p.order ?? phases().indexOf(p) + 1}.${n}`, phase: p.id, kind: "milestone", order: n, title: "", do: "", minutes: 5 });
-        set("steps", steps); reopen(); (sections.querySelector<HTMLDetailsElement>(`[data-item="steps.${steps.length - 1}"]`) ?? { open: false }).open = true;
+      if (b.dataset.select) { const [k, i] = b.dataset.select.split(":"); selectThing(k, Number(i)); return; }
+      if (b.dataset.add) {
+        const arr = get(b.dataset.add) ?? []; arr.push(blanks[b.dataset.blank!]()); set(b.dataset.add, arr);
+        if (b.dataset.thenSelect) selectThing(b.dataset.add, arr.length - 1); else drawForm();
+        return;
       }
       if (b.dataset.remove) {
-        const [path, i] = b.dataset.remove.split(":"); const arr = get(path) ?? []; arr.splice(Number(i), 1); set(path, arr.length ? arr : (path.includes(".") ? undefined : []));
+        const [path, i] = b.dataset.remove.split(":");
+        if (b.classList.contains("rm") && !confirm(fill(W.common.sure, { what: b.dataset.what || "" }))) return;
+        const arr = get(path) ?? []; arr.splice(Number(i), 1); set(path, arr.length ? arr : (path.includes(".") ? undefined : []));
         if (path === "phases") list("phases").forEach((p, j) => (p.order = j + 1));
-        reopen();
+        if (b.classList.contains("rm")) sel = { kind: path.includes(".") ? sel.kind : path, index: -1 };
+        if (path === "steps") sel = { kind: "phases", index: Math.max(0, phases().findIndex((p) => p.id === openPhase)) };
+        draw(); return;
       }
       if (b.dataset.move) {
         const [path, i, d] = b.dataset.move.split(":"); const arr = get(path); const a = Number(i), c = a + Number(d);
         if (c < 0 || c >= arr.length) return; [arr[a], arr[c]] = [arr[c], arr[a]];
         if (path === "phases") arr.forEach((p: any, j: number) => (p.order = j + 1));
-        set(path, arr); reopen();
+        set(path, arr); sel.index = c; draw(); return;
       }
       if (b.dataset.stepMove) {
         const [i, d] = b.dataset.stepMove.split(":").map(Number); const steps = list("steps"); const s = steps[i];
-        const here = steps.filter((x) => x.phase === s.phase).sort((a, b2) => (a.order ?? 0) - (b2.order ?? 0));
+        const here = steps.filter((x) => x.phase === s.phase).sort((x, y) => (x.order ?? 0) - (y.order ?? 0));
         const j = here.indexOf(s); const other = here[j + d]; if (!other) return;
-        [s.order, other.order] = [other.order, s.order]; set("steps", steps); reopen();
+        [s.order, other.order] = [other.order, s.order]; set("steps", steps); draw(); return;
       }
-      if (b.dataset.ungate) { const [path, k] = b.dataset.ungate.split(":"); const g = get(path) ?? {}; delete g[k]; set(path, Object.keys(g).length ? g : undefined); reopen(); }
+      if (b.dataset.ungate) { const [path, k] = b.dataset.ungate.split(":"); const g = get(path) ?? {}; delete g[k]; set(path, Object.keys(g).length ? g : undefined); drawForm(); return; }
     });
-    sections.addEventListener("toggle", (event) => {
-      /* One step at a time: opening one closes its siblings in the same list. */
-      const d = event.target as HTMLDetailsElement;
-      if (d.open && d.classList.contains("ed-item")) for (const o of d.parentElement!.querySelectorAll<HTMLDetailsElement>(":scope > details[open]")) if (o !== d) o.open = false;
-    }, true);
-    nav.addEventListener("click", (event) => {
-      const b = (event.target as HTMLElement).closest<HTMLElement>("[data-goto]"); if (!b) return;
-      current = b.dataset.goto!; draw();
+    outline.addEventListener("click", (event) => {
+      const b = (event.target as HTMLElement).closest<HTMLElement>("button"); if (!b) return;
+      if (b.dataset.select) { const [k, i] = b.dataset.select.split(":"); if (k === "phases" && b.dataset.phase) openPhase = openPhase === b.dataset.phase && sel.kind === "phases" && sel.index === Number(i) ? "" : b.dataset.phase; selectThing(k, Number(i)); return; }
+      if (b.dataset.add) { const arr = get(b.dataset.add) ?? []; arr.push(blanks[b.dataset.blank!]()); set(b.dataset.add, arr); selectThing(b.dataset.add, arr.length - 1); return; }
+      if (b.dataset.addStep) {
+        const p = phases().find((x) => x.id === b.dataset.addStep); const steps = list("steps");
+        const n = steps.filter((s) => s.phase === p.id).length + 1;
+        steps.push({ id: `P${p.order ?? phases().indexOf(p) + 1}.${n}`, phase: p.id, kind: "milestone", order: n, title: "", do: "", minutes: 5 });
+        set("steps", steps); selectThing("steps", steps.length - 1);
+      }
     });
-    problemList.addEventListener("click", (event) => {
+    groupsEl.addEventListener("click", (event) => {
+      const b = (event.target as HTMLElement).closest<HTMLElement>("[data-select]"); if (!b) return;
+      const [k, i] = b.dataset.select!.split(":"); selectThing(k, Number(i));
+    });
+    checks.addEventListener("click", (event) => {
       const b = (event.target as HTMLElement).closest<HTMLElement>("[data-problem]"); if (!b) return;
-      const path = b.dataset.problem!.replace(/^\$\.?/, "").replace(/\[(\d+)\]/g, ".$1").replace(/ \([^)]*\)/g, "");
-      const key = path.split(".")[0]; current = key === "game" ? "guide" : key === "codex_notes" ? "notes" : (key in render ? key : "guide"); draw();
-      const item = sections.querySelector<HTMLDetailsElement>(`[data-item="${path.split(".").slice(0, 2).join(".")}"]`);
-      if (item) { item.open = true; item.scrollIntoView({ block: "center" }); }
+      const path = norm(b.dataset.problem!); const [key, idx] = path.split(".");
+      if (key === "guide" || key === "game") selectThing("guide", -1);
+      else if (key in KINDS || key === "phases" || key === "steps") selectThing(key, /^\d+$/.test(idx ?? "") ? Number(idx) : -1);
       const el = sections.querySelector<HTMLElement>(`[data-path="${path}"]`); el?.focus();
     });
 
     /* ── saving, submitting, files ────────────────────────────────────── */
     const token = () => document.cookie.split("; ").find((c) => c.startsWith("shruti_csrf="))?.split("=")[1] ?? "";
     const tidy = () => {
-      /* Orders follow position; empties fall away. */
       list("phases").forEach((p: any, j: number) => { if (p.order == null) p.order = j + 1; });
-      for (const k of ["checkin", "phases", "steps", "routines", "codex", "codex_notes", "tracks"]) if (Array.isArray(doc[k]) && doc[k].length === 0 && k !== "phases" && k !== "steps") delete doc[k];
+      for (const k of ["checkin", "routines", "codex", "codex_notes", "tracks"]) if (Array.isArray(doc[k]) && doc[k].length === 0 && k !== "checkin") delete doc[k];
+      if (!Array.isArray(doc.checkin)) doc.checkin = [];
       if (!Array.isArray(doc.steps)) doc.steps = [];
       if (!Array.isArray(doc.phases)) doc.phases = [];
       doc.format = 1;
     };
-    const save = async (): Promise<boolean> => {
+    const save = async (source = "desk"): Promise<boolean> => {
       if (!editable) return false;
       tidy(); tell(W.status.saving);
       try {
-        const r = await fetch("/api/guides/draft", { method: "PUT", headers: { "content-type": "application/json", "x-csrf-token": token() }, body: JSON.stringify({ version_id: Number(versionId), body: doc }) });
+        const r = await fetch("/api/guides/draft", { method: "PUT", headers: { "content-type": "application/json", "x-csrf-token": token() }, body: JSON.stringify({ version_id: Number(versionId), body: doc, source }) });
         const a = await r.json().catch(() => ({}));
         if (!r.ok) { tell(a.detail || W.status.failed, "bad"); return false; }
-        problems = a.problems ?? []; dirty = false;
+        problems = a.problems ?? []; dirty = false; savedAt = Date.now();
         tell(problems.length ? fill(W.status.savedProblems, { n: String(problems.length) }) : W.status.saved, problems.length ? "bad" : "");
         draw(); return true;
       } catch { tell(W.status.failed, "bad"); return false; }
     };
-    root.querySelector("[data-save]")?.addEventListener("click", save);
+    root.querySelector("[data-save]")?.addEventListener("click", () => save());
     root.querySelector("[data-submit]")?.addEventListener("click", async () => {
       if (!(await save())) return;
       if (problems.length) { tell(W.status.submitFailed, "bad"); return; }
@@ -607,13 +812,17 @@ const WORDS = {
     });
     root.querySelector<HTMLInputElement>("[data-import]")?.addEventListener("change", async (event) => {
       const input = event.target as HTMLInputElement; const chosen = input.files?.[0]; if (!chosen) return;
-      try { doc = JSON.parse(await chosen.text()); dirty = true; problems = []; draw(); tell(W.status.unsaved); } catch { tell(W.status.failed, "bad"); }
+      try { doc = JSON.parse(await chosen.text()); dirty = true; problems = []; sel = { kind: "guide", index: -1 }; draw(); tell(W.status.unsaved); await save("file"); } catch { tell(W.status.failed, "bad"); }
       input.value = "";
     });
     window.addEventListener("keydown", (event) => { if ((event.ctrlKey || event.metaKey) && event.key === "s") { event.preventDefault(); save(); } });
     window.addEventListener("beforeunload", (event) => { if (dirty && editable) { event.preventDefault(); event.returnValue = ""; } });
-    if (editable) window.setInterval(() => { if (dirty) save(); }, 90_000);
+    if (editable) window.setInterval(() => { if (dirty) save(); else if (savedAt && !status.dataset.tone) tell(fill(W.status.savedAgo, { n: String(Math.round((Date.now() - savedAt) / 1000)) })); }, 30_000);
 
+    /* Open on the first phase, as the board does; the guide is one click up. */
+    openPhase = phases()[0]?.id ?? "";
+    const first = list("steps").findIndex((s) => s.phase === openPhase);
+    if (first >= 0) sel = { kind: "steps", index: first }; else if (openPhase) sel = { kind: "phases", index: 0 };
     draw();
   }
 </script>

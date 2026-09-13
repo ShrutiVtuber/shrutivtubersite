@@ -80,7 +80,9 @@ def test_page_has_a_top_level_heading(page: Path) -> None:
     # A shared header component promoted to the top level.
     has_promoted = re.search(r'as=\{?"h1"\}?', body) is not None
     # Or the page delegates its whole head-and-title to another page component.
-    delegates = re.search(r"<(ToolLayout|ClassLayout)\b", body) is not None
+    # The guide reader and its preview hand the whole document — title
+    # included — to the shared Reader component, so the h1 lives there.
+    delegates = re.search(r"<(ToolLayout|ClassLayout|Reader)\b", body) is not None
 
     assert has_literal or has_promoted or delegates, (
         f"{rel} renders no <h1>. If its title comes from SectionHeader, pass "

@@ -98,6 +98,11 @@ class GuideVersion(TimestampMixin, table=True):
     # ⚠ Her note when sending a draft back. Shown to the author on the draft,
     # because "rejected" with no reason is the practice room's lesson again.
     note: str = ""
+    # ⚠ Which tool wrote it: desk | agent | file. Her queue marks an agent's
+    # draft, because "drafted by an agent" is a fact she wants in front of
+    # her when she reads — and the rule that nothing an agent does publishes
+    # is only checkable if the origin is kept.
+    source: str = Field(default="desk")
     created_by: int = Field(index=True, foreign_key="site_user.id")
     submitted_at: Optional[datetime] = Field(default=None, sa_type=UTC_TS)
     published_at: Optional[datetime] = Field(default=None, sa_type=UTC_TS)

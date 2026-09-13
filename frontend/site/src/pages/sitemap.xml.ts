@@ -143,6 +143,11 @@ export const GET: APIRoute = async () => {
     for (const g of guides) {
       add(`/guides/${g.game.slug}/${g.slug}`, "0.7", "weekly", g.publishedAt ?? undefined);
     }
+    /* And each game's almanac page, for the games that have a guide. */
+    const games = (await site<{ slug: string; guides: number }[]>("/api/guides/games")) ?? [];
+    for (const g of games) {
+      if (g.guides > 0) add(`/guides/${g.slug}`, "0.6", "weekly");
+    }
   }
 
   /* Published writing, if the backend is reachable. Absent, the static list

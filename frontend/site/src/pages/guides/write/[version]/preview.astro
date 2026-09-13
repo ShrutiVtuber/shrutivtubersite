@@ -1,0 +1,58 @@
+---
+/* A draft, read exactly as the reader will read it.
+ *
+ * The same component as the public page, fed the author's version instead
+ * of the published one, with the actions off. A preview that is a lookalike
+ * drifts; this one cannot.
+ */
+import BaseLayout from "../../../../layouts/BaseLayout.astro";
+import Reader from "../../../../components/guides/Reader.astro";
+import { account, asReader } from "../../../../lib/account";
+import { copy } from "../../../../lib/copy";
+import type { GuideDoc, GuideSummary } from "../../../../lib/guides";
+
+const say = await copy("guides/write/[version]/preview");
+const id = Astro.params.version ?? "";
+if (!/^\d+$/.test(id)) return Astro.rewrite("/404");
+
+const me = await account(Astro);
+if (!me) return Astro.redirect(`/signin?next=/guides/write/${id}/preview`);
+
+const read = await asReader(Astro, `/api/guides/mine/by-id/${id}`);
+if (!read.ok) return Astro.rewrite("/404");
+
+const version = read.body as {
+  id: number; number: number; state: string; editable: boolean;
+  guide: { id: number; slug: string; title: string; published: number | null; game: { slug: string; name: string } | null };
+  body: GuideDoc;
+};
+const doc = version.body;
+const guide: GuideSummary & { body: GuideDoc } = {
+  id: version.guide.id, slug: version.guide.slug,
+  title: String(doc.guide?.title ?? version.guide.title),
+  game: version.guide.game ?? { slug: String(doc.game?.id ?? ""), name: String(doc.game?.name ?? "") },
+  author: me.displayName, authorId: 0, version: String(doc.guide?.version ?? ""),
+  gamePatch: String(doc.guide?.game_patch ?? ""), summary: String(doc.guide?.summary ?? ""),
+  licence: String(doc.guide?.licence ?? ""),
+  phases: (doc.phases ?? []).length, steps: (doc.steps ?? []).length, hours: 0, number: version.number,
+  votes: 0, voted: false, featured: false, mine: true, hidden: false, hiddenBy: "", publishedAt: null,
+  body: doc,
+};
+---
+
+<BaseLayout title={`${say("meta.prefix", "Preview:")} ${guide.title}`} description={say("meta.description", "A draft, as the reader will see it.")} noindex bare>
+  <main class="rp-page">
+    <p class="rp-bar">
+      <a href={`/guides/write/${version.id}`}>{say("back", "Back to the desk")}</a>
+      <span aria-hidden="true">·</span>
+      <span>{say("version", "version")} {version.number}</span>
+    </p>
+    <Reader guide={guide} signedIn preview />
+  </main>
+</BaseLayout>
+
+<style>
+  .rp-page { max-width: var(--page-max); margin-inline: auto; }
+  .rp-bar { margin: 0; padding: 12px var(--page-pad); display: flex; gap: 10px; font-family: var(--font-mono); font-size: var(--text-xs); color: var(--ink-faint); border-bottom: var(--border-w) solid var(--line); }
+  .rp-bar a { color: var(--accent); text-decoration: none; }
+</style>

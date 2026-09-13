@@ -1,170 +1,199 @@
 ---
-/* Shruti's Guides: the catalogue.
+/* Shruti's Guides: the front door (board W1).
  *
- * Featured first — her choice, from the admin — then what the room found
- * useful, then what is newest; and a row of games to narrow by. Reading needs
- * no account. The list is fetched AS the reader when there is one, so a
- * blocked author's guides are not on it, which is the practice room's rule.
+ * The page's one sky, spent on the hero. Then Featured as three cards — she
+ * picks them by hand in the admin — then Most voted and Newest as almanac
+ * indices with dotted leaders rather than more cards, because a landing page
+ * of twelve identical cards tells you nothing about which to read. By game
+ * is a grid whose last tile is an instruction, and it is where a new game
+ * actually comes from. Nothing on the page is ranked by an algorithm.
  *
- * ⚠ Nothing here links to the desk yet. The page that writes a guide is the
- * next thing to build, and a link to a page that is not there is the worst
- * kind of promise.
+ * Reading needs no account. The lists are fetched AS the reader when there
+ * is one, so a blocked author's guides are not on them.
  */
 import BaseLayout from "../../layouts/BaseLayout.astro";
-import SectionHeader from "../../components/brand/SectionHeader.astro";
 import EmptyState from "../../components/feedback/EmptyState.astro";
-import GuideCard, { type GuideSummary } from "../../components/cards/GuideCard.astro";
 import { site } from "../../lib/api";
 import { asReader } from "../../lib/account";
+import type { GuideSummary } from "../../lib/guides";
 import { copy } from "../../lib/copy";
 
 const say = await copy("guides");
 
 interface Game { id: number; slug: string; name: string; variants: { id: string; name: string }[]; guides: number }
 
-/* ⚠ Query parameters go into an API path, so they are a slug or nothing, and
-   the sort is one of three words or the default. */
-const wantedGame = Astro.url.searchParams.get("game") ?? "";
-const gameSlug = /^[a-z0-9-]{1,80}$/.test(wantedGame) ? wantedGame : "";
-const SORT_KEYS = ["featured", "top", "new"] as const;
-type Sort = (typeof SORT_KEYS)[number];
-const wantedSort = Astro.url.searchParams.get("sort") ?? "";
-const sort: Sort = (SORT_KEYS as readonly string[]).includes(wantedSort) ? (wantedSort as Sort) : "featured";
-
-const query = new URLSearchParams({ sort, limit: "60" });
-if (gameSlug) query.set("game", gameSlug);
-
-const [games, listed] = await Promise.all([
+const [games, featuredRead, topRead, newRead] = await Promise.all([
   site<Game[]>("/api/guides/games"),
-  asReader(Astro, `/api/guides?${query.toString()}`),
+  asReader(Astro, "/api/guides?sort=featured&limit=12"),
+  asReader(Astro, "/api/guides?sort=top&limit=5"),
+  asReader(Astro, "/api/guides?sort=new&limit=5"),
 ]);
-const all: GuideSummary[] = listed.ok && Array.isArray(listed.body) ? listed.body : [];
-const gameName = (games ?? []).find((g) => g.slug === gameSlug)?.name ?? "";
+const list = (r: { ok: boolean; body: any }): GuideSummary[] => (r.ok && Array.isArray(r.body) ? r.body : []);
+const featured = list(featuredRead).filter((g) => g.featured).slice(0, 3);
+const top = list(topRead);
+const newest = list(newRead);
+const allGames = (games ?? []).filter((g) => g.guides > 0);
+const total = allGames.reduce((n, g) => n + g.guides, 0);
+const nothing = featured.length === 0 && top.length === 0 && newest.length === 0;
 
-/* A featured band only on the default view: filtered or re-sorted, the list
-   is what was asked for and nothing is pulled out of it. */
-const featured = sort === "featured" && !gameSlug ? all.filter((g) => g.featured) : [];
-const rest = all.filter((g) => !featured.includes(g));
-
-const withParams = (change: { game?: string; sort?: Sort }) => {
-  const q = new URLSearchParams();
-  const g = change.game ?? gameSlug;
-  const s = change.sort ?? sort;
-  if (g) q.set("game", g);
-  if (s !== "featured") q.set("sort", s);
-  const qs = q.toString();
-  return qs ? `/guides?${qs}` : "/guides";
-};
-
-const SORTS: [Sort, string][] = [
-  ["featured", say("sort.featured", "Featured first")],
-  ["top", say("sort.top", "Most useful")],
-  ["new", say("sort.new", "Newest")],
-];
-const words = {
-  by: say("card.by", "by"),
-  steps: say("card.steps", "steps"),
-  votes: say("card.votes", "found it useful"),
-  featured: say("card.featured", "Featured"),
-  patch: say("card.patch", "patch"),
-};
+const day = (iso: string | null) =>
+  iso ? new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" }) : "";
 ---
 
 <BaseLayout
   title={say("meta.title", "Shruti's Guides")}
   description={say("meta.description",
-    "Game guides you can follow one step at a time — written by Shruti and by anyone with an account, read by everyone.")}
+    "Game guides written as a path: phases, steps, routines and a codex. Written by Shruti, by other streamers, and drafted by agents; every one read by a person before it is published.")}
 >
-  <div class="page gd-index">
-    <div class="section-head">
-      <SectionHeader
-        as="h1" glyph="⌖"
-        eyebrow={say("eyebrow", "Shruti's Guides")}
-        title={say("title", "A game, one step at a time")}
-        body={say("lede",
-          "Each guide is a path: the phases, the steps, and the systems behind them, in the order you meet them. Read any of them here.")}
-      />
+  <div class="page gd">
+    <div class="sky gd-hero">
+      <div class="gd-hero-veil">
+        <span class="gd-eyebrow">{say("eyebrow", "Shruti's Guides")}</span>
+        <h1 class="gd-hero-title">{say("hero.title", "A guide is a path. Keep your place on one.")}</h1>
+        <p class="gd-hero-lede">
+          {say("hero.lede",
+            "Written by me, by other streamers, and drafted by agents — every one of them read by a person before it is published. Read any of them here.")}
+        </p>
+      </div>
+      <div class="sky-horizon"></div>
     </div>
 
-    <nav class="gd-filters" aria-label={say("filters.label", "Games and order")}>
-      <ul class="gd-chips">
-        <li>
-          <a href={withParams({ game: "" })} aria-current={!gameSlug ? "page" : undefined}>
-            {say("games.all", "All games")}
-          </a>
-        </li>
-        {(games ?? []).map((g) => (
-          <li>
-            <a href={withParams({ game: g.slug })} aria-current={gameSlug === g.slug ? "page" : undefined}>
-              {g.name} <span class="gd-count t-tabular">{g.guides}</span>
-            </a>
-          </li>
-        ))}
-      </ul>
-      <ul class="gd-chips gd-sorts">
-        {SORTS.map(([key, label]) => (
-          <li>
-            <a href={withParams({ sort: key })} aria-current={sort === key ? "page" : undefined}>{label}</a>
-          </li>
-        ))}
-      </ul>
-    </nav>
+    {nothing ? (
+      <EmptyState as="h2" glyph="○"
+        title={say("empty", "Nothing published yet")}
+        body={say("empty.body", "Guides go up here once Shruti has read them. Nothing is hidden; there is simply nothing published yet.")} />
+    ) : (
+      <div class="gd-sections">
+        {featured.length > 0 && (
+          <section class="gd-section">
+            <div class="gd-section-head">
+              <h2>{say("featured", "Featured")}</h2>
+              <span class="gd-mono">{say("featured.note", "chosen by hand")}</span>
+            </div>
+            <div class="gd-featured">
+              {featured.map((g) => (
+                <a class="gd-card" href={`/guides/${g.game.slug}/${g.slug}`}>
+                  <span class="gd-art">
+                    <span class="gd-art-label">{say("art.empty", "art slot · empty")}</span>
+                    <span class="gd-art-name">{g.game.name}</span>
+                  </span>
+                  <span class="gd-card-body">
+                    <span class="gd-card-title">{g.title}</span>
+                    {g.summary && <span class="gd-card-sum">{g.summary}</span>}
+                    <span class="gd-card-foot">
+                      <span class="gd-mono soft">{g.author} · {g.phases} {say("card.phases", "phases")}</span>
+                      <span class="gd-votes"><span class="gd-glyph" aria-hidden="true">●</span>{g.votes}</span>
+                    </span>
+                  </span>
+                </a>
+              ))}
+            </div>
+          </section>
+        )}
 
-    {featured.length > 0 && (
-      <section class="gd-section">
-        <h2 class="gd-h2">{say("featured", "Featured")}</h2>
-        <div class="grid-2">
-          {featured.map((g) => <GuideCard guide={g} words={words} wide />)}
+        <div class="gd-indices">
+          <section class="gd-section">
+            <div class="gd-section-head">
+              <h2>{say("top", "Most voted")}</h2>
+              <span class="gd-mono">{say("top.note", "all time")}</span>
+            </div>
+            <div class="gd-index">
+              {top.map((g) => (
+                <a class="gd-row" href={`/guides/${g.game.slug}/${g.slug}`}>
+                  <span class="gd-row-n rose">{g.votes}</span>
+                  <span class="gd-row-title">{g.title}</span>
+                  <span class="gd-leader" aria-hidden="true"></span>
+                  <span class="gd-mono">{g.author}</span>
+                </a>
+              ))}
+            </div>
+          </section>
+          <section class="gd-section">
+            <div class="gd-section-head">
+              <h2>{say("new", "Newest")}</h2>
+              <span class="gd-mono">{say("new.note", "published")}</span>
+            </div>
+            <div class="gd-index">
+              {newest.map((g) => (
+                <a class="gd-row" href={`/guides/${g.game.slug}/${g.slug}`}>
+                  <span class="gd-row-n wide">{day(g.publishedAt)}</span>
+                  <span class="gd-row-title">{g.title}</span>
+                  <span class="gd-leader" aria-hidden="true"></span>
+                  <span class="gd-mono">{g.number && g.number > 1 ? `v${g.number}` : say("new.first", "new")}</span>
+                </a>
+              ))}
+            </div>
+          </section>
         </div>
-      </section>
-    )}
 
-    {rest.length > 0 ? (
-      <section class="gd-section">
-        <h2 class="gd-h2">
-          {featured.length > 0
-            ? say("rest", "Everything else")
-            : gameSlug ? gameName : say("all", "All guides")}
-        </h2>
-        <div class="grid-3">
-          {rest.map((g) => <GuideCard guide={g} words={words} />)}
-        </div>
-      </section>
-    ) : featured.length === 0 && (
-      <EmptyState
-        as="h2" glyph="○"
-        title={gameSlug ? say("empty.game", "Nothing for this game yet") : say("empty", "Nothing published yet")}
-        body={say("empty.body",
-          "Guides go up here once Shruti has read them. Nothing is hidden; there is simply nothing published yet.")}
-      />
+        <section class="gd-section">
+          <div class="gd-section-head">
+            <h2>{say("games", "By game")}</h2>
+            <span class="gd-mono">{allGames.length} {say("games.count", "games")} · {total} {say("games.guides", "guides")}</span>
+          </div>
+          <div class="gd-games">
+            {allGames.map((g) => (
+              <a class="gd-game" href={`/guides/${g.slug}`}>
+                <span class="gd-game-name">{g.name}</span>
+                <span class="gd-mono soft">{g.guides} {g.guides === 1 ? say("game.one", "guide") : say("game.many", "guides")}</span>
+              </a>
+            ))}
+            <div class="gd-game dashed">
+              <span class="gd-game-ask">{say("games.yours", "Your game isn't here")}</span>
+              <span class="gd-game-how">{say("games.how", "Any account can write a guide. A new game arrives with its first one.")}</span>
+            </div>
+          </div>
+        </section>
+      </div>
     )}
 
     <p class="gd-foot">
       {say("foot",
-        "Every guide can be downloaded as a file from its own page — the same file the tracker reads, so a guide you like is yours to keep.")}
+        "Every guide carries report and block, as in the practice room: a reported guide hides at the same threshold, and a blocked author's guides leave your lists. Featured is chosen by hand — nothing on this page is ranked by an algorithm.")}
     </p>
   </div>
 </BaseLayout>
 
 <style>
-  .gd-index { padding-block: var(--space-6) var(--space-9); display: grid; gap: var(--space-7); }
-  .gd-filters { display: grid; gap: var(--space-3); }
-  .gd-chips { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
-  .gd-chips a {
-    display: inline-flex; align-items: center; gap: 6px;
-    padding: 6px 12px; border-radius: var(--radius-full);
-    border: var(--border-w) solid var(--line);
-    font: 500 var(--text-sm) var(--font-body); color: var(--ink-soft);
-    text-decoration: none; background: var(--surface-card);
-  }
-  .gd-chips a:hover { border-color: var(--line-strong); color: var(--ink); }
-  .gd-chips a[aria-current="page"] { border-color: var(--accent); color: var(--accent); background: var(--accent-wash); }
-  .gd-count { color: var(--ink-faint); font-size: var(--text-xs); }
-  .gd-sorts a { border-style: dashed; }
-  .gd-section { display: grid; gap: var(--space-4); }
-  .gd-h2 {
-    margin: 0; font-family: var(--font-body); font-size: var(--text-micro); font-weight: 600;
-    letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; color: var(--ink-faint);
-  }
-  .gd-foot { margin: 0; max-width: var(--measure-ui); font-size: var(--text-sm); color: var(--ink-faint); }
+  .gd { padding-block: var(--space-7) var(--space-9); display: flex; flex-direction: column; gap: 44px; font-family: var(--font-body); }
+  .gd-hero { border-radius: var(--radius-lg); overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end; min-height: 300px; padding: 36px; }
+  .gd-hero-veil { background: var(--surface-veil); border-radius: var(--radius-lg); padding: 30px 32px; max-width: 640px; display: flex; flex-direction: column; gap: 12px; box-shadow: var(--shadow-1); }
+  .gd-eyebrow { font-size: var(--text-micro); font-weight: 600; letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; color: var(--ink-faint); }
+  .gd-hero-title { margin: 0; font-family: var(--font-display); font-size: clamp(30px, 4vw, 44px); line-height: 1.08; font-weight: 500; color: var(--ink); text-wrap: pretty; }
+  .gd-hero-lede { margin: 0; font-family: var(--font-display); font-size: 18px; line-height: 1.65; color: var(--ink); }
+  .gd-sections { display: flex; flex-direction: column; gap: 44px; }
+  .gd-section { display: flex; flex-direction: column; gap: 18px; }
+  .gd-section-head { display: flex; align-items: baseline; justify-content: space-between; border-bottom: var(--border-w) solid var(--line); padding-bottom: 12px; }
+  .gd-section-head h2 { margin: 0; font-family: var(--font-display); font-size: 26px; font-weight: 600; color: var(--ink); }
+  .gd-mono { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--ink-faint); }
+  .gd-mono.soft { color: var(--ink-soft); font-size: 11.5px; }
+  .gd-featured { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; }
+  .gd-card { background: var(--surface-card); border: var(--border-w) solid var(--line); border-radius: var(--radius-md); box-shadow: var(--shadow-1); overflow: hidden; display: flex; flex-direction: column; text-decoration: none; color: inherit; transition: border-color var(--dur-1) var(--ease-out), box-shadow var(--dur-1) var(--ease-out); }
+  .gd-card:hover { border-color: var(--line-strong); box-shadow: var(--shadow-2); }
+  .gd-art { height: 110px; background: var(--surface-inset); border-bottom: var(--border-w) solid var(--line); display: flex; align-items: flex-end; padding: 12px 16px; position: relative; }
+  .gd-art-label { position: absolute; top: 10px; right: 14px; font-family: var(--font-mono); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-faint); }
+  .gd-art-name { font-family: var(--font-display); font-size: 20px; font-weight: 600; color: var(--ink); }
+  .gd-card-body { padding: 18px 18px 16px; display: flex; flex-direction: column; gap: 10px; flex: 1; }
+  .gd-card-title { font-family: var(--font-display); font-size: 21px; line-height: 1.2; font-weight: 600; color: var(--ink); text-wrap: pretty; }
+  .gd-card-sum { font-size: var(--text-sm); line-height: 1.55; color: var(--ink-soft); }
+  .gd-card-foot { margin-top: auto; display: flex; align-items: center; justify-content: space-between; padding-top: 10px; border-top: var(--border-w) solid var(--line); }
+  .gd-votes { display: inline-flex; align-items: center; gap: 6px; font-family: var(--font-mono); font-size: 11.5px; color: var(--rose); font-variant-numeric: tabular-nums; }
+  .gd-glyph { font-family: var(--font-display); font-size: 13px; }
+  .gd-indices { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 44px; }
+  .gd-index { display: flex; flex-direction: column; }
+  .gd-row { display: flex; align-items: baseline; gap: 10px; padding: 12px 0; border-bottom: var(--border-w) solid var(--line); text-decoration: none; color: inherit; }
+  .gd-row:hover .gd-row-title { text-decoration: underline; }
+  .gd-row-n { font-family: var(--font-mono); font-size: 13px; color: var(--ink-faint); min-width: 42px; font-variant-numeric: tabular-nums; }
+  .gd-row-n.rose { color: var(--rose); }
+  .gd-row-n.wide { min-width: 74px; font-size: var(--text-micro); }
+  .gd-row-title { font-size: 15.5px; color: var(--ink); }
+  .gd-leader { flex: 1; border-bottom: 1px dotted var(--line-strong); transform: translateY(-4px); min-width: 20px; }
+  .gd-games { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 20px; }
+  .gd-game { border: var(--border-w) solid var(--line); border-radius: var(--radius-md); background: var(--surface-inset); height: 130px; display: flex; flex-direction: column; justify-content: flex-end; padding: 16px; text-decoration: none; color: inherit; }
+  .gd-game:hover { border-color: var(--line-strong); }
+  .gd-game.dashed { border-style: dashed; border-color: var(--line-strong); background: transparent; justify-content: center; gap: 6px; }
+  .gd-game-name { font-family: var(--font-display); font-size: 22px; font-weight: 600; color: var(--ink); }
+  .gd-game-ask { font-family: var(--font-display); font-size: 17px; color: var(--ink-soft); }
+  .gd-game-how { font-size: var(--text-xs); line-height: 1.5; color: var(--ink-faint); }
+  .gd-foot { margin: 0; padding-top: 40px; border-top: var(--border-w) solid var(--line); max-width: 70ch; font-family: var(--font-mono); font-size: 13.5px; line-height: 1.7; color: var(--ink-faint); }
 </style>

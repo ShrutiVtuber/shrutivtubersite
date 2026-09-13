@@ -99,4 +99,4 @@ def test_the_gate_keys_come_from_the_checkin_fields() -> None:
 
 def test_a_read_only_version_disables_the_desk() -> None:
     assert 'disabled={!version.editable}' in EDITOR
-    assert '[data-editable="0"] input' in EDITOR
+    assert '[data-editable="0"] .ed-form input' in EDITOR

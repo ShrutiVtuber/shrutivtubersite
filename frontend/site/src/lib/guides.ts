@@ -55,6 +55,18 @@ export interface GuideDoc {
   codex?: CodexEntry[]; codex_notes?: CodexNote[]; tracks?: Track[];
 }
 
+/** A guide as the catalogue routes describe it — the card the API returns. */
+export interface GuideSummary {
+  id: number; slug: string; title: string;
+  game: { slug: string; name: string };
+  author: string; authorId: number;
+  version: string; gamePatch: string; summary: string; licence: string;
+  phases: number; steps: number; hours: number; number: number | null;
+  votes: number; voted: boolean;
+  featured: boolean; mine: boolean; hidden: boolean; hiddenBy: string;
+  publishedAt: string | null;
+}
+
 /** The vocabulary a page hands in. Each is a template with {named} holes. */
 export interface GateWords {
   min: string; max: string; atLeast: string; is: string; variant: string; after: string; once: string;
