@@ -274,6 +274,8 @@ def subscription_started(
     stop — the four things somebody needs to not feel trapped by a thing they
     just signed up to.
     """
+    if tier.startswith("hosting"):
+        return hosting_started(tier=tier, amount=amount, currency=currency, renews_on=renews_on, imprint=imprint)
     name = TIER_NAMES.get(tier, "Monthly support")
     subject = f"Your {name} support has started"
     html = billing(
@@ -314,6 +316,8 @@ def renewal_reminder(
     the reminder outright. Sent whether or not it is required, because being
     surprised by a charge is a bad thing to do to somebody either way.
     """
+    if tier.startswith("hosting"):
+        return hosting_renewal(tier=tier, amount=amount, currency=currency, charge_on=charge_on, imprint=imprint)
     name = TIER_NAMES.get(tier, "Monthly support")
     subject = f"Your support renews on {_day(charge_on)}"
     html = billing(
@@ -345,6 +349,8 @@ def subscription_cancelled(
 ) -> tuple[str, str]:
     """Confirming it was received, and — the part people actually want — the
     date it stops, so nobody spends a month wondering whether it took."""
+    if tier.startswith("hosting"):
+        return hosting_cancelled(ends_on=ends_on, imprint=imprint)
     name = TIER_NAMES.get(tier, "Monthly support")
     subject = "Your support is cancelled"
     ends = _day(ends_on)
@@ -368,6 +374,95 @@ def subscription_cancelled(
             "the payment. Coming back later is a button, not a negotiation."
         ),
         preheader="Confirmed. You will not be charged again." + (f" Access until {ends}." if ends else ""),
+        imprint=imprint,
+    )
+    return subject, html
+
+
+def _hosting_period(tier: str) -> str:
+    return "year" if tier.endswith("yearly") else "month"
+
+
+def hosting_started(
+    *, tier: str, amount: int | None, currency: str, renews_on, imprint: dict | None = None
+) -> tuple[str, str]:
+    """
+    Overlay hosting's contract confirmation — owed, like the membership's:
+    the recurring nature, the amount, the next charge, and how to stop.
+    Hosting is a service, not a membership: nobody is thanked on stream.
+    """
+    period = _hosting_period(tier)
+    subject = "Your overlay hosting has started"
+    html = billing(
+        glyph="&#9789;",
+        heading="Hosting is on",
+        lede=(
+            "Overlay hosting is on for your account: the server draws your overlays while you "
+            "stream, the hours limit is lifted, and you may hold up to twenty overlays. "
+            f"<b style=\"font-weight:600\">This renews every {period} until you stop it.</b>"
+        ),
+        facts=[
+            ("Plan", f"Overlay hosting, {'yearly' if period == 'year' else 'monthly'}"),
+            ("Amount", f"{money(amount, currency)} / {period}"),
+            ("Next charge", _day(renews_on)),
+        ],
+        cta_url=f"{site_url()}/account",
+        cta_label="Manage or cancel",
+        note=(
+            "Cancelling is one button on your account page. It takes effect at the end of the "
+            f"{period} you have already paid for rather than the moment you press it, and no message "
+            "to me is needed or wanted. Your right to withdraw and the refund terms are on the "
+            f'<a href="{site_url()}/terms" style="color:#33639C" class="acc">terms page</a>.'
+        ),
+        preheader=f"Overlay hosting · {money(amount, currency)} a {period} · cancel any time in one click",
+        imprint=imprint,
+    )
+    return subject, html
+
+
+def hosting_cancelled(*, ends_on, imprint: dict | None = None) -> tuple[str, str]:
+    ends = _day(ends_on)
+    subject = "Your overlay hosting is cancelled"
+    html = billing(
+        glyph="&#9789;",
+        heading="Cancelled, as asked",
+        lede=(
+            f"Overlay hosting stays on until <b style=\"font-weight:600\">{_escape(ends)}</b>, the "
+            "end of the time you have already paid for. After that the free tier applies: overlays "
+            "for a hundred hours on air a month. Nothing else changes — reading guides and tracking "
+            "your progress were never behind it."
+        ),
+        facts=[("Hosting until", ends)],
+        cta_url=f"{site_url()}/account",
+        cta_label="Your account",
+        note="If this was not you, or you would rather keep it, hosting can be started again from the same page.",
+        preheader=f"Hosting stays until {ends}",
+        imprint=imprint,
+    )
+    return subject, html
+
+
+def hosting_renewal(
+    *, tier: str, amount: int | None, currency: str, charge_on, imprint: dict | None = None
+) -> tuple[str, str]:
+    period = _hosting_period(tier)
+    subject = f"Your overlay hosting renews on {_day(charge_on)}"
+    html = billing(
+        glyph="&#9789;",
+        heading="A renewal is coming",
+        lede=(
+            f"Your overlay hosting renews shortly: <b style=\"font-weight:600\">{money(amount, currency)}</b> "
+            f"on {_escape(_day(charge_on))}, for another {period}. Nothing to do if that is what you want."
+        ),
+        facts=[
+            ("Plan", f"Overlay hosting, {'yearly' if period == 'year' else 'monthly'}"),
+            ("Amount", f"{money(amount, currency)}"),
+            ("Charged on", _day(charge_on)),
+        ],
+        cta_url=f"{site_url()}/account",
+        cta_label="Manage or cancel",
+        note="Cancelling before that date stops the charge; cancelling after it stops the next one.",
+        preheader=f"{money(amount, currency)} on {_day(charge_on)} · cancel any time in one click",
         imprint=imprint,
     )
     return subject, html
