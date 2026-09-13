@@ -540,6 +540,7 @@ async def admin_overlays(
     return [{
         "id": o.id, "kind": o.kind, "label": o.label,
         "counterId": o.counter_id, "motion": o.motion, "appearance": o.appearance,
+        "runId": o.run_id, "routineId": o.routine_id, "theme": o.theme,
         "lastSeen": o.last_seen.isoformat() if o.last_seen else None,
     } for o in rows]
 

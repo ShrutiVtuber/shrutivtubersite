@@ -1,0 +1,100 @@
+---
+/* The now card — the current step, 900 wide at 72,72 (board F1–F3).
+ *
+ * A browser source for OBS: its own document, transparent, 1920x1080, on
+ * the shared overlay ground plus the guides' theme sheet. `?t=` is the whole
+ * authentication and is never rendered into the page. The overlay never
+ * blanks and never says "connecting": with no run it is an empty frame.
+ */
+import "../../styles/global.css";
+import "../../styles/overlay.css";
+import "../../styles/overlay-guides.css";
+import { SITE_API } from "../../lib/api";
+
+export const prerender = false;
+
+const token = Astro.url.searchParams.get("t") ?? "";
+let data: any = null;
+if (token) {
+  try {
+    const r = await fetch(`${SITE_API}/api/overlay/guide?t=${encodeURIComponent(token)}`);
+    if (r.ok) data = await r.json();
+  } catch {
+    /* Held, not blanked. */
+  }
+}
+const theme = data?.theme ?? "almanac";
+const motion = data?.motion ?? "reduced";
+const el = data?.element ?? null;
+const initial = JSON.stringify({ version: data?.version ?? "", element: el });
+---
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>guide · now</title>
+    <meta name="robots" content="noindex, nofollow" />
+  </head>
+  <body>
+    <div class="gov" data-theme={theme} data-motion={motion} data-token={token} data-initial={initial} data-kind="guide-now">
+      <div class="gov-plate gov-now" data-now hidden={!el || !el.id}>
+        <div class="swap" data-swap>
+          <span class="gov-eyebrow" data-phase>{el?.phase ?? ""}</span>
+          <span class="title" data-title>{el?.title ?? ""}</span>
+          <span class="line" data-line>{el?.line ?? ""}</span>
+          <span class="horizon"></span>
+        </div>
+      </div>
+      <span class="gov-done-line" data-done-line hidden></span>
+      <div class="gov-plate gov-empty" data-empty hidden={!!el && !!el.id}>
+        <span class="gov-eyebrow">Shruti's Guides</span>
+        <span class="say">No run selected.</span>
+      </div>
+    </div>
+  </body>
+</html>
+<script>
+  /* Poll every two seconds; redraw only when the run's version changed. */
+  const root = document.querySelector<HTMLElement>(".gov")!;
+  const token = root.dataset.token || "";
+  let last: any = JSON.parse(root.dataset.initial || "{}");
+  const esc = (s: unknown) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
+  const still = root.dataset.motion === "still", reduced = root.dataset.motion === "reduced";
+  const empty = root.querySelector<HTMLElement>("[data-empty]")!;
+  const wait = (ms: number) => new Promise((r) => window.setTimeout(r, ms));
+  const card = root.querySelector<HTMLElement>("[data-now]")!;
+  const swap = root.querySelector<HTMLElement>("[data-swap]")!;
+  const line = root.querySelector<HTMLElement>("[data-done-line]")!;
+  const paint = (el: any) => {
+    root.querySelector("[data-phase]")!.textContent = el?.phase ?? "";
+    root.querySelector("[data-title]")!.textContent = el?.title ?? "";
+    root.querySelector("[data-line]")!.textContent = el?.line ?? "";
+    card.hidden = !el || !el.id; empty.hidden = !!(el && el.id);
+  };
+  const draw = async (prev: any, next: any) => {
+    const stepChanged = prev?.id && next?.id !== prev.id;
+    if (!stepChanged || still || reduced) {
+      paint(next);
+      if (stepChanged && reduced) { line.textContent = `Done · ${prev.id}`; line.hidden = false; window.setTimeout(() => { line.hidden = true; }, 2000); }
+      return;
+    }
+    /* The Done moment: ignite 0–300, collapse 260–340, unfold 300–400. */
+    card.classList.add("ignite");
+    await wait(260); swap.classList.add("collapse");
+    await wait(80); paint(next); swap.classList.remove("collapse"); swap.classList.add("unfold");
+    requestAnimationFrame(() => requestAnimationFrame(() => swap.classList.remove("unfold")));
+    await wait(100); card.classList.remove("ignite");
+  };
+  const tick = async () => {
+    if (!token) return;
+    try {
+      const r = await fetch(`/api/overlay/guide?t=${encodeURIComponent(token)}`, { cache: "no-store" });
+      if (!r.ok) return;                       /* held, not blanked */
+      const next = await r.json();
+      if (next.version !== last.version || (!last.element && next.element)) {
+        await draw(last.element, next.element);
+        last = { version: next.version, element: next.element };
+      }
+    } catch { /* offline: the last frame stands */ }
+  };
+  window.setInterval(tick, 2000);
+</script>

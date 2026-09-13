@@ -1,0 +1,85 @@
+---
+/* One routine — a checklist, 760 wide at left 72, bottom 72.
+ *
+ * A browser source for OBS: its own document, transparent, 1920x1080, on
+ * the shared overlay ground plus the guides' theme sheet. `?t=` is the whole
+ * authentication and is never rendered into the page. The overlay never
+ * blanks and never says "connecting": with no run it is an empty frame.
+ */
+import "../../styles/global.css";
+import "../../styles/overlay.css";
+import "../../styles/overlay-guides.css";
+import { SITE_API } from "../../lib/api";
+
+export const prerender = false;
+
+const token = Astro.url.searchParams.get("t") ?? "";
+let data: any = null;
+if (token) {
+  try {
+    const r = await fetch(`${SITE_API}/api/overlay/guide?t=${encodeURIComponent(token)}`);
+    if (r.ok) data = await r.json();
+  } catch {
+    /* Held, not blanked. */
+  }
+}
+const theme = data?.theme ?? "almanac";
+const motion = data?.motion ?? "reduced";
+const el = data?.element ?? null;
+const initial = JSON.stringify({ version: data?.version ?? "", element: el });
+---
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>guide · routine</title>
+    <meta name="robots" content="noindex, nofollow" />
+  </head>
+  <body>
+    <div class="gov" data-theme={theme} data-motion={motion} data-token={token} data-initial={initial} data-kind="guide-routine">
+      <div class="gov-plate gov-routine" data-routine hidden={!el || !el.routine}>
+        <div class="head"><span class="name" data-name>{el?.routine?.name ?? ""}</span><span class="gov-mono count" data-rcount>{el?.routine?.count ?? ""}</span></div>
+        <div data-items>
+          {(el?.routine?.items ?? []).map((i: any) => (
+            <div class:list={["item", i.done && "done"]}><span class:list={["dot", i.done ? "done" : "available"]}></span><span>{i.text}</span></div>
+          ))}
+        </div>
+      </div>
+      <div class="gov-plate gov-empty" data-empty hidden={!!el && !!el.routine}>
+        <span class="gov-eyebrow">Shruti's Guides</span>
+        <span class="say">No run selected.</span>
+      </div>
+    </div>
+  </body>
+</html>
+<script>
+  /* Poll every two seconds; redraw only when the run's version changed. */
+  const root = document.querySelector<HTMLElement>(".gov")!;
+  const token = root.dataset.token || "";
+  let last: any = JSON.parse(root.dataset.initial || "{}");
+  const esc = (s: unknown) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
+  const still = root.dataset.motion === "still", reduced = root.dataset.motion === "reduced";
+  const empty = root.querySelector<HTMLElement>("[data-empty]")!;
+  const wait = (ms: number) => new Promise((r) => window.setTimeout(r, ms));
+  const box = root.querySelector<HTMLElement>("[data-routine]")!;
+  const paint = (el: any) => {
+    const r = el?.routine; box.hidden = !r; empty.hidden = !!r;
+    if (!r) return;
+    root.querySelector("[data-name]")!.textContent = r.name ?? "";
+    root.querySelector("[data-rcount]")!.textContent = r.count ?? "";
+    root.querySelector("[data-items]")!.innerHTML = (r.items ?? []).map((i: any) => `<div class="item ${i.done ? "done" : ""}"><span class="dot ${i.done ? "done" : "available"}"></span><span>${esc(i.text)}</span></div>`).join("");
+  };
+  const draw = async (_prev: any, next: any) => { paint(next); };
+  const tick = async () => {
+    if (!token) return;
+    try {
+      const r = await fetch(`/api/overlay/guide?t=${encodeURIComponent(token)}`, { cache: "no-store" });
+      if (!r.ok) return;                       /* held, not blanked */
+      const next = await r.json();
+      if (next.version !== last.version || (!last.element && next.element)) {
+        await draw(last.element, next.element);
+        last = { version: next.version, element: next.element };
+      }
+    } catch { /* offline: the last frame stands */ }
+  };
+  window.setInterval(tick, 2000);
+</script>

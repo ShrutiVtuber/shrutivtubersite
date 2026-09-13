@@ -41,6 +41,9 @@ const runId = /^\d+$/.test(wanted) ? Number(wanted) : (runs[0]?.id ?? null);
 const viewRead = !starting && runId ? await asReader(Astro, `/api/runs/${runId}`) : null;
 const view = viewRead?.ok ? viewRead.body : null;
 if (!starting && !view) return Astro.rewrite("/404");
+const overlaysRead = view ? await asReader(Astro, `/api/runs/${view.id}/overlays`) : null;
+const overlays = overlaysRead?.ok && Array.isArray(overlaysRead.body) ? overlaysRead.body : [];
+const origin = Astro.url.origin;
 
 const variants = doc.game.variants ?? [];
 const skipGroups = [...new Set(phasesOf(doc).map((p) => p.skip_group).filter(Boolean))] as string[];
@@ -105,6 +108,17 @@ const WORDS = {
     starting: say("new.starting", "Starting…"), skipTitle: say("new.skip_title", "Skip the phases you have done before?"), steps: say("new.steps", "steps"),
     skipFooter: say("new.skip_footer", "Skipped phases stay on the Path, greyed. You can walk back into any of them later."), skipN: say("new.skip_n", "Skip {n} steps"),
   },
+  overlays: {
+    none: say("ov.none", "No overlays yet. An overlay is a browser source that draws this run and keeps up while you stream — one element per source."),
+    kinds: { "guide-now": say("ov.now", "Now card"), "guide-sigil": say("ov.sigil", "Sigil"), "guide-path": say("ov.path", "Path strip"), "guide-routine": say("ov.routine", "Routine") },
+    themes: { almanac: say("ov.almanac", "Almanac"), grimoire: say("ov.grimoire", "Grimoire"), plain: say("ov.plain", "Plain") },
+    motions: { reduced: say("ov.reduced", "Reduced motion"), full: say("ov.full", "Full motion"), still: say("ov.still", "Still") },
+    element: say("ov.element", "Element"), theme: say("ov.theme", "Theme"), motion: say("ov.motion", "Motion"), which: say("ov.which", "Which routine"),
+    label: say("ov.label", "Label, for you"), make: say("ov.make", "New overlay"), copy: say("ov.copy", "Copy for OBS"), copied: say("ov.copied", "Copied."),
+    once: say("ov.once", "This URL is shown once. The token is the secret: anyone with the URL sees the overlay; nobody with it can change your run."),
+    revoke: say("ov.revoke", "Revoke"), live: say("ov.live", "live"), idle: say("ov.idle", "idle"),
+    themeNote: say("ov.theme_note", "A theme changes palette, type and ornament. It never changes the layout or the four state colours, so chat learns them once."),
+  },
   gate: {
     words: { min: say("gate.min", "at {what} {n}"), max: say("gate.max", "up to {what} {n}"), atLeast: say("gate.at_least", "from {value}"), is: say("gate.is", "when {what} is {value}"), variant: say("gate.variant", "in {name}"), after: say("gate.after", "after {ids}"), once: say("gate.once", "once {names} is in play") },
     short: { min: say("gate.s_min", "at {n}"), max: say("gate.s_max", "up to {n}"), atLeast: say("gate.s_at_least", "from {value}"), is: say("gate.s_is", "{value}"), variant: say("gate.s_variant", "{name}"), after: say("gate.s_after", "after {ids}"), once: say("gate.s_once", "with {names}") },
@@ -140,7 +154,7 @@ const WORDS = {
       <div class="tk-sheet" data-sheet hidden><div class="tk-sheet-scrim" data-sheet-close></div><div class="tk-sheet-card"><span class="tk-grab"></span><div data-sheet-body></div></div></div>
     </main>
   ) : (
-    <main class="tk" data-track data-words={JSON.stringify(WORDS)} data-doc={JSON.stringify(doc)} data-run={JSON.stringify(view)}>
+    <main class="tk" data-track data-words={JSON.stringify(WORDS)} data-doc={JSON.stringify(doc)} data-run={JSON.stringify(view)} data-overlays={JSON.stringify(overlays)} data-origin={origin}>
       <header class="tk-bar">
         <a class="tk-back" href={`/guides/${game}/${slug}`}>{say("bar.read", "Read the guide")}</a>
         <div class="tk-bar-mid">
@@ -196,6 +210,31 @@ const WORDS = {
           <div data-track={t.id}></div>
         </section>
       ))}
+      <section class="tk-section" id="overlays">
+        <h2 class="tk-h2">{say("sec.overlays", "Overlays")}</h2>
+        <div data-overlays-list></div>
+        <form class="tk-ov-form" data-new-overlay>
+          <label class="tk-field"><span class="tk-eyebrow">{say("ov.element", "Element")}</span>
+            <select name="kind">
+              <option value="guide-now">{say("ov.now", "Now card")}</option>
+              <option value="guide-sigil">{say("ov.sigil", "Sigil")}</option>
+              <option value="guide-path">{say("ov.path", "Path strip")}</option>
+              {(doc.routines ?? []).length > 0 && <option value="guide-routine">{say("ov.routine", "Routine")}</option>}
+            </select></label>
+          {(doc.routines ?? []).length > 0 && (
+            <label class="tk-field"><span class="tk-eyebrow">{say("ov.which", "Which routine")}</span>
+              <select name="routine_id">{(doc.routines ?? []).map((r) => <option value={r.id}>{r.name}</option>)}</select></label>
+          )}
+          <label class="tk-field"><span class="tk-eyebrow">{say("ov.theme", "Theme")}</span>
+            <select name="theme"><option value="almanac">{say("ov.almanac", "Almanac")}</option><option value="grimoire">{say("ov.grimoire", "Grimoire")}</option><option value="plain">{say("ov.plain", "Plain")}</option></select></label>
+          <label class="tk-field"><span class="tk-eyebrow">{say("ov.motion", "Motion")}</span>
+            <select name="motion"><option value="reduced">{say("ov.reduced", "Reduced motion")}</option><option value="full">{say("ov.full", "Full motion")}</option><option value="still">{say("ov.still", "Still")}</option></select></label>
+          <label class="tk-field"><span class="tk-eyebrow">{say("ov.label", "Label, for you")}</span><input type="text" name="label" maxlength="80" /></label>
+          <button type="submit" class="tk-secondary sm">{say("ov.make", "New overlay")}</button>
+        </form>
+        <p class="tk-quiet">{say("ov.theme_note", "A theme changes palette, type and ornament. It never changes the layout or the four state colours, so chat learns them once.")}</p>
+        <div class="tk-ov-minted" data-minted hidden></div>
+      </section>
       <section class="tk-section" id="note">
         <h2 class="tk-h2">{say("sec.note", "Your note")}</h2>
         <textarea class="tk-note" data-note rows="3" maxlength="2000" placeholder={say("note.hint", "One line for the person who opens this next. It's the first thing they'll read.")}></textarea>
@@ -361,6 +400,11 @@ const WORDS = {
   .tk-much[data-timer="1"] .tk-much-timer { display: flex; }
   .tk-much[data-timer="1"] [data-timer] { display: none; }
   .tk-clock { font: 500 56px var(--font-mono); font-variant-numeric: tabular-nums; }
+  .tk-ov-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); gap: 12px; align-items: end; }
+  .tk-ov-form button { justify-self: start; }
+  .tk-ov-row { display: grid; grid-template-columns: minmax(0, 2fr) 1fr 1fr auto auto; gap: 0 16px; align-items: baseline; padding: 12px 0; border-bottom: var(--border-w) solid var(--line); font-size: 15px; }
+  .tk-ov-minted { border: var(--border-w) solid var(--accent); border-radius: var(--radius-md); padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+  .tk-ov-url { font-family: var(--font-mono); font-size: 12.5px; color: var(--ink); word-break: break-all; padding: 8px 10px; background: var(--surface-inset); border-radius: var(--radius-sm); }
   @media (max-width: 900px) { .tk-grid { grid-template-columns: 1fr !important; } .tk-main { border-right: 0; } .tk-side { border-top: var(--border-w) solid var(--line); } }
 </style>
 

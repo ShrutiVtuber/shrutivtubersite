@@ -1,0 +1,107 @@
+---
+/* The sigil — one arc per phase, 200px at right 76, top 72.
+ *
+ * A browser source for OBS: its own document, transparent, 1920x1080, on
+ * the shared overlay ground plus the guides' theme sheet. `?t=` is the whole
+ * authentication and is never rendered into the page. The overlay never
+ * blanks and never says "connecting": with no run it is an empty frame.
+ */
+import "../../styles/global.css";
+import "../../styles/overlay.css";
+import "../../styles/overlay-guides.css";
+import { SITE_API } from "../../lib/api";
+
+export const prerender = false;
+
+const token = Astro.url.searchParams.get("t") ?? "";
+let data: any = null;
+if (token) {
+  try {
+    const r = await fetch(`${SITE_API}/api/overlay/guide?t=${encodeURIComponent(token)}`);
+    if (r.ok) data = await r.json();
+  } catch {
+    /* Held, not blanked. */
+  }
+}
+const theme = data?.theme ?? "almanac";
+const motion = data?.motion ?? "reduced";
+const el = data?.element ?? null;
+const initial = JSON.stringify({ version: data?.version ?? "", element: el });
+---
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>guide · sigil</title>
+    <meta name="robots" content="noindex, nofollow" />
+  </head>
+  <body>
+    <div class="gov" data-theme={theme} data-motion={motion} data-token={token} data-initial={initial} data-kind="guide-sigil">
+      <div class="gov-sigil" data-sigil hidden={!el}>
+        <div class="ring" data-ring></div>
+        <span class="count" data-count>{el?.count ?? ""}</span>
+      </div>
+      <div class="gov-plate gov-empty" data-empty hidden={!!el && true}>
+        <span class="gov-eyebrow">Shruti's Guides</span>
+        <span class="say">No run selected.</span>
+      </div>
+    </div>
+  </body>
+</html>
+<script>
+  /* Poll every two seconds; redraw only when the run's version changed. */
+  const root = document.querySelector<HTMLElement>(".gov")!;
+  const token = root.dataset.token || "";
+  let last: any = JSON.parse(root.dataset.initial || "{}");
+  const esc = (s: unknown) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
+  const still = root.dataset.motion === "still", reduced = root.dataset.motion === "reduced";
+  const empty = root.querySelector<HTMLElement>("[data-empty]")!;
+  const wait = (ms: number) => new Promise((r) => window.setTimeout(r, ms));
+  const ring = root.querySelector<HTMLElement>("[data-ring]")!;
+  const count = root.querySelector<HTMLElement>("[data-count]")!;
+  const holder = root.querySelector<HTMLElement>("[data-sigil]")!;
+  const stroke = Number(getComputedStyle(root).getPropertyValue("--gt-stroke")) || 12;
+  const arcD = (r: number, a0: number, a1: number) => {
+    const R = (d: number) => ((d - 90) * Math.PI) / 180;
+    const x0 = 50 + r * Math.cos(R(a0)), y0 = 50 + r * Math.sin(R(a0)), x1 = 50 + r * Math.cos(R(a1)), y1 = 50 + r * Math.sin(R(a1));
+    return `M ${x0.toFixed(2)} ${y0.toFixed(2)} A ${r} ${r} 0 ${a1 - a0 > 180 ? 1 : 0} 1 ${x1.toFixed(2)} ${y1.toFixed(2)}`;
+  };
+  const build = (parts: any[]) => {
+    const n = Math.max(1, parts.length), gap = Math.max(2, Math.min(8, 24 / n)), span = 360 / n, w = stroke * 0.5, r = 50 - w / 2 - 1;
+    let out = "";
+    parts.forEach((p, i) => {
+      const a0 = i * span + gap / 2, a1 = (i + 1) * span - gap / 2;
+      out += `<path d="${arcD(r, a0, a1)}" fill="none" stroke="var(--gt-faint)" stroke-opacity=".35" stroke-width="${w}"/>`;
+      const pct = Math.max(0, Math.min(1, p.pct || 0));
+      out += `<path class="fill" data-i="${i}" pathLength="100" d="${arcD(r, a0, a1)}" fill="none" stroke="${p.state === "done" ? "var(--st-done)" : "var(--st-now)"}" stroke-width="${w}" style="stroke-dasharray:${(pct * 100).toFixed(1)} 100${pct <= 0.004 ? ";opacity:0" : ""}"/>`;
+    });
+    return `<svg viewBox="0 0 100 100" width="200" height="200" aria-hidden="true">${out}</svg>`;
+  };
+  const paint = (el: any) => {
+    holder.hidden = !el; empty.hidden = !!el;
+    if (!el) return;
+    const fills = ring.querySelectorAll<SVGPathElement>(".fill");
+    if (fills.length === (el.parts ?? []).length && fills.length) {
+      el.parts.forEach((p: any, i: number) => { const f = fills[i]; const pct = Math.max(0, Math.min(1, p.pct || 0)); f.setAttribute("stroke", p.state === "done" ? "var(--st-done)" : "var(--st-now)"); f.style.strokeDasharray = `${(pct * 100).toFixed(1)} 100`; f.style.opacity = pct <= 0.004 ? "0" : "1"; });
+    } else ring.innerHTML = build(el.parts ?? []);
+    count.textContent = el.count ?? "";
+  };
+  const draw = async (prev: any, next: any) => {
+    const finished = prev && next && (prev.parts ?? []).filter((p: any) => p.state === "done").length < (next.parts ?? []).filter((p: any) => p.state === "done").length;
+    paint(next);
+    if (finished && !still && !reduced) { holder.classList.add("phase-done"); await wait(600); holder.classList.remove("phase-done"); }
+  };
+  if (last.element) paint(last.element);
+  const tick = async () => {
+    if (!token) return;
+    try {
+      const r = await fetch(`/api/overlay/guide?t=${encodeURIComponent(token)}`, { cache: "no-store" });
+      if (!r.ok) return;                       /* held, not blanked */
+      const next = await r.json();
+      if (next.version !== last.version || (!last.element && next.element)) {
+        await draw(last.element, next.element);
+        last = { version: next.version, element: next.element };
+      }
+    } catch { /* offline: the last frame stands */ }
+  };
+  window.setInterval(tick, 2000);
+</script>

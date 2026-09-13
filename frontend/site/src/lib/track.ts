@@ -241,9 +241,16 @@ export function mountTrack(root: HTMLElement) {
     }
   };
 
+  let overlays: any[] = JSON.parse(root.dataset.overlays || "[]");
+  const origin = root.dataset.origin || location.origin;
+  const drawOverlays = () => {
+    const el = $("[data-overlays-list]"); if (!el) return;
+    if (!overlays.length) { el.innerHTML = `<p class="tk-quiet">${esc(W.overlays.none)}</p>`; return; }
+    el.innerHTML = overlays.map((o) => `<div class="tk-ov-row"><span>${esc(o.label || W.overlays.kinds[o.kind] || o.kind)}</span><span class="tk-mono">${esc(W.overlays.kinds[o.kind] ?? o.kind)}</span><span class="tk-mono">${esc(W.overlays.themes[o.theme] ?? o.theme)}</span><span class="tk-mono ${o.lastSeen && Date.now() - new Date(o.lastSeen).getTime() < 15000 ? "rose" : ""}">${esc(o.lastSeen && Date.now() - new Date(o.lastSeen).getTime() < 15000 ? W.overlays.live : W.overlays.idle)}</span><button type="button" class="tk-x" data-revoke="${o.id}">${esc(W.overlays.revoke)}</button></div>`).join("");
+  };
   const drawNote = () => { const el = $<HTMLTextAreaElement>("[data-note]"); if (el && document.activeElement !== el) el.value = view.note ?? ""; };
 
-  const draw = () => { drawHead(); drawNow(); drawLater(); drawPath(); drawAlso(); drawRoutines(); drawCodex(); drawTracks(); drawNote(); };
+  const draw = () => { drawHead(); drawNow(); drawLater(); drawPath(); drawAlso(); drawRoutines(); drawCodex(); drawTracks(); drawNote(); drawOverlays(); };
 
   /* ── the Done moment ─────────────────────────────────────────────────── */
   const done = async (stepId: string) => {
@@ -277,6 +284,11 @@ export function mountTrack(root: HTMLElement) {
     if (btn?.matches("[data-reset]")) { await act(() => call("POST", `/api/runs/${view.id}/routines/${encodeURIComponent(btn.dataset.reset!)}/reset`)); return; }
     if (btn?.matches("[data-count]")) { const [tid, cid, d] = btn.dataset.count!.split(":"); const cur = Number(view.tracks?.[tid]?.counters?.[cid] ?? 0); const counters = { ...(view.tracks?.[tid]?.counters ?? {}), [cid]: Math.max(0, cur + Number(d)) }; await act(() => call("PUT", `/api/runs/${view.id}/track/${encodeURIComponent(tid)}`, { counters })); return; }
     if (btn?.matches("[data-row-state]")) { const [id, st] = btn.dataset.rowState!.split(":"); await act(() => call("POST", `/api/runs/${view.id}/steps/${encodeURIComponent(id)}`, { state: st })); return; }
+    if (btn?.matches("[data-revoke]")) {
+      const r = await fetch(`/api/runs/${view.id}/overlays/${btn.dataset.revoke}`, { method: "DELETE", headers: { "x-csrf-token": token() } });
+      if (r.ok || r.status === 204) { overlays = overlays.filter((o) => String(o.id) !== btn.dataset.revoke); drawOverlays(); }
+      return;
+    }
     if (btn?.matches("[data-checkin]")) { openCheckin(); return; }
     if (btn?.matches("[data-much]")) { openMuch(); return; }
     if (btn?.matches("[data-sheet-close]")) { closeSheet(); return; }
@@ -308,6 +320,21 @@ export function mountTrack(root: HTMLElement) {
     const form = event.target as HTMLFormElement;
     if (form.matches("[data-park]")) { event.preventDefault(); const text = String(new FormData(form).get("text") ?? "").trim(); if (text) await act(() => call("POST", `/api/runs/${view.id}/later`, { text })); return; }
     if (form.matches("[data-checkin-form]")) { event.preventDefault(); await saveCheckin(form); return; }
+    if (form.matches("[data-new-overlay]")) {
+      event.preventDefault();
+      const data = new FormData(form);
+      const body = { kind: String(data.get("kind")), theme: String(data.get("theme")), motion: String(data.get("motion")), routine_id: String(data.get("routine_id") ?? ""), label: String(data.get("label") ?? "") };
+      const r = await fetch(`/api/runs/${view.id}/overlays`, { method: "POST", headers: { "content-type": "application/json", "x-csrf-token": token() }, body: JSON.stringify(body) });
+      if (!r.ok) return;
+      const made = await r.json();
+      const url = `${origin}/overlay/${made.kind}?t=${made.token}`;
+      const box = $("[data-minted]")!;
+      box.hidden = false;
+      box.innerHTML = `<span class="tk-eyebrow">${esc(W.overlays.kinds[made.kind] ?? made.kind)}</span><span class="tk-ov-url" data-url>${esc(url)}</span><div style="display:flex;gap:10px;align-items:center"><button type="button" class="tk-secondary sm" data-copy>${esc(W.overlays.copy)}</button><span class="tk-mono" data-copied></span></div><p class="tk-quiet">${esc(W.overlays.once)}</p>`;
+      box.querySelector("[data-copy]")!.addEventListener("click", async () => { try { await navigator.clipboard.writeText(url); box.querySelector("[data-copied]")!.textContent = W.overlays.copied; } catch {} });
+      const list = await fetch(`/api/runs/${view.id}/overlays`); if (list.ok) { overlays = await list.json(); drawOverlays(); }
+      return;
+    }
     if (form.matches("[data-proposal-form]")) { event.preventDefault(); const ids = Array.from(form.querySelectorAll<HTMLInputElement>("input[name=step]:checked")).map((x) => x.value); closeSheet(); if (ids.length) await act(() => call("POST", `/api/runs/${view.id}/accept`, { steps: ids })); return; }
   });
   root.addEventListener("input", (event) => {

@@ -549,6 +549,16 @@ class OverlayToken(TimestampMixin, table=True):
     # on two machines, or in two scenes, may want different ones.
     appearance: str = "almanac"
 
+    # ── Shruti's Guides ──
+    # A guide overlay (kind guide-now | guide-sigil | guide-path |
+    # guide-routine) shows one RUN — a person's place on a path — and is
+    # minted by that person, not only by her. `theme` is the game theme it
+    # wears: almanac | grimoire | plain. A theme may change palette, type and
+    # ornament; it may never change the four state colours or the layout.
+    run_id: Optional[int] = Field(default=None, foreign_key="guide_run.id", index=True)
+    routine_id: str = ""
+    theme: str = "almanac"
+
     last_seen: Optional[datetime] = Field(default=None, sa_type=UTC_TS)
 
 
