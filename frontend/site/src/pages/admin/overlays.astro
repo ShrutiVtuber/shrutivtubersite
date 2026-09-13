@@ -186,7 +186,7 @@ const signedIn = runsRead.status !== 401 && runsRead.status !== 0;
   if (root) {
     type El = { kind: string; x: number; y: number; w: number; routine_id: string; shows: string };
     const esc = (s: unknown) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
-    const KINDS: [string, string][] = [["guide-now", "Now card"], ["guide-sigil", "Sigil"], ["guide-path", "Path strip"], ["guide-routine", "Routine"], ["guide-goal", "Goal"], ["counter", "Counter"], ["text", "Text"], ["image", "Image"]];
+    const KINDS: [string, string][] = [["guide-now", "Now card"], ["guide-sigil", "Sigil"], ["guide-path", "Path strip"], ["guide-routine", "Routine"], ["guide-goal", "Goal"], ["counter", "Counter"], ["text", "Text"], ["image", "Image"], ["ticker", "Ticker"], ["sky", "Sky"], ["hours", "Planetary hours"], ["countdown", "Countdown"], ["alerts", "Alerts"], ["wheel", "Transit wheel"]];
     const PLACES: Record<string, El> = {
       "guide-now": { kind: "guide-now", x: 72, y: 72, w: 900, routine_id: "", shows: "" },
       "guide-sigil": { kind: "guide-sigil", x: 1620, y: 72, w: 224, routine_id: "", shows: "" },
@@ -196,6 +196,12 @@ const signedIn = runsRead.status !== 401 && runsRead.status !== 0;
       "counter": { kind: "counter", x: 1416, y: 300, w: 432, routine_id: "", shows: "", group: "", counter_id: 0 },
       "text": { kind: "text", x: 72, y: 480, w: 600, routine_id: "", shows: "", group: "", counter_id: 0, text: "", url: "" },
       "image": { kind: "image", x: 1560, y: 780, w: 288, routine_id: "", shows: "", group: "", counter_id: 0, text: "", url: "" },
+      "ticker": { kind: "ticker", x: 72, y: 1008, w: 1776, routine_id: "", shows: "", group: "", counter_id: 0, text: "", url: "" },
+      "sky": { kind: "sky", x: 1416, y: 320, w: 432, routine_id: "", shows: "", group: "", counter_id: 0, text: "", url: "", lat: 37.9838, lon: 23.7275 },
+      "hours": { kind: "hours", x: 1180, y: 72, w: 420, routine_id: "", shows: "", group: "", counter_id: 0, text: "", url: "", lat: 37.9838, lon: 23.7275 },
+      "countdown": { kind: "countdown", x: 1416, y: 560, w: 432, routine_id: "", shows: "", group: "", counter_id: 0, text: "", url: "" },
+      "alerts": { kind: "alerts", x: 1200, y: 640, w: 648, routine_id: "", shows: "", group: "", counter_id: 0, text: "", url: "" },
+      "wheel": { kind: "wheel", x: 1416, y: 300, w: 432, routine_id: "", shows: "", group: "", counter_id: 0, text: "", url: "" },
     };
     const runs: { id: number; name: string }[] = JSON.parse(root.dataset.runs || "[]");
     const layouts: any[] = JSON.parse(root.dataset.layouts || "[]");
@@ -257,7 +263,9 @@ const signedIn = runsRead.status !== 401 && runsRead.status !== 0;
         `<span>width</span><input type="number" data-prop="w" value="${e.w}" />` +
         (e.kind === "guide-routine" ? `<span>routine</span><input type="text" data-prop="routine_id" value="${e.routine_id}" placeholder="routine id, or the first" />` : "") +
         (e.kind === "guide-goal" ? `<span>group</span><input type="text" data-prop="group" value="${e.group ?? ""}" placeholder="the group's join code" />` : "") +
-        (e.kind === "counter" ? `<span>counter</span><input type="number" min="0" step="1" data-prop="counter_id" value="${e.counter_id ?? 0}" placeholder="the counter's id" />` : "") +
+        (e.kind === "counter" || e.kind === "countdown" || e.kind === "ticker" ? `<span>counter</span><input type="number" min="0" step="1" data-prop="counter_id" value="${e.counter_id ?? 0}" placeholder="${e.kind === "ticker" ? "a counter's id, or all support" : "the counter's id"}" />` : "") +
+        (e.kind === "sky" || e.kind === "hours" ? `<span>lat · lon</span><span><input type="number" step="0.0001" data-prop="lat" value="${e.lat ?? 37.9838}" /> <input type="number" step="0.0001" data-prop="lon" value="${e.lon ?? 23.7275}" /></span>` : "") +
+        (e.kind === "wheel" ? `<span>wheel</span><input type="text" data-prop="shows" value="${esc(e.shows ?? "")}" placeholder="rising=Leo&strip=0" />` : "") +
         (e.kind === "text" ? `<span>text</span><input type="text" maxlength="200" data-prop="text" value="${esc(e.text ?? "")}" placeholder="a line of text" />` : "") +
         (e.kind === "image" ? `<span>image</span><input type="url" data-prop="url" value="${esc(e.url ?? "")}" placeholder="https://… (a picture)" />` : "") +
         `<span>shows</span><span class="od-mono">${e.kind === "guide-now" ? "phase · title · one line" : e.kind === "guide-path" ? "the last two, the current, the next three" : e.kind === "guide-sigil" ? "one arc per phase" : "the checklist"}</span>` +

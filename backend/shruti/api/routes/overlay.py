@@ -235,16 +235,8 @@ async def sky(t: str, lat: float = 37.9838, lon: float = 23.7275,
     return await sky_now(lat, lon)
 
 
-@router.get("/hours")
-async def hours(t: str, lat: float = 37.9838, lon: float = 23.7275,
-                session: AsyncSession = Depends(get_session)) -> dict:
-    """
-    Past, current and next planetary hour.
-
-    Three cells, because the strip shows where the day has got to and not only
-    where it is. The turnover is the only thing this surface ever animates.
-    """
-    await _overlay(t, session)
+async def hours_now(lat: float = 37.9838, lon: float = 23.7275) -> dict:
+    """Past, current and next planetary hour — for the strip and for a layout element."""
     now = datetime.now(timezone.utc)
     try:
         data = await _from_daemon("/planetary-hours", {
@@ -282,33 +274,27 @@ async def hours(t: str, lat: float = 37.9838, lon: float = 23.7275,
     }
 
 
-@router.get("/ticker")
-async def ticker(t: str, limit: int = 18,
-                 session: AsyncSession = Depends(get_session)) -> dict:
+@router.get("/hours")
+async def hours(t: str, lat: float = 37.9838, lon: float = 23.7275,
+                session: AsyncSession = Depends(get_session)) -> dict:
     """
-    Who has supported, most recent first — a row of names, and nothing else.
+    Past, current and next planetary hour.
 
-    Amounts are deliberately absent. The ticker runs along the bottom of the
-    stream for the whole session; a row of figures turns everyone who gave a
-    little into a small number displayed beside a bigger one, permanently. The
-    counter bar carries the total, which is the number that means anything.
-
-    When there is nothing yet, the row does NOT say "no supporters yet" — an
-    empty state that advertises emptiness is worse than no row at all. It
-    carries her standing line instead (§8), so the space still earns itself at
-    the start of a campaign. The line is hers, out of settings, because a
-    sentence baked in here would be a second place to maintain her words.
+    Three cells, because the strip shows where the day has got to and not only
+    where it is. The turnover is the only thing this surface ever animates.
     """
-    row = await _overlay(t, session)
+    await _overlay(t, session)
+    return await hours_now(lat, lon)
+
+
+async def ticker_payload(session: AsyncSession, counter_row, limit: int = 18) -> dict:
+    """Who has supported, most recent first, and her standing line — for the ticker and for a layout element."""
     from shruti.models import SupportEvent
 
     q = select(SupportEvent).order_by(SupportEvent.occurred_at.desc())
 
     # Scoped to the counter when the overlay has one, so a ticker beside a
     # campaign bar shows that campaign's supporters rather than all traffic.
-    counter_row = (
-        await session.get(Counter, row.counter_id) if row.counter_id else None
-    )
     if counter_row is not None:
         sources = [x for x in (counter_row.sources or "").split(",") if x]
         if sources:
@@ -339,12 +325,35 @@ async def ticker(t: str, limit: int = 18,
     )).get("overlay.ticker_standing", "").strip()
 
     return {
-        "motion": row.motion,
-        "appearance": row.appearance or "almanac",
         "names": names,
         "standing": standing,
         "label": counter_row.name if counter_row is not None else "",
     }
+
+
+@router.get("/ticker")
+async def ticker(t: str, limit: int = 18,
+                 session: AsyncSession = Depends(get_session)) -> dict:
+    """
+    Who has supported, most recent first — a row of names, and nothing else.
+
+    Amounts are deliberately absent. The ticker runs along the bottom of the
+    stream for the whole session; a row of figures turns everyone who gave a
+    little into a small number displayed beside a bigger one, permanently. The
+    counter bar carries the total, which is the number that means anything.
+
+    When there is nothing yet, the row does NOT say "no supporters yet" — an
+    empty state that advertises emptiness is worse than no row at all. It
+    carries her standing line instead (§8), so the space still earns itself at
+    the start of a campaign. The line is hers, out of settings, because a
+    sentence baked in here would be a second place to maintain her words.
+    """
+    row = await _overlay(t, session)
+    counter_row = (
+        await session.get(Counter, row.counter_id) if row.counter_id else None
+    )
+    return {"motion": row.motion, "appearance": row.appearance or "almanac",
+            **await ticker_payload(session, counter_row, limit)}
 
 
 @router.get("/countdown")

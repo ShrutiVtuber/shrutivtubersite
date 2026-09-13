@@ -127,6 +127,38 @@
 .gov-path .it.skipped span:last-child { text-decoration: line-through; }
 
 /* ── the routine · 760 wide at left 72, bottom 72 ──────────────────────── */
+/* The site's instruments as elements: the same plate, the same eyebrow. */
+.gov-ticker { left: 72px; bottom: 24px; width: 1776px; padding: 14px 28px; display: flex; gap: 20px; align-items: baseline; }
+.gov-ticker .names { display: flex; gap: 14px; flex-wrap: nowrap; overflow: hidden; white-space: nowrap; font-size: 26px; }
+.gov-ticker .sep { color: var(--gt-faint); }
+.gov-ticker .anon { font-style: italic; color: var(--gt-soft); }
+.gov-ticker .standing { color: var(--gt-soft); }
+.gov-sky { left: 1416px; top: 320px; width: 432px; padding: 20px 28px; display: flex; flex-direction: column; gap: 6px; }
+.gov-sky .body { display: grid; grid-template-columns: 1fr auto auto; gap: 14px; align-items: baseline; font-size: 24px; }
+.gov-sky .where { font-size: 22px; }
+.gov-sky .retro { margin-left: 8px; font-size: 16px; color: var(--gt-faint); letter-spacing: .08em; text-transform: uppercase; }
+.gov-sky .rate { font-size: 18px; color: var(--gt-faint); }
+.gov-hours { left: 1180px; top: 72px; width: 420px; padding: 20px 28px; display: flex; flex-direction: column; gap: 12px; }
+.gov-hours .cells { display: grid; grid-template-columns: 1fr 1.3fr 1fr; gap: 10px; }
+.gov-hours .cell { display: flex; flex-direction: column; gap: 2px; color: var(--gt-faint); }
+.gov-hours .cell.now { color: var(--gt-ink); }
+.gov-hours .who { font-size: 26px; }
+.gov-hours .cell.now .who { font-size: 32px; font-weight: 600; }
+.gov-hours .ord, .gov-hours .day { font-size: 18px; color: var(--gt-faint); }
+.gov-countdown { left: 1416px; top: 560px; width: 432px; padding: 20px 28px; display: flex; flex-direction: column; gap: 4px; }
+.gov-countdown .figure { font-size: 64px; line-height: 1.05; font-variant-numeric: tabular-nums; }
+.gov-countdown .say { font-size: 22px; color: var(--gt-soft); }
+.gov-alerts { position: absolute; left: 1200px; top: 640px; width: 648px; }
+.gov-alert { position: relative; left: auto; top: auto; width: 100%; padding: 22px 30px; display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 18px; }
+.gov-alert .who { font-size: 34px; font-weight: 600; }
+.gov-alert .amount { font-size: 30px; }
+.gov-alert .message { flex-basis: 100%; font-size: 24px; color: var(--gt-soft); }
+.gov-alert.enter { animation: gov-alert-in 260ms cubic-bezier(.2,.8,.2,1) both; }
+@keyframes gov-alert-in { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+.gov-wheel { position: absolute; left: 1416px; top: 300px; width: 432px; height: 432px; border: 0; background: transparent; }
+.gov-placed .gov-ticker, .gov-placed .gov-sky, .gov-placed .gov-hours, .gov-placed .gov-countdown { left: auto; top: auto; bottom: auto; }
+.gov-placed .gov-alerts, .gov-placed .gov-wheel { position: relative; left: auto; top: auto; width: 100%; }
+.gov-placed .gov-wheel { aspect-ratio: 1; height: auto; }
 /* A line of text and a picture: a layout's own content, not the run's. */
 .gov-text { left: 72px; top: 480px; width: 600px; padding: 20px 28px; }
 .gov-text .line { font-size: 30px; line-height: 1.3; }

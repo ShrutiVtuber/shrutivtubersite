@@ -25,11 +25,13 @@ const KIND: Record<string, string> = {
   "guide-now": say("kind.now", "Now card"), "guide-sigil": say("kind.sigil", "Sigil"), "guide-path": say("kind.path", "Path strip"),
   "guide-routine": say("kind.routine", "Routine"), "guide-goal": say("kind.goal", "Goal"), "counter": say("kind.counter", "Counter"),
   "text": say("kind.text", "Text"), "image": say("kind.image", "Picture"),
+  "ticker": say("kind.ticker", "Ticker"), "sky": say("kind.sky", "Sky"), "hours": say("kind.hours", "Planetary hours"),
+  "countdown": say("kind.countdown", "Countdown"), "alerts": say("kind.alerts", "Alerts"), "wheel": say("kind.wheel", "Transit wheel"),
 };
 const THEME: Record<string, string> = { almanac: say("theme.almanac", "Almanac"), grimoire: say("theme.grimoire", "Grimoire"), plain: say("theme.plain", "Plain") };
 const MOTION: Record<string, string> = { full: say("motion.full", "full motion"), reduced: say("motion.reduced", "reduced motion"), still: say("motion.still", "still") };
 // A thumbnail: each element as a box on the canvas, at a tenth of the size.
-const height = (k: string) => (k === "guide-sigil" ? 224 : k === "guide-path" ? 96 : k === "guide-now" ? 200 : k === "guide-routine" ? 260 : k === "counter" ? 140 : k === "text" ? 80 : k === "image" ? 160 : 220);
+const height = (k: string) => (k === "guide-sigil" ? 224 : k === "guide-path" ? 96 : k === "guide-now" ? 200 : k === "guide-routine" ? 260 : k === "counter" ? 140 : k === "text" ? 80 : k === "image" ? 160 : k === "ticker" ? 64 : k === "sky" ? 300 : k === "hours" ? 150 : k === "countdown" ? 130 : k === "alerts" ? 120 : k === "wheel" ? 432 : 220);
 const WORDS = {
   minted: say("words.minted", "Made. Paste this into OBS as a browser source, 1920 × 1080 — it is shown once."),
   failed: say("words.failed", "That did not go through. Try again."),

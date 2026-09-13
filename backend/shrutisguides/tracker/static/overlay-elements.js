@@ -139,6 +139,114 @@ var OverlayElements = (() => {
       slot.innerHTML = /^https:\/\//i.test(url) ? `<img class="gov-image" src="${esc(url)}" alt="" />` : "";
       return;
     }
+    if (kind === "ticker") {
+      const t = next && Array.isArray(next.names) ? next : null;
+      if (!t) {
+        slot.innerHTML = "";
+        return;
+      }
+      const row = t.names.length ? t.names.map((n) => `<span class="${n.anonymous ? "anon" : ""}">${esc(n.who)}</span>`).join(`<span class="sep">\xB7</span>`) : t.standing ? `<span class="standing">${esc(t.standing)}</span>` : "";
+      slot.innerHTML = row ? `<div class="gov-plate gov-ticker"><span class="gov-eyebrow">${esc(t.label || "supporters")}</span><div class="names">${row}</div></div>` : "";
+      return;
+    }
+    if (kind === "sky") {
+      const bodies = next && Array.isArray(next.bodies) ? next.bodies : [];
+      if (!bodies.length) {
+        slot.innerHTML = "";
+        return;
+      }
+      const deg = (d) => {
+        const whole = Math.floor(d), min = Math.round((d - whole) * 60);
+        return `${whole}\xB0${String(min).padStart(2, "0")}\u2032`;
+      };
+      slot.innerHTML = `<div class="gov-plate gov-sky"><span class="gov-eyebrow">the sky now</span>${bodies.map((b) => `<div class="body"><span class="name">${esc(b.name)}</span><span class="gov-mono where">${esc(b.sign)} ${deg(Number(b.degree) || 0)}${b.retrograde ? `<span class="retro">retro</span>` : ""}</span><span class="gov-mono rate">${(Number(b.perHour) || 0) >= 0 ? "+" : ""}${(Number(b.perHour) || 0).toFixed(2)}\xB0/h</span></div>`).join("")}</div>`;
+      return;
+    }
+    if (kind === "hours") {
+      const h = next && next.current ? next : null;
+      if (!h) {
+        slot.innerHTML = "";
+        return;
+      }
+      const ROMAN = ["", "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII"];
+      const cell = (c, now) => c ? `<div class="cell ${now ? "now" : ""}"><span class="who">${esc(c.ruler)}</span><span class="gov-mono ord">${ROMAN[c.index] ?? c.index} \xB7 ${c.isNight ? "night" : "day"}</span></div>` : `<div class="cell"><span class="who">\u2014</span></div>`;
+      slot.innerHTML = `<div class="gov-plate gov-hours"><span class="gov-eyebrow">planetary hours</span><div class="cells">${cell(h.past, false)}${cell(h.current, true)}${cell(h.next, false)}</div><span class="gov-mono day">the day belongs to ${esc(h.dayRuler || "")}</span></div>`;
+      return;
+    }
+    if (kind === "countdown") {
+      const c = next && next.name != null ? next : null;
+      const anySlot = slot;
+      if (anySlot._tick) {
+        window.clearInterval(anySlot._tick);
+        anySlot._tick = 0;
+      }
+      if (!c) {
+        slot.innerHTML = "";
+        return;
+      }
+      slot.innerHTML = `<div class="gov-plate gov-countdown"><span class="gov-eyebrow">${esc(c.name)}</span><span class="gov-mono figure" data-figure></span><span class="say" data-say></span></div>`;
+      const figure = slot.querySelector("[data-figure]"), say = slot.querySelector("[data-say]");
+      if (!c.endsAt) {
+        say.textContent = "Open \xB7 no closing date";
+        return;
+      }
+      const offset = Date.now() - new Date(c.now || Date.now()).getTime();
+      const ends = new Date(c.endsAt).getTime();
+      const paint = () => {
+        const left = ends - (Date.now() - offset);
+        if (left <= 0) {
+          figure.textContent = "";
+          say.textContent = "Window closed";
+          if (anySlot._tick) {
+            window.clearInterval(anySlot._tick);
+            anySlot._tick = 0;
+          }
+          return;
+        }
+        const s = Math.floor(left / 1e3), d = Math.floor(s / 86400), hh = Math.floor(s % 86400 / 3600), mm = Math.floor(s % 3600 / 60), ss = s % 60;
+        figure.textContent = d > 0 ? `${d}d ${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}:${String(ss).padStart(2, "0")}` : `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}:${String(ss).padStart(2, "0")}`;
+        say.textContent = "left";
+      };
+      paint();
+      anySlot._tick = window.setInterval(paint, 1e3);
+      return;
+    }
+    if (kind === "alerts") {
+      const events = next && Array.isArray(next.events) ? next.events : [];
+      const anySlot = slot;
+      if (!anySlot._seen) {
+        anySlot._seen = new Set(events.map((e) => e.id));
+        anySlot._queue = [];
+        if (!slot.querySelector(".gov-alerts")) slot.innerHTML = `<div class="gov-alerts" data-alerts></div>`;
+        return;
+      }
+      const fresh = events.filter((e) => !anySlot._seen.has(e.id));
+      fresh.forEach((e) => anySlot._seen.add(e.id));
+      anySlot._queue.push(...fresh);
+      const box = slot.querySelector("[data-alerts]") ?? (() => {
+        slot.innerHTML = `<div class="gov-alerts" data-alerts></div>`;
+        return slot.querySelector("[data-alerts]");
+      })();
+      const money = (e) => e.amountMinor ? `${(e.currency || "").toUpperCase() === "EUR" ? "\u20AC" : (e.currency || "") + " "}${(e.amountMinor / 100).toFixed(2)}` : e.quantity ? `\xD7 ${e.quantity}` : "";
+      const showNext = async () => {
+        if (anySlot._showing) return;
+        const e = anySlot._queue.shift();
+        if (!e) return;
+        anySlot._showing = true;
+        box.innerHTML = `<div class="gov-plate gov-alert ${o.still || o.reduced ? "" : "enter"}"><span class="who">${esc(e.who || "Someone")}</span>${money(e) ? `<span class="gov-mono amount">${esc(money(e))}</span>` : ""}${e.message ? `<span class="message">${esc(e.message)}</span>` : ""}</div>`;
+        await wait(6e3);
+        box.innerHTML = "";
+        anySlot._showing = false;
+        if (anySlot._queue.length) showNext();
+      };
+      showNext();
+      return;
+    }
+    if (kind === "wheel") {
+      const src = String(next?.src || "");
+      slot.innerHTML = src.startsWith("/overlay/wheel") ? `<iframe class="gov-wheel" src="${esc(src)}" title="transit wheel" loading="eager"></iframe>` : "";
+      return;
+    }
     if (kind === "guide-routine") {
       const r = next?.routine;
       slot.innerHTML = r ? `<div class="gov-plate gov-routine"><div class="head"><span class="name">${esc(r.name)}</span><span class="gov-mono count">${esc(r.count)}</span></div><div>${(r.items ?? []).map((i) => `<div class="item ${i.done ? "done" : ""}"><span class="dot ${i.done ? "done" : "available"}"></span><span>${esc(i.text)}</span></div>`).join("")}</div></div>` : "";

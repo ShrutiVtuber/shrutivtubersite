@@ -23,13 +23,17 @@ from shrutisguides import engine
 REENTRY_AFTER = timedelta(hours=6)
 STATES = ("done", "skipped", "later", "open")
 GUIDE_KINDS = ("guide-now", "guide-sigil", "guide-path", "guide-routine", "guide-layout")
-ELEMENT_KINDS = ("guide-now", "guide-sigil", "guide-path", "guide-routine", "guide-goal", "counter", "text", "image")
+ELEMENT_KINDS = ("guide-now", "guide-sigil", "guide-path", "guide-routine", "guide-goal", "counter", "text", "image",
+                 "ticker", "sky", "hours", "countdown", "alerts", "wheel")
 # Two kinds that carry their own content — a line of text, a picture by its
 # https address — so a layout can hold a title card or a logo without a run.
 OWN_KINDS = ("text", "image")
 # The two kinds a host fills in rather than the run: a group's goal and the
 # site's counter. The self-hosted tracker has neither and draws them empty.
-HOST_KINDS = ("guide-goal", "counter")
+# …and the site's other instruments: the ticker of supporters, the sky, the
+# planetary hours, a countdown, the alerts, the transit wheel. A tracker has
+# none of them and draws them empty.
+HOST_KINDS = ("guide-goal", "counter", "ticker", "sky", "hours", "countdown", "alerts", "wheel")
 # Where each element sits when nobody has moved it: the boards' positions at
 # 1920 × 1080, so a layout with no coordinates is the frame the design shows.
 DEFAULT_PLACES = {
@@ -41,6 +45,12 @@ DEFAULT_PLACES = {
     "counter": {"x": 1416, "y": 300, "w": 432},
     "text": {"x": 72, "y": 480, "w": 600},
     "image": {"x": 1560, "y": 780, "w": 288},
+    "ticker": {"x": 72, "y": 1008, "w": 1776},
+    "sky": {"x": 1416, "y": 320, "w": 432},
+    "hours": {"x": 1180, "y": 72, "w": 420},
+    "countdown": {"x": 1416, "y": 560, "w": 432},
+    "alerts": {"x": 1200, "y": 640, "w": 648},
+    "wheel": {"x": 1416, "y": 300, "w": 432},
 }
 THEMES = ("almanac", "grimoire", "plain")
 MOTIONS = ("full", "reduced", "still")
@@ -289,6 +299,14 @@ def from_export(r: dict, doc: dict, fallback_name: str) -> dict:
     }
 
 
+def _coord(value: Any, default: float, limit: float) -> float:
+    try:
+        v = float(value)
+    except (TypeError, ValueError):
+        return default
+    return round(min(limit, max(-limit, v)), 4)
+
+
 def _https(value: Any) -> str:
     """An image address, or nothing: https only, so a browser source never loads a file or a script."""
     url = str(value or "").strip()[:500]
@@ -324,6 +342,9 @@ def clean_layout(layout: Any) -> list[dict]:
             "counter_id": num("counter_id", 0, 0, 10**9),
             "text": str(e.get("text") or "")[:200],
             "url": _https(e.get("url")),
+            # Where the sky and the hours are read from; her city unless moved.
+            "lat": _coord(e.get("lat"), 37.9838, 90.0),
+            "lon": _coord(e.get("lon"), 23.7275, 180.0),
         })
     return out[:12]
 

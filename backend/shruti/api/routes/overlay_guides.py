@@ -15,6 +15,8 @@ which theme the token wears.
 """
 from __future__ import annotations
 
+import logging
+
 import json
 import re
 
@@ -24,6 +26,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import func
 from sqlmodel import select
 
 from shruti.api.deps import get_session
@@ -33,6 +36,7 @@ from shruti.models import OverlayToken
 from shruti.models.guides import Game, Guide, GuideRun, GuideVersion
 from shrutisguides import progress
 
+log = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/overlay", tags=["overlay"])
 runs_router = APIRouter(prefix="/api/runs", tags=["runs"])
 
@@ -82,7 +86,27 @@ async def guide(t: str, session: AsyncSession = Depends(get_session)) -> dict:
     else:
         base["element"] = progress.element(token.kind, _stored(run), v.body, token.routine_id)
     base["version"] = run.updated_at.isoformat() if run.updated_at else ""
+    if token.kind == "guide-layout":
+        base["version"] += await _instrument_stamp(session, base["elements"])
     return base
+
+
+async def _instrument_stamp(session: AsyncSession, elements: list[dict]) -> str:
+    """
+    A layout redraws when its version changes. The run's is the run's clock;
+    an instrument's is the latest support event (alerts, ticker, counter) or
+    the five-minute bucket (the sky, the hours). Nothing else polls faster.
+    """
+    kinds = {e.get("kind") for e in elements}
+    stamp = ""
+    if kinds & {"alerts", "ticker", "counter", "guide-goal"}:
+        from shruti.models import SupportEvent
+        latest = (await session.execute(select(func.max(SupportEvent.id)))).scalar() or 0
+        totals = ":".join(str(e.get("element", {}).get("total", "")) for e in elements if e.get("kind") == "guide-goal")
+        stamp += f":e{latest}:{totals}"
+    if kinds & {"sky", "hours", "countdown"}:
+        stamp += f":t{int(datetime.now(timezone.utc).timestamp() // 300)}"
+    return stamp
 
 
 async def _goal_frame(session: AsyncSession, token: OverlayToken, base: dict) -> dict:
@@ -116,15 +140,47 @@ async def _fill_goals(session: AsyncSession, elements: list[dict]) -> None:
     counter names one of her counters by id. The site draws both; a tracker
     draws neither.
     """
+    from shruti.api.routes import overlay as instruments
     from shruti.api.routes.groups import goal_by_code
     from shruti.core import counters
-    from shruti.models import Counter
+    from shruti.models import Counter, SupportEvent
+    now = datetime.now(timezone.utc)
+
+    async def counter_of(e: dict):
+        c = await session.get(Counter, int(e["counter_id"])) if e.get("counter_id") else None
+        return c if c is not None and c.visible else None
+
     for e in elements:
-        if e.get("kind") == "guide-goal" and e.get("group"):
-            e["element"] = (await goal_by_code(session, e["group"])) or {}
-        elif e.get("kind") == "counter" and e.get("counter_id"):
-            c = await session.get(Counter, int(e["counter_id"]))
-            e["element"] = _counter_element(c, await counters.progress(session, c)) if c is not None and c.visible else {}
+        kind = e.get("kind")
+        try:
+            if kind == "guide-goal" and e.get("group"):
+                e["element"] = (await goal_by_code(session, e["group"])) or {}
+            elif kind == "counter":
+                c = await counter_of(e)
+                e["element"] = _counter_element(c, await counters.progress(session, c)) if c is not None else {}
+            elif kind == "ticker":
+                e["element"] = await instruments.ticker_payload(session, await counter_of(e), 18)
+            elif kind == "sky":
+                e["element"] = await instruments.sky_now(e.get("lat", 37.9838), e.get("lon", 23.7275))
+            elif kind == "hours":
+                e["element"] = await instruments.hours_now(e.get("lat", 37.9838), e.get("lon", 23.7275))
+            elif kind == "countdown":
+                c = await counter_of(e)
+                e["element"] = ({"name": c.name, "note": c.note, "now": now.isoformat(),
+                                 "endsAt": c.ends_at.isoformat() if c.ends_at else None,
+                                 "startsAt": c.starts_at.isoformat() if c.starts_at else None} if c is not None else {})
+            elif kind == "alerts":
+                rows = (await session.execute(select(SupportEvent).order_by(SupportEvent.id.desc()).limit(5))).scalars().all()
+                e["element"] = {"events": [{"id": r.id, "source": r.source, "who": r.who or "Someone", "amountMinor": r.amount_minor,
+                                            "currency": r.currency, "quantity": r.quantity,
+                                            "message": r.message if r.message_approved else ""} for r in reversed(rows)]}
+            elif kind == "wheel":
+                query = "".join(ch for ch in str(e.get("shows") or "") if ch.isalnum() or ch in "=&-_")[:80]
+                e["element"] = {"src": f"/overlay/wheel?size={int(e.get('w', 432))}&bg=" + (f"&{query}" if query else "")}
+        except Exception as exc:                        # noqa: BLE001
+            # An instrument that cannot answer leaves its element empty; the layout never blanks.
+            log.warning("layout element %s unavailable: %s", kind, type(exc).__name__)
+            e["element"] = {}
 
 
 PRIVATE_FIELDS = ("routine_id", "group", "counter_id", "text", "url")
