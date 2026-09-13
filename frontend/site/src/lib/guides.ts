@@ -1,4 +1,4 @@
-/* Shruti's Guides on the site: the shape of a guide document, and words for
+/* Squirrel Guides on the site: the shape of a guide document, and words for
  * the parts of it that are not prose.
  *
  * The document is format 1 from the shrutisgametracker repository —

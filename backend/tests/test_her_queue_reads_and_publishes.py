@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 """
-Her side of Shruti's Guides: the review queue (board W6), the reports, the
+Her side of Squirrel Guides: the review queue (board W6), the reports, the
 switches, and the channel being told.
 
 Source-level guards, as everywhere in this suite.

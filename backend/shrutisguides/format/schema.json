@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://shrutivtuber.com/guides/format/1/guide.schema.json",
-  "title": "Shruti's Guides — a guide, format 1",
+  "title": "Squirrel Guides — a guide, format 1",
   "description": "A game guide as a path: phases, steps, routines, a codex, and optional time-boxed tracks. Generalised from the Diablo IV Grimoire spec so it is not Diablo-shaped: check-in fields and variants are declared per guide, and the gate language refers to them by name.",
   "type": "object",
   "required": [

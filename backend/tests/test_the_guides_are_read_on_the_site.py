@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 """
-Shruti's Guides are read on the site: the front door, a game's almanac, and
+Squirrel Guides are read on the site: the front door, a game's almanac, and
 the reader — boards W1, W2 and W3 of the 13 September 2026 handoff.
 
 Source-level guards, as everywhere in this suite. The routes have their own

@@ -952,7 +952,7 @@ MEDIA_USERS: tuple[tuple[type, str], ...] = (
     # model" is how this one slipped through unguarded.
     (SavedChart, "kept chart"),
     (CardDesign, "share card design"),
-    # ⚠ Shruti's Guides: a game's art. The guard caught this missing the day
+    # ⚠ Squirrel Guides: a game's art. The guard caught this missing the day
     # the model was written, which is what the guard is for.
     (Game, "guide game"),
 )

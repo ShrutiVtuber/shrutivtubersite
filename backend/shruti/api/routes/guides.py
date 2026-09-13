@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 """
-Shruti's Guides — the catalogue people read from, and the desk authors write at.
+Squirrel Guides — the catalogue people read from, and the desk authors write at.
 
 ⚠ **Route order.** Literal paths first (`/games`, `/mine`, `/draft`,
 `/admin/…`, `/by-id/…`), the two-segment reader `/{game}/{slug}` last. This

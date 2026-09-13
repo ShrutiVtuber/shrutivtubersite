@@ -53,7 +53,7 @@ SECTIONS = {
     "shop": "page.shop",
     "horoscopes": "page.horoscopes",
     "classes": "page.classes",
-    # Shruti's Guides. Starts HIDDEN (migration d7f2a4c9e0b1 writes the row):
+    # Squirrel Guides. Starts HIDDEN (migration d7f2a4c9e0b1 writes the row):
     # her words were that the links appear "when it's ready".
     "guides": "page.guides",
 }

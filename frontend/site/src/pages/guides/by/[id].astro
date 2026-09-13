@@ -26,7 +26,7 @@ const statusWord = (s: string) =>
 const WORDS = { blocked: say("words.blocked", "Blocked. Their guides stay in the catalogue; you will not see them in the practice room."), failed: say("words.failed", "That did not go through. Try again.") };
 ---
 
-<BaseLayout title={`${author.name} — ${say("meta.title", "Shruti's Guides")}`} description={say("meta.description", "What {name} has published.").replace("{name}", author.name)}>
+<BaseLayout title={`${author.name} — ${say("meta.title", "Squirrel Guides")}`} description={say("meta.description", "What {name} has published.").replace("{name}", author.name)}>
   <article class="page author" data-author={author.id} data-words={JSON.stringify(WORDS)}>
     <header class="head">
       <p class="eyebrow">{say("head.eyebrow", "Author")}</p>

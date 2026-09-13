@@ -842,7 +842,7 @@ async def erase(user: User, session: AsyncSession) -> dict:
 
 async def _erase_guides(session: AsyncSession, uid: int) -> None:
     """
-    Everything Shruti's Guides holds about a person goes with the account:
+    Everything Squirrel Guides holds about a person goes with the account:
     runs and their overlays, groups they made and joined, what they gave to
     a goal, the vote, the report, hosting. What they WROTE is not theirs
     alone to take from the people following it: a published guide stays in

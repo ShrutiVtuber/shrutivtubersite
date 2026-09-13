@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 """
-Shruti's Guides on the site: the catalogue, the desk, and her queue.
+Squirrel Guides on the site: the catalogue, the desk, and her queue.
 
 Source-level guards, as everywhere in this suite. The format itself is tested
 where it lives (shrutisgametracker/server/tests); these hold the site's half:

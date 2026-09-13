@@ -551,7 +551,7 @@ class OverlayToken(TimestampMixin, table=True):
     # on two machines, or in two scenes, may want different ones.
     appearance: str = "almanac"
 
-    # ── Shruti's Guides ──
+    # ── Squirrel Guides ──
     # A guide overlay (kind guide-now | guide-sigil | guide-path |
     # guide-routine) shows one RUN — a person's place on a path — and is
     # minted by that person, not only by her. `theme` is the game theme it

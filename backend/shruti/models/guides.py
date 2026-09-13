@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 """
-Shruti's Guides: a game guide as a path, kept on the site.
+Squirrel Guides: a game guide as a path, kept on the site.
 
 A guide's CONTENT is one JSON document in the format defined by
 `shrutisguides.format` (schema, validator, importer — the shared package in

@@ -44,7 +44,7 @@ const WORDS = {
 };
 ---
 
-<BaseLayout title={`${g.name} — ${say("meta.title", "Shruti's Guides")}`} description={g.goal || g.name} noindex>
+<BaseLayout title={`${g.name} — ${say("meta.title", "Squirrel Guides")}`} description={g.goal || g.name} noindex>
   <article class="page group" data-group data-code={g.code} data-words={JSON.stringify(WORDS)}>
     <header class="head">
       <div class="sigil" set:html={sigilSvg(g.sigil, 12, 160)} />

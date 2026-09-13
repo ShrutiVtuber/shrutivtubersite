@@ -41,7 +41,7 @@ SECRET = os.environ.get("TRACKER_SECRET", "").strip()
 ZONE = progress.zone_of(os.environ.get("TRACKER_TZ", "UTC"))
 STATIC = Path(__file__).resolve().parent / "static"
 
-app = FastAPI(title="Shruti's Guides — tracker", version=VERSION)
+app = FastAPI(title="Squirrel Guides — tracker", version=VERSION)
 
 
 # ── storage ──────────────────────────────────────────────────────────────────
