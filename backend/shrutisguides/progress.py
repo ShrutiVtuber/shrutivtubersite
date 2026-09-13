@@ -23,7 +23,10 @@ from shrutisguides import engine
 REENTRY_AFTER = timedelta(hours=6)
 STATES = ("done", "skipped", "later", "open")
 GUIDE_KINDS = ("guide-now", "guide-sigil", "guide-path", "guide-routine", "guide-layout")
-ELEMENT_KINDS = ("guide-now", "guide-sigil", "guide-path", "guide-routine", "guide-goal", "counter")
+ELEMENT_KINDS = ("guide-now", "guide-sigil", "guide-path", "guide-routine", "guide-goal", "counter", "text", "image")
+# Two kinds that carry their own content — a line of text, a picture by its
+# https address — so a layout can hold a title card or a logo without a run.
+OWN_KINDS = ("text", "image")
 # The two kinds a host fills in rather than the run: a group's goal and the
 # site's counter. The self-hosted tracker has neither and draws them empty.
 HOST_KINDS = ("guide-goal", "counter")
@@ -36,6 +39,8 @@ DEFAULT_PLACES = {
     "guide-routine": {"x": 72, "y": 640, "w": 760},
     "guide-goal": {"x": 72, "y": 300, "w": 860},
     "counter": {"x": 1416, "y": 300, "w": 432},
+    "text": {"x": 72, "y": 480, "w": 600},
+    "image": {"x": 1560, "y": 780, "w": 288},
 }
 THEMES = ("almanac", "grimoire", "plain")
 MOTIONS = ("full", "reduced", "still")
@@ -284,6 +289,12 @@ def from_export(r: dict, doc: dict, fallback_name: str) -> dict:
     }
 
 
+def _https(value: Any) -> str:
+    """An image address, or nothing: https only, so a browser source never loads a file or a script."""
+    url = str(value or "").strip()[:500]
+    return url if url.lower().startswith("https://") else ""
+
+
 def clean_layout(layout: Any) -> list[dict]:
     """
     A layout as stored: [{kind, x, y, w, routine_id, shows}], clamped to the
@@ -311,6 +322,8 @@ def clean_layout(layout: Any) -> list[dict]:
             # A goal element draws a group, not the run: the group's join code.
             "group": str(e.get("group") or "")[:12].upper(),
             "counter_id": num("counter_id", 0, 0, 10**9),
+            "text": str(e.get("text") or "")[:200],
+            "url": _https(e.get("url")),
         })
     return out[:12]
 
@@ -319,4 +332,12 @@ def layout_elements(layout: list[dict], stored: dict, doc: dict) -> list[dict]:
     """Every element of a layout, drawn: the placement plus what the element shows."""
     # A goal element is a group's, not the run's; the host fills it in (the
     # site knows groups, the self-hosted tracker has none and draws it empty).
-    return [{**e, "element": {} if e["kind"] in HOST_KINDS else element(e["kind"], stored, doc, e.get("routine_id", ""))} for e in layout]
+    def one(e: dict) -> dict:
+        if e["kind"] in HOST_KINDS:
+            return {}
+        if e["kind"] == "text":
+            return {"text": e.get("text", "")}
+        if e["kind"] == "image":
+            return {"url": e.get("url", "")}
+        return element(e["kind"], stored, doc, e.get("routine_id", ""))
+    return [{**e, "element": one(e)} for e in layout]

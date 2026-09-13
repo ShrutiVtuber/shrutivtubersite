@@ -130,6 +130,15 @@ var OverlayElements = (() => {
       slot.innerHTML = c ? `<div class="gov-plate gov-counter"><span class="gov-eyebrow">${esc(c.name)}</span><span class="gov-mono number">${esc(c.text)}</span>${c.target_text ? `<span class="of">${esc(c.target_text)}</span>` : ""}</div>` : "";
       return;
     }
+    if (kind === "text") {
+      slot.innerHTML = next && next.text ? `<div class="gov-plate gov-text"><span class="line">${esc(next.text)}</span></div>` : "";
+      return;
+    }
+    if (kind === "image") {
+      const url = String(next?.url || "");
+      slot.innerHTML = /^https:\/\//i.test(url) ? `<img class="gov-image" src="${esc(url)}" alt="" />` : "";
+      return;
+    }
     if (kind === "guide-routine") {
       const r = next?.routine;
       slot.innerHTML = r ? `<div class="gov-plate gov-routine"><div class="head"><span class="name">${esc(r.name)}</span><span class="gov-mono count">${esc(r.count)}</span></div><div>${(r.items ?? []).map((i) => `<div class="item ${i.done ? "done" : ""}"><span class="dot ${i.done ? "done" : "available"}"></span><span>${esc(i.text)}</span></div>`).join("")}</div></div>` : "";

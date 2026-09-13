@@ -113,6 +113,9 @@ def test_a_layout_is_several_elements_in_one_source_placed_on_the_canvas() -> No
     assert "guide-layout" in progress.GUIDE_KINDS and "guide-layout" not in progress.ELEMENT_KINDS
     assert set(progress.DEFAULT_PLACES) == set(progress.ELEMENT_KINDS)
     cleaned = progress.clean_layout([{"kind": "guide-now", "x": -50, "y": 5000, "w": 10}, {"kind": "nope"}])
-    assert cleaned == [{"kind": "guide-now", "x": 0, "y": 1080, "w": 120, "routine_id": "", "shows": "", "group": ""}]
+    assert cleaned == [{"kind": "guide-now", "x": 0, "y": 1080, "w": 120, "routine_id": "", "shows": "", "group": "", "counter_id": 0, "text": "", "url": ""}]
+    # A picture is loaded from https only: a browser source must never load a file or a script.
+    assert progress.clean_layout([{"kind": "image", "url": "file:///etc/passwd"}])[0]["url"] == ""
+    assert progress.clean_layout([{"kind": "image", "url": "https://example.org/a.png"}])[0]["url"] == "https://example.org/a.png"
     assert "progress.layout_elements(" in code_of(og.guide)
     assert 'left:${e.x}px;top:${e.y}px;width:${e.w}px' in LAYOUT
