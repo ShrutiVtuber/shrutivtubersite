@@ -62,7 +62,9 @@ def test_the_editor_is_for_the_author_only() -> None:
     assert "asReader(Astro, `/api/guides/mine/by-id/${id}`)" in EDITOR
     body = inspect.getsource(guides.my_version)
     body = re.sub(r'"""..*?"""', " ", body, flags=re.S)         # the docstring SAYS "never 403"
-    assert "guide.created_by != user.id" in body and "403" not in body
+    assert "_may_open(user, guide, version)" in body and "403" not in body
+    gate = inspect.getsource(guides._may_open)
+    assert "guide.created_by == user.id or version.contributed_by == user.id" in gate, "the author, or the person whose proposal it is"
 
 
 def test_submitting_saves_first_and_refuses_problems() -> None:

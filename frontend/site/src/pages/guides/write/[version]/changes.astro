@@ -1,0 +1,148 @@
+---
+/* What a proposal changes, in the guide's own terms — a step added, a
+ * phase renamed, a routine's item dropped — against the version it was
+ * written against. The author accepts it (it becomes their draft, credited)
+ * or declines it with a note; a bare "no" is the practice room's lesson.
+ */
+import BaseLayout from "../../../../layouts/BaseLayout.astro";
+import { account, asReader } from "../../../../lib/account";
+import { copy } from "../../../../lib/copy";
+
+const say = await copy("guides/write/[version]/changes");
+const id = Astro.params.version ?? "";
+if (!/^\d{1,12}$/.test(id)) return Astro.rewrite("/404");
+const me = await account(Astro);
+if (!me) return Astro.redirect(`/signin?next=${encodeURIComponent(`/guides/write/${id}/changes`)}`);
+const read = await asReader(Astro, `/api/guides/mine/by-id/${id}/changes`);
+if (!read.ok) return Astro.rewrite("/404");
+const view = read.body as {
+  id: number; state: string; note: string; by: string; owner: boolean; mine: boolean; accepted: boolean;
+  guide: { id: number; slug: string; title: string }; against: { id: number; number: number } | null;
+  changes: { kind: string; id: string; title: string; change: string; fields: { name: string; before: unknown; after: unknown }[] }[];
+  summary: { added: number; removed: number; changed: number };
+};
+const word = (c: string) => c === "added" ? say("change.added", "added") : c === "removed" ? say("change.removed", "removed") : say("change.changed", "changed");
+const show = (v: unknown) => v === undefined || v === null || v === "" ? say("field.empty", "— nothing —") : typeof v === "string" ? v : JSON.stringify(v);
+const WORDS = {
+  accepted: say("words.accepted", "Accepted. It is your draft now; open it from the desk and submit it when you are ready."),
+  declined: say("words.declined", "Declined, with your note."),
+  needNote: say("words.need_note", "Say why — the note goes to the person who wrote it."),
+  openDraft: say("words.open_draft", "You have an open draft of this guide. Submit or discard it first."),
+  failed: say("words.failed", "That did not go through. Try again."),
+};
+---
+
+<BaseLayout title={`${say("meta.title", "Changes")} — ${view.guide.title}`} description={say("meta.description", "What a suggested change alters.")} noindex>
+  <article class="page changes" data-changes={view.id} data-words={JSON.stringify(WORDS)}>
+    <header class="head">
+      <p class="eyebrow">{say("head.eyebrow", "Suggested change")}</p>
+      <h1>{view.guide.title}</h1>
+      <p class="meta">
+        {say("head.by", "by {who}").replace("{who}", view.by)}
+        {view.against && <span class="mono"> · {say("head.against", "against version {n}").replace("{n}", String(view.against.number))}</span>}
+        <span class="mono"> · {say("head.counts", "{a} added · {r} removed · {c} changed").replace("{a}", String(view.summary.added)).replace("{r}", String(view.summary.removed)).replace("{c}", String(view.summary.changed))}</span>
+      </p>
+      {view.state === "declined" && view.note && <p class="note-was">{say("head.declined", "Declined. The author wrote:")} “{view.note}”</p>}
+      {view.accepted && <p class="note-was">{say("head.accepted", "Accepted into the author's draft.")}</p>}
+    </header>
+
+    <p class="note" data-note hidden></p>
+
+    {view.changes.length === 0 ? (
+      <p class="quiet">{say("none", "No difference from the published version.")}</p>
+    ) : (
+      <ol class="list">
+        {view.changes.map((c) => (
+          <li class={`item ${c.change}`}>
+            <p class="line">
+              <span class="chip">{word(c.change)}</span>
+              <span class="kind">{c.kind}</span>
+              {c.id && <span class="mono">{c.id}</span>}
+              {c.title && <span class="title">{c.title}</span>}
+            </p>
+            {c.fields.length > 0 && (
+              <dl class="fields">
+                {c.fields.map((f) => (
+                  <div>
+                    <dt class="mono">{f.name}</dt>
+                    <dd><span class="before">{show(f.before)}</span><span class="after">{show(f.after)}</span></dd>
+                  </div>
+                ))}
+              </dl>
+            )}
+          </li>
+        ))}
+      </ol>
+    )}
+
+    {view.owner && view.state === "proposed" && (
+      <section class="decide">
+        <h2>{say("decide.title", "Your call")}</h2>
+        <p class="quiet">{say("decide.text", "Accepting makes it your open draft, credited to them; nothing is published until you submit it and Shruti reads it. Declining sends your note back.")}</p>
+        <div class="row">
+          <button type="button" class="button" data-accept>{say("decide.accept", "Accept")}</button>
+        </div>
+        <label class="declining">
+          <span>{say("decide.note", "Or decline, with a note to them")}</span>
+          <textarea rows="3" maxlength="1000" data-decline-note></textarea>
+        </label>
+        <button type="button" class="link" data-decline>{say("decide.decline", "Decline with this note")}</button>
+      </section>
+    )}
+    <p class="back"><a href="/guides/write">{say("back", "Back to the desk")}</a></p>
+  </article>
+</BaseLayout>
+
+<style>
+  .changes { max-width: 720px; margin: 0 auto; padding: var(--space-6) var(--space-4); display: grid; gap: var(--space-5); }
+  .eyebrow { font-size: .8rem; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft); margin: 0 0 var(--space-1); }
+  h1 { font-size: 1.7rem; line-height: 1.15; margin: 0; text-wrap: balance; }
+  h2 { font-size: 1.05rem; margin: 0 0 var(--space-2); }
+  .meta { color: var(--ink-soft); margin: var(--space-2) 0 0; }
+  .mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: .9em; }
+  .quiet { color: var(--ink-soft); }
+  .note { border-left: 2px solid var(--accent); padding-left: var(--space-3); }
+  .note-was { border-left: 2px solid var(--rule); padding-left: var(--space-3); color: var(--ink-soft); margin: var(--space-2) 0 0; }
+  .list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; border-top: 1px solid var(--rule); }
+  .item { padding: var(--space-3) 0; border-bottom: 1px solid var(--rule); display: grid; gap: var(--space-2); }
+  .line { margin: 0; display: flex; gap: var(--space-2); align-items: baseline; flex-wrap: wrap; }
+  .chip { font-family: var(--font-mono); font-size: .75rem; letter-spacing: .08em; text-transform: uppercase; padding: 1px 6px; border: 1px solid var(--rule); }
+  .item.added .chip { border-color: #8FBEE8; }
+  .item.removed .chip { border-color: var(--ink-soft); text-decoration: line-through; }
+  .kind { color: var(--ink-soft); }
+  .title { font-weight: 600; }
+  .fields { margin: 0; display: grid; gap: var(--space-2); }
+  .fields div { display: grid; grid-template-columns: 8rem 1fr; gap: var(--space-3); }
+  .fields dd { margin: 0; display: grid; gap: 2px; }
+  .before { color: var(--ink-soft); text-decoration: line-through; white-space: pre-wrap; }
+  .after { white-space: pre-wrap; }
+  .decide { border: 1px solid var(--rule); padding: var(--space-4); display: grid; gap: var(--space-3); }
+  .declining { display: grid; gap: var(--space-1); }
+  .declining span { font-size: .85rem; color: var(--ink-soft); }
+  textarea { font: inherit; padding: .5rem .6rem; border: 1px solid var(--rule); background: var(--paper); color: var(--ink); width: 100%; }
+  .link { font: inherit; background: none; border: 0; padding: 0; color: var(--accent); text-decoration: underline; cursor: pointer; justify-self: start; }
+</style>
+
+<script>
+  const root = document.querySelector<HTMLElement>("[data-changes]");
+  if (root) {
+    const words = JSON.parse(root.dataset.words || "{}");
+    const id = root.dataset.changes;
+    const note = root.querySelector<HTMLElement>("[data-note]");
+    const tell = (t: string) => { if (note) { note.textContent = t; note.hidden = false; } };
+    const csrf = () => document.cookie.split("; ").find((c) => c.startsWith("shruti_csrf="))?.split("=")[1] ?? "";
+    const post = (path: string, body?: unknown) => fetch(path, { method: "POST", headers: { "content-type": "application/json", "x-csrf-token": csrf() }, body: body === undefined ? undefined : JSON.stringify(body) });
+    root.querySelector("[data-accept]")?.addEventListener("click", async () => {
+      const r = await post(`/api/guides/mine/by-id/${id}/accept`);
+      if (r.ok) { tell(words.accepted); root.querySelector<HTMLElement>(".decide")?.remove(); return; }
+      tell(r.status === 409 ? words.openDraft : words.failed);
+    });
+    root.querySelector("[data-decline]")?.addEventListener("click", async () => {
+      const text = (root.querySelector<HTMLTextAreaElement>("[data-decline-note]")?.value || "").trim();
+      if (!text) { tell(words.needNote); return; }
+      const r = await post(`/api/guides/mine/by-id/${id}/decline`, { note: text });
+      if (r.ok) { tell(words.declined); root.querySelector<HTMLElement>(".decide")?.remove(); return; }
+      tell(words.failed);
+    });
+  }
+</script>

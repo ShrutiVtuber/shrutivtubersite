@@ -39,9 +39,11 @@ const version = read.body as {
   id: number; number: number; state: string; note: string; editable: boolean;
   guide: { id: number; slug: string; title: string; published: number | null;
            game: { slug: string; name: string } | null };
+  contribution: { by: string; author: string; mine: boolean; owner: boolean; accepted: boolean } | null;
   body: Record<string, unknown>;
   problems: { path: string; message: string }[];
 };
+const proposal = version.contribution && !version.contribution.accepted ? version.contribution : null;
 const doc = version.body;
 const title = String((doc.guide as any)?.title ?? version.guide.title);
 
@@ -167,6 +169,13 @@ const WORDS = {
 ---
 
 <BaseLayout title={`${say("meta.prefix", "Editing:")} ${title}`} description={say("meta.description", "The desk.")} noindex bare>
+  {proposal && (
+    <p class="ed-proposal">
+      {proposal.mine
+        ? say("proposal.mine", "You are suggesting a change to “{title}” by {author}. When you send it, the author sees the difference against the published guide — nothing changes until they accept it.").replace("{title}", title).replace("{author}", proposal.author)
+        : say("proposal.theirs", "A change suggested by {by}. Accept it or decline it with a note from the changes page; it cannot be edited while it is theirs.").replace("{by}", proposal.by)}
+    </p>
+  )}
   <main class="ed" data-editor data-version={String(version.id)}
         data-editable={version.editable ? "1" : "0"} data-state={version.state}
         data-words={JSON.stringify(WORDS)} data-doc={JSON.stringify(doc)}>
@@ -181,7 +190,7 @@ const WORDS = {
       <div class="ed-bar-right">
         <a class="ed-btn ghost" href={`/guides/write/${version.id}/preview`}>{say("preview", "Preview as reader")}</a>
         <button type="button" class="ed-btn" data-save disabled={!version.editable}>{say("save", "Save draft")}</button>
-        <button type="button" class="ed-btn primary" data-submit disabled={!version.editable}>{say("submit", "Submit for review")}</button>
+        <button type="button" class="ed-btn primary" data-submit disabled={!version.editable}>{proposal ? say("submit.author", "Send to the author") : say("submit", "Submit for review")}</button>
       </div>
     </div>
 
@@ -229,6 +238,7 @@ const WORDS = {
 
 <style>
   .ed { font-family: var(--font-body); color: var(--ink); display: flex; flex-direction: column; min-height: 80vh; }
+  .ed-proposal { margin: 0; padding: 10px var(--page-pad); border-bottom: var(--border-w) solid var(--line); background: var(--surface-inset); font-size: 13.5px; color: var(--ink-soft); }
   .ed-bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; padding: 12px var(--page-pad); border-bottom: var(--border-w) solid var(--line); background: var(--surface-card); position: sticky; top: 0; z-index: 3; }
   .ed-bar-left, .ed-bar-right { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
   .ed-back { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--ink-faint); text-decoration: none; }

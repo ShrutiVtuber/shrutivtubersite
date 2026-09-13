@@ -65,6 +65,9 @@ export interface GuideSummary {
   votes: number; voted: boolean;
   featured: boolean; mine: boolean; hidden: boolean; hiddenBy: string;
   publishedAt: string | null;
+  forkable?: boolean;
+  forkedFrom?: { title: string; game: string; slug: string } | null;
+  contributor?: string;
 }
 
 /** The vocabulary a page hands in. Each is a template with {named} holes. */

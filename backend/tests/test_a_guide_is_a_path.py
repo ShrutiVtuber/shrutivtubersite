@@ -67,7 +67,7 @@ def test_only_a_clean_draft_may_be_submitted() -> None:
     body = code_of(guides.submit)
     assert "_problems(version.body)" in body
     assert "status_code=422" in body
-    assert 'version.state = "submitted"' in body
+    assert 'version.state = "proposed" if proposal else "submitted"' in body, "a proposal goes to the author, the author's own draft to her"
 
 
 def test_publishing_refuses_problems_even_from_her() -> None:

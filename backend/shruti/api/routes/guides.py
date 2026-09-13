@@ -37,6 +37,9 @@ from sqlmodel import select
 from shrutisguides.format import validate as validate_guide
 
 from shruti.api.deps import require_admin
+import copy
+
+from shruti.core import guide_diff
 from shruti.api.routes.practice import (
     REPORTS_TO_HIDE, REPORT_REASONS as REASONS, _hidden_from, _name, _reader, _refuse_if_suspended,
 )
@@ -202,7 +205,7 @@ async def mine(request: Request, session: AsyncSession = Depends(get_session)) -
     out = []
     for g, game in rows:
         versions = (await session.execute(
-            select(GuideVersion).where(GuideVersion.guide_id == g.id)
+            select(GuideVersion).where(GuideVersion.guide_id == g.id, GuideVersion.contributed_by.is_(None))
             .order_by(GuideVersion.number.desc())
         )).scalars().all()
         out.append({
@@ -233,18 +236,42 @@ async def my_version(
     user = await _reader(request, session)
     version = await session.get(GuideVersion, version_id)
     guide = await session.get(Guide, version.guide_id) if version else None
-    if version is None or guide is None or guide.created_by != user.id:
+    if version is None or guide is None or not _may_open(user, guide, version):
         raise HTTPException(404, "no such draft")
     game = await session.get(Game, guide.game_id)
+    contribution = None
+    if version.contributed_by is not None:
+        author = await session.get(User, guide.created_by)
+        who = await session.get(User, version.contributed_by)
+        contribution = {"by": _name(who), "byId": version.contributed_by, "author": _name(author),
+                        "mine": version.contributed_by == user.id, "owner": guide.created_by == user.id,
+                        "against": version.against_id, "accepted": version.accepted_at is not None}
     return {
         "id": version.id, "number": version.number, "state": version.state, "note": version.note,
-        "editable": version.state in ("draft", "sent_back"),
+        "editable": version.state in ("draft", "sent_back") and (version.contributed_by in (None, user.id) or version.accepted_at is not None),
         "guide": {"id": guide.id, "slug": guide.slug, "title": guide.title,
                   "published": guide.published_version_id,
                   "game": {"slug": game.slug, "name": game.name} if game else None},
+        "contribution": contribution,
         "body": version.body,
         "problems": _problems(version.body),
     }
+
+
+def _may_open(user: User, guide: Guide, version: GuideVersion) -> bool:
+    """The author, or the person whose contribution it is. Nobody else, and 404 either way."""
+    return guide.created_by == user.id or version.contributed_by == user.id
+
+
+def _may_edit(user: User, guide: Guide, version: GuideVersion) -> bool:
+    """
+    A contribution is edited by its contributor until it is accepted; once
+    accepted it is the author's draft. The author never edits somebody's
+    open proposal — they accept it or decline it with a note.
+    """
+    if version.contributed_by is None or version.accepted_at is not None:
+        return guide.created_by == user.id
+    return version.contributed_by == user.id
 
 
 SOURCES = ("desk", "agent", "file")
@@ -264,6 +291,7 @@ async def _open_draft(session: AsyncSession, guide_id: int) -> GuideVersion | No
         select(GuideVersion).where(
             GuideVersion.guide_id == guide_id,
             GuideVersion.state.in_(("draft", "sent_back")),
+            (GuideVersion.contributed_by.is_(None)) | (GuideVersion.accepted_at.is_not(None)),
         ).order_by(GuideVersion.number.desc())
     )).scalars().first()
 
@@ -325,15 +353,18 @@ async def save_draft(
         if version is None:
             raise HTTPException(404, "no such draft")
         guide = await session.get(Guide, version.guide_id)
-        if guide is None or guide.created_by != user.id:
+        if guide is None or not _may_open(user, guide, version):
             raise HTTPException(404, "no such draft")
+        if not _may_edit(user, guide, version):
+            raise HTTPException(409, "that version is somebody's proposal; accept it or decline it with a note")
         if version.state not in ("draft", "sent_back"):
             raise HTTPException(409, f"that version is {version.state} and cannot be edited")
 
     version.body = doc
     version.state = "draft"
     version.source = body.source if body.source in SOURCES else "desk"
-    guide.title = title
+    if version.contributed_by is None or version.accepted_at is not None:
+        guide.title = title           # a proposal does not rename the guide; accepting it may
     await session.commit()
     return {"ok": True, "guideId": guide.id, "versionId": version.id,
             "number": version.number, "problems": problems}
@@ -348,8 +379,10 @@ async def submit(
     await _refuse_if_suspended(session, user)
     version = await session.get(GuideVersion, version_id)
     guide = await session.get(Guide, version.guide_id) if version else None
-    if version is None or guide is None or guide.created_by != user.id:
+    if version is None or guide is None or not _may_open(user, guide, version):
         raise HTTPException(404, "no such draft")
+    if not _may_edit(user, guide, version):
+        raise HTTPException(409, "that version is somebody's proposal")
     if version.state not in ("draft", "sent_back"):
         raise HTTPException(409, f"that version is {version.state}")
     problems = _problems(version.body)
@@ -357,8 +390,194 @@ async def submit(
         return JSONResponse(status_code=422, content={
             "ok": False, "problems": problems,
             "detail": f"{len(problems)} thing(s) to fix before it can be submitted"})
-    version.state = "submitted"
+    # ⚠ A contribution is proposed to the guide's author; only the author's
+    # own version goes into her queue. Nothing anybody proposes publishes.
+    proposal = version.contributed_by is not None and version.accepted_at is None
+    version.state = "proposed" if proposal else "submitted"
     version.submitted_at = _now()
+    await session.commit()
+    return {"ok": True, "versionId": version.id, "state": version.state}
+
+
+# ── forks and contributions ──────────────────────────────────────────────────
+
+# The licences under which somebody may take a guide and make it their own.
+FORKABLE = ("CC-BY-SA-4.0", "CC-BY-4.0", "CC0-1.0")
+
+
+def _forkable(version: GuideVersion | None) -> bool:
+    meta = (version.body if version else {}).get("guide", {})
+    return str(meta.get("licence") or "") in FORKABLE
+
+
+async def _published(session: AsyncSession, guide_id: int) -> tuple[Guide, GuideVersion]:
+    guide = await session.get(Guide, guide_id)
+    version = await session.get(GuideVersion, guide.published_version_id) if guide and guide.published_version_id else None
+    if guide is None or version is None or guide.hidden:
+        raise HTTPException(404, "no such guide")
+    return guide, version
+
+
+@router.post("/by-id/{guide_id}/fork", status_code=201)
+async def fork(guide_id: int, request: Request, session: AsyncSession = Depends(get_session)) -> dict:
+    """
+    A copy of a published guide, under the forker's name, remembering where
+    it came from. Only under a licence that allows it: CC BY-SA, CC BY or
+    CC0. The original authors stay in the credits; the forker is added.
+    """
+    user = await _reader(request, session)
+    await _refuse_if_suspended(session, user)
+    guide, version = await _published(session, guide_id)
+    if not _forkable(version):
+        raise HTTPException(409, "this guide's licence does not allow forks")
+    game = await session.get(Game, guide.game_id)
+    base = f"{guide.slug}-{_slugify(_name(user))}"[:150] or f"{guide.slug}-fork"
+    slug, n = base, 2
+    while (await session.execute(select(Guide).where(Guide.game_id == game.id, Guide.slug == slug))).scalars().first() is not None:
+        slug, n = f"{base}-{n}", n + 1
+    body = copy.deepcopy(version.body)
+    meta = body.setdefault("guide", {})
+    meta["id"] = slug
+    authors = [a for a in (meta.get("authors") or []) if isinstance(a, str)]
+    if _name(user) not in authors:
+        authors.append(_name(user))
+    meta["authors"] = authors
+    meta["version"] = "1"
+    new = Guide(game_id=game.id, slug=slug, title=guide.title, created_by=user.id, forked_from_id=guide.id)
+    session.add(new)
+    await session.flush()
+    draft = GuideVersion(guide_id=new.id, number=1, body=body, created_by=user.id, source="desk")
+    session.add(draft)
+    await session.commit()
+    await session.refresh(draft)
+    return {"ok": True, "guideId": new.id, "versionId": draft.id, "slug": slug}
+
+
+def _slugify(text: str) -> str:
+    out = "".join(ch if ch.isalnum() else "-" for ch in text.lower()).strip("-")
+    while "--" in out:
+        out = out.replace("--", "-")
+    return out[:40]
+
+
+@router.post("/by-id/{guide_id}/contribute", status_code=201)
+async def contribute(guide_id: int, request: Request, session: AsyncSession = Depends(get_session)) -> dict:
+    """
+    Suggest a change: a copy of the published version to edit, which goes to
+    the guide's author as a proposal — a difference against what is
+    published, never a silent edit. One open proposal per person per guide.
+    """
+    user = await _reader(request, session)
+    await _refuse_if_suspended(session, user)
+    guide, version = await _published(session, guide_id)
+    if guide.created_by == user.id:
+        raise HTTPException(409, "it is your own guide: start a new version instead")
+    existing = (await session.execute(
+        select(GuideVersion).where(GuideVersion.guide_id == guide.id, GuideVersion.contributed_by == user.id,
+                                   GuideVersion.state.in_(("draft", "proposed")))
+    )).scalars().first()
+    if existing is not None:
+        return {"ok": True, "versionId": existing.id, "state": existing.state, "existing": True}
+    last = (await session.execute(select(func.max(GuideVersion.number)).where(GuideVersion.guide_id == guide.id))).scalar() or 0
+    draft = GuideVersion(guide_id=guide.id, number=last + 1, body=copy.deepcopy(version.body), created_by=user.id,
+                         source="desk", contributed_by=user.id, against_id=version.id)
+    session.add(draft)
+    await session.commit()
+    await session.refresh(draft)
+    return {"ok": True, "versionId": draft.id, "state": draft.state, "existing": False}
+
+
+@router.get("/mine/contributions")
+async def contributions(request: Request, session: AsyncSession = Depends(get_session)) -> dict:
+    """The proposals this person made, and the ones made to their guides."""
+    user = await _reader(request, session)
+
+    async def shape(v: GuideVersion) -> dict:
+        guide = await session.get(Guide, v.guide_id)
+        game = await session.get(Game, guide.game_id) if guide else None
+        who = await session.get(User, v.contributed_by) if v.contributed_by else None
+        author = await session.get(User, guide.created_by) if guide else None
+        against = await session.get(GuideVersion, v.against_id) if v.against_id else None
+        return {"id": v.id, "state": v.state, "note": v.note, "accepted": v.accepted_at is not None,
+                "by": _name(who), "byId": v.contributed_by, "author": _name(author),
+                "guide": {"id": guide.id, "slug": guide.slug, "title": guide.title,
+                          "game": {"slug": game.slug, "name": game.name} if game else None} if guide else None,
+                "changes": guide_diff.summary(guide_diff.changes(against.body if against else {}, v.body)),
+                "problems": len(_problems(v.body)),
+                "updatedAt": v.updated_at.isoformat() if v.updated_at else None}
+
+    given = (await session.execute(
+        select(GuideVersion).where(GuideVersion.contributed_by == user.id).order_by(GuideVersion.updated_at.desc())
+    )).scalars().all()
+    received = (await session.execute(
+        select(GuideVersion).join(Guide, Guide.id == GuideVersion.guide_id)
+        .where(Guide.created_by == user.id, GuideVersion.contributed_by.is_not(None), GuideVersion.contributed_by != user.id,
+               GuideVersion.state.in_(("proposed", "declined")) | GuideVersion.accepted_at.is_not(None))
+        .order_by(GuideVersion.updated_at.desc())
+    )).scalars().all()
+    return {"given": [await shape(v) for v in given], "received": [await shape(v) for v in received]}
+
+
+@router.get("/mine/by-id/{version_id}/changes")
+async def version_changes(version_id: int, request: Request, session: AsyncSession = Depends(get_session)) -> dict:
+    """What a proposal changes against the version it was written against."""
+    user = await _reader(request, session)
+    version = await session.get(GuideVersion, version_id)
+    guide = await session.get(Guide, version.guide_id) if version else None
+    if version is None or guide is None or not _may_open(user, guide, version):
+        raise HTTPException(404, "no such draft")
+    against = await session.get(GuideVersion, version.against_id) if version.against_id else None
+    if against is None and guide.published_version_id:
+        against = await session.get(GuideVersion, guide.published_version_id)
+    items = guide_diff.changes(against.body if against else {}, version.body)
+    who = await session.get(User, version.contributed_by) if version.contributed_by else None
+    return {"id": version.id, "state": version.state, "note": version.note, "by": _name(who),
+            "owner": guide.created_by == user.id, "mine": version.contributed_by == user.id,
+            "accepted": version.accepted_at is not None,
+            "guide": {"id": guide.id, "slug": guide.slug, "title": guide.title},
+            "against": {"id": against.id, "number": against.number} if against else None,
+            "changes": items, "summary": guide_diff.summary(items)}
+
+
+@router.post("/mine/by-id/{version_id}/accept")
+async def accept_contribution(version_id: int, request: Request, session: AsyncSession = Depends(get_session)) -> dict:
+    """
+    The author takes a proposal: it becomes their open draft, credited to
+    the contributor, and goes to her queue when the author submits it.
+    Nothing is published by accepting.
+    """
+    user = await _reader(request, session)
+    version = await session.get(GuideVersion, version_id)
+    guide = await session.get(Guide, version.guide_id) if version else None
+    if version is None or guide is None or guide.created_by != user.id or version.contributed_by is None:
+        raise HTTPException(404, "no such proposal")
+    if version.state != "proposed":
+        raise HTTPException(409, f"that proposal is {version.state}")
+    if await _open_draft(session, guide.id) is not None:
+        raise HTTPException(409, "you have an open draft of this guide; submit or discard it first")
+    version.accepted_at = _now()
+    version.state = "draft"
+    version.note = ""
+    await session.commit()
+    return {"ok": True, "versionId": version.id, "state": version.state}
+
+
+class DeclineIn(BaseModel):
+    note: str = Field(min_length=1, max_length=1000)
+
+
+@router.post("/mine/by-id/{version_id}/decline")
+async def decline_contribution(version_id: int, body: DeclineIn, request: Request, session: AsyncSession = Depends(get_session)) -> dict:
+    """Declined, with a note — a bare "no" is the practice room's lesson again."""
+    user = await _reader(request, session)
+    version = await session.get(GuideVersion, version_id)
+    guide = await session.get(Guide, version.guide_id) if version else None
+    if version is None or guide is None or guide.created_by != user.id or version.contributed_by is None:
+        raise HTTPException(404, "no such proposal")
+    if version.state != "proposed":
+        raise HTTPException(409, f"that proposal is {version.state}")
+    version.state = "declined"
+    version.note = body.note.strip()
     await session.commit()
     return {"ok": True, "versionId": version.id, "state": version.state}
 
@@ -684,8 +903,11 @@ async def by_author(user_id: int, request: Request, session: AsyncSession = Depe
             status = "update in review"
         guides.append({"id": g.id, "slug": g.slug, "title": g.title, "game": {"slug": game.slug, "name": game.name},
                        "licence": str(meta.get("licence") or ""), "status": status, "votes": int(votes.get(g.id, 0))})
+    contributed = (await session.execute(
+        select(func.count()).select_from(GuideVersion).where(GuideVersion.contributed_by == user_id, GuideVersion.accepted_at.is_not(None))
+    )).scalar_one()
     return {
-        "id": author.id, "name": _name(author), "own": own,
+        "id": author.id, "name": _name(author), "own": own, "contributed": int(contributed),
         "published": sum(1 for g in guides if g["status"] in ("published", "update in review")),
         "votes": sum(g["votes"] for g in guides),
         "guides": guides,
@@ -745,4 +967,15 @@ async def one(
     voted = g.id in await _voted_by(session, viewer, [g.id])
     out = _card(g, game_row, author, v, votes, voted, viewer)
     out["body"] = v.body if v else {}
+    # Forks and credits: whether the licence allows a fork, where a fork came
+    # from, and who contributed the published version, if somebody did.
+    out["forkable"] = _forkable(v)
+    out["forkedFrom"] = None
+    if g.forked_from_id:
+        origin = await session.get(Guide, g.forked_from_id)
+        origin_game = await session.get(Game, origin.game_id) if origin else None
+        if origin is not None and origin_game is not None and origin.published_version_id and not origin.hidden:
+            out["forkedFrom"] = {"title": origin.title, "game": origin_game.slug, "slug": origin.slug}
+    contributor = await session.get(User, v.contributed_by) if v is not None and v.contributed_by else None
+    out["contributor"] = _name(contributor) if contributor is not None and v.accepted_at is not None else ""
     return out

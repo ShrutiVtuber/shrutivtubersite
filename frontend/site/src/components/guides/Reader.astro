@@ -85,7 +85,7 @@ const REASONS: [string, string][] = [
 const actions = !preview;
 ---
 
-<div class="rd" data-reader>
+<div class="rd" data-reader data-suggest-words={JSON.stringify({ fork: say("fork.refused", "This guide's licence does not allow forks."), suggest: say("suggest.refused", "That did not start. Try again."), failed: say("suggest.failed", "That did not go through. Try again.") })}>
   <aside class="rd-rail">
     <div class="rd-rail-block">
       <span class="rd-eyebrow">{say("rail.path", "The path")}</span>
@@ -98,6 +98,13 @@ const actions = !preview;
       </nav>
     </div>
 
+    {actions && signedIn && !guide.mine && (
+      <div class="rd-rail-block rd-suggest">
+        <button type="button" class="rd-btn-quiet" data-suggest={guide.id}>{say("suggest", "Suggest a change")}</button>
+        {guide.forkable && <button type="button" class="rd-btn-quiet" data-fork={guide.id}>{say("fork", "Fork this guide")}</button>}
+        <p class="rd-quiet" data-suggest-note hidden></p>
+      </div>
+    )}
     {actions && trackHref && (
       <div class="rd-rail-block rd-track">
         <a class="rd-btn" href={signedIn ? trackHref : `/signin?next=${encodeURIComponent(trackHref)}`}>
@@ -116,6 +123,18 @@ const actions = !preview;
         <div class="rd-fact">
           <span class="rd-mono">{say("rail.by", "by")}</span>
           <span class="rd-mono soft">{(doc.guide.authors ?? []).join(", ")}</span>
+        </div>
+      )}
+      {guide.contributor && (
+        <div class="rd-fact">
+          <span class="rd-mono">{say("rail.with", "with")}</span>
+          <span class="rd-mono soft">{guide.contributor}</span>
+        </div>
+      )}
+      {guide.forkedFrom && (
+        <div class="rd-fact">
+          <span class="rd-mono">{say("rail.forked", "forked from")}</span>
+          <a class="rd-mono soft" href={`/guides/${guide.forkedFrom.game}/${guide.forkedFrom.slug}`}>{guide.forkedFrom.title}</a>
         </div>
       )}
       <div class="rd-fact">
@@ -347,6 +366,9 @@ const actions = !preview;
   .rd-rail { border-right: var(--border-w) solid var(--line); padding: var(--space-6) var(--space-5); display: flex; flex-direction: column; gap: 22px; background: var(--surface-card); align-self: start; position: sticky; top: 0; max-height: 100vh; overflow-y: auto; }
   .rd-rail-block { display: flex; flex-direction: column; gap: 8px; }
   .rd-facts, .rd-track { border-top: var(--border-w) solid var(--line); padding-top: 18px; }
+  .rd-suggest { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+  .rd-btn-quiet { font: 500 var(--text-sm) var(--font-body); padding: 0; border: 0; background: none; color: var(--accent); text-decoration: underline; cursor: pointer; }
+  .rd-quiet { margin: 0; font-size: var(--text-sm); color: var(--ink-soft); }
   .rd-btn { display: inline-flex; align-items: center; justify-content: center; font: 600 var(--text-sm) var(--font-body); padding: 10px 16px; border-radius: var(--radius-sm); background: var(--accent); color: var(--on-accent); text-decoration: none; }
   .rd-btn:hover { background: var(--accent-hover); }
   .rd-btn.lg { padding: 13px 22px; font-size: 15px; flex: none; }
@@ -451,6 +473,18 @@ const actions = !preview;
       }
       vote.disabled = false;
     });
+
+    const suggestNote = root.querySelector<HTMLElement>("[data-suggest-note]");
+    const suggestWords = JSON.parse(root.dataset.suggestWords || "{}");
+    const startCopy = async (btn: HTMLButtonElement, action: string) => {
+      btn.disabled = true;
+      const r = await post(`/api/guides/by-id/${btn.dataset[action]}/${action === "fork" ? "fork" : "contribute"}`);
+      if (r.ok) { const a = await r.json(); location.href = `/guides/write/${a.versionId}`; return; }
+      btn.disabled = false;
+      if (suggestNote) { suggestNote.textContent = r.status === 409 ? suggestWords[action] : suggestWords.failed; suggestNote.hidden = false; }
+    };
+    root.querySelector<HTMLButtonElement>("[data-suggest]")?.addEventListener("click", (e) => startCopy(e.currentTarget as HTMLButtonElement, "suggest"));
+    root.querySelector<HTMLButtonElement>("[data-fork]")?.addEventListener("click", (e) => startCopy(e.currentTarget as HTMLButtonElement, "fork"));
 
     const block = root.querySelector<HTMLButtonElement>("[data-block]");
     block?.addEventListener("click", async () => {

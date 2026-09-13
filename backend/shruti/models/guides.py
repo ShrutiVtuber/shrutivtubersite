@@ -74,6 +74,9 @@ class Guide(TimestampMixin, table=True):
     # Same vocabulary as the practice room: reports | her | author.
     hidden: bool = False
     hidden_by: str = ""
+    # A fork remembers where it came from, so the reader can say so. Not a
+    # foreign key: a deleted original must not take its forks with it.
+    forked_from_id: Optional[int] = Field(default=None, index=True)
 
 
 class GuideVersion(TimestampMixin, table=True):
@@ -106,6 +109,12 @@ class GuideVersion(TimestampMixin, table=True):
     created_by: int = Field(index=True, foreign_key="site_user.id")
     submitted_at: Optional[datetime] = Field(default=None, sa_type=UTC_TS)
     published_at: Optional[datetime] = Field(default=None, sa_type=UTC_TS)
+    # ⚠ A contribution: somebody else's version of this guide, written against
+    # a published one. States: draft → proposed → accepted (it becomes the
+    # author's draft, credited) or declined (with a note — never bare).
+    contributed_by: Optional[int] = Field(default=None, index=True, foreign_key="site_user.id")
+    against_id: Optional[int] = Field(default=None)
+    accepted_at: Optional[datetime] = Field(default=None, sa_type=UTC_TS)
 
 
 class GuideVote(TimestampMixin, table=True):

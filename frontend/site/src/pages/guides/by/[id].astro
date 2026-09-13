@@ -15,7 +15,7 @@ const me = await account(Astro);
 const read = await asReader(Astro, `/api/guides/by/${id}`);
 if (!read.ok) return Astro.rewrite("/404");
 const author = read.body as {
-  id: number; name: string; own: boolean; published: number; votes: number;
+  id: number; name: string; own: boolean; published: number; votes: number; contributed: number;
   guides: { id: number; slug: string; title: string; game: { slug: string; name: string }; licence: string; status: string; votes: number }[];
 };
 const statusWord = (s: string) =>
@@ -56,6 +56,10 @@ const WORDS = { blocked: say("words.blocked", "Blocked. Their guides stay in the
       ))}
       {author.guides.length === 0 && <p class="quiet">{say("none", "Nothing published yet.")}</p>}
     </div>
+
+    {author.contributed > 0 && (
+      <p class="quiet">{(author.contributed === 1 ? say("contributed.one", "Contributed one correction to a guide by somebody else.") : say("contributed.many", "Contributed {n} corrections to guides by other people.")).replace("{n}", String(author.contributed))}</p>
+    )}
 
     {me && !author.own && (
       <p class="block">

@@ -32,6 +32,24 @@ const [games, mineRead] = await Promise.all([
   me ? asReader(Astro, "/api/guides/mine") : Promise.resolve({ ok: false, status: 0, body: null }),
 ]);
 const mine: Mine[] = mineRead.ok && Array.isArray(mineRead.body) ? mineRead.body : [];
+interface Proposal {
+  id: number; state: string; note: string; accepted: boolean; by: string; author: string;
+  guide: { id: number; slug: string; title: string; game: { slug: string; name: string } | null } | null;
+  changes: { added: number; removed: number; changed: number }; problems: number;
+}
+const propRead = me ? await asReader(Astro, "/api/guides/mine/contributions") : { ok: false, status: 0, body: null };
+const given: Proposal[] = propRead.ok && Array.isArray(propRead.body?.given) ? propRead.body.given : [];
+const received: Proposal[] = propRead.ok && Array.isArray(propRead.body?.received) ? propRead.body.received : [];
+const PSTATE: Record<string, string> = {
+  draft: say("pstate.draft", "still writing"),
+  proposed: say("pstate.proposed", "sent to the author"),
+  declined: say("pstate.declined", "declined"),
+  submitted: say("pstate.submitted", "accepted — waiting for Shruti"),
+  published: say("pstate.published", "accepted and published"),
+  superseded: say("pstate.superseded", "accepted, since replaced"),
+};
+const pstate = (p: Proposal) => (p.accepted && p.state === "draft") ? say("pstate.accepted", "accepted — in the author's draft") : (PSTATE[p.state] ?? p.state);
+const counts = (c: Proposal["changes"]) => say("changes.line", "{a} added · {r} removed · {c} changed").replace("{a}", String(c.added)).replace("{r}", String(c.removed)).replace("{c}", String(c.changed));
 
 const STATE: Record<string, string> = {
   draft: say("state.draft", "draft"),
@@ -119,6 +137,42 @@ const openDraft = (g: Mine) => g.versions.find((v) => v.state === "draft" || v.s
           )}
         </section>
 
+        {(received.length > 0 || given.length > 0) && (
+          <section class="dk-section">
+            <h2 class="dk-h2">{say("proposals", "Suggested changes")}</h2>
+            {received.length > 0 && (
+              <>
+                <h3 class="dk-h3">{say("proposals.received", "To your guides")}</h3>
+                <ul class="dk-list">
+                  {received.map((p) => (
+                    <li class="dk-proposal">
+                      <p class="dk-guide-title"><span>{p.guide?.title}</span><span class="dk-game">{say("proposals.by", "by {who}").replace("{who}", p.by)}</span></p>
+                      <p class="dk-quiet t-tabular">{counts(p.changes)} · {pstate(p)}</p>
+                      <a class="dk-edit" href={`/guides/write/${p.id}/changes`}>{say("proposals.see", "See the changes")}</a>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+            {given.length > 0 && (
+              <>
+                <h3 class="dk-h3">{say("proposals.given", "Yours, to other people's guides")}</h3>
+                <ul class="dk-list">
+                  {given.map((p) => (
+                    <li class="dk-proposal">
+                      <p class="dk-guide-title"><span>{p.guide?.title}</span><span class="dk-game">{say("proposals.to", "by {who}").replace("{who}", p.author)}</span></p>
+                      <p class="dk-quiet t-tabular">{counts(p.changes)} · {pstate(p)}</p>
+                      {p.state === "declined" && p.note && <p class="dk-note">{say("proposals.note", "The author wrote:")} “{p.note}”</p>}
+                      {p.state === "draft" && !p.accepted && <a class="dk-edit" href={`/guides/write/${p.id}`}>{say("edit", "Open")}</a>}
+                      {p.state !== "draft" && <a class="dk-edit" href={`/guides/write/${p.id}/changes`}>{say("proposals.see", "See the changes")}</a>}
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+          </section>
+        )}
+
         <section class="dk-section">
           <h2 class="dk-h2">{say("new", "Start a new guide")}</h2>
           <form class="dk-form" data-new>
@@ -192,6 +246,8 @@ const openDraft = (g: Mine) => g.versions.find((v) => v.state === "draft" || v.s
   .dk-btn { justify-self: start; font: 500 var(--text-sm) var(--font-body); padding: 8px 16px; border-radius: var(--radius-full); border: var(--border-w) solid var(--accent); background: var(--accent); color: var(--on-accent); cursor: pointer; text-decoration: none; }
   .dk-btn.ghost { background: var(--surface-card); color: var(--ink); border-color: var(--line-strong); }
   .dk-foot { margin: 0; max-width: var(--measure-ui); font-size: var(--text-sm); color: var(--ink-faint); }
+  .dk-h3 { font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-faint); margin: 14px 0 6px; font-weight: 600; }
+  .dk-proposal { display: grid; gap: 4px; padding: 12px 0; border-top: var(--border-w) solid var(--line); }
 </style>
 
 <script>
