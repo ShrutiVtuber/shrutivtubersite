@@ -4,8 +4,9 @@ Runs: one person's progress through one guide, kept on the site.
 
 Only what a person SET is stored — done, skipped, later, ticks, the
 check-in, a note. Locked, available and current are computed on every read
-by the shared engine (`shrutisguides.engine`), the same code the overlays
-and the tracker run, so nothing here can disagree with the guide.
+by the shared engine, and the view, the resets and the elements come from
+`shrutisguides.progress` — the same functions a self-hosted tracker runs,
+so the two can never disagree about what a run means.
 
 ⚠ **Nothing is applied silently.** A check-in returns proposals; `accept`
 marks what the person ticked. A run starts with a bulk-skip PROPOSAL, not a
@@ -22,8 +23,7 @@ and the path shows them greyed.
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta, timezone
-from zoneinfo import ZoneInfo
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
@@ -35,13 +35,12 @@ from shruti.api.deps import get_session
 from shruti.api.routes.practice import _reader
 from shruti.models import User
 from shruti.models.guides import Game, Guide, GuideRun, GuideVersion
-from shrutisguides import engine
+from shrutisguides import engine, progress
 
 log = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/runs", tags=["runs"])
 
-STATES = ("done", "skipped", "later", "open")
-REENTRY_AFTER = timedelta(hours=6)
+STATES = progress.STATES
 
 
 def _now() -> datetime:
@@ -50,6 +49,16 @@ def _now() -> datetime:
 
 def _iso(dt: datetime | None) -> str | None:
     return dt.isoformat() if dt else None
+
+
+def _stored(row: GuideRun) -> dict:
+    """The row as the shared functions read it."""
+    return {
+        "name": row.name, "variant": row.variant, "checkin": row.checkin or {}, "steps": row.steps or {},
+        "routines": row.routines or {}, "tracks": row.tracks or {}, "later": row.later or [],
+        "note": row.note, "link_overrides": row.link_overrides or {},
+        "last_done": row.last_done, "last_done_at": _iso(row.last_done_at), "last_seen_at": _iso(row.last_seen_at),
+    }
 
 
 async def _run_of(session: AsyncSession, user: User, run_id: int) -> GuideRun:
@@ -71,119 +80,11 @@ async def _doc_for(session: AsyncSession, guide: Guide) -> tuple[GuideVersion, d
 
 
 def _engine_run(row: GuideRun) -> engine.Run:
-    return engine.Run(
-        variant=row.variant,
-        checkin=dict(row.checkin or {}),
-        states={sid: v.get("state", "") for sid, v in (row.steps or {}).items() if isinstance(v, dict)},
-        routines={rid: list(v.get("ticked", [])) for rid, v in (row.routines or {}).items() if isinstance(v, dict)},
-        tracks=dict(row.tracks or {}),
-    )
+    return progress.engine_run(_stored(row))
 
 
-def _zone(user: User) -> ZoneInfo:
-    try:
-        return ZoneInfo(getattr(user, "timezone", "") or "UTC")
-    except Exception:                                  # noqa: BLE001
-        return ZoneInfo("UTC")
-
-
-def _reset_due(kind: str, reset_at: datetime | None, last_seen: datetime | None, now: datetime, zone: ZoneInfo) -> bool:
-    """
-    Whether a routine's ticks should be cleared: session (six hours since
-    the run was last seen), daily (04:00 local), weekly (Tuesday 04:00 local).
-    A routine never ticked has nothing to reset.
-    """
-    if kind == "manual":
-        return False
-    if kind == "session":
-        return last_seen is not None and now - last_seen >= REENTRY_AFTER
-    local = now.astimezone(zone)
-    boundary = local.replace(hour=4, minute=0, second=0, microsecond=0)
-    if local < boundary:
-        boundary -= timedelta(days=1)
-    if kind == "weekly":
-        # Back to the most recent Tuesday 04:00.
-        boundary -= timedelta(days=(boundary.weekday() - 1) % 7)
-    return reset_at is None or reset_at < boundary.astimezone(timezone.utc)
-
-
-def _apply_resets(row: GuideRun, doc: dict, user: User, now: datetime) -> bool:
-    """Clear ticks whose reset has come. Returns whether anything changed."""
-    changed = False
-    zone = _zone(user)
-    routines = dict(row.routines or {})
-    for r in doc.get("routines", []):
-        if not isinstance(r, dict):
-            continue
-        state = routines.get(r["id"])
-        if not state or not state.get("ticked"):
-            continue
-        reset_at = datetime.fromisoformat(state["reset_at"]) if state.get("reset_at") else None
-        if _reset_due(r.get("resets", "manual"), reset_at, row.last_seen_at, now, zone):
-            routines[r["id"]] = {"ticked": [], "reset_at": now.isoformat()}
-            changed = True
-    if changed:
-        row.routines = routines
-    return changed
-
-
-def _weekday_evening(dt: datetime, zone: ZoneInfo) -> str:
-    """"Tuesday evening", never "3 days ago": a weekday is a place, a count is a measurement of absence."""
-    local = dt.astimezone(zone)
-    hour = local.hour
-    part = "morning" if hour < 12 else "afternoon" if hour < 18 else "evening"
-    return f"{local.strftime('%A')} {part}"
-
-
-def _view(row: GuideRun, guide: Guide, game: Game, version: GuideVersion, doc: dict, user: User,
-          now: datetime) -> dict:
-    run = _engine_run(row)
-    progress = engine.compute(doc, run)
-    steps = {s["id"]: s for s in doc.get("steps", []) if isinstance(s, dict)}
-    current = steps.get(progress.current) if progress.current else None
-    reentry = None
-    if row.last_seen_at and now - row.last_seen_at >= REENTRY_AFTER and row.last_done:
-        last = steps.get(row.last_done)
-        reentry = {
-            "when": _weekday_evening(row.last_done_at or row.last_seen_at, _zone(user)),
-            "lastDone": {"id": row.last_done, "title": last.get("title", "") if last else row.last_done},
-            "note": row.note,
-            "next": {"id": current["id"], "title": current.get("title", "")} if current else None,
-        }
-    return {
-        "id": row.id, "name": row.name, "variant": row.variant,
-        "guide": {"id": guide.id, "slug": guide.slug, "title": guide.title,
-                  "game": {"slug": game.slug, "name": game.name}},
-        "versionId": row.version_id, "publishedVersionId": version.id,
-        "stale": bool(row.version_id) and row.version_id != version.id,
-        "checkin": row.checkin or {},
-        "steps": row.steps or {},
-        "routines": row.routines or {},
-        "tracks": row.tracks or {},
-        "later": row.later or [],
-        "note": row.note,
-        "linkOverrides": row.link_overrides or {},
-        "lastDone": {"id": row.last_done, "at": _iso(row.last_done_at)} if row.last_done else None,
-        "lastSeenAt": _iso(row.last_seen_at),
-        "reentry": reentry,
-        # Which check-in fields the sheet shows now: a field with show_when
-        # hidden until it holds — stated in one line, never shown disabled.
-        "checkinShown": {
-            f["id"]: engine.applies(f, run) and engine.holds(f.get("show_when"), doc, run)
-            for f in doc.get("checkin", []) if isinstance(f, dict)
-        },
-        "progress": {
-            "states": progress.states,
-            "current": progress.current,
-            "trackCurrent": progress.track_current,
-            "codex": progress.codex,
-            "routines": progress.routines,
-            "orphaned": progress.orphaned,
-            "proposals": progress.proposals,
-            "phaseCounts": {k: list(v) for k, v in progress.phase_counts.items()},
-            "sigil": engine.sigil_parts(doc, progress, run),
-        },
-    }
+def _zone(user: User):
+    return progress.zone_of(getattr(user, "timezone", "") or "UTC")
 
 
 async def _context(session: AsyncSession, row: GuideRun) -> tuple[Guide, Game, GuideVersion, dict]:
@@ -195,12 +96,27 @@ async def _context(session: AsyncSession, row: GuideRun) -> tuple[Guide, Game, G
     return guide, game, version, doc
 
 
+def _view(row: GuideRun, guide: Guide, game: Game, version: GuideVersion, doc: dict, user: User,
+          now: datetime) -> dict:
+    out = progress.view(
+        _stored(row), doc, zone=_zone(user), now=now,
+        guide_meta={"id": guide.id, "slug": guide.slug, "title": guide.title,
+                    "game": {"slug": game.slug, "name": game.name}},
+        version_id=row.version_id, published_version_id=version.id,
+    )
+    out["id"] = row.id
+    return out
+
+
 async def _answer(session: AsyncSession, user: User, row: GuideRun, *, touch: bool = True) -> dict:
     """The view, after the resets that are due — and the run marked seen."""
     guide, game, version, doc = await _context(session, row)
     now = _now()
     out = _view(row, guide, game, version, doc, user, now)
-    changed = _apply_resets(row, doc, user, now)
+    routines = progress.apply_resets(_stored(row), doc, _zone(user), now)
+    changed = routines is not None
+    if changed:
+        row.routines = routines
     if touch:
         row.last_seen_at = now
         changed = True
@@ -274,7 +190,7 @@ async def create(body: RunIn, request: Request, session: AsyncSession = Depends(
     row = GuideRun(
         guide_id=guide.id, user_id=user.id, version_id=version.id,
         name=body.name.strip()[:80] or guide.title, variant=variant,
-        checkin=_clean_checkin(body.checkin, doc),
+        checkin=progress.clean_checkin(body.checkin, doc),
         steps={sid: {"state": "skipped", "at": now} for sid in body.skip_steps if sid in known},
         routines={}, tracks={}, later=[], link_overrides={},
     )
@@ -284,30 +200,6 @@ async def create(body: RunIn, request: Request, session: AsyncSession = Depends(
     return await _answer(session, user, row)
 
 
-def _clean_checkin(values: dict, doc: dict) -> dict:
-    """Only the fields the guide declares, typed as it declares them."""
-    out: dict = {}
-    for f in doc.get("checkin", []):
-        if not isinstance(f, dict) or f["id"] not in values:
-            continue
-        v = values[f["id"]]
-        if v is None or v == "":
-            continue
-        if f.get("type") == "number":
-            try:
-                n = float(v)
-            except (TypeError, ValueError):
-                continue
-            lo, hi = f.get("min"), f.get("max")
-            if lo is not None:
-                n = max(float(lo), n)
-            if hi is not None:
-                n = min(float(hi), n)
-            out[f["id"]] = int(n) if n == int(n) else n
-        else:
-            if v in (f.get("options") or []):
-                out[f["id"]] = v
-    return out
 
 
 @router.get("/{run_id}")
@@ -358,7 +250,7 @@ async def checkin(run_id: int, body: CheckIn, request: Request, session: AsyncSe
     row = await _run_of(session, user, run_id)
     _, _, _, doc = await _context(session, row)
     merged = dict(row.checkin or {})
-    merged.update(_clean_checkin(body.values, doc))
+    merged.update(progress.clean_checkin(body.values, doc))
     row.checkin = merged
     return await _answer(session, user, row)
 
@@ -379,22 +271,11 @@ async def set_step(run_id: int, step_id: str, body: StepIn, request: Request,
         raise HTTPException(422, "state is done, skipped, later or open")
     row = await _run_of(session, user, run_id)
     _, _, _, doc = await _context(session, row)
-    steps = dict(row.steps or {})
-    later = list(row.later or [])
-    titles = {s["id"]: s.get("title", "") for s in doc.get("steps", []) if isinstance(s, dict)}
-    now = _now()
-    if body.state == "open":
-        steps.pop(step_id, None)
-        later = [x for x in later if x.get("step") != step_id]
-    else:
-        steps[step_id] = {"state": body.state, "at": now.isoformat()}
-        if body.state == "later" and not any(x.get("step") == step_id for x in later):
-            later.append({"text": titles.get(step_id, step_id), "step": step_id, "at": now.isoformat()})
-        if body.state != "later":
-            later = [x for x in later if x.get("step") != step_id]
-        if body.state == "done":
-            row.last_done, row.last_done_at = step_id, now
-    row.steps, row.later = steps, later
+    changed = progress.set_step(_stored(row), doc, step_id, body.state, _now())
+    row.steps, row.later = changed["steps"], changed["later"]
+    if "last_done" in changed:
+        row.last_done = changed["last_done"]
+        row.last_done_at = datetime.fromisoformat(changed["last_done_at"])
     return await _answer(session, user, row)
 
 
@@ -546,14 +427,7 @@ async def export_run(run_id: int, request: Request, session: AsyncSession = Depe
     user = await _reader(request, session)
     row = await _run_of(session, user, run_id)
     guide, game, version, _ = await _context(session, row)
-    body = {
-        "format": 1, "kind": "run",
-        "guide": {"game": game.slug, "slug": guide.slug, "title": guide.title, "versionId": version.id},
-        "name": row.name, "variant": row.variant, "checkin": row.checkin, "steps": row.steps,
-        "routines": row.routines, "tracks": row.tracks, "later": row.later, "note": row.note,
-        "linkOverrides": row.link_overrides, "lastDone": row.last_done, "lastDoneAt": _iso(row.last_done_at),
-        "exportedAt": _now().isoformat(),
-    }
+    body = progress.export(_stored(row), {"game": game.slug, "slug": guide.slug, "title": guide.title, "versionId": version.id}, _now())
     return JSONResponse(body, headers={"Content-Disposition": f'attachment; filename="{guide.slug}.run.json"'})
 
 
@@ -570,21 +444,11 @@ async def import_run(body: ImportIn, request: Request, session: AsyncSession = D
     if guide is None or guide.hidden:
         raise HTTPException(404, "no such guide")
     version, doc = await _doc_for(session, guide)
-    r = body.run
-    if r.get("kind") != "run":
-        raise HTTPException(422, "that is not a run file")
-    steps = {str(k): v for k, v in (r.get("steps") or {}).items() if isinstance(v, dict) and v.get("state") in ("done", "skipped", "later")}
-    row = GuideRun(
-        guide_id=guide.id, user_id=user.id, version_id=version.id,
-        name=str(r.get("name") or guide.title)[:80], variant=str(r.get("variant") or ""),
-        checkin=_clean_checkin(r.get("checkin") or {}, doc), steps=steps,
-        routines={str(k): v for k, v in (r.get("routines") or {}).items() if isinstance(v, dict)},
-        tracks={str(k): v for k, v in (r.get("tracks") or {}).items() if isinstance(v, dict)},
-        later=[x for x in (r.get("later") or []) if isinstance(x, dict) and x.get("text")][:200],
-        note=str(r.get("note") or "")[:2000],
-        link_overrides={str(k): v for k, v in (r.get("linkOverrides") or {}).items() if isinstance(v, list)},
-        last_done=str(r.get("lastDone") or ""),
-    )
+    try:
+        fields = progress.from_export(body.run, doc, guide.title)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    row = GuideRun(guide_id=guide.id, user_id=user.id, version_id=version.id, **fields)
     session.add(row)
     await session.commit()
     await session.refresh(row)

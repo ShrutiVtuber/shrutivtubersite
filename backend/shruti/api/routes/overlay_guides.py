@@ -27,68 +27,20 @@ from shruti.api.deps import get_session
 from shruti.api.routes.practice import _reader
 from shruti.models import OverlayToken
 from shruti.models.guides import Game, Guide, GuideRun, GuideVersion
-from shrutisguides import engine
+from shrutisguides import progress
 
 router = APIRouter(prefix="/api/overlay", tags=["overlay"])
 runs_router = APIRouter(prefix="/api/runs", tags=["runs"])
 
-GUIDE_KINDS = ("guide-now", "guide-sigil", "guide-path", "guide-routine")
-THEMES = ("almanac", "grimoire", "plain")
-MOTIONS = ("full", "reduced", "still")
+GUIDE_KINDS, THEMES, MOTIONS = progress.GUIDE_KINDS, progress.THEMES, progress.MOTIONS
 
 
-def _run_of(row: GuideRun) -> engine.Run:
-    return engine.Run(
-        variant=row.variant, checkin=dict(row.checkin or {}),
-        states={sid: v.get("state", "") for sid, v in (row.steps or {}).items() if isinstance(v, dict)},
-        routines={rid: list(v.get("ticked", [])) for rid, v in (row.routines or {}).items() if isinstance(v, dict)},
-        tracks=dict(row.tracks or {}),
-    )
-
-
-def _element(kind: str, token: OverlayToken, run: GuideRun, doc: dict, progress: engine.Progress) -> dict:
-    """What one element draws — only that, so a source never carries the whole guide."""
-    steps = {s["id"]: s for s in doc.get("steps", []) if isinstance(s, dict)}
-    phases = {p["id"]: p for p in doc.get("phases", []) if isinstance(p, dict)}
-    path = [s for ph in engine.phases_in_order(doc) if not ph.get("track") for s in engine.steps_in(doc, ph["id"])]
-    cur = steps.get(progress.current) if progress.current else None
-    phase = phases.get(cur["phase"]) if cur else None
-    here = engine.steps_in(doc, phase["id"]) if phase else []
-    counted = [s for s in here if s.get("kind") != "optional"]
-    done_here = sum(1 for s in counted if progress.states.get(s["id"]) == "done")
-    if kind == "guide-now":
-        return {
-            "phase": phase.get("name", "") if phase else "",
-            "id": cur["id"] if cur else None,
-            "title": cur.get("title", "") if cur else "",
-            "line": (cur.get("oneliner") or cur.get("do", "").split("\n")[0]) if cur else "",
-            "count": f"{done_here} of {len(counted)}" if phase else "",
-            "finished": cur is None and bool(path) and all(progress.states.get(s["id"]) in ("done", "skipped") for s in path),
-        }
-    if kind == "guide-sigil":
-        main = [ph for ph in engine.phases_in_order(doc) if not ph.get("track")]
-        idx = main.index(phase) + 1 if phase in main else 0
-        return {"parts": engine.sigil_parts(doc, progress, _run_of(run)),
-                "label": f"{idx}/{len(main)}" if idx else "",
-                "count": f"{done_here} of {len(counted)}" if phase else ""}
-    if kind == "guide-path":
-        i = next((k for k, s in enumerate(path) if s["id"] == progress.current), None)
-        if i is None:
-            window = path[-6:]
-        else:
-            window = path[max(0, i - 2): i + 4]
-        return {"strip": [{"id": s["id"], "title": s.get("title", ""), "state": progress.states.get(s["id"], "locked")} for s in window]}
-    if kind == "guide-routine":
-        routine = next((r for r in doc.get("routines", []) if isinstance(r, dict) and r["id"] == token.routine_id), None)
-        if routine is None:
-            routine = next((r for r in doc.get("routines", []) if isinstance(r, dict)), None)
-        if routine is None:
-            return {"routine": None}
-        ticked = set((run.routines or {}).get(routine["id"], {}).get("ticked", []))
-        return {"routine": {"name": routine.get("name", ""), "open": progress.routines.get(routine["id"], False),
-                            "items": [{"id": i["id"], "text": i["text"], "done": i["id"] in ticked} for i in routine.get("items", [])],
-                            "count": f"{len(ticked)} / {len(routine.get('items', []))}"}}
-    return {}
+def _stored(row: GuideRun) -> dict:
+    return {
+        "name": row.name, "variant": row.variant, "checkin": row.checkin or {}, "steps": row.steps or {},
+        "routines": row.routines or {}, "tracks": row.tracks or {}, "later": row.later or [],
+        "note": row.note, "link_overrides": row.link_overrides or {},
+    }
 
 
 @router.get("/guide")
@@ -115,9 +67,8 @@ async def guide(t: str, session: AsyncSession = Depends(get_session)) -> dict:
     if g is None or v is None:
         return base
     game = await session.get(Game, g.game_id)
-    progress = engine.compute(v.body, _run_of(run))
     base["run"] = {"name": run.name, "guide": g.title, "game": game.name if game else ""}
-    base["element"] = _element(token.kind, token, run, v.body, progress)
+    base["element"] = progress.element(token.kind, _stored(run), v.body, token.routine_id)
     base["version"] = run.updated_at.isoformat() if run.updated_at else ""
     return base
 

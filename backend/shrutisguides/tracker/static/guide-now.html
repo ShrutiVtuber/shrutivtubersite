@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>guide · now</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="stylesheet" href="/overlay-guides.css">
+</head>
+<body>
+<div class="gov" data-theme="almanac" data-motion="reduced">
+  <div class="gov-plate gov-now" data-now hidden>
+    <div class="swap" data-swap>
+      <span class="gov-eyebrow" data-phase></span>
+      <span class="title" data-title></span>
+      <span class="line" data-line></span>
+      <span class="horizon"></span>
+    </div>
+  </div>
+  <span class="gov-done-line" data-done-line hidden></span>
+  <div class="gov-plate gov-empty" data-empty>
+    <span class="gov-eyebrow">Shruti's Guides</span>
+    <span class="say">No run selected.</span>
+  </div>
+</div>
+<script>
+  const root = document.querySelector(".gov");
+  const token = new URLSearchParams(location.search).get("t") || "";
+  let last = { version: "", element: null };
+  const esc = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
+  let still = false, reduced = false;
+  const empty = root.querySelector("[data-empty]");
+  const wait = (ms) => new Promise((r) => window.setTimeout(r, ms));
+  const card = root.querySelector("[data-now]"), swap = root.querySelector("[data-swap]"), line = root.querySelector("[data-done-line]");
+  const paint = (el) => { root.querySelector("[data-phase]").textContent = el?.phase ?? ""; root.querySelector("[data-title]").textContent = el?.title ?? ""; root.querySelector("[data-line]").textContent = el?.line ?? ""; card.hidden = !el || !el.id; empty.hidden = !!(el && el.id); };
+  const draw = async (prev, next) => {
+    const stepChanged = prev?.id && next?.id !== prev.id;
+    if (!stepChanged || still || reduced) { paint(next); if (stepChanged && reduced) { line.textContent = `Done · ${prev.id}`; line.hidden = false; window.setTimeout(() => { line.hidden = true; }, 2000); } return; }
+    card.classList.add("ignite"); await wait(260); swap.classList.add("collapse"); await wait(80); paint(next); swap.classList.remove("collapse"); swap.classList.add("unfold");
+    requestAnimationFrame(() => requestAnimationFrame(() => swap.classList.remove("unfold"))); await wait(100); card.classList.remove("ignite");
+  };
+  const tick = async () => {
+    if (!token) return;
+    try {
+      const r = await fetch(`/api/overlay/guide?t=${encodeURIComponent(token)}`, { cache: "no-store" });
+      if (!r.ok) return;                       /* held, not blanked */
+      const next = await r.json();
+      root.dataset.theme = next.theme; root.dataset.motion = next.motion;
+      still = next.motion === "still"; reduced = next.motion === "reduced";
+      if (next.version !== last.version || (!last.element && next.element)) {
+        await draw(last.element, next.element);
+        last = { version: next.version, element: next.element };
+      }
+    } catch { /* offline: the last frame stands */ }
+  };
+  tick(); window.setInterval(tick, 2000);
+</script>
+</body>
+</html>

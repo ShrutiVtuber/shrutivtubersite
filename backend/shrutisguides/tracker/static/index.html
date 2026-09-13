@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Shruti's Guides — tracker</title>
+<style>
+  :root { --ink: #26304A; --soft: #4A5470; --faint: #5F677C; --line: #DCD6DC; --accent: #33639C; --rose: #98506A; --page: #F8F6F3; --card: #FFFFFF; }
+  @media (prefers-color-scheme: dark) { :root { --ink: #E9E6F0; --soft: #B3B9D2; --faint: #8B93AF; --line: #2E3752; --accent: #8FBEE8; --rose: #E0A4BC; --page: #121829; --card: #1A2138; } }
+  body { margin: 0; background: var(--page); color: var(--ink); font: 16px/1.55 -apple-system, "Segoe UI", system-ui, sans-serif; }
+  main { max-width: 52rem; margin: 0 auto; padding: 32px 20px 64px; display: flex; flex-direction: column; gap: 28px; }
+  h1 { margin: 0; font: 500 32px Georgia, serif; } h2 { margin: 0 0 10px; font: 600 20px Georgia, serif; }
+  .eyebrow { font-size: 12px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--faint); }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 18px 20px; display: flex; flex-direction: column; gap: 10px; }
+  .row { display: flex; align-items: baseline; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+  .row .lead { flex: 1; border-bottom: 1px dotted var(--faint); transform: translateY(-4px); min-width: 20px; }
+  .mono { font-family: ui-monospace, Menlo, monospace; font-size: 12.5px; color: var(--faint); }
+  input, select, button { font: inherit; padding: 8px 12px; border: 1px solid var(--line); border-radius: 4px; background: var(--card); color: var(--ink); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; cursor: pointer; }
+  form { display: flex; flex-wrap: wrap; gap: 8px; align-items: end; }
+  label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--soft); }
+  .url { font-family: ui-monospace, Menlo, monospace; font-size: 12.5px; word-break: break-all; padding: 8px 10px; border: 1px solid var(--accent); border-radius: 4px; }
+  .quiet { margin: 0; font-size: 14px; color: var(--faint); }
+</style>
+</head>
+<body>
+<main>
+  <div><span class="eyebrow">Shruti's Guides</span><h1>Your tracker</h1><p class="quiet" data-health></p></div>
+  <section class="card"><h2>Guides</h2><div data-guides></div>
+    <form data-pull><label>Game address<input name="game" placeholder="diablo-iv" required></label><label>Guide address<input name="slug" placeholder="shrutis-diablo-iv-squirrel-guide-for-warlocks" required></label><button class="primary" type="submit">Pull from the site</button></form>
+    <form data-import><label>Or a guide file<input type="file" name="file" accept=".json,application/json"></label><button type="submit">Import</button></form>
+  </section>
+  <section class="card"><h2>Runs</h2><div data-runs></div>
+    <form data-new-run><label>Guide<select name="guide_id" data-guide-options></select></label><label>Name<input name="name" placeholder="Squirrel · S15"></label><label>Variant<input name="variant" placeholder="seasonal"></label><button class="primary" type="submit">Start a run</button></form>
+    <p class="quiet">The phone app and the overlays talk to this tracker by its address. Guides and tracking never need anything else.</p>
+  </section>
+  <section class="card"><h2>Overlays</h2><div data-overlays></div>
+    <form data-mint><label>Run<select name="run_id" data-run-options></select></label><label>Element<select name="kind"><option value="guide-now">Now card</option><option value="guide-sigil">Sigil</option><option value="guide-path">Path strip</option><option value="guide-routine">Routine</option></select></label><label>Theme<select name="theme"><option value="almanac">Almanac</option><option value="grimoire">Grimoire</option><option value="plain">Plain</option></select></label><label>Motion<select name="motion"><option value="reduced">Reduced</option><option value="full">Full</option><option value="still">Still</option></select></label><button class="primary" type="submit">New overlay</button></form>
+    <div data-minted hidden></div>
+    <p class="quiet">The token is the secret: anyone with the URL sees the overlay; nobody with it can change your run.</p>
+  </section>
+</main>
+<script>
+  const secret = localStorage.getItem("tracker.secret") || "";
+  const H = { "content-type": "application/json", ...(secret ? { authorization: "Bearer " + secret } : {}) };
+  const esc = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
+  const j = async (method, path, body) => { const r = await fetch(path, { method, headers: H, body: body === undefined ? undefined : JSON.stringify(body) }); if (r.status === 401) { const s = prompt("This tracker has a secret. Paste it:"); if (s) { localStorage.setItem("tracker.secret", s); location.reload(); } throw new Error("401"); } return r.ok ? r.json() : Promise.reject(await r.text()); };
+  let guides = [], runs = [];
+  const draw = async () => {
+    const h = await fetch("/api/health").then((r) => r.json()); document.querySelector("[data-health]").textContent = `v${h.version} · ${h.guides} guides · pulls from ${h.site}`;
+    guides = await j("GET", "/api/guides"); runs = await j("GET", "/api/runs");
+    document.querySelector("[data-guides]").innerHTML = guides.length ? guides.map((g) => `<div class="row"><span>${esc(g.title)}</span><span class="lead"></span><span class="mono">${esc(g.game.name)}</span></div>`).join("") : `<p class="quiet">No guides yet. Pull one from the site by its address, or import a guide file.</p>`;
+    document.querySelector("[data-guide-options]").innerHTML = guides.map((g) => `<option value="${g.id}">${esc(g.title)}</option>`).join("");
+    document.querySelector("[data-runs]").innerHTML = runs.length ? runs.map((r) => `<div class="row"><span>${esc(r.name)}</span><span class="lead"></span><span class="mono">${esc(r.now ? "Now: " + r.now.title : "finished")}</span></div>`).join("") : `<p class="quiet">No runs yet. Pick a guide and start one.</p>`;
+    document.querySelector("[data-run-options]").innerHTML = runs.map((r) => `<option value="${r.id}">${esc(r.name)}</option>`).join("");
+    const ov = (await Promise.all(runs.map((r) => j("GET", `/api/runs/${r.id}/overlays`).then((list) => list.map((o) => ({ ...o, run: r.name })))))).flat();
+    document.querySelector("[data-overlays]").innerHTML = ov.length ? ov.map((o) => `<div class="row"><span>${esc(o.label || o.kind)}</span><span class="lead"></span><span class="mono">${esc(o.run)} · ${esc(o.theme)}</span></div>`).join("") : `<p class="quiet">No overlays yet.</p>`;
+  };
+  document.querySelector("[data-pull]").addEventListener("submit", async (e) => { e.preventDefault(); const d = new FormData(e.target); await j("POST", "/api/guides/pull", { game: d.get("game"), slug: d.get("slug") }); draw(); });
+  document.querySelector("[data-import]").addEventListener("submit", async (e) => { e.preventDefault(); const f = e.target.querySelector("input[type=file]").files[0]; if (!f) return; await j("POST", "/api/guides/import", JSON.parse(await f.text())); draw(); });
+  document.querySelector("[data-new-run]").addEventListener("submit", async (e) => { e.preventDefault(); const d = new FormData(e.target); await j("POST", "/api/runs", { guide_id: Number(d.get("guide_id")), name: d.get("name"), variant: d.get("variant") }); draw(); });
+  document.querySelector("[data-mint]").addEventListener("submit", async (e) => { e.preventDefault(); const d = new FormData(e.target); const made = await j("POST", `/api/runs/${d.get("run_id")}/overlays`, { kind: d.get("kind"), theme: d.get("theme"), motion: d.get("motion") }); const box = document.querySelector("[data-minted]"); box.hidden = false; box.innerHTML = `<p class="quiet">Shown once — paste it into OBS as a browser source, 1920 × 1080.</p><div class="url">${esc(location.origin)}/overlay/${esc(made.kind)}?t=${esc(made.token)}</div>`; draw(); });
+  draw();
+</script>
+</body>
+</html>

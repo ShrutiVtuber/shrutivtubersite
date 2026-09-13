@@ -1,0 +1,155 @@
+/* Type for a self-hosted overlay: system faces with the same roles. No webfont is fetched from anywhere. */
+:root { --font-display: "EB Garamond", "Noto Serif Devanagari", Georgia, "Times New Roman", serif; --font-body: "Commissioner", "Mukta", -apple-system, "Segoe UI", system-ui, sans-serif; --font-mono: "JetBrains Mono", "Noto Sans Devanagari", ui-monospace, Menlo, monospace; }
+html, body { margin: 0; padding: 0; background: transparent !important; overflow: hidden; width: 1920px; height: 1080px; }
+/* Shruti's Guides on stream: six elements, three skins, one layout.
+ *
+ * Built on the shared overlay ground (overlay.css): transparent, 1920x1080,
+ * every length a pixel. A THEME re-points the palette, the display face and
+ * the ornament — nothing else. The four state colours and shapes below are
+ * defined ONCE, outside every theme block, on purpose: a Grimoire overlay is
+ * ember, ash and a gold rule, and the dot that means "current" is still the
+ * same blue it is in every other game and on the website. Chat learns the
+ * four states once.
+ */
+
+/* The state vocabulary. Not themeable. */
+.gov {
+  --st-done: #E0A4BC;
+  --st-now: #8FBEE8;
+  --st-open: var(--gt-ink);
+  --st-locked: var(--gt-faint);
+}
+
+/* Almanac — her house theme: the dusk palette unchanged, radius 16, a rose
+   horizon hairline closing the card. */
+.gov[data-theme="almanac"] {
+  --gt-panel: rgba(26, 33, 56, .92);
+  --gt-panel-dim: rgba(26, 33, 56, .72);
+  --gt-border: #2E3752;
+  --gt-ink: #E9E6F0;
+  --gt-soft: #B3B9D2;
+  --gt-faint: #8B93AF;
+  --gt-eyebrow: #8B93AF;
+  --gt-rule: #8A6880;
+  --gt-radius: 16px;
+  --gt-display: var(--font-display);
+  --gt-display-weight: 500;
+  --gt-stroke: 12;
+  --gt-left-rule: 0;
+  --gt-ring: transparent;
+}
+
+/* Grimoire — Diablo-feeling: ember, ash, a gold rule; built from its own
+   palette and nothing of Blizzard's. */
+.gov[data-theme="grimoire"] {
+  --gt-panel: rgba(36, 27, 22, .92);
+  --gt-panel-dim: rgba(36, 27, 22, .72);
+  --gt-border: #6B5233;
+  --gt-ink: #EDE3D6;
+  --gt-soft: #C4B4A2;
+  --gt-faint: #8A7C6C;
+  --gt-eyebrow: #C9A227;
+  --gt-rule: transparent;
+  --gt-radius: 10px;
+  --gt-display: var(--font-display);
+  --gt-display-weight: 600;
+  --gt-stroke: 12;
+  --gt-left-rule: 4px;
+  --gt-ring: rgba(201, 162, 39, .45);
+}
+
+/* Plain — the information and none of her atmosphere; the fallback when a
+   game has no theme of its own. */
+.gov[data-theme="plain"] {
+  --gt-panel: rgba(21, 22, 26, .88);
+  --gt-panel-dim: rgba(21, 22, 26, .66);
+  --gt-border: transparent;
+  --gt-ink: #FFFFFF;
+  --gt-soft: #C8CCD4;
+  --gt-faint: #9AA0AE;
+  --gt-eyebrow: #9AA0AE;
+  --gt-rule: transparent;
+  --gt-radius: 10px;
+  --gt-display: var(--font-body);
+  --gt-display-weight: 600;
+  --gt-stroke: 10;
+  --gt-left-rule: 0;
+  --gt-ring: transparent;
+}
+
+.gov { position: relative; width: 1920px; height: 1080px; font-family: var(--font-body); -webkit-font-smoothing: antialiased; color: var(--gt-ink); }
+
+/* The plate. */
+.gov-plate {
+  position: absolute; box-sizing: border-box;
+  background: var(--gt-panel);
+  border: 1px solid var(--gt-border);
+  border-left-width: max(1px, var(--gt-left-rule));
+  border-left-color: var(--gt-eyebrow);
+  border-radius: var(--gt-radius);
+  box-shadow: 0 12px 34px rgba(6, 9, 18, .5);
+}
+.gov[data-theme="almanac"] .gov-plate { border-left-color: var(--gt-border); }
+.gov[data-theme="plain"] .gov-plate { border-left-color: transparent; }
+
+.gov-eyebrow { font: 600 24px var(--font-body); letter-spacing: .14em; text-transform: uppercase; color: var(--gt-eyebrow); }
+.gov-mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; color: var(--gt-faint); }
+
+/* ── the now card · 900 wide at 72,72 ──────────────────────────────────── */
+.gov-now { left: 72px; top: 72px; width: 900px; padding: 34px 38px 32px; display: flex; flex-direction: column; gap: 18px; overflow: hidden; }
+.gov-now .title { font: var(--gt-display-weight) 54px/1.1 var(--gt-display); color: var(--gt-ink); }
+.gov-now .line { font: 400 30px/1.4 var(--font-body); color: var(--gt-soft); }
+.gov-now .horizon { height: 1px; background: var(--gt-rule); margin-top: 6px; }
+/* The ignite: 3px, not 1.5 — at 720p a 1.5px rose line disappears. */
+.gov-now.ignite::before { content: ""; position: absolute; inset: -2px; border: 3px solid var(--st-done); border-radius: calc(var(--gt-radius) + 2px); pointer-events: none; animation: gov-ignite 300ms cubic-bezier(.2,.7,.3,1) forwards; }
+.gov-now.ignite::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: var(--st-done); transform-origin: left; animation: gov-horizon 300ms cubic-bezier(.2,.7,.3,1) forwards; }
+@keyframes gov-ignite { from { opacity: 0; } to { opacity: 1; } }
+@keyframes gov-horizon { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+.gov-now .swap { display: flex; flex-direction: column; gap: 18px; }
+.gov-now .swap.collapse { max-height: 0; opacity: 0; transform: translateY(-12px); transition: max-height 80ms cubic-bezier(.45,0,.25,1), opacity 80ms cubic-bezier(.45,0,.25,1), transform 80ms cubic-bezier(.45,0,.25,1); overflow: hidden; }
+.gov-now .swap.unfold { opacity: 0; transform: translateY(12px); }
+.gov-now .swap { max-height: 460px; transition: opacity 100ms cubic-bezier(.2,.7,.3,1), transform 100ms cubic-bezier(.2,.7,.3,1); }
+.gov-done-line { position: absolute; left: 72px; top: 24px; font: 500 24px var(--font-mono); color: var(--st-done); }
+
+/* ── the sigil · 200px at right 76, top 72 ─────────────────────────────── */
+.gov-sigil { position: absolute; right: 76px; top: 72px; display: flex; flex-direction: column; align-items: center; gap: 14px; }
+.gov-sigil .ring { position: relative; display: grid; place-items: center; width: 224px; height: 224px; border: 1px solid var(--gt-ring); border-radius: 999px; }
+.gov-sigil svg { display: block; }
+.gov-sigil .fill { transition: stroke-dasharray 600ms cubic-bezier(.2,.7,.3,1); }
+.gov-sigil .count { font: 600 24px var(--font-body); letter-spacing: .14em; text-transform: uppercase; color: var(--gt-faint); }
+.gov-sigil.phase-done .ring { animation: gov-ring 600ms cubic-bezier(.2,.7,.3,1); }
+@keyframes gov-ring { 0% { border-color: var(--gt-ring); } 40% { border-color: var(--st-done); } 100% { border-color: var(--gt-ring); } }
+
+/* ── the path strip · full width at bottom 72 ──────────────────────────── */
+.gov-path { left: 72px; right: 72px; bottom: 72px; padding: 22px 30px; display: flex; align-items: center; gap: 30px; border-left-width: 1px; border-left-color: var(--gt-border); }
+.gov[data-theme="grimoire"] .gov-path { background: rgba(36, 27, 22, .86); border-top: 1px solid #6B5233; }
+.gov-path .it { display: flex; align-items: center; gap: 14px; flex: none; max-width: 420px; }
+.gov-path .it span:last-child { font: 400 24px var(--font-body); color: var(--gt-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gov-path .it.available span:last-child { color: var(--gt-ink); }
+.gov-path .it.current span:last-child { font: 600 28px var(--font-body); color: var(--gt-ink); }
+.gov-path .it.skipped span:last-child { text-decoration: line-through; }
+
+/* ── the routine · 760 wide at left 72, bottom 72 ──────────────────────── */
+.gov-routine { left: 72px; bottom: 72px; width: 760px; padding: 28px 32px; display: flex; flex-direction: column; gap: 18px; }
+.gov-routine .head { display: flex; align-items: baseline; justify-content: space-between; }
+.gov-routine .name { font: 600 32px var(--gt-display); color: var(--gt-ink); }
+.gov-routine .count { font-size: 22px; }
+.gov-routine .item { display: flex; align-items: center; gap: 18px; }
+.gov-routine .item span:last-child { font: 400 26px var(--font-body); color: var(--gt-ink); }
+.gov-routine .item.done span:last-child { color: var(--gt-faint); text-decoration: line-through; }
+
+/* The state dots at 26px: shape differs as well as colour. */
+.dot { display: block; flex: none; box-sizing: border-box; }
+.dot.done, .dot.skipped, .dot.later { width: 26px; height: 6px; border-radius: 3px; background: var(--st-done); }
+.dot.skipped, .dot.later { background: var(--st-locked); }
+.dot.current { width: 26px; height: 26px; border-radius: 999px; background: var(--st-now); }
+.dot.available { width: 26px; height: 26px; border-radius: 999px; border: 5px solid var(--st-open); }
+.dot.locked { width: 26px; height: 26px; border-radius: 999px; border: 5px solid var(--st-locked); }
+
+/* ── empty: no run selected ─────────────────────────────────────────────── */
+.gov-empty { left: 72px; top: 72px; width: 520px; padding: 30px 34px; display: flex; flex-direction: column; gap: 12px; background: var(--gt-panel-dim); border-color: color-mix(in srgb, var(--gt-border) 50%, transparent); }
+.gov-empty .say { font: var(--gt-display-weight) 34px/1.2 var(--gt-display); color: var(--gt-soft); }
+
+/* Motion is the overlay's own setting. Still: nothing moves, ever. Reduced:
+   the Done moment collapses to an instant swap and one line. */
+.gov[data-motion="still"] *, .gov[data-motion="reduced"] .swap, .gov[data-motion="reduced"] .fill, .gov[data-motion="reduced"] .ring { transition: none !important; animation: none !important; }

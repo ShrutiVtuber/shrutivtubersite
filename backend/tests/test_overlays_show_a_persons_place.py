@@ -97,7 +97,10 @@ def test_tokens_belong_to_the_runs_owner() -> None:
 
 
 def test_each_element_carries_only_what_it_draws() -> None:
-    body = code_of(og._element)
+    """Computed by the shared function, so a self-hosted overlay draws the same thing."""
+    from shrutisguides import progress
+    assert "progress.element(token.kind, _stored(run), v.body, token.routine_id)" in code_of(og.guide)
+    body = code_of(progress.element)
     assert 'if kind == "guide-now":' in body and '"finished"' in body
     assert 'path[max(0, i - 2): i + 4]' in body                      # the six-item window
     assert "engine.sigil_parts" in body
