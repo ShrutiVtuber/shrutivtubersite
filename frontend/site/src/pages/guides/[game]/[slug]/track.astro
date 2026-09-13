@@ -1,0 +1,373 @@
+---
+/* The track view: app screens 10–21 as one web page (board W4).
+ *
+ * One step is the page. Done is the largest thing on it. Too much replaces
+ * the whole page. The path sits beside Now — and, her decision, the person
+ * can fold it away; the choice is remembered in their browser.
+ *
+ * The server computes every state with the shared engine on each answer;
+ * the script only draws and plays the one motion the product has. Nothing
+ * here measures absence: no streaks, no day counts. The re-entry block
+ * names a weekday, never a count.
+ *
+ * ⚠ Every word the script draws lives in WORDS and is passed as data, so
+ * it is editable from the admin like any other sentence on the site.
+ */
+import BaseLayout from "../../../../layouts/BaseLayout.astro";
+import { account, asReader } from "../../../../lib/account";
+import { copy } from "../../../../lib/copy";
+import { type GuideDoc, type GuideSummary, phasesOf } from "../../../../lib/guides";
+
+const say = await copy("guides/[game]/[slug]/track");
+const game = Astro.params.game ?? "";
+const slug = Astro.params.slug ?? "";
+if (!/^[a-z0-9-]{1,80}$/.test(game) || !/^[a-z0-9-]{1,160}$/.test(slug)) return Astro.rewrite("/404");
+
+const me = await account(Astro);
+if (!me) return Astro.redirect(`/signin?next=${encodeURIComponent(`/guides/${game}/${slug}/track`)}`);
+
+const answer = await asReader(Astro, `/api/guides/${game}/${slug}`);
+if (!answer.ok) return Astro.rewrite("/404");
+const guide = answer.body as GuideSummary & { body: GuideDoc };
+if (!guide.publishedAt || guide.hidden) return Astro.rewrite("/404");
+const doc = guide.body;
+
+const runsRead = await asReader(Astro, `/api/runs?guide=${guide.id}`);
+const runs: { id: number; name: string; variant: string; now: { title: string } | null }[] =
+  runsRead.ok && Array.isArray(runsRead.body) ? runsRead.body : [];
+const wanted = Astro.url.searchParams.get("run") ?? "";
+const starting = Astro.url.searchParams.get("new") === "1" || runs.length === 0;
+const runId = /^\d+$/.test(wanted) ? Number(wanted) : (runs[0]?.id ?? null);
+const viewRead = !starting && runId ? await asReader(Astro, `/api/runs/${runId}`) : null;
+const view = viewRead?.ok ? viewRead.body : null;
+if (!starting && !view) return Astro.rewrite("/404");
+
+const variants = doc.game.variants ?? [];
+const skipGroups = [...new Set(phasesOf(doc).map((p) => p.skip_group).filter(Boolean))] as string[];
+const groupNames = (g: string) => phasesOf(doc).filter((p) => p.skip_group === g).map((p) => p.name).join(", ");
+
+const WORDS = {
+  head: { phase: say("head.phase", "Phase {n} of {of}"), finished: say("head.finished", "The whole path"), steps: say("head.steps", "{d} of {n} steps") },
+  now: {
+    stepOf: say("now.step_of", "step {n} of {of}"), done: say("now.done", "Done"), later: say("now.later", "Later"), more: say("now.more", "Why / more"),
+    skip: say("now.skip", "Skip this step"), doneWord: say("now.done_word", "Done"),
+    finished: say("now.finished", "That's the whole path. The routines still run, and the codex stays. Start another run whenever you like."),
+    allGated: say("now.all_gated", "Nothing is open at {summary}. Check in with your real level, or open the Path and pick something optional."),
+    noCheckin: say("now.no_checkin", "this check-in"),
+  },
+  step: { ongoing: say("step.ongoing", "ongoing"), min: say("step.min", "min"), video: say("step.video", "Video"), done: say("step.done", "Done when"), codex: say("step.codex", "Opens a codex entry") },
+  reentry: { last: say("re.last", "Last time"), finished: say("re.finished", "You finished"), next: say("re.next", "Next:") },
+  later: {
+    title: say("later.title", "Later"), parked: say("later.parked", "{n} parked"), from: say("later.from", "from {id}"), remove: say("later.remove", "Remove"),
+    empty: say("later.empty", "Nothing in Later. Park a distraction here with the Later button on any step. It stops competing for the step you are on."),
+    hint: say("later.hint", "Park a distraction here"), add: say("later.add", "Park it"),
+  },
+  path: {
+    title: say("path.title", "The path"), show: say("path.show", "Show the path"), hide: say("path.hide", "Hide the path"),
+    skipped: say("path.skipped", "skipped"), later: say("path.later", "later"), optional: say("path.optional", "optional"),
+    notThisRun: say("path.not_this_run", "not in this run"), gone: say("path.gone", "No longer in this guide"), done: say("path.done", "done"),
+    undo: say("path.undo", "Not done after all"), back: say("path.back", "Back on the path"), locked: say("path.locked", "Opens {when}."),
+  },
+  also: {
+    title: say("also.title", "Also here"), routines: say("also.routines", "Routines"), open: say("also.open", "{n} open"), codex: say("also.codex", "Codex"),
+    of: say("also.of", "of"), rank: say("also.rank", "rank {n}"), note: say("also.note", "Your note"), written: say("also.written", "written"), empty: say("also.empty", "empty"),
+  },
+  routines: {
+    empty: say("routines.empty", "This guide declares no routines. Guides that do use them for things you repeat — a town visit, the start of a session."),
+    lastReset: say("routines.last_reset", "last reset {when}"), gated: say("routines.gated", "opens"), reset: say("routines.reset", "Reset"),
+  },
+  resets: { session: say("resets.session", "resets each session"), daily: say("resets.daily", "resets daily"), weekly: say("resets.weekly", "resets weekly"), manual: say("resets.manual", "reset by hand") },
+  codex: {
+    nothing: say("codex.nothing", "Nothing to explain yet. Entries open themselves when a step needs them."),
+    nothingFirst: say("codex.nothing_first", "Nothing to explain yet. Entries open themselves when a step needs them — the first is {name}, {when}."),
+    what: say("codex.what", "What"), when: say("codex.when", "When"), how: say("codex.how", "How"), ignore: say("codex.ignore", "ignore until"),
+    moreLater: say("codex.more_later", "{n} more open later."), firstAt: say("codex.first_at", "The first is {name}, {when}."),
+  },
+  track: { ranks: say("track.ranks", "Ranks"), rankOf: say("track.rank_of", "rank {n} of {of}"), rank: say("track.rank", "Rank"), dayOne: say("track.day_one", "Day one"), notThisRun: say("track.not_this_run", "For {names} runs only.") },
+  note: { saved: say("note.saved", "Saved."), hint: say("note.hint", "One line for the person who opens this next. It's the first thing they'll read."), save: say("note.save", "Save the note") },
+  checkin: {
+    title: say("checkin.title", "Check in"), last: say("checkin.last", "Last checked in {when}. Change what has moved."), first: say("checkin.first", "The first check-in. Only what the guide asks for."),
+    appears: say("checkin.appears", "{label} appears {when}."), cancel: say("checkin.cancel", "Cancel"), save: say("checkin.save", "Save"),
+  },
+  proposal: {
+    title: say("proposal.title", "You're {summary} now — mark these {n} done?"), sub: say("proposal.sub", "Untick anything you haven't actually done."),
+    footer: say("proposal.footer", "Nothing changes until you confirm."), nothing: say("proposal.nothing", "Skip nothing"), mark: say("proposal.mark", "Mark {n} done"),
+  },
+  much: {
+    only: say("much.only", "Only this"), okay: say("much.okay", "Okay"), play: say("much.play", "Play for 15 minutes"),
+    playing: say("much.playing", "Play. Nothing is being counted, and nothing happens when it ends."), finished: say("much.finished", "That was fifteen minutes."), stop: say("much.stop", "Stop the timer"),
+  },
+  error: {
+    noAnswer: say("error.no_answer", "shrutivtuber.com didn't answer. Nothing was lost — try again."),
+    signedOut: say("error.signed_out", "Your session ended. Sign in again and this run picks up exactly where it is."), retry: say("error.retry", "Try again"),
+  },
+  newRun: {
+    starting: say("new.starting", "Starting…"), skipTitle: say("new.skip_title", "Skip the phases you have done before?"), steps: say("new.steps", "steps"),
+    skipFooter: say("new.skip_footer", "Skipped phases stay on the Path, greyed. You can walk back into any of them later."), skipN: say("new.skip_n", "Skip {n} steps"),
+  },
+  gate: {
+    words: { min: say("gate.min", "at {what} {n}"), max: say("gate.max", "up to {what} {n}"), atLeast: say("gate.at_least", "from {value}"), is: say("gate.is", "when {what} is {value}"), variant: say("gate.variant", "in {name}"), after: say("gate.after", "after {ids}"), once: say("gate.once", "once {names} is in play") },
+    short: { min: say("gate.s_min", "at {n}"), max: say("gate.s_max", "up to {n}"), atLeast: say("gate.s_at_least", "from {value}"), is: say("gate.s_is", "{value}"), variant: say("gate.s_variant", "{name}"), after: say("gate.s_after", "after {ids}"), once: say("gate.s_once", "with {names}") },
+  },
+};
+---
+
+<BaseLayout title={`${guide.title} — ${say("meta.suffix", "track")}`} description={say("meta.description", "Your place on the path.")} noindex bare>
+  {starting ? (
+    <main class="tk-new" data-new-run-root data-guide={String(guide.id)} data-words={JSON.stringify(WORDS)}>
+      <p class="tk-eyebrow"><a href={`/guides/${game}/${slug}`}>{guide.title}</a></p>
+      <h1 class="tk-new-title">{say("new.title", "Start a run")}</h1>
+      <p class="tk-quiet">{say("new.lede", "A run is your place on one path. You can keep several, and switch between them here.")}</p>
+      <form class="tk-new-form" data-new-run>
+        <label class="tk-field"><span class="tk-eyebrow">{say("new.name", "Name the run")}</span><input type="text" name="name" maxlength="80" placeholder={guide.title} /></label>
+        {variants.length > 0 && (
+          <div class="tk-field">
+            <span class="tk-eyebrow">{say("new.variant", "Which way are you playing?")}</span>
+            <div class="tk-seg">{variants.map((v, i) => <label><input type="radio" name="variant" value={v.id} checked={i === 0} /><span>{v.name}</span></label>)}</div>
+          </div>
+        )}
+        {skipGroups.length > 0 && (
+          <div class="tk-field">
+            <span class="tk-eyebrow">{say("new.played", "Have you played before?")}</span>
+            {skipGroups.map((g) => <label class="tk-check"><input type="checkbox" name="skip" value={g} /> <span>{say("new.skip_group", "I have finished:")} {groupNames(g)}</span></label>)}
+            <p class="tk-quiet">{say("new.promise", "Your answer becomes a proposal on the next screen. Nothing is skipped without you seeing the list.")}</p>
+          </div>
+        )}
+        <button type="submit" class="tk-primary">{say("new.go", "Start the run")}</button>
+        <p class="tk-mono" data-new-status></p>
+      </form>
+      {runs.length > 0 && <p class="tk-quiet"><a href={`/guides/${game}/${slug}/track`}>{say("new.back", "Back to your runs")}</a></p>}
+      <div class="tk-sheet" data-sheet hidden><div class="tk-sheet-scrim" data-sheet-close></div><div class="tk-sheet-card"><span class="tk-grab"></span><div data-sheet-body></div></div></div>
+    </main>
+  ) : (
+    <main class="tk" data-track data-words={JSON.stringify(WORDS)} data-doc={JSON.stringify(doc)} data-run={JSON.stringify(view)}>
+      <header class="tk-bar">
+        <a class="tk-back" href={`/guides/${game}/${slug}`}>{say("bar.read", "Read the guide")}</a>
+        <div class="tk-bar-mid">
+          <label class="tk-switch">
+            <span class="tk-eyebrow">{view.name}</span>
+            <select data-switch aria-label={say("bar.switch", "Your runs")}>
+              {runs.map((r) => <option value={r.id} selected={r.id === view.id}>{r.name}</option>)}
+              <option value="new">{say("bar.new", "New run…")}</option>
+            </select>
+            <span class="tk-mono" aria-hidden="true">▾</span>
+          </label>
+        </div>
+        <div class="tk-bar-acts">
+          <button type="button" class="tk-secondary sm" data-checkin>{say("bar.checkin", "Check in")}</button>
+          <button type="button" class="tk-ghost sm pill" data-much>{say("bar.much", "Too much")}</button>
+        </div>
+      </header>
+      <p class="tk-errorbar" data-error hidden><span data-error-text></span> <button type="button" class="tk-ghost sm" data-retry>{say("error.retry", "Try again")}</button></p>
+      <p class="tk-stale" data-stale hidden>{say("stale", "This guide has a newer version. Your progress is kept, including steps that no longer exist.")}</p>
+
+      <div class="tk-grid">
+        <section class="tk-main">
+          <div class="tk-sigil-row">
+            <div data-sigil></div>
+            <div class="tk-phase">
+              <span class="tk-eyebrow" data-phase-eyebrow></span>
+              <h1 class="tk-phase-name" data-phase-name></h1>
+              <span class="tk-mono" data-phase-meta></span>
+              <span class="tk-mono rose" data-done-line hidden></span>
+            </div>
+          </div>
+          <div class="tk-reentry" data-reentry hidden></div>
+          <div data-now></div>
+          <div class="tk-later" data-later></div>
+        </section>
+        <aside class="tk-side">
+          <div data-path></div>
+          <div class="tk-also" data-also></div>
+        </aside>
+      </div>
+
+      <section class="tk-section" id="routines">
+        <h2 class="tk-h2">{say("sec.routines", "Routines")}</h2>
+        <div data-routines></div>
+      </section>
+      <section class="tk-section" id="codex">
+        <h2 class="tk-h2">{say("sec.codex", "Codex")}</h2>
+        <div data-codex></div>
+      </section>
+      {(doc.tracks ?? []).map((t) => (
+        <section class="tk-section" id={`track-${t.id}`}>
+          <h2 class="tk-h2">{t.name}</h2>
+          <div data-track={t.id}></div>
+        </section>
+      ))}
+      <section class="tk-section" id="note">
+        <h2 class="tk-h2">{say("sec.note", "Your note")}</h2>
+        <textarea class="tk-note" data-note rows="3" maxlength="2000" placeholder={say("note.hint", "One line for the person who opens this next. It's the first thing they'll read.")}></textarea>
+        <div class="tk-note-acts"><button type="button" class="tk-secondary sm" data-save-note>{say("note.save", "Save the note")}</button><span class="tk-mono" data-note-status></span></div>
+      </section>
+
+      <div class="tk-sheet" data-sheet hidden><div class="tk-sheet-scrim" data-sheet-close></div><div class="tk-sheet-card"><span class="tk-grab"></span><div data-sheet-body></div></div></div>
+
+      <div class="tk-much sky" data-much-panel hidden>
+        <div class="tk-much-veil">
+          <span class="tk-eyebrow">{say("much.only", "Only this")}</span>
+          <p class="tk-much-line" data-much-line></p>
+        </div>
+        <div class="sky-horizon"></div>
+        <div class="tk-much-acts">
+          <div class="tk-much-timer"><span class="tk-clock" data-clock>15:00</span><p class="tk-quiet" data-timer-said></p><button type="button" class="tk-secondary" data-timer-stop>{say("much.stop", "Stop the timer")}</button></div>
+          <button type="button" class="tk-primary big" data-much-close>{say("much.okay", "Okay")}</button>
+          <button type="button" class="tk-secondary" data-timer>{say("much.play", "Play for 15 minutes")}</button>
+        </div>
+      </div>
+    </main>
+  )}
+</BaseLayout>
+
+<style is:global>
+  .tk, .tk-new { font-family: var(--font-body); color: var(--ink); max-width: var(--page-max); margin-inline: auto; }
+  .tk-new { padding: var(--space-6) var(--page-pad) var(--space-9); display: flex; flex-direction: column; gap: 18px; max-width: 40rem; }
+  .tk-new-title { margin: 0; font-family: var(--font-display); font-size: var(--text-h1); font-weight: 500; }
+  .tk-new-form { display: flex; flex-direction: column; gap: 18px; }
+  .tk-eyebrow { font-size: var(--text-micro); font-weight: 600; letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; color: var(--ink-faint); }
+  .tk-eyebrow.rose { color: var(--rose); }
+  .tk-eyebrow a { color: inherit; text-decoration: none; }
+  .tk-mono { font-family: var(--font-mono); font-size: 12px; color: var(--ink-faint); font-variant-numeric: tabular-nums; }
+  .tk-mono.accent { color: var(--accent); }
+  .tk-mono.rose { color: var(--rose); }
+  .tk-quiet { margin: 0; font-size: var(--text-sm); line-height: 1.6; color: var(--ink-faint); }
+  .tk-quiet a { color: var(--accent); }
+  .tk-bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px var(--page-pad); border-bottom: var(--border-w) solid var(--line); background: var(--surface-card); }
+  .tk-back { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--ink-faint); text-decoration: none; }
+  .tk-switch { display: inline-flex; align-items: center; gap: 10px; position: relative; cursor: pointer; }
+  .tk-switch select { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; }
+  .tk-bar-acts { display: flex; gap: 10px; }
+  .tk-primary, .tk-secondary, .tk-ghost, .tk-done { font: 600 15px var(--font-body); border-radius: var(--radius-sm); cursor: pointer; border: var(--border-w) solid transparent; padding: 0 22px; min-height: 48px; }
+  .tk-primary { background: var(--accent); color: var(--on-accent); }
+  .tk-primary.big { min-height: 56px; }
+  .tk-secondary { background: transparent; color: var(--accent); border-color: var(--line-strong); }
+  .tk-ghost { background: transparent; color: var(--accent); }
+  .tk-ghost.pill, .tk-secondary.sm, .tk-ghost.sm { min-height: 32px; padding: 0 14px; font-size: var(--text-sm); }
+  .tk-ghost.pill { border-color: var(--line-strong); border-radius: var(--radius-full); }
+  .tk-primary:active, .tk-done:active { transform: translateY(1px); }
+  .tk-errorbar, .tk-stale { margin: 0; padding: 10px var(--page-pad); border-bottom: var(--border-w) solid var(--line); font-size: var(--text-sm); color: var(--ink-soft); background: var(--surface-inset); display: flex; gap: 12px; align-items: center; }
+  .tk-grid { display: grid; grid-template-columns: minmax(0, 1fr) 380px; }
+  .tk[data-folded="1"] .tk-grid { grid-template-columns: minmax(0, 1fr) 260px; }
+  .tk-main { padding: 40px var(--page-pad) 40px; display: flex; flex-direction: column; gap: 26px; border-right: var(--border-w) solid var(--line); min-width: 0; }
+  .tk-side { padding: 40px 32px; display: flex; flex-direction: column; gap: 26px; background: var(--surface-card); }
+  .tk-sigil-row { display: flex; align-items: center; gap: 24px; }
+  .sg { position: relative; flex: none; }
+  .sg svg { display: block; }
+  .sg-fill { transition: stroke-dasharray 600ms cubic-bezier(.2,.7,.3,1); }
+  .sg-label { position: absolute; inset: 0; display: grid; place-items: center; font-family: var(--font-mono); color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+  .tk-phase { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .tk-phase-name { margin: 0; font-family: var(--font-display); font-size: 26px; font-weight: 600; line-height: 1.2; }
+  .tk-reentry { background: var(--rose-wash); border-radius: var(--radius-md); padding: 14px 18px; display: flex; flex-direction: column; gap: 6px; max-width: 62ch; }
+  .tk-re-line { margin: 0; font-size: 15px; }
+  .tk-re-note { margin: 0; font-family: var(--font-display); font-style: italic; font-size: 17px; color: var(--ink); }
+  .tk-now { position: relative; background: var(--surface-card); border: var(--border-w) solid var(--accent); border-radius: var(--radius-md); box-shadow: var(--shadow-1); padding: 30px 32px 28px; display: flex; flex-direction: column; gap: 16px; max-width: 62ch; overflow: hidden; }
+  .tk-now.empty { border-color: var(--line); }
+  .tk-empty { margin: 0; font-family: var(--font-display); font-size: 19px; line-height: 1.6; }
+  .tk-now-title { margin: 0; font-family: var(--font-display); font-size: 36px; line-height: 1.12; font-weight: 600; text-wrap: pretty; }
+  .tk-now-do { margin: 0; font-family: var(--font-display); font-size: 19px; line-height: 1.7; white-space: pre-line; }
+  .tk-now-meta { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  .tk-now-meta .tk-mono { font-size: 13.5px; color: var(--ink-soft); }
+  .tk-pill { display: inline-flex; align-items: center; gap: 8px; border: var(--border-w) solid var(--line); border-radius: var(--radius-full); padding: 6px 14px 6px 7px; font-size: 13.5px; color: var(--accent); text-decoration: none; }
+  .tk-play { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: var(--radius-full); background: var(--accent-wash); flex: none; }
+  .tk-play span { display: block; width: 0; height: 0; border-left: 7px solid var(--accent); border-top: 5px solid transparent; border-bottom: 5px solid transparent; margin-left: 2px; }
+  .tk-now-more { display: flex; flex-direction: column; gap: 10px; padding-top: 6px; border-top: var(--border-w) solid var(--line); }
+  .tk-line { margin: 0; font-size: 14.5px; line-height: 1.65; color: var(--ink-soft); white-space: pre-line; }
+  .tk-line b { color: var(--ink); font-weight: 600; }
+  .tk-why { margin: 0; font-family: var(--font-display); font-size: 18px; line-height: 1.72; }
+  .tk-links { display: flex; flex-wrap: wrap; gap: 8px; }
+  .tk-codex-rule { border-left: 2px solid var(--rose); padding: 4px 0 4px 14px; display: flex; flex-direction: column; gap: 4px; font-family: var(--font-display); font-size: 16px; }
+  .tk-now-acts { display: flex; gap: 12px; padding-top: 6px; flex-wrap: wrap; }
+  .tk-done { min-width: 220px; min-height: 52px; background: var(--accent); color: var(--on-accent); font-size: 17px; }
+  .tk-now.ignite { border-color: var(--rose); border-width: 1.5px; }
+  .tk-now.ignite::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 1px; background: var(--rose); transform-origin: left; animation: tk-horizon 300ms cubic-bezier(.2,.7,.3,1) forwards; }
+  @keyframes tk-horizon { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+  .tk-now.collapse { max-height: 0; opacity: 0; transform: translateY(-6px); padding-top: 0; padding-bottom: 0; transition: max-height 80ms cubic-bezier(.45,0,.25,1), opacity 80ms cubic-bezier(.45,0,.25,1), transform 80ms cubic-bezier(.45,0,.25,1); }
+  .tk-now.unfold { opacity: 0; transform: translateY(6px); }
+  .tk-now { transition: opacity 100ms cubic-bezier(.2,.7,.3,1), transform 100ms cubic-bezier(.2,.7,.3,1); }
+  @media (prefers-reduced-motion: reduce) { .tk-now, .sg-fill, .tk-now.collapse { transition: none !important; animation: none !important; } }
+  .tk-sec-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; border-bottom: var(--border-w) solid var(--line); padding-bottom: 10px; }
+  .tk-fold { margin-left: auto; font: 500 var(--text-xs) var(--font-body); color: var(--accent); background: none; border: 0; cursor: pointer; }
+  .tk-later { display: flex; flex-direction: column; gap: 12px; max-width: 62ch; }
+  .tk-row { display: flex; align-items: baseline; gap: 10px; text-decoration: none; color: inherit; }
+  .tk-row-text { font-size: 15px; color: var(--ink); }
+  .tk-row-text.accent { color: var(--accent); }
+  .tk-leader { flex: 1; border-bottom: 1px dotted var(--line-strong); transform: translateY(-4px); min-width: 20px; }
+  .tk-x { background: none; border: 0; color: var(--ink-faint); cursor: pointer; font-family: var(--font-mono); }
+  .tk-park { display: flex; gap: 8px; }
+  .tk-park input { flex: 1; font: inherit; padding: 8px 10px; border: var(--border-w) solid var(--line); border-radius: var(--radius-sm); background: var(--surface-page); color: var(--ink); }
+  .tk-path { display: flex; flex-direction: column; }
+  .tk-ph { display: flex; align-items: baseline; justify-content: space-between; padding: 14px 0 7px; border-top: var(--border-w) solid var(--line-strong); margin-top: 6px; }
+  .tk-ph-name { font-family: var(--font-display); font-size: 15px; font-weight: 600; color: var(--ink-faint); }
+  .tk-ph.now .tk-ph-name { color: var(--ink); }
+  .tk-ph.done .tk-ph-name { color: var(--ink-soft); }
+  .tk-step { display: flex; align-items: center; gap: 12px; padding: 8px 0; cursor: pointer; }
+  .tk-step-title { flex: 1; min-width: 0; font-size: 14px; color: var(--ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tk-step.current { padding: 10px 10px; margin: 2px -10px; background: var(--accent-wash); border-radius: 4px; }
+  .tk-step.current .tk-step-title { font-weight: 600; color: var(--ink); }
+  .tk-step.available .tk-step-title { color: var(--ink); }
+  .tk-step.locked .tk-step-title, .tk-step.faint .tk-step-title { color: var(--ink-faint); }
+  .tk-step.skipped .tk-step-title { text-decoration: line-through; color: var(--ink-faint); }
+  .tk-row-menu { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 4px 0 8px 26px; }
+  .dot { display: block; flex: none; box-sizing: border-box; }
+  .dot.dash { width: 14px; height: 3px; border-radius: 2px; }
+  .dot.dash.rose { background: var(--rose); }
+  .dot.dash.faint { background: var(--ink-faint); }
+  .dot.disc { width: 14px; height: 14px; border-radius: 999px; background: var(--accent); }
+  .dot.ring { width: 14px; height: 14px; border-radius: 999px; border: 3px solid var(--ink); }
+  .dot.hollow { width: 14px; height: 14px; border-radius: 999px; border: 1.5px solid var(--ink-faint); }
+  .tk-also { display: flex; flex-direction: column; gap: 10px; border-top: var(--border-w) solid var(--line); padding-top: 18px; }
+  .tk-section { padding: 32px var(--page-pad); border-top: var(--border-w) solid var(--line); display: flex; flex-direction: column; gap: 14px; max-width: 66ch; }
+  .tk-h2 { margin: 0; font-family: var(--font-display); font-size: var(--text-h2); font-weight: 600; }
+  .tk-routine, .tk-entry { border-top: var(--border-w) solid var(--line); padding: 10px 0; }
+  .tk-routine > summary, .tk-entry > summary { display: flex; align-items: center; gap: 12px; cursor: pointer; list-style: none; }
+  .tk-routine > summary::-webkit-details-marker, .tk-entry > summary::-webkit-details-marker { display: none; }
+  .tk-entry.soon { display: flex; align-items: center; gap: 12px; }
+  .tk-routine-items, .tk-entry-body, .tk-ranks { display: flex; flex-direction: column; gap: 8px; padding: 10px 0 0 26px; }
+  .tk-check { display: flex; gap: 10px; align-items: flex-start; font-size: 14.5px; line-height: 1.5; cursor: pointer; }
+  .tk-check input { width: 18px; height: 18px; margin-top: 2px; accent-color: var(--accent); }
+  .tk-check.big { padding: 10px 0; border-bottom: var(--border-w) solid var(--line); }
+  .tk-check.big > span { display: flex; flex-direction: column; gap: 3px; }
+  .struck { text-decoration: line-through; color: var(--ink-faint); }
+  .tk-notes { border: var(--border-w) solid var(--rose); border-radius: var(--radius-md); padding: 12px 16px; display: flex; flex-direction: column; gap: 6px; }
+  .tk-notes ul { margin: 0; padding-left: 1.1em; font-size: 14.5px; color: var(--ink-soft); }
+  .tk-counter { display: flex; flex-direction: column; gap: 8px; padding-top: 10px; }
+  .tk-stepper { display: inline-flex; align-items: center; gap: 6px; }
+  .tk-stepper button { width: 48px; height: 48px; border: var(--border-w) solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-card); font: 600 20px var(--font-body); color: var(--ink); cursor: pointer; }
+  .tk-stepper .tk-count, .tk-stepper input { width: 56px; text-align: center; font: 500 20px var(--font-mono); color: var(--ink); background: transparent; border: 0; }
+  .tk-nudge { margin: 0; padding: 10px 14px; background: var(--rose-wash); border-radius: var(--radius-sm); font-size: 14px; }
+  .tk-note { width: 100%; box-sizing: border-box; font: 400 17px var(--font-display); line-height: 1.6; padding: 12px 14px; border: var(--border-w) solid var(--line); border-radius: var(--radius-sm); background: var(--surface-page); color: var(--ink); resize: vertical; }
+  .tk-note-acts { display: flex; align-items: center; gap: 12px; }
+  .tk-field { display: flex; flex-direction: column; gap: 8px; }
+  .tk-field select, .tk-field input[type="text"] { font: inherit; padding: 10px 12px; border: var(--border-w) solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-page); color: var(--ink); }
+  .tk-seg { display: flex; flex-wrap: wrap; gap: 6px; }
+  .tk-seg label { position: relative; }
+  .tk-seg input { position: absolute; opacity: 0; inset: 0; }
+  .tk-seg span { display: inline-block; padding: 8px 14px; border: var(--border-w) solid var(--line-strong); border-radius: var(--radius-sm); font-size: var(--text-sm); color: var(--ink); cursor: pointer; }
+  .tk-seg input:checked + span { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+  .tk-sheet { position: fixed; inset: 0; z-index: 20; display: flex; align-items: flex-end; justify-content: center; }
+  .tk-sheet-scrim { position: absolute; inset: 0; background: rgba(9,12,22,.42); }
+  .tk-sheet-card { position: relative; width: min(560px, 100%); max-height: 88vh; overflow-y: auto; background: var(--surface-card); border-radius: 16px 16px 0 0; box-shadow: var(--shadow-3); padding: 12px 22px 22px; display: flex; flex-direction: column; gap: 12px; }
+  .tk-grab { width: 40px; height: 4px; border-radius: 2px; background: var(--line-strong); margin: 0 auto 6px; }
+  .tk-sheet-title { margin: 0; font-family: var(--font-display); font-size: 24px; font-weight: 600; }
+  .tk-sheet-acts { display: flex; justify-content: flex-end; gap: 10px; padding-top: 8px; }
+  [data-sheet-body] form { display: flex; flex-direction: column; gap: 14px; }
+  .tk-much { position: fixed; inset: 0; z-index: 30; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 40px var(--page-pad); gap: 24px; }
+  .tk-much-veil { background: var(--surface-veil); border-radius: 16px; padding: 30px 32px; max-width: 560px; width: 100%; display: flex; flex-direction: column; gap: 12px; box-shadow: var(--shadow-1); }
+  .tk-much-line { margin: 0; font-family: var(--font-display); font-size: 31px; line-height: 1.15; }
+  .tk-much .sky-horizon { position: absolute; left: 0; right: 0; bottom: 40%; }
+  .tk-much-acts { display: flex; flex-direction: column; gap: 12px; width: min(560px, 100%); }
+  .tk-much-timer { display: none; flex-direction: column; align-items: center; gap: 12px; text-align: center; }
+  .tk-much[data-timer="1"] .tk-much-timer { display: flex; }
+  .tk-much[data-timer="1"] [data-timer] { display: none; }
+  .tk-clock { font: 500 56px var(--font-mono); font-variant-numeric: tabular-nums; }
+  @media (max-width: 900px) { .tk-grid { grid-template-columns: 1fr !important; } .tk-main { border-right: 0; } .tk-side { border-top: var(--border-w) solid var(--line); } }
+</style>
+
+<script>
+  import { mountTrack, mountNewRun } from "../../../../lib/track";
+  const track = document.querySelector<HTMLElement>("[data-track]");
+  if (track) mountTrack(track);
+  const fresh = document.querySelector<HTMLElement>("[data-new-run-root]");
+  if (fresh) mountNewRun(fresh);
+</script>

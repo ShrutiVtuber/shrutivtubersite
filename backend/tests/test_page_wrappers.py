@@ -41,6 +41,7 @@ LAYS_ITSELF_OUT = {
     "guides/[game]/[slug].astro",
     "guides/write/[version].astro",
     "guides/write/[version]/preview.astro",
+    "guides/[game]/[slug]/track.astro",
     "classes/[slug]/[lesson].astro",
     # The compatibility page opens on a full-bleed sky panel that has to reach
     # both edges of the window, so it cannot sit inside a fixed-width wrapper.

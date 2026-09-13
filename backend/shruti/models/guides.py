@@ -135,3 +135,47 @@ class GuideReport(TimestampMixin, table=True):
     detail: str = ""
     reviewed_at: Optional[datetime] = Field(default=None, sa_type=UTC_TS)
     outcome: str = ""            # upheld | dismissed
+
+
+class GuideRun(TimestampMixin, table=True):
+    """
+    One person's progress through one guide — the spec's "character",
+    generalised. A person may keep several runs of the same guide and
+    switch between them.
+
+    ⚠ Progress is keyed by step id and lives in JSON columns, so a new
+    version of the guide never deletes any of it: ids the version no longer
+    has are kept and shown greyed. `version_id` is the version the run last
+    followed, for "this guide has a newer version" — never a constraint.
+
+    ⚠ Only what a person SET is stored — done, skipped, later, ticks, the
+    check-in. Locked, available and current are computed by the shared
+    engine on every read, never written, so nothing here can disagree with
+    the guide.
+    """
+
+    __tablename__ = "guide_run"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    guide_id: int = Field(index=True, foreign_key="guide.id")
+    user_id: int = Field(index=True, foreign_key="site_user.id")
+    version_id: Optional[int] = Field(default=None)
+    name: str = ""
+    variant: str = ""
+    checkin: dict = Field(default_factory=dict, sa_column=Column(JSONB, nullable=False))
+    # step id → {"state": done|skipped|later, "at": iso}
+    steps: dict = Field(default_factory=dict, sa_column=Column(JSONB, nullable=False))
+    # routine id → {"ticked": [item ids], "reset_at": iso}
+    routines: dict = Field(default_factory=dict, sa_column=Column(JSONB, nullable=False))
+    # track id → {"rank": n, "day_one": [ids], "counters": {id: n}}
+    tracks: dict = Field(default_factory=dict, sa_column=Column(JSONB, nullable=False))
+    # [{"text": …, "step": id|null, "at": iso}] — parked, never ordered by urgency, never expiring
+    later: list = Field(default_factory=list, sa_column=Column(JSONB, nullable=False))
+    # One note per run, overwritten, never versioned.
+    note: str = ""
+    # step id → [links] the person edited on their own run
+    link_overrides: dict = Field(default_factory=dict, sa_column=Column(JSONB, nullable=False))
+    # The last step done and when — drives the re-entry block after six hours.
+    last_done: str = ""
+    last_done_at: Optional[datetime] = Field(default=None, sa_type=UTC_TS)
+    last_seen_at: Optional[datetime] = Field(default=None, sa_type=UTC_TS)

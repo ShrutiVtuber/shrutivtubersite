@@ -108,7 +108,7 @@ def test_a_games_page_is_an_almanac_table() -> None:
 
 def test_the_reader_is_one_component_for_the_page_and_the_preview() -> None:
     """A preview that is a lookalike drifts."""
-    assert "<Reader guide={guide} signedIn={!!me} />" in PAGE
+    assert "<Reader guide={guide} signedIn={!!me} trackHref=" in PAGE
     assert "<Reader guide={guide} signedIn preview />" in PREVIEW
     assert "const actions = !preview;" in READER
 
@@ -165,11 +165,13 @@ def test_the_actions_follow_the_practice_room() -> None:
     assert body.count("it has gone to Shruti") == 1            # the same words, first or fourth
 
 
-def test_the_reader_does_not_promise_tracking() -> None:
-    """Nothing on the page claims progress can be kept until it can."""
-    for body in (without_comments(READER), without_comments(PAGE)):
-        assert "Track this" not in body and "keeps your place" not in body and "remembers which step" not in body
-    assert "/download" in without_comments(READER)
+def test_tracking_is_offered_only_where_it_exists() -> None:
+    """A published, visible guide can be tracked; a draft or a hidden one says nothing about it."""
+    assert "trackHref={guide.publishedAt && !guide.hidden ? `/guides/${game}/${slug}/track` : \"\"}" in PAGE
+    body = without_comments(READER)
+    assert "{actions && trackHref && (" in body               # the rail block and the end card
+    assert body.count("trackHref && (") == 2
+    assert "/download" in body
 
 
 def test_the_licence_is_stated_or_said_to_be_missing() -> None:

@@ -25,8 +25,10 @@ interface Props {
   guide: GuideSummary & { body: GuideDoc };
   signedIn: boolean;
   preview?: boolean;
+  /** The track page for this guide — present only for a published guide. */
+  trackHref?: string;
 }
-const { guide, signedIn, preview = false } = Astro.props;
+const { guide, signedIn, preview = false, trackHref = "" } = Astro.props;
 const say = await copy("component:GuideReader");
 
 const doc = guide.body;
@@ -95,6 +97,15 @@ const actions = !preview;
         {(groups.length > 0 || notes.length > 0) && <a href="#codex">{say("rail.codex", "Codex")} · {(doc.codex ?? []).length}</a>}
       </nav>
     </div>
+
+    {actions && trackHref && (
+      <div class="rd-rail-block rd-track">
+        <a class="rd-btn" href={signedIn ? trackHref : `/signin?next=${encodeURIComponent(trackHref)}`}>
+          {signedIn ? say("track", "Track this") : say("track.signin", "Sign in to track this")}
+        </a>
+        <span class="rd-quiet">{say("track.note", "Tracking is free with an account. It keeps your place, nothing else.")}</span>
+      </div>
+    )}
 
     <div class="rd-rail-block rd-facts">
       <div class="rd-fact">
@@ -311,6 +322,17 @@ const actions = !preview;
         ))}
       </section>
     )}
+    {actions && trackHref && (
+      <div class="rd-card">
+        <div class="rd-card-words">
+          <span class="rd-card-title">{say("card.title", "Reading is enough. Tracking is better.")}</span>
+          <span class="rd-card-body">{say("card.body", "Sign in and this page remembers which step you are on, on every device.")}</span>
+        </div>
+        <a class="rd-btn lg" href={signedIn ? trackHref : `/signin?next=${encodeURIComponent(trackHref)}`}>
+          {signedIn ? say("card.track", "Track this") : say("card.signin", "Sign in")}
+        </a>
+      </div>
+    )}
   </article>
 </div>
 
@@ -318,7 +340,14 @@ const actions = !preview;
   .rd { display: grid; grid-template-columns: 264px minmax(0, 1fr); font-family: var(--font-body); color: var(--ink); }
   .rd-rail { border-right: var(--border-w) solid var(--line); padding: var(--space-6) var(--space-5); display: flex; flex-direction: column; gap: 22px; background: var(--surface-card); align-self: start; position: sticky; top: 0; max-height: 100vh; overflow-y: auto; }
   .rd-rail-block { display: flex; flex-direction: column; gap: 8px; }
-  .rd-facts { border-top: var(--border-w) solid var(--line); padding-top: 18px; }
+  .rd-facts, .rd-track { border-top: var(--border-w) solid var(--line); padding-top: 18px; }
+  .rd-btn { display: inline-flex; align-items: center; justify-content: center; font: 600 var(--text-sm) var(--font-body); padding: 10px 16px; border-radius: var(--radius-sm); background: var(--accent); color: var(--on-accent); text-decoration: none; }
+  .rd-btn:hover { background: var(--accent-hover); }
+  .rd-btn.lg { padding: 13px 22px; font-size: 15px; flex: none; }
+  .rd-card { max-width: 66ch; border: var(--border-w) solid var(--line); border-radius: var(--radius-md); background: var(--surface-card); box-shadow: var(--shadow-1); padding: 22px 24px; display: flex; align-items: center; justify-content: space-between; gap: 24px; flex-wrap: wrap; }
+  .rd-card-words { display: flex; flex-direction: column; gap: 6px; }
+  .rd-card-title { font-family: var(--font-display); font-size: 19px; font-weight: 600; color: var(--ink); }
+  .rd-card-body { font-size: var(--text-sm); line-height: 1.6; color: var(--ink-soft); }
   .rd-eyebrow { font-size: var(--text-micro); font-weight: 600; letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; color: var(--ink-faint); }
   .rd-eyebrow.rose { color: var(--rose); }
   .rd-index { display: flex; flex-direction: column; }

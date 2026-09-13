@@ -70,7 +70,7 @@ const jsonLd = guide.publishedAt && !guide.hidden
     {!guide.hidden && !guide.publishedAt && (
       <p class="rd-down" role="status">{say("draft", "This is your draft. Only you can see it until it is published.")}</p>
     )}
-    <Reader guide={guide} signedIn={!!me} />
+    <Reader guide={guide} signedIn={!!me} trackHref={guide.publishedAt && !guide.hidden ? `/guides/${game}/${slug}/track` : ""} />
   </main>
 </BaseLayout>
 
