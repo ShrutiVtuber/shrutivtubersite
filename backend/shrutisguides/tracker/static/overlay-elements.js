@@ -125,6 +125,11 @@ var OverlayElements = (() => {
       slot.innerHTML = `<div class="gov-plate gov-goal"><span class="gov-eyebrow">${esc(g.name)}</span><span class="title">${esc(g.goal)}</span><span class="gov-mono count">${esc(g.count)}${g.tiers ? ` \xB7 tier ${esc(g.tier)} of ${esc(g.tiers)}` : ""}</span><div class="tiers">${(g.parts ?? []).map((p) => `<span class="tier ${esc(p.state)}"><span class="fill" style="width:${(Math.max(0, Math.min(1, p.pct || 0)) * 100).toFixed(1)}%"></span></span>`).join("")}</div><span class="crew">${esc(line)}</span></div>`;
       return;
     }
+    if (kind === "counter") {
+      const c = next && next.text != null ? next : null;
+      slot.innerHTML = c ? `<div class="gov-plate gov-counter"><span class="gov-eyebrow">${esc(c.name)}</span><span class="gov-mono number">${esc(c.text)}</span>${c.target_text ? `<span class="of">${esc(c.target_text)}</span>` : ""}</div>` : "";
+      return;
+    }
     if (kind === "guide-routine") {
       const r = next?.routine;
       slot.innerHTML = r ? `<div class="gov-plate gov-routine"><div class="head"><span class="name">${esc(r.name)}</span><span class="gov-mono count">${esc(r.count)}</span></div><div>${(r.items ?? []).map((i) => `<div class="item ${i.done ? "done" : ""}"><span class="dot ${i.done ? "done" : "available"}"></span><span>${esc(i.text)}</span></div>`).join("")}</div></div>` : "";

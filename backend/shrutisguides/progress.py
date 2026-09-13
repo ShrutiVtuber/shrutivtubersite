@@ -23,7 +23,10 @@ from shrutisguides import engine
 REENTRY_AFTER = timedelta(hours=6)
 STATES = ("done", "skipped", "later", "open")
 GUIDE_KINDS = ("guide-now", "guide-sigil", "guide-path", "guide-routine", "guide-layout")
-ELEMENT_KINDS = ("guide-now", "guide-sigil", "guide-path", "guide-routine", "guide-goal")
+ELEMENT_KINDS = ("guide-now", "guide-sigil", "guide-path", "guide-routine", "guide-goal", "counter")
+# The two kinds a host fills in rather than the run: a group's goal and the
+# site's counter. The self-hosted tracker has neither and draws them empty.
+HOST_KINDS = ("guide-goal", "counter")
 # Where each element sits when nobody has moved it: the boards' positions at
 # 1920 × 1080, so a layout with no coordinates is the frame the design shows.
 DEFAULT_PLACES = {
@@ -32,6 +35,7 @@ DEFAULT_PLACES = {
     "guide-path": {"x": 72, "y": 936, "w": 1776},
     "guide-routine": {"x": 72, "y": 640, "w": 760},
     "guide-goal": {"x": 72, "y": 300, "w": 860},
+    "counter": {"x": 1416, "y": 300, "w": 432},
 }
 THEMES = ("almanac", "grimoire", "plain")
 MOTIONS = ("full", "reduced", "still")
@@ -306,6 +310,7 @@ def clean_layout(layout: Any) -> list[dict]:
             "shows": str(e.get("shows") or "")[:40],
             # A goal element draws a group, not the run: the group's join code.
             "group": str(e.get("group") or "")[:12].upper(),
+            "counter_id": num("counter_id", 0, 0, 10**9),
         })
     return out[:12]
 
@@ -314,4 +319,4 @@ def layout_elements(layout: list[dict], stored: dict, doc: dict) -> list[dict]:
     """Every element of a layout, drawn: the placement plus what the element shows."""
     # A goal element is a group's, not the run's; the host fills it in (the
     # site knows groups, the self-hosted tracker has none and draws it empty).
-    return [{**e, "element": {} if e["kind"] == "guide-goal" else element(e["kind"], stored, doc, e.get("routine_id", ""))} for e in layout]
+    return [{**e, "element": {} if e["kind"] in HOST_KINDS else element(e["kind"], stored, doc, e.get("routine_id", ""))} for e in layout]

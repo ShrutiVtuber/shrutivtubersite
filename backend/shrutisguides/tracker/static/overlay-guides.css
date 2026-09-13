@@ -1,6 +1,3 @@
-/* Type for a self-hosted overlay: system faces with the same roles. No webfont is fetched from anywhere. */
-:root { --font-display: "EB Garamond", "Noto Serif Devanagari", Georgia, "Times New Roman", serif; --font-body: "Commissioner", "Mukta", -apple-system, "Segoe UI", system-ui, sans-serif; --font-mono: "JetBrains Mono", "Noto Sans Devanagari", ui-monospace, Menlo, monospace; }
-html, body { margin: 0; padding: 0; background: transparent !important; overflow: hidden; width: 1920px; height: 1080px; }
 /* Shruti's Guides on stream: six elements, three skins, one layout.
  *
  * Built on the shared overlay ground (overlay.css): transparent, 1920x1080,
@@ -130,6 +127,21 @@ html, body { margin: 0; padding: 0; background: transparent !important; overflow
 .gov-path .it.skipped span:last-child { text-decoration: line-through; }
 
 /* ── the routine · 760 wide at left 72, bottom 72 ──────────────────────── */
+/* The counter — auto width: label 22px eyebrow, number 72px mono tabular. */
+.gov-counter { left: 1416px; top: 300px; width: 432px; padding: 24px 32px; display: flex; flex-direction: column; gap: 4px; }
+.gov-counter .number { font-size: 72px; line-height: 1; font-variant-numeric: tabular-nums; }
+.gov-counter .of { font-size: 24px; color: var(--gt-ink-soft, inherit); }
+.gov-placed .gov-counter { left: auto; top: auto; }
+/* The goal — 860px: title 34, count 30 mono, tier bars 14px tall, the crew at 24. */
+.gov-goal { left: 72px; top: 300px; width: 860px; padding: 28px 32px; display: flex; flex-direction: column; gap: 14px; }
+.gov-goal .title { font-size: 34px; line-height: 1.15; font-weight: 600; }
+.gov-goal .count { font-size: 30px; }
+.gov-goal .tiers { display: flex; gap: 8px; margin-top: 6px; }
+.gov-goal .tier { flex: 1; height: 14px; background: var(--gt-faint); opacity: .9; position: relative; overflow: hidden; }
+.gov-goal .tier .fill { position: absolute; inset: 0 auto 0 0; background: var(--st-now); }
+.gov-goal .tier.done .fill { background: var(--st-done); }
+.gov-goal .crew { font-size: 24px; color: var(--gt-ink-soft, inherit); }
+.gov-placed .gov-goal { left: auto; top: auto; }
 .gov-routine { left: 72px; bottom: 72px; width: 760px; padding: 28px 32px; display: flex; flex-direction: column; gap: 18px; }
 .gov-routine .head { display: flex; align-items: baseline; justify-content: space-between; }
 .gov-routine .name { font: 600 32px var(--gt-display); color: var(--gt-ink); }

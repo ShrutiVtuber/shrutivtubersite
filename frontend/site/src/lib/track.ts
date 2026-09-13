@@ -250,6 +250,18 @@ export function mountTrack(root: HTMLElement) {
   };
   const drawNote = () => { const el = $<HTMLTextAreaElement>("[data-note]"); if (el && document.activeElement !== el) el.value = view.note ?? ""; };
 
+  $("[data-import]")?.addEventListener("change", async (ev) => {
+    const input = ev.currentTarget as HTMLInputElement;
+    const note = $("[data-file-note]");
+    const tell = (t: string) => { if (note) { note.textContent = t; note.hidden = false; } };
+    const file = input.files?.[0]; if (!file) return;
+    let run: any = null;
+    try { run = JSON.parse(await file.text()); } catch { run = null; }
+    if (!run || typeof run !== "object") { tell(W.file.bad); input.value = ""; return; }
+    const r = await api("POST", "/api/runs/import", { guide_id: Number(root.dataset.guide || 0), run });
+    if (r.ok) { location.href = `${location.pathname}?run=${r.body.id}`; return; }
+    tell(r.status === 422 ? W.file.bad : W.file.failed); input.value = "";
+  });
   const draw = () => { drawHead(); drawNow(); drawLater(); drawPath(); drawAlso(); drawRoutines(); drawCodex(); drawTracks(); drawNote(); drawOverlays(); };
 
   /* ── the Done moment ─────────────────────────────────────────────────── */
@@ -334,6 +346,16 @@ export function mountTrack(root: HTMLElement) {
       box.querySelector("[data-copy]")!.addEventListener("click", async () => { try { await navigator.clipboard.writeText(url); box.querySelector("[data-copied]")!.textContent = W.overlays.copied; } catch {} });
       const list = await fetch(`/api/runs/${view.id}/overlays`); if (list.ok) { overlays = await list.json(); drawOverlays(); }
       return;
+    }
+    if (btn?.matches("[data-export]")) {
+      const r = await fetch(`/api/runs/${view.id}/export`);
+      if (!r.ok) return;
+      const blob = await r.blob();
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `${location.pathname.split("/")[3] || "run"}.run.json`;
+      document.body.appendChild(a); a.click(); a.remove();
+      window.setTimeout(() => URL.revokeObjectURL(a.href), 1000);
     }
     if (form.matches("[data-proposal-form]")) { event.preventDefault(); const ids = Array.from(form.querySelectorAll<HTMLInputElement>("input[name=step]:checked")).map((x) => x.value); closeSheet(); if (ids.length) await act(() => call("POST", `/api/runs/${view.id}/accept`, { steps: ids })); return; }
   });

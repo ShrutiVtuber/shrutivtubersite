@@ -96,12 +96,32 @@ async def _goal_frame(session: AsyncSession, token: OverlayToken, base: dict) ->
     return base
 
 
+def _counter_element(c, prog: dict) -> dict:
+    """€184 of €300, or 14 of 20 — the wording the site's own counter page uses."""
+    cur, target = prog.get("current", 0), c.target or 0
+    if c.unit == "money":
+        sym = {"EUR": "€", "USD": "$", "GBP": "£"}.get((c.currency or "EUR").upper(), (c.currency or "") + " ")
+        text, target_text = f"{sym}{cur:,.0f}", (f"of {sym}{target:,.0f}" if target else "")
+    else:
+        text, target_text = f"{cur:,}", (f"of {target:,}" if target else "")
+    return {"name": c.name, "text": text, "target_text": target_text, "current": cur, "target": target, "unit": c.unit}
+
+
 async def _fill_goals(session: AsyncSession, elements: list[dict]) -> None:
-    """The goal elements of a layout name a group by its code; the site draws them."""
+    """
+    The host's elements of a layout: a goal names a group by its code, a
+    counter names one of her counters by id. The site draws both; a tracker
+    draws neither.
+    """
     from shruti.api.routes.groups import goal_by_code
+    from shruti.core import counters
+    from shruti.models import Counter
     for e in elements:
         if e.get("kind") == "guide-goal" and e.get("group"):
             e["element"] = (await goal_by_code(session, e["group"])) or {}
+        elif e.get("kind") == "counter" and e.get("counter_id"):
+            c = await session.get(Counter, int(e["counter_id"]))
+            e["element"] = _counter_element(c, await counters.progress(session, c)) if c is not None and c.visible else {}
 
 
 @router.get("/mine")

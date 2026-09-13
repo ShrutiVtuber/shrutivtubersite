@@ -50,6 +50,7 @@ const skipGroups = [...new Set(phasesOf(doc).map((p) => p.skip_group).filter(Boo
 const groupNames = (g: string) => phasesOf(doc).filter((p) => p.skip_group === g).map((p) => p.name).join(", ");
 
 const WORDS = {
+  file: { bad: say("file.bad", "That is not a run file for this guide."), failed: say("file.failed", "That did not go through. Try again.") },
   head: { phase: say("head.phase", "Phase {n} of {of}"), finished: say("head.finished", "The whole path"), steps: say("head.steps", "{d} of {n} steps") },
   now: {
     stepOf: say("now.step_of", "step {n} of {of}"), done: say("now.done", "Done"), later: say("now.later", "Later"), more: say("now.more", "Why / more"),
@@ -154,7 +155,7 @@ const WORDS = {
       <div class="tk-sheet" data-sheet hidden><div class="tk-sheet-scrim" data-sheet-close></div><div class="tk-sheet-card"><span class="tk-grab"></span><div data-sheet-body></div></div></div>
     </main>
   ) : (
-    <main class="tk" data-track data-words={JSON.stringify(WORDS)} data-doc={JSON.stringify(doc)} data-run={JSON.stringify(view)} data-overlays={JSON.stringify(overlays)} data-origin={origin}>
+    <main class="tk" data-track data-words={JSON.stringify(WORDS)} data-doc={JSON.stringify(doc)} data-run={JSON.stringify(view)} data-overlays={JSON.stringify(overlays)} data-origin={origin} data-guide={guide.id}>
       <header class="tk-bar">
         <a class="tk-back" href={`/guides/${game}/${slug}`}>{say("bar.read", "Read the guide")}</a>
         <div class="tk-bar-mid">
@@ -213,6 +214,13 @@ const WORDS = {
       <section class="tk-section" id="overlays">
         <h2 class="tk-h2">{say("sec.overlays", "Overlays")}</h2>
         <div data-overlays-list></div>
+        <h2 class="tk-h2">{say("sec.file", "Your run as a file")}</h2>
+        <p class="tk-quiet">{say("file.text", "Nobody's progress is trapped here. Download the run as a file, and bring one back — from here or from your own tracker.")}</p>
+        <div class="tk-file">
+          <button type="button" class="tk-btn" data-export>{say("file.download", "Download")}</button>
+          <label class="tk-btn tk-btn-quiet">{say("file.import", "Bring a run file")}<input type="file" accept="application/json,.json" data-import hidden /></label>
+        </div>
+        <p class="tk-quiet" data-file-note hidden></p>
         <form class="tk-ov-form" data-new-overlay>
           <label class="tk-field"><span class="tk-eyebrow">{say("ov.element", "Element")}</span>
             <select name="kind">
@@ -289,6 +297,8 @@ const WORDS = {
   .tk-grid { display: grid; grid-template-columns: minmax(0, 1fr) 380px; }
   .tk[data-folded="1"] .tk-grid { grid-template-columns: minmax(0, 1fr) 260px; }
   .tk-main { padding: 40px var(--page-pad) 40px; display: flex; flex-direction: column; gap: 26px; border-right: var(--border-w) solid var(--line); min-width: 0; }
+  .tk-file { display: flex; gap: 10px; flex-wrap: wrap; }
+  .tk-btn-quiet { cursor: pointer; }
   .tk-side { padding: 40px 32px; display: flex; flex-direction: column; gap: 26px; background: var(--surface-card); }
   .tk-sigil-row { display: flex; align-items: center; gap: 24px; }
   .sg { position: relative; flex: none; }

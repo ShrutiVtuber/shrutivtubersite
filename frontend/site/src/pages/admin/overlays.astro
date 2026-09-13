@@ -161,13 +161,14 @@ const signedIn = runsRead.status !== 401 && runsRead.status !== 0;
   const root = document.querySelector<HTMLElement>("[data-designer]");
   if (root) {
     type El = { kind: string; x: number; y: number; w: number; routine_id: string; shows: string };
-    const KINDS: [string, string][] = [["guide-now", "Now card"], ["guide-sigil", "Sigil"], ["guide-path", "Path strip"], ["guide-routine", "Routine"], ["guide-goal", "Goal"]];
+    const KINDS: [string, string][] = [["guide-now", "Now card"], ["guide-sigil", "Sigil"], ["guide-path", "Path strip"], ["guide-routine", "Routine"], ["guide-goal", "Goal"], ["counter", "Counter"]];
     const PLACES: Record<string, El> = {
       "guide-now": { kind: "guide-now", x: 72, y: 72, w: 900, routine_id: "", shows: "" },
       "guide-sigil": { kind: "guide-sigil", x: 1620, y: 72, w: 224, routine_id: "", shows: "" },
       "guide-path": { kind: "guide-path", x: 72, y: 936, w: 1776, routine_id: "", shows: "" },
       "guide-routine": { kind: "guide-routine", x: 72, y: 640, w: 760, routine_id: "", shows: "" },
       "guide-goal": { kind: "guide-goal", x: 72, y: 300, w: 860, routine_id: "", shows: "", group: "" },
+      "counter": { kind: "counter", x: 1416, y: 300, w: 432, routine_id: "", shows: "", group: "", counter_id: 0 },
     };
     const runs: { id: number; name: string }[] = JSON.parse(root.dataset.runs || "[]");
     const layouts: any[] = JSON.parse(root.dataset.layouts || "[]");
@@ -201,6 +202,7 @@ const signedIn = runsRead.status !== 401 && runsRead.status !== 0;
         `<span>width</span><input type="number" data-prop="w" value="${e.w}" />` +
         (e.kind === "guide-routine" ? `<span>routine</span><input type="text" data-prop="routine_id" value="${e.routine_id}" placeholder="routine id, or the first" />` : "") +
         (e.kind === "guide-goal" ? `<span>group</span><input type="text" data-prop="group" value="${e.group ?? ""}" placeholder="the group's join code" />` : "") +
+        (e.kind === "counter" ? `<span>counter</span><input type="number" min="0" step="1" data-prop="counter_id" value="${e.counter_id ?? 0}" placeholder="the counter's id" />` : "") +
         `<span>shows</span><span class="od-mono">${e.kind === "guide-now" ? "phase · title · one line" : e.kind === "guide-path" ? "the last two, the current, the next three" : e.kind === "guide-sigil" ? "one arc per phase" : "the checklist"}</span>` +
         `<span>on done</span><span class="od-mono">${e.kind === "guide-now" ? "the transition plays" : e.kind === "guide-sigil" ? "the arc extends" : "the window advances"}</span>` +
         `<button type="button" class="rm" data-remove>Remove from the canvas</button>`;
