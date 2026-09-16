@@ -16,16 +16,18 @@ const read = await asReader(Astro, `/api/builds/${id}`);
 if (!read.ok) return Astro.rewrite("/404");
 type Item = { id: string; label: string; kind: string; state: string; ratio: number; target: string; note: string; have?: number; want?: number; unit?: string };
 type Cat = { id: string; name: string; met: number; total: number; ratio: number; items: Item[] };
-const view = read.body as { id: number; name: string; variant: string; template: { name: string; game: { name: string } | null; categories: { id: string; items: { id: string; hint: string; max: number }[] }[] } | null; progress: { met: number; total: number; ratio: number; complete: boolean; categories: Cat[]; next: unknown[] } };
+const view = read.body as { id: number; name: string; variant: string; runId: number | null; template: { name: string; game: { name: string } | null; categories: { id: string; items: { id: string; hint: string; max: number }[] }[] } | null; progress: { met: number; partly: number; total: number; ratio: number; complete: boolean; categories: Cat[]; next: unknown[] } };
 const hints: Record<string, string> = {};
 for (const c of view.template?.categories ?? []) for (const it of c.items) hints[it.id] = it.hint;
-const tokensRead = await asReader(Astro, `/api/builds/${id}/overlays`);
+const [tokensRead, runsRead] = await Promise.all([asReader(Astro, `/api/builds/${id}/overlays`), asReader(Astro, "/api/runs")]);
+const runs: { id: number; name: string }[] = runsRead.ok && Array.isArray(runsRead.body) ? runsRead.body : [];
 const tokens: { id: number; theme: string; label: string }[] = tokensRead.ok && Array.isArray(tokensRead.body) ? tokensRead.body : [];
-const parts = view.progress.categories.map((c) => ({ pct: c.ratio, state: c.total && c.met === c.total ? "done" : c.ratio > 0 ? "now" : "todo" }));
+const parts = view.progress.categories.map((c) => ({ pct: c.total ? c.met / c.total : 0, partly: c.total ? (c.met + (c as any).partly) / c.total : 0, state: c.total && c.met === c.total ? "done" : c.ratio > 0 ? "now" : "todo" }));
 const WORDS = {
   of: say("words.of", "of"), met: say("state.met", "met"), partial: say("state.partial", "partly"), open: say("state.open", "not yet"),
   failed: say("words.failed", "That did not save. Try again."), copied: say("words.copied", "Copied."), overlay: say("words.overlay", "Build overlay"), revoke: say("words.revoke", "Revoke"),
   confirmDelete: say("words.confirm_delete", "Delete this build? Its overlays stop drawing."),
+  saved: say("words.saved", "Saved."),
 };
 ---
 
@@ -36,7 +38,7 @@ const WORDS = {
       <div>
         <p class="eyebrow">{view.template?.game?.name}{view.variant && ` · ${view.variant}`}</p>
         <h1>{view.name}</h1>
-        <p class="mono meta"><span data-count>{view.progress.met} {say("words.of", "of")} {view.progress.total}</span> · {view.template?.name}</p>
+        <p class="mono meta"><span data-count>{view.progress.met} {say("words.of", "of")} {view.progress.total}</span> {say("head.met_word", "met")}{view.progress.partly > 0 && ` · ${view.progress.partly} ${say("state.partly", "partly")}`} · {view.template?.name}</p>
         <p class="mono complete" data-complete hidden={!view.progress.complete}>{say("head.complete", "Complete — the build is on the character.")}</p>
         <nav class="cats" data-cats></nav>
       </div>
@@ -45,12 +47,12 @@ const WORDS = {
 
     {view.progress.categories.map((c) => (
       <section class="cat-block" id={`cat-${c.id}`}>
-        <h2>{c.name} <span class="mono">{c.met}/{c.total}</span></h2>
+        <h2>{c.name} <span class="mono">{say("cat.count", "{met}/{total} met").replace("{met}", String(c.met)).replace("{total}", String(c.total))}</span></h2>
         <div class="items">
           {c.items.map((it) => (
             <div class="item" data-item={it.id} data-state={it.state}>
               <div class="line">
-                <span class="label">{it.label}</span>
+                <span class="label">{it.label} <span class="mono kind">{it.kind === "slot" ? say("kind.slot", "slot") : it.kind === "counter" ? say("kind.counter", "counter") : say("kind.check", "check")}</span></span>
                 <span class="mono state" data-state>{it.state === "met" ? say("state.met", "met") : it.state === "partial" ? say("state.partial", "partly") : say("state.open", "not yet")}</span>
               </div>
               {it.kind === "slot" && (
@@ -82,22 +84,34 @@ const WORDS = {
     ))}
 
     <section class="overlay">
-      <h2>{say("overlay.title", "The build on stream")}</h2>
-      <p class="quiet">{say("overlay.text", "A browser source that draws this build: the name, met of total, one arc per category, the gear slots and the next open goals. The URL is shown once. Tick from the phone; the stream follows within two seconds.")}</p>
+      <h2>{say("overlay.title", "Overlay")}</h2>
       <div class="mint">
         <label><span>{say("overlay.theme", "Theme")}</span><select data-theme><option value="almanac">{say("overlay.almanac", "Almanac")}</option><option value="grimoire">{say("overlay.grimoire", "Grimoire")}</option><option value="plain">{say("overlay.plain", "Plain")}</option></select></label>
-        <label><span>{say("overlay.motion", "Motion")}</span><select data-motion><option value="reduced">{say("overlay.reduced", "Reduced")}</option><option value="full">{say("overlay.full", "Full")}</option><option value="still">{say("overlay.still", "Still")}</option></select></label>
-        <button type="button" class="button" data-mint>{say("overlay.mint", "Make an overlay")}</button>
+        <label><span>{say("overlay.motion", "Motion")}</span><select data-motion><option value="full">{say("overlay.ignite", "Ignite on met · 260 ms")}</option><option value="still">{say("overlay.none", "None")}</option></select></label>
+        <button type="button" class="button" data-mint>{say("overlay.mint", "Mint overlay")}</button>
       </div>
       <div class="minted" data-minted hidden>
-        <label><span>{say("overlay.url", "Browser source URL — shown once")}</span><input type="text" readonly data-url /></label>
-        <button type="button" class="link" data-copy>{say("overlay.copy", "Copy the URL")}</button>
+        <label><span>{say("overlay.minted", "Minted · shown once")}</span><input type="text" readonly data-url /></label>
+        <div class="row"><button type="button" class="link" data-copy>{say("overlay.copy", "Copy")}</button><button type="button" class="link quiet" data-have-it>{say("overlay.have_it", "I have it")}</button></div>
       </div>
+      <p class="quiet">{say("overlay.text", "Tick from the phone; the stream follows within two seconds. A browser source in OBS, 1920 × 1080.")}</p>
       <div class="tokens" data-tokens hidden={tokens.length === 0}>
         {tokens.map((t) => (<div class="bd-token"><span>{t.label} · {t.theme}</span><button type="button" class="link" data-revoke={t.id}>{say("overlay.revoke", "Revoke")}</button></div>))}
       </div>
     </section>
-    <p class="foot"><a href="/builds">{say("back", "All builds")}</a> · <button type="button" class="link quiet" data-delete>{say("delete", "Delete this build")}</button></p>
+    <section class="beside">
+      <h2>{say("run.title", "Beside a run")}</h2>
+      <label><span>{say("run.pick", "Run")}</span>
+        <select data-run><option value="">{say("run.none", "No run")}</option>{runs.map((r) => <option value={r.id} selected={r.id === view.runId}>{r.name}</option>)}</select>
+      </label>
+      <p class="quiet">{say("run.note", "The run walks the path; the build fills the set. Both plates can share a layout.")}</p>
+    </section>
+    <section class="remove">
+      <h2>{say("remove.title", "Remove")}</h2>
+      <button type="button" class="link quiet" data-delete>{say("delete", "Delete this build")}</button>
+      <p class="quiet">{say("delete.note", "Removes the goals and stops the overlay. The template stays. You will be asked once.")}</p>
+    </section>
+    <p class="foot"><a href="/builds">{say("back", "All builds")}</a></p>
   </article>
 </BaseLayout>
 
@@ -142,6 +156,9 @@ const WORDS = {
   .link { font: inherit; background: none; border: 0; padding: 0; color: var(--accent); text-decoration: underline; cursor: pointer; }
   .link.quiet { color: var(--ink-soft); }
   .foot { color: var(--ink-soft); }
+  .kind { font-size: .75rem; color: var(--ink-soft); font-weight: 400; margin-left: 6px; }
+  .beside, .remove { display: grid; gap: var(--space-2); }
+  .row { display: flex; gap: var(--space-3); }
 </style>
 
 <script>

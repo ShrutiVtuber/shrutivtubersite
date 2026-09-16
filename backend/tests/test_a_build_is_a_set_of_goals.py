@@ -41,7 +41,7 @@ def test_progress_is_met_partial_or_open_and_never_a_rate() -> None:
     p = builds.progress_of(t, b)
     states = {it["id"]: it["state"] for c in p["categories"] for it in c["items"]}
     assert states == {"helm": "met", "chest": "partial", "points": "partial"}
-    assert p["met"] == 1 and p["total"] == 3 and p["complete"] is False
+    assert p["met"] == 1 and p["partly"] == 2 and p["total"] == 3 and p["complete"] is False
     assert [c["ratio"] for c in p["categories"]] == [0.75, 0.5]
     assert p["next"][0]["label"] == "Chest"
     for word in ("streak", "days", "since", "percent"):
@@ -69,3 +69,15 @@ def test_a_build_token_is_read_once_and_counts_against_fair_use() -> None:
     body = prose_free(inspect.getsource(builds.mint_build_token))
     assert "secrets.token_urlsafe(24)" in body and "refuse_if_out_of_allowance" in body
     assert '"token"' not in prose_free(inspect.getsource(builds.build_tokens))
+
+
+def test_one_grid_category_per_template_and_the_plate_draws_only_its_slots() -> None:
+    cats = builds.clean_categories([{"name": "Gear", "grid": True, "items": [{"label": "Helm", "kind": "slot"}]},
+                                    {"name": "Skills", "grid": True, "items": [{"label": "Core", "kind": "slot"}]}])
+    assert [c["grid"] for c in cats] == [True, False]
+    t = BuildTemplate(game_id=1, name="t", categories=cats)
+    b = Build(user_id=1, template_id=1, name="b", goals={})
+    el = builds.build_element({"name": "b", "variant": "", "template": {"game": {"name": "Diablo IV"}}, "progress": builds.progress_of(t, b)})
+    assert el["gridName"] == "Gear" and [s["label"] for s in el["slots"]] == ["Helm"]
+    assert el["eyebrow"] == "Build · Diablo IV"
+    assert el["parts"][0]["partly"] == 0.0 and el["next"][0]["word"] == "not yet"

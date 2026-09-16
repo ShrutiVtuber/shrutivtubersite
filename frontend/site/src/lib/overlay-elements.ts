@@ -19,6 +19,13 @@ export function sigilSvg(parts: any[], stroke = 12, size = 200): string {
     const a0 = i * span + gap / 2, a1 = (i + 1) * span - gap / 2;
     out += `<path d="${arcD(r, a0, a1)}" fill="none" stroke="var(--gt-faint)" stroke-opacity=".35" stroke-width="${w}"/>`;
     const pct = Math.max(0, Math.min(1, p.pct || 0));
+    if (p.partly !== undefined) {
+      /* Two fills: blue on to met + partly (motion, not absence), rose to met on top. */
+      const partly = Math.max(pct, Math.min(1, Number(p.partly) || 0));
+      out += `<path class="fill partly" pathLength="100" d="${arcD(r, a0, a1)}" fill="none" stroke="var(--st-now)" stroke-width="${w}" style="stroke-dasharray:${(partly * 100).toFixed(1)} 100${partly <= 0.004 ? ";opacity:0" : ""}"/>`;
+      out += `<path class="fill" pathLength="100" d="${arcD(r, a0, a1)}" fill="none" stroke="var(--st-done)" stroke-width="${w}" style="stroke-dasharray:${(pct * 100).toFixed(1)} 100${pct <= 0.004 ? ";opacity:0" : ""}"/>`;
+      return;
+    }
     out += `<path class="fill" pathLength="100" d="${arcD(r, a0, a1)}" fill="none" stroke="${p.state === "done" ? "var(--st-done)" : "var(--st-now)"}" stroke-width="${w}" style="stroke-dasharray:${(pct * 100).toFixed(1)} 100${pct <= 0.004 ? ";opacity:0" : ""}"/>`;
   });
   return `<svg viewBox="0 0 100 100" width="${size}" height="${size}" aria-hidden="true">${out}</svg>`;
@@ -177,20 +184,34 @@ export async function drawElement(slot: HTMLElement, kind: string, prev: any, ne
     return;
   }
   if (kind === "build") {
-    /* A build: its name, met-of-total, one arc per category (the sigil's own
-     * drawing), a grid of the gear slots, and the next open goals. The one
-     * number is a fact about the build, never about the person. */
+    /* Board O1 (BuildPlate): the sigil's arcs as the categories with two
+     * fills, the name, chips, the one grid category's slot labels, the next
+     * open goals, or Complete. Narrow (< 560 px): arcs, name and one goal.
+     * `shows: compact` is the one-row variant beside a now card. The one
+     * number is met of total — a fact about the build, never the person. */
     const b = next && Array.isArray(next.parts) ? next : null;
     if (!b) { slot.innerHTML = ""; return; }
     const stroke = Number(getComputedStyle(slot.closest(".gov")!).getPropertyValue("--gt-stroke")) || 12;
-    const cats = (b.parts as any[]).map((p: any) => `<span class="cat ${esc(p.state)}"><span class="dot ${p.state === "done" ? "done" : p.state === "now" ? "current" : "locked"}"></span>${esc(p.name)} <span class="gov-mono">${esc(p.met)}/${esc(p.total)}</span></span>`).join("");
-    const slots = (b.slots as any[] ?? []).map((sl: any) => `<span class="slot ${esc(sl.state)}" title="${esc(sl.target)}">${esc(sl.label)}</span>`).join("");
-    const nextGoals = (b.next as any[] ?? []).slice(0, 3).map((n: any) => `<span class="goal"><span class="gov-eyebrow">${esc(n.category)}</span><span>${esc(n.label)}${n.target ? ` · ${esc(n.target)}` : ""}</span></span>`).join("");
-    const prev = slot.querySelector<HTMLElement>(".gov-build");
-    const wasMet = prev ? Number(prev.dataset.met || 0) : null;
-    slot.innerHTML = `<div class="gov-plate gov-build" data-met="${esc(b.met)}"><div class="head"><div class="ring">${sigilSvg(b.parts, stroke, 148)}<span class="gov-mono count">${esc(b.count)}</span></div><div class="titles"><span class="gov-eyebrow">${esc(b.variant || "build")}</span><span class="title">${esc(b.name)}</span>${b.complete ? `<span class="gov-mono complete">complete</span>` : ""}<div class="cats">${cats}</div></div></div>${slots ? `<div class="slots">${slots}</div>` : ""}${nextGoals ? `<div class="next">${nextGoals}</div>` : ""}</div>`;
+    const prevPlate = slot.querySelector<HTMLElement>(".gov-build");
+    const wasMet = prevPlate ? Number(prevPlate.dataset.met || 0) : null;
+    const metBefore = new Set((prevPlate?.dataset.metSlots || "").split("|").filter(Boolean));
+    const flip = prevPlate?.dataset.flip === "a" ? "b" : "a";
+    const compact = slot.dataset.shows === "compact";
+    const narrow = !compact && slot.clientWidth > 0 && slot.clientWidth < 560;
+    const wordOf = (st: string) => (st === "met" ? "met" : st === "partial" ? "partly" : "not yet");
+    const ring = (size: number, count: number, of: number) => `<div class="ring" style="width:${size}px;height:${size}px">${sigilSvg(b.parts, stroke, size)}<div class="ring-count"><span class="gov-mono met" style="font-size:${count}px">${esc(b.met)}</span><span class="gov-mono of" style="font-size:${of}px">of ${esc(b.total)}</span></div></div>`;
+    if (compact) {
+      slot.innerHTML = `<div class="gov-plate gov-build compact" data-met="${esc(b.met)}" data-flip="${flip}"><span class="title">${esc(b.name)}</span>${ring(64, 0, 0)}<span class="gov-mono count">${esc(b.met)} <span class="of">/ ${esc(b.total)}</span></span></div>`;
+    } else {
+      const chips = narrow ? "" : `<div class="chips">${(b.parts as any[]).map((p: any) => `<span class="chip ${esc(p.state === "done" ? "met" : p.state === "now" ? "partly" : "open")}">${esc(p.name)}<span class="gov-mono">${esc(p.met)}/${esc(p.total)}</span></span>`).join("")}</div>`;
+      const grid = narrow || !b.gridName || !(b.slots ?? []).length ? "" : `<div class="grid-block"><p class="gov-eyebrow">${esc(b.gridName)}</p><div class="grid">${(b.slots as any[]).map((sl: any) => `<span class="cell ${esc(sl.state)}${sl.state === "met" && !metBefore.has(sl.label) && metBefore.size + wasMet! > 0 ? ` lit-${flip}` : ""}">${esc(sl.label)}</span>`).join("")}</div></div>`;
+      const goals = (b.next as any[] ?? []).slice(0, narrow ? 1 : 3);
+      const nextBlock = b.complete || !goals.length ? "" : `<div class="next-block">${narrow ? "" : `<p class="gov-eyebrow">Next open goals</p>`}${goals.map((n: any) => `<div class="goal"><span class="cat">${narrow ? "Next · " : ""}${esc(n.category)}</span><span class="label">${esc(n.label)}</span>${n.detail ? `<span class="detail">${esc(n.detail)}</span>` : ""}<span class="leader"></span><span class="word ${n.word === "partly" ? "partly" : "open"}">${esc(n.word)}</span></div>`).join("")}</div>`;
+      const complete = b.complete ? `<div class="complete-block"><span class="gov-eyebrow rose">Complete</span><span class="sentence">The build is on the character.</span></div>` : "";
+      slot.innerHTML = `<div class="gov-plate gov-build${narrow ? " narrow" : ""}" data-met="${esc(b.met)}" data-flip="${flip}" data-met-slots="${esc((b.slots as any[] ?? []).filter((x: any) => x.state === "met").map((x: any) => x.label).join("|"))}"><div class="head">${ring(narrow ? 120 : 168, narrow ? 34 : 46, narrow ? 14 : 17)}<div class="titles"><p class="gov-eyebrow">${esc(b.eyebrow || "Build")}</p><h2 class="title">${esc(b.name)}</h2>${chips}</div></div>${grid}${nextBlock}${complete}</div>`;
+    }
     if (wasMet !== null && Number(b.met) > wasMet && !o.still && !o.reduced) {
-      const card = slot.querySelector<HTMLElement>(".gov-build")!; card.classList.add("ignite"); await wait(260); card.classList.remove("ignite");
+      const card = slot.querySelector<HTMLElement>(".gov-build")!; card.classList.add(`ignite-${flip}`);
     }
     return;
   }

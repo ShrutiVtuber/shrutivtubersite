@@ -20,11 +20,13 @@ export function mountBuild(root: HTMLElement): void {
   const drawHead = () => {
     const p = view.progress;
     const count = $("[data-count]"); if (count) count.textContent = `${p.met} ${words.of} ${p.total}`;
+    const partlyEl = $("[data-partly]"); if (partlyEl) partlyEl.textContent = p.partly ? `· ${p.partly} ${words.partial}` : "";
     const done = $("[data-complete]"); if (done) done.hidden = !p.complete;
     const cats = $("[data-cats]");
     if (cats) cats.innerHTML = p.categories.map((c: any) => `<a href="#cat-${esc(c.id)}" class="cat ${c.total && c.met === c.total ? "met" : c.ratio > 0 ? "partial" : ""}"><span>${esc(c.name)}</span><span class="mono">${c.met}/${c.total}</span></a>`).join("");
     const ring = $("[data-ring]");
-    if (ring) ring.querySelectorAll<SVGPathElement>(".fill").forEach((f, i) => { const c = p.categories[i]; if (!c) return; const pct = Math.max(0, Math.min(1, c.ratio)); f.style.strokeDasharray = `${(pct * 100).toFixed(1)} 100`; f.style.opacity = pct <= 0.004 ? "0" : "1"; f.setAttribute("stroke", c.total && c.met === c.total ? "var(--st-done)" : "var(--st-now)"); });
+    if (ring) ring.querySelectorAll<SVGPathElement>(".fill:not(.partly)").forEach((f, i) => { const c = p.categories[i]; if (!c) return; const pct = c.total ? c.met / c.total : 0; f.style.strokeDasharray = `${(pct * 100).toFixed(1)} 100`; f.style.opacity = pct <= 0.004 ? "0" : "1"; });
+    if (ring) ring.querySelectorAll<SVGPathElement>(".fill.partly").forEach((f, i) => { const c = p.categories[i]; if (!c) return; const pct = c.total ? (c.met + (c.partly || 0)) / c.total : 0; f.style.strokeDasharray = `${(pct * 100).toFixed(1)} 100`; f.style.opacity = pct <= 0.004 ? "0" : "1"; });
   };
   const drawItems = () => {
     for (const c of view.progress.categories) {
@@ -72,6 +74,11 @@ export function mountBuild(root: HTMLElement): void {
     if (list) { const row = document.createElement("div"); row.className = "bd-token"; row.innerHTML = `<span>${esc(words.overlay)} · ${esc(theme)}</span><button type="button" class="link" data-revoke="${r.body.id}">${esc(words.revoke)}</button>`; list.appendChild(row); list.hidden = false; }
   });
   $("[data-copy]")?.addEventListener("click", async () => { const url = $<HTMLInputElement>("[data-url]"); if (!url) return; try { await navigator.clipboard.writeText(url.value); tell(words.copied); } catch { url.select(); } });
+  $("[data-have-it]")?.addEventListener("click", () => { const box = $("[data-minted]"); const url = $<HTMLInputElement>("[data-url]"); if (url) url.value = ""; if (box) box.hidden = true; });
+  $<HTMLSelectElement>("[data-run]")?.addEventListener("change", async (ev) => {
+    const r = await api("PUT", `/api/builds/${id}`, { run_id: Number((ev.currentTarget as HTMLSelectElement).value) || 0 });
+    tell(r.ok ? words.saved : words.failed);
+  });
   root.addEventListener("click", async (ev) => {
     const btn = (ev.target as HTMLElement).closest<HTMLButtonElement>("[data-revoke]"); if (!btn) return;
     const r = await fetch(`/api/builds/${id}/overlays/${btn.dataset.revoke}`, { method: "DELETE", headers: { "x-csrf-token": csrf() } });

@@ -21,7 +21,7 @@
   const paintAll = async (prev, next) => {
     if (holder.children.length !== next.length) holder.innerHTML = next.map((e, i) => `<div class="gov-placed" data-slot="${i}" style="left:${e.x}px;top:${e.y}px;width:${e.w}px"></div>`).join("");
     empty.hidden = next.length > 0;
-    await Promise.all(next.map((e, i) => { const slot = holder.querySelector(`[data-slot="${i}"]`); slot.style.left = `${e.x}px`; slot.style.top = `${e.y}px`; slot.style.width = `${e.w}px`; return drawElement(slot, e.kind, prev?.[i]?.element ?? null, e.element, { still, reduced, line }); }));
+    await Promise.all(next.map((e, i) => { const slot = holder.querySelector(`[data-slot="${i}"]`); slot.style.left = `${e.x}px`; slot.style.top = `${e.y}px`; slot.style.width = `${e.w}px`; slot.dataset.shows = e.shows || ""; return drawElement(slot, e.kind, prev?.[i]?.element ?? null, e.element, { still, reduced, line }); }));
   };
   const tick = async () => {
     if (!token) return;

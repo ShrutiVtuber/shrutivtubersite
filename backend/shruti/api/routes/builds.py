@@ -73,7 +73,14 @@ def clean_categories(raw) -> list[dict]:
                 mx = 0
             items.append({"id": iid, "label": str(it.get("label") or iid)[:80], "kind": kind,
                           "hint": str(it.get("hint") or "")[:120], "max": mx, "unit": str(it.get("unit") or "")[:20]})
-        out.append({"id": cid, "name": str(c.get("name") or cid)[:60], "items": items})
+        out.append({"id": cid, "name": str(c.get("name") or cid)[:60], "items": items, "grid": bool(c.get("grid"))})
+    # One grid per template: the first flagged category keeps the flag.
+    seen_grid = False
+    for c in out:
+        if c["grid"] and not seen_grid:
+            seen_grid = True
+        else:
+            c["grid"] = False
     return out
 
 
@@ -111,8 +118,9 @@ def progress_of(template: BuildTemplate, build: Build) -> dict:
     cats = []
     met_all = total_all = 0
     next_open: list[dict] = []
+    partly_all = 0
     for c in template.categories or []:
-        met = total = 0
+        met = total = partly = 0
         ratio_sum = 0.0
         items = []
         for it in c.get("items", []):
@@ -120,6 +128,7 @@ def progress_of(template: BuildTemplate, build: Build) -> dict:
             state, ratio = item_state(it, g)
             total += 1
             met += 1 if state == "met" else 0
+            partly += 1 if state == "partial" else 0
             ratio_sum += ratio
             row = {"id": it["id"], "label": it["label"], "kind": it["kind"], "state": state, "ratio": round(ratio, 3),
                    "target": str(g.get("target") or "")[:120], "note": str(g.get("note") or "")[:200]}
@@ -135,12 +144,16 @@ def progress_of(template: BuildTemplate, build: Build) -> dict:
                 row["unit"] = it.get("unit", "")
             items.append(row)
             if state != "met" and len(next_open) < 6:
-                next_open.append({"category": c["name"], "label": it["label"], "target": row["target"], "state": state})
-        cats.append({"id": c["id"], "name": c["name"], "met": met, "total": total,
-                     "ratio": round(ratio_sum / total, 3) if total else 0.0, "items": items})
+                next_open.append({"id": it["id"], "kind": it["kind"], "category": c["name"], "categoryId": c["id"],
+                                  "label": it["label"], "target": row["target"], "state": state,
+                                  "have": row.get("have"), "want": row.get("want"), "unit": row.get("unit", "")})
+        cats.append({"id": c["id"], "name": c["name"], "met": met, "partly": partly, "total": total,
+                     "ratio": round(ratio_sum / total, 3) if total else 0.0, "grid": bool(c.get("grid")), "items": items})
         met_all += met
         total_all += total
-    return {"met": met_all, "total": total_all, "ratio": round(met_all / total_all, 3) if total_all else 0.0,
+        partly_all += partly
+    return {"met": met_all, "partly": partly_all, "total": total_all,
+            "ratio": round(met_all / total_all, 3) if total_all else 0.0,
             "categories": cats, "next": next_open, "complete": total_all > 0 and met_all == total_all}
 
 
@@ -191,10 +204,12 @@ class TemplateIn(BaseModel):
 
 @router.get("/admin/templates", dependencies=[Depends(require_admin)])
 async def admin_templates(session: AsyncSession = Depends(get_session)) -> list[dict]:
+    from sqlalchemy import func
     rows = (await session.execute(
         select(BuildTemplate, Game).join(Game, Game.id == BuildTemplate.game_id).order_by(BuildTemplate.position, BuildTemplate.id)
     )).all()
-    return [_template_view(t, g) for t, g in rows]
+    counts = dict((await session.execute(select(Build.template_id, func.count()).group_by(Build.template_id))).all())
+    return [{**_template_view(t, g), "builds": int(counts.get(t.id, 0))} for t, g in rows]
 
 
 @router.post("/admin/templates", status_code=201, dependencies=[Depends(require_admin)])
@@ -362,15 +377,22 @@ class BuildTokenIn(BaseModel):
 def build_element(view: dict) -> dict:
     """What the build overlay draws: the name, met-of-total, one arc per category, the next open goals."""
     p = view["progress"]
+    grid = next((c for c in p["categories"] if c.get("grid")), None)
+    game = (view.get("template") or {}).get("game") or {}
     return {
-        "name": view["name"], "variant": view["variant"],
-        "met": p["met"], "total": p["total"], "ratio": p["ratio"], "complete": p["complete"],
+        "name": view["name"], "variant": view["variant"], "game": game.get("name", ""),
+        "eyebrow": " · ".join(x for x in ("Build", game.get("name", ""), view["variant"]) if x),
+        "met": p["met"], "partly": p["partly"], "total": p["total"], "ratio": p["ratio"], "complete": p["complete"],
         "count": f"{p['met']} of {p['total']}",
-        "parts": [{"pct": c["ratio"], "state": "done" if c["total"] and c["met"] == c["total"] else ("now" if c["ratio"] > 0 else "todo"),
+        # Two fills per arc: rose to met, blue on to met + partly — motion, not absence.
+        "parts": [{"pct": (c["met"] / c["total"]) if c["total"] else 0.0,
+                   "partly": ((c["met"] + c["partly"]) / c["total"]) if c["total"] else 0.0,
+                   "state": "done" if c["total"] and c["met"] == c["total"] else ("now" if (c["met"] + c["partly"]) > 0 else "todo"),
                    "name": c["name"], "met": c["met"], "total": c["total"]} for c in p["categories"]],
-        "slots": [{"label": it["label"], "state": it["state"], "target": it["target"]}
-                  for c in p["categories"] for it in c["items"] if it["kind"] == "slot"][:24],
-        "next": p["next"],
+        "gridName": grid["name"] if grid else "",
+        "slots": [{"label": it["label"], "state": it["state"]} for it in (grid["items"] if grid else []) if it["kind"] == "slot"][:25],
+        "next": [{"category": n["category"], "label": n["label"], "detail": n["target"] or (f"{n['have']} of {n['want']} {n['unit']}".strip() if n["kind"] == "counter" else ""),
+                  "word": "partly" if n["state"] == "partial" else "not yet"} for n in p["next"][:3]],
     }
 
 

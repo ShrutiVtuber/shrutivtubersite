@@ -37,12 +37,32 @@ const signedIn = read.status !== 401 && read.status !== 0;
           <label class="bt-inline"><input type="checkbox" data-f="visible" checked /> People can start builds from it</label>
           <label>Position <input type="number" data-f="position" value="0" /></label>
         </div>
+        <div class="bt-modes">
+          <button type="button" class="od-btn" data-mode="paste">Items · paste a list</button>
+          <button type="button" class="od-btn" data-mode="rows">Edit rows one by one</button>
+        </div>
+        <div class="bt-paste" data-paste-mode hidden>
+          <p class="bt-lede">One category per block, one item per line. Then mark kinds on the right — most are read for you.</p>
+          <div class="bt-paste-grid">
+            <textarea rows="16" data-paste placeholder="Gear:&#10;Helm — item · key affixes · aspect&#10;Chest — item · key affixes · aspect&#10;&#10;Paragon:&#10;Paragon points spent = 300 points&#10;[ ] Boards match the plan"></textarea>
+            <div class="bt-rules">
+              <p class="od-mono">How lines are read</p>
+              <p><code>Category:</code> starts a category</p>
+              <p><code>Label — hint</code> a slot, hint optional</p>
+              <p><code>Label = 300 points</code> a counter, max and unit</p>
+              <p><code>[ ] Label</code> a check</p>
+              <button type="button" class="od-btn" data-parse>Read the list</button>
+              <p class="od-mono" data-paste-summary></p>
+            </div>
+          </div>
+        </div>
         <div data-categories></div>
         <div class="bt-actions">
-          <button type="button" class="od-btn" data-add-category>+ category</button>
+          <button type="button" class="od-btn" data-add-category>Add category</button>
           <button type="submit" class="od-btn primary">Save template</button>
-          <button type="button" class="od-btn ghost" data-delete>Delete or hide</button>
+          <button type="button" class="od-btn ghost" data-delete>Hide template</button>
           <span class="od-mono" data-status></span>
+          <span class="od-mono" data-builds></span>
         </div>
       </form>
     </section>
@@ -69,6 +89,14 @@ const signedIn = read.status !== 401 && read.status !== 0;
   .od-btn.primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
   .od-btn.ghost { color: var(--ink-soft); }
   .od-mono { font-family: var(--font-mono); font-size: 12px; }
+  .bt-modes { display: flex; gap: 8px; }
+  .bt-modes .od-btn.on { background: var(--accent-wash, var(--surface-inset)); border-color: var(--accent); }
+  .bt-paste-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 14px; }
+  .bt-paste textarea { font-family: var(--font-mono); font-size: 13px; line-height: 1.5; }
+  .bt-rules { display: grid; gap: 6px; align-content: start; font-size: 13px; color: var(--ink-soft); }
+  .bt-rules code { font-family: var(--font-mono); color: var(--ink); }
+  .bt-cat.collapsed .bt-items { display: none; }
+  .bt-cat-head .bt-grid { display: inline-flex; gap: 6px; align-items: center; font-size: 12.5px; color: var(--ink-soft); white-space: nowrap; }
 </style>
 
 <script>
@@ -91,11 +119,15 @@ const signedIn = read.status !== 401 && read.status !== 0;
       field("name").value = current.name ?? ""; field("description").value = current.description ?? "";
       field("visible").checked = current.visible !== false; field("position").value = String(current.position ?? 0);
       drawCategories(); drawPick(); status.textContent = current.id ? `template ${current.id}` : "new";
+      const builds = Number(current.builds || 0);
+      $("[data-builds]").textContent = builds ? `${builds} build${builds === 1 ? "" : "s"} use this template — it can be hidden, not deleted.` : "";
+      $("[data-delete]").textContent = builds ? "Hide template" : "Delete template";
+      setMode(current.id || current.categories.length ? "rows" : "paste");
     };
     const drawCategories = () => {
       const box = $("[data-categories]");
-      box.innerHTML = current.categories.map((c: any, ci: number) => `<div class="bt-cat" data-ci="${ci}">
-        <div class="bt-cat-head"><input type="text" data-cat-name value="${esc(c.name)}" placeholder="Gear" /><span class="od-mono">${esc(c.id || "")}</span><button type="button" class="od-btn" data-add-item>+ item</button><button type="button" class="od-btn ghost" data-remove-cat>remove</button></div>
+      box.innerHTML = current.categories.map((c: any, ci: number) => `<div class="bt-cat${c._collapsed ? " collapsed" : ""}" data-ci="${ci}">
+        <div class="bt-cat-head"><span class="od-mono">${ci + 1}</span><input type="text" data-cat-name value="${esc(c.name)}" placeholder="Gear" /><label class="bt-grid"><input type="checkbox" data-cat-grid ${c.grid ? "checked" : ""} /> Grid on overlay</label><span class="od-mono">${(c.items || []).length} items</span><button type="button" class="od-btn ghost" data-up title="Move category up">↑</button><button type="button" class="od-btn ghost" data-down title="Move category down">↓</button><button type="button" class="od-btn ghost" data-collapse>${c._collapsed ? `Collapsed — show ${(c.items || []).length} items` : "Collapse"}</button><button type="button" class="od-btn" data-add-item>Add item</button><button type="button" class="od-btn ghost" data-remove-cat>Remove</button></div>
         <div class="bt-items"><span class="od-mono">label</span><span class="od-mono">kind</span><span class="od-mono">hint</span><span class="od-mono">max</span><span class="od-mono">unit</span><span></span>${
           (c.items || []).map((it: any, ii: number) => `<input type="text" data-ii="${ii}" data-it="label" value="${esc(it.label)}" /><select data-ii="${ii}" data-it="kind">${["slot", "counter", "check"].map((k) => `<option ${it.kind === k ? "selected" : ""}>${k}</option>`).join("")}</select><input type="text" data-ii="${ii}" data-it="hint" value="${esc(it.hint ?? "")}" /><input type="number" data-ii="${ii}" data-it="max" value="${esc(it.max ?? 0)}" ${it.kind === "counter" ? "" : "disabled"} /><input type="text" data-ii="${ii}" data-it="unit" value="${esc(it.unit ?? "")}" ${it.kind === "counter" ? "" : "disabled"} /><button type="button" class="od-btn ghost" data-remove-item="${ii}">×</button>`).join("")
         }</div></div>`).join("");
@@ -104,24 +136,60 @@ const signedIn = read.status !== 401 && read.status !== 0;
       for (const catEl of root.querySelectorAll<HTMLElement>("[data-ci]")) {
         const ci = Number(catEl.dataset.ci); const c = current.categories[ci];
         c.name = catEl.querySelector<HTMLInputElement>("[data-cat-name]")!.value;
+        c.grid = catEl.querySelector<HTMLInputElement>("[data-cat-grid]")!.checked;
         for (const el of catEl.querySelectorAll<HTMLInputElement>("[data-ii]")) { const it = c.items[Number(el.dataset.ii)]; const key = el.dataset.it!; (it as any)[key] = key === "max" ? Number(el.value) || 0 : el.value; }
       }
     };
     root.addEventListener("click", (ev) => {
       const t = ev.target as HTMLElement;
       const catEl = t.closest<HTMLElement>("[data-ci]"); const ci = catEl ? Number(catEl.dataset.ci) : -1;
-      if (t.matches("[data-add-item]")) { readForm(); current.categories[ci].items.push({ label: "", kind: "slot", hint: "", max: 0, unit: "" }); drawCategories(); }
+      if (t.matches("[data-up]") && ci > 0) { readForm(); const cs = current.categories; [cs[ci - 1], cs[ci]] = [cs[ci], cs[ci - 1]]; drawCategories(); }
+      else if (t.matches("[data-down]") && ci >= 0 && ci < current.categories.length - 1) { readForm(); const cs = current.categories; [cs[ci + 1], cs[ci]] = [cs[ci], cs[ci + 1]]; drawCategories(); }
+      else if (t.matches("[data-collapse]")) { readForm(); current.categories[ci]._collapsed = !current.categories[ci]._collapsed; drawCategories(); }
+      else if (t.matches("[data-add-item]")) { readForm(); current.categories[ci].items.push({ label: "", kind: "slot", hint: "", max: 0, unit: "" }); drawCategories(); }
       else if (t.matches("[data-remove-cat]")) { readForm(); current.categories.splice(ci, 1); drawCategories(); }
       else if (t.matches("[data-remove-item]")) { readForm(); current.categories[ci].items.splice(Number(t.dataset.removeItem), 1); drawCategories(); }
     });
-    root.addEventListener("change", (ev) => { const el = ev.target as HTMLSelectElement; if (el.matches('[data-it="kind"]')) { readForm(); drawCategories(); } });
+    root.addEventListener("change", (ev) => {
+      const el = ev.target as HTMLInputElement;
+      if (el.matches('[data-it="kind"]')) { readForm(); drawCategories(); }
+      if (el.matches("[data-cat-grid]") && el.checked) { readForm(); const ci = Number(el.closest<HTMLElement>("[data-ci]")!.dataset.ci); current.categories.forEach((c: any, i: number) => { c.grid = i === ci; }); drawCategories(); }
+    });
+    /* W3a: the paste grammar — four rules do the heavy lifting; the rows are the correction tool. */
+    const parsePaste = (text: string) => {
+      const cats: any[] = []; let cat: any = null;
+      for (const raw of text.split(/\r?\n/)) {
+        const line = raw.trim(); if (!line) continue;
+        const m = /^(.+?):\s*$/.exec(line);
+        if (m) { cat = { name: m[1].trim(), items: [], grid: cats.length === 0 }; cats.push(cat); continue; }
+        if (!cat) { cat = { name: "Goals", items: [], grid: true }; cats.push(cat); }
+        const check = /^\[\s*[xX ]?\s*\]\s*(.+)$/.exec(line);
+        if (check) { cat.items.push({ label: check[1].trim(), kind: "check", hint: "", max: 0, unit: "" }); continue; }
+        const counter = /^(.+?)\s*=\s*(\d+)\s*(.*)$/.exec(line);
+        if (counter) { cat.items.push({ label: counter[1].trim(), kind: "counter", hint: "", max: Number(counter[2]), unit: counter[3].trim() }); continue; }
+        const slot = /^(.+?)\s+(?:—|–|-)\s+(.+)$/.exec(line);
+        cat.items.push(slot ? { label: slot[1].trim(), kind: "slot", hint: slot[2].trim(), max: 0, unit: "" } : { label: line, kind: "slot", hint: "", max: 0, unit: "" });
+      }
+      return cats;
+    };
+    const setMode = (mode: string) => { root.querySelectorAll<HTMLButtonElement>("[data-mode]").forEach((b) => b.classList.toggle("on", b.dataset.mode === mode)); $("[data-paste-mode]").hidden = mode !== "paste"; $("[data-categories]").hidden = mode === "paste" && !current?.categories?.length; };
+    root.querySelectorAll<HTMLButtonElement>("[data-mode]").forEach((b) => b.addEventListener("click", () => setMode(b.dataset.mode!)));
+    $("[data-parse]").addEventListener("click", () => {
+      const cats = parsePaste($<HTMLTextAreaElement>("[data-paste]").value);
+      if (!cats.length) { $("[data-paste-summary]").textContent = "Nothing read — one category per block, one item per line."; return; }
+      current.categories = cats; drawCategories(); setMode("rows");
+      const n = cats.reduce((a, c) => a + c.items.length, 0);
+      const by = (k: string) => cats.reduce((a, c) => a + c.items.filter((i: any) => i.kind === k).length, 0);
+      $("[data-paste-summary]").textContent = `${n} items in ${cats.length} categories — ${by("slot")} read as slot, ${by("counter")} with "= number" read as counter, ${by("check")} with "[ ]" read as check. Change any kind on the right before saving.`;
+      status.textContent = $("[data-paste-summary]").textContent;
+    });
     $("[data-add-category]").addEventListener("click", () => { readForm(); current.categories.push({ name: "", items: [] }); drawCategories(); });
     $("[data-new]").addEventListener("click", () => load(blank()));
     $("[data-duplicate]").addEventListener("click", () => { if (!current) return; readForm(); const copy = JSON.parse(JSON.stringify(current)); copy.id = null; copy.game = { slug: "", name: "" }; copy.name = `${current.name} (copy)`; load(copy); });
     pick.addEventListener("change", () => { const t = list.find((x) => String(x.id) === pick.value); if (t) load(t); });
     $("[data-form]").addEventListener("submit", async (ev) => {
       ev.preventDefault(); readForm();
-      const body = { game: field("game").value.trim(), game_name: field("game_name").value.trim(), name: field("name").value.trim(), description: field("description").value.trim(), visible: field("visible").checked, position: Number(field("position").value) || 0, categories: current.categories };
+      const body = { game: field("game").value.trim(), game_name: field("game_name").value.trim(), name: field("name").value.trim(), description: field("description").value.trim(), visible: field("visible").checked, position: Number(field("position").value) || 0, categories: current.categories.map((c: any) => ({ id: c.id, name: c.name, grid: !!c.grid, items: c.items })) };
       if (!body.game || !body.name) { status.textContent = "A game address and a template name are needed."; return; }
       const r = await fetch(current.id ? `/api/builds/admin/templates/${current.id}` : "/api/builds/admin/templates", { method: current.id ? "PUT" : "POST", headers: { "content-type": "application/json", "x-csrf-token": token() }, body: JSON.stringify(body) });
       if (!r.ok) { status.textContent = `Not saved (${r.status}).`; return; }
@@ -130,7 +198,7 @@ const signedIn = read.status !== 401 && read.status !== 0;
       load(saved); status.textContent = `Saved · template ${saved.id}`;
     });
     $("[data-delete]").addEventListener("click", async () => {
-      if (!current?.id || !confirm("Delete this template? If people have builds on it, it is hidden instead.")) return;
+      if (!current?.id || !confirm(Number(current.builds || 0) ? "Hide this template? Builds already on it keep working." : "Delete this template?")) return;
       const r = await fetch(`/api/builds/admin/templates/${current.id}`, { method: "DELETE", headers: { "x-csrf-token": token() } });
       if (r.ok) { list = list.filter((t) => t.id !== current.id); load(list[0] ?? blank()); status.textContent = "Removed or hidden."; }
     });

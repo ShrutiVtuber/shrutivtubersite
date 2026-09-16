@@ -78,7 +78,7 @@ const initial = JSON.stringify({ version: data?.version ?? "", elements });
     empty.hidden = next.length > 0;
     await Promise.all(next.map((e: any, i: number) => {
       const slot = holder.querySelector<HTMLElement>(`[data-slot="${i}"]`)!;
-      slot.style.left = `${e.x}px`; slot.style.top = `${e.y}px`; slot.style.width = `${e.w}px`;
+      slot.style.left = `${e.x}px`; slot.style.top = `${e.y}px`; slot.style.width = `${e.w}px`; slot.dataset.shows = e.shows || "";
       return drawElement(slot, e.kind, prev?.[i]?.element ?? null, e.element, { still, reduced, line });
     }));
   };

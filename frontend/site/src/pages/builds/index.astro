@@ -39,7 +39,7 @@ const WORDS = { needsName: say("words.needs_name", "A build needs a name."), nee
             <a href={`/builds/${b.id}`}>
               <span class="name">{b.name}</span>
               <span class="game">{b.template?.game?.name}{b.variant && ` · ${b.variant}`}</span>
-              <span class="mono">{say("row.count", "{met} of {total}").replace("{met}", String(b.progress.met)).replace("{total}", String(b.progress.total))}{b.progress.complete && ` · ${say("row.complete", "complete")}`}</span>
+              <span class="mono">{say("row.count", "{met} / {total}").replace("{met}", String(b.progress.met)).replace("{total}", String(b.progress.total))}{b.progress.complete && ` · ${say("row.complete", "complete")}`}</span>
               <span class="cats mono">{b.progress.categories.map((c) => `${c.name} ${c.met}/${c.total}`).join(" · ")}</span>
             </a>
           </li>
@@ -49,16 +49,16 @@ const WORDS = { needsName: say("words.needs_name", "A build needs a name."), nee
 
     <form class="card" data-new-form>
       <h2>{say("new.title", "Start a build")}</h2>
-      <label><span>{say("new.template", "Game and template")}</span>
+      <label><span>{say("new.template", "Template")}</span>
         <select data-template>
           {list.map((t) => <option value={t.id}>{t.game?.name} · {t.name}</option>)}
         </select>
       </label>
       {list.length === 0 && <p class="quiet">{say("new.none", "No templates yet. Shruti adds a game's template when the game is ready.")}</p>}
       <label><span>{say("new.name", "Name")}</span><input type="text" data-name maxlength="80" placeholder={say("new.name_hint", "Squirrel · Season 15")} /></label>
-      <label><span>{say("new.variant", "Class, season or league")}</span><input type="text" data-variant maxlength="80" placeholder={say("new.variant_hint", "Warlock · Legion")} /></label>
+      <label><span>{say("new.variant", "Variant")}</span><input type="text" data-variant maxlength="80" placeholder={say("new.variant_hint", "Class · season or league")} /></label>
       {runs.length > 0 && (
-        <label><span>{say("new.run", "Beside a run, if you like")}</span>
+        <label><span>{say("new.run", "Beside a run · optional")}</span>
           <select data-run><option value="">{say("new.no_run", "No run")}</option>{runs.map((r) => <option value={r.id}>{r.name}</option>)}</select>
         </label>
       )}

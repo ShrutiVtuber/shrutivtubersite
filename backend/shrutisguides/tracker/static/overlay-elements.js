@@ -38,6 +38,12 @@ var OverlayElements = (() => {
       const a0 = i * span + gap / 2, a1 = (i + 1) * span - gap / 2;
       out += `<path d="${arcD(r, a0, a1)}" fill="none" stroke="var(--gt-faint)" stroke-opacity=".35" stroke-width="${w}"/>`;
       const pct = Math.max(0, Math.min(1, p.pct || 0));
+      if (p.partly !== void 0) {
+        const partly = Math.max(pct, Math.min(1, Number(p.partly) || 0));
+        out += `<path class="fill partly" pathLength="100" d="${arcD(r, a0, a1)}" fill="none" stroke="var(--st-now)" stroke-width="${w}" style="stroke-dasharray:${(partly * 100).toFixed(1)} 100${partly <= 4e-3 ? ";opacity:0" : ""}"/>`;
+        out += `<path class="fill" pathLength="100" d="${arcD(r, a0, a1)}" fill="none" stroke="var(--st-done)" stroke-width="${w}" style="stroke-dasharray:${(pct * 100).toFixed(1)} 100${pct <= 4e-3 ? ";opacity:0" : ""}"/>`;
+        return;
+      }
       out += `<path class="fill" pathLength="100" d="${arcD(r, a0, a1)}" fill="none" stroke="${p.state === "done" ? "var(--st-done)" : "var(--st-now)"}" stroke-width="${w}" style="stroke-dasharray:${(pct * 100).toFixed(1)} 100${pct <= 4e-3 ? ";opacity:0" : ""}"/>`;
     });
     return `<svg viewBox="0 0 100 100" width="${size}" height="${size}" aria-hidden="true">${out}</svg>`;
@@ -245,6 +251,37 @@ var OverlayElements = (() => {
     if (kind === "wheel") {
       const src = String(next?.src || "");
       slot.innerHTML = src.startsWith("/overlay/wheel") ? `<iframe class="gov-wheel" src="${esc(src)}" title="transit wheel" loading="eager"></iframe>` : "";
+      return;
+    }
+    if (kind === "build") {
+      const b = next && Array.isArray(next.parts) ? next : null;
+      if (!b) {
+        slot.innerHTML = "";
+        return;
+      }
+      const stroke = Number(getComputedStyle(slot.closest(".gov")).getPropertyValue("--gt-stroke")) || 12;
+      const prevPlate = slot.querySelector(".gov-build");
+      const wasMet = prevPlate ? Number(prevPlate.dataset.met || 0) : null;
+      const metBefore = new Set((prevPlate?.dataset.metSlots || "").split("|").filter(Boolean));
+      const flip = prevPlate?.dataset.flip === "a" ? "b" : "a";
+      const compact = slot.dataset.shows === "compact";
+      const narrow = !compact && slot.clientWidth > 0 && slot.clientWidth < 560;
+      const wordOf = (st) => st === "met" ? "met" : st === "partial" ? "partly" : "not yet";
+      const ring = (size, count, of) => `<div class="ring" style="width:${size}px;height:${size}px">${sigilSvg(b.parts, stroke, size)}<div class="ring-count"><span class="gov-mono met" style="font-size:${count}px">${esc(b.met)}</span><span class="gov-mono of" style="font-size:${of}px">of ${esc(b.total)}</span></div></div>`;
+      if (compact) {
+        slot.innerHTML = `<div class="gov-plate gov-build compact" data-met="${esc(b.met)}" data-flip="${flip}"><span class="title">${esc(b.name)}</span>${ring(64, 0, 0)}<span class="gov-mono count">${esc(b.met)} <span class="of">/ ${esc(b.total)}</span></span></div>`;
+      } else {
+        const chips = narrow ? "" : `<div class="chips">${b.parts.map((p) => `<span class="chip ${esc(p.state === "done" ? "met" : p.state === "now" ? "partly" : "open")}">${esc(p.name)}<span class="gov-mono">${esc(p.met)}/${esc(p.total)}</span></span>`).join("")}</div>`;
+        const grid = narrow || !b.gridName || !(b.slots ?? []).length ? "" : `<div class="grid-block"><p class="gov-eyebrow">${esc(b.gridName)}</p><div class="grid">${b.slots.map((sl) => `<span class="cell ${esc(sl.state)}${sl.state === "met" && !metBefore.has(sl.label) && metBefore.size + wasMet > 0 ? ` lit-${flip}` : ""}">${esc(sl.label)}</span>`).join("")}</div></div>`;
+        const goals = (b.next ?? []).slice(0, narrow ? 1 : 3);
+        const nextBlock = b.complete || !goals.length ? "" : `<div class="next-block">${narrow ? "" : `<p class="gov-eyebrow">Next open goals</p>`}${goals.map((n) => `<div class="goal"><span class="cat">${narrow ? "Next \xB7 " : ""}${esc(n.category)}</span><span class="label">${esc(n.label)}</span>${n.detail ? `<span class="detail">${esc(n.detail)}</span>` : ""}<span class="leader"></span><span class="word ${n.word === "partly" ? "partly" : "open"}">${esc(n.word)}</span></div>`).join("")}</div>`;
+        const complete = b.complete ? `<div class="complete-block"><span class="gov-eyebrow rose">Complete</span><span class="sentence">The build is on the character.</span></div>` : "";
+        slot.innerHTML = `<div class="gov-plate gov-build${narrow ? " narrow" : ""}" data-met="${esc(b.met)}" data-flip="${flip}" data-met-slots="${esc((b.slots ?? []).filter((x) => x.state === "met").map((x) => x.label).join("|"))}"><div class="head">${ring(narrow ? 120 : 168, narrow ? 34 : 46, narrow ? 14 : 17)}<div class="titles"><p class="gov-eyebrow">${esc(b.eyebrow || "Build")}</p><h2 class="title">${esc(b.name)}</h2>${chips}</div></div>${grid}${nextBlock}${complete}</div>`;
+      }
+      if (wasMet !== null && Number(b.met) > wasMet && !o.still && !o.reduced) {
+        const card = slot.querySelector(".gov-build");
+        card.classList.add(`ignite-${flip}`);
+      }
       return;
     }
     if (kind === "guide-routine") {

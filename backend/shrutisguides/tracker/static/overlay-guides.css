@@ -127,6 +127,67 @@
 .gov-path .it.skipped span:last-child { text-decoration: line-through; }
 
 /* ── the routine · 760 wide at left 72, bottom 72 ──────────────────────── */
+/* A build — board O1: 900 px, padding 32/36/30, radius 16. The sigil 168 with the
+   count inside (46 / 17), the eyebrow 20, the name 46, chips 20/18, the grid's
+   labels 22, the goals 26 with an 18 eyebrow. Two ignite names alternate so
+   consecutive ticks restart the 260 ms. */
+.gov-build { left: 72px; top: 300px; width: 900px; padding: 32px 36px 30px; border-radius: 16px; display: flex; flex-direction: column; gap: 0; }
+.gov-build .head { display: flex; align-items: center; gap: 30px; }
+.gov-build .ring { position: relative; flex: none; display: grid; place-items: center; }
+.gov-build .ring svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.gov-build .ring-count { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1; pointer-events: none; }
+.gov-build .ring-count .met { font-weight: 500; }
+.gov-build .ring-count .of { margin-top: 5px; color: var(--gt-faint); }
+.gov-build .titles { flex: 1; min-width: 0; display: grid; gap: 12px; }
+.gov-build .gov-eyebrow { font-size: 20px; line-height: 1; letter-spacing: .14em; }
+.gov-build .title { margin: 0; font-family: var(--gt-display); font-weight: var(--gt-display-weight); font-size: 46px; line-height: 1.08; letter-spacing: -.01em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gov-build .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.gov-build .chip { display: inline-flex; align-items: baseline; gap: 8px; border: 1px solid var(--gt-border); border-radius: 999px; padding: 6px 14px; font-size: 20px; line-height: 1.2; font-weight: 500; color: var(--gt-faint); }
+.gov-build .chip .gov-mono { font-size: 18px; }
+.gov-build .chip.met { border-color: var(--st-done); color: var(--gt-ink); }
+.gov-build .chip.partly { border-color: var(--st-now); color: var(--gt-ink); }
+.gov-build .grid-block, .gov-build .next-block, .gov-build .complete-block { margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--gt-border); }
+.gov-build .grid-block { margin-top: 26px; }
+.gov-build .grid-block .gov-eyebrow { margin: 0 0 12px; }
+.gov-build .grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+.gov-build .cell { box-sizing: border-box; border: 1px solid var(--gt-border); color: var(--gt-faint); border-radius: 6px; padding: 11px 8px; font-size: 22px; line-height: 1.2; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gov-build .cell.met { border-color: var(--st-done); color: var(--gt-ink); }
+.gov-build .cell.partial { border-color: var(--st-now); color: var(--gt-ink); }
+.gov-build .next-block { display: grid; gap: 12px; }
+.gov-build .goal { display: flex; align-items: baseline; gap: 14px; min-width: 0; }
+.gov-build .goal .cat { flex: 0 0 150px; font-size: 18px; line-height: 1.2; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--gt-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gov-build .goal .label { font-size: 26px; line-height: 1.2; font-weight: 600; white-space: nowrap; }
+.gov-build .goal .detail { min-width: 0; font-family: var(--gt-display); font-size: 26px; line-height: 1.2; color: var(--gt-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gov-build .goal .leader { flex: 1 1 20px; min-width: 20px; border-bottom: 1px dotted var(--gt-faint); transform: translateY(-6px); }
+.gov-build .goal .word { font-size: 20px; line-height: 1.2; font-weight: 600; white-space: nowrap; color: var(--gt-faint); }
+.gov-build .goal .word.partly { color: var(--st-now); }
+.gov-build .complete-block { border-top-color: var(--st-done); display: flex; align-items: baseline; gap: 14px; }
+.gov-build .complete-block .rose { color: var(--st-done); }
+.gov-build .complete-block .sentence { font-family: var(--gt-display); font-size: 26px; line-height: 1.2; }
+/* Narrow: arcs, name, one goal. */
+.gov-build.narrow { padding: 24px 26px 22px; }
+.gov-build.narrow .title { font-size: 34px; white-space: normal; }
+.gov-build.narrow .goal { flex-wrap: wrap; gap: 6px 12px; }
+.gov-build.narrow .goal .cat { flex-basis: 100%; }
+.gov-build.narrow .goal .leader { display: none; }
+/* Compact: one row beside a now card. */
+.gov-build.compact { width: 560px; flex-direction: row; align-items: center; gap: 20px; padding: 16px 24px; }
+.gov-build.compact .title { flex: 1; font-size: 30px; }
+.gov-build.compact .ring-count { display: none; }
+.gov-build.compact .count { font-size: 30px; }
+.gov-build.compact .count .of { color: var(--gt-faint); font-size: 22px; }
+/* The Done moment on the plate and on the cell that was met: 260 ms, two names so consecutive ticks restart it. */
+.gov-build.ignite-a { animation: sg-ignite-a 260ms ease-out both; }
+.gov-build.ignite-b { animation: sg-ignite-b 260ms ease-out both; }
+.gov-build .cell.lit-a { animation: sg-cell-a 260ms ease-out both; }
+.gov-build .cell.lit-b { animation: sg-cell-b 260ms ease-out both; }
+@keyframes sg-ignite-a { 0% { box-shadow: inset 0 0 0 2px var(--st-done); } 100% { box-shadow: inset 0 0 0 0 transparent; } }
+@keyframes sg-ignite-b { 0% { box-shadow: inset 0 0 0 2px var(--st-done); } 100% { box-shadow: inset 0 0 0 0 transparent; } }
+@keyframes sg-cell-a { 0% { background-color: color-mix(in srgb, var(--st-done) 25%, transparent); } 100% { background-color: transparent; } }
+@keyframes sg-cell-b { 0% { background-color: color-mix(in srgb, var(--st-done) 25%, transparent); } 100% { background-color: transparent; } }
+.gov[data-motion="reduced"] .gov-build, .gov[data-motion="still"] .gov-build, .gov[data-motion="reduced"] .gov-build .cell, .gov[data-motion="still"] .gov-build .cell { animation-duration: 1ms !important; }
+.gov-placed .gov-build { left: auto; top: auto; }
+.gov-placed .gov-build.compact { width: 100%; }
 /* The site's instruments as elements: the same plate, the same eyebrow. */
 .gov-ticker { left: 72px; bottom: 24px; width: 1776px; padding: 14px 28px; display: flex; gap: 20px; align-items: baseline; }
 .gov-ticker .names { display: flex; gap: 14px; flex-wrap: nowrap; overflow: hidden; white-space: nowrap; font-size: 26px; }
