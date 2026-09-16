@@ -93,6 +93,7 @@ const SECTION_PATHS: Record<string, string> = {
   "/classes": "classes",
   "/guides": "guides",
   "/groups": "guides",
+  "/builds": "guides",
 };
 
 function sectionOf(path: string): string | null {

@@ -1,0 +1,91 @@
+---
+/* Builds: one character's goals, slot by slot — the ones a person has, and
+ * a way to start one from a template of the game's. */
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import SectionHeader from "../../components/brand/SectionHeader.astro";
+import EmptyState from "../../components/feedback/EmptyState.astro";
+import { site } from "../../lib/api";
+import { account, asReader } from "../../lib/account";
+import { copy } from "../../lib/copy";
+
+const say = await copy("builds");
+const me = await account(Astro);
+if (!me) return Astro.redirect("/signin?next=%2Fbuilds");
+type Template = { id: number; name: string; description: string; game: { slug: string; name: string } | null; categories: { items: unknown[] }[] };
+type BuildRow = { id: number; name: string; variant: string; template: Template | null; progress: { met: number; total: number; ratio: number; complete: boolean; categories: { id: string; name: string; met: number; total: number; ratio: number }[] } };
+const [templates, mineRead, runsRead] = await Promise.all([
+  site<Template[]>("/api/builds/templates"),
+  asReader(Astro, "/api/builds"),
+  asReader(Astro, "/api/runs"),
+]);
+const list: Template[] = Array.isArray(templates) ? templates : [];
+const builds: BuildRow[] = mineRead.ok && Array.isArray(mineRead.body) ? mineRead.body : [];
+const runs: { id: number; name: string }[] = runsRead.ok && Array.isArray(runsRead.body) ? runsRead.body : [];
+const WORDS = { needsName: say("words.needs_name", "A build needs a name."), needsTemplate: say("words.needs_template", "Pick the game's template."), failed: say("words.failed", "That did not go through. Try again.") };
+---
+
+<BaseLayout title={say("meta.title", "Builds — Squirrel Guides")} description={say("meta.description", "One character's goals, slot by slot, on your account and on stream.")} noindex>
+  <section class="page builds" data-builds data-words={JSON.stringify(WORDS)}>
+    <SectionHeader as="h1" eyebrow={say("head.eyebrow", "Squirrel Guides")} title={say("head.title", "Builds")} />
+    <p class="lede">{say("head.lede", "A build is a set of goals for one character: the gear you want in each slot, the points to reach, the pieces to put in place. Each is met, partly met or not yet — and the whole thing draws on stream.")}</p>
+    <p class="note" data-note hidden></p>
+
+    {builds.length === 0 ? (
+      <EmptyState title={say("empty.title", "No builds yet.")} text={say("empty.text", "Start one below from the game's template, then write your targets into the slots.")} />
+    ) : (
+      <ul class="list">
+        {builds.map((b) => (
+          <li>
+            <a href={`/builds/${b.id}`}>
+              <span class="name">{b.name}</span>
+              <span class="game">{b.template?.game?.name}{b.variant && ` · ${b.variant}`}</span>
+              <span class="mono">{say("row.count", "{met} of {total}").replace("{met}", String(b.progress.met)).replace("{total}", String(b.progress.total))}{b.progress.complete && ` · ${say("row.complete", "complete")}`}</span>
+              <span class="cats mono">{b.progress.categories.map((c) => `${c.name} ${c.met}/${c.total}`).join(" · ")}</span>
+            </a>
+          </li>
+        ))}
+      </ul>
+    )}
+
+    <form class="card" data-new-form>
+      <h2>{say("new.title", "Start a build")}</h2>
+      <label><span>{say("new.template", "Game and template")}</span>
+        <select data-template>
+          {list.map((t) => <option value={t.id}>{t.game?.name} · {t.name}</option>)}
+        </select>
+      </label>
+      {list.length === 0 && <p class="quiet">{say("new.none", "No templates yet. Shruti adds a game's template when the game is ready.")}</p>}
+      <label><span>{say("new.name", "Name")}</span><input type="text" data-name maxlength="80" placeholder={say("new.name_hint", "Squirrel · Season 15")} /></label>
+      <label><span>{say("new.variant", "Class, season or league")}</span><input type="text" data-variant maxlength="80" placeholder={say("new.variant_hint", "Warlock · Legion")} /></label>
+      {runs.length > 0 && (
+        <label><span>{say("new.run", "Beside a run, if you like")}</span>
+          <select data-run><option value="">{say("new.no_run", "No run")}</option>{runs.map((r) => <option value={r.id}>{r.name}</option>)}</select>
+        </label>
+      )}
+      <button type="submit" class="button">{say("new.go", "Start")}</button>
+    </form>
+  </section>
+</BaseLayout>
+
+<style>
+  .builds { max-width: 680px; margin: 0 auto; padding: var(--space-6) var(--space-4); display: grid; gap: var(--space-5); }
+  .lede { color: var(--ink-soft); max-width: 62ch; }
+  .note { border-left: 2px solid var(--accent); padding-left: var(--space-3); }
+  .quiet { color: var(--ink-soft); }
+  .list { list-style: none; margin: 0; padding: 0; display: grid; gap: 1px; background: var(--rule); border: 1px solid var(--rule); }
+  .list a { display: grid; gap: 4px; padding: var(--space-3) var(--space-4); background: var(--paper); color: inherit; text-decoration: none; }
+  .list .name { font-weight: 600; }
+  .list .game { color: var(--ink-soft); }
+  .mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: .85rem; color: var(--ink-soft); }
+  .card { border: 1px solid var(--rule); padding: var(--space-4); display: grid; gap: var(--space-3); }
+  .card h2 { font-size: 1.1rem; margin: 0; }
+  label { display: grid; gap: 4px; }
+  label span { font-size: .85rem; color: var(--ink-soft); }
+  input, select { font: inherit; padding: .5rem .6rem; border: 1px solid var(--rule); background: var(--paper); color: var(--ink); }
+</style>
+
+<script>
+  import { mountBuilds } from "../../lib/builds";
+  const root = document.querySelector<HTMLElement>("[data-builds]");
+  if (root) mountBuilds(root);
+</script>

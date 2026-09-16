@@ -569,6 +569,8 @@ class OverlayToken(TimestampMixin, table=True):
     user_id: Optional[int] = Field(default=None, foreign_key="site_user.id")
     # A layout of hers, shown in the gallery for anybody to start from.
     shared: bool = Field(default=False)
+    # kind build: a build tracker rather than a run.
+    build_id: Optional[int] = Field(default=None, foreign_key="build.id")
 
     last_seen: Optional[datetime] = Field(default=None, sa_type=UTC_TS)
 

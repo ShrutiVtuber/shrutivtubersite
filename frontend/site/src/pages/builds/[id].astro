@@ -1,0 +1,151 @@
+---
+/* One build: the categories as the sigil's arcs, each item a row — a slot
+ * with the target written in and a tick, a counter with its have and want,
+ * a check. Met, partly met, not yet. Nothing here measures the person. */
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import { account, asReader } from "../../lib/account";
+import { copy } from "../../lib/copy";
+import { sigilSvg } from "../../lib/overlay-elements";
+
+const say = await copy("builds/[id]");
+const id = Astro.params.id ?? "";
+if (!/^\d{1,12}$/.test(id)) return Astro.rewrite("/404");
+const me = await account(Astro);
+if (!me) return Astro.redirect(`/signin?next=${encodeURIComponent(`/builds/${id}`)}`);
+const read = await asReader(Astro, `/api/builds/${id}`);
+if (!read.ok) return Astro.rewrite("/404");
+type Item = { id: string; label: string; kind: string; state: string; ratio: number; target: string; note: string; have?: number; want?: number; unit?: string };
+type Cat = { id: string; name: string; met: number; total: number; ratio: number; items: Item[] };
+const view = read.body as { id: number; name: string; variant: string; template: { name: string; game: { name: string } | null; categories: { id: string; items: { id: string; hint: string; max: number }[] }[] } | null; progress: { met: number; total: number; ratio: number; complete: boolean; categories: Cat[]; next: unknown[] } };
+const hints: Record<string, string> = {};
+for (const c of view.template?.categories ?? []) for (const it of c.items) hints[it.id] = it.hint;
+const tokensRead = await asReader(Astro, `/api/builds/${id}/overlays`);
+const tokens: { id: number; theme: string; label: string }[] = tokensRead.ok && Array.isArray(tokensRead.body) ? tokensRead.body : [];
+const parts = view.progress.categories.map((c) => ({ pct: c.ratio, state: c.total && c.met === c.total ? "done" : c.ratio > 0 ? "now" : "todo" }));
+const WORDS = {
+  of: say("words.of", "of"), met: say("state.met", "met"), partial: say("state.partial", "partly"), open: say("state.open", "not yet"),
+  failed: say("words.failed", "That did not save. Try again."), copied: say("words.copied", "Copied."), overlay: say("words.overlay", "Build overlay"), revoke: say("words.revoke", "Revoke"),
+  confirmDelete: say("words.confirm_delete", "Delete this build? Its overlays stop drawing."),
+};
+---
+
+<BaseLayout title={`${view.name} — ${say("meta.title", "Squirrel Guides")}`} description={say("meta.description", "One character's goals, slot by slot.")} noindex>
+  <article class="page build" data-build={view.id} data-words={JSON.stringify(WORDS)} data-view={JSON.stringify(view)}>
+    <header class="head">
+      <div class="ring" data-ring set:html={sigilSvg(parts, 12, 160)} />
+      <div>
+        <p class="eyebrow">{view.template?.game?.name}{view.variant && ` · ${view.variant}`}</p>
+        <h1>{view.name}</h1>
+        <p class="mono meta"><span data-count>{view.progress.met} {say("words.of", "of")} {view.progress.total}</span> · {view.template?.name}</p>
+        <p class="mono complete" data-complete hidden={!view.progress.complete}>{say("head.complete", "Complete — the build is on the character.")}</p>
+        <nav class="cats" data-cats></nav>
+      </div>
+    </header>
+    <p class="note" data-note hidden></p>
+
+    {view.progress.categories.map((c) => (
+      <section class="cat-block" id={`cat-${c.id}`}>
+        <h2>{c.name} <span class="mono">{c.met}/{c.total}</span></h2>
+        <div class="items">
+          {c.items.map((it) => (
+            <div class="item" data-item={it.id} data-state={it.state}>
+              <div class="line">
+                <span class="label">{it.label}</span>
+                <span class="mono state" data-state>{it.state === "met" ? say("state.met", "met") : it.state === "partial" ? say("state.partial", "partly") : say("state.open", "not yet")}</span>
+              </div>
+              {it.kind === "slot" && (
+                <div class="controls">
+                  <input type="text" class="target" data-target maxlength="120" value={it.target} placeholder={hints[it.id] || say("slot.hint", "what you want here")} />
+                  <label class="tick"><input type="checkbox" data-partial checked={it.state === "partial"} /> {say("slot.partial", "partly")}</label>
+                  <label class="tick"><input type="checkbox" data-met checked={it.state === "met"} /> {say("slot.met", "on the character")}</label>
+                </div>
+              )}
+              {it.kind === "counter" && (
+                <div class="controls">
+                  <button type="button" class="step" data-step="-1" aria-label={say("counter.less", "One less")}>−</button>
+                  <span class="mono have" data-have>{it.have ?? 0}</span>
+                  <button type="button" class="step" data-step="1" aria-label={say("counter.more", "One more")}>+</button>
+                  <span class="mono">{say("counter.of", "of")}</span>
+                  <input type="number" class="want" data-want min="0" step="1" value={it.want ?? 0} aria-label={say("counter.want", "Target")} />
+                  {it.unit && <span class="mono unit">{it.unit}</span>}
+                </div>
+              )}
+              {it.kind === "check" && (
+                <div class="controls">
+                  <label class="tick"><input type="checkbox" data-met checked={it.state === "met"} /> {say("check.done", "done")}</label>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </section>
+    ))}
+
+    <section class="overlay">
+      <h2>{say("overlay.title", "The build on stream")}</h2>
+      <p class="quiet">{say("overlay.text", "A browser source that draws this build: the name, met of total, one arc per category, the gear slots and the next open goals. The URL is shown once. Tick from the phone; the stream follows within two seconds.")}</p>
+      <div class="mint">
+        <label><span>{say("overlay.theme", "Theme")}</span><select data-theme><option value="almanac">{say("overlay.almanac", "Almanac")}</option><option value="grimoire">{say("overlay.grimoire", "Grimoire")}</option><option value="plain">{say("overlay.plain", "Plain")}</option></select></label>
+        <label><span>{say("overlay.motion", "Motion")}</span><select data-motion><option value="reduced">{say("overlay.reduced", "Reduced")}</option><option value="full">{say("overlay.full", "Full")}</option><option value="still">{say("overlay.still", "Still")}</option></select></label>
+        <button type="button" class="button" data-mint>{say("overlay.mint", "Make an overlay")}</button>
+      </div>
+      <div class="minted" data-minted hidden>
+        <label><span>{say("overlay.url", "Browser source URL — shown once")}</span><input type="text" readonly data-url /></label>
+        <button type="button" class="link" data-copy>{say("overlay.copy", "Copy the URL")}</button>
+      </div>
+      <div class="tokens" data-tokens hidden={tokens.length === 0}>
+        {tokens.map((t) => (<div class="bd-token"><span>{t.label} · {t.theme}</span><button type="button" class="link" data-revoke={t.id}>{say("overlay.revoke", "Revoke")}</button></div>))}
+      </div>
+    </section>
+    <p class="foot"><a href="/builds">{say("back", "All builds")}</a> · <button type="button" class="link quiet" data-delete>{say("delete", "Delete this build")}</button></p>
+  </article>
+</BaseLayout>
+
+<style>
+  .build { max-width: 720px; margin: 0 auto; padding: var(--space-6) var(--space-4); display: grid; gap: var(--space-5); }
+  .head { display: grid; grid-template-columns: 160px 1fr; gap: var(--space-4); align-items: center; }
+  @media (max-width: 520px) { .head { grid-template-columns: 1fr; } }
+  .ring :global(svg) { display: block; --gt-faint: var(--rule); --st-done: #E0A4BC; --st-now: #8FBEE8; }
+  .eyebrow { font-size: .8rem; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft); margin: 0 0 var(--space-1); }
+  h1 { font-size: 1.9rem; line-height: 1.15; margin: 0; text-wrap: balance; }
+  h2 { font-size: 1.05rem; margin: 0 0 var(--space-2); display: flex; justify-content: space-between; align-items: baseline; }
+  .mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: .9rem; }
+  .meta, .quiet { color: var(--ink-soft); }
+  .complete { color: #E0A4BC; margin: var(--space-1) 0 0; }
+  .cats { display: flex; flex-wrap: wrap; gap: 6px 12px; margin-top: var(--space-2); }
+  .cats :global(a) { color: var(--ink-soft); text-decoration: none; font-size: .9rem; display: inline-flex; gap: 6px; }
+  .cats :global(a.met) { color: var(--ink); }
+  .cats :global(a.met .mono) { color: #E0A4BC; }
+  .note { border-left: 2px solid var(--accent); padding-left: var(--space-3); }
+  .items { display: grid; gap: 0; border-top: 1px solid var(--rule); }
+  .item { padding: var(--space-3) 0; border-bottom: 1px solid var(--rule); display: grid; gap: var(--space-2); }
+  .line { display: flex; justify-content: space-between; gap: var(--space-3); align-items: baseline; }
+  .label { font-weight: 600; }
+  .item[data-state="met"] .label { color: var(--ink-soft); text-decoration: line-through; text-decoration-color: #E0A4BC; }
+  .item[data-state="met"] .state { color: #E0A4BC; }
+  .item[data-state="partial"] .state { color: #8FBEE8; }
+  .state { color: var(--ink-soft); }
+  .controls { display: flex; gap: var(--space-3); align-items: center; flex-wrap: wrap; }
+  .target { flex: 1 1 16rem; font: inherit; padding: .45rem .55rem; border: 1px solid var(--rule); background: var(--paper); color: var(--ink); }
+  .tick { display: inline-flex; gap: 6px; align-items: center; color: var(--ink-soft); font-size: .9rem; }
+  .step { font: inherit; width: 2.4rem; height: 2.4rem; border: 1px solid var(--rule); background: var(--paper); color: var(--ink); cursor: pointer; }
+  .have { min-width: 2.5rem; text-align: center; font-size: 1.1rem; }
+  .want { width: 5rem; font: inherit; font-family: var(--font-mono); padding: .4rem .5rem; border: 1px solid var(--rule); background: var(--paper); color: var(--ink); }
+  .unit { color: var(--ink-soft); }
+  .mint { display: grid; grid-template-columns: 1fr 1fr auto; gap: var(--space-3); align-items: end; }
+  @media (max-width: 520px) { .mint { grid-template-columns: 1fr; } }
+  label { display: grid; gap: 4px; }
+  label span { font-size: .85rem; color: var(--ink-soft); }
+  select, .minted input { font: inherit; padding: .5rem .6rem; border: 1px solid var(--rule); background: var(--paper); color: var(--ink); width: 100%; }
+  .minted, .tokens { display: grid; gap: var(--space-2); margin-top: var(--space-3); }
+  .bd-token { display: flex; justify-content: space-between; gap: var(--space-3); border-top: 1px solid var(--rule); padding-top: var(--space-2); }
+  .link { font: inherit; background: none; border: 0; padding: 0; color: var(--accent); text-decoration: underline; cursor: pointer; }
+  .link.quiet { color: var(--ink-soft); }
+  .foot { color: var(--ink-soft); }
+</style>
+
+<script>
+  import { mountBuild } from "../../lib/builds";
+  const root = document.querySelector<HTMLElement>("[data-build]");
+  if (root) mountBuild(root);
+</script>

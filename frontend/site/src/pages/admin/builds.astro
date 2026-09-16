@@ -1,0 +1,139 @@
+---
+/* Build templates: what a build of one game is made of, edited here so a
+ * new game is a new template, not a deploy. Categories hold items; an item
+ * is a slot to fill, a counter to reach or a thing to tick. */
+import AdminLayout from "../../layouts/AdminLayout.astro";
+import { asAdmin } from "../../lib/admin";
+
+const read = await asAdmin(Astro, "/api/builds/admin/templates");
+const templates = read.ok && Array.isArray(read.body) ? read.body : [];
+const signedIn = read.status !== 401 && read.status !== 0;
+---
+
+<AdminLayout title="Build templates">
+  {!signedIn ? (
+    <section class="adm-card"><p>Sign in to the admin first.</p></section>
+  ) : (
+    <section class="adm-card bt" data-templates data-list={JSON.stringify(templates)}>
+      <header class="bt-head">
+        <div>
+          <h1>Build templates</h1>
+          <p class="bt-lede">What a build of one game is made of. Categories hold items; an item is a <b>slot</b> to fill (the person writes their target and ticks it), a <b>counter</b> to reach (have of want), or a <b>check</b>. A person starts a build from a template and every surface — the page, the app, the overlay — follows it.</p>
+        </div>
+        <div class="bt-actions">
+          <select data-pick></select>
+          <button type="button" class="od-btn" data-new>New template</button>
+          <button type="button" class="od-btn" data-duplicate>Duplicate for another game</button>
+        </div>
+      </header>
+      <form class="bt-form" data-form>
+        <div class="bt-row">
+          <label>Game address <input type="text" data-f="game" placeholder="diablo-iv" /></label>
+          <label>Game name <input type="text" data-f="game_name" placeholder="Diablo IV" /></label>
+          <label>Template name <input type="text" data-f="name" placeholder="Seasonal character build" /></label>
+        </div>
+        <label>Description <textarea rows="2" data-f="description"></textarea></label>
+        <div class="bt-row">
+          <label class="bt-inline"><input type="checkbox" data-f="visible" checked /> People can start builds from it</label>
+          <label>Position <input type="number" data-f="position" value="0" /></label>
+        </div>
+        <div data-categories></div>
+        <div class="bt-actions">
+          <button type="button" class="od-btn" data-add-category>+ category</button>
+          <button type="submit" class="od-btn primary">Save template</button>
+          <button type="button" class="od-btn ghost" data-delete>Delete or hide</button>
+          <span class="od-mono" data-status></span>
+        </div>
+      </form>
+    </section>
+  )}
+</AdminLayout>
+
+<style>
+  .bt { display: flex; flex-direction: column; gap: 18px; }
+  .bt-head { display: flex; justify-content: space-between; gap: 24px; align-items: flex-start; flex-wrap: wrap; }
+  .bt-head h1 { margin: 0 0 6px; }
+  .bt-lede { margin: 0; max-width: 70ch; color: var(--ink-soft); font-size: 14px; line-height: 1.6; }
+  .bt-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .bt-form { display: flex; flex-direction: column; gap: 14px; }
+  .bt-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+  .bt-form label { display: grid; gap: 4px; font-size: 12.5px; color: var(--ink-soft); }
+  .bt-inline { grid-template-columns: auto 1fr; align-items: center; display: grid; }
+  .bt-form input, .bt-form textarea, .bt-form select, .bt-actions select { font: inherit; padding: 7px 10px; border: var(--border-w) solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-page); color: var(--ink); }
+  .bt-cat { border: var(--border-w) solid var(--line); border-radius: var(--radius-md); padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; }
+  .bt-cat-head { display: flex; gap: 10px; align-items: center; }
+  .bt-cat-head input { flex: 1; }
+  .bt-items { display: grid; grid-template-columns: 2fr 1fr 2fr .6fr .8fr auto; gap: 6px 8px; align-items: center; }
+  .bt-items .od-mono { color: var(--ink-faint); }
+  .od-btn { font: inherit; padding: 7px 12px; border: var(--border-w) solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-page); color: var(--ink); cursor: pointer; }
+  .od-btn.primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+  .od-btn.ghost { color: var(--ink-soft); }
+  .od-mono { font-family: var(--font-mono); font-size: 12px; }
+</style>
+
+<script>
+  const root = document.querySelector<HTMLElement>("[data-templates]");
+  if (root) {
+    const token = () => document.cookie.split("; ").find((c) => c.startsWith("shruti_csrf="))?.split("=")[1] ?? "";
+    const esc = (s: unknown) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
+    let list: any[] = JSON.parse(root.dataset.list || "[]");
+    let current: any = null;
+    const $ = <T extends HTMLElement>(sel: string) => root.querySelector<T>(sel)!;
+    const pick = $<HTMLSelectElement>("[data-pick]");
+    const status = $("[data-status]");
+    const drawPick = () => { pick.innerHTML = `<option value="">— pick a template —</option>` + list.map((t) => `<option value="${t.id}" ${current?.id === t.id ? "selected" : ""}>${esc(t.game?.name)} · ${esc(t.name)}${t.visible ? "" : " (hidden)"}</option>`).join(""); };
+    const field = (name: string) => root.querySelector<HTMLInputElement>(`[data-f="${name}"]`)!;
+    const blank = () => ({ id: null, game: { slug: "", name: "" }, name: "", description: "", visible: true, position: 0, categories: [] });
+    const load = (t: any) => {
+      current = JSON.parse(JSON.stringify(t));
+      field("game").value = current.game?.slug ?? ""; field("game").disabled = !!current.id;
+      field("game_name").value = current.game?.name ?? "";
+      field("name").value = current.name ?? ""; field("description").value = current.description ?? "";
+      field("visible").checked = current.visible !== false; field("position").value = String(current.position ?? 0);
+      drawCategories(); drawPick(); status.textContent = current.id ? `template ${current.id}` : "new";
+    };
+    const drawCategories = () => {
+      const box = $("[data-categories]");
+      box.innerHTML = current.categories.map((c: any, ci: number) => `<div class="bt-cat" data-ci="${ci}">
+        <div class="bt-cat-head"><input type="text" data-cat-name value="${esc(c.name)}" placeholder="Gear" /><span class="od-mono">${esc(c.id || "")}</span><button type="button" class="od-btn" data-add-item>+ item</button><button type="button" class="od-btn ghost" data-remove-cat>remove</button></div>
+        <div class="bt-items"><span class="od-mono">label</span><span class="od-mono">kind</span><span class="od-mono">hint</span><span class="od-mono">max</span><span class="od-mono">unit</span><span></span>${
+          (c.items || []).map((it: any, ii: number) => `<input type="text" data-ii="${ii}" data-it="label" value="${esc(it.label)}" /><select data-ii="${ii}" data-it="kind">${["slot", "counter", "check"].map((k) => `<option ${it.kind === k ? "selected" : ""}>${k}</option>`).join("")}</select><input type="text" data-ii="${ii}" data-it="hint" value="${esc(it.hint ?? "")}" /><input type="number" data-ii="${ii}" data-it="max" value="${esc(it.max ?? 0)}" ${it.kind === "counter" ? "" : "disabled"} /><input type="text" data-ii="${ii}" data-it="unit" value="${esc(it.unit ?? "")}" ${it.kind === "counter" ? "" : "disabled"} /><button type="button" class="od-btn ghost" data-remove-item="${ii}">×</button>`).join("")
+        }</div></div>`).join("");
+    };
+    const readForm = () => {
+      for (const catEl of root.querySelectorAll<HTMLElement>("[data-ci]")) {
+        const ci = Number(catEl.dataset.ci); const c = current.categories[ci];
+        c.name = catEl.querySelector<HTMLInputElement>("[data-cat-name]")!.value;
+        for (const el of catEl.querySelectorAll<HTMLInputElement>("[data-ii]")) { const it = c.items[Number(el.dataset.ii)]; const key = el.dataset.it!; (it as any)[key] = key === "max" ? Number(el.value) || 0 : el.value; }
+      }
+    };
+    root.addEventListener("click", (ev) => {
+      const t = ev.target as HTMLElement;
+      const catEl = t.closest<HTMLElement>("[data-ci]"); const ci = catEl ? Number(catEl.dataset.ci) : -1;
+      if (t.matches("[data-add-item]")) { readForm(); current.categories[ci].items.push({ label: "", kind: "slot", hint: "", max: 0, unit: "" }); drawCategories(); }
+      else if (t.matches("[data-remove-cat]")) { readForm(); current.categories.splice(ci, 1); drawCategories(); }
+      else if (t.matches("[data-remove-item]")) { readForm(); current.categories[ci].items.splice(Number(t.dataset.removeItem), 1); drawCategories(); }
+    });
+    root.addEventListener("change", (ev) => { const el = ev.target as HTMLSelectElement; if (el.matches('[data-it="kind"]')) { readForm(); drawCategories(); } });
+    $("[data-add-category]").addEventListener("click", () => { readForm(); current.categories.push({ name: "", items: [] }); drawCategories(); });
+    $("[data-new]").addEventListener("click", () => load(blank()));
+    $("[data-duplicate]").addEventListener("click", () => { if (!current) return; readForm(); const copy = JSON.parse(JSON.stringify(current)); copy.id = null; copy.game = { slug: "", name: "" }; copy.name = `${current.name} (copy)`; load(copy); });
+    pick.addEventListener("change", () => { const t = list.find((x) => String(x.id) === pick.value); if (t) load(t); });
+    $("[data-form]").addEventListener("submit", async (ev) => {
+      ev.preventDefault(); readForm();
+      const body = { game: field("game").value.trim(), game_name: field("game_name").value.trim(), name: field("name").value.trim(), description: field("description").value.trim(), visible: field("visible").checked, position: Number(field("position").value) || 0, categories: current.categories };
+      if (!body.game || !body.name) { status.textContent = "A game address and a template name are needed."; return; }
+      const r = await fetch(current.id ? `/api/builds/admin/templates/${current.id}` : "/api/builds/admin/templates", { method: current.id ? "PUT" : "POST", headers: { "content-type": "application/json", "x-csrf-token": token() }, body: JSON.stringify(body) });
+      if (!r.ok) { status.textContent = `Not saved (${r.status}).`; return; }
+      const saved = await r.json();
+      if (current.id) list = list.map((t) => (t.id === saved.id ? saved : t)); else list.push(saved);
+      load(saved); status.textContent = `Saved · template ${saved.id}`;
+    });
+    $("[data-delete]").addEventListener("click", async () => {
+      if (!current?.id || !confirm("Delete this template? If people have builds on it, it is hidden instead.")) return;
+      const r = await fetch(`/api/builds/admin/templates/${current.id}`, { method: "DELETE", headers: { "x-csrf-token": token() } });
+      if (r.ok) { list = list.filter((t) => t.id !== current.id); load(list[0] ?? blank()); status.textContent = "Removed or hidden."; }
+    });
+    load(list[0] ?? blank());
+  }
+</script>

@@ -124,7 +124,7 @@ def test_a_layout_is_several_elements_in_one_source_placed_on_the_canvas() -> No
     assert "guide-layout" in progress.GUIDE_KINDS and "guide-layout" not in progress.ELEMENT_KINDS
     assert set(progress.DEFAULT_PLACES) == set(progress.ELEMENT_KINDS)
     cleaned = progress.clean_layout([{"kind": "guide-now", "x": -50, "y": 5000, "w": 10}, {"kind": "nope"}])
-    assert cleaned == [{"kind": "guide-now", "x": 0, "y": 1080, "w": 120, "routine_id": "", "shows": "", "group": "", "counter_id": 0, "text": "", "url": "",
+    assert cleaned == [{"kind": "guide-now", "x": 0, "y": 1080, "w": 120, "routine_id": "", "shows": "", "group": "", "counter_id": 0, "build_id": 0, "text": "", "url": "",
                         "lat": 37.9838, "lon": 23.7275}]
     # The sky and the hours are read from a place; a nonsense place is her city, an outlandish one is clamped.
     assert progress.clean_layout([{"kind": "sky", "lat": "nope", "lon": 999}])[0]["lat"] == 37.9838

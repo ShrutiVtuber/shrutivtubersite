@@ -24,7 +24,7 @@ REENTRY_AFTER = timedelta(hours=6)
 STATES = ("done", "skipped", "later", "open")
 GUIDE_KINDS = ("guide-now", "guide-sigil", "guide-path", "guide-routine", "guide-layout")
 ELEMENT_KINDS = ("guide-now", "guide-sigil", "guide-path", "guide-routine", "guide-goal", "counter", "text", "image",
-                 "ticker", "sky", "hours", "countdown", "alerts", "wheel")
+                 "ticker", "sky", "hours", "countdown", "alerts", "wheel", "build")
 # Two kinds that carry their own content — a line of text, a picture by its
 # https address — so a layout can hold a title card or a logo without a run.
 OWN_KINDS = ("text", "image")
@@ -33,7 +33,7 @@ OWN_KINDS = ("text", "image")
 # …and the site's other instruments: the ticker of supporters, the sky, the
 # planetary hours, a countdown, the alerts, the transit wheel. A tracker has
 # none of them and draws them empty.
-HOST_KINDS = ("guide-goal", "counter", "ticker", "sky", "hours", "countdown", "alerts", "wheel")
+HOST_KINDS = ("guide-goal", "counter", "ticker", "sky", "hours", "countdown", "alerts", "wheel", "build")
 # Where each element sits when nobody has moved it: the boards' positions at
 # 1920 × 1080, so a layout with no coordinates is the frame the design shows.
 DEFAULT_PLACES = {
@@ -51,6 +51,7 @@ DEFAULT_PLACES = {
     "countdown": {"x": 1416, "y": 560, "w": 432},
     "alerts": {"x": 1200, "y": 640, "w": 648},
     "wheel": {"x": 1416, "y": 300, "w": 432},
+    "build": {"x": 72, "y": 300, "w": 900},
 }
 THEMES = ("almanac", "grimoire", "plain")
 MOTIONS = ("full", "reduced", "still")
@@ -340,6 +341,7 @@ def clean_layout(layout: Any) -> list[dict]:
             # A goal element draws a group, not the run: the group's join code.
             "group": str(e.get("group") or "")[:12].upper(),
             "counter_id": num("counter_id", 0, 0, 10**9),
+            "build_id": num("build_id", 0, 0, 10**9),
             "text": str(e.get("text") or "")[:200],
             "url": _https(e.get("url")),
             # Where the sky and the hours are read from; her city unless moved.

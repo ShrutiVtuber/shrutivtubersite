@@ -127,6 +127,26 @@
 .gov-path .it.skipped span:last-child { text-decoration: line-through; }
 
 /* ── the routine · 760 wide at left 72, bottom 72 ──────────────────────── */
+/* A build — 900px: the sigil's arcs as the categories, the gear as a grid, the next goals. */
+.gov-build { left: 72px; top: 300px; width: 900px; padding: 24px 28px; display: flex; flex-direction: column; gap: 18px; }
+.gov-build .head { display: flex; gap: 24px; align-items: center; }
+.gov-build .ring { position: relative; width: 148px; height: 148px; flex: none; display: grid; place-items: center; }
+.gov-build .ring svg { position: absolute; inset: 0; }
+.gov-build .ring .count { font-size: 22px; }
+.gov-build .titles { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.gov-build .title { font-family: var(--gt-display); font-weight: var(--gt-display-weight); font-size: 34px; line-height: 1.1; }
+.gov-build .complete { color: var(--st-done); font-size: 18px; letter-spacing: .1em; text-transform: uppercase; }
+.gov-build .cats { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 18px; color: var(--gt-soft); }
+.gov-build .cat { display: inline-flex; align-items: center; gap: 6px; }
+.gov-build .cat .dot { width: 12px; height: 12px; }
+.gov-build .slots { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+.gov-build .slot { padding: 8px 10px; border: 1px solid var(--gt-border); border-radius: calc(var(--gt-radius) / 2); font-size: 16px; color: var(--gt-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gov-build .slot.met { color: var(--gt-ink); border-color: var(--st-done); box-shadow: inset 0 0 0 1px var(--st-done); }
+.gov-build .slot.partial { color: var(--gt-ink); border-color: var(--st-now); }
+.gov-build .next { display: flex; gap: 20px; flex-wrap: wrap; }
+.gov-build .goal { display: flex; flex-direction: column; gap: 2px; font-size: 18px; max-width: 280px; }
+.gov-build.ignite { box-shadow: 0 0 0 3px var(--st-done); }
+.gov-placed .gov-build { left: auto; top: auto; }
 /* The site's instruments as elements: the same plate, the same eyebrow. */
 .gov-ticker { left: 72px; bottom: 24px; width: 1776px; padding: 14px 28px; display: flex; gap: 20px; align-items: baseline; }
 .gov-ticker .names { display: flex; gap: 14px; flex-wrap: nowrap; overflow: hidden; white-space: nowrap; font-size: 26px; }

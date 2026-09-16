@@ -232,3 +232,48 @@ class GroupContribution(TimestampMixin, table=True):
     group_id: int = Field(index=True, foreign_key="guide_group.id")
     user_id: int = Field(index=True, foreign_key="site_user.id")
     amount: int = 0
+
+
+class BuildTemplate(TimestampMixin, table=True):
+    """
+    What a build of one game is made of, as she defines it in the admin: the
+    categories (Gear, Skills, Paragon, Talisman, Season…) and the items in
+    each — a slot to fill, a counter to reach, a thing to tick. A template is
+    generic enough to hold Diablo IV, Path of Exile 2 and the next game, and
+    precise enough to track a whole seasonal build item by item.
+
+    `categories` is JSON: [{id, name, items: [{id, label, kind, hint, max, unit}]}]
+    where kind is slot | counter | check.
+    """
+
+    __tablename__ = "build_template"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    game_id: int = Field(index=True, foreign_key="guide_game.id")
+    name: str
+    description: str = ""
+    categories: list = Field(default_factory=list, sa_column=Column(JSONB, nullable=False, server_default="[]"))
+    visible: bool = True
+    position: int = 0
+
+
+class Build(TimestampMixin, table=True):
+    """
+    One person's build: a template filled with their own targets — the item
+    they want in each slot, the number they are reaching for — and how far
+    they have got. Nothing here is measured against time: a build is a set
+    of goals, and each is met, partly met or not yet.
+
+    `goals` is JSON keyed by item id: {target, want, have, met, note}.
+    """
+
+    __tablename__ = "build"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(index=True, foreign_key="site_user.id")
+    template_id: int = Field(index=True, foreign_key="build_template.id")
+    run_id: Optional[int] = Field(default=None, foreign_key="guide_run.id")
+    name: str
+    variant: str = ""                      # class, season, league — free text
+    goals: dict = Field(default_factory=dict, sa_column=Column(JSONB, nullable=False, server_default="{}"))
+    last_seen_at: Optional[datetime] = Field(default=None, sa_type=UTC_TS)

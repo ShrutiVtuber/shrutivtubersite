@@ -44,7 +44,7 @@ runs_router = APIRouter(prefix="/api/runs", tags=["runs"])
 
 GUIDE_KINDS, THEMES, MOTIONS = progress.GUIDE_KINDS, progress.THEMES, progress.MOTIONS
 # The site's one extra kind: a group's goal, bound to a group rather than a run.
-SITE_KINDS = GUIDE_KINDS + ("guide-goal",)
+SITE_KINDS = GUIDE_KINDS + ("guide-goal", "build")
 
 
 def _stored(row: GuideRun) -> dict:
@@ -78,6 +78,18 @@ async def guide(t: str, v: str = "", session: AsyncSession = Depends(get_session
             "motion": token.motion, "run": None, "element": None, "version": ""}
     if token.kind == "guide-goal":
         return await _goal_frame(session, token, base)
+    if token.kind == "build":
+        from shruti.api.routes.builds import build_frame
+        from shruti.models.guides import Build
+        element = await build_frame(session, token.build_id)
+        if element is not None:
+            b = await session.get(Build, token.build_id)
+            base["element"] = element
+            base["run"] = {"name": b.name, "guide": b.variant, "game": ""}
+            base["version"] = f"{b.updated_at.isoformat() if b.updated_at else ''}:{element['met']}"
+            if v and v.replace(" ", "+") == base["version"]:
+                return {"kind": token.kind, "theme": base["theme"], "motion": base["motion"], "version": base["version"], "unchanged": True}
+        return base
     run = await session.get(GuideRun, token.run_id) if token.run_id else None
     if run is None:
         return base
@@ -186,6 +198,12 @@ async def _instrument_stamp(session: AsyncSession, elements: list[dict]) -> str:
         codes = sorted({e.get("group", "") for e in elements if e.get("kind") == "guide-goal"})
         latest = (await session.execute(select(func.max(GroupContribution.id)))).scalar() or 0
         stamp += f":g{latest}:{','.join(codes)}"
+    if kinds & {"build"}:
+        from shruti.models.guides import Build
+        ids = [int(e.get("build_id") or 0) for e in elements if e.get("kind") == "build" and e.get("build_id")]
+        if ids:
+            rows = (await session.execute(select(Build.id, Build.updated_at).where(Build.id.in_(ids)))).all()
+            stamp += ":b" + ",".join(f"{i}@{u.isoformat() if u else ''}" for i, u in rows)
     if kinds & {"sky", "hours", "countdown"}:
         stamp += f":t{int(datetime.now(timezone.utc).timestamp() // 300)}"
     return stamp
@@ -257,6 +275,9 @@ async def _fill_goals(session: AsyncSession, elements: list[dict]) -> None:
                 e["element"] = {"events": [{"id": r.id, "source": r.source, "who": r.who or "Someone", "amountMinor": r.amount_minor,
                                             "currency": r.currency, "quantity": r.quantity,
                                             "message": r.message if r.message_approved else ""} for r in reversed(rows)]}
+            elif kind == "build" and e.get("build_id"):
+                from shruti.api.routes.builds import build_frame
+                e["element"] = (await build_frame(session, int(e["build_id"]))) or {}
             elif kind == "wheel":
                 query = "".join(ch for ch in str(e.get("shows") or "") if ch.isalnum() or ch in "=&-_")[:80]
                 e["element"] = {"src": f"/overlay/wheel?size={int(e.get('w', 432))}&bg=" + (f"&{query}" if query else "")}

@@ -176,6 +176,24 @@ export async function drawElement(slot: HTMLElement, kind: string, prev: any, ne
     slot.innerHTML = src.startsWith("/overlay/wheel") ? `<iframe class="gov-wheel" src="${esc(src)}" title="transit wheel" loading="eager"></iframe>` : "";
     return;
   }
+  if (kind === "build") {
+    /* A build: its name, met-of-total, one arc per category (the sigil's own
+     * drawing), a grid of the gear slots, and the next open goals. The one
+     * number is a fact about the build, never about the person. */
+    const b = next && Array.isArray(next.parts) ? next : null;
+    if (!b) { slot.innerHTML = ""; return; }
+    const stroke = Number(getComputedStyle(slot.closest(".gov")!).getPropertyValue("--gt-stroke")) || 12;
+    const cats = (b.parts as any[]).map((p: any) => `<span class="cat ${esc(p.state)}"><span class="dot ${p.state === "done" ? "done" : p.state === "now" ? "current" : "locked"}"></span>${esc(p.name)} <span class="gov-mono">${esc(p.met)}/${esc(p.total)}</span></span>`).join("");
+    const slots = (b.slots as any[] ?? []).map((sl: any) => `<span class="slot ${esc(sl.state)}" title="${esc(sl.target)}">${esc(sl.label)}</span>`).join("");
+    const nextGoals = (b.next as any[] ?? []).slice(0, 3).map((n: any) => `<span class="goal"><span class="gov-eyebrow">${esc(n.category)}</span><span>${esc(n.label)}${n.target ? ` · ${esc(n.target)}` : ""}</span></span>`).join("");
+    const prev = slot.querySelector<HTMLElement>(".gov-build");
+    const wasMet = prev ? Number(prev.dataset.met || 0) : null;
+    slot.innerHTML = `<div class="gov-plate gov-build" data-met="${esc(b.met)}"><div class="head"><div class="ring">${sigilSvg(b.parts, stroke, 148)}<span class="gov-mono count">${esc(b.count)}</span></div><div class="titles"><span class="gov-eyebrow">${esc(b.variant || "build")}</span><span class="title">${esc(b.name)}</span>${b.complete ? `<span class="gov-mono complete">complete</span>` : ""}<div class="cats">${cats}</div></div></div>${slots ? `<div class="slots">${slots}</div>` : ""}${nextGoals ? `<div class="next">${nextGoals}</div>` : ""}</div>`;
+    if (wasMet !== null && Number(b.met) > wasMet && !o.still && !o.reduced) {
+      const card = slot.querySelector<HTMLElement>(".gov-build")!; card.classList.add("ignite"); await wait(260); card.classList.remove("ignite");
+    }
+    return;
+  }
   if (kind === "guide-routine") {
     const r = next?.routine;
     slot.innerHTML = r ? `<div class="gov-plate gov-routine"><div class="head"><span class="name">${esc(r.name)}</span><span class="gov-mono count">${esc(r.count)}</span></div><div>${(r.items ?? []).map((i: any) => `<div class="item ${i.done ? "done" : ""}"><span class="dot ${i.done ? "done" : "available"}"></span><span>${esc(i.text)}</span></div>`).join("")}</div></div>` : "";

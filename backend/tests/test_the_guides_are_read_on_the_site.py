@@ -40,9 +40,9 @@ def test_the_section_is_declared_everywhere_a_section_must_be() -> None:
     """
     store = (ROOT / "backend" / "shruti" / "core" / "settings_store.py").read_text(encoding="utf-8")
     assert '"guides": "page.guides"' in store
-    assert '"guides": ("/guides", "/groups")' in store, "groups are part of the guides section"
+    assert '"guides": ("/guides", "/groups", "/builds")' in store, "groups and builds are part of the guides section"
     middleware = (SRC / "middleware.ts").read_text(encoding="utf-8")
-    assert '"/guides": "guides"' in middleware and '"/groups": "guides"' in middleware
+    assert '"/guides": "guides"' in middleware and '"/groups": "guides"' in middleware and '"/builds": "guides"' in middleware
     admin = (SRC / "pages" / "admin" / "settings.astro").read_text(encoding="utf-8")
     assert '["guides", ' in admin
 
