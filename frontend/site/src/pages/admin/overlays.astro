@@ -202,7 +202,7 @@ const signedIn = runsRead.status !== 401 && runsRead.status !== 0;
       "countdown": { kind: "countdown", x: 1416, y: 560, w: 432, routine_id: "", shows: "", group: "", counter_id: 0, text: "", url: "" },
       "alerts": { kind: "alerts", x: 1200, y: 640, w: 648, routine_id: "", shows: "", group: "", counter_id: 0, text: "", url: "" },
       "wheel": { kind: "wheel", x: 1416, y: 300, w: 432, routine_id: "", shows: "", group: "", counter_id: 0, text: "", url: "" },
-      "build": { kind: "build", x: 72, y: 300, w: 900, routine_id: "", shows: "", group: "", counter_id: 0, text: "", url: "", build_id: 0 },
+      "build": { kind: "build", x: 72, y: 300, w: 900, routine_id: "", shows: "", group: "", counter_id: 0, text: "", url: "", build_id: 0, lat: 37.9838, lon: 23.7275 },
     };
     const runs: { id: number; name: string }[] = JSON.parse(root.dataset.runs || "[]");
     const layouts: any[] = JSON.parse(root.dataset.layouts || "[]");
@@ -267,7 +267,7 @@ const signedIn = runsRead.status !== 401 && runsRead.status !== 0;
         (e.kind === "counter" || e.kind === "countdown" || e.kind === "ticker" ? `<span>counter</span><input type="number" min="0" step="1" data-prop="counter_id" value="${e.counter_id ?? 0}" placeholder="${e.kind === "ticker" ? "a counter's id, or all support" : "the counter's id"}" />` : "") +
         (e.kind === "sky" || e.kind === "hours" ? `<span>lat · lon</span><span><input type="number" step="0.0001" data-prop="lat" value="${e.lat ?? 37.9838}" /> <input type="number" step="0.0001" data-prop="lon" value="${e.lon ?? 23.7275}" /></span>` : "") +
         (e.kind === "wheel" ? `<span>wheel</span><input type="text" data-prop="shows" value="${esc(e.shows ?? "")}" placeholder="rising=Leo&strip=0" />` : "") +
-        (e.kind === "build" ? `<span>build</span><input type="number" min="0" step="1" data-prop="build_id" value="${e.build_id ?? 0}" placeholder="the build's id" />` : "") +
+        (e.kind === "build" ? `<span>build</span><input type="number" min="0" step="1" data-prop="build_id" value="${e.build_id ?? 0}" placeholder="the build's id" /><span>variant</span><select data-prop="shows"><option value="" ${!e.shows ? "selected" : ""}>the plate</option><option value="compact" ${e.shows === "compact" ? "selected" : ""}>compact row · beside a now card</option></select>` : "") +
         (e.kind === "text" ? `<span>text</span><input type="text" maxlength="200" data-prop="text" value="${esc(e.text ?? "")}" placeholder="a line of text" />` : "") +
         (e.kind === "image" ? `<span>image</span><input type="url" data-prop="url" value="${esc(e.url ?? "")}" placeholder="https://… (a picture)" />` : "") +
         `<span>shows</span><span class="od-mono">${e.kind === "guide-now" ? "phase · title · one line" : e.kind === "guide-path" ? "the last two, the current, the next three" : e.kind === "guide-sigil" ? "one arc per phase" : "the checklist"}</span>` +
