@@ -1,19 +1,11 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 """
-Builds: a set of goals for one character, tracked slot by slot.
+Builds on the site: templates, hers; a build, one person's; the build on
+stream. The logic lives in the shared package (`shrutisguides.builds`) so
+the self-hosted tracker and the site cannot disagree — these routes keep
+the rows, check who is asking, and hand the rest to it.
 
-A TEMPLATE, hers, says what a build of one game is made of — categories of
-items, each a slot to fill, a counter to reach or a thing to tick. It is
-generic enough for Diablo IV today and Path of Exile 2 tomorrow, and edited
-from the admin, so a new game is a new template and not a new deploy.
-
-A BUILD is one person's: the template with their own targets written in
-("Shroud of False Death, 2 greater affixes") and how far they have got. It
-is drawn on stream by its own overlay element and ticked from the app.
-
-⚠ Nothing measures absence. A goal is met, partly met or not yet; there is
-no "since", no rate, no percentage of a person. The one number on the
-plate is met-of-total, which is a fact about the build.
+⚠ Nothing measures absence. A goal is met, partly met or not yet.
 """
 from __future__ import annotations
 
@@ -22,8 +14,12 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
+from sqlalchemy import func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
+
+from shrutisguides import builds as shared
+from shrutisguides.builds import clean_categories, item_state, parse_list  # noqa: F401  (re-exported for callers and tests)
 
 from shruti.api.deps import get_session, require_admin
 from shruti.api.routes.practice import _reader, _refuse_if_suspended
@@ -32,129 +28,16 @@ from shruti.models.guides import Build, BuildTemplate, Game, GuideRun
 
 router = APIRouter(prefix="/api/builds", tags=["builds"])
 
-ITEM_KINDS = ("slot", "counter", "check")
-MAX_CATEGORIES = 24
-MAX_ITEMS = 60
 
-
-# ── the template's shape, cleaned once ──────────────────────────────────────
-
-def _ident(value, fallback: str) -> str:
-    v = "".join(ch for ch in str(value or "").strip().lower().replace(" ", "-") if ch.isalnum() or ch in "-_")[:40]
-    return v or fallback
-
-
-def clean_categories(raw) -> list[dict]:
-    """[{id, name, items: [{id, label, kind, hint, max, unit}]}] — unknown kinds become checks."""
-    out: list[dict] = []
-    if not isinstance(raw, list):
-        return out
-    seen: set[str] = set()
-    for ci, c in enumerate(raw[:MAX_CATEGORIES]):
-        if not isinstance(c, dict):
-            continue
-        cid = _ident(c.get("id") or c.get("name"), f"c{ci + 1}")
-        while cid in seen:
-            cid += "-2"
-        seen.add(cid)
-        items: list[dict] = []
-        used: set[str] = set()
-        for ii, it in enumerate((c.get("items") or [])[:MAX_ITEMS]):
-            if not isinstance(it, dict):
-                continue
-            iid = _ident(it.get("id") or it.get("label"), f"{cid}-{ii + 1}")
-            while iid in used:
-                iid += "-2"
-            used.add(iid)
-            kind = it.get("kind") if it.get("kind") in ITEM_KINDS else "check"
-            try:
-                mx = max(0, int(it.get("max") or 0))
-            except (TypeError, ValueError):
-                mx = 0
-            items.append({"id": iid, "label": str(it.get("label") or iid)[:80], "kind": kind,
-                          "hint": str(it.get("hint") or "")[:120], "max": mx, "unit": str(it.get("unit") or "")[:20]})
-        out.append({"id": cid, "name": str(c.get("name") or cid)[:60], "items": items, "grid": bool(c.get("grid"))})
-    # One grid per template: the first flagged category keeps the flag.
-    seen_grid = False
-    for c in out:
-        if c["grid"] and not seen_grid:
-            seen_grid = True
-        else:
-            c["grid"] = False
-    return out
-
-
-# ── progress, computed here so every surface agrees ─────────────────────────
-
-def _goal(goals: dict, item_id: str) -> dict:
-    g = goals.get(item_id) if isinstance(goals, dict) else None
-    return g if isinstance(g, dict) else {}
-
-
-def item_state(item: dict, goal: dict) -> tuple[str, float]:
-    """met | partial | open, and how far along, for one item."""
-    if item["kind"] == "counter":
-        want = goal.get("want")
-        try:
-            want = int(want) if want not in (None, "") else int(item.get("max") or 0)
-        except (TypeError, ValueError):
-            want = int(item.get("max") or 0)
-        try:
-            have = int(goal.get("have") or 0)
-        except (TypeError, ValueError):
-            have = 0
-        if want <= 0:
-            return ("met" if goal.get("met") else "open"), (1.0 if goal.get("met") else 0.0)
-        ratio = max(0.0, min(1.0, have / want))
-        return ("met" if have >= want else ("partial" if have > 0 else "open")), ratio
-    met = bool(goal.get("met"))
-    if item["kind"] == "slot" and not met and goal.get("partial"):
-        return "partial", 0.5
-    return ("met" if met else "open"), (1.0 if met else 0.0)
-
+# ── the shapes every surface reads ──────────────────────────────────────────
 
 def progress_of(template: BuildTemplate, build: Build) -> dict:
-    goals = build.goals or {}
-    cats = []
-    met_all = total_all = 0
-    next_open: list[dict] = []
-    partly_all = 0
-    for c in template.categories or []:
-        met = total = partly = 0
-        ratio_sum = 0.0
-        items = []
-        for it in c.get("items", []):
-            g = _goal(goals, it["id"])
-            state, ratio = item_state(it, g)
-            total += 1
-            met += 1 if state == "met" else 0
-            partly += 1 if state == "partial" else 0
-            ratio_sum += ratio
-            row = {"id": it["id"], "label": it["label"], "kind": it["kind"], "state": state, "ratio": round(ratio, 3),
-                   "target": str(g.get("target") or "")[:120], "note": str(g.get("note") or "")[:200]}
-            if it["kind"] == "counter":
-                try:
-                    row["have"] = int(g.get("have") or 0)
-                except (TypeError, ValueError):
-                    row["have"] = 0
-                try:
-                    row["want"] = int(g.get("want")) if g.get("want") not in (None, "") else int(it.get("max") or 0)
-                except (TypeError, ValueError):
-                    row["want"] = int(it.get("max") or 0)
-                row["unit"] = it.get("unit", "")
-            items.append(row)
-            if state != "met" and len(next_open) < 6:
-                next_open.append({"id": it["id"], "kind": it["kind"], "category": c["name"], "categoryId": c["id"],
-                                  "label": it["label"], "target": row["target"], "state": state,
-                                  "have": row.get("have"), "want": row.get("want"), "unit": row.get("unit", "")})
-        cats.append({"id": c["id"], "name": c["name"], "met": met, "partly": partly, "total": total,
-                     "ratio": round(ratio_sum / total, 3) if total else 0.0, "grid": bool(c.get("grid")), "items": items})
-        met_all += met
-        total_all += total
-        partly_all += partly
-    return {"met": met_all, "partly": partly_all, "total": total_all,
-            "ratio": round(met_all / total_all, 3) if total_all else 0.0,
-            "categories": cats, "next": next_open, "complete": total_all > 0 and met_all == total_all}
+    return shared.progress(template.categories or [], build.goals or {})
+
+
+def build_element(view: dict) -> dict:
+    game = ((view.get("template") or {}).get("game") or {}).get("name", "")
+    return shared.element(view["name"], view["variant"], game, view["progress"])
 
 
 def _template_view(t: BuildTemplate, game: Game | None) -> dict:
@@ -166,10 +49,11 @@ def _template_view(t: BuildTemplate, game: Game | None) -> dict:
 async def _build_view(session: AsyncSession, b: Build) -> dict:
     t = await session.get(BuildTemplate, b.template_id)
     game = await session.get(Game, t.game_id) if t else None
+    empty = {"met": 0, "partly": 0, "total": 0, "ratio": 0.0, "categories": [], "next": [], "complete": False}
     return {"id": b.id, "name": b.name, "variant": b.variant, "runId": b.run_id,
             "template": _template_view(t, game) if t else None,
             "goals": b.goals or {},
-            "progress": progress_of(t, b) if t else {"met": 0, "total": 0, "ratio": 0.0, "categories": [], "next": [], "complete": False},
+            "progress": progress_of(t, b) if t else empty,
             "updatedAt": b.updated_at.isoformat() if b.updated_at else None}
 
 
@@ -204,7 +88,6 @@ class TemplateIn(BaseModel):
 
 @router.get("/admin/templates", dependencies=[Depends(require_admin)])
 async def admin_templates(session: AsyncSession = Depends(get_session)) -> list[dict]:
-    from sqlalchemy import func
     rows = (await session.execute(
         select(BuildTemplate, Game).join(Game, Game.id == BuildTemplate.game_id).order_by(BuildTemplate.position, BuildTemplate.id)
     )).all()
@@ -214,14 +97,14 @@ async def admin_templates(session: AsyncSession = Depends(get_session)) -> list[
 
 @router.post("/admin/templates", status_code=201, dependencies=[Depends(require_admin)])
 async def create_template(body: TemplateIn, session: AsyncSession = Depends(get_session)) -> dict:
-    slug = _ident(body.game, "game")
+    slug = shared.ident(body.game, "game")
     game = (await session.execute(select(Game).where(Game.slug == slug))).scalars().first()
     if game is None:
         game = Game(slug=slug, name=body.game_name.strip() or body.game.strip(), variants=[])
         session.add(game)
         await session.flush()
     t = BuildTemplate(game_id=game.id, name=body.name.strip(), description=body.description.strip(),
-                      categories=clean_categories(body.categories), visible=body.visible, position=body.position)
+                      categories=shared.clean_categories(body.categories), visible=body.visible, position=body.position)
     session.add(t)
     await session.commit()
     await session.refresh(t)
@@ -235,7 +118,7 @@ async def update_template(template_id: int, body: TemplateIn, session: AsyncSess
         raise HTTPException(404, "no such template")
     t.name = body.name.strip()
     t.description = body.description.strip()
-    t.categories = clean_categories(body.categories)
+    t.categories = shared.clean_categories(body.categories)
     t.visible = body.visible
     t.position = body.position
     await session.commit()
@@ -274,8 +157,9 @@ async def my_builds(request: Request, session: AsyncSession = Depends(get_sessio
     for b in rows:
         v = await _build_view(session, b)
         v.pop("goals", None)
-        v["progress"] = {k: v["progress"][k] for k in ("met", "total", "ratio", "complete")} | {
-            "categories": [{"id": c["id"], "name": c["name"], "met": c["met"], "total": c["total"], "ratio": c["ratio"]} for c in v["progress"]["categories"]]}
+        p = v["progress"]
+        v["progress"] = {k: p[k] for k in ("met", "partly", "total", "ratio", "complete")} | {
+            "categories": [{k: c[k] for k in ("id", "name", "met", "partly", "total", "ratio")} for c in p["categories"]]}
         out.append(v)
     return out
 
@@ -330,27 +214,17 @@ class GoalIn(BaseModel):
     note: str | None = Field(default=None, max_length=200)
     met: bool | None = None
     partial: bool | None = None
-    have: int | None = Field(default=None, ge=0, le=1_000_000)
-    want: int | None = Field(default=None, ge=0, le=1_000_000)
+    have: int | None = Field(default=None, ge=0, le=shared.MAX_COUNT)
+    want: int | None = Field(default=None, ge=0, le=shared.MAX_COUNT)
 
 
 @router.put("/{build_id}/goals/{item_id}")
 async def set_goal(build_id: int, item_id: str, body: GoalIn, request: Request, session: AsyncSession = Depends(get_session)) -> dict:
     b, _ = await _mine(session, request, build_id)
     t = await session.get(BuildTemplate, b.template_id)
-    known = {it["id"] for c in (t.categories if t else []) for it in c.get("items", [])}
-    if item_id not in known:
+    if item_id not in shared.known_items(t.categories if t else []):
         raise HTTPException(404, "no such goal in this build")
-    goals = dict(b.goals or {})
-    g = dict(goals.get(item_id) or {})
-    for field in ("target", "note", "met", "partial", "have", "want"):
-        value = getattr(body, field)
-        if value is not None:
-            g[field] = value
-    if body.met:
-        g["partial"] = False
-    goals[item_id] = g
-    b.goals = goals
+    b.goals = shared.apply_goal(b.goals, item_id, body.model_dump(exclude_none=True))
     b.updated_at = datetime.now(timezone.utc)
     await session.commit()
     return await _build_view(session, b)
@@ -372,28 +246,6 @@ class BuildTokenIn(BaseModel):
     label: str = ""
     theme: str = "almanac"
     motion: str = "reduced"
-
-
-def build_element(view: dict) -> dict:
-    """What the build overlay draws: the name, met-of-total, one arc per category, the next open goals."""
-    p = view["progress"]
-    grid = next((c for c in p["categories"] if c.get("grid")), None)
-    game = (view.get("template") or {}).get("game") or {}
-    return {
-        "name": view["name"], "variant": view["variant"], "game": game.get("name", ""),
-        "eyebrow": " · ".join(x for x in ("Build", game.get("name", ""), view["variant"]) if x),
-        "met": p["met"], "partly": p["partly"], "total": p["total"], "ratio": p["ratio"], "complete": p["complete"],
-        "count": f"{p['met']} of {p['total']}",
-        # Two fills per arc: rose to met, blue on to met + partly — motion, not absence.
-        "parts": [{"pct": (c["met"] / c["total"]) if c["total"] else 0.0,
-                   "partly": ((c["met"] + c["partly"]) / c["total"]) if c["total"] else 0.0,
-                   "state": "done" if c["total"] and c["met"] == c["total"] else ("now" if (c["met"] + c["partly"]) > 0 else "todo"),
-                   "name": c["name"], "met": c["met"], "total": c["total"]} for c in p["categories"]],
-        "gridName": grid["name"] if grid else "",
-        "slots": [{"label": it["label"], "state": it["state"]} for it in (grid["items"] if grid else []) if it["kind"] == "slot"][:25],
-        "next": [{"category": n["category"], "label": n["label"], "detail": n["target"] or (f"{n['have']} of {n['want']} {n['unit']}".strip() if n["kind"] == "counter" else ""),
-                  "word": "partly" if n["state"] == "partial" else "not yet"} for n in p["next"][:3]],
-    }
 
 
 async def build_frame(session: AsyncSession, build_id: int | None) -> dict | None:

@@ -34,8 +34,16 @@
     <form data-new-run><label>Guide<select name="guide_id" data-guide-options></select></label><label>Name<input name="name" placeholder="Squirrel · S15"></label><label>Variant<input name="variant" placeholder="seasonal"></label><button class="primary" type="submit">Start a run</button></form>
     <p class="quiet">The phone app and the overlays talk to this tracker by its address. Guides and tracking never need anything else.</p>
   </section>
+  <section class="card"><h2>Builds</h2><p class="quiet">One character's goals, slot by slot — ticked from the phone app pointed at this tracker. A build needs a template of the game's: pull Shruti's from the site, or import a template file.</p>
+    <div data-templates></div>
+    <form data-pull-templates><button class="primary" type="submit">Pull the site's templates</button></form>
+    <form data-import-template><label>Or a template file<input type="file" name="file" accept=".json,application/json"></label><button type="submit">Import</button></form>
+    <div data-builds></div>
+    <form data-new-build><label>Template<select name="template_id" data-template-options></select></label><label>Name<input name="name" placeholder="Squirrel · Season 15"></label><label>Variant<input name="variant" placeholder="Warlock · Legion"></label><button class="primary" type="submit">Start a build</button></form>
+  </section>
   <section class="card"><h2>Overlays</h2><div data-overlays></div>
     <form data-mint><label>Run<select name="run_id" data-run-options></select></label><label>Element<select name="kind"><option value="guide-now">Now card</option><option value="guide-sigil">Sigil</option><option value="guide-path">Path strip</option><option value="guide-routine">Routine</option></select></label><label>Theme<select name="theme"><option value="almanac">Almanac</option><option value="grimoire">Grimoire</option><option value="plain">Plain</option></select></label><label>Motion<select name="motion"><option value="reduced">Reduced</option><option value="full">Full</option><option value="still">Still</option></select></label><button class="primary" type="submit">New overlay</button></form>
+    <form data-mint-build><label>Build<select name="build_id" data-build-options></select></label><label>Theme<select name="theme"><option value="almanac">Almanac</option><option value="grimoire">Grimoire</option><option value="plain">Plain</option></select></label><label>Motion<select name="motion"><option value="full">Ignite on met</option><option value="still">None</option></select></label><button class="primary" type="submit">Build overlay</button></form>
     <div data-minted hidden></div>
     <p class="quiet">The token is the secret: anyone with the URL sees the overlay; nobody with it can change your run.</p>
   </section>
@@ -45,7 +53,7 @@
   const H = { "content-type": "application/json", ...(secret ? { authorization: "Bearer " + secret } : {}) };
   const esc = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
   const j = async (method, path, body) => { const r = await fetch(path, { method, headers: H, body: body === undefined ? undefined : JSON.stringify(body) }); if (r.status === 401) { const s = prompt("This tracker has a secret. Paste it:"); if (s) { localStorage.setItem("tracker.secret", s); location.reload(); } throw new Error("401"); } return r.ok ? r.json() : Promise.reject(await r.text()); };
-  let guides = [], runs = [];
+  let guides = [], runs = [], templates = [], builds = [];
   const draw = async () => {
     const h = await fetch("/api/health").then((r) => r.json()); document.querySelector("[data-health]").textContent = `v${h.version} · ${h.guides} guides · pulls from ${h.site}`;
     guides = await j("GET", "/api/guides"); runs = await j("GET", "/api/runs");
@@ -53,13 +61,23 @@
     document.querySelector("[data-guide-options]").innerHTML = guides.map((g) => `<option value="${g.id}">${esc(g.title)}</option>`).join("");
     document.querySelector("[data-runs]").innerHTML = runs.length ? runs.map((r) => `<div class="row"><span>${esc(r.name)}</span><span class="lead"></span><span class="mono">${esc(r.now ? "Now: " + r.now.title : "finished")}</span></div>`).join("") : `<p class="quiet">No runs yet. Pick a guide and start one.</p>`;
     document.querySelector("[data-run-options]").innerHTML = runs.map((r) => `<option value="${r.id}">${esc(r.name)}</option>`).join("");
-    const ov = (await Promise.all(runs.map((r) => j("GET", `/api/runs/${r.id}/overlays`).then((list) => list.map((o) => ({ ...o, run: r.name })))))).flat();
+    templates = await j("GET", "/api/builds/templates"); builds = await j("GET", "/api/builds");
+    document.querySelector("[data-templates]").innerHTML = templates.length ? templates.map((t) => `<div class="row"><span>${esc(t.game.name)} · ${esc(t.name)}</span><span class="lead"></span><span class="mono">${t.categories.reduce((n, c) => n + c.items.length, 0)} goals</span></div>`).join("") : `<p class="quiet">No templates yet.</p>`;
+    document.querySelector("[data-template-options]").innerHTML = templates.map((t) => `<option value="${t.id}">${esc(t.game.name)} · ${esc(t.name)}</option>`).join("");
+    document.querySelector("[data-builds]").innerHTML = builds.length ? builds.map((b) => `<div class="row"><span>${esc(b.name)}</span><span class="lead"></span><span class="mono">${b.progress.met} / ${b.progress.total} met${b.progress.complete ? " · complete" : ""}</span></div>`).join("") : `<p class="quiet">No builds yet.</p>`;
+    document.querySelector("[data-build-options]").innerHTML = builds.map((b) => `<option value="${b.id}">${esc(b.name)}</option>`).join("");
+    const bov = (await Promise.all(builds.map((b) => j("GET", `/api/builds/${b.id}/overlays`).then((list) => list.map((o) => ({ ...o, run: b.name })))))).flat();
+    const ov = (await Promise.all(runs.map((r) => j("GET", `/api/runs/${r.id}/overlays`).then((list) => list.map((o) => ({ ...o, run: r.name })))))).flat().concat(bov);
     document.querySelector("[data-overlays]").innerHTML = ov.length ? ov.map((o) => `<div class="row"><span>${esc(o.label || o.kind)}</span><span class="lead"></span><span class="mono">${esc(o.run)} · ${esc(o.theme)}</span></div>`).join("") : `<p class="quiet">No overlays yet.</p>`;
   };
   document.querySelector("[data-pull]").addEventListener("submit", async (e) => { e.preventDefault(); const d = new FormData(e.target); await j("POST", "/api/guides/pull", { game: d.get("game"), slug: d.get("slug") }); draw(); });
   document.querySelector("[data-import]").addEventListener("submit", async (e) => { e.preventDefault(); const f = e.target.querySelector("input[type=file]").files[0]; if (!f) return; await j("POST", "/api/guides/import", JSON.parse(await f.text())); draw(); });
   document.querySelector("[data-new-run]").addEventListener("submit", async (e) => { e.preventDefault(); const d = new FormData(e.target); await j("POST", "/api/runs", { guide_id: Number(d.get("guide_id")), name: d.get("name"), variant: d.get("variant") }); draw(); });
   document.querySelector("[data-mint]").addEventListener("submit", async (e) => { e.preventDefault(); const d = new FormData(e.target); const made = await j("POST", `/api/runs/${d.get("run_id")}/overlays`, { kind: d.get("kind"), theme: d.get("theme"), motion: d.get("motion") }); const box = document.querySelector("[data-minted]"); box.hidden = false; box.innerHTML = `<p class="quiet">Shown once — paste it into OBS as a browser source, 1920 × 1080.</p><div class="url">${esc(location.origin)}/overlay/${esc(made.kind)}?t=${esc(made.token)}</div>`; draw(); });
+  document.querySelector("[data-pull-templates]").addEventListener("submit", async (e) => { e.preventDefault(); await j("POST", "/api/builds/templates/pull"); draw(); });
+  document.querySelector("[data-import-template]").addEventListener("submit", async (e) => { e.preventDefault(); const f = e.target.querySelector("input[type=file]").files[0]; if (!f) return; await j("POST", "/api/builds/admin/templates", JSON.parse(await f.text())); draw(); });
+  document.querySelector("[data-new-build]").addEventListener("submit", async (e) => { e.preventDefault(); const d = new FormData(e.target); await j("POST", "/api/builds", { template_id: Number(d.get("template_id")), name: d.get("name"), variant: d.get("variant") }); draw(); });
+  document.querySelector("[data-mint-build]").addEventListener("submit", async (e) => { e.preventDefault(); const d = new FormData(e.target); const made = await j("POST", `/api/builds/${d.get("build_id")}/overlays`, { theme: d.get("theme"), motion: d.get("motion") }); const box = document.querySelector("[data-minted]"); box.hidden = false; box.innerHTML = `<p class="quiet">Shown once — paste it into OBS as a browser source, 1920 × 1080.</p><div class="url">${esc(location.origin)}/overlay/build?t=${esc(made.token)}</div>`; draw(); });
   draw();
 </script>
 </body>

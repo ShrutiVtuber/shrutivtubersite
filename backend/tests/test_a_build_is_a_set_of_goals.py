@@ -1,13 +1,16 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 """
-A build is a set of goals for one character: slots to fill, counters to
-reach, things to tick. The template is hers and generic; the build is one
-person's, precise. Nothing measures absence.
+A build is a set of goals for one character. The logic is tested where it
+lives (shrutisgametracker/server/tests/test_builds.py); these hold the
+site's half: that the routes DELEGATE to the shared functions rather than
+keeping a copy, and the rules a route could quietly break.
 """
 from __future__ import annotations
 
 import inspect
 import re
+
+from shrutisguides import builds as shared
 
 from shruti.api.routes import builds
 from shruti.models.guides import Build, BuildTemplate
@@ -15,69 +18,61 @@ from shruti.models.guides import Build, BuildTemplate
 SOURCE = inspect.getsource(builds)
 
 
+def code_of(function) -> str:
+    source = inspect.getsource(function)
+    source = re.sub(r'"""..*?"""', " ", source, flags=re.S)
+    return re.sub(r"(?m)#.*$", " ", source)
+
+
 def prose_free(text: str) -> str:
     text = re.sub(r'"""..*?"""', " ", text, flags=re.S)
     return re.sub(r"(?m)#.*$", " ", text)
 
 
-def test_a_template_is_cleaned_into_known_kinds() -> None:
-    cats = builds.clean_categories([
-        {"name": "Gear", "items": [{"label": "Helm", "kind": "slot"}, {"label": "Masterwork", "kind": "counter", "max": 12}, {"label": "Nope", "kind": "weird"}]},
-        {"name": "Gear", "items": []},
-        "junk",
-    ])
-    assert [c["id"] for c in cats] == ["gear", "gear-2"]
-    kinds = [it["kind"] for it in cats[0]["items"]]
-    assert kinds == ["slot", "counter", "check"], "an unknown kind becomes a check, not an error"
-    assert cats[0]["items"][1]["max"] == 12
+# ── one implementation, shared with the self-hosted tracker ─────────────────
+
+def test_the_site_delegates_to_the_shared_functions() -> None:
+    assert "shared.progress(" in code_of(builds.progress_of)
+    assert "shared.element(" in code_of(builds.build_element)
+    assert "shared.apply_goal(" in code_of(builds.set_goal) and "shared.known_items(" in code_of(builds.set_goal)
+    assert "shared.clean_categories(" in code_of(builds.create_template) and "shared.clean_categories(" in code_of(builds.update_template)
+    for name in ("_progress", "_item_state", "_element", "_apply_goal", "_clean_categories"):
+        assert not hasattr(builds, name), f"{name} is a local copy"
 
 
-def test_progress_is_met_partial_or_open_and_never_a_rate() -> None:
-    t = BuildTemplate(game_id=1, name="t", categories=builds.clean_categories([
-        {"name": "Gear", "items": [{"label": "Helm", "kind": "slot"}, {"label": "Chest", "kind": "slot"}]},
+def test_progress_reaches_the_site_unchanged() -> None:
+    t = BuildTemplate(game_id=1, name="t", categories=shared.clean_categories([
+        {"name": "Gear", "grid": True, "items": [{"label": "Helm", "kind": "slot"}, {"label": "Chest", "kind": "slot"}]},
         {"name": "Paragon", "items": [{"label": "Points", "kind": "counter", "max": 300}]},
     ]))
-    b = Build(user_id=1, template_id=1, name="b", goals={"helm": {"met": True, "target": "Shroud"}, "chest": {"partial": True}, "points": {"have": 150}})
+    b = Build(user_id=1, template_id=1, name="b", goals={"helm": {"met": True}, "chest": {"partial": True}, "points": {"have": 150}})
     p = builds.progress_of(t, b)
-    states = {it["id"]: it["state"] for c in p["categories"] for it in c["items"]}
-    assert states == {"helm": "met", "chest": "partial", "points": "partial"}
-    assert p["met"] == 1 and p["partly"] == 2 and p["total"] == 3 and p["complete"] is False
-    assert [c["ratio"] for c in p["categories"]] == [0.75, 0.5]
-    assert p["next"][0]["label"] == "Chest"
-    for word in ("streak", "days", "since", "percent"):
-        assert word not in prose_free(SOURCE).lower()
+    assert (p["met"], p["partly"], p["total"]) == (1, 2, 3) and p["next"][0]["id"] == "chest"
+    el = builds.build_element({"name": "b", "variant": "", "template": {"game": {"name": "Diablo IV"}}, "progress": p})
+    assert el["gridName"] == "Gear" and el["eyebrow"] == "Build · Diablo IV"
 
 
-def test_the_overlay_element_carries_only_what_it_draws() -> None:
-    body = prose_free(inspect.getsource(builds.build_element))
-    assert '"parts"' in body and '"next"' in body and '"count"' in body
-    assert '"goals"' not in body and '"note"' not in body, "a person's own notes stay off the stream"
+# ── the rules a route could quietly break ────────────────────────────────────
+
+def test_nothing_measures_absence() -> None:
+    body = prose_free(SOURCE).lower()
+    for word in ("streak", "days since", "since", "percent", "inactive", "remind"):
+        assert word not in body
 
 
-def test_a_goal_outside_the_template_is_refused_and_met_clears_partial() -> None:
-    body = prose_free(inspect.getsource(builds.set_goal))
-    assert 'raise HTTPException(404, "no such goal in this build")' in body
-    assert 'g["partial"] = False' in body
+def test_a_goal_outside_the_template_is_refused() -> None:
+    assert 'raise HTTPException(404, "no such goal in this build")' in code_of(builds.set_goal)
 
 
 def test_a_template_with_builds_on_it_is_hidden_not_deleted() -> None:
-    body = prose_free(inspect.getsource(builds.delete_template))
-    assert "t.visible = False" in body
+    assert "t.visible = False" in code_of(builds.delete_template)
 
 
 def test_a_build_token_is_read_once_and_counts_against_fair_use() -> None:
-    body = prose_free(inspect.getsource(builds.mint_build_token))
+    body = code_of(builds.mint_build_token)
     assert "secrets.token_urlsafe(24)" in body and "refuse_if_out_of_allowance" in body
-    assert '"token"' not in prose_free(inspect.getsource(builds.build_tokens))
+    assert '"token"' not in code_of(builds.build_tokens), "a listing never repeats the token"
 
 
-def test_one_grid_category_per_template_and_the_plate_draws_only_its_slots() -> None:
-    cats = builds.clean_categories([{"name": "Gear", "grid": True, "items": [{"label": "Helm", "kind": "slot"}]},
-                                    {"name": "Skills", "grid": True, "items": [{"label": "Core", "kind": "slot"}]}])
-    assert [c["grid"] for c in cats] == [True, False]
-    t = BuildTemplate(game_id=1, name="t", categories=cats)
-    b = Build(user_id=1, template_id=1, name="b", goals={})
-    el = builds.build_element({"name": "b", "variant": "", "template": {"game": {"name": "Diablo IV"}}, "progress": builds.progress_of(t, b)})
-    assert el["gridName"] == "Gear" and [s["label"] for s in el["slots"]] == ["Helm"]
-    assert el["eyebrow"] == "Build · Diablo IV"
-    assert el["parts"][0]["partly"] == 0.0 and el["next"][0]["word"] == "not yet"
+def test_a_persons_notes_stay_off_the_stream() -> None:
+    assert '"note"' not in prose_free(inspect.getsource(shared.element))

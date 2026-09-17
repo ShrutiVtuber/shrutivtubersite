@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>guide · build</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="stylesheet" href="/overlay-guides.css">
+<script src="/overlay-elements.js"></script>
+</head>
+<body>
+<div class="gov" data-theme="almanac" data-motion="reduced">
+  <div data-slot></div>
+  <div class="gov-plate gov-empty" data-empty>
+    <span class="gov-eyebrow">Squirrel Guides</span>
+    <span class="say">No build selected.</span>
+  </div>
+</div>
+<script>
+  const root = document.querySelector(".gov");
+  const token = new URLSearchParams(location.search).get("t") || "";
+  let last = { version: "", element: null };
+  let still = false, reduced = false;
+  const slot = root.querySelector("[data-slot]"), empty = root.querySelector("[data-empty]");
+  const paint = async (prev, next) => { empty.hidden = !!next; await OverlayElements.drawElement(slot, "build", prev, next, { still, reduced }); };
+  const tick = async () => {
+    if (!token) return;
+    try {
+      const r = await fetch(`/api/overlay/guide?t=${encodeURIComponent(token)}&v=${encodeURIComponent(last.version ?? "")}`, { cache: "no-store" });
+      if (!r.ok) return;                       /* held, not blanked */
+      const next = await r.json();
+      if (next.unchanged) return;
+      root.dataset.theme = next.theme; root.dataset.motion = next.motion;
+      still = next.motion === "still"; reduced = next.motion === "reduced";
+      if (next.version !== last.version) {
+        await paint(last.element, next.element ?? null);
+        last = { version: next.version, element: next.element ?? null };
+      }
+    } catch { /* offline: the last frame stands */ }
+  };
+  tick(); window.setInterval(tick, 2000);
+</script>
+</body>
+</html>

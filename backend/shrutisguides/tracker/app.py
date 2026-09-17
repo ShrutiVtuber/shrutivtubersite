@@ -8,7 +8,7 @@ same shared functions (`shrutisguides.progress`), so the phone app and the
 overlays cannot tell the two apart. Guides come from the catalogue on the
 site (pulled by address) or from a guide file.
 
-    SHRUTI_SITE_URL   where guides are pulled from      default https://shrutivtuber.com
+    SHRUTI_SITE_URL   where guides and build templates are pulled from   default https://shrutivtuber.com
     TRACKER_DATA      where the database lives           default ./data
     TRACKER_SECRET    a bearer token for writes; unset = open (one machine, one person)
     TRACKER_TZ        the person's timezone              default UTC
@@ -31,7 +31,7 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Query
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from pydantic import BaseModel
 
-from shrutisguides import engine, progress
+from shrutisguides import builds, engine, progress
 from shrutisguides.format.validate import validate
 
 VERSION = "0.1.0"
@@ -57,16 +57,38 @@ def db() -> sqlite3.Connection:
         CREATE TABLE IF NOT EXISTS run (
             id INTEGER PRIMARY KEY, guide_id INTEGER NOT NULL REFERENCES guide(id),
             stored TEXT NOT NULL, updated_at TEXT NOT NULL);
+        CREATE TABLE IF NOT EXISTS build_template (
+            id INTEGER PRIMARY KEY, game_slug TEXT NOT NULL, game_name TEXT NOT NULL, name TEXT NOT NULL,
+            description TEXT NOT NULL DEFAULT '', categories TEXT NOT NULL DEFAULT '[]',
+            visible INTEGER NOT NULL DEFAULT 1, position INTEGER NOT NULL DEFAULT 0, UNIQUE(game_slug, name));
+        CREATE TABLE IF NOT EXISTS build (
+            id INTEGER PRIMARY KEY, template_id INTEGER NOT NULL REFERENCES build_template(id), run_id INTEGER REFERENCES run(id),
+            name TEXT NOT NULL, variant TEXT NOT NULL DEFAULT '', goals TEXT NOT NULL DEFAULT '{}', updated_at TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS overlay (
-            id INTEGER PRIMARY KEY, token TEXT NOT NULL UNIQUE, kind TEXT NOT NULL, run_id INTEGER NOT NULL REFERENCES run(id),
+            id INTEGER PRIMARY KEY, token TEXT NOT NULL UNIQUE, kind TEXT NOT NULL, run_id INTEGER REFERENCES run(id),
+            build_id INTEGER REFERENCES build(id),
             routine_id TEXT NOT NULL DEFAULT '', theme TEXT NOT NULL DEFAULT 'almanac', motion TEXT NOT NULL DEFAULT 'reduced',
             label TEXT NOT NULL DEFAULT '', last_seen TEXT, layout TEXT NOT NULL DEFAULT '[]');
     """)
-    try:
+    columns = {r["name"] for r in con.execute("PRAGMA table_info(overlay)").fetchall()}
+    if "layout" not in columns:
         con.execute("ALTER TABLE overlay ADD COLUMN layout TEXT NOT NULL DEFAULT '[]'")
         con.commit()
-    except sqlite3.OperationalError:
-        pass                                   # already there
+    if "build_id" not in columns:
+        # An older tracker: the overlay belonged to a run and nothing else.
+        # SQLite cannot loosen a NOT NULL, so the table is rebuilt in place.
+        con.executescript("""
+            ALTER TABLE overlay RENAME TO overlay_old;
+            CREATE TABLE overlay (
+                id INTEGER PRIMARY KEY, token TEXT NOT NULL UNIQUE, kind TEXT NOT NULL, run_id INTEGER REFERENCES run(id),
+                build_id INTEGER REFERENCES build(id),
+                routine_id TEXT NOT NULL DEFAULT '', theme TEXT NOT NULL DEFAULT 'almanac', motion TEXT NOT NULL DEFAULT 'reduced',
+                label TEXT NOT NULL DEFAULT '', last_seen TEXT, layout TEXT NOT NULL DEFAULT '[]');
+            INSERT INTO overlay (id, token, kind, run_id, routine_id, theme, motion, label, last_seen, layout)
+                SELECT id, token, kind, run_id, routine_id, theme, motion, label, last_seen, layout FROM overlay_old;
+            DROP TABLE overlay_old;
+        """)
+        con.commit()
     return con
 
 
@@ -137,7 +159,8 @@ def owner(authorization: str = Header(default="")) -> None:
 def health() -> dict:
     con = db()
     n = con.execute("SELECT COUNT(*) FROM guide").fetchone()[0]
-    return {"ok": True, "version": VERSION, "guides": n, "site": SITE}
+    templates = con.execute("SELECT COUNT(*) FROM build_template").fetchone()[0]
+    return {"ok": True, "version": VERSION, "guides": n, "templates": templates, "site": SITE}
 
 
 # ── guides: the library ──────────────────────────────────────────────────────
@@ -483,6 +506,226 @@ class TokenIn(BaseModel):
     layout: list = []
 
 
+# ── builds: one character's goals, slot by slot ──────────────────────────────
+#
+# The same shapes as shrutivtuber.com's /api/builds, computed by the same
+# shared functions (shrutisguides.builds). Templates are pulled from the
+# site by name, imported from a file, or written here — the tracker is one
+# person's, so its person is the admin.
+
+def _template_row(con: sqlite3.Connection, template_id: int) -> sqlite3.Row:
+    row = con.execute("SELECT * FROM build_template WHERE id = ?", (template_id,)).fetchone()
+    if row is None:
+        raise HTTPException(404, "no such template")
+    return row
+
+
+def _build_row(con: sqlite3.Connection, build_id: int) -> sqlite3.Row:
+    row = con.execute("SELECT * FROM build WHERE id = ?", (build_id,)).fetchone()
+    if row is None:
+        raise HTTPException(404, "no such build")
+    return row
+
+
+def _template_view(t: sqlite3.Row) -> dict:
+    return {"id": t["id"], "name": t["name"], "description": t["description"], "visible": bool(t["visible"]), "position": t["position"],
+            "game": {"slug": t["game_slug"], "name": t["game_name"]}, "categories": json.loads(t["categories"] or "[]")}
+
+
+def _build_view(con: sqlite3.Connection, b: sqlite3.Row) -> dict:
+    t = _template_view(_template_row(con, b["template_id"]))
+    goals = json.loads(b["goals"] or "{}")
+    return {"id": b["id"], "name": b["name"], "variant": b["variant"], "runId": b["run_id"], "template": t, "goals": goals,
+            "progress": builds.progress(t["categories"], goals), "updatedAt": b["updated_at"]}
+
+
+def _build_element(view: dict) -> dict:
+    return builds.element(view["name"], view["variant"], view["template"]["game"]["name"], view["progress"])
+
+
+def _store_template(con: sqlite3.Connection, t: dict) -> dict:
+    """Upsert by game and name; the categories are cleaned once, here."""
+    slug = builds.ident(t.get("game") or (t.get("game_slug") if isinstance(t, dict) else ""), "game") if not isinstance(t.get("game"), dict) else str(t["game"].get("slug") or "game")
+    game_name = (t["game"].get("name") if isinstance(t.get("game"), dict) else (t.get("game_name") or t.get("game") or slug)) or slug
+    name = str(t.get("name") or "").strip()[:80]
+    if not name:
+        raise HTTPException(422, "a template needs a name")
+    cats = json.dumps(builds.clean_categories(t.get("categories")))
+    con.execute("""INSERT INTO build_template (game_slug, game_name, name, description, categories, visible, position)
+                   VALUES (?, ?, ?, ?, ?, ?, ?)
+                   ON CONFLICT(game_slug, name) DO UPDATE SET game_name = excluded.game_name, description = excluded.description,
+                   categories = excluded.categories, visible = excluded.visible, position = excluded.position""",
+                (slug, str(game_name)[:80], name, str(t.get("description") or "")[:400], cats,
+                 1 if t.get("visible", True) else 0, int(t.get("position") or 0)))
+    con.commit()
+    return _template_view(con.execute("SELECT * FROM build_template WHERE game_slug = ? AND name = ?", (slug, name)).fetchone())
+
+
+@app.get("/api/builds/templates")
+def build_templates(game: str = "") -> list[dict]:
+    con = db()
+    rows = con.execute("SELECT * FROM build_template WHERE visible = 1" + (" AND game_slug = ?" if game else "") + " ORDER BY position, id",
+                       (game,) if game else ()).fetchall()
+    return [_template_view(t) for t in rows]
+
+
+@app.post("/api/builds/templates/pull", status_code=201, dependencies=[Depends(owner)])
+def pull_templates() -> dict:
+    """Her templates, from the site: every visible one, upserted by game and name."""
+    try:
+        r = httpx.get(f"{SITE}/api/builds/templates", timeout=20)
+    except httpx.HTTPError as exc:
+        raise HTTPException(502, f"could not reach {SITE}: {type(exc).__name__}")
+    if r.status_code != 200:
+        raise HTTPException(502, f"{SITE} answered {r.status_code}")
+    con = db()
+    got = [_store_template(con, t) for t in r.json() if isinstance(t, dict)]
+    return {"ok": True, "templates": got}
+
+
+@app.get("/api/builds/admin/templates", dependencies=[Depends(owner)])
+def admin_templates() -> list[dict]:
+    con = db()
+    rows = con.execute("SELECT * FROM build_template ORDER BY position, id").fetchall()
+    counts = dict(con.execute("SELECT template_id, COUNT(*) FROM build GROUP BY template_id").fetchall())
+    return [{**_template_view(t), "builds": int(counts.get(t["id"], 0))} for t in rows]
+
+
+@app.post("/api/builds/admin/templates", status_code=201, dependencies=[Depends(owner)])
+def create_template(body: dict) -> dict:
+    return _store_template(db(), body)
+
+
+@app.put("/api/builds/admin/templates/{template_id}", dependencies=[Depends(owner)])
+def update_template(template_id: int, body: dict) -> dict:
+    con = db(); t = _template_row(con, template_id)
+    con.execute("UPDATE build_template SET name = ?, description = ?, categories = ?, visible = ?, position = ? WHERE id = ?",
+                (str(body.get("name") or t["name"]).strip()[:80], str(body.get("description") or "")[:400],
+                 json.dumps(builds.clean_categories(body.get("categories"))), 1 if body.get("visible", True) else 0,
+                 int(body.get("position") or 0), template_id))
+    con.commit()
+    return _template_view(_template_row(con, template_id))
+
+
+@app.delete("/api/builds/admin/templates/{template_id}", status_code=204, dependencies=[Depends(owner)])
+def delete_template(template_id: int) -> None:
+    con = db(); _template_row(con, template_id)
+    used = con.execute("SELECT 1 FROM build WHERE template_id = ? LIMIT 1", (template_id,)).fetchone()
+    if used:
+        con.execute("UPDATE build_template SET visible = 0 WHERE id = ?", (template_id,))      # builds stand on it
+    else:
+        con.execute("DELETE FROM build_template WHERE id = ?", (template_id,))
+    con.commit()
+
+
+class BuildIn(BaseModel):
+    template_id: int
+    name: str
+    variant: str = ""
+    run_id: int | None = None
+
+
+@app.get("/api/builds", dependencies=[Depends(owner)])
+def my_builds() -> list[dict]:
+    con = db()
+    out = []
+    for b in con.execute("SELECT * FROM build ORDER BY updated_at DESC").fetchall():
+        v = _build_view(con, b); v.pop("goals", None)
+        p = v["progress"]
+        v["progress"] = {"met": p["met"], "partly": p["partly"], "total": p["total"], "ratio": p["ratio"], "complete": p["complete"],
+                         "categories": [{k: c[k] for k in ("id", "name", "met", "partly", "total", "ratio")} for c in p["categories"]]}
+        out.append(v)
+    return out
+
+
+@app.post("/api/builds", status_code=201, dependencies=[Depends(owner)])
+def create_build(body: BuildIn) -> dict:
+    con = db(); t = _template_row(con, body.template_id)
+    if not t["visible"]:
+        raise HTTPException(404, "no such template")
+    run_id = body.run_id if body.run_id and con.execute("SELECT 1 FROM run WHERE id = ?", (body.run_id,)).fetchone() else None
+    name = body.name.strip()[:80]
+    if not name:
+        raise HTTPException(422, "a build needs a name")
+    cur = con.execute("INSERT INTO build (template_id, run_id, name, variant, goals, updated_at) VALUES (?, ?, ?, ?, '{}', ?)",
+                      (t["id"], run_id, name, body.variant.strip()[:80], _now().isoformat()))
+    con.commit()
+    return _build_view(con, _build_row(con, cur.lastrowid))
+
+
+@app.get("/api/builds/{build_id}", dependencies=[Depends(owner)])
+def one_build(build_id: int) -> dict:
+    con = db()
+    return _build_view(con, _build_row(con, build_id))
+
+
+class BuildPatch(BaseModel):
+    name: str | None = None
+    variant: str | None = None
+    run_id: int | None = None
+
+
+@app.put("/api/builds/{build_id}", dependencies=[Depends(owner)])
+def rename_build(build_id: int, body: BuildPatch) -> dict:
+    con = db(); b = _build_row(con, build_id)
+    name = (body.name.strip()[:80] or b["name"]) if body.name is not None else b["name"]
+    variant = body.variant.strip()[:80] if body.variant is not None else b["variant"]
+    run_id = b["run_id"]
+    if body.run_id is not None:
+        run_id = body.run_id if body.run_id and con.execute("SELECT 1 FROM run WHERE id = ?", (body.run_id,)).fetchone() else None
+    con.execute("UPDATE build SET name = ?, variant = ?, run_id = ? WHERE id = ?", (name, variant, run_id, build_id)); con.commit()
+    return _build_view(con, _build_row(con, build_id))
+
+
+@app.put("/api/builds/{build_id}/goals/{item_id}", dependencies=[Depends(owner)])
+def set_goal(build_id: int, item_id: str, body: dict) -> dict:
+    con = db(); b = _build_row(con, build_id)
+    t = _template_view(_template_row(con, b["template_id"]))
+    if item_id not in builds.known_items(t["categories"]):
+        raise HTTPException(404, "no such goal in this build")
+    goals = builds.apply_goal(json.loads(b["goals"] or "{}"), item_id, body)
+    con.execute("UPDATE build SET goals = ?, updated_at = ? WHERE id = ?", (json.dumps(goals), _now().isoformat(), build_id)); con.commit()
+    return _build_view(con, _build_row(con, build_id))
+
+
+@app.delete("/api/builds/{build_id}", dependencies=[Depends(owner)])
+def delete_build(build_id: int) -> dict:
+    con = db(); _build_row(con, build_id)
+    con.execute("DELETE FROM overlay WHERE build_id = ?", (build_id,))
+    con.execute("DELETE FROM build WHERE id = ?", (build_id,)); con.commit()
+    return {"ok": True}
+
+
+@app.get("/api/builds/{build_id}/overlays", dependencies=[Depends(owner)])
+def build_tokens(build_id: int) -> list[dict]:
+    con = db(); _build_row(con, build_id)
+    return [{"id": o["id"], "kind": o["kind"], "label": o["label"], "theme": o["theme"], "motion": o["motion"], "lastSeen": o["last_seen"]}
+            for o in con.execute("SELECT * FROM overlay WHERE build_id = ? ORDER BY id", (build_id,)).fetchall()]
+
+
+class BuildTokenIn(BaseModel):
+    theme: str = "almanac"
+    motion: str = "reduced"
+    label: str = ""
+
+
+@app.post("/api/builds/{build_id}/overlays", status_code=201, dependencies=[Depends(owner)])
+def mint_build_token(build_id: int, body: BuildTokenIn) -> dict:
+    """The build as a browser source; the token is returned once."""
+    con = db(); b = _build_row(con, build_id)
+    token = secrets.token_urlsafe(24)
+    cur = con.execute("INSERT INTO overlay (token, kind, build_id, theme, motion, label) VALUES (?, 'build', ?, ?, ?, ?)",
+                      (token, build_id, body.theme if body.theme in progress.THEMES else "almanac",
+                       body.motion if body.motion in progress.MOTIONS else "reduced", body.label.strip()[:80] or b["name"]))
+    con.commit()
+    return {"id": cur.lastrowid, "token": token, "kind": "build"}
+
+
+@app.delete("/api/builds/{build_id}/overlays/{token_id}", status_code=204, dependencies=[Depends(owner)])
+def revoke_build_token(build_id: int, token_id: int) -> None:
+    con = db(); con.execute("DELETE FROM overlay WHERE id = ? AND build_id = ?", (token_id, build_id)); con.commit()
+
+
 @app.get("/api/runs/{run_id}/overlays", dependencies=[Depends(owner)])
 def list_tokens(run_id: int) -> list[dict]:
     con = db(); _run_row(con, run_id)
@@ -527,27 +770,50 @@ def overlay_guide(t: str, v: str = "") -> dict:
     if not seen or (_now() - datetime.fromisoformat(seen)).total_seconds() > 60:
         con.execute("UPDATE overlay SET last_seen = ? WHERE id = ?", (_now().isoformat(), o["id"])); con.commit()
     base = {"kind": o["kind"], "theme": o["theme"], "motion": o["motion"], "run": None, "element": None, "version": ""}
+    if o["kind"] == "build":
+        b = con.execute("SELECT * FROM build WHERE id = ?", (o["build_id"],)).fetchone()
+        if b is None:
+            return base
+        view = _build_view(con, b)
+        base["version"] = f"{b['updated_at']}:{view['progress']['met']}"
+        if v and v.replace(" ", "+") == base["version"]:
+            base["unchanged"] = True
+            return base
+        base["element"] = _build_element(view)
+        base["run"] = {"name": b["name"], "guide": b["variant"], "game": view["template"]["game"]["name"]}
+        return base
     row = con.execute("SELECT * FROM run WHERE id = ?", (o["run_id"],)).fetchone()
     if row is None:
         return base
-    base["version"] = row["updated_at"]
-    if v and v == row["updated_at"]:
+    layout = progress.clean_layout(json.loads(o["layout"] or "[]")) if o["kind"] == "guide-layout" else []
+    version = row["updated_at"]
+    if layout:
+        ids = [int(e["build_id"]) for e in layout if e["kind"] == "build" and e.get("build_id")]
+        if ids:
+            stamps = con.execute(f"SELECT id, updated_at FROM build WHERE id IN ({','.join('?' * len(ids))})", ids).fetchall()
+            version += ":b" + ",".join(f"{r['id']}@{r['updated_at']}" for r in stamps)
+    base["version"] = version
+    if v and v.replace(" ", "+") == version:
         base["unchanged"] = True
         return base
     g = _guide_row(con, row["guide_id"]); doc = json.loads(g["body"]); stored = _stored(row)
     base["run"] = {"name": stored.get("name", ""), "guide": g["title"], "game": g["game_name"]}
     if o["kind"] == "guide-layout":
-        base["elements"] = progress.layout_elements(json.loads(o["layout"] or "[]"), stored, doc)
+        elements = progress.layout_elements(layout, stored, doc)
+        for e in elements:
+            if e["kind"] == "build" and e.get("build_id"):
+                b = con.execute("SELECT * FROM build WHERE id = ?", (int(e["build_id"]),)).fetchone()
+                e["element"] = _build_element(_build_view(con, b)) if b is not None else {}
+        base["elements"] = elements
     else:
         base["element"] = progress.element(o["kind"], stored, doc, o["routine_id"])
-    base["version"] = row["updated_at"]
     return base
 
 
 @app.get("/overlay/{kind}")
 def overlay_page(kind: str):
     """The browser sources, as plain files: no build step, cache-friendly."""
-    if kind not in progress.GUIDE_KINDS:
+    if kind not in progress.GUIDE_KINDS and kind != "build":
         raise HTTPException(404, "no such overlay")
     return FileResponse(STATIC / f"{kind}.html", media_type="text/html")
 
