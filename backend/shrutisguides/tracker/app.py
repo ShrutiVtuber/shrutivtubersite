@@ -721,6 +721,20 @@ def mint_build_token(build_id: int, body: BuildTokenIn) -> dict:
     return {"id": cur.lastrowid, "token": token, "kind": "build"}
 
 
+class BuildRebindIn(BaseModel):
+    build_id: int
+
+
+@app.put("/api/builds/{build_id}/overlays/{token_id}", dependencies=[Depends(owner)])
+def rebind_build_token(build_id: int, token_id: int, body: BuildRebindIn) -> dict:
+    """Point a build overlay at another build; the stream switches without a new source in OBS."""
+    con = db(); _build_row(con, build_id); _build_row(con, body.build_id)
+    if con.execute("SELECT 1 FROM overlay WHERE id = ? AND build_id = ?", (token_id, build_id)).fetchone() is None:
+        raise HTTPException(404, "no such overlay")
+    con.execute("UPDATE overlay SET build_id = ? WHERE id = ?", (body.build_id, token_id)); con.commit()
+    return {"ok": True, "id": token_id, "buildId": body.build_id}
+
+
 @app.delete("/api/builds/{build_id}/overlays/{token_id}", status_code=204, dependencies=[Depends(owner)])
 def revoke_build_token(build_id: int, token_id: int) -> None:
     con = db(); con.execute("DELETE FROM overlay WHERE id = ? AND build_id = ?", (token_id, build_id)); con.commit()

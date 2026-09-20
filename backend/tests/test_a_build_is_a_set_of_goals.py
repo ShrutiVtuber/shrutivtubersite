@@ -76,3 +76,8 @@ def test_a_build_token_is_read_once_and_counts_against_fair_use() -> None:
 
 def test_a_persons_notes_stay_off_the_stream() -> None:
     assert '"note"' not in prose_free(inspect.getsource(shared.element))
+
+
+def test_a_build_overlay_switches_only_between_the_same_persons_builds() -> None:
+    body = code_of(builds.rebind_build_token)
+    assert "target.user_id != user.id" in body and "row.build_id = target.id" in body

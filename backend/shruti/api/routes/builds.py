@@ -281,6 +281,23 @@ async def mint_build_token(build_id: int, body: BuildTokenIn, request: Request, 
     return {"id": row.id, "token": token, "kind": row.kind, "theme": row.theme, "motion": row.motion}
 
 
+class BuildRebindIn(BaseModel):
+    build_id: int
+
+
+@router.put("/{build_id}/overlays/{token_id}")
+async def rebind_build_token(build_id: int, token_id: int, body: BuildRebindIn, request: Request, session: AsyncSession = Depends(get_session)) -> dict:
+    """Point a build overlay at another of the person's builds — the stream switches without a new source in OBS."""
+    b, user = await _mine(session, request, build_id)
+    row = (await session.execute(select(OverlayToken).where(OverlayToken.id == token_id, OverlayToken.build_id == b.id))).scalar_one_or_none()
+    target = await session.get(Build, body.build_id)
+    if row is None or target is None or target.user_id != user.id:
+        raise HTTPException(404, "no such overlay or build")
+    row.build_id = target.id
+    await session.commit()
+    return {"ok": True, "id": row.id, "buildId": target.id}
+
+
 @router.delete("/{build_id}/overlays/{token_id}", status_code=204)
 async def drop_build_token(build_id: int, token_id: int, request: Request, session: AsyncSession = Depends(get_session)) -> None:
     b, _ = await _mine(session, request, build_id)
