@@ -14,6 +14,8 @@ import SelectField from "../components/forms/SelectField.astro";
 import ConsentCheckbox from "../components/forms/ConsentCheckbox.astro";
 import CsrfField from "../components/forms/CsrfField.astro";
 import Button from "../components/forms/Button.astro";
+import Plate from "../components/guides/Plate.astro";
+import { PRESETS } from "../lib/plate";
 import { CONSENTS } from "../lib/consents";
 import PasskeyList, { type PasskeyRow } from "../components/auth/PasskeyList.astro";
 import { account, asReader } from "../lib/account";
@@ -261,37 +263,32 @@ const themeWord = (t: string) => t === "grimoire" ? say("tokens.theme.grimoire",
       }
     </section>
 
-    <section class="card">
-      <h2>{say("tokens.1", "Overlay tokens")}</h2>
+    <section class="card" id="tokens" data-tokens-card data-revoke-words={JSON.stringify({ failed: say("tokens.revoke_failed", "That did not go through. Try again.") })}>
+      <div class="card-head"><h2>{say("tokens.1", "Overlay tokens")}</h2>{allowance && <span class="t-tabular faint">{allowance.tokensLimit === null ? String(allowance.tokens) : say("tokens.count", "{n} of {limit}").replace("{n}", String(allowance.tokens)).replace("{limit}", String(allowance.tokensLimit))}</span>}</div>
       {
         guideTokens.length === 0 ? (
           <div class="stack">
-            <p class="quiet">{say("tokens.2", "None yet. An overlay is minted from a run's track page, or from a group's page; the URL is shown once, there.")}</p>
+            <p class="quiet">{say("tokens.2", "None yet. An overlay is minted from a run's page, a build's page or a group's page; the URL is shown once, there.")}</p>
             <div><Button variant="secondary" href="/guides">{say("tokens.3", "Open the guides")}</Button></div>
           </div>
         ) : (
-          <div class="tokens" role="table">
-            <div class="tokens-row tokens-head" role="row">
-              <span role="columnheader">{say("tokens.col.name", "Name")}</span>
-              <span role="columnheader">{say("tokens.col.showing", "Showing")}</span>
-              <span role="columnheader">{say("tokens.col.theme", "Theme")}</span>
-              <span role="columnheader">{say("tokens.col.state", "State")}</span>
-              <span role="columnheader" class="right">{say("tokens.col.hours", "On air this month")}</span>
-            </div>
+          <ul class="token-rows">
             {guideTokens.map((t) => (
-              <div class="tokens-row" role="row">
-                <span role="cell">{t.label || kindWord(t.kind)}<span class="faint"> — {kindWord(t.kind)}</span></span>
-                <span role="cell">{t.href ? <a href={t.href}>{t.showing}</a> : t.showing}</span>
-                <span role="cell" class="faint">{themeWord(t.theme)}</span>
-                <span role="cell" class={`t-tabular ${t.live ? "live" : "faint"}`}>{t.live ? say("tokens.live", "live") : say("tokens.idle", "idle")}</span>
-                <span role="cell" class="t-tabular faint right">{say("tokens.hours", "{n} h").replace("{n}", String(t.hoursThisMonth ?? 0))}</span>
-              </div>
+              <li class="token-row" data-token-row>
+                <Plate theme={t.theme} elements={t.kind === "guide-goal" ? "goal" : t.kind === "build" ? "grid" : t.kind === "guide-path" ? "path" : t.kind === "guide-sigil" ? "sigil" : "now"} width={64} aria={themeWord(t.theme)} />
+                <div class="token-text">
+                  <span class="token-label">{t.label || kindWord(t.kind)}</span>
+                  <span class="token-showing">{t.href ? <a href={t.href}>{t.showing}</a> : t.showing}</span>
+                  <span class="gd-note">{kindWord(t.kind)} · {themeWord(t.theme)} · {t.live ? say("tokens.drawing", "drawing") : say("tokens.idle", "idle")} · {say("tokens.hours", "{n} h on air this month").replace("{n}", String(t.hoursThisMonth ?? 0))}</span>
+                </div>
+                <Button type="button" variant="ghost" size="sm" data-revoke={t.id}>{say("tokens.revoke", "Revoke")}</Button>
+              </li>
             ))}
-            <p class="quiet t-tabular">{say("tokens.total", "{n} hours on air this month, all overlays together.").replace("{n}", String(Math.round(guideTokens.reduce((a, t) => a + (t.hoursThisMonth ?? 0), 0) * 10) / 10))}</p>
-            <p class="quiet">{say("tokens.4", "A token's URL is shown once, when it is minted. Revoke one from the page it was minted on.")}</p>
-          </div>
+          </ul>
         )
       }
+      {guideTokens.length > 0 && <p class="quiet t-tabular">{say("tokens.total", "{n} hours on air this month, all overlays together.").replace("{n}", String(Math.round(guideTokens.reduce((a, t) => a + (t.hoursThisMonth ?? 0), 0) * 10) / 10))}</p>}
+      <p class="quiet">{say("tokens.4", "URLs were shown once, at minting. Nothing here lists them. Lose one — revoke it and mint again from the run, build or group.")}</p>
     </section>
 
     <section class="card">
@@ -308,8 +305,8 @@ const themeWord = (t: string) => t === "grimoire" ? say("tokens.theme.grimoire",
       {allowance?.tokensFull && !allowance.over && <p class="over">{say("limits.full", "Every overlay slot is in use. Revoke one you no longer stream with, or move to hosting for more.")}</p>}
     </section>
 
-    <section class="card hosting" data-hosting>
-      <h2>{say("hosting.1", "Overlay hosting")}</h2>
+    <section class="card hosting" data-hosting id="hosting">
+      <span class="gd-eyebrow rose">{say("hosting.1", "Overlay hosting")}</span>
       {hostingStarted && <p class="notice">{say("hosting.started", "Thank you. Hosting shows here as soon as Stripe confirms it, usually within a minute.")}</p>}
       {hosting?.active ? (
         <div class="stack">
@@ -326,17 +323,17 @@ const themeWord = (t: string) => t === "grimoire" ? say("tokens.theme.grimoire",
         </div>
       ) : (
         <div class="stack">
-          <p class="price">
-            {monthly && <span class="t-tabular"><strong>{money(monthly.amount, monthly.currency)}</strong> {say("hosting.per_month", "a month")}</span>}
+          <h2 class="price t-tabular">
+            {monthly && <span>{money(monthly.amount, monthly.currency)} {say("hosting.per_month", "a month")}</span>}
             {monthly && yearly && <span class="faint"> · </span>}
-            {yearly && <span class="t-tabular"><strong>{money(yearly.amount, yearly.currency)}</strong> {say("hosting.per_year", "a year — two months free")}</span>}
-          </p>
+            {yearly && <span>{money(yearly.amount, yearly.currency)} {say("hosting.per_year", "a year — two months free")}</span>}
+          </h2>
           <p class="quiet">{say("hosting.what", "She runs the server that draws your overlays while you stream. That is the part that costs real processing, and it is the only thing on this site that costs anything.")}</p>
           <p class="quiet">{say("hosting.free", "Without it, overlays are free for {n} hours on air a month.").replace("{n}", String(allowance?.hoursLimit ?? 100))}</p>
           {hosting?.configured ? (
             <div class="row">
-              {monthly && <form method="POST"><CsrfField /><input type="hidden" name="action" value="hosting" /><input type="hidden" name="tier" value={monthly.tier} /><Button type="submit">{say("hosting.buy_month", "Host monthly")}</Button></form>}
-              {yearly && <form method="POST"><CsrfField /><input type="hidden" name="action" value="hosting" /><input type="hidden" name="tier" value={yearly.tier} /><Button type="submit" variant="secondary">{say("hosting.buy_year", "Host yearly")}</Button></form>}
+              {monthly && <form method="POST"><CsrfField /><input type="hidden" name="action" value="hosting" /><input type="hidden" name="tier" value={monthly.tier} /><Button type="submit">{say("hosting.buy_month", "Host monthly")} · {money(monthly.amount, monthly.currency)}</Button></form>}
+              {yearly && <form method="POST"><CsrfField /><input type="hidden" name="action" value="hosting" /><input type="hidden" name="tier" value={yearly.tier} /><Button type="submit" variant="secondary">{say("hosting.buy_year", "Host yearly")} · {money(yearly.amount, yearly.currency)}</Button></form>}
             </div>
           ) : (
             <p class="quiet">{say("hosting.not_yet", "Not on sale yet.")}</p>
@@ -344,10 +341,7 @@ const themeWord = (t: string) => t === "grimoire" ? say("tokens.theme.grimoire",
           {hosting?.testMode && <p class="quiet">{say("hosting.test", "Test mode: cards are not charged.")}</p>}
         </div>
       )}
-      <div class="self">
-        <h3>{say("self.1", "Or run it yourself")}</h3>
-        <p class="quiet">{say("self.2", "The server, the overlays and the MCP are AGPL-3.0. A Docker image and a compose file are in the hosting notes; a self-hosted instance downloads public guides from here.")} <a href="/tracker">{say("self.3", "Hosting notes")}</a></p>
-      </div>
+      <p class="quiet self">{say("self.1", "Or run it yourself — the whole server is AGPL.")} <a href="/tracker">{say("self.3", "How, in three steps")}</a>.</p>
     </section>
 
     <section class="card">
@@ -626,8 +620,35 @@ const themeWord = (t: string) => t === "grimoire" ? say("tokens.theme.grimoire",
   .hosting .self { margin-top: var(--space-4); padding-top: var(--space-3); border-top: 1px solid var(--line); }
   .hosting .self h3 { font-size: 1rem; margin: 0 0 var(--space-1); }
   .hosting .status .live { color: var(--rose, #E0A4BC); }
+  .card-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+  .card-head h2 { margin: 0; }
+  .token-rows { margin: 0; padding: 0; list-style: none; display: grid; border-top: var(--border-w) solid var(--line-strong); }
+  .token-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 14px; align-items: center; padding: 12px 0; border-bottom: var(--border-w) solid var(--line); }
+  .token-text { display: grid; gap: 3px; min-width: 0; }
+  .token-label { font-weight: 600; }
+  .token-showing { font-size: var(--text-sm); color: var(--ink-soft); }
+  .hosting { border: 1.5px solid var(--rose); }
+  .gd-eyebrow.rose { color: var(--rose); }
+  .hosting .price { margin: 0; font: 600 var(--text-h2) var(--font-display); line-height: 1.2; color: var(--ink); }
+  .hosting .self { margin-top: var(--space-3); }
 </style>
 
+<script>
+  /* Revoke an overlay from the account page: the token's page is not needed. */
+  const card = document.querySelector<HTMLElement>("[data-tokens-card]");
+  if (card) {
+    const words = JSON.parse(card.dataset.revokeWords || "{}");
+    const csrf = () => document.cookie.split("; ").find((c) => c.startsWith("shruti_csrf="))?.split("=")[1] ?? "";
+    card.addEventListener("click", async (ev) => {
+      const btn = (ev.target as HTMLElement).closest<HTMLButtonElement>("[data-revoke]");
+      if (!btn) return;
+      btn.disabled = true;
+      const r = await fetch(`/api/overlay/mine/${btn.dataset.revoke}`, { method: "DELETE", headers: { "x-csrf-token": csrf() } });
+      if (r.ok) btn.closest("[data-token-row]")?.remove();
+      else { btn.disabled = false; alert(words.failed); }
+    });
+  }
+</script>
 <script is:inline>
   (function () {
     var modal = document.querySelector("[data-delete-modal]");

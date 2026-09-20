@@ -1,0 +1,13 @@
+---
+/* A section page's opener (README §4.1 note): the page's own eyebrow, a display
+ * title, one sentence. The lockup strip carries the section's name, so no page
+ * says "Squirrel Guides" twice. */
+interface Props { eyebrow: string; title: string; lede?: string; as?: "h1" | "h2"; max?: string }
+const { eyebrow, title, lede, as: Tag = "h1", max = "60ch" } = Astro.props;
+---
+<header class="gd-head" style={`max-width:${max}`}>
+  <span class="gd-eyebrow">{eyebrow}</span>
+  <Tag>{title}</Tag>
+  {lede && <p class="gd-lede">{lede}</p>}
+  <slot />
+</header>

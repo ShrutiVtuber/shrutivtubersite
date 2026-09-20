@@ -1,0 +1,9 @@
+---
+/* The sigil with the section's ring — one drawing, six sizes (README §4.2).
+ * The markup comes from lib/sigil.ts so a client script can redraw the same
+ * thing live. `aria` is the accessible name and should be a say() string. */
+import { sigil, type SigilOptions } from "../../lib/guides-sigil";
+type Props = SigilOptions;
+const opts = Astro.props;
+---
+<Fragment set:html={sigil(opts)} />

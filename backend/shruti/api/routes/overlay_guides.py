@@ -502,6 +502,28 @@ async def my_tokens(request: Request, session: AsyncSession = Depends(get_sessio
     return out
 
 
+@router.delete("/mine/{token_id}", status_code=204)
+async def revoke_mine(token_id: int, request: Request, session: AsyncSession = Depends(get_session)) -> None:
+    """
+    Revoke one of the person's own overlays from the account page — a run's,
+    a build's or a group's, the same set `my_tokens` lists. Somebody else's
+    token is a 404, never a 403: nothing here says whether an id exists.
+    """
+    from shruti.api.routes.practice import _reader
+    user = await _reader(request, session)
+    row = await session.get(OverlayToken, token_id)
+    if row is None or row.kind not in SITE_KINDS:
+        raise HTTPException(404, "no such overlay")
+    owned = row.user_id == user.id
+    if not owned and row.run_id:
+        run = await session.get(GuideRun, row.run_id)
+        owned = bool(run and run.user_id == user.id)
+    if not owned:
+        raise HTTPException(404, "no such overlay")
+    await session.delete(row)
+    await session.commit()
+
+
 # ── the person's own tokens ──────────────────────────────────────────────────
 
 class TokenIn(BaseModel):

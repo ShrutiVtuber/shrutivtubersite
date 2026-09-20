@@ -1,0 +1,152 @@
+/* Squirrel Guides — what the section adds to the system, as classes. Every measurement
+   is the handoff's (README §4 of 20 September 2026). Nothing here is a new hue. */
+
+/* A section page fills the page column. The site's main is a grid and .page centres
+   itself with auto margins, which on a grid item means shrink-to-fit; the section's
+   pages are laid out at the full 1120, as the boards are. */
+[data-wing="guides"] .site-main > .page, .gd-full { width: 100%; box-sizing: border-box; }
+
+/* Type helpers */
+.gd-eyebrow { font: 600 12px/1 var(--font-body); letter-spacing: .14em; text-transform: uppercase; color: var(--ink-faint); }
+.gd-mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 13px; }
+.gd-note { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 12px; color: var(--ink-faint); }
+.gd-soft { color: var(--ink-soft); }
+.gd-hint { margin: 0; font-size: 13px; color: var(--ink-faint); }
+.gd-lede { margin: 0; font-size: var(--text-body); line-height: var(--leading-body); color: var(--ink-soft); max-width: 66ch; text-wrap: pretty; }
+.gd-h2 { margin: 0; font-family: var(--font-display); font-size: 24px; font-weight: 600; line-height: 1.2; }
+.gd-h3 { margin: 0; font-family: var(--font-display); font-size: 22px; font-weight: 600; line-height: 1.2; }
+
+/* The sigil's one load-time motion: filled arcs draw over --dur-3. Reduced motion collapses it (effects.css). */
+.gd-arc-draw { animation: gd-draw var(--dur-3) var(--ease-out) both; }
+@keyframes gd-draw { from { stroke-dashoffset: var(--gd-len); } to { stroke-dashoffset: 0; } }
+
+/* Section head: the page's own eyebrow, a display title, one sentence */
+.gd-head { display: grid; gap: 10px; max-width: 66ch; }
+.gd-head h1 { margin: 0; font-family: var(--font-display); font-size: 36px; font-weight: 600; line-height: 1.2; letter-spacing: -0.01em; text-wrap: balance; }
+@media (max-width: 600px) { .gd-head h1 { font-size: 28px; } }
+
+/* The console frame — not a card: page ground, 1px --line-strong, radius 4, four corner marks */
+.gd-console { position: relative; display: grid; gap: 16px; padding: 20px; border: 1px solid var(--line-strong); border-radius: 4px; background: var(--surface-page); margin: 0; }
+.gd-console > .gd-corner { position: absolute; width: 12px; height: 12px; pointer-events: none; }
+.gd-console > .gd-corner[data-at="tl"] { top: -1px; left: -1px; border-top: 1.5px solid var(--guide-frame); border-left: 1.5px solid var(--guide-frame); }
+.gd-console > .gd-corner[data-at="tr"] { top: -1px; right: -1px; border-top: 1.5px solid var(--guide-frame); border-right: 1.5px solid var(--guide-frame); }
+.gd-console > .gd-corner[data-at="bl"] { bottom: -1px; left: -1px; border-bottom: 1.5px solid var(--guide-frame); border-left: 1.5px solid var(--guide-frame); }
+.gd-console > .gd-corner[data-at="br"] { bottom: -1px; right: -1px; border-bottom: 1.5px solid var(--guide-frame); border-right: 1.5px solid var(--guide-frame); }
+.gd-console-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.gd-console .sh-field { max-width: none; }
+
+/* Almanac index: rows with a dotted leader, values in mono at the right */
+.gd-index { margin: 0; padding: 0; list-style: none; display: grid; }
+.gd-index > * { display: flex; align-items: baseline; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--line); margin: 0; }
+.gd-index .gd-lead { flex: 1; border-bottom: 1px dotted var(--line-strong); transform: translateY(-4px); min-width: 16px; }
+.gd-index .gd-val { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 14px; white-space: nowrap; }
+
+/* Tab row: the same grammar as the strip */
+.gd-tabs { display: flex; gap: var(--space-5); border-bottom: 1px solid var(--line); overflow-x: auto; scrollbar-width: none; margin: 0; padding: 0; list-style: none; }
+.gd-tabs::-webkit-scrollbar { display: none; }
+.gd-tab { flex: none; padding: 12px 2px; margin-bottom: -1px; font: 500 14px/1 var(--font-body); color: var(--ink-soft); background: none; border: 0; border-bottom: 2px solid transparent; cursor: pointer; text-decoration: none; white-space: nowrap; }
+.gd-tab:hover { color: var(--ink); }
+.gd-tab[aria-selected="true"], .gd-tab[aria-current="page"] { color: var(--accent); border-bottom-color: var(--accent); }
+.gd-panel[hidden] { display: none; }
+
+/* Chips */
+.gd-chiprow { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 8px; padding: 10px 0; background: var(--surface-page); border-bottom: 1px solid var(--line); overflow-x: auto; scrollbar-width: none; }
+.gd-chiprow::-webkit-scrollbar { display: none; }
+.gd-chiprow .gd-total { margin-left: auto; padding-left: 16px; font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 16px; white-space: nowrap; }
+.gd-chip { flex: none; display: inline-flex; align-items: center; gap: 8px; height: 32px; padding: 0 12px; border-radius: 4px; border: 1px solid var(--line); background: none; font: 500 13px/1 var(--font-body); color: var(--ink); cursor: pointer; text-decoration: none; white-space: nowrap; }
+.gd-chip .gd-count { font-family: var(--font-mono); font-size: 12px; color: var(--ink-soft); }
+.gd-chip[data-open="true"], .gd-chip[aria-current="true"] { border-color: var(--accent); background: var(--accent-wash); }
+.gd-change { display: inline-block; font: 600 11px/1 var(--font-body); letter-spacing: .14em; text-transform: uppercase; padding: 5px 8px; border-radius: 4px; border: 1px solid var(--line-strong); color: var(--ink-soft); }
+.gd-change[data-change="added"] { border-color: var(--accent); color: var(--accent); }
+.gd-change[data-change="removed"] { color: var(--ink-faint); text-decoration: line-through; }
+.gd-code { display: inline-block; font-family: var(--font-mono); font-size: 12px; letter-spacing: .18em; color: var(--ink-soft); border: 1px solid var(--line-strong); border-radius: 4px; padding: 3px 8px 3px 10px; }
+.gd-pill-complete { display: inline-block; font: 600 11px/1 var(--font-body); letter-spacing: .14em; text-transform: uppercase; color: var(--rose); border: 1px solid var(--rose); border-radius: 999px; padding: 4px 8px; }
+.gd-mark { display: inline-block; font: 600 11px/1 var(--font-body); letter-spacing: .14em; text-transform: uppercase; color: var(--ink-faint); border: 1px solid var(--line-strong); padding: 4px 6px; }
+
+/* State dots: four states, four shapes; builds borrow three */
+.gd-dot { display: inline-block; width: 15px; height: 15px; box-sizing: border-box; border-radius: 50%; flex: none; vertical-align: middle; }
+.gd-dot[data-state="locked"], .gd-dot[data-state="notyet"], .gd-dot[data-state="not yet"], .gd-dot[data-state="open"] { border: 1.5px solid var(--state-locked); }
+.gd-dot[data-state="notyet"], .gd-dot[data-state="not yet"] { border-color: var(--notyet); }
+.gd-dot[data-state="open"] { border: 3px solid var(--state-open); }
+.gd-dot[data-state="now"], .gd-dot[data-state="partly"], .gd-dot[data-state="partial"] { background: var(--state-now); }
+.gd-dot[data-state="done"], .gd-dot[data-state="met"], .gd-dot[data-state="skipped"] { height: 3px; border-radius: 2px; background: var(--state-done); }
+.gd-dot[data-state="skipped"] { background: var(--state-locked); }
+
+/* Rows that carry the thing's shape: build · group · desk · guide */
+.gd-rows { display: grid; border-top: 1px solid var(--line-strong); margin: 0; padding: 0; list-style: none; }
+.gd-row { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; gap: 16px; align-items: center; padding: 16px 0; border-bottom: 1px solid var(--line); color: inherit; text-decoration: none; }
+a.gd-row:hover, .gd-row[data-link]:hover { background: var(--surface-veil); }
+.gd-row-main { display: grid; gap: 4px; min-width: 0; }
+.gd-row-name { font-family: var(--font-display); font-size: 22px; font-weight: 600; line-height: 1.2; }
+.gd-row-title { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
+.gd-row-variant { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 13px; color: var(--ink-soft); }
+.gd-row-ledger { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 12px; color: var(--ink-faint); }
+.gd-row-line { font-size: 14px; color: var(--ink-soft); }
+.gd-row-right { display: grid; justify-items: end; gap: 2px; text-align: right; }
+.gd-row-num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 22px; line-height: 1; white-space: nowrap; }
+.gd-row-num .gd-of { color: var(--ink-faint); font-size: 16px; }
+.gd-row-num[data-complete="true"] { color: var(--rose); }
+.gd-row-under { font: 600 11px/1 var(--font-body); letter-spacing: .14em; text-transform: uppercase; color: var(--ink-faint); }
+.gd-row-under.gd-mono { font: 400 12px/1 var(--font-mono); letter-spacing: 0; text-transform: none; }
+@media (max-width: 480px) { .gd-row { grid-template-columns: 44px minmax(0, 1fr); } .gd-row-right { grid-column: 2; justify-items: start; text-align: left; } }
+
+/* Version ladder under a desk row's title */
+.gd-ladder { display: grid; margin: 0; padding: 0; list-style: none; }
+.gd-ladder > li { display: grid; grid-template-columns: 15px 3ch minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 7px 0; border-top: 1px solid var(--line); font-size: 14px; }
+.gd-ladder .gd-vno { font-family: var(--font-mono); font-size: 13px; color: var(--ink-faint); }
+.gd-ladder .gd-vword[data-state="waiting"] { color: var(--accent); font-weight: 600; }
+.gd-ladder .gd-vword[data-state="published"] { color: var(--rose); font-weight: 600; }
+.gd-ladder .gd-vword[data-state="tofix"] { font-weight: 600; }
+.gd-ladder .gd-vword[data-state="replaced"] { color: var(--ink-faint); text-decoration: line-through; }
+.gd-ladder .gd-vdate { font-family: var(--font-mono); font-size: 12px; color: var(--ink-faint); }
+
+/* The section's empty state: the site's dashed field, the ring where the ○ was */
+.gd-empty { display: grid; justify-items: center; text-align: center; gap: 12px; padding: 48px 24px; border: 1px dashed var(--line-strong); border-radius: 10px; background: color-mix(in srgb, var(--surface-veil) 40%, transparent); font-family: var(--font-body); color: var(--ink); }
+.gd-empty[data-compact="true"] { padding: 28px 20px; }
+.gd-empty h3 { margin: 0; font-family: var(--font-display); font-size: 22px; font-weight: 600; line-height: 1.2; text-wrap: pretty; }
+.gd-empty p { margin: 0; font-size: 14px; line-height: 1.55; color: var(--ink-soft); max-width: 44ch; text-wrap: pretty; }
+.gd-empty .gd-empty-action { padding-top: 6px; }
+.gd-empty .gd-empty-action:empty { display: none; }
+
+/* Theme tiles: a 3-up of labels, each a plate, a radio and the name */
+.gd-themes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.gd-theme { display: grid; gap: 6px; padding: 8px; min-width: 0; border: 1px solid var(--line); border-radius: 4px; cursor: pointer; }
+.gd-theme:has(input:checked) { border-color: var(--accent); background: var(--accent-wash); }
+.gd-theme .gd-theme-row { display: flex; align-items: center; gap: 8px; font: 500 13px/1 var(--font-body); color: var(--ink); }
+.gd-theme .gd-plate { width: 100%; max-width: 160px; }
+
+/* Controls a script may render: ticks, steppers, token rows — global so injected markup is styled */
+.gd-ticks { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; padding-bottom: 12px; }
+.gd-tick { display: flex; align-items: center; gap: 8px; font-size: 15px; white-space: nowrap; }
+.gd-tick input { width: 18px; height: 18px; margin: 0; }
+.gd-stepper { display: flex; align-items: center; gap: 6px; font-family: var(--font-mono); font-size: 13px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.gd-step { width: 32px; height: 32px; border-radius: 4px; border: 1px solid var(--line); background: var(--surface-card); color: var(--ink); font: inherit; cursor: pointer; }
+.gd-step:hover { border-color: var(--line-strong); }
+.gd-have { min-width: 2ch; text-align: center; }
+.gd-tokens { margin: 0; padding: 0; list-style: none; display: grid; border-top: 1px solid var(--line); }
+.gd-tokens[hidden] { display: none; }
+.gd-token { display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.gd-token-text { display: grid; gap: 2px; min-width: 0; }
+.gd-token-label { font-size: 14px; font-weight: 600; }
+
+/* Cards the section keeps: the Now card and the Next card carry the one accent border */
+.gd-now { position: relative; display: grid; gap: 12px; padding: 24px; background: var(--surface-card); border: 1px solid var(--accent); border-radius: 10px; box-shadow: var(--shadow-1); overflow: hidden; }
+.gd-now .gd-horizon { position: absolute; left: 0; bottom: 0; height: 1px; width: 0; background: var(--rose); }
+.gd-now[data-ignite="true"] { border-color: var(--rose); border-width: 1.5px; }
+.gd-now[data-ignite="true"] .gd-horizon { width: 100%; transition: width 300ms var(--ease-out); }
+
+/* The once-shown URL box */
+.gd-once { display: grid; gap: 10px; padding: 16px; background: var(--surface-inset); border: 1px solid var(--line); border-radius: 4px; }
+.gd-once .sh-field { max-width: none; }
+.gd-once .gd-once-row { display: flex; gap: 12px; flex-wrap: wrap; }
+
+/* Code that a person copies */
+.gd-code-block { position: relative; margin: 0; padding: 14px 44px 14px 16px; background: var(--surface-inset); border: 1px solid var(--line); border-radius: 4px; font-family: var(--font-mono); font-size: 13px; line-height: 1.6; color: var(--ink); overflow-x: auto; white-space: pre; }
+
+/* A left-rule note */
+.gd-rule-note { margin: 0; padding-left: 12px; border-left: 2px solid var(--accent); color: var(--ink-soft); font-size: 14px; }
+.gd-rule-note[data-tone="rose"] { border-left-color: var(--rose); }
+
+/* Sideways-scrolling rows on the phone */
+.gd-scroll-x { overflow-x: auto; scrollbar-width: none; }
+.gd-scroll-x::-webkit-scrollbar { display: none; }

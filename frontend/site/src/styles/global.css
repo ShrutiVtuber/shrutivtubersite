@@ -1,5 +1,7 @@
 @import "@shruti/shared/tokens.css";
+@import "./guides.css";
 @import "./forms.css";
+@import "./guides-section.css";
 
 @tailwind base;
 @tailwind components;

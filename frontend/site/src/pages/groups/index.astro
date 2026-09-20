@@ -1,13 +1,16 @@
 ---
-/* Groups: the ones a person is in, a code to join by, and a way to start one.
+/* Groups (board Groups, 20 Sep 2026): the ones a person is in as rows whose
+ * sigil is the tiers, a code to join by, and a way to start one — two console
+ * frames side by side when there is room.
  *
  * A group has a goal and nothing else — no path, no steps, no schedule.
- * Nothing here counts anyone's absence; a group lists its crew by size
- * with "and N others", never by rank.
- */
+ * Nothing here counts anyone's absence; a group lists its crew by size with
+ * "and N others", never by rank. */
 import BaseLayout from "../../layouts/BaseLayout.astro";
-import SectionHeader from "../../components/brand/SectionHeader.astro";
-import EmptyState from "../../components/feedback/EmptyState.astro";
+import Head from "../../components/guides/Head.astro";
+import Empty from "../../components/guides/Empty.astro";
+import Console from "../../components/guides/Console.astro";
+import Sigil from "../../components/guides/Sigil.astro";
 import TextField from "../../components/forms/TextField.astro";
 import Button from "../../components/forms/Button.astro";
 import { account, asReader } from "../../lib/account";
@@ -21,6 +24,8 @@ const read = await asReader(Astro, "/api/groups/mine");
 type GroupView = { code: string; name: string; goal: string; total: number; target: number; tier: number; tiers: number; members: number; closed: boolean };
 const groups: GroupView[] = read.ok && Array.isArray(read.body) ? read.body : [];
 const n = (v: number) => v.toLocaleString("en-GB");
+/* The API counts filled tiers; people say which tier they are on. */
+const onTier = (g: GroupView) => (g.total >= g.target ? g.tiers : Math.min(g.tiers, g.tier + 1));
 const WORDS = {
   sixLetters: say("words.six_letters", "A join code is six letters."),
   noSuchGroup: say("words.no_such_group", "No group has that code."),
@@ -30,30 +35,35 @@ const WORDS = {
 };
 ---
 
-<BaseLayout
-  title={say("meta.title", "Groups — Squirrel Guides")}
-  description={say("meta.description", "A group has a goal and nothing else: a shared target, filled by contributions.")}
-  noindex
->
+<BaseLayout title={say("meta.title", "Groups — Squirrel Guides")} description={say("meta.description", "A group has a goal and nothing else: a shared target, filled by contributions.")} noindex>
   <section class="page groups" data-groups data-words={JSON.stringify(WORDS)}>
-    <SectionHeader as="h1" eyebrow={say("head.eyebrow", "Squirrel Guides")} title={say("head.title", "Groups")} />
-    <p class="lede">{say("head.lede", "A group has a goal and nothing else — no path, no steps, no schedule. Contributions fill its tiers, and nobody is ranked.")}</p>
-
-    <p class="note" data-note hidden></p>
+    <Head as="h1" eyebrow={say("head.eyebrow", "Groups")} title={say("head.title", "Your groups")}
+      lede={say("head.lede", "A group has a goal and nothing else — no path, no steps, no schedule. Contributions fill its tiers, and nobody is ranked.")} />
+    <p class="gd-rule-note" data-note hidden></p>
 
     {groups.length === 0 ? (
-      <EmptyState title={say("empty.title", "You are in no group yet.")} body={say("empty.text", "Join one with a six-letter code, or start your own.")}>
-        <Button slot="action" href="#join" variant="secondary">{say("empty.action", "Join with a code")}</Button>
-      </EmptyState>
+      <Empty n={5} eyebrow={say("empty.eyebrow", "Groups")} title={say("empty.title", "Join with a code, or start a group.")}
+        body={say("empty.body", "Six letters spoken on stream get you in. A group has a goal and nothing else: contributions fill its tiers, the sigil draws them, and nobody is ranked.")}
+        action={say("empty.action", "Join with a code")} href="#join" ringAria={say("empty.ring", "An empty ring")} />
     ) : (
-      <ul class="list">
+      <ul class="gd-rows">
         {groups.map((g) => (
           <li>
-            <a href={`/groups/${g.code}`}>
-              <span class="name">{g.name}</span>
-              <span class="goal">{g.goal}</span>
-              <span class="mono">{say("row.count", "{total} of {target} · tier {tier} of {tiers}").replace("{total}", n(g.total)).replace("{target}", n(g.target)).replace("{tier}", String(g.tier)).replace("{tiers}", String(g.tiers))}</span>
-              <span class="mono code">{g.code}</span>
+            <a class="gd-row" href={`/groups/${g.code}`}>
+              <Sigil n={Math.max(1, g.tiers)} done={Math.min(g.tier, g.tiers)} size={44} ring={false} showCount={false}
+                aria={say("row.aria", "{filled} of {tiers} tiers filled").replace("{filled}", String(g.tier)).replace("{tiers}", String(g.tiers))} />
+              <div class="gd-row-main">
+                <span class="gd-row-title">
+                  <span class="gd-row-name">{g.name}</span>
+                  <span class="gd-code">{g.code}</span>
+                  {g.closed && <span class="gd-eyebrow">{say("row.closed", "closed")}</span>}
+                </span>
+                <span class="gd-row-line">{g.goal}</span>
+              </div>
+              <div class="gd-row-right">
+                <span class="gd-row-num" data-complete={g.total >= g.target}>{n(g.total)} <span class="gd-of">/ {n(g.target)}</span></span>
+                <span class="gd-row-under gd-mono">{say("row.tier", "tier {tier} of {tiers}").replace("{tier}", String(onTier(g))).replace("{tiers}", String(g.tiers))}</span>
+              </div>
             </a>
           </li>
         ))}
@@ -61,46 +71,67 @@ const WORDS = {
     )}
 
     <div class="two">
-      <form class="card" id="join" data-join-form>
-        <h2>{say("join.title", "Join with a code")}</h2>
-        <TextField label={say("join.code", "Six letters, spoken on stream")} name="code" maxlength="6" autocapitalize="characters" spellcheck="false" placeholder="HEKATE" data-join-code />
+      <Console as="form" id="join" eyebrow={say("join.title", "Join with a code")} data-join-form>
+        <TextField label={say("join.code", "The code")} name="code" maxlength="6" autocapitalize="characters" spellcheck="false" placeholder="HEKATE" data-join-code
+          hint={say("join.hint", "Six letters, spoken on stream. Case does not matter.")} />
         <div><Button type="submit">{say("join.button", "Join")}</Button></div>
-      </form>
-      <form class="card" id="start" data-start-form>
-        <h2>{say("start.title", "Start a group")}</h2>
-        <TextField label={say("start.name", "Name")} name="name" maxlength="80" placeholder={say("start.name_hint", "Squirrel stream crew")} data-name />
-        <TextField label={say("start.goal", "The goal")} name="goal" maxlength="120" placeholder={say("start.goal_hint", "Empire to tier 5")} data-goal />
+        <p class="gd-hint">{say("join.note", "Reading a group needs no account. Joining and contributing do.")}</p>
+      </Console>
+      <Console as="form" id="start" eyebrow={say("start.title", "Start a group")} data-start-form>
+        <TextField label={say("start.name", "Name")} name="name" maxlength="80" required placeholder={say("start.name_hint", "The Thursday crew")} data-name />
+        <TextField label={say("start.goal", "The goal")} name="goal" maxlength="120" required placeholder={say("start.goal_hint", "Whispers turned in, together")} hint={say("start.goal_note", "One line. What the number counts.")} data-goal />
         <div class="row">
-          <TextField type="number" label={say("start.target", "Target")} name="target" min="0" step="1" value="1200" data-target />
-          <TextField type="number" label={say("start.tiers", "Tiers")} name="tiers" min="1" max="12" step="1" value="5" data-tiers />
+          <TextField type="number" label={say("start.target", "Target")} name="target" min="1" step="1" value="1200" data-target />
+          <div class="tiers">
+            <span class="tiers-label">{say("start.tiers", "Tiers")}</span>
+            <span class="stepper" data-tier-stepper>
+              <button type="button" class="step" data-fewer aria-label={say("start.fewer", "fewer tiers")}>−</button>
+              <span class="count" data-tier-count>5</span>
+              <button type="button" class="step" data-more aria-label={say("start.more", "more tiers")}>+</button>
+              <input type="hidden" name="tiers" value="5" data-tiers />
+              <span class="live" data-tier-sigil><Sigil n={5} done={0} now={0} size={44} ring={false} showCount={false} aria={say("start.sigil_aria", "The tiers as arcs")} /></span>
+            </span>
+          </div>
         </div>
-        <p class="hint">{say("start.hint", "The tiers are the sigil's arcs, filled as the crew contributes.")}</p>
+        <p class="gd-hint">{say("start.hint", "The tiers are the sigil's arcs, filled as the crew contributes. Two to twelve.")}</p>
         <div><Button type="submit">{say("start.button", "Start")}</Button></div>
-      </form>
+      </Console>
     </div>
   </section>
 </BaseLayout>
 
 <style>
-  .groups { max-width: 620px; margin: 0 auto; padding: var(--space-6) var(--space-4); display: grid; gap: var(--space-5); }
-  .lede { color: var(--ink-soft); max-width: 60ch; }
-  .note { color: var(--ink); border-left: 2px solid var(--accent); padding-left: var(--space-3); }
-  .list { list-style: none; margin: 0; padding: 0; display: grid; gap: 1px; background: var(--line); border: var(--border-w) solid var(--line); border-radius: var(--radius-md); overflow: hidden; }
-  .list a { display: grid; grid-template-columns: 1fr auto; gap: var(--space-1) var(--space-3); padding: var(--space-3) var(--space-4); background: var(--surface-card); color: inherit; text-decoration: none; }
-  .list .name { font-weight: 600; }
-  .list .goal { grid-column: 1; color: var(--ink-soft); }
-  .list .mono { font-family: var(--font-mono); font-size: .85rem; color: var(--ink-soft); }
-  .list .code { grid-column: 2; grid-row: 1; letter-spacing: .12em; }
-  .two { display: grid; gap: var(--space-4); grid-template-columns: 1fr 1fr; }
-  @media (max-width: 640px) { .two { grid-template-columns: 1fr; } }
-  .card { border-top: var(--border-w) solid var(--line); padding-top: var(--space-4); display: grid; gap: var(--space-3); align-content: start; scroll-margin-top: 80px; }
-  .card h2 { font: 600 var(--text-h3) var(--font-display); margin: 0; }
-  .row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); }
-  .hint { font-size: .85rem; color: var(--ink-soft); margin: 0; }
+  .groups { padding-block: var(--space-6) 0; display: grid; gap: var(--space-7); }
+  .two { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: var(--space-6); align-items: start; scroll-margin-top: 80px; }
+  .row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; align-items: center; }
+  .tiers { display: grid; gap: 6px; }
+  .tiers-label { font-size: 14px; font-weight: 600; }
+  .stepper { display: flex; align-items: center; gap: 6px; font-family: var(--font-mono); font-size: 14px; font-variant-numeric: tabular-nums; }
+  .step { width: 32px; height: 32px; border-radius: 4px; border: 1px solid var(--line); background: var(--surface-card); color: var(--ink); font: inherit; cursor: pointer; }
+  .step:hover { border-color: var(--line-strong); }
+  .count { min-width: 2ch; text-align: center; }
+  .live { display: inline-flex; line-height: 0; }
+  @media (max-width: 420px) { .row { grid-template-columns: 1fr; } }
 </style>
 
 <script>
   import { mountGroups } from "../../lib/groups";
+  import { sigil } from "../../lib/guides-sigil";
   const root = document.querySelector<HTMLElement>("[data-groups]");
   if (root) mountGroups(root);
+  /* The tiers stepper: two to twelve, and the sigil beside it redraws live. */
+  const stepper = root?.querySelector<HTMLElement>("[data-tier-stepper]");
+  if (stepper) {
+    const input = stepper.querySelector<HTMLInputElement>("[data-tiers]")!;
+    const count = stepper.querySelector<HTMLElement>("[data-tier-count]")!;
+    const live = stepper.querySelector<HTMLElement>("[data-tier-sigil]")!;
+    const aria = live.querySelector("[aria-label]")?.getAttribute("aria-label") ?? "";
+    const set = (v: number) => {
+      const n = Math.max(2, Math.min(12, v));
+      input.value = String(n); count.textContent = String(n);
+      live.innerHTML = sigil({ n, done: 0, now: 0, size: 44, ring: false, showCount: false, animate: false, aria });
+    };
+    stepper.querySelector("[data-fewer]")?.addEventListener("click", () => set(Number(input.value) - 1));
+    stepper.querySelector("[data-more]")?.addEventListener("click", () => set(Number(input.value) + 1));
+  }
 </script>

@@ -21,6 +21,8 @@
  * ⚠ Inputs bind to paths in the document ("steps.3.do") and only structural
  * changes redraw, so typing never loses the caret.
  */
+import Button from "../../../components/forms/Button.astro";
+import Plate from "../../../components/guides/Plate.astro";
 import BaseLayout from "../../../layouts/BaseLayout.astro";
 import { account, asReader } from "../../../lib/account";
 import { copy } from "../../../lib/copy";
@@ -184,15 +186,16 @@ const WORDS = {
 
     <div class="ed-bar">
       <div class="ed-bar-left">
-        <a class="ed-back" href="/guides/write">{say("back", "Your guides")}</a>
-        <h1 class="ed-bar-title" data-title>{title}</h1>
-        <span class="ed-chip" data-state-chip>{STATE[version.state] ?? version.state} <span class="t-tabular">v{version.number}</span></span>
+        <div class="ed-bar-head">
+          <span class="gd-eyebrow"><a class="ed-back" href="/guides/write">{say("back", "Your guides")}</a> · <span class="t-tabular">v{version.number}</span> · <span data-state-chip>{STATE[version.state] ?? version.state}</span></span>
+          <h1 class="ed-bar-title" data-title>{title}</h1>
+        </div>
         <span class="ed-status" data-status aria-live="polite"></span>
       </div>
       <div class="ed-bar-right">
         <a class="ed-btn ghost" href={`/guides/write/${version.id}/preview`}>{say("preview", "Preview as reader")}</a>
-        <button type="button" class="ed-btn" data-save disabled={!version.editable}>{say("save", "Save draft")}</button>
-        <button type="button" class="ed-btn primary" data-submit disabled={!version.editable}>{proposal ? say("submit.author", "Send to the author") : say("submit", "Submit for review")}</button>
+        <Button type="button" variant="secondary" size="sm" data-save disabled={!version.editable}>{say("save", "Save draft")}</Button>
+        <Button type="button" size="sm" data-submit disabled={!version.editable}>{proposal ? say("submit.author", "Send to the author") : say("submit", "Submit for review")}</Button>
       </div>
     </div>
 
@@ -207,7 +210,12 @@ const WORDS = {
       </p>
     )}
 
-    <div class="ed-grid">
+    <div class="gd-tabs ed-tabs" role="tablist" data-ed-tabs>
+      <button type="button" class="gd-tab" role="tab" data-show="outline">{say("tabs.outline", "Outline")}</button>
+      <button type="button" class="gd-tab" role="tab" data-show="form" aria-selected="true">{say("tabs.form", "Form")}</button>
+      <button type="button" class="gd-tab" role="tab" data-show="preview">{say("tabs.preview", "Preview")}</button>
+    </div>
+    <div class="ed-grid" data-ed-grid data-showing="form">
       <nav class="ed-outline" aria-label={say("outline.label", "Outline")}>
         <div class="ed-outline-list" data-outline></div>
         <div class="ed-outline-foot">
@@ -226,8 +234,12 @@ const WORDS = {
       <div class="ed-form" data-sections></div>
 
       <aside class="ed-side">
-        <div class="ed-side-head"><span class="ed-eyebrow">{say("pv.title", "Preview — this is the reader")}</span></div>
+        <div class="ed-side-head"><span class="ed-eyebrow">{say("pv.title", "Preview")}</span><span class="gd-note">{say("pv.as_reader", "as the reader shows it")}</span></div>
         <div class="ed-preview" data-preview></div>
+        <div class="ed-plate">
+          <span class="ed-eyebrow">{say("pv.on_stream", "On stream, now")}</span>
+          <Plate theme="almanac" elements="now" width={360} fluid aria={say("pv.plate_aria", "The Now card on stream, in the Almanac theme")} />
+        </div>
         <div class="ed-validation">
           <span class="ed-eyebrow">{say("pv.validation", "Validation")}</span>
           <ul class="ed-checks" data-checks></ul>
@@ -238,14 +250,18 @@ const WORDS = {
   </main>
 </BaseLayout>
 
-<style>
+<style is:global>
   .ed { font-family: var(--font-body); color: var(--ink); display: flex; flex-direction: column; min-height: 80vh; }
   .ed-proposal { margin: 0; padding: 10px var(--page-pad); border-bottom: var(--border-w) solid var(--line); background: var(--surface-inset); font-size: 13.5px; color: var(--ink-soft); }
-  .ed-bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; padding: 12px var(--page-pad); border-bottom: var(--border-w) solid var(--line); background: var(--surface-card); position: sticky; top: 0; z-index: 3; }
+  .ed-bar-head { display: grid; gap: 4px; min-width: 0; }
+  .ed-tabs { display: none; margin: 0 var(--page-pad); }
+  .ed-plate { padding: 16px 20px; display: grid; gap: 6px; border-top: var(--border-w) solid var(--line); }
+  .ed-plate :global(.gd-plate) { width: 100%; max-width: none; }
+  .ed-bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; padding: 12px var(--page-pad) 14px; border-bottom: var(--border-w) solid var(--line); background: transparent; position: sticky; top: 0; z-index: 3; }
   .ed-bar-left, .ed-bar-right { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
   .ed-back { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--ink-faint); text-decoration: none; }
   .ed-back:hover { color: var(--ink); }
-  .ed-bar-title { margin: 0; font-family: var(--font-display); font-size: 19px; font-weight: 600; color: var(--ink); }
+  .ed-bar-title { margin: 0; font-family: var(--font-display); font-size: 24px; font-weight: 600; line-height: 1.2; color: var(--ink); }
   .ed-chip { font-family: var(--font-mono); font-size: 11.5px; color: var(--rose); border: var(--border-w) solid var(--rose); border-radius: var(--radius-full); padding: 3px 10px; }
   .ed-status { font-family: var(--font-mono); font-size: 11.5px; color: var(--ink-faint); }
   .ed-status[data-tone="bad"] { color: var(--rose); }
@@ -296,7 +312,10 @@ const WORDS = {
   .ed-count.over { color: var(--rose); }
   .ed-check { display: flex; gap: 8px; align-items: center; font: 400 14px var(--font-body); color: var(--ink-soft); }
   .ed-checks-row { display: flex; flex-wrap: wrap; gap: 14px; }
-  .ed-card { border: var(--border-w) solid var(--line); border-radius: var(--radius-md); background: var(--surface-card); padding: 18px 20px; display: flex; flex-direction: column; gap: 14px; }
+  .ed-card { position: relative; border: var(--border-w) solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-page); padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+  .ed-card::before, .ed-card::after { content: ""; position: absolute; width: 12px; height: 12px; pointer-events: none; }
+  .ed-card::before { top: -1px; left: -1px; border-top: 1.5px solid var(--guide-frame); border-left: 1.5px solid var(--guide-frame); }
+  .ed-card::after { bottom: -1px; right: -1px; border-bottom: 1.5px solid var(--guide-frame); border-right: 1.5px solid var(--guide-frame); }
   .ed-card-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
   .ed-gate-rows { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
   .ed-gate-rows select, .ed-gate-rows input { font: 400 14px var(--font-body); padding: 9px 12px; border: var(--border-w) solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-page); color: var(--ink); }
@@ -353,6 +372,10 @@ const WORDS = {
   }
   @media (max-width: 760px) {
     .ed-grid { grid-template-columns: 1fr; }
+    .ed-tabs { display: flex; }
+    .ed-grid[data-showing="form"] .ed-outline, .ed-grid[data-showing="form"] .ed-side { display: none; }
+    .ed-grid[data-showing="outline"] .ed-form, .ed-grid[data-showing="outline"] .ed-side { display: none; }
+    .ed-grid[data-showing="preview"] .ed-form, .ed-grid[data-showing="preview"] .ed-outline { display: none; }
     .ed-outline { position: static; max-height: none; border-right: 0; border-bottom: var(--border-w) solid var(--line); }
     .ed-form { padding: 20px var(--page-pad) 32px; }
   }
@@ -365,6 +388,12 @@ const WORDS = {
      one thing selected at a time, structural redraws only. */
   const root = document.querySelector<HTMLElement>("[data-editor]");
   if (root) {
+    /* Outline · Form · Preview as a tab row on the phone; a desk shows all three. */
+    const grid = root.querySelector<HTMLElement>("[data-ed-grid]");
+    root.querySelectorAll<HTMLButtonElement>("[data-ed-tabs] [data-show]").forEach((t) => t.addEventListener("click", () => {
+      if (grid) grid.dataset.showing = t.dataset.show;
+      root.querySelectorAll<HTMLButtonElement>("[data-ed-tabs] [data-show]").forEach((x) => x.setAttribute("aria-selected", String(x === t)));
+    }));
     type Doc = any;
     const W = JSON.parse(root.dataset.words || "{}");
     const versionId = root.dataset.version || "";
@@ -639,6 +668,7 @@ const WORDS = {
       }
       checks.innerHTML = items.join("");
       verdict.textContent = problems.length === 0 ? W.preview.clean : problems.length === 1 ? W.preview.countOne : fill(W.preview.countBlocking, { n: String(problems.length) });
+      const submitBtn = root.querySelector<HTMLButtonElement>("[data-submit]"); if (submitBtn) submitBtn.disabled = !editable || problems.length > 0;
     };
 
     /* ── drawing ──────────────────────────────────────────────────────── */

@@ -1,18 +1,21 @@
 ---
-/* Squirrel Guides: the front door (board W1).
+/* Squirrel Guides: the front door (board Guides, 20 Sep 2026).
  *
- * The page's one sky, spent on the hero. Then Featured as three cards — she
- * picks them by hand in the admin — then Most voted and Newest as almanac
- * indices with dotted leaders rather than more cards, because a landing page
- * of twelve identical cards tells you nothing about which to read. By game
- * is a grid whose last tile is an instruction, and it is where a new game
- * actually comes from. Nothing on the page is ranked by an algorithm.
+ * The page's one sky, spent on the hero, with the ring sigil beside the
+ * capsule. Then Featured as three cards — she picks them by hand in the
+ * admin — whose art is the guide's own sigil; then Most voted and Newest as
+ * almanac indices with dotted leaders rather than more cards; By game as a
+ * grid whose last tile is an instruction; and the three other rooms of the
+ * wing as an index. Nothing on the page is ranked by an algorithm, and the
+ * desk is not advertised here — the strip already carries it.
  *
  * Reading needs no account. The lists are fetched AS the reader when there
  * is one, so a blocked author's guides are not on them.
  */
 import BaseLayout from "../../layouts/BaseLayout.astro";
-import EmptyState from "../../components/feedback/EmptyState.astro";
+import Empty from "../../components/guides/Empty.astro";
+import Sigil from "../../components/guides/Sigil.astro";
+import Button from "../../components/forms/Button.astro";
 import { site } from "../../lib/api";
 import { asReader } from "../../lib/account";
 import type { GuideSummary } from "../../lib/guides";
@@ -33,11 +36,18 @@ const featured = list(featuredRead).filter((g) => g.featured).slice(0, 3);
 const top = list(topRead);
 const newest = list(newRead);
 const allGames = (games ?? []).filter((g) => g.guides > 0);
-const total = allGames.reduce((n, g) => n + g.guides, 0);
 const nothing = featured.length === 0 && top.length === 0 && newest.length === 0;
 
 const day = (iso: string | null) =>
   iso ? new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" }) : "";
+const shape = (g: GuideSummary) => say("shape", "{p} phases · {s} steps").replace("{p}", String(g.phases)).replace("{s}", String(g.steps));
+const cardMeta = (g: GuideSummary) => [g.game.name, g.gamePatch ? say("card.patch", "patch {p}").replace("{p}", g.gamePatch) : "", g.number ? `v${g.number}` : ""].filter(Boolean).join(" · ");
+const gameMeta = (g: Game) => (g.guides === 1 ? say("game.one", "1 guide") : say("game.many", "{n} guides").replace("{n}", String(g.guides)));
+const WING = [
+  { href: "/builds", n: 4, done: 1, name: say("wing.builds", "Builds"), line: say("wing.builds_line", "a set of goals for one character — met, partly met or not yet — and it draws on stream.") },
+  { href: "/groups", n: 5, done: 2, name: say("wing.groups", "Groups"), line: say("wing.groups_line", "a shared goal and nothing else; contributions fill its tiers, and nobody is ranked.") },
+  { href: "/guides/overlays", n: 3, done: 0, name: say("wing.layouts", "Layouts"), line: say("wing.layouts_line", "overlay layouts to start from — where the elements sit; a theme is what they wear.") },
+];
 ---
 
 <BaseLayout
@@ -46,43 +56,51 @@ const day = (iso: string | null) =>
     "Game guides written as a path: phases, steps, routines and a codex. Written by Shruti, by other streamers, and drafted by agents; every one read by a person before it is published.")}
 >
   <div class="page gd">
-    <div class="sky gd-hero">
-      <div class="gd-hero-veil">
-        <span class="gd-eyebrow">{say("eyebrow", "Squirrel Guides")}</span>
-        <h1 class="gd-hero-title">{say("hero.title", "A guide is a path. Keep your place on one.")}</h1>
-        <p class="gd-hero-lede">
-          {say("hero.lede",
-            "Written by me, by other streamers, and drafted by agents — every one of them read by a person before it is published. Read any of them here.")}
-        </p>
+    <section class="sky gd-hero" aria-labelledby="hero-title">
+      <div class="gd-hero-row">
+        <div class="gd-hero-veil">
+          <span class="gd-eyebrow">{say("eyebrow", "Guides")}</span>
+          <h1 id="hero-title" class="gd-hero-title">{say("hero.title", "A guide is a path. Keep your place on one.")}</h1>
+          <p class="gd-hero-lede">{say("hero.lede", "Guides written by people who played the game, tracked from the phone, at the desk and on the stream. Reading needs no account.")}</p>
+          <div class="gd-hero-actions">
+            <Button href="#by-game">{say("hero.browse", "Browse by game")}</Button>
+            <Button href="#how" variant="ghost">{say("hero.how", "How tracking works")}</Button>
+          </div>
+        </div>
+        <div class="gd-hero-sigil">
+          <span class="gd-hero-sigil-desk"><Sigil n={9} done={3} size={160} ring label={say("hero.sigil_label", "P4")} aria={say("hero.sigil_aria", "A nine-phase path, three phases crossed")} /></span>
+          <span class="gd-hero-sigil-phone"><Sigil n={9} done={3} size={104} ring label={say("hero.sigil_label", "P4")} aria={say("hero.sigil_aria", "A nine-phase path, three phases crossed")} /></span>
+          <span class="gd-note">{say("hero.sigil_caption", "one arc per phase · rose is behind you")}</span>
+        </div>
       </div>
       <div class="sky-horizon"></div>
-    </div>
+    </section>
 
     {nothing ? (
-      <EmptyState as="h2" glyph="○"
-        title={say("empty", "Nothing published yet")}
-        body={say("empty.body", "Guides go up here once Shruti has read them. Nothing is hidden; there is simply nothing published yet.")} />
+      <Empty n={9} eyebrow={say("empty.eyebrow", "Guides")} title={say("empty", "Nothing published yet.")}
+        body={say("empty.body", "Guides go up here once Shruti has read them. Nothing is hidden; there is simply nothing published yet.")} ringAria={say("empty.ring", "An empty ring")} />
     ) : (
       <div class="gd-sections">
         {featured.length > 0 && (
-          <section class="gd-section">
+          <section class="gd-section" aria-labelledby="featured">
             <div class="gd-section-head">
-              <h2>{say("featured", "Featured")}</h2>
-              <span class="gd-mono">{say("featured.note", "chosen by hand")}</span>
+              <div class="gd-section-title"><span class="gd-eyebrow">{say("featured", "Featured")}</span><h2 id="featured">{say("featured.title", "Three I picked by hand")}</h2></div>
+              <span class="gd-mono gd-faint">{say("featured.note", "not ranked · changed when I feel like it")}</span>
             </div>
             <div class="gd-featured">
               {featured.map((g) => (
                 <a class="gd-card" href={`/guides/${g.game.slug}/${g.slug}`}>
                   <span class="gd-art">
-                    <span class="gd-art-label">{say("art.empty", "art slot · empty")}</span>
-                    <span class="gd-art-name">{g.game.name}</span>
+                    <Sigil n={Math.max(1, g.phases)} done={0} now={-1} size={88} ring label={String(g.phases)} aria={shape(g)} />
+                    <span class="gd-note gd-soft">{shape(g)}</span>
                   </span>
                   <span class="gd-card-body">
+                    <span class="gd-note">{cardMeta(g)}</span>
                     <span class="gd-card-title">{g.title}</span>
                     {g.summary && <span class="gd-card-sum">{g.summary}</span>}
                     <span class="gd-card-foot">
-                      <span class="gd-mono soft">{g.author} · {g.phases} {say("card.phases", "phases")}</span>
-                      <span class="gd-votes"><span class="gd-glyph" aria-hidden="true">●</span>{g.votes}</span>
+                      <span class="gd-soft">{say("card.by", "by {who}").replace("{who}", g.author)}</span>
+                      <span class="gd-votes"><span class="t-glyph" aria-hidden="true">●</span> {g.votes}</span>
                     </span>
                   </span>
                 </a>
@@ -93,114 +111,110 @@ const day = (iso: string | null) =>
 
         <div class="gd-indices">
           <section class="gd-section">
-            <div class="gd-section-head">
-              <h2>{say("top", "Most voted")}</h2>
-              <span class="gd-mono">{say("top.note", "all time")}</span>
-            </div>
-            <div class="gd-index">
-              {top.map((g) => (
-                <a class="gd-row" href={`/guides/${g.game.slug}/${g.slug}`}>
-                  <span class="gd-row-n rose">{g.votes}</span>
-                  <span class="gd-row-title">{g.title}</span>
-                  <span class="gd-leader" aria-hidden="true"></span>
-                  <span class="gd-mono">{g.author}</span>
-                </a>
+            <div class="gd-section-title gd-section-line"><span class="gd-eyebrow">{say("top", "Most voted")}</span><h2 class="gd-h3">{say("top.title", "Counted, not ranked by a machine")}</h2></div>
+            <ol class="gd-index">
+              {top.map((g, i) => (
+                <li>
+                  <span class="gd-rank">{i + 1}</span>
+                  <a class="gd-index-title" href={`/guides/${g.game.slug}/${g.slug}`}>{g.title}</a>
+                  <span class="gd-lead" aria-hidden="true"></span>
+                  <span class="gd-mono gd-faint nowrap">{g.game.name}</span>
+                  <span class="gd-votes"><span class="t-glyph" aria-hidden="true">●</span> {g.votes}</span>
+                </li>
               ))}
-            </div>
+            </ol>
           </section>
           <section class="gd-section">
-            <div class="gd-section-head">
-              <h2>{say("new", "Newest")}</h2>
-              <span class="gd-mono">{say("new.note", "published")}</span>
-            </div>
-            <div class="gd-index">
+            <div class="gd-section-title gd-section-line"><span class="gd-eyebrow">{say("new", "Newest")}</span><h2 class="gd-h3">{say("new.title", "By date, published or revised")}</h2></div>
+            <ol class="gd-index">
               {newest.map((g) => (
-                <a class="gd-row" href={`/guides/${g.game.slug}/${g.slug}`}>
-                  <span class="gd-row-n wide">{day(g.publishedAt)}</span>
-                  <span class="gd-row-title">{g.title}</span>
-                  <span class="gd-leader" aria-hidden="true"></span>
-                  <span class="gd-mono">{g.number && g.number > 1 ? `v${g.number}` : say("new.first", "new")}</span>
-                </a>
+                <li>
+                  <a class="gd-index-title" href={`/guides/${g.game.slug}/${g.slug}`}>{g.title}</a>
+                  <span class="gd-lead" aria-hidden="true"></span>
+                  <span class="gd-mono gd-faint nowrap">{day(g.publishedAt)}{g.number ? ` · v${g.number}` : ""}</span>
+                </li>
               ))}
-            </div>
+            </ol>
           </section>
         </div>
 
-        <section class="gd-section">
-          <div class="gd-section-head">
-            <h2>{say("games", "By game")}</h2>
-            <span class="gd-mono">{allGames.length} {say("games.count", "games")} · {total} {say("games.guides", "guides")}</span>
-          </div>
+        <section id="by-game" class="gd-section" aria-labelledby="bygame">
+          <div class="gd-section-title gd-section-line"><span class="gd-eyebrow">{say("games", "By game")}</span><h2 id="bygame">{say("games.title", "Every game with a guide")}</h2></div>
           <div class="gd-games">
             {allGames.map((g) => (
               <a class="gd-game" href={`/guides/${g.slug}`}>
                 <span class="gd-game-name">{g.name}</span>
-                <span class="gd-mono soft">{g.guides} {g.guides === 1 ? say("game.one", "guide") : say("game.many", "guides")}</span>
+                <span class="gd-mono gd-soft">{gameMeta(g)}</span>
               </a>
             ))}
             <div class="gd-game dashed">
-              <span class="gd-game-ask">{say("games.yours", "Your game isn't here")}</span>
-              <span class="gd-game-how">{say("games.how", "Any account can write a guide. A new game arrives with its first one.")}</span>
+              <p>{say("games.yours", "Your game isn't here.")} {say("games.how", "Any account can write a guide. A new game arrives with its first one.")}</p>
             </div>
           </div>
         </section>
+
+        <section id="how" class="gd-section" aria-labelledby="wing">
+          <div class="gd-section-title gd-section-line"><span class="gd-eyebrow">{say("wing", "Also in this wing")}</span><h2 id="wing" class="gd-h3">{say("wing.title", "Three more rooms, one vocabulary")}</h2></div>
+          <ul class="gd-wing">
+            {WING.map((r) => (
+              <li>
+                <Sigil n={r.n} done={r.done} size={44} ring={false} showCount={false} aria={r.name} />
+                <div class="gd-wing-text"><a href={r.href}>{r.name}</a><span class="gd-soft">{r.line}</span></div>
+              </li>
+            ))}
+          </ul>
+          <p class="gd-foot"><span class="t-glyph gd-faint" aria-hidden="true">○</span> {say("foot", "Nothing on this page is ranked by an algorithm. Featured is chosen by hand, Most voted counts votes, Newest is by date. A guide written for an older patch is not hidden — its patch is stated beside it.")}</p>
+        </section>
       </div>
     )}
-
-    <p class="gd-also">
-      <a href="/groups">{say("also.groups", "Groups — a shared goal, filled by a crew")}</a>
-      <span aria-hidden="true"> · </span>
-      <a href="/guides/overlays">{say("also.overlays", "Overlay layouts to start from")}</a>
-    </p>
-    <p class="gd-foot">
-      {say("foot",
-        "Every guide carries report and block, as in the practice room: a reported guide hides at the same threshold, and a blocked author's guides leave your lists. Featured is chosen by hand — nothing on this page is ranked by an algorithm.")}
-    </p>
   </div>
 </BaseLayout>
 
 <style>
-  .gd { padding-block: var(--space-7) var(--space-9); display: flex; flex-direction: column; gap: 44px; font-family: var(--font-body); }
-  .gd-hero { border-radius: var(--radius-lg); overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end; min-height: 300px; padding: 36px; }
-  .gd-hero-veil { background: var(--surface-veil); border-radius: var(--radius-lg); padding: 30px 32px; max-width: 640px; display: flex; flex-direction: column; gap: 12px; box-shadow: var(--shadow-1); }
-  .gd-eyebrow { font-size: var(--text-micro); font-weight: 600; letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; color: var(--ink-faint); }
-  .gd-hero-title { margin: 0; font-family: var(--font-display); font-size: clamp(30px, 4vw, 44px); line-height: 1.08; font-weight: 500; color: var(--ink); text-wrap: pretty; }
-  .gd-hero-lede { margin: 0; font-family: var(--font-display); font-size: 18px; line-height: 1.65; color: var(--ink); }
-  .gd-sections { display: flex; flex-direction: column; gap: 44px; }
-  .gd-section { display: flex; flex-direction: column; gap: 18px; }
-  .gd-section-head { display: flex; align-items: baseline; justify-content: space-between; border-bottom: var(--border-w) solid var(--line); padding-bottom: 12px; }
-  .gd-section-head h2 { margin: 0; font-family: var(--font-display); font-size: 26px; font-weight: 600; color: var(--ink); }
-  .gd-mono { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--ink-faint); }
-  .gd-mono.soft { color: var(--ink-soft); font-size: 11.5px; }
-  .gd-featured { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; }
-  .gd-card { background: var(--surface-card); border: var(--border-w) solid var(--line); border-radius: var(--radius-md); box-shadow: var(--shadow-1); overflow: hidden; display: flex; flex-direction: column; text-decoration: none; color: inherit; transition: border-color var(--dur-1) var(--ease-out), box-shadow var(--dur-1) var(--ease-out); }
+  .gd { padding-block: var(--space-5) var(--space-9); display: grid; gap: var(--space-8); font-family: var(--font-body); }
+  .gd-hero { border-radius: 16px; border: 1px solid var(--line); padding: clamp(24px, 4vw, 48px); overflow: hidden; position: relative; }
+  .gd-hero-row { display: flex; flex-wrap: wrap; gap: var(--space-6); align-items: center; position: relative; }
+  .gd-hero-veil { flex: 1 1 380px; padding: clamp(20px, 3vw, 32px); display: grid; gap: 14px; max-width: 62ch; background: var(--surface-veil); border-radius: 16px; box-shadow: var(--shadow-1); }
+  .gd-hero-title { margin: 0; font-family: var(--font-display); font-size: clamp(34px, 5vw, 54px); line-height: 1.08; font-weight: 500; letter-spacing: -0.01em; color: var(--ink); text-wrap: pretty; }
+  .gd-hero-lede { margin: 0; font-family: var(--font-display); font-size: 19px; line-height: 1.5; color: var(--ink-soft); max-width: 52ch; text-wrap: pretty; }
+  .gd-hero-actions { display: flex; flex-wrap: wrap; gap: 12px; padding-top: 4px; }
+  .gd-hero-sigil { flex: 0 0 auto; margin: 0 auto; display: grid; justify-items: center; gap: 10px; }
+  .gd-hero-sigil-phone { display: none; }
+  @media (max-width: 600px) { .gd-hero-sigil-desk { display: none; } .gd-hero-sigil-phone { display: block; } }
+  .gd-sections { display: grid; gap: var(--space-8); }
+  .gd-section { display: grid; gap: var(--space-5); align-content: start; }
+  .gd-section-head { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; flex-wrap: wrap; border-bottom: 1px solid var(--line); padding-bottom: 12px; }
+  .gd-section-title { display: grid; gap: 6px; }
+  .gd-section-line { border-bottom: 1px solid var(--line); padding-bottom: 12px; }
+  .gd-section h2 { margin: 0; font-family: var(--font-display); font-size: 28px; font-weight: 600; line-height: 1.2; color: var(--ink); }
+  .gd-section h2.gd-h3 { font-size: 22px; }
+  .gd-faint { color: var(--ink-faint); }
+  .nowrap { white-space: nowrap; }
+  .gd-featured { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr)); gap: var(--space-5); }
+  .gd-card { display: grid; gap: 0; background: var(--surface-card); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow-1); text-decoration: none; color: var(--ink); overflow: hidden; transition: border-color var(--dur-1) var(--ease-out), box-shadow var(--dur-1) var(--ease-out); }
   .gd-card:hover { border-color: var(--line-strong); box-shadow: var(--shadow-2); }
-  .gd-art { height: 110px; background: var(--surface-inset); border-bottom: var(--border-w) solid var(--line); display: flex; align-items: flex-end; padding: 12px 16px; position: relative; }
-  .gd-art-label { position: absolute; top: 10px; right: 14px; font-family: var(--font-mono); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-faint); }
-  .gd-art-name { font-family: var(--font-display); font-size: 20px; font-weight: 600; color: var(--ink); }
-  .gd-card-body { padding: 18px 18px 16px; display: flex; flex-direction: column; gap: 10px; flex: 1; }
-  .gd-card-title { font-family: var(--font-display); font-size: 21px; line-height: 1.2; font-weight: 600; color: var(--ink); text-wrap: pretty; }
-  .gd-card-sum { font-size: var(--text-sm); line-height: 1.55; color: var(--ink-soft); }
-  .gd-card-foot { margin-top: auto; display: flex; align-items: center; justify-content: space-between; padding-top: 10px; border-top: var(--border-w) solid var(--line); }
-  .gd-votes { display: inline-flex; align-items: center; gap: 6px; font-family: var(--font-mono); font-size: 11.5px; color: var(--rose); font-variant-numeric: tabular-nums; }
-  .gd-glyph { font-family: var(--font-display); font-size: 13px; }
-  .gd-indices { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 44px; }
-  .gd-index { display: flex; flex-direction: column; }
-  .gd-row { display: flex; align-items: baseline; gap: 10px; padding: 12px 0; border-bottom: var(--border-w) solid var(--line); text-decoration: none; color: inherit; }
-  .gd-row:hover .gd-row-title { text-decoration: underline; }
-  .gd-row-n { font-family: var(--font-mono); font-size: 13px; color: var(--ink-faint); min-width: 42px; font-variant-numeric: tabular-nums; }
-  .gd-row-n.rose { color: var(--rose); }
-  .gd-row-n.wide { min-width: 74px; font-size: var(--text-micro); }
-  .gd-row-title { font-size: 15.5px; color: var(--ink); }
-  .gd-leader { flex: 1; border-bottom: 1px dotted var(--line-strong); transform: translateY(-4px); min-width: 20px; }
-  .gd-games { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 20px; }
-  .gd-game { border: var(--border-w) solid var(--line); border-radius: var(--radius-md); background: var(--surface-inset); height: 130px; display: flex; flex-direction: column; justify-content: flex-end; padding: 16px; text-decoration: none; color: inherit; }
-  .gd-game:hover { border-color: var(--line-strong); }
-  .gd-game.dashed { border-style: dashed; border-color: var(--line-strong); background: transparent; justify-content: center; gap: 6px; }
-  .gd-game-name { font-family: var(--font-display); font-size: 22px; font-weight: 600; color: var(--ink); }
-  .gd-game-ask { font-family: var(--font-display); font-size: 17px; color: var(--ink-soft); }
-  .gd-game-how { font-size: var(--text-xs); line-height: 1.5; color: var(--ink-faint); }
-  .gd-also { margin: 0; padding-top: 32px; font-family: var(--font-mono); font-size: 13.5px; line-height: 1.8; color: var(--ink-soft); }
-  .gd-also a { color: inherit; }
-  .gd-foot { margin: 0; padding-top: 40px; border-top: var(--border-w) solid var(--line); max-width: 70ch; font-family: var(--font-mono); font-size: 13.5px; line-height: 1.7; color: var(--ink-faint); }
+  .gd-art { aspect-ratio: 16 / 10; background: var(--surface-veil); border-bottom: 1px solid var(--line); display: grid; place-items: center; align-content: center; gap: 10px; padding: 16px; }
+  .gd-card-body { padding: 16px 18px 18px; display: grid; gap: 8px; }
+  .gd-card-title { font-family: var(--font-display); font-size: 22px; font-weight: 600; line-height: 1.2; text-wrap: pretty; }
+  .gd-card-sum { font-size: 14px; color: var(--ink-soft); text-wrap: pretty; }
+  .gd-card-foot { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding-top: 4px; font-size: 13px; }
+  .gd-votes { font-family: var(--font-mono); font-size: 13px; color: var(--rose); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .gd-indices { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: var(--space-6); }
+  .gd-index > li { font-size: 15px; }
+  .gd-rank { font-family: var(--font-mono); font-size: 13px; color: var(--ink-faint); width: 2ch; flex: none; font-variant-numeric: tabular-nums; }
+  .gd-index-title { color: var(--ink); text-decoration: none; min-width: 0; }
+  .gd-index-title:hover { color: var(--accent-hover); }
+  .gd-games { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr)); gap: 16px; }
+  .gd-game { display: grid; gap: 8px; padding: 20px; background: var(--surface-card); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow-1); text-decoration: none; color: var(--ink); min-height: 120px; align-content: space-between; transition: border-color var(--dur-1) var(--ease-out), box-shadow var(--dur-1) var(--ease-out); }
+  .gd-game:hover { border-color: var(--line-strong); box-shadow: var(--shadow-2); }
+  .gd-game-name { font-family: var(--font-display); font-size: 22px; font-weight: 600; line-height: 1.2; }
+  .gd-game.dashed { border: 1px dashed var(--line-strong); background: color-mix(in srgb, var(--surface-veil) 40%, transparent); box-shadow: none; align-content: center; }
+  .gd-game.dashed p { margin: 0; font-size: 14px; color: var(--ink-soft); text-wrap: pretty; }
+  .gd-wing { margin: 0; padding: 0; list-style: none; display: grid; }
+  .gd-wing li { display: grid; grid-template-columns: 44px 1fr; gap: 14px; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--line); }
+  .gd-wing-text { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 12px; }
+  .gd-wing-text a { font-family: var(--font-display); font-size: 20px; font-weight: 600; color: var(--ink); text-decoration: none; }
+  .gd-wing-text a:hover { color: var(--accent-hover); }
+  .gd-wing-text span { font-size: 14px; text-wrap: pretty; }
+  .gd-foot { margin: 12px 0 0; font-family: var(--font-display); font-size: 17px; line-height: 1.6; color: var(--ink-soft); max-width: 66ch; text-wrap: pretty; }
 </style>

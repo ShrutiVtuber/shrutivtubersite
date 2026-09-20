@@ -1,0 +1,29 @@
+/* Squirrel Guides — the section's token layer, in the decision-A form: a name, a
+   meaning, a dawn value, a dusk value, the contrast it clears. From the 20 September
+   2026 handoff. Loads AFTER the site's tokens. No page carries a hex. */
+:root{
+  /* --guide-gold · the compass ring's north mark and the lockup's mark — ornament only,
+     never a state, never a text colour below 18px.
+     Dawn #8C6D1F on paper #F8F6F3 = 4.6:1 · Dusk #E0BE7E on #121829 = 10.2:1 */
+  --guide-gold:#8C6D1F;
+  /* --guide-ring · the 1px compass ring and its three unlit marks. Alias of --line-strong. */
+  --guide-ring:var(--line-strong);
+  /* --guide-track · the sigil's unfilled arc. --ink-faint at 30 %, as the app draws it. */
+  --guide-track:color-mix(in srgb,var(--ink-faint) 30%,transparent);
+  /* --guide-frame · the console frame's corner marks. Alias of --line-strong. */
+  --guide-frame:var(--line-strong);
+  /* The four state aliases, exactly as the app added them (13 September, decision A). */
+  --state-locked:var(--ink-faint);
+  --state-open:var(--ink);
+  --state-now:var(--accent);
+  --state-done:var(--rose);
+  /* Build states use the same vocabulary. */
+  --met:var(--rose);
+  --partly:var(--accent);
+  --notyet:var(--line-strong);
+}
+@media (prefers-color-scheme:dark){ :root:not([data-theme="light"]){ --guide-gold:#E0BE7E } }
+[data-theme="dark"]{ --guide-gold:#E0BE7E }
+[data-theme="light"]{ --guide-gold:#8C6D1F }
+/* Native controls the section reuses (checkbox, radio) take the accent, both hours. */
+[data-wing="guides"] input[type="checkbox"],[data-wing="guides"] input[type="radio"]{accent-color:var(--accent)}

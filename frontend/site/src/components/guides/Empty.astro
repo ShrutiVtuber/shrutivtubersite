@@ -1,0 +1,30 @@
+---
+/* The section's empty state (README §4.9): the site's dashed field with the
+ * 44px ring where the ○ was, drawn with the place's own count of arcs and
+ * nothing filled. The title is an instruction with a full stop; the body says
+ * what the place is for and what to do first; one secondary button does it.
+ * Every string arrives from the page's say(). */
+import Button from "../forms/Button.astro";
+import { sigil } from "../../lib/guides-sigil";
+interface Props {
+  n: number;
+  eyebrow: string;
+  title: string;
+  body?: string;
+  action?: string;
+  href?: string;
+  ringAria: string;
+  compact?: boolean;
+}
+const { n, eyebrow, title, body, action, href, ringAria, compact = false } = Astro.props;
+---
+<div class="gd-empty" data-compact={compact}>
+  <Fragment set:html={sigil({ n, done: 0, now: -1, size: 44, ring: true, showCount: false, aria: ringAria })} />
+  <span class="gd-eyebrow">{eyebrow}</span>
+  <h3>{title}</h3>
+  {body && <p>{body}</p>}
+  <div class="gd-empty-action">
+    {action && href && <Button variant="secondary" href={href}>{action}</Button>}
+    <slot name="action" />
+  </div>
+</div>

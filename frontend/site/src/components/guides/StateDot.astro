@@ -1,0 +1,8 @@
+---
+/* The state dot (README §4.3): four states, four shapes — colour is never the
+ * only carrier. Builds borrow three: met (done's dash), partly (now's disc),
+ * not yet (a hollow ring in --notyet). */
+interface Props { state: "locked" | "open" | "now" | "done" | "skipped" | "met" | "partly" | "partial" | "notyet" | "not yet" | string; class?: string }
+const { state, class: klass } = Astro.props;
+---
+<span class:list={["gd-dot", klass]} data-state={state} aria-hidden="true"></span>

@@ -208,13 +208,18 @@ async def mine(request: Request, session: AsyncSession = Depends(get_session)) -
             select(GuideVersion).where(GuideVersion.guide_id == g.id, GuideVersion.contributed_by.is_(None))
             .order_by(GuideVersion.number.desc())
         )).scalars().all()
+        # The guide's shape — one arc per phase on the desk row — from the
+        # latest version, whatever its state.
+        latest = versions[0].body if versions and isinstance(versions[0].body, dict) else {}
         out.append({
             "id": g.id, "slug": g.slug, "title": g.title,
             "game": {"slug": game.slug, "name": game.name},
             "published": g.published_version_id,
             "hidden": g.hidden, "hiddenBy": g.hidden_by,
+            "shape": {"phases": len(latest.get("phases") or []), "steps": len(latest.get("steps") or [])},
             "versions": [{"id": v.id, "number": v.number, "state": v.state,
-                          "note": v.note, "problems": len(_problems(v.body))}
+                          "note": v.note, "problems": len(_problems(v.body)),
+                          "updated": v.updated_at.isoformat() if v.updated_at else None}
                          for v in versions],
         })
     return out
@@ -901,8 +906,10 @@ async def by_author(user_id: int, request: Request, session: AsyncSession = Depe
         status = "hidden" if g.hidden else ("published" if version else "in review")
         if version and g.id in pending:
             status = "update in review"
+        body = version.body if version and isinstance(version.body, dict) else {}
         guides.append({"id": g.id, "slug": g.slug, "title": g.title, "game": {"slug": game.slug, "name": game.name},
-                       "licence": str(meta.get("licence") or ""), "status": status, "votes": int(votes.get(g.id, 0))})
+                       "licence": str(meta.get("licence") or ""), "status": status, "votes": int(votes.get(g.id, 0)),
+                       "shape": {"phases": len(body.get("phases") or []), "steps": len(body.get("steps") or [])}})
     contributed = (await session.execute(
         select(func.count()).select_from(GuideVersion).where(GuideVersion.contributed_by == user_id, GuideVersion.accepted_at.is_not(None))
     )).scalar_one()

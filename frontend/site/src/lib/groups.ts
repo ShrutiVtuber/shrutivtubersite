@@ -17,6 +17,14 @@ async function api(method: string, path: string, body?: unknown): Promise<{ ok: 
   return { ok: r.ok, status: r.status, body: out };
 }
 
+import { plate } from "./plate";
+const esc = (v: string) => String(v).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
+
+/** The chosen theme: a tile radio on the new pages, a select on older ones. */
+export function chosenTheme(root: HTMLElement): string {
+  return root.querySelector<HTMLInputElement>("input[data-theme]:checked")?.value || root.querySelector<HTMLSelectElement>("select[data-theme]")?.value || "almanac";
+}
+
 export function mountGroup(root: HTMLElement): void {
   const words = JSON.parse(root.dataset.words || "{}");
   const code = root.dataset.code || "";
@@ -53,7 +61,7 @@ export function mountGroup(root: HTMLElement): void {
   const minted = $("[data-minted]");
   const url = $<HTMLInputElement>("[data-url]");
   $("[data-mint]")?.addEventListener("click", async () => {
-    const theme = ($<HTMLSelectElement>("[data-theme]")?.value) || "almanac";
+    const theme = chosenTheme(root);
     const motion = ($<HTMLSelectElement>("[data-motion]")?.value) || "reduced";
     const r = await api("POST", `/api/groups/${code}/overlays`, { theme, motion, label: "" });
     if (!r.ok) { tell(r.status === 403 ? words.joinFirst : words.failed); return; }
@@ -61,13 +69,16 @@ export function mountGroup(root: HTMLElement): void {
     if (minted) minted.hidden = false;
     const list = $("[data-tokens]");
     if (list) {
-      const row = document.createElement("div");
-      row.className = "gp-token";
-      row.innerHTML = `<span>${words.goalOverlay} · ${theme}</span><button type="button" class="link" data-revoke="${r.body.id}">${words.revoke}</button>`;
+      /* A new token row, in the same shape as the server-rendered ones. */
+      const row = document.createElement("li");
+      row.className = "gd-token"; row.setAttribute("data-token-row", "");
+      const themeName = words.themes?.[theme] ?? theme; const motionName = words.motions?.[motion] ?? motion;
+      row.innerHTML = `${plate({ theme, elements: [{ kind: "guide-sigil", x: 860, y: 300, w: 200, h: 200 }, { kind: "guide-goal", x: 560, y: 560, w: 800, h: 120 }], width: 56, aria: themeName })}<span class="gd-token-text"><span class="gd-token-label">${esc(words.goalOverlay)}</span><span class="gd-note">${esc(themeName)} · ${esc(motionName)} · ${esc(words.idle)}</span></span><button type="button" class="sh-btn" data-variant="ghost" data-size="sm" data-revoke="${r.body.id}"><span>${esc(words.revoke)}</span></button>`;
       list.appendChild(row);
       list.hidden = false;
     }
   });
+  $("[data-have-it]")?.addEventListener("click", () => { if (url) url.value = ""; if (minted) minted.hidden = true; });
   $("[data-copy]")?.addEventListener("click", async () => {
     if (!url) return;
     try { await navigator.clipboard.writeText(url.value); tell(words.copied); } catch { url.select(); }
@@ -76,7 +87,7 @@ export function mountGroup(root: HTMLElement): void {
     const btn = (ev.target as HTMLElement).closest<HTMLButtonElement>("[data-revoke]");
     if (!btn) return;
     const r = await fetch(`/api/groups/${code}/overlays/${btn.dataset.revoke}`, { method: "DELETE", headers: { "x-csrf-token": csrf() } });
-    if (r.ok) btn.closest(".gp-token")?.remove(); else tell(words.failed);
+    if (r.ok) { btn.closest("[data-token-row]")?.remove(); const list = $("[data-tokens]"); if (list && !list.querySelector("[data-token-row]")) list.hidden = true; } else tell(words.failed);
   });
 }
 

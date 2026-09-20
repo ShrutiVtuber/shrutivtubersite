@@ -1,55 +1,141 @@
 ---
-/* The hosting notes, at /tracker so they are never behind the guides section's gate: the server, the overlays and the MCP are AGPL-3.0, and
- * anybody may run the tracker for nothing. Hosting on shrutivtuber.com is
- * the same software, run and looked after by Shruti — the service, not the
- * code. The price lives on the account page and nowhere else.
+/* Run it yourself (board Tracker, 20 Sep 2026): the server, the overlays and
+ * the MCP are AGPL-3.0, and anybody may run the tracker for nothing. The
+ * install is itself a three-step path with state dots; the settings are an
+ * almanac table; what it serves is an index; provenance sits in a console
+ * rail. Hosting on shrutivtuber.com is one sentence pointing at the account
+ * page, with no price — the price lives there and nowhere else. This page
+ * stays outside the guides section's gate on purpose.
  */
 import BaseLayout from "../layouts/BaseLayout.astro";
-import SectionHeader from "../components/brand/SectionHeader.astro";
+import Console from "../components/guides/Console.astro";
+import StateDot from "../components/guides/StateDot.astro";
+import Button from "../components/forms/Button.astro";
 import { copy } from "../lib/copy";
 
 const say = await copy("tracker");
+const WORDS = { copied: say("words.copied", "Copied.") };
+const STEPS = [
+  { id: "1", dot: "now", title: say("step1.title", "Get the image"), body: say("step1.body", "One container, from the repository's compose file. It keeps your runs in a volume on your machine and draws your overlays from there."),
+    code: say("step1.code", "git clone https://github.com/ShrutiVtuber/shrutisgametracker\ncd shrutisgametracker/server\ndocker compose up -d\nopen http://localhost:8210") },
+  { id: "2", dot: "open", title: say("step2.title", "Set four values"), body: say("step2.body", "Or leave them: the defaults run on one machine for one person."), table: true },
+  { id: "3", dot: "open", title: say("step3.title", "Point the site at it"), body: say("step3.body", "On your account page, give the site your server's address. Your runs move there; this site keeps reading guides. The phone app points at either."),
+    code: say("step3.code", "python -m venv .venv && .venv/bin/pip install \".[tracker]\"\n.venv/bin/uvicorn shrutisguides.tracker.app:app --host 127.0.0.1 --port 8210") },
+];
+const SETTINGS = [
+  { key: "SHRUTI_SITE_URL", what: say("settings.site", "Where guides are pulled from, by address."), def: say("settings.site_default", "this site") },
+  { key: "TRACKER_DATA", what: say("settings.data", "Where the database lives."), def: say("settings.data_default", "/data in Docker · ./data otherwise") },
+  { key: "TRACKER_SECRET", what: say("settings.secret", "A bearer token every write needs. Unset means open, for one machine and one person. If anything but your own machine can reach the tracker, set one."), def: say("settings.secret_default", "unset") },
+  { key: "TRACKER_TZ", what: say("settings.tz", "Your timezone, for daily and weekly routine resets."), def: say("settings.tz_default", "UTC") },
+];
+const SERVES = [
+  { path: "/", what: say("serves.home", "a small page: pull a guide by its address, import a guide file, start a run, mint an overlay") },
+  { path: "/api", what: say("serves.api", "the same shapes as this site's guides, runs, builds and overlays, so the phone app points at either") },
+  { path: "/overlay/*", what: say("serves.overlays", "the browser sources — now card, sigil, path strip, routine, build, and layouts of several — in the three themes") },
+];
 ---
 
 <BaseLayout title={say("meta.title", "Run your own tracker — Squirrel Guides")} description={say("meta.description", "The tracker is AGPL-3.0: a Docker image, a compose file, and your runs on your own machine.")}>
-  <article class="page hosting">
-    <SectionHeader as="h1" eyebrow={say("head.eyebrow", "Squirrel Guides")} title={say("head.title", "Run your own tracker")} />
-    <p class="lede">{say("head.lede", "The server, the overlays and the MCP are AGPL-3.0. You can run the tracker yourself, for nothing: it keeps your runs on your machine and draws your overlays from there. Reading guides and tracking your progress never need anything else.")}</p>
+  <div class="page gd-full tk" data-tracker data-words={JSON.stringify(WORDS)}>
+    <div class="tk-main">
+      <header class="gd-head" style="max-width:66ch">
+        <span class="gd-eyebrow">{say("head.eyebrow", "Run it yourself")}</span>
+        <h1>{say("head.title", "The whole server is yours to run")}</h1>
+        <p class="tk-lede">{say("head.lede", "The Squirrel Guides server is AGPL-3.0. Everything the site does for a run — the tracking, the overlays, the file — runs from one container on a machine you own. Three steps; this page is itself a path.")}</p>
+      </header>
 
-    <h2>{say("run.title", "Run it")}</h2>
-    <pre><code>{say("run.docker", "cd server\ndocker compose up -d\nopen http://localhost:8210")}</code></pre>
-    <p class="quiet">{say("run.or", "Or without Docker:")}</p>
-    <pre><code>{say("run.python", "cd server\npython -m venv .venv && .venv/bin/pip install \".[tracker]\"\n.venv/bin/uvicorn shrutisguides.tracker.app:app --host 127.0.0.1 --port 8210")}</code></pre>
+      <ol class="tk-steps">
+        {STEPS.map((s) => (
+          <li>
+            <StateDot state={s.dot} class="tk-dot" />
+            <div class="tk-step">
+              <h2><span class="tk-id">{s.id}</span>{s.title}</h2>
+              <p>{s.body}</p>
+              {s.code && (
+                <div class="tk-code">
+                  <span class="tk-copy"><Button type="button" variant="ghost" size="sm" data-copy>{say("copy", "Copy")}</Button></span>
+                  <pre class="gd-code-block" data-code>{s.code}</pre>
+                </div>
+              )}
+              {s.table && (
+                <dl class="tk-settings">
+                  {SETTINGS.map((k) => (
+                    <div><dt>{k.key}</dt><dd><span>{k.what}</span><span class="gd-note">{k.def}</span></dd></div>
+                  ))}
+                </dl>
+              )}
+            </div>
+          </li>
+        ))}
+      </ol>
 
-    <h2>{say("settings.title", "Settings")}</h2>
-    <dl class="settings">
-      <div><dt><code>SHRUTI_SITE_URL</code></dt><dd>{say("settings.site", "Where guides are pulled from, by address. Default: this site.")}</dd></div>
-      <div><dt><code>TRACKER_DATA</code></dt><dd>{say("settings.data", "Where the database lives. /data in Docker, ./data otherwise.")}</dd></div>
-      <div><dt><code>TRACKER_SECRET</code></dt><dd>{say("settings.secret", "A bearer token every write needs. Unset means open, for one machine and one person. If anything but your own machine can reach the tracker, set one.")}</dd></div>
-      <div><dt><code>TRACKER_TZ</code></dt><dd>{say("settings.tz", "Your timezone, for daily and weekly routine resets. Default: UTC.")}</dd></div>
-    </dl>
+      <section class="tk-serves" aria-labelledby="serves">
+        <span id="serves" class="gd-eyebrow">{say("serves.title", "What it serves")}</span>
+        <ul class="gd-index">
+          {SERVES.map((r) => (
+            <li><span class="gd-mono nowrap">{r.path}</span><span class="gd-lead" aria-hidden="true"></span><span class="gd-soft right">{r.what}</span></li>
+          ))}
+        </ul>
+      </section>
 
-    <h2>{say("serves.title", "What it serves")}</h2>
-    <ul>
-      <li>{say("serves.home", "A small page: pull a guide by its address, import a guide file, start a run, mint an overlay.")}</li>
-      <li>{say("serves.api", "The same API shapes as this site's guides, runs and overlays, so the phone app points at either.")}</li>
-      <li>{say("serves.overlays", "The browser sources — now card, sigil, path strip, routine, and layouts of several — in the three themes.")}</li>
-    </ul>
+      <p class="tk-host">{say("hosted.text", "Or let Shruti host it: hosting on my server is arranged on")} <a href="/account">{say("hosted.link", "the account page")}</a> {say("hosted.rest", "and nowhere else.")}</p>
+    </div>
 
-    <h2>{say("hosted.title", "Or let Shruti host it")}</h2>
-    <p class="quiet">{say("hosted.text", "Hosting on this site is the same software, run and looked after by her, with your overlays drawn from here while you stream. It is arranged on your account page.")} <a href="/account">{say("hosted.link", "Your account")}</a></p>
-  </article>
+    <Console as="aside" class="tk-rail" eyebrow={say("prov.title", "Provenance")}>
+      <dl class="tk-prov">
+        <div><dt>{say("prov.licence", "Licence")}</dt><dd class="gd-mono">{say("prov.licence_value", "AGPL-3.0")}</dd></div>
+        <div><dt>{say("prov.version", "Version")}</dt><dd class="gd-mono">{say("prov.version_value", "0.1.0 · September 2026")}</dd></div>
+        <div><dt>{say("prov.image", "Image")}</dt><dd class="gd-mono">{say("prov.image_value", "built from the compose file")}</dd></div>
+        <div><dt>{say("prov.source", "Source")}</dt><dd><a href={say("prov.source_url", "https://github.com/ShrutiVtuber/shrutisgametracker")}>{say("prov.source_link", "the repository")}</a></dd></div>
+        <div><dt>{say("prov.runs", "This site runs")}</dt><dd class="gd-mono">{say("prov.runs_value", "the same server, unmodified")}</dd></div>
+      </dl>
+      <p class="gd-hint">{say("prov.note", "The source for the running build is offered here because the licence asks for it, and because you should be able to check.")}</p>
+    </Console>
+  </div>
 </BaseLayout>
 
 <style>
-  .hosting { max-width: 680px; margin: 0 auto; padding: var(--space-6) var(--space-4); display: grid; gap: var(--space-4); }
-  .lede { color: var(--ink-soft); max-width: 62ch; }
-  h2 { font-size: 1.1rem; margin: var(--space-3) 0 0; }
-  pre { margin: 0; padding: var(--space-3) var(--space-4); border: 1px solid var(--line); background: var(--surface-inset, transparent); overflow-x: auto; font-family: var(--font-mono); font-size: .9rem; line-height: 1.6; }
-  .quiet { color: var(--ink-soft); }
-  .settings { margin: 0; display: grid; gap: var(--space-2); }
-  .settings div { display: grid; grid-template-columns: 11rem 1fr; gap: var(--space-3); align-items: baseline; }
-  .settings dd { margin: 0; color: var(--ink-soft); }
-  @media (max-width: 560px) { .settings div { grid-template-columns: 1fr; } }
-  ul { margin: 0; padding-left: 1.2rem; display: grid; gap: var(--space-1); }
+  .tk { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: var(--space-7); align-items: start; padding-block: var(--space-6) var(--space-9); }
+  @media (max-width: 900px) { .tk { grid-template-columns: minmax(0, 1fr); } }
+  .tk-main { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-6); max-width: 66ch; min-width: 0; }
+  .tk-lede { margin: 0; font-family: var(--font-display); font-size: 19px; line-height: 1.6; color: var(--ink-soft); text-wrap: pretty; }
+  .tk-steps { margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-5); }
+  .tk-steps > li { display: grid; grid-template-columns: 15px minmax(0, 1fr); gap: 16px; }
+  .tk-dot { margin-top: 7px; }
+  .tk-step { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; min-width: 0; }
+  .tk-code { min-width: 0; }
+  .tk-step h2 { margin: 0; font-family: var(--font-display); font-size: 24px; font-weight: 600; line-height: 1.2; }
+  .tk-id { font-family: var(--font-mono); font-size: 13px; font-weight: 400; color: var(--ink-faint); margin-right: 10px; }
+  .tk-step p { margin: 0; font-size: 15px; color: var(--ink-soft); text-wrap: pretty; }
+  .tk-code { position: relative; }
+  .tk-copy { position: absolute; top: 8px; right: 8px; }
+  .tk-settings { margin: 0; display: grid; border-top: 1px solid var(--line-strong); }
+  .tk-settings div { display: grid; grid-template-columns: 14ch minmax(0, 1fr); gap: 4px 16px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+  @media (max-width: 520px) { .tk-settings div { grid-template-columns: 1fr; } }
+  .tk-settings dt { font-family: var(--font-mono); font-size: 13px; color: var(--ink); }
+  .tk-settings dd { margin: 0; font-size: 14px; color: var(--ink-soft); display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  .tk-serves { display: grid; gap: 8px; padding-top: 24px; border-top: 1px solid var(--line-strong); }
+  .tk-serves li { font-size: 15px; }
+  .nowrap { white-space: nowrap; }
+  .right { text-align: right; }
+  .tk-host { margin: 0; font-size: 15px; color: var(--ink-soft); text-wrap: pretty; }
+  .tk-rail { padding: 16px; gap: 12px; position: sticky; top: 16px; }
+  .tk-prov { margin: 0; display: grid; gap: 8px; font-size: 14px; }
+  .tk-prov div { display: flex; justify-content: space-between; gap: 12px; border-bottom: 1px solid var(--line); padding-bottom: 8px; }
+  .tk-prov div:last-child { border-bottom: 0; }
+  .tk-prov dt { color: var(--ink-soft); }
+  .tk-prov dd { margin: 0; text-align: right; }
 </style>
+
+<script>
+  const root = document.querySelector<HTMLElement>("[data-tracker]");
+  if (root) {
+    const words = JSON.parse(root.dataset.words || "{}");
+    root.querySelectorAll<HTMLButtonElement>("[data-copy]").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const code = btn.closest(".tk-code")?.querySelector("[data-code]")?.textContent ?? "";
+        try { await navigator.clipboard.writeText(code); btn.textContent = words.copied; setTimeout(() => location.reload(), 1200); } catch { /* the text is selectable */ }
+      });
+    });
+  }
+</script>

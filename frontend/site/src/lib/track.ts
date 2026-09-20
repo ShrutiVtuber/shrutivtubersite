@@ -12,6 +12,8 @@
  * ⚠ No English lives here. Every word comes from the page's copy() as W.
  * ⚠ Nothing measures absence: no streaks, no counts of days, no "you missed".
  */
+import { sigil as ringSigil } from "./guides-sigil";
+import { plate, PRESETS } from "./plate";
 import {
   type Gate, type GuideDoc, type Step, fill, gateWords, optionLabel, phasesOf, safeUrl, stepsOf,
 } from "./guides";
@@ -100,7 +102,10 @@ export function mountTrack(root: HTMLElement) {
     const parts = view.progress.sigil ?? [];
     const idx = phase ? pathPhases.indexOf(phase) : -1;
     const [d, n] = phase ? (view.progress.phaseCounts[phase.id] ?? [0, 0]) : [0, 0];
-    $("[data-sigil]")!.innerHTML = sigil(parts, 104, idx >= 0 ? `${idx + 1}/${pathPhases.length}` : "");
+    const doneParts = parts.filter((x: any) => x.state === "done").length;
+    $("[data-sigil]")!.innerHTML = ringSigil({ n: Math.max(1, parts.length), done: doneParts, now: idx >= 0 ? idx : -1, size: 104, ring: true, label: idx >= 0 ? `P${idx + 1}` : "", animate: false, aria: `${doneParts} of ${parts.length}` });
+    const pathMeta = $("[data-path-meta]"); if (pathMeta) pathMeta.textContent = fill(W.head.phase, { n: String(Math.max(0, idx + 1)), of: String(pathPhases.length) });
+    const checkinLine = $("[data-checkin-line]"); if (checkinLine) checkinLine.textContent = checkinSummary() || "";
     $("[data-phase-eyebrow]")!.textContent = phase ? fill(W.head.phase, { n: String(idx + 1), of: String(pathPhases.length) }) : "";
     $("[data-phase-name]")!.textContent = phase ? phase.name : W.head.finished;
     $("[data-phase-meta]")!.textContent = phase ? [fill(W.head.steps, { d: String(d), n: String(n) }), phase.band ? phase.band : "", checkinSummary()].filter(Boolean).join(" · ") : "";
@@ -186,7 +191,7 @@ export function mountTrack(root: HTMLElement) {
   };
 
   const drawAlso = () => {
-    const el = $("[data-also]")!;
+    const el = $("[data-also]"); if (!el) return;
     const routinesOpen = Object.values(view.progress.routines ?? {}).filter(Boolean).length;
     const codexActive = Object.values(view.progress.codex ?? {}).filter((s) => s === "active").length;
     const rows = [
@@ -250,7 +255,12 @@ export function mountTrack(root: HTMLElement) {
   const drawOverlays = () => {
     const el = $("[data-overlays-list]"); if (!el) return;
     if (!overlays.length) { el.innerHTML = `<p class="tk-quiet">${esc(W.overlays.none)}</p>`; return; }
-    el.innerHTML = overlays.map((o) => `<div class="tk-ov-row"><span>${esc(o.label || W.overlays.kinds[o.kind] || o.kind)}</span><span class="tk-mono">${esc(W.overlays.kinds[o.kind] ?? o.kind)}</span><span class="tk-mono">${esc(W.overlays.themes[o.theme] ?? o.theme)}</span><span class="tk-mono ${o.lastSeen && Date.now() - new Date(o.lastSeen).getTime() < 15000 ? "rose" : ""}">${esc(o.lastSeen && Date.now() - new Date(o.lastSeen).getTime() < 15000 ? W.overlays.live : W.overlays.idle)}</span><button type="button" class="tk-x" data-revoke="${o.id}">${esc(W.overlays.revoke)}</button></div>`).join("");
+    const presetOf = (o: any) => (o.kind === "guide-layout" && Array.isArray(o.layout) && o.layout.length ? o.layout : o.kind === "guide-sigil" ? PRESETS.sigil : o.kind === "guide-path" ? PRESETS.path : PRESETS.now);
+    el.innerHTML = `<div class="tk-ov-rows">` + overlays.map((o) => {
+      const drawing = !!(o.lastSeen && Date.now() - new Date(o.lastSeen).getTime() < 15000);
+      const meta = [W.overlays.kinds[o.kind] ?? o.kind, W.overlays.themes[o.theme] ?? o.theme, W.overlays.motions?.[o.motion] ?? o.motion, drawing ? W.overlays.live : W.overlays.idle].filter(Boolean).join(" · ");
+      return `<div class="tk-ov-row">${plate({ theme: o.theme, elements: presetOf(o), width: 72, aria: String(W.overlays.themes[o.theme] ?? o.theme) })}<span class="tk-ov-text"><span class="tk-ov-label">${esc(o.label || W.overlays.kinds[o.kind] || o.kind)}</span><span class="tk-mono${drawing ? " rose" : ""}">${esc(meta)}</span></span><button type="button" class="sh-btn" data-variant="ghost" data-size="sm" data-revoke="${o.id}"><span>${esc(W.overlays.revoke)}</span></button></div>`;
+    }).join("") + `</div>`;
   };
   const drawNote = () => { const el = $<HTMLTextAreaElement>("[data-note]"); if (el && document.activeElement !== el) el.value = view.note ?? ""; };
 

@@ -16,6 +16,8 @@
  * `preview` so the actions stay off and a notice says what it is.
  */
 import { copy } from "../../lib/copy";
+import Button from "../forms/Button.astro";
+import Sigil from "./Sigil.astro";
 import {
   type GuideSummary,  type Gate, type GuideDoc, type Link, type Step,
   codexGroups, gateWords, phasesOf, safeUrl, stepsOf, titled, variantNames,
@@ -106,41 +108,56 @@ const actions = !preview;
       </div>
     )}
     {actions && trackHref && (
-      <div class="rd-rail-block rd-track">
-        <a class="rd-btn" href={signedIn ? trackHref : `/signin?next=${encodeURIComponent(trackHref)}`}>
-          {signedIn ? say("track", "Track this") : say("track.signin", "Sign in to track this")}
-        </a>
-        <span class="rd-quiet">{say("track.note", "Tracking is free with an account. It keeps your place, nothing else.")}</span>
+      <div class="gd-console rd-track">
+        <span class="gd-corner" data-at="tl" aria-hidden="true"></span><span class="gd-corner" data-at="tr" aria-hidden="true"></span><span class="gd-corner" data-at="bl" aria-hidden="true"></span><span class="gd-corner" data-at="br" aria-hidden="true"></span>
+        <div class="rd-track-head">
+          <Sigil n={Math.max(1, pathPhases.length)} done={0} now={-1} size={44} ring showCount={false} aria={say("track.ring", "An empty ring, one arc per phase")} />
+          <div class="rd-track-text"><span class="rd-track-title">{say("track.title", "Track this path")}</span><span class="gd-note gd-soft">{say("track.arcs", "{n} arcs · yours fill as you go").replace("{n}", String(pathPhases.length))}</span></div>
+        </div>
+        <Button variant="secondary" href={signedIn ? trackHref : `/signin?next=${encodeURIComponent(trackHref)}`}>{signedIn ? say("track", "Track this") : say("track.signin", "Sign in to track this")}</Button>
+        <p class="gd-hint">{say("track.note", "Reading needs no account. Tracking keeps your step, your Later list and your note — on the phone, here, and on stream.")}</p>
       </div>
     )}
 
     <div class="rd-rail-block rd-facts">
       <div class="rd-fact">
-        <span class="rd-mono">{say("rail.votes", "votes")}</span>
+        <span class="rd-fact-key">{say("rail.votes", "Votes")}</span>
         <span class="rd-votes"><span class="rd-glyph" aria-hidden="true">●</span><span data-votes>{guide.votes}</span></span>
       </div>
       {(doc.guide.authors ?? []).length > 0 && (
         <div class="rd-fact">
-          <span class="rd-mono">{say("rail.by", "by")}</span>
+          <span class="rd-fact-key">{say("rail.by", "By")}</span>
           <span class="rd-mono soft">{(doc.guide.authors ?? []).join(", ")}</span>
         </div>
       )}
       {guide.contributor && (
         <div class="rd-fact">
-          <span class="rd-mono">{say("rail.with", "with")}</span>
+          <span class="rd-fact-key">{say("rail.with", "With")}</span>
           <span class="rd-mono soft">{guide.contributor}</span>
         </div>
       )}
       {guide.forkedFrom && (
         <div class="rd-fact">
-          <span class="rd-mono">{say("rail.forked", "forked from")}</span>
+          <span class="rd-fact-key">{say("rail.forked", "Forked from")}</span>
           <a class="rd-mono soft" href={`/guides/${guide.forkedFrom.game}/${guide.forkedFrom.slug}`}>{guide.forkedFrom.title}</a>
         </div>
       )}
       <div class="rd-fact">
-        <span class="rd-mono">{say("rail.licence", "licence")}</span>
+        <span class="rd-fact-key">{say("rail.licence", "Licence")}</span>
         <span class="rd-mono soft">{licence || say("licence.unsaid", "not stated")}</span>
       </div>
+      {guide.number && (
+        <div class="rd-fact">
+          <span class="rd-fact-key">{say("rail.version", "Version")}</span>
+          <span class="rd-mono soft">v{guide.number}{guide.publishedAt && ` · ${new Date(guide.publishedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" })}`}</span>
+        </div>
+      )}
+      {guide.publishedAt && (
+        <div class="rd-fact">
+          <span class="rd-fact-key">{say("rail.read_by", "Read before publishing by")}</span>
+          <span class="rd-fact-val">{say("rail.read_by_who", "Shruti")}</span>
+        </div>
+      )}
       {actions && signedIn && !guide.mine && (
         <button type="button" class="rd-vote" data-vote={guide.id} aria-pressed={guide.voted}>
           {guide.voted ? say("vote.done", "Useful ✓") : say("vote", "Useful")}
@@ -191,6 +208,19 @@ const actions = !preview;
   </aside>
 
   <article class="rd-column">
+    {pathPhases.length > 0 && !preview && (
+      <div class="rd-placebar" data-placebar>
+        <span class="gd-mono gd-soft"><span data-place-id>{pathPhases[0].id}</span> · <span data-place-name>{pathPhases[0].name}</span> · <span class="rd-place-count" data-place-count>{say("place.count", "{i} of {n}").replace("{i}", "1").replace("{n}", String(pathPhases.length))}</span></span>
+        <details class="rd-contents">
+          <summary>{say("contents", "Contents")} <span aria-hidden="true">▾</span></summary>
+          <ol>
+            {pathPhases.map((p) => (
+              <li><span class="gd-note">{p.id}</span><a href={`#phase-${p.id}`}>{p.name}</a><span class="gd-note">{stepsOf(doc, p).length}</span></li>
+            ))}
+          </ol>
+        </details>
+      </div>
+    )}
     {preview && (
       <p class="rd-preview" role="status">{say("preview", "This is how your draft reads. Nobody else can see it yet.")}</p>
     )}
@@ -365,7 +395,21 @@ const actions = !preview;
   .rd { display: grid; grid-template-columns: 264px minmax(0, 1fr); font-family: var(--font-body); color: var(--ink); }
   .rd-rail { border-right: var(--border-w) solid var(--line); padding: var(--space-6) var(--space-5); display: flex; flex-direction: column; gap: 22px; background: var(--surface-card); align-self: start; position: sticky; top: 0; max-height: 100vh; overflow-y: auto; }
   .rd-rail-block { display: flex; flex-direction: column; gap: 8px; }
-  .rd-facts, .rd-track { border-top: var(--border-w) solid var(--line); padding-top: 18px; }
+  .rd-facts { border-top: var(--border-w) solid var(--line); padding-top: 18px; }
+  .rd-track { padding: 16px; gap: 12px; }
+  .rd-track-head { display: flex; align-items: center; gap: 12px; }
+  .rd-track-text { display: grid; gap: 2px; }
+  .rd-track-title { font-size: 14px; font-weight: 600; }
+  .rd-fact-key { font-size: 14px; color: var(--ink-soft); }
+  .rd-fact-val { font-size: 14px; }
+  .rd-placebar { display: none; position: sticky; top: 0; z-index: 2; background: var(--surface-page); border-bottom: var(--border-w) solid var(--line); margin: 0 calc(-1 * var(--page-pad)); padding: 10px var(--page-pad); align-items: center; justify-content: space-between; gap: 12px; }
+  .rd-place-count { color: var(--ink); }
+  .rd-contents { position: relative; }
+  .rd-contents summary { list-style: none; cursor: pointer; font-size: 14px; font-weight: 500; color: var(--accent); }
+  .rd-contents summary::-webkit-details-marker { display: none; }
+  .rd-contents ol { position: absolute; right: 0; top: 28px; min-width: 260px; margin: 0; padding: 8px 12px; list-style: none; background: var(--surface-card); border: var(--border-w) solid var(--line); border-radius: 10px; box-shadow: var(--shadow-3); display: grid; z-index: 3; }
+  .rd-contents li { display: flex; gap: 8px; align-items: baseline; padding: 8px 0; border-bottom: var(--border-w) solid var(--line); font-size: 14px; }
+  .rd-contents li a { color: var(--ink); text-decoration: none; flex: 1; }
   .rd-suggest { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
   .rd-btn-quiet { font: 500 var(--text-sm) var(--font-body); padding: 0; border: 0; background: none; color: var(--accent); text-decoration: underline; cursor: pointer; }
   .rd-quiet { margin: 0; font-size: var(--text-sm); color: var(--ink-soft); }
@@ -382,7 +426,7 @@ const actions = !preview;
   .rd-index a { padding: 7px 0; font-size: var(--text-sm); color: var(--ink-soft); text-decoration: none; }
   .rd-index a:hover { color: var(--ink); }
   .rd-index-rule { border-top: var(--border-w) solid var(--line); margin: 8px 0 4px; }
-  .rd-fact { display: flex; align-items: center; justify-content: space-between; }
+  .rd-fact { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding-bottom: 8px; border-bottom: var(--border-w) solid var(--line); }
   .rd-mono { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--ink-faint); }
   .rd-mono.soft { color: var(--ink-soft); }
   .rd-mono.faint { color: var(--ink-faint); }
@@ -443,12 +487,33 @@ const actions = !preview;
   .rd-group-name { margin: 0; font-family: var(--font-display); font-size: var(--text-h4); font-weight: 600; color: var(--ink-soft); }
   @media (max-width: 860px) {
     .rd { grid-template-columns: 1fr; }
+    .rd-placebar { display: flex; }
     .rd-rail { position: static; max-height: none; border-right: 0; border-bottom: var(--border-w) solid var(--line); }
     .rd-column { padding: var(--space-6) var(--page-pad) var(--space-8); }
   }
 </style>
 
 <script>
+  /* The phone's place bar names the phase in view — one observer, nothing else. */
+  const bar = document.querySelector<HTMLElement>("[data-placebar]");
+  if (bar && "IntersectionObserver" in window) {
+    const phases = Array.from(document.querySelectorAll<HTMLElement>(".rd-phase[id^='phase-']"));
+    const idEl = bar.querySelector<HTMLElement>("[data-place-id]"), nameEl = bar.querySelector<HTMLElement>("[data-place-name]"), countEl = bar.querySelector<HTMLElement>("[data-place-count]");
+    const countWords = countEl?.textContent ?? "";
+    const seen = new Map<Element, number>();
+    const show = () => {
+      let best: HTMLElement | null = null, bestTop = Infinity;
+      for (const p of phases) { const r = p.getBoundingClientRect(); if (r.bottom > 60 && r.top < bestTop) { bestTop = r.top; best = p; } }
+      if (!best) return;
+      const i = phases.indexOf(best);
+      if (idEl) idEl.textContent = best.id.replace("phase-", "");
+      if (nameEl) nameEl.textContent = best.querySelector(".rd-phase-name")?.textContent ?? "";
+      if (countEl) countEl.textContent = countWords.replace(/^\S+/, String(i + 1));
+    };
+    const io = new IntersectionObserver((entries) => { for (const e of entries) seen.set(e.target, e.intersectionRatio); show(); }, { rootMargin: "-56px 0px -60% 0px", threshold: [0, 0.1, 0.5] });
+    phases.forEach((p) => io.observe(p));
+    bar.querySelector(".rd-contents")?.addEventListener("click", (e) => { if ((e.target as HTMLElement).tagName === "A") (bar.querySelector(".rd-contents") as HTMLDetailsElement).open = false; });
+  }
   const root = document.querySelector<HTMLElement>("[data-reader]");
   if (root) {
     const token = () =>

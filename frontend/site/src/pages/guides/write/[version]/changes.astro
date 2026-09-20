@@ -1,14 +1,17 @@
 ---
-/* What a proposal changes, in the guide's own terms — a step added, a
- * phase renamed, a routine's item dropped — against the version it was
- * written against. The author accepts it (it becomes their draft, credited)
- * or declines it with a note; a bare "no" is the practice room's lesson.
+/* What a proposal changes (board Changes, 20 Sep 2026), in the guide's own
+ * terms — a step added, a phase renamed, a routine's item dropped — against
+ * the version it was written against, in a diff console: each change a row,
+ * the fields as before → after. The author accepts it (it becomes their
+ * draft, credited) or declines it with a note; a bare "no" is not a reason,
+ * so the decline button waits for the note.
  */
 import BaseLayout from "../../../../layouts/BaseLayout.astro";
-import { account, asReader } from "../../../../lib/account";
-import { copy } from "../../../../lib/copy";
+import Console from "../../../../components/guides/Console.astro";
 import TextArea from "../../../../components/forms/TextArea.astro";
 import Button from "../../../../components/forms/Button.astro";
+import { account, asReader } from "../../../../lib/account";
+import { copy } from "../../../../lib/copy";
 
 const say = await copy("guides/write/[version]/changes");
 const id = Astro.params.version ?? "";
@@ -25,6 +28,9 @@ const view = read.body as {
 };
 const word = (c: string) => c === "added" ? say("change.added", "added") : c === "removed" ? say("change.removed", "removed") : say("change.changed", "changed");
 const show = (v: unknown) => v === undefined || v === null || v === "" ? say("field.empty", "— nothing —") : typeof v === "string" ? v : JSON.stringify(v);
+const isEmpty = (v: unknown) => v === undefined || v === null || v === "";
+const counts = say("head.counts", "{a} added · {r} removed · {c} changed").replace("{a}", String(view.summary.added)).replace("{r}", String(view.summary.removed)).replace("{c}", String(view.summary.changed));
+const total = view.summary.added + view.summary.removed + view.summary.changed;
 const WORDS = {
   accepted: say("words.accepted", "Accepted. It is your draft now; open it from your guides and submit it when you are ready."),
   declined: say("words.declined", "Declined, with your note."),
@@ -36,87 +42,103 @@ const WORDS = {
 
 <BaseLayout title={`${say("meta.title", "Changes")} — ${view.guide.title}`} description={say("meta.description", "What a suggested change alters.")} noindex>
   <article class="page changes" data-changes={view.id} data-words={JSON.stringify(WORDS)}>
+    <nav class="crumb" aria-label={say("crumb.aria", "Breadcrumb")}>
+      <a href="/guides/write">{say("crumb.desk", "Your guides")}</a><span aria-hidden="true">/</span>
+      <span class="crumb-title">{view.guide.title}</span><span aria-hidden="true">/</span>
+      <span>{say("crumb.here", "Suggested change")}</span>
+    </nav>
     <header class="head">
-      <p class="eyebrow">{say("head.eyebrow", "Suggested change")}</p>
+      <span class="gd-eyebrow">{say("head.eyebrow", "Suggested change")}</span>
       <h1>{view.guide.title}</h1>
-      <p class="meta">
+      <span class="gd-mono gd-soft line">
         {say("head.by", "by {who}").replace("{who}", view.by)}
-        {view.against && <span class="mono"> · {say("head.against", "against version {n}").replace("{n}", String(view.against.number))}</span>}
-        <span class="mono"> · {say("head.counts", "{a} added · {r} removed · {c} changed").replace("{a}", String(view.summary.added)).replace("{r}", String(view.summary.removed)).replace("{c}", String(view.summary.changed))}</span>
-      </p>
+        {view.against && ` · ${say("head.against", "against version {n}").replace("{n}", String(view.against.number))}`}
+        {` · ${counts}`}
+      </span>
       {view.state === "declined" && view.note && <p class="note-was">{say("head.declined", "Declined. The author wrote:")} “{view.note}”</p>}
       {view.accepted && <p class="note-was">{say("head.accepted", "Accepted into the author's draft.")}</p>}
     </header>
 
-    <p class="note" data-note hidden></p>
+    <p class="gd-rule-note" data-note hidden></p>
 
     {view.changes.length === 0 ? (
-      <p class="quiet">{say("none", "No difference from the published version.")}</p>
+      <p class="gd-hint">{say("none", "No difference from the published version.")}</p>
     ) : (
-      <ol class="list">
+      <Console as="section" class="diff" aria-label={say("diff.aria", "The changes")}>
         {view.changes.map((c) => (
-          <li class={`item ${c.change}`}>
-            <p class="line">
-              <span class="chip">{word(c.change)}</span>
+          <article class="change">
+            <div class="change-line">
+              <span class="gd-change" data-change={c.change}>{word(c.change)}</span>
               <span class="kind">{c.kind}</span>
-              {c.id && <span class="mono">{c.id}</span>}
+              {c.id && <span class="gd-mono gd-faint">{c.id}</span>}
               {c.title && <span class="title">{c.title}</span>}
-            </p>
+            </div>
             {c.fields.length > 0 && (
               <dl class="fields">
                 {c.fields.map((f) => (
                   <div>
-                    <dt class="mono">{f.name}</dt>
-                    <dd><span class="before">{show(f.before)}</span><span class="after">{show(f.after)}</span></dd>
+                    <dt class="gd-note">{f.name}</dt>
+                    <dd>
+                      {!isEmpty(f.before) && <span class="before" data-removed={c.change === "removed"}><span class="tag">{say("field.before", "before")}</span>{show(f.before)}</span>}
+                      <span class="after"><span class="tag">{say("field.after", "after")}</span>{show(f.after)}</span>
+                    </dd>
                   </div>
                 ))}
               </dl>
             )}
-          </li>
+          </article>
         ))}
-      </ol>
+      </Console>
     )}
 
     {view.owner && view.state === "proposed" && (
-      <section class="decide">
-        <h2>{say("decide.title", "Your call")}</h2>
-        <p class="quiet">{say("decide.text", "Accepting makes it your open draft, credited to them; nothing is published until you submit it and Shruti reads it. Declining sends your note back.")}</p>
-        <div class="row">
-          <Button type="button" data-accept>{say("decide.accept", "Accept")}</Button>
+      <section class="call" aria-labelledby="call">
+        <div class="call-text">
+          <h2 id="call">{say("decide.title", "Your call")}</h2>
+          <p>{say("decide.text", "Accept, and the {n} changes become your draft, credited to {who} on the guide. Decline, and {who} reads your reason — a bare no is not a reason.").replaceAll("{n}", String(total)).replaceAll("{who}", view.by)}</p>
+          <div><Button type="button" data-accept>{say("decide.accept", "Accept into a new draft")}</Button></div>
         </div>
-        <TextArea label={say("decide.note", "Or decline, with a note to them")} name="note" rows={3} maxlength={1000} data-decline-note />
-        <div><Button type="button" variant="secondary" data-decline>{say("decide.decline", "Decline with this note")}</Button></div>
+        <form class="decline" data-decline-form>
+          <TextArea label={say("decide.note", "Decline with a note")} name="note" rows={3} maxlength={1000} data-decline-note placeholder={say("decide.note_hint", "Why not, or what would make it right.")} hint={say("decide.note_note", "Required to decline. {who} sees it; nobody else does.").replace("{who}", view.by)} />
+          <div><Button type="submit" variant="secondary" data-decline disabled>{say("decide.decline", "Decline with this note")}</Button></div>
+        </form>
       </section>
     )}
-    <p class="back"><a href="/guides/write">{say("back", "Back to your guides")}</a></p>
   </article>
 </BaseLayout>
 
 <style>
-  .changes { max-width: 720px; margin: 0 auto; padding: var(--space-6) var(--space-4); display: grid; gap: var(--space-5); }
-  .eyebrow { font-size: .8rem; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft); margin: 0 0 var(--space-1); }
-  h1 { font-size: 1.7rem; line-height: 1.15; margin: 0; text-wrap: balance; }
-  h2 { font-size: 1.05rem; margin: 0 0 var(--space-2); }
-  .meta { color: var(--ink-soft); margin: var(--space-2) 0 0; }
-  .mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: .9em; }
-  .quiet { color: var(--ink-soft); }
-  .note { border-left: 2px solid var(--accent); padding-left: var(--space-3); }
-  .note-was { border-left: 2px solid var(--line); padding-left: var(--space-3); color: var(--ink-soft); margin: var(--space-2) 0 0; }
-  .list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; border-top: 1px solid var(--line); }
-  .item { padding: var(--space-3) 0; border-bottom: 1px solid var(--line); display: grid; gap: var(--space-2); }
-  .line { margin: 0; display: flex; gap: var(--space-2); align-items: baseline; flex-wrap: wrap; }
-  .chip { font-family: var(--font-mono); font-size: .75rem; letter-spacing: .08em; text-transform: uppercase; padding: 1px 6px; border: 1px solid var(--line); }
-  .item.added .chip { border-color: #8FBEE8; }
-  .item.removed .chip { border-color: var(--ink-soft); text-decoration: line-through; }
-  .kind { color: var(--ink-soft); }
-  .title { font-weight: 600; }
-  .fields { margin: 0; display: grid; gap: var(--space-2); }
-  .fields div { display: grid; grid-template-columns: 8rem 1fr; gap: var(--space-3); }
-  .fields dd { margin: 0; display: grid; gap: 2px; }
-  .before { color: var(--ink-soft); text-decoration: line-through; white-space: pre-wrap; }
-  .after { white-space: pre-wrap; }
-  .decide { border-top: var(--border-w) solid var(--line); padding-top: var(--space-4); display: grid; gap: var(--space-3); }
-  .link { font: inherit; background: none; border: 0; padding: 0; color: var(--accent); text-decoration: underline; cursor: pointer; justify-self: start; }
+  .changes { max-width: 820px; margin: 0 auto; width: 100%; padding-block: var(--space-6) var(--space-9); display: grid; gap: var(--space-6); }
+  .crumb { display: flex; flex-wrap: wrap; gap: 8px; font-size: 13px; color: var(--ink-faint); }
+  .crumb a { color: inherit; }
+  .crumb-title { color: var(--ink-soft); }
+  .head { display: grid; gap: 10px; }
+  .head h1 { margin: 0; font-family: var(--font-display); font-size: 32px; font-weight: 600; line-height: 1.2; letter-spacing: -0.01em; text-wrap: pretty; }
+  .line { font-size: 14px; }
+  .gd-faint { color: var(--ink-faint); }
+  .note-was { margin: 0; font-size: 15px; color: var(--ink-soft); max-width: 66ch; text-wrap: pretty; }
+  .diff { gap: 0; padding: 0; }
+  .change { display: grid; gap: 12px; padding: 16px 20px; border-bottom: 1px solid var(--line); }
+  .change:last-child { border-bottom: 0; }
+  .change-line { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+  .kind { font-size: 14px; color: var(--ink-soft); }
+  .title { font-family: var(--font-display); font-size: 19px; font-weight: 600; flex-basis: 100%; }
+  .fields { margin: 0; display: grid; gap: 10px; }
+  .fields div { display: grid; grid-template-columns: 10ch minmax(0, 1fr); gap: 6px 16px; align-items: start; }
+  @media (max-width: 520px) { .fields div { grid-template-columns: 1fr; } }
+  .fields dt { padding-top: 8px; }
+  .fields dd { margin: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: 8px; }
+  .before, .after { padding: 8px 10px; border-radius: 4px; font-size: 14px; white-space: pre-wrap; }
+  .before { background: var(--surface-inset); color: var(--ink-soft); }
+  .before[data-removed="true"] { text-decoration: line-through; }
+  .after { background: var(--accent-wash); color: var(--ink); }
+  .tag { font-family: var(--font-mono); font-size: 11px; color: var(--ink-faint); margin-right: 8px; }
+  .call { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: var(--space-6); align-items: start; }
+  .call-text { display: grid; gap: 12px; }
+  .call h2 { margin: 0; font-family: var(--font-display); font-size: 22px; font-weight: 600; }
+  .call p { margin: 0; font-size: 14px; color: var(--ink-soft); text-wrap: pretty; }
+  .decline { display: grid; gap: 12px; }
+  .decline :global(.sh-field) { max-width: none; }
 </style>
 
 <script>
@@ -128,16 +150,21 @@ const WORDS = {
     const tell = (t: string) => { if (note) { note.textContent = t; note.hidden = false; } };
     const csrf = () => document.cookie.split("; ").find((c) => c.startsWith("shruti_csrf="))?.split("=")[1] ?? "";
     const post = (path: string, body?: unknown) => fetch(path, { method: "POST", headers: { "content-type": "application/json", "x-csrf-token": csrf() }, body: body === undefined ? undefined : JSON.stringify(body) });
+    const field = root.querySelector<HTMLTextAreaElement>("[data-decline-note]");
+    const declineBtn = root.querySelector<HTMLButtonElement>("[data-decline]");
+    /* The decline button waits for a reason. */
+    field?.addEventListener("input", () => { if (declineBtn) declineBtn.disabled = !field.value.trim(); });
     root.querySelector("[data-accept]")?.addEventListener("click", async () => {
       const r = await post(`/api/guides/mine/by-id/${id}/accept`);
-      if (r.ok) { tell(words.accepted); root.querySelector<HTMLElement>(".decide")?.remove(); return; }
+      if (r.ok) { tell(words.accepted); root.querySelector<HTMLElement>(".call")?.remove(); return; }
       tell(r.status === 409 ? words.openDraft : words.failed);
     });
-    root.querySelector("[data-decline]")?.addEventListener("click", async () => {
-      const text = (root.querySelector<HTMLTextAreaElement>("[data-decline-note]")?.value || "").trim();
+    root.querySelector<HTMLFormElement>("[data-decline-form]")?.addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      const text = (field?.value || "").trim();
       if (!text) { tell(words.needNote); return; }
       const r = await post(`/api/guides/mine/by-id/${id}/decline`, { note: text });
-      if (r.ok) { tell(words.declined); root.querySelector<HTMLElement>(".decide")?.remove(); return; }
+      if (r.ok) { tell(words.declined); root.querySelector<HTMLElement>(".call")?.remove(); return; }
       tell(words.failed);
     });
   }

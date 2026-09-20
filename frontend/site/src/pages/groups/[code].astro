@@ -1,17 +1,23 @@
 ---
-/* A group (board W9): the goal's tiers are the sigil's parts. The crew is
- * listed by size with "and N others" — no rank numbers and no medals, so a
- * small contribution is never the bottom of a leaderboard. Contribute is
- * one stepper and one button. Reading needs no account; joining and
- * contributing do.
+/* A group (board Group, 20 Sep 2026): the goal's tiers are the sigil's parts,
+ * and an almanac index beneath the head. The crew is listed by size with
+ * "and N others" — no rank numbers and no medals, so a small contribution is
+ * never the bottom of a leaderboard. Contribute is one stepper and one
+ * button in a console frame. Reading needs no account; joining and
+ * contributing do. The goal on stream is a console with theme tiles; the
+ * URL is shown once.
  */
 import BaseLayout from "../../layouts/BaseLayout.astro";
-import { account, asReader } from "../../lib/account";
-import { copy } from "../../lib/copy";
-import { sigilSvg } from "../../lib/overlay-elements";
+import Sigil from "../../components/guides/Sigil.astro";
+import StateDot from "../../components/guides/StateDot.astro";
+import Console from "../../components/guides/Console.astro";
+import ThemeTiles from "../../components/guides/ThemeTiles.astro";
+import Plate from "../../components/guides/Plate.astro";
 import SelectField from "../../components/forms/SelectField.astro";
 import TextField from "../../components/forms/TextField.astro";
 import Button from "../../components/forms/Button.astro";
+import { account, asReader } from "../../lib/account";
+import { copy } from "../../lib/copy";
 
 const say = await copy("groups/[code]");
 const code = (Astro.params.code ?? "").toUpperCase();
@@ -26,16 +32,36 @@ const g = read.body as {
   contributions: Row[]; others: { count: number; amount: number }; sigil: { pct: number; state: string }[]; member: boolean; owner: boolean; since: string | null;
 };
 const tokensRead = me && g.member ? await asReader(Astro, `/api/groups/${code}/overlays`) : null;
-const tokens: { id: number; theme: string; label: string }[] = tokensRead?.ok && Array.isArray(tokensRead.body) ? tokensRead.body : [];
+type Token = { id: number; theme: string; motion?: string; label: string; lastSeen?: string | null };
+const tokens: Token[] = tokensRead?.ok && Array.isArray(tokensRead.body) ? tokensRead.body : [];
 
 const n = (v: number) => v.toLocaleString("en-GB");
 const SMALL = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve"];
 const few = (v: number) => (v >= 0 && v < SMALL.length ? SMALL[v] : String(v));
-const since = g.since ? new Date(g.since).toLocaleDateString("en-GB", { day: "numeric", month: "long" }) : "";
-const meta = say("head.meta", "{total} of {target} · {members} members · tier {tier} of {tiers}")
-  .replace("{total}", n(g.total)).replace("{target}", n(g.target)).replace("{members}", String(g.members))
-  .replace("{tier}", String(g.tier)).replace("{tiers}", String(g.tiers));
+const since = g.since ? new Date(g.since).toLocaleDateString("en-GB", { day: "numeric", month: "short" }) : "";
+const per = g.tiers > 0 ? g.target / g.tiers : g.target;
+const filled = Math.min(g.tiers, g.tier);
+const onTier = g.total >= g.target ? g.tiers : Math.min(g.tiers, filled + 1);
+const headLine = [
+  `${n(g.total)} / ${n(g.target)}`,
+  say("head.tier", "tier {tier} of {tiers}").replace("{tier}", String(onTier)).replace("{tiers}", String(g.tiers)),
+  g.members === 1 ? say("head.crew_one", "1 in the crew") : say("head.crew", "{n} in the crew").replace("{n}", String(g.members)),
+].join(" · ");
+/* Each tier as a row: filled, the one in progress with what is in it, or its range. */
+const tiersIndex = Array.from({ length: g.tiers }, (_, i) => {
+  const idx = i + 1, start = Math.round(i * per), end = Math.round(idx * per);
+  const state = idx <= filled ? "done" : idx === filled + 1 && g.total < g.target ? "now" : "open";
+  const right = state === "done" ? say("tiers.filled", "filled") : state === "now" ? say("tiers.in", "{n} in").replace("{n}", n(Math.max(0, g.total - start))) : `${n(start + 1)}–${n(end)}`;
+  return { idx, state, right };
+});
 const othersLine = (g.others.count === 1 ? say("crew.one_other", "and one other") : say("crew.others", "and {n} others").replace("{n}", few(g.others.count)));
+const themeWord = (t: string) => (t === "grimoire" ? say("theme.grimoire", "Grimoire") : t === "plain" ? say("theme.plain", "Plain") : say("theme.almanac", "Almanac"));
+const motionWord = (m?: string) => (m === "full" ? say("motion.full_word", "full") : m === "still" ? say("motion.still_word", "still") : say("motion.reduced_word", "reduced"));
+const seenWord = (t: Token) => {
+  if (!t.lastSeen) return say("token.idle", "idle");
+  const ago = Date.now() - new Date(t.lastSeen).getTime();
+  return ago < 15000 ? say("token.drawing", "drawing, seen just now") : say("token.idle_since", "idle since {date}").replace("{date}", new Date(t.lastSeen).toLocaleDateString("en-GB", { day: "numeric", month: "short" }));
+};
 const WORDS = {
   closed: say("words.closed", "This group is closed."),
   failed: say("words.failed", "That did not go through. Try again."),
@@ -44,123 +70,154 @@ const WORDS = {
   copied: say("words.copied", "Copied."),
   goalOverlay: say("words.goal_overlay", "Goal overlay"),
   revoke: say("words.revoke", "Revoke"),
+  themes: { almanac: themeWord("almanac"), grimoire: themeWord("grimoire"), plain: themeWord("plain") },
+  motions: { full: motionWord("full"), reduced: motionWord("reduced"), still: motionWord("still") },
+  drawing: say("token.drawing", "drawing, seen just now"), idle: say("token.idle", "idle"),
 };
 ---
 
 <BaseLayout title={`${g.name} — ${say("meta.title", "Squirrel Guides")}`} description={g.goal || g.name} noindex>
   <article class="page group" data-group data-code={g.code} data-words={JSON.stringify(WORDS)}>
     <header class="head">
-      <div class="sigil" set:html={sigilSvg(g.sigil, 12, 160)} />
-      <div>
-        <p class="eyebrow">{g.name}</p>
-        <h1>{g.goal || g.name}</h1>
-        <p class="mono meta">{meta}</p>
-        {g.closed && <p class="mono closed">{say("head.closed", "closed")}</p>}
-      </div>
+      <Sigil n={Math.max(1, g.tiers)} done={filled} size={160} ring label={n(g.total)}
+        aria={say("head.sigil_aria", "{filled} of {tiers} tiers filled").replace("{filled}", String(filled)).replace("{tiers}", String(g.tiers))} />
+      <span class="gd-eyebrow">{g.name} · <span class="code">{g.code}</span></span>
+      <h1>{g.goal || g.name}</h1>
+      <span class="gd-mono gd-soft line">{headLine}{g.closed && ` · ${say("head.closed", "closed")}`}</span>
     </header>
 
-    <p class="note" data-note hidden></p>
+    <p class="gd-rule-note" data-note hidden></p>
 
-    <section class="crew">
-      <h2>{say("crew.title", "Contributions")}{since && <span class="mono since"> · {say("crew.since", "since {date}").replace("{date}", since)}</span>}</h2>
+    <section class="block" aria-labelledby="tiers">
+      <div class="block-head"><span id="tiers" class="gd-eyebrow">{say("tiers.title", "Tiers")}</span><span class="gd-note">{say("tiers.each", "{n} each").replace("{n}", n(Math.round(per)))}</span></div>
+      <ol class="tiers">
+        {tiersIndex.map((t) => (
+          <li data-state={t.state}>
+            <StateDot state={t.state} />
+            <span class="tier-name"><span class="tier-word">{say("tiers.tier", "Tier {n}").replace("{n}", String(t.idx))}</span><span class="gd-lead" aria-hidden="true"></span></span>
+            <span class="gd-mono tier-right">{t.right}</span>
+          </li>
+        ))}
+      </ol>
+    </section>
+
+    <section class="block" aria-labelledby="contrib">
+      <div class="block-head"><span id="contrib" class="gd-eyebrow">{say("crew.title", "Contributions")}</span>{since && <span class="gd-note">{say("crew.since", "since {date}").replace("{date}", since)}</span>}</div>
       {g.contributions.length === 0 && g.others.count === 0 ? (
-        <p class="soft">{say("crew.none", "Nothing yet. The first number opens the first tier.")}</p>
+        <p class="gd-hint">{say("crew.none", "Nothing yet. The first number opens the first tier.")}</p>
       ) : (
-        <dl>
-          {g.contributions.map((c) => (<div><dt>{c.who}</dt><dd class="mono">{n(c.amount)}</dd></div>))}
-          {g.others.count > 0 && <div><dt class="soft">{othersLine}</dt><dd class="mono">{n(g.others.amount)}</dd></div>}
-        </dl>
+        <ul class="gd-index crew">
+          {g.contributions.map((c) => (<li><span>{c.who}</span><span class="gd-lead" aria-hidden="true"></span><span class="gd-val">{n(c.amount)}</span></li>))}
+          {g.others.count > 0 && <li><span class="gd-soft">{othersLine}</span><span class="gd-lead" aria-hidden="true"></span><span class="gd-val">{n(g.others.amount)}</span></li>}
+        </ul>
       )}
     </section>
 
     {me && g.member && !g.closed && (
-      <section class="give">
-        <h2>{say("give.title", "Contribute")}</h2>
-        <div class="stepper">
-          <button type="button" class="step" data-less aria-label={say("give.less", "One less")}>−</button>
-          <input type="number" min="1" step="1" value="10" data-amount aria-label={say("give.amount", "Amount")} />
-          <button type="button" class="step" data-more aria-label={say("give.more", "One more")}>+</button>
+      <Console as="section" eyebrow={say("give.title", "Contribute")} class="give">
+        <div class="give-row">
+          <span class="stepper">
+            <button type="button" class="step" data-less aria-label={say("give.less", "One less")}>−</button>
+            <input type="number" min="1" step="1" value="10" data-amount aria-label={say("give.amount", "Amount")} />
+            <button type="button" class="step" data-more aria-label={say("give.more", "One more")}>+</button>
+          </span>
           <Button type="button" data-contribute>{say("give.button", "Contribute")}</Button>
         </div>
-        <p class="soft">{say("give.rule", "One number. Nobody is ranked, and nobody is reminded.")}</p>
-      </section>
+        <p class="gd-hint">{say("give.rule", "One number. Nobody is ranked, and nobody is reminded.")}</p>
+      </Console>
     )}
 
-    <section class="join">
+    <p class="nothing-else">{say("join.nothing_else", "A group has a goal and nothing else — no path, no steps, no schedule.")}</p>
+
+    <div class="membership">
       {!me && (
-        <p>
-          <Button href={`/signin?next=${encodeURIComponent(`/groups/${g.code}`)}`}>{say("join.signin", "Sign in to join")}</Button>
-          <span class="soft"> {say("join.code_line", "Join with the code {code}.").replace("{code}", g.code)}</span>
-        </p>
+        <>
+          <span class="gd-soft small">{say("join.code_line", "Join with the code {code}.").replace("{code}", g.code)}</span>
+          <Button href={`/signin?next=${encodeURIComponent(`/groups/${g.code}`)}`} size="sm">{say("join.signin", "Sign in to join")}</Button>
+        </>
       )}
       {me && !g.member && !g.closed && (
-        <p>
-          <Button type="button" data-join>{say("join.button", "Join")}</Button>
-          <span class="soft"> {say("join.code_line", "Join with the code {code}.").replace("{code}", g.code)}</span>
-        </p>
+        <>
+          <span class="gd-soft small">{say("join.code_line", "Join with the code {code}.").replace("{code}", g.code)}</span>
+          <Button type="button" size="sm" data-join>{say("join.button", "Join")}</Button>
+        </>
       )}
-      <p class="soft">{say("join.nothing_else", "A group has a goal and nothing else — no path, no steps, no schedule.")}</p>
-      {me && g.member && !g.owner && <button type="button" class="link" data-leave>{say("join.leave", "Leave the group")}</button>}
-      {me && g.owner && (
-        <button type="button" class="link" data-close={g.closed ? "0" : "1"}>{g.closed ? say("join.reopen", "Reopen the group") : say("join.close", "Close the group")}</button>
+      {me && g.member && (
+        <>
+          <span class="gd-soft small">{g.owner ? say("join.you_started", "You started this group.") : say("join.you_are_in", "You are in this group.")}</span>
+          <span class="actions">
+            {g.owner && <Button type="button" variant="ghost" size="sm" data-close={g.closed ? "0" : "1"}>{g.closed ? say("join.reopen", "Reopen the group") : say("join.close", "Close the group")}</Button>}
+            {!g.owner && <Button type="button" variant="ghost" size="sm" data-leave>{say("join.leave", "Leave")}</Button>}
+          </span>
+        </>
       )}
-    </section>
+    </div>
 
     {me && g.member && (
-      <section class="overlay">
-        <h2>{say("overlay.title", "The goal on stream")}</h2>
-        <p class="soft">{say("overlay.text", "A browser source that draws this goal — the title, the count, one bar per tier, the crew. The URL is shown once.")}</p>
-        <div class="mint">
-          <SelectField label={say("overlay.theme", "Theme")} name="theme" data-theme
-            options={[{ value: "almanac", label: say("overlay.almanac", "Almanac") }, { value: "grimoire", label: say("overlay.grimoire", "Grimoire") }, { value: "plain", label: say("overlay.plain", "Plain") }]} />
-          <SelectField label={say("overlay.motion", "Motion")} name="motion" data-motion
-            options={[{ value: "reduced", label: say("overlay.reduced", "Reduced") }, { value: "full", label: say("overlay.full", "Full") }, { value: "still", label: say("overlay.still", "Still") }]} />
-          <div><Button type="button" data-mint>{say("overlay.mint", "Make an overlay")}</Button></div>
+      <Console as="form" eyebrow={say("overlay.title", "The goal on stream")} class="overlay" data-overlay-form>
+        <fieldset class="themes">
+          <legend>{say("overlay.theme", "Theme")}</legend>
+          <ThemeTiles name="theme" value="almanac" preset="goal"
+            themes={[{ value: "almanac", label: themeWord("almanac") }, { value: "grimoire", label: themeWord("grimoire") }, { value: "plain", label: themeWord("plain") }]}
+            note={say("overlay.theme_note", "A theme is a skin. The four state colours are the same in all three.")} />
+        </fieldset>
+        <SelectField label={say("overlay.motion", "Motion")} name="motion" data-motion value="reduced"
+          options={[{ value: "reduced", label: say("overlay.reduced", "Reduced — an instant fill") }, { value: "full", label: say("overlay.full", "Arc fills on contribution · 600 ms") }, { value: "still", label: say("overlay.still", "Still") }]} />
+        <div><Button type="button" data-mint>{say("overlay.mint", "Make an overlay")}</Button></div>
+        <p class="gd-hint">{say("overlay.once_line", "This URL is shown once. The token is the secret: anyone with the URL sees the goal; nobody with it can contribute to it.")}</p>
+        <div class="gd-once" data-minted hidden>
+          <span class="gd-eyebrow">{say("overlay.shown_once", "Shown once")}</span>
+          <TextField label={say("overlay.url", "Browser source URL")} name="url" readonly data-url />
+          <div class="gd-once-row"><Button type="button" variant="secondary" size="sm" data-copy>{say("overlay.copy", "Copy")}</Button><Button type="button" variant="ghost" size="sm" data-have-it>{say("overlay.have_it", "I have it")}</Button></div>
         </div>
-        <div class="minted" data-minted hidden>
-          <TextField label={say("overlay.url", "Browser source URL — shown once")} name="url" readonly data-url />
-          <div><Button type="button" variant="secondary" size="sm" data-copy>{say("overlay.copy", "Copy the URL")}</Button></div>
-        </div>
-        <div class="tokens" data-tokens hidden={tokens.length === 0}>
-          {tokens.map((t) => (<div class="gp-token"><span>{t.label} · {t.theme}</span><button type="button" class="link" data-revoke={t.id}>{say("overlay.revoke", "Revoke")}</button></div>))}
-        </div>
-      </section>
+        <ul class="gd-tokens" data-tokens hidden={tokens.length === 0}>
+          {tokens.map((t) => (
+            <li class="gd-token" data-token-row>
+              <Plate theme={t.theme} elements="goal" width={56} aria={themeWord(t.theme)} />
+              <span class="gd-token-text"><span class="gd-token-label">{t.label || say("words.goal_overlay", "Goal overlay")}</span><span class="gd-note">{themeWord(t.theme)} · {motionWord(t.motion)} · {seenWord(t)}</span></span>
+              <Button type="button" variant="ghost" size="sm" data-revoke={t.id}>{say("overlay.revoke", "Revoke")}</Button>
+            </li>
+          ))}
+        </ul>
+      </Console>
     )}
   </article>
 </BaseLayout>
 
 <style>
-  .group { max-width: 620px; margin: 0 auto; padding: var(--space-6) var(--space-4); display: grid; gap: var(--space-5); }
-  .head { display: grid; grid-template-columns: 160px 1fr; gap: var(--space-4); align-items: center; }
-  @media (max-width: 480px) { .head { grid-template-columns: 1fr; } }
-  .sigil :global(svg) { display: block; --gt-faint: var(--line); --st-done: #E0A4BC; --st-now: #8FBEE8; }
-  .eyebrow { font-size: .8rem; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft); margin: 0 0 var(--space-1); }
-  h1 { font-size: 1.9rem; line-height: 1.15; margin: 0; text-wrap: balance; }
-  h2 { font-size: 1.05rem; margin: 0 0 var(--space-3); }
-  .mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
-  .meta { color: var(--ink-soft); margin: var(--space-2) 0 0; }
-  .closed { color: var(--ink-soft); margin: var(--space-1) 0 0; }
-  .soft { color: var(--ink-soft); }
-  .since { font-weight: 400; font-size: .85rem; color: var(--ink-soft); }
-  .note { border-left: 2px solid var(--accent); padding-left: var(--space-3); }
-  dl { margin: 0; display: grid; gap: var(--space-2); }
-  dl div { display: flex; align-items: baseline; gap: var(--space-2); }
-  dl div::after { content: ""; order: 2; flex: 1; border-bottom: 1px dotted var(--line); transform: translateY(-.3em); }
-  dt { order: 1; margin: 0; }
-  dd { order: 3; margin: 0; }
-  .stepper { display: flex; gap: var(--space-2); align-items: stretch; }
-  .stepper input, .step { font: inherit; color: var(--ink); background: var(--surface-card); border: var(--border-w) solid var(--line); border-radius: var(--radius-sm); min-height: 44px; box-sizing: border-box; }
-  .stepper input:hover, .step:hover { border-color: var(--line-strong); }
-  .stepper input:focus-visible, .step:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; border-color: var(--accent); }
-  .stepper input { width: 6.5rem; font-family: var(--font-mono); text-align: center; padding: 10px; }
-  .step { width: 44px; cursor: pointer; }
-  .join { display: grid; gap: var(--space-2); }
-  .link { font: inherit; background: none; border: 0; padding: 0; color: var(--accent); text-decoration: underline; cursor: pointer; justify-self: start; }
-  .mint { display: grid; grid-template-columns: 1fr 1fr auto; gap: var(--space-3); align-items: end; }
-  @media (max-width: 480px) { .mint { grid-template-columns: 1fr; } }
-  .minted { display: grid; gap: var(--space-2); margin-top: var(--space-3); }
-  .tokens { display: grid; gap: var(--space-2); margin-top: var(--space-3); }
-  .gp-token { display: flex; justify-content: space-between; gap: var(--space-3); border-top: var(--border-w) solid var(--line); padding-top: var(--space-2); }
+  .group { max-width: 620px; margin: 0 auto; padding-block: var(--space-6) var(--space-9); display: grid; gap: var(--space-7); width: 100%; }
+  .head { display: grid; justify-items: center; text-align: center; gap: 12px; }
+  .head .code { letter-spacing: .22em; }
+  .head h1 { margin: 0; font-family: var(--font-display); font-size: 36px; font-weight: 600; line-height: 1.15; letter-spacing: -0.01em; text-wrap: pretty; }
+  .head .line { font-size: 14px; }
+  .block { display: grid; gap: 8px; }
+  .block-head { display: flex; justify-content: space-between; align-items: baseline; border-bottom: 1px solid var(--line-strong); padding-bottom: 8px; }
+  .tiers { margin: 0; padding: 0; list-style: none; display: grid; }
+  .tiers li { display: grid; grid-template-columns: 15px 1fr auto; gap: 12px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--line); font-size: 15px; }
+  .tier-name { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+  .tier-name .gd-lead { flex: 1; border-bottom: 1px dotted var(--line-strong); transform: translateY(-4px); }
+  .tiers li[data-state="done"] .tier-word { color: var(--ink-soft); }
+  .tiers li[data-state="now"] .tier-word { font-weight: 600; }
+  .tiers li[data-state="open"] .tier-word { color: var(--ink-faint); }
+  .tier-right { white-space: nowrap; }
+  .tiers li[data-state="done"] .tier-right { color: var(--rose); }
+  .tiers li[data-state="now"] .tier-right { color: var(--accent); }
+  .tiers li[data-state="open"] .tier-right { color: var(--ink-faint); }
+  .crew li { font-size: 15px; }
+  .give { gap: 12px; }
+  .give-row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+  .stepper { display: flex; align-items: center; gap: 6px; font-family: var(--font-mono); font-size: 18px; font-variant-numeric: tabular-nums; }
+  .stepper input { width: 6ch; text-align: center; font: inherit; color: var(--ink); background: var(--surface-card); border: 1px solid var(--line); border-radius: 4px; min-height: 44px; padding: 0 6px; box-sizing: border-box; appearance: textfield; -moz-appearance: textfield; }
+  .stepper input::-webkit-outer-spin-button, .stepper input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  .step { width: 44px; height: 44px; border-radius: 4px; border: 1px solid var(--line); background: var(--surface-card); color: var(--ink); font: inherit; cursor: pointer; }
+  .step:hover { border-color: var(--line-strong); }
+  .nothing-else { margin: 0; font-family: var(--font-display); font-size: 17px; line-height: 1.6; color: var(--ink-soft); text-wrap: pretty; }
+  .membership { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; padding-top: 16px; border-top: 1px solid var(--line); }
+  .membership:empty { display: none; }
+  .small { font-size: 14px; }
+  .actions { display: flex; gap: 8px; }
+  .themes { border: 0; padding: 0; margin: 0; display: grid; gap: 8px; }
+  .themes legend { font-size: 14px; font-weight: 600; padding: 0; margin-bottom: 8px; }
 </style>
 
 <script>

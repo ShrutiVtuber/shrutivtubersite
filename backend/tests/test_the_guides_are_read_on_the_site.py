@@ -76,9 +76,9 @@ def test_the_front_door_is_the_boards_front_door() -> None:
     assert body.count('class="sky gd-hero"') == 1 and body.count("sky-horizon") == 1, "the page has exactly one sky"
     assert ".filter((g) => g.featured).slice(0, 3)" in body
     assert '"/api/guides?sort=top&limit=5"' in body and '"/api/guides?sort=new&limit=5"' in body
-    assert 'class="gd-leader"' in body                         # dotted leaders, not cards
+    assert 'class="gd-lead"' in body                           # dotted leaders, not cards (the section's index rows)
     assert "href={`/guides/${g.slug}`}" in body                # the by-game tiles
-    assert """say("games.yours", "Your game isn't here")""" in body
+    assert 'say("games.yours"' in body                        # the dashed tile keeps its sentence
 
 
 def test_the_front_door_is_fetched_as_the_reader() -> None:
@@ -89,7 +89,7 @@ def test_the_front_door_is_fetched_as_the_reader() -> None:
 
 def test_nothing_on_the_front_door_is_ranked_by_an_algorithm() -> None:
     body = without_comments(INDEX)
-    assert "nothing on this page is ranked by an algorithm" in body
+    assert "nothing on this page is ranked by an algorithm" in body.lower()
     assert "/guides/write" not in body                          # the desk is not advertised here
 
 
@@ -99,9 +99,12 @@ def test_a_games_page_is_an_almanac_table() -> None:
     body = without_comments(GAME)
     assert re.search(r"/\^\[a-z0-9-\]\{1,80\}\$/\.test\(slug\)", body)
     assert 'return Astro.rewrite("/404")' in body
-    for col in ("col.guide", "col.author", "col.published", "col.patch", "col.path", "col.votes"):
+    # The 20 September boards: guide · author · version · patch · path · votes, and an
+    # older patch reads "older" in faint ink rather than being hidden.
+    for col in ("col.guide", "col.author", "col.version", "col.patch", "col.path", "col.votes"):
         assert f'say("{col}"' in body
-    assert "the patch it was written for is a column, and you decide" in body
+    assert "a guide written for an older patch stays listed, with its patch beside it" in body
+    assert 'say("patch.older"' in body
 
 
 # ── the reader (W3) ──────────────────────────────────────────────────────────

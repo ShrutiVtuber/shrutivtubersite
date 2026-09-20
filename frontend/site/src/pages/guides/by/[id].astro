@@ -1,10 +1,13 @@
 ---
-/* An author (board W10): the name the catalogue prints, what they have
- * published — guide, licence, status, votes — and Block author, which is
- * the practice room's block. No avatar, no follower count: this site is
- * not that.
+/* An author (board Author, 20 Sep 2026): the name the catalogue prints, what
+ * they have published — each guide a row with its shape, licence, standing
+ * and votes — contributions to other people's guides, and Block author. No
+ * avatar, no follower count: this page is the work.
  */
 import BaseLayout from "../../../layouts/BaseLayout.astro";
+import Sigil from "../../../components/guides/Sigil.astro";
+import StateDot from "../../../components/guides/StateDot.astro";
+import Button from "../../../components/forms/Button.astro";
 import { account, asReader } from "../../../lib/account";
 import { copy } from "../../../lib/copy";
 
@@ -14,79 +17,82 @@ if (!/^\d{1,12}$/.test(id)) return Astro.rewrite("/404");
 const me = await account(Astro);
 const read = await asReader(Astro, `/api/guides/by/${id}`);
 if (!read.ok) return Astro.rewrite("/404");
-const author = read.body as {
-  id: number; name: string; own: boolean; published: number; votes: number; contributed: number;
-  guides: { id: number; slug: string; title: string; game: { slug: string; name: string }; licence: string; status: string; votes: number }[];
-};
+interface AuthorGuide { id: number; slug: string; title: string; game: { slug: string; name: string }; licence: string; status: string; votes: number; shape?: { phases: number; steps: number } }
+const author = read.body as { id: number; name: string; own: boolean; published: number; votes: number; contributed: number; guides: AuthorGuide[] };
 const statusWord = (s: string) =>
   s === "published" ? say("status.published", "published")
   : s === "in review" ? say("status.review", "in review")
   : s === "update in review" ? say("status.update", "update in review")
   : say("status.hidden", "hidden");
+const statusDot = (s: string) => (s === "published" ? "done" : s === "in review" || s === "update in review" ? "now" : "locked");
+const shape = (g: AuthorGuide) => (g.shape ? say("shape", "{p} phases · {s} steps").replace("{p}", String(g.shape.phases)).replace("{s}", String(g.shape.steps)) : "");
+const games = Array.from(new Set(author.guides.map((g) => g.game.name)));
+const headLine = [
+  say("head.published", "{n} published").replace("{n}", String(author.published)),
+  games.length ? say("head.writes", "writes for {games}").replace("{games}", games.join(" · ")) : "",
+];
 const WORDS = { blocked: say("words.blocked", "Blocked. Their guides stay in the catalogue; you will not see them in the practice room."), failed: say("words.failed", "That did not go through. Try again.") };
 ---
 
 <BaseLayout title={`${author.name} — ${say("meta.title", "Squirrel Guides")}`} description={say("meta.description", "What {name} has published.").replace("{name}", author.name)}>
   <article class="page author" data-author={author.id} data-words={JSON.stringify(WORDS)}>
-    <header class="head">
-      <p class="eyebrow">{say("head.eyebrow", "Author")}</p>
+    <header class="gd-head" style="max-width:none">
+      <span class="gd-eyebrow">{say("head.eyebrow", "Author")}</span>
       <h1>{author.name}</h1>
-      <p class="mono meta">
-        {say("head.published", "{n} published").replace("{n}", String(author.published))}
-        <span class="rose"> · ● {say("head.votes", "{n} votes").replace("{n}", String(author.votes))}</span>
-      </p>
+      <span class="gd-mono line">{headLine[0]} · <span class="gd-rose"><span class="t-glyph" aria-hidden="true">●</span> {say("head.votes", "{n} votes").replace("{n}", String(author.votes))}</span>{headLine[1] && ` · ${headLine[1]}`}</span>
+      <p class="gd-hint note">{say("head.note", "No avatar, no follower count. This page is the work: the guides, their licences, their standing.")}</p>
     </header>
 
-    <p class="note" data-note hidden></p>
+    <p class="gd-rule-note" data-note hidden></p>
 
-    <div class="grid" role="table">
-      <div class="tr th" role="row">
-        <span role="columnheader">{say("col.guide", "Guide")}</span>
-        <span role="columnheader">{say("col.licence", "Licence")}</span>
-        <span role="columnheader">{say("col.status", "Status")}</span>
-        <span role="columnheader" class="right">{say("col.votes", "Votes")}</span>
-      </div>
-      {author.guides.map((g) => (
-        <a class="tr" role="row" href={g.status === "published" || g.status === "update in review" ? `/guides/${g.game.slug}/${g.slug}` : `/guides/${g.game.slug}`}>
-          <span role="cell"><span class="title">{g.title}</span><span class="game mono">{g.game.name}</span></span>
-          <span class="mono" role="cell">{g.licence || "—"}</span>
-          <span class="mono" role="cell">{statusWord(g.status)}</span>
-          <span class="mono rose right" role="cell">{g.votes}</span>
-        </a>
-      ))}
-      {author.guides.length === 0 && <p class="quiet">{say("none", "Nothing published yet.")}</p>}
-    </div>
+    {author.guides.length === 0 ? (
+      <p class="gd-hint">{say("none", "Nothing published yet.")}</p>
+    ) : (
+      <ul class="gd-rows">
+        {author.guides.map((g) => (
+          <li class="gd-row">
+            <Sigil n={Math.max(1, g.shape?.phases ?? 1)} done={0} now={-1} size={44} ring={false} showCount={false} aria={shape(g) || g.title} />
+            <div class="gd-row-main">
+              <a class="gd-row-name link" href={g.status === "published" || g.status === "update in review" ? `/guides/${g.game.slug}/${g.slug}` : `/guides/${g.game.slug}`}>{g.title}</a>
+              <span class="gd-note gd-soft">{[g.game.name, g.licence || "", shape(g)].filter(Boolean).join(" · ")}</span>
+            </div>
+            <div class="gd-row-right standing">
+              <span class="status" data-status={g.status}><StateDot state={statusDot(g.status)} />{statusWord(g.status)}</span>
+              <span class="votes"><span class="t-glyph" aria-hidden="true">●</span> {g.votes}</span>
+            </div>
+          </li>
+        ))}
+      </ul>
+    )}
 
     {author.contributed > 0 && (
-      <p class="quiet">{(author.contributed === 1 ? say("contributed.one", "Contributed one correction to a guide by somebody else.") : say("contributed.many", "Contributed {n} corrections to guides by other people.")).replace("{n}", String(author.contributed))}</p>
+      <p class="contrib">{(author.contributed === 1 ? say("contributed.one", "Suggested one change to somebody else's guide.") : say("contributed.many", "Suggested {n} changes to other people's guides.")).replace("{n}", String(author.contributed))}</p>
     )}
 
     {me && !author.own && (
-      <p class="block">
-        <button type="button" class="link" data-block>{say("block.button", "Block author")}</button>
-        <span class="quiet"> {say("block.text", "Blocking hides this person from you in the practice room. Their guides stay in the catalogue for everyone.")}</span>
-      </p>
+      <div class="block">
+        <p>{say("block.text", "Blocking hides {name}'s guides and suggested changes from you, everywhere in Guides. {name} is not told.").replaceAll("{name}", author.name)}</p>
+        <Button type="button" variant="ghost" size="sm" data-block>{say("block.button", "Block author")}</Button>
+      </div>
     )}
   </article>
 </BaseLayout>
 
 <style>
-  .author { max-width: 620px; margin: 0 auto; padding: var(--space-6) var(--space-4); display: grid; gap: var(--space-5); }
-  .eyebrow { font-size: .8rem; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft); margin: 0 0 var(--space-1); }
-  h1 { font-size: 1.9rem; line-height: 1.15; margin: 0; text-wrap: balance; }
-  .mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: .9rem; }
-  .meta { color: var(--ink-soft); margin: var(--space-2) 0 0; }
-  .rose { color: var(--rose, #E0A4BC); }
-  .quiet { color: var(--ink-soft); }
-  .note { border-left: 2px solid var(--accent); padding-left: var(--space-3); }
-  .grid { border-top: 1px solid var(--line); }
-  .tr { display: grid; grid-template-columns: 1fr 7rem 8rem 4rem; gap: var(--space-3); padding: var(--space-3) 0; border-bottom: 1px solid var(--line); color: inherit; text-decoration: none; align-items: baseline; }
-  .th { font-size: .8rem; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); }
-  .title { display: block; font-weight: 600; }
-  .game { display: block; color: var(--ink-soft); }
-  .right { text-align: right; }
-  @media (max-width: 560px) { .tr { grid-template-columns: 1fr 4rem; } .tr span:nth-child(2), .tr span:nth-child(3) { display: none; } }
-  .link { font: inherit; background: none; border: 0; padding: 0; color: var(--accent); text-decoration: underline; cursor: pointer; }
+  .author { padding-block: var(--space-6) var(--space-9); display: grid; gap: var(--space-6); }
+  .line { font-size: 14px; color: var(--ink-soft); }
+  .gd-rose { color: var(--rose); }
+  .note { max-width: 56ch; font-size: 14px; }
+  .link { text-decoration: none; color: var(--ink); }
+  .link:hover { color: var(--accent-hover); }
+  .standing { gap: 6px; }
+  .status { display: flex; align-items: center; gap: 8px; font-family: var(--font-mono); font-size: 12px; color: var(--ink-soft); }
+  .status[data-status="published"] { color: var(--rose); }
+  .status[data-status="in review"], .status[data-status="update in review"] { color: var(--accent); }
+  .votes { font-family: var(--font-mono); font-size: 13px; color: var(--rose); font-variant-numeric: tabular-nums; }
+  .contrib { margin: 0; font-size: 15px; color: var(--ink-soft); max-width: 66ch; }
+  .block { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; justify-content: space-between; padding-top: 16px; border-top: 1px solid var(--line); }
+  .block p { margin: 0; font-size: 14px; color: var(--ink-soft); max-width: 56ch; }
 </style>
 
 <script>

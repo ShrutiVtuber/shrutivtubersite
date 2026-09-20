@@ -1,10 +1,10 @@
 ---
-/* Squirrel Guides' own place on the site: a strip under the header on every
- * page of the section — the guides, the builds, the groups, the layouts and
- * the desk — so a person is never one wrong click from losing the section.
- * Rendered only on those paths, which are gated with the section itself.
- */
+/* Squirrel Guides' own chrome: the lockup strip under the site header on every
+ * page of the section (README §4.1). The mark is the 28px ring sigil with four
+ * empty arcs and the north lit; the name is type, not a logo; then the five
+ * places as tabs. On the phone it is two rows and never hides its name. */
 import { copy } from "../../lib/copy";
+import { sigil } from "../../lib/guides-sigil";
 
 const say = await copy("component:GuidesNav");
 const here = Astro.url.pathname;
@@ -21,11 +21,31 @@ const current = (href: string) => {
 };
 ---
 
-<div class="guides-nav">
-  <div class="page">
-    <div class="row">
-      <span class="eyebrow">{say("eyebrow", "Squirrel Guides")}</span>
-      {ITEMS.map(([href, name]) => <a href={href} aria-current={current(href) ? "page" : undefined}>{name}</a>)}
-    </div>
+<div class="gd-strip">
+  <div class="page gd-strip-row">
+    <a class="gd-lockup" href="/guides" aria-label={say("lockup.aria", "Squirrel Guides — the front door")}>
+      <Fragment set:html={sigil({ n: 4, done: 0, now: -1, size: 28, ring: true, showCount: false, animate: false, aria: say("mark.aria", "Squirrel Guides mark") })} />
+      <span class="gd-lockup-name">{say("eyebrow", "Squirrel Guides")}</span>
+    </a>
+    <span class="gd-strip-divider" aria-hidden="true"></span>
+    <nav class="gd-strip-nav" aria-label={say("nav.aria", "Squirrel Guides")}>
+      {ITEMS.map(([href, name]) => <a class="gd-tab" href={href} aria-current={current(href) ? "page" : undefined}>{name}</a>)}
+    </nav>
   </div>
 </div>
+
+<style>
+  .gd-strip { background: var(--surface-card); border-bottom: var(--border-w) solid var(--line); }
+  .gd-strip-row { display: flex; flex-wrap: wrap; align-items: stretch; column-gap: var(--space-5); }
+  .gd-lockup { display: flex; align-items: center; gap: 12px; height: 56px; text-decoration: none; color: var(--ink); flex: none; }
+  .gd-lockup-name { font-family: var(--font-display); font-size: 20px; font-weight: 600; letter-spacing: -0.01em; line-height: 1; }
+  .gd-strip-divider { width: 1px; background: var(--line-strong); margin: 18px 0; flex: none; }
+  .gd-strip-nav { display: flex; gap: var(--space-5); flex: 1 1 auto; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+  .gd-strip-nav::-webkit-scrollbar { display: none; }
+  .gd-strip-nav .gd-tab { display: flex; align-items: center; height: 56px; padding: 0 2px; margin-bottom: -1px; }
+  @media (max-width: 599px) {
+    .gd-strip-divider { display: none; }
+    .gd-strip-nav { flex-basis: 100%; }
+    .gd-strip-nav .gd-tab { height: 44px; }
+  }
+</style>

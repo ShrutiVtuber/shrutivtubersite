@@ -1,12 +1,17 @@
 ---
-/* A game's guides: an almanac table, not a card grid (board W2).
+/* A game's guides: an almanac table, not a card grid (board Game, 20 Sep 2026).
  *
  * Six facts per guide, all comparable down a column. This is the page where
  * "is this still current?" gets answered, so the patch a guide was written
- * for sits next to when it was published, and nothing is hidden for being
- * old — the patch is a column, and the reader decides.
+ * for sits beside its version, and nothing is hidden for being old — an
+ * older patch reads "older" in faint ink, and the reader decides. Each row
+ * carries the guide's shape: one arc per phase. Under 600px the table
+ * becomes rows.
  */
 import BaseLayout from "../../../layouts/BaseLayout.astro";
+import Head from "../../../components/guides/Head.astro";
+import Sigil from "../../../components/guides/Sigil.astro";
+import Button from "../../../components/forms/Button.astro";
 import { site } from "../../../lib/api";
 import { asReader } from "../../../lib/account";
 import type { GuideSummary } from "../../../lib/guides";
@@ -25,8 +30,16 @@ const read = await asReader(Astro, `/api/guides?sort=top&game=${slug}&limit=200`
 const guides: GuideSummary[] = read.ok && Array.isArray(read.body) ? read.body : [];
 const variants = game.variants ?? [];
 
-const day = (iso: string | null) =>
-  iso ? new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }) : "";
+/* The newest patch any guide here was written for; anything earlier is older, not hidden. */
+const patchKey = (p: string) => p.split(/[^0-9]+/).filter(Boolean).map((n) => n.padStart(4, "0")).join(".");
+const latestPatch = guides.map((g) => g.gamePatch).filter(Boolean).sort((a, b) => patchKey(b).localeCompare(patchKey(a)))[0] ?? "";
+const older = (g: GuideSummary) => !!g.gamePatch && !!latestPatch && patchKey(g.gamePatch) < patchKey(latestPatch);
+const patchCell = (g: GuideSummary) => (g.gamePatch ? (older(g) ? say("patch.older", "{p} · older").replace("{p}", g.gamePatch) : g.gamePatch) : "—");
+const shape = (g: GuideSummary) => say("shape", "{p} phases · {s} steps").replace("{p}", String(g.phases)).replace("{s}", String(g.steps));
+const version = (g: GuideSummary) => (g.number ? `v${g.number}` : g.version || "—");
+const lede = (guides.length === 1 ? say("count.one", "One guide.") : say("count.many", "{n} guides.").replace("{n}", String(guides.length)))
+  + " " + say("lede", "The patch column answers “is this still current?” — a guide written for an older patch stays listed, with its patch beside it.");
+const variantLine = variants.length ? say("variants.line", "ways to play: {list}").replace("{list}", variants.map((v) => v.name).join(" · ")) : "";
 ---
 
 <BaseLayout
@@ -34,73 +47,84 @@ const day = (iso: string | null) =>
   description={say("meta.description", "Every guide for this game, with the patch each was written for.")}
 >
   <div class="page gg">
-    <p class="gg-crumb"><a href="/guides">{say("crumb", "Guides")}</a><span aria-hidden="true">/</span><span>{game.name}</span></p>
+    <nav class="gg-crumb" aria-label={say("crumb.aria", "Breadcrumb")}><a href="/guides">{say("crumb", "Guides")}</a><span aria-hidden="true">/</span><span>{game.name}</span></nav>
+    <Head as="h1" eyebrow={say("head.eyebrow", "Game")} title={game.name} lede={lede} max="56ch">
+      {(latestPatch || variantLine) && <span class="gd-mono gd-faint">{[latestPatch ? say("head.patch", "latest patch seen {p}").replace("{p}", latestPatch) : "", variantLine].filter(Boolean).join(" · ")}</span>}
+    </Head>
 
-    <div class="gg-head">
-      <div class="gg-art">
-        <span class="gg-art-label">{say("art.empty", "art slot · empty")}</span>
-        <span class="gg-art-name">{game.name}</span>
-      </div>
-      <div class="gg-intro">
-        <h1 class="gg-title">{game.name}</h1>
-        <p class="gg-lede">
-          {guides.length} {guides.length === 1 ? say("count.one", "guide.") : say("count.many", "guides.")}
-          {variants.length > 0 && <> {say("variants.a", "The game declares")} {variants.length} {say("variants.b", "ways to play")} — {variants.map((v) => v.name).join(" · ")} — {say("variants.c", "and every guide says which of them each step is for.")}</>}
-        </p>
-      </div>
-    </div>
+    {guides.length === 0 ? (
+      <p class="gd-hint">{say("none", "Nothing published for this game yet.")}</p>
+    ) : (
+      <>
+        <table class="gg-table">
+          <thead>
+            <tr>
+              <th scope="col">{say("col.guide", "Guide")}</th>
+              <th scope="col">{say("col.author", "Author")}</th>
+              <th scope="col">{say("col.version", "Version")}</th>
+              <th scope="col">{say("col.patch", "Patch")}</th>
+              <th scope="col">{say("col.path", "Path")}</th>
+              <th scope="col" class="right">{say("col.votes", "Votes")}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {guides.map((g) => (
+              <tr>
+                <td><a class="gg-title" href={`/guides/${game.slug}/${g.slug}`}>{g.title}</a></td>
+                <td class="gd-soft">{g.author}</td>
+                <td class="gd-mono">{version(g)}</td>
+                <td class="gd-mono" data-older={older(g)}>{patchCell(g)}</td>
+                <td><span class="gg-path"><Sigil n={Math.max(1, g.phases)} done={0} now={-1} size={28} ring={false} showCount={false} aria={shape(g)} /><span class="gd-mono gd-soft nowrap">{shape(g)}</span></span></td>
+                <td class="right"><span class="gg-votes"><span class="t-glyph" aria-hidden="true">●</span> {g.votes}</span></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <ul class="gg-rows">
+          {guides.map((g) => (
+            <li>
+              <Sigil n={Math.max(1, g.phases)} done={0} now={-1} size={44} ring={false} showCount={false} aria={shape(g)} />
+              <div class="gg-row-main">
+                <a class="gg-title" href={`/guides/${game.slug}/${g.slug}`}>{g.title}</a>
+                <span class="gd-note gd-soft">{[g.author, version(g), g.gamePatch ? say("row.patch", "patch {p}").replace("{p}", patchCell(g)) : "", shape(g)].filter(Boolean).join(" · ")}</span>
+              </div>
+              <span class="gg-votes"><span class="t-glyph" aria-hidden="true">●</span> {g.votes}</span>
+            </li>
+          ))}
+        </ul>
+      </>
+    )}
 
-    <div class="gg-table" role="table">
-      <div class="gg-tr gg-th" role="row">
-        <span role="columnheader">{say("col.guide", "Guide")}</span>
-        <span role="columnheader">{say("col.author", "Author")}</span>
-        <span role="columnheader">{say("col.published", "Published")}</span>
-        <span role="columnheader">{say("col.patch", "Patch")}</span>
-        <span role="columnheader">{say("col.path", "Path")}</span>
-        <span role="columnheader" class="right">{say("col.votes", "Votes")}</span>
-      </div>
-      {guides.map((g) => (
-        <a class="gg-tr" role="row" href={`/guides/${game.slug}/${g.slug}`}>
-          <span class="gg-guide" role="cell">
-            <span class="gg-guide-title">{g.title}</span>
-            {g.summary && <span class="gg-guide-sum">{g.summary}</span>}
-          </span>
-          <span class="gg-mono" role="cell">{g.author}</span>
-          <span class="gg-mono" role="cell">{day(g.publishedAt)}</span>
-          <span class="gg-mono" role="cell">{g.gamePatch || "—"}</span>
-          <span class="gg-mono" role="cell">{g.phases}{g.hours > 0 && <> · ~{g.hours} h</>}</span>
-          <span class="gg-mono rose right" role="cell">{g.votes}</span>
-        </a>
-      ))}
-      {guides.length === 0 && <p class="gg-quiet">{say("none", "Nothing published for this game yet.")}</p>}
+    <div class="gg-field">
+      <p>{say("field.note", "Any account can write a guide for {game}. A second guide for the same game is another path, not a competition — both are listed, both carry their patch.").replace("{game}", game.name)}</p>
+      <Button href="/guides/write" variant="secondary" size="sm">{say("field.write", "Write a guide for {game}").replace("{game}", game.name)}</Button>
     </div>
-    <p class="gg-note">{say("note", "A guide written for an older patch is not hidden — the patch it was written for is a column, and you decide.")}</p>
   </div>
 </BaseLayout>
 
 <style>
-  .gg { padding-block: var(--space-6) var(--space-9); display: flex; flex-direction: column; gap: 22px; font-family: var(--font-body); }
-  .gg-crumb { margin: 0; display: flex; align-items: center; gap: 10px; font-family: var(--font-mono); font-size: 12.5px; color: var(--ink-faint); }
-  .gg-crumb a { color: var(--accent); text-decoration: none; }
-  .gg-crumb > span:last-child { color: var(--ink); }
-  .gg-head { display: flex; align-items: flex-end; gap: 28px; flex-wrap: wrap; }
-  .gg-art { flex: none; width: 280px; height: 160px; border: var(--border-w) solid var(--line); border-radius: var(--radius-md); background: var(--surface-inset); position: relative; display: flex; align-items: flex-end; padding: 16px; }
-  .gg-art-label { position: absolute; top: 12px; right: 14px; font-family: var(--font-mono); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-faint); }
-  .gg-art-name { font-family: var(--font-display); font-size: 26px; font-weight: 600; color: var(--ink); }
-  .gg-intro { flex: 1; min-width: 260px; display: flex; flex-direction: column; gap: 10px; padding-bottom: 6px; }
-  .gg-title { margin: 0; font-family: var(--font-display); font-size: 38px; line-height: 1.1; font-weight: 500; color: var(--ink); }
-  .gg-lede { margin: 0; max-width: 62ch; font-family: var(--font-display); font-size: 17px; line-height: 1.65; color: var(--ink-soft); }
-  .gg-table { display: flex; flex-direction: column; margin-top: 18px; overflow-x: auto; }
-  .gg-tr { display: grid; grid-template-columns: minmax(0, 3fr) 1fr 1fr 1fr 1fr auto; gap: 0 24px; align-items: baseline; padding: 18px 0; border-bottom: var(--border-w) solid var(--line); text-decoration: none; color: inherit; min-width: 760px; }
-  .gg-th { padding: 0 0 12px; border-bottom: var(--border-w) solid var(--line-strong); }
-  .gg-th span { font-size: var(--text-micro); font-weight: 600; letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; color: var(--ink-faint); }
+  .gg { padding-block: var(--space-6) var(--space-9); display: grid; gap: var(--space-6); font-family: var(--font-body); }
+  .gg-crumb { display: flex; gap: 8px; font-size: 13px; color: var(--ink-faint); }
+  .gg-crumb a { color: inherit; }
+  .gd-faint { color: var(--ink-faint); }
+  .nowrap { white-space: nowrap; }
+  .gg-table { width: 100%; border-collapse: collapse; font-size: 15px; }
+  .gg-table th { padding: 0 12px 10px; border-bottom: 1px solid var(--line-strong); font: 600 12px/1 var(--font-body); letter-spacing: .14em; text-transform: uppercase; color: var(--ink-faint); text-align: left; }
+  .gg-table th:first-child, .gg-table td:first-child { padding-left: 0; }
+  .gg-table th:last-child, .gg-table td:last-child { padding-right: 0; }
+  .gg-table td { padding: 14px 12px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+  .gg-table tbody tr:hover { background: var(--surface-veil); }
+  .gg-table td.gd-mono { font-size: 13px; }
+  .gg-table td[data-older="true"] { color: var(--ink-faint); }
   .right { text-align: right; }
-  .gg-guide { display: flex; flex-direction: column; gap: 4px; }
-  .gg-guide-title { font-family: var(--font-display); font-size: 20px; font-weight: 600; color: var(--ink); }
-  a.gg-tr:hover .gg-guide-title { text-decoration: underline; }
-  .gg-guide-sum { font-size: 13.5px; color: var(--ink-soft); }
-  .gg-mono { font-family: var(--font-mono); font-size: 13px; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
-  .gg-mono.rose { color: var(--rose); }
-  .gg-quiet { margin: 0; padding: 18px 0; font-size: var(--text-sm); color: var(--ink-faint); }
-  .gg-note { margin: 0; font-family: var(--font-mono); font-size: var(--text-xs); color: var(--ink-faint); }
+  .gg-title { font-family: var(--font-display); font-size: 19px; font-weight: 600; color: var(--ink); text-decoration: none; line-height: 1.2; }
+  .gg-title:hover { color: var(--accent-hover); }
+  .gg-path { display: flex; align-items: center; gap: 10px; }
+  .gg-votes { font-family: var(--font-mono); font-size: 13px; color: var(--rose); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .gg-rows { display: none; margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--line-strong); }
+  .gg-rows li { display: grid; grid-template-columns: 44px 1fr auto; gap: 14px; align-items: center; padding: 14px 0; border-bottom: 1px solid var(--line); }
+  .gg-row-main { display: grid; gap: 4px; min-width: 0; }
+  @media (max-width: 599px) { .gg-table { display: none; } .gg-rows { display: grid; } }
+  .gg-field { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; justify-content: space-between; padding: 20px; border: 1px dashed var(--line-strong); border-radius: 10px; background: color-mix(in srgb, var(--surface-veil) 40%, transparent); }
+  .gg-field p { margin: 0; font-size: 14px; color: var(--ink-soft); max-width: 56ch; text-wrap: pretty; }
 </style>

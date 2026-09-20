@@ -13,6 +13,12 @@
  * ⚠ Every word the script draws lives in WORDS and is passed as data, so
  * it is editable from the admin like any other sentence on the site.
  */
+import Console from "../../../../components/guides/Console.astro";
+import ThemeTiles from "../../../../components/guides/ThemeTiles.astro";
+import TextField from "../../../../components/forms/TextField.astro";
+import SelectField from "../../../../components/forms/SelectField.astro";
+import TextArea from "../../../../components/forms/TextArea.astro";
+import Button from "../../../../components/forms/Button.astro";
 import BaseLayout from "../../../../layouts/BaseLayout.astro";
 import { account, asReader } from "../../../../lib/account";
 import { copy } from "../../../../lib/copy";
@@ -42,6 +48,8 @@ const viewRead = !starting && runId ? await asReader(Astro, `/api/runs/${runId}`
 const view = viewRead?.ok ? viewRead.body : null;
 if (!starting && !view) return Astro.rewrite("/404");
 const overlaysRead = view ? await asReader(Astro, `/api/runs/${view.id}/overlays`) : null;
+const allowanceRead = view ? await asReader(Astro, "/api/overlay/allowance") : null;
+const allowance = allowanceRead?.ok ? (allowanceRead.body as { tokens: number; tokensLimit: number | null }) : null;
 const overlays = overlaysRead?.ok && Array.isArray(overlaysRead.body) ? overlaysRead.body : [];
 const origin = Astro.url.origin;
 
@@ -119,7 +127,7 @@ const WORDS = {
     element: say("ov.element", "Element"), theme: say("ov.theme", "Theme"), motion: say("ov.motion", "Motion"), which: say("ov.which", "Which routine"),
     label: say("ov.label", "Label, for you"), make: say("ov.make", "New overlay"), copy: say("ov.copy", "Copy for OBS"), copied: say("ov.copied", "Copied."),
     once: say("ov.once", "This URL is shown once. The token is the secret: anyone with the URL sees the overlay; nobody with it can change your run."),
-    revoke: say("ov.revoke", "Revoke"), live: say("ov.live", "live"), idle: say("ov.idle", "idle"),
+    revoke: say("ov.revoke", "Revoke"), live: say("ov.live", "drawing"), idle: say("ov.idle", "idle"),
     themeNote: say("ov.theme_note", "A theme changes palette, type and ornament. It never changes the layout or the four state colours, so chat learns them once."),
   },
   gate: {
@@ -171,6 +179,7 @@ const WORDS = {
           </label>
         </div>
         <div class="tk-bar-acts">
+          <span class="tk-mono soft" data-checkin-line></span>
           <button type="button" class="tk-secondary sm" data-checkin>{say("bar.checkin", "Check in")}</button>
           <button type="button" class="tk-ghost sm pill" data-much>{say("bar.much", "Too much")}</button>
         </div>
@@ -184,80 +193,94 @@ const WORDS = {
 
       <div class="tk-grid">
         <section class="tk-main">
-          <div class="tk-sigil-row">
-            <div data-sigil></div>
-            <div class="tk-phase">
-              <span class="tk-eyebrow" data-phase-eyebrow></span>
-              <h1 class="tk-phase-name" data-phase-name></h1>
+          <div class="tk-reentry" data-reentry hidden></div>
+          <section class="tk-nowcard" data-nowcard>
+            <div class="tk-nowcard-sigil">
+              <div data-sigil></div>
               <span class="tk-mono" data-phase-meta></span>
+            </div>
+            <div class="tk-nowcard-body">
+              <span class="tk-eyebrow accent" data-phase-eyebrow></span>
+              <span class="tk-phase-name" data-phase-name></span>
+              <div data-now></div>
               <span class="tk-mono rose" data-done-line hidden></span>
             </div>
-          </div>
-          <div class="tk-reentry" data-reentry hidden></div>
-          <div data-now></div>
+          </section>
           <div class="tk-later" data-later></div>
         </section>
         <aside class="tk-side">
-          <div data-path></div>
-          <div class="tk-also" data-also></div>
+          <details class="tk-path-details" data-path-details>
+            <summary><span class="tk-eyebrow">{say("path.title", "Path")}</span><span class="tk-mono" data-path-meta></span></summary>
+            <div data-path></div>
+          </details>
+          <div class="tk-also" data-also hidden></div>
         </aside>
       </div>
 
-      <section class="tk-section" id="routines">
-        <h2 class="tk-h2">{say("sec.routines", "Routines")}</h2>
-        <div data-routines></div>
-      </section>
-      <section class="tk-section" id="codex">
-        <h2 class="tk-h2">{say("sec.codex", "Codex")}</h2>
-        <div data-codex></div>
-      </section>
-      {(doc.tracks ?? []).map((t) => (
-        <section class="tk-section" id={`track-${t.id}`}>
-          <h2 class="tk-h2">{t.name}</h2>
-          <div data-track={t.id}></div>
-        </section>
-      ))}
-      <section class="tk-section" id="overlays">
-        <h2 class="tk-h2">{say("sec.overlays", "Overlays")}</h2>
-        <div data-overlays-list></div>
-        <h2 class="tk-h2">{say("sec.file", "Your run as a file")}</h2>
-        <p class="tk-quiet">{say("file.text", "Nobody's progress is trapped here. Download the run as a file, and bring one back — from here or from your own tracker.")}</p>
-        <div class="tk-file">
-          <button type="button" class="tk-btn" data-export>{say("file.download", "Download")}</button>
-          <label class="tk-btn tk-btn-quiet">{say("file.import", "Bring a run file")}<input type="file" accept="application/json,.json" data-import hidden /></label>
+      <section class="tk-panels" aria-label={say("also.title", "Also here")}>
+        <div class="gd-tabs" role="tablist" data-tabs>
+          {(doc.routines ?? []).length > 0 && <button type="button" class="gd-tab" role="tab" data-tab="routines">{say("sec.routines", "Routines")}</button>}
+          {(doc.codex ?? []).length > 0 && <button type="button" class="gd-tab" role="tab" data-tab="codex">{say("sec.codex", "Codex")}</button>}
+          {(doc.tracks ?? []).map((t) => <button type="button" class="gd-tab" role="tab" data-tab={`track-${t.id}`}>{t.name}</button>)}
+          <button type="button" class="gd-tab" role="tab" data-tab="overlays">{say("sec.overlays", "Overlays")}</button>
+          <button type="button" class="gd-tab" role="tab" data-tab="file">{say("sec.file", "Your run as a file")}</button>
+          <button type="button" class="gd-tab" role="tab" data-tab="note">{say("sec.note", "Your note")}</button>
         </div>
-        <p class="tk-quiet" data-file-note hidden></p>
-        <form class="tk-ov-form" data-new-overlay>
-          <label class="tk-field"><span class="tk-eyebrow">{say("ov.element", "Element")}</span>
-            <select name="kind">
-              <option value="guide-now">{say("ov.now", "Now card")}</option>
-              <option value="guide-sigil">{say("ov.sigil", "Sigil")}</option>
-              <option value="guide-path">{say("ov.path", "Path strip")}</option>
-              {(doc.routines ?? []).length > 0 && <option value="guide-routine">{say("ov.routine", "Routine")}</option>}
-            </select></label>
-          {(doc.routines ?? []).length > 0 && (
-            <label class="tk-field"><span class="tk-eyebrow">{say("ov.which", "Which routine")}</span>
-              <select name="routine_id">{(doc.routines ?? []).map((r) => <option value={r.id}>{r.name}</option>)}</select></label>
-          )}
-          <label class="tk-field"><span class="tk-eyebrow">{say("ov.theme", "Theme")}</span>
-            <select name="theme">
-              <option value="almanac" selected={gameTheme === "almanac"}>{say("ov.almanac", "Almanac")}</option>
-              <option value="grimoire" selected={gameTheme === "grimoire"}>{say("ov.grimoire", "Grimoire")}</option>
-              <option value="plain" selected={gameTheme === "plain"}>{say("ov.plain", "Plain")}</option>
-            </select></label>
-          <label class="tk-field"><span class="tk-eyebrow">{say("ov.motion", "Motion")}</span>
-            <select name="motion"><option value="reduced">{say("ov.reduced", "Reduced motion")}</option><option value="full">{say("ov.full", "Full motion")}</option><option value="still">{say("ov.still", "Still")}</option></select></label>
-          <label class="tk-field"><span class="tk-eyebrow">{say("ov.label", "Label, for you")}</span><input type="text" name="label" maxlength="80" /></label>
-          <button type="submit" class="tk-secondary sm">{say("ov.make", "New overlay")}</button>
-        </form>
-        <p class="tk-quiet">{say("ov.theme_note", "A theme changes palette, type and ornament. It never changes the layout or the four state colours, so chat learns them once.")}</p>
-        <p class="tk-quiet"><a href="/guides/overlays">{say("ov.gallery", "Or start from one of Shruti's layouts")}</a></p>
-        <div class="tk-ov-minted" data-minted hidden></div>
-      </section>
-      <section class="tk-section" id="note">
-        <h2 class="tk-h2">{say("sec.note", "Your note")}</h2>
-        <textarea class="tk-note" data-note rows="3" maxlength="2000" placeholder={say("note.hint", "One line for the person who opens this next. It's the first thing they'll read.")}></textarea>
-        <div class="tk-note-acts"><button type="button" class="tk-secondary sm" data-save-note>{say("note.save", "Save the note")}</button><span class="tk-mono" data-note-status></span></div>
+
+        <div class="gd-panel tk-panel" data-panel="routines" id="routines" hidden><div data-routines></div></div>
+        <div class="gd-panel tk-panel" data-panel="codex" id="codex" hidden><div data-codex></div></div>
+        {(doc.tracks ?? []).map((t) => (
+          <div class="gd-panel tk-panel" data-panel={`track-${t.id}`} id={`track-${t.id}`} hidden><div data-track={t.id}></div></div>
+        ))}
+
+        <div class="gd-panel tk-panel tk-ov" data-panel="overlays" id="overlays" hidden>
+          <div class="tk-ov-list">
+            <div class="tk-ov-head"><h2 class="tk-h2">{say("ov.title", "This run on stream")}</h2><p class="tk-quiet">{say("ov.lede", "Tick from the phone; the stream follows within two seconds.")}</p></div>
+            <div data-overlays-list></div>
+            <p class="tk-quiet">{say("ov.shown_once", "The URL was shown once, when each was made. Nothing here lists it. Lose it — revoke and mint again.")}</p>
+            <div class="gd-once tk-ov-minted" data-minted hidden></div>
+          </div>
+          <Console as="form" eyebrow={say("ov.new", "New overlay")} note={allowance ? (allowance.tokensLimit === null ? "" : say("ov.used", "{n} of {limit} tokens used").replace("{n}", String(allowance.tokens)).replace("{limit}", String(allowance.tokensLimit))) : undefined} data-new-overlay>
+            <TextField label={say("ov.label", "Label")} name="label" maxlength="80" placeholder={say("ov.label_hint", "Main scene")} hint={say("ov.label_note", "For you; chat never sees it.")} />
+            <SelectField label={say("ov.element", "Kind")} name="kind"
+              options={[{ value: "guide-now", label: say("ov.now", "Now card") }, { value: "guide-sigil", label: say("ov.sigil", "Sigil") }, { value: "guide-path", label: say("ov.path", "Path strip") }, ...((doc.routines ?? []).length > 0 ? [{ value: "guide-routine", label: say("ov.routine", "Routine") }] : [])]} />
+            {(doc.routines ?? []).length > 0 && (
+              <SelectField label={say("ov.which", "Which routine")} name="routine_id" options={(doc.routines ?? []).map((r) => ({ value: r.id, label: r.name }))} />
+            )}
+            <fieldset class="tk-themes">
+              <legend>{say("ov.theme", "Theme")}</legend>
+              <ThemeTiles name="theme" value={gameTheme} preset="now"
+                themes={[{ value: "almanac", label: say("ov.almanac", "Almanac") }, { value: "grimoire", label: say("ov.grimoire", "Grimoire") }, { value: "plain", label: say("ov.plain", "Plain") }]}
+                note={say("ov.theme_note", "A theme is a skin. The four state colours are the same in all three.")} />
+            </fieldset>
+            <SelectField label={say("ov.motion", "Motion")} name="motion" value="full"
+              options={[{ value: "full", label: say("ov.full", "Full — the Done moment, 600 ms") }, { value: "reduced", label: say("ov.reduced", "Reduced — an instant swap") }, { value: "still", label: say("ov.still", "Still") }]} />
+            <div class="tk-ov-actions"><Button type="submit">{say("ov.make", "New overlay")}</Button><a href="/guides/overlays">{say("ov.gallery", "Or start from one of Shruti's layouts")}</a></div>
+            <p class="gd-hint">{say("ov.once", "This URL is shown once. The token is the secret: anyone with the URL sees the overlay; nobody with it can change your run.")}</p>
+          </Console>
+        </div>
+
+        <div class="gd-panel tk-panel tk-filepanel" data-panel="file" id="file" hidden>
+          <div class="tk-file-dl">
+            <h2 class="tk-h2">{say("file.download_title", "Download")}</h2>
+            <p class="tk-quiet">{say("file.text", "One JSON file: the run, its check-ins, the Later list, the note. Yours to keep, or to move to a server you run.")}</p>
+            <div><Button type="button" variant="secondary" data-export>{say("file.download", "Download run.json")}</Button></div>
+          </div>
+          <label class="tk-drop">
+            <span class="tk-drop-title">{say("file.import_title", "Import a run file")}</span>
+            <span class="tk-quiet">{say("file.import_text", "Drop a run.json here, or choose one. It replaces nothing until you confirm.")}</span>
+            <span class="tk-drop-btn"><Button type="button" variant="ghost" size="sm" data-import-button>{say("file.import", "Choose a file")}</Button></span>
+            <input type="file" accept="application/json,.json" data-import class="tk-file-input" />
+          </label>
+          <p class="tk-quiet tk-file-note" data-file-note hidden></p>
+        </div>
+
+        <div class="gd-panel tk-panel" data-panel="note" id="note" hidden>
+          <div class="tk-notewrap">
+            <TextArea label={say("note.title", "Your note")} name="note" rows={3} maxlength={2000} data-note placeholder={say("note.hint", "One line for the person who opens this next. It's the first thing they'll read.")} hint={say("note.note", "To yourself. Shown at re-entry, on the phone too.")} />
+            <div class="tk-note-acts"><Button type="button" variant="secondary" size="sm" data-save-note>{say("note.save", "Save note")}</Button><span class="tk-mono" data-note-status></span></div>
+          </div>
+        </div>
       </section>
 
       <div class="tk-sheet" data-sheet hidden><div class="tk-sheet-scrim" data-sheet-close></div><div class="tk-sheet-card"><span class="tk-grab"></span><div data-sheet-body></div></div></div>
@@ -430,12 +453,82 @@ const WORDS = {
   .tk-ov-minted { border: var(--border-w) solid var(--accent); border-radius: var(--radius-md); padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
   .tk-ov-url { font-family: var(--font-mono); font-size: 12.5px; color: var(--ink); word-break: break-all; padding: 8px 10px; background: var(--surface-inset); border-radius: var(--radius-sm); }
   @media (max-width: 900px) { .tk-grid { grid-template-columns: 1fr !important; } .tk-main { border-right: 0; } .tk-side { border-top: var(--border-w) solid var(--line); } }
+  /* ── The 20 September board: page ground, the Now card holds the sigil, the Path beside it, one tab row below ── */
+  .tk-bar { background: transparent; padding: 12px var(--page-pad) 16px; flex-wrap: wrap; row-gap: 12px; }
+  .tk-bar .tk-eyebrow { font: 600 24px/1.2 var(--font-display); letter-spacing: 0; text-transform: none; color: var(--ink); }
+  .tk-mono.soft { color: var(--ink-soft); font-size: 13px; padding-right: 6px; }
+  .tk-grid { grid-template-columns: minmax(0, 1fr) 380px; gap: var(--space-7); padding: 0 var(--page-pad); align-items: start; }
+  .tk[data-folded="1"] .tk-grid { grid-template-columns: minmax(0, 1fr) 380px; }
+  .tk-main { padding: var(--space-5) 0 0; border-right: 0; gap: var(--space-6); }
+  .tk-side { padding: var(--space-5) 0 0; background: transparent; gap: 10px; }
+  .tk-reentry { font-family: var(--font-mono); font-size: 13px; color: var(--ink-soft); display: grid; gap: 4px; }
+  .tk-nowcard { position: relative; display: grid; grid-template-columns: 104px minmax(0, 1fr); gap: 24px; align-items: start; padding: clamp(20px, 3vw, 28px); background: var(--surface-card); border: 1px solid var(--accent); border-radius: 10px; box-shadow: var(--shadow-1); overflow: hidden; }
+  .tk-nowcard::after { content: ""; position: absolute; left: 0; bottom: 0; height: 1px; width: 0; background: var(--rose); }
+  .tk-nowcard:has(.tk-now.ignite) { border-color: var(--rose); border-width: 1.5px; }
+  .tk-nowcard:has(.tk-now.ignite)::after { width: 100%; transition: width 300ms var(--ease-out); }
+  .tk-nowcard-sigil { display: grid; justify-items: center; gap: 8px; text-align: center; }
+  .tk-nowcard-body { display: grid; gap: 14px; min-width: 0; }
+  .tk-eyebrow.accent { color: var(--accent); }
+  .tk-nowcard .tk-phase-name { font: 500 14px/1.4 var(--font-body); color: var(--ink-soft); }
+  .tk-nowcard .tk-now { border: 0; background: transparent; box-shadow: none; padding: 0; }
+  .tk-nowcard .tk-now.ignite::after { display: none; }
+  .tk-nowcard .tk-now-title { font-size: clamp(28px, 3vw, 36px); line-height: 1.15; letter-spacing: -0.01em; }
+  .tk-nowcard .tk-now-do { font: 400 16px/1.55 var(--font-body); color: var(--ink-soft); white-space: pre-line; }
+  @media (max-width: 640px) { .tk-nowcard { grid-template-columns: 1fr; } .tk-nowcard-sigil { justify-items: start; text-align: left; } }
+  .tk-path-details summary { list-style: none; cursor: pointer; display: flex; justify-content: space-between; align-items: baseline; border-bottom: 1px solid var(--line); padding-bottom: 8px; }
+  .tk-path-details summary::-webkit-details-marker { display: none; }
+  .tk-path-details > div { padding-top: 10px; }
+  .tk-path .tk-sec-head { display: none; }
+  .tk-panels { display: grid; gap: var(--space-5); padding: var(--space-6) var(--page-pad) 0; }
+  .tk-panel { max-width: none; padding: 0; border-top: 0; }
+  .tk-ov { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); gap: var(--space-6); align-items: start; }
+  .tk-ov-list { display: grid; gap: 12px; }
+  .tk-ov-head { display: grid; gap: 4px; }
+  .tk-ov-rows { display: grid; border-top: 1px solid var(--line-strong); }
+  .tk-ov-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 14px; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--line); }
+  .tk-ov-text { display: grid; gap: 3px; min-width: 0; }
+  .tk-ov-label { font-weight: 600; }
+  .tk-ov-minted { border: 1px solid var(--line); }
+  .tk-ov-minted .tk-ov-url { background: transparent; border: 0; padding: 0; }
+  .tk-themes { border: 0; padding: 0; margin: 0; display: grid; gap: 8px; }
+  .tk-themes legend { font-size: 14px; font-weight: 600; padding: 0; margin-bottom: 8px; }
+  .tk-ov-actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; }
+  .tk-ov-actions a { font-size: 14px; }
+  .tk-filepanel { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: var(--space-6); }
+  .tk-file-dl { display: grid; gap: 12px; align-content: start; }
+  .tk-drop { display: grid; gap: 10px; place-items: center; text-align: center; padding: 32px 20px; border: 1px dashed var(--line-strong); border-radius: 10px; background: color-mix(in srgb, var(--surface-veil) 40%, transparent); cursor: pointer; }
+  .tk-drop-title { font-weight: 600; }
+  .tk-file-input { position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden; }
+  .tk-file-note { grid-column: 1 / -1; }
+  .tk-notewrap { display: grid; gap: 12px; max-width: 66ch; }
+  .tk-notewrap .sh-field { max-width: none; }
+  @media (max-width: 900px) { .tk-grid { grid-template-columns: 1fr !important; } .tk-side { border-top: 0; padding-top: 0; } }
+  @media (min-width: 901px) { .tk-path-details summary { pointer-events: none; } }
+  .tk-much[hidden] { display: none; }
+  .tk [hidden], .tk-new [hidden] { display: none !important; }
 </style>
 
 <script>
   import { mountTrack, mountNewRun } from "../../../../lib/track";
   const track = document.querySelector<HTMLElement>("[data-track]");
-  if (track) mountTrack(track);
+  if (track) {
+    mountTrack(track);
+    /* One tab row, one panel: Overlays when the run has a token, else the first tab. */
+    const tabs = Array.from(track.querySelectorAll<HTMLButtonElement>("[data-tab]"));
+    const panels = Array.from(track.querySelectorAll<HTMLElement>("[data-panel]"));
+    const pick = (name: string) => {
+      for (const t of tabs) t.setAttribute("aria-selected", String(t.dataset.tab === name));
+      for (const p of panels) p.hidden = p.dataset.panel !== name;
+    };
+    const overlays = JSON.parse(track.dataset.overlays || "[]");
+    const wanted = location.hash.replace("#", "");
+    pick(tabs.some((t) => t.dataset.tab === wanted) ? wanted : overlays.length ? "overlays" : (tabs[0]?.dataset.tab ?? "overlays"));
+    tabs.forEach((t) => t.addEventListener("click", () => pick(t.dataset.tab!)));
+    /* The Path is open on a desk, folded on a phone. */
+    const details = track.querySelector<HTMLDetailsElement>("[data-path-details]");
+    if (details) { const wide = matchMedia("(min-width: 901px)"); const set = () => { details.open = wide.matches ? true : details.open; }; set(); wide.addEventListener("change", set); }
+    track.querySelector("[data-import-button]")?.addEventListener("click", (e) => { e.preventDefault(); track.querySelector<HTMLInputElement>("[data-import]")?.click(); });
+  }
   const fresh = document.querySelector<HTMLElement>("[data-new-run-root]");
   if (fresh) mountNewRun(fresh);
 </script>

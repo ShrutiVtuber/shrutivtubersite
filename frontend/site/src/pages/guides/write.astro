@@ -1,18 +1,24 @@
 ---
-/* The desk: where a guide is written.
+/* Create a guide (board Desk, 20 Sep 2026): where a guide is written.
  *
  * Any account can write. Everything written is a draft until Shruti has read
- * it, and the desk says so where the author will see it. Reading needs no
+ * it, and the page says so where the author will see it. Reading needs no
  * account and never will; writing needs one because a guide is published
- * under a name.
+ * under a name. Each guide is a row that carries its shape — one arc per
+ * phase — with its versions as a ladder in the state vocabulary.
  *
  * ⚠ A new guide is created by SAVING a skeleton, not by a create endpoint:
  * the server has one rule for filing a draft (guide.id, title, game.id) and
  * this page uses it rather than growing a second one.
  */
 import BaseLayout from "../../layouts/BaseLayout.astro";
-import SectionHeader from "../../components/brand/SectionHeader.astro";
-import EmptyState from "../../components/feedback/EmptyState.astro";
+import Head from "../../components/guides/Head.astro";
+import Empty from "../../components/guides/Empty.astro";
+import Console from "../../components/guides/Console.astro";
+import Sigil from "../../components/guides/Sigil.astro";
+import StateDot from "../../components/guides/StateDot.astro";
+import TextField from "../../components/forms/TextField.astro";
+import Button from "../../components/forms/Button.astro";
 import { site } from "../../lib/api";
 import { account, asReader } from "../../lib/account";
 import { copy } from "../../lib/copy";
@@ -20,10 +26,12 @@ import { copy } from "../../lib/copy";
 const say = await copy("guides/write");
 
 interface Game { id: number; slug: string; name: string; variants: { id: string; name: string }[]; guides: number }
+interface Version { id: number; number: number; state: string; note: string; problems: number; updated?: string | null }
 interface Mine {
   id: number; slug: string; title: string; game: { slug: string; name: string };
   published: number | null; hidden: boolean; hiddenBy: string;
-  versions: { id: number; number: number; state: string; note: string; problems: number }[];
+  shape?: { phases: number; steps: number };
+  versions: Version[];
 }
 
 const me = await account(Astro);
@@ -51,6 +59,9 @@ const PSTATE: Record<string, string> = {
 const pstate = (p: Proposal) => (p.accepted && p.state === "draft") ? say("pstate.accepted", "accepted — in the author's draft") : (PSTATE[p.state] ?? p.state);
 const counts = (c: Proposal["changes"]) => say("changes.line", "{a} added · {r} removed · {c} changed").replace("{a}", String(c.added)).replace("{r}", String(c.removed)).replace("{c}", String(c.changed));
 
+/* The ladder's words and dots: draft = open ring · to fix = open ring, bold ·
+   waiting for Shruti = now disc · published = done dash · replaced = done's
+   dash with the colour taken away, the word struck. */
 const STATE: Record<string, string> = {
   draft: say("state.draft", "draft"),
   submitted: say("state.submitted", "waiting for Shruti"),
@@ -58,7 +69,15 @@ const STATE: Record<string, string> = {
   sent_back: say("state.sent_back", "sent back"),
   superseded: say("state.superseded", "replaced"),
 };
+const dotOf = (v: Version) => (v.state === "published" ? "done" : v.state === "submitted" ? "now" : v.state === "superseded" ? "skipped" : "open");
+const wordState = (v: Version) => (v.state === "published" ? "published" : v.state === "submitted" ? "waiting" : v.state === "superseded" ? "replaced" : v.problems > 0 ? "tofix" : "draft");
+const wordOf = (v: Version) => {
+  const base = STATE[v.state] ?? v.state;
+  return (v.state === "draft" || v.state === "sent_back") && v.problems > 0 ? `${base} · ${v.problems} ${say("problems", "to fix")}` : base;
+};
+const dateOf = (v: Version) => (v.updated ? new Date(v.updated).toLocaleDateString("en-GB", { day: "numeric", month: "short" }) : "");
 const openDraft = (g: Mine) => g.versions.find((v) => v.state === "draft" || v.state === "sent_back");
+const shapeLine = (g: Mine) => [g.game.name, g.shape ? say("row.shape", "{p} phases · {s} steps").replace("{p}", String(g.shape.phases)).replace("{s}", String(g.shape.steps)) : ""].filter(Boolean).join(" · ");
 ---
 
 <BaseLayout
@@ -67,15 +86,8 @@ const openDraft = (g: Mine) => g.versions.find((v) => v.state === "draft" || v.s
   noindex
 >
   <div class="page dk-wrap">
-    <div class="section-head">
-      <SectionHeader
-        as="h1" glyph="✎"
-        eyebrow={say("eyebrow", "Squirrel Guides")}
-        title={say("title", "Create a guide")}
-        body={say("lede",
-          "Write a guide as a path: the phases, the steps in each, the routines that reset and the systems behind them. Everything you write is a draft until Shruti has read it.")}
-      />
-    </div>
+    <Head as="h1" eyebrow={say("title", "Create a guide")} title={say("mine", "Your guides")}
+      lede={say("lede", "Drafts, versions, and where each one stands with me. Create a guide, or import one from a file. Every version is read before it goes up.")} />
     <ol class="dk-how" aria-label={say("how.title", "How it works")}>
       <li>{say("how.1", "Write it here as a path: the phases, the steps in each, the routines that reset, and the codex behind them.")}</li>
       <li>{say("how.2", "Submit it. Shruti reads every guide before it goes up.")}</li>
@@ -83,29 +95,28 @@ const openDraft = (g: Mine) => g.versions.find((v) => v.state === "draft" || v.s
     </ol>
 
     {!me ? (
-      <EmptyState as="h2" glyph="○"
-        title={say("signin.title", "Sign in to write")}
-        body={say("signin.body", "A guide goes up under a name, so writing needs an account. Reading never will.")}>
-        <a slot="action" class="dk-btn" href="/signin">{say("signin.cta", "Sign in")}</a>
-      </EmptyState>
+      <Empty n={9} eyebrow={say("signin.eyebrow", "Create a guide")} title={say("signin.title", "Sign in to write.")}
+        body={say("signin.body", "A guide goes up under a name, so writing needs an account. Reading never will.")}
+        action={say("signin.cta", "Sign in")} href="/signin?next=%2Fguides%2Fwrite" ringAria={say("empty.ring", "An empty ring")} />
     ) : (
       <div class="dk-grid" data-desk data-author={me.displayName}>
-        <section class="dk-section">
-          <h2 class="dk-h2">{say("mine", "Your guides")}</h2>
-          {mine.length === 0 ? (
-            <p class="dk-quiet">{say("mine.none", "Nothing yet. Create one below, or import a guide file.")}</p>
-          ) : (
-            <ul class="dk-list">
-              {mine.map((g) => (
-                <li class="dk-guide">
-                  <p class="dk-guide-title">
-                    {g.published
-                      ? <a href={`/guides/${g.game.slug}/${g.slug}`}>{g.title}</a>
-                      : <span>{g.title}</span>}
-                    <span class="dk-game">{g.game.name}</span>
-                  </p>
+        {mine.length === 0 ? (
+          <Empty n={9} eyebrow={say("empty.eyebrow", "Create a guide")} title={say("empty.title", "Create a guide.")}
+            body={say("empty.body", "A guide is a path: phases, steps, routines, a codex. Write the first phase here — outline, form and preview side by side. Nothing publishes until Shruti has read it.")}
+            action={say("empty.action", "Create a guide")} href="#start" ringAria={say("empty.ring", "An empty ring")} />
+        ) : (
+          <ul class="gd-rows dk-list">
+            {mine.map((g) => (
+              <li class="dk-guide">
+                <Sigil n={Math.max(1, g.shape?.phases ?? 1)} done={0} now={-1} size={44} ring={false} showCount={false}
+                  aria={say("row.aria", "{n} phases").replace("{n}", String(g.shape?.phases ?? 0))} />
+                <div class="dk-main">
+                  <div class="dk-title">
+                    {g.published ? <a class="gd-row-name" href={`/guides/${g.game.slug}/${g.slug}`}>{g.title}</a> : <span class="gd-row-name">{g.title}</span>}
+                    <span class="gd-note">{shapeLine(g)}</span>
+                  </div>
                   {g.hidden && (
-                    <p class="dk-quiet">
+                    <p class="gd-hint">
                       {g.hiddenBy === "author"
                         ? say("hidden.author", "You took this down. Readers cannot see it.")
                         : g.hiddenBy === "reports"
@@ -113,47 +124,45 @@ const openDraft = (g: Mine) => g.versions.find((v) => v.state === "draft" || v.s
                         : say("hidden.her", "Shruti took this down.")}
                     </p>
                   )}
-                  <ul class="dk-versions">
+                  <ol class="gd-ladder">
                     {g.versions.map((v) => (
-                      <li class="dk-version" data-state={v.state}>
-                        <span class="dk-vnum t-tabular">{say("version", "version")} {v.number}</span>
-                        <span class="dk-chip">{STATE[v.state] ?? v.state}</span>
-                        {(v.state === "draft" || v.state === "sent_back") && v.problems > 0 && (
-                          <span class="dk-chip warn t-tabular">{v.problems} {say("problems", "to fix")}</span>
-                        )}
-                        {(v.state === "draft" || v.state === "sent_back") && (
-                          <a class="dk-edit" href={`/guides/write/${v.id}`}>{say("edit", "Open")}</a>
-                        )}
-                        {v.state === "sent_back" && v.note && (
-                          <span class="dk-note">{say("note", "Shruti wrote:")} “{v.note}”</span>
-                        )}
+                      <li>
+                        <StateDot state={dotOf(v)} />
+                        <span class="gd-vno">{say("version.short", "v{n}").replace("{n}", String(v.number))}</span>
+                        <span class="dk-vline">
+                          <span class="gd-vword" data-state={wordState(v)}>{wordOf(v)}</span>
+                          {dateOf(v) && <span class="gd-vdate">{dateOf(v)}</span>}
+                          {v.state === "sent_back" && v.note && <span class="dk-note">{say("note", "Shruti wrote:")} “{v.note}”</span>}
+                        </span>
+                        {(v.state === "draft" || v.state === "sent_back") ? (
+                          <a class="dk-act" href={`/guides/write/${v.id}`}>{say("edit", "Open")}</a>
+                        ) : v.state === "published" ? (
+                          <a class="dk-act" href={`/guides/${g.game.slug}/${g.slug}`}>{say("read", "Read")}</a>
+                        ) : <span />}
                       </li>
                     ))}
-                  </ul>
+                  </ol>
                   {g.published && !openDraft(g) && (
-                    <button type="button" class="dk-btn ghost" data-new-version={g.id}
-                            data-game={g.game.slug} data-slug={g.slug}>
-                      {say("new_version", "Start a new version")}
-                    </button>
+                    <div><Button type="button" variant="secondary" size="sm" data-new-version={g.id} data-game={g.game.slug} data-slug={g.slug}>{say("new_version", "Start a new version")}</Button></div>
                   )}
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
 
         {(received.length > 0 || given.length > 0) && (
           <section class="dk-section">
-            <h2 class="dk-h2">{say("proposals", "Suggested changes")}</h2>
+            <h2 class="gd-h2">{say("proposals", "Suggested changes")}</h2>
             {received.length > 0 && (
               <>
-                <h3 class="dk-h3">{say("proposals.received", "To your guides")}</h3>
-                <ul class="dk-list">
+                <h3 class="gd-eyebrow dk-h3">{say("proposals.received", "To your guides")}</h3>
+                <ul class="gd-index">
                   {received.map((p) => (
-                    <li class="dk-proposal">
-                      <p class="dk-guide-title"><span>{p.guide?.title}</span><span class="dk-game">{say("proposals.by", "by {who}").replace("{who}", p.by)}</span></p>
-                      <p class="dk-quiet t-tabular">{counts(p.changes)} · {pstate(p)}</p>
-                      <a class="dk-edit" href={`/guides/write/${p.id}/changes`}>{say("proposals.see", "See the changes")}</a>
+                    <li>
+                      <span class="dk-ptitle">{p.guide?.title} <span class="gd-note">{say("proposals.by", "by {who}").replace("{who}", p.by)} · {counts(p.changes)} · {pstate(p)}</span></span>
+                      <span class="gd-lead"></span>
+                      <a class="dk-act" href={`/guides/write/${p.id}/changes`}>{say("proposals.see", "See the changes")}</a>
                     </li>
                   ))}
                 </ul>
@@ -161,15 +170,16 @@ const openDraft = (g: Mine) => g.versions.find((v) => v.state === "draft" || v.s
             )}
             {given.length > 0 && (
               <>
-                <h3 class="dk-h3">{say("proposals.given", "Yours, to other people's guides")}</h3>
-                <ul class="dk-list">
+                <h3 class="gd-eyebrow dk-h3">{say("proposals.given", "Yours, to other people's guides")}</h3>
+                <ul class="gd-index">
                   {given.map((p) => (
-                    <li class="dk-proposal">
-                      <p class="dk-guide-title"><span>{p.guide?.title}</span><span class="dk-game">{say("proposals.to", "by {who}").replace("{who}", p.author)}</span></p>
-                      <p class="dk-quiet t-tabular">{counts(p.changes)} · {pstate(p)}</p>
-                      {p.state === "declined" && p.note && <p class="dk-note">{say("proposals.note", "The author wrote:")} “{p.note}”</p>}
-                      {p.state === "draft" && !p.accepted && <a class="dk-edit" href={`/guides/write/${p.id}`}>{say("edit", "Open")}</a>}
-                      {p.state !== "draft" && <a class="dk-edit" href={`/guides/write/${p.id}/changes`}>{say("proposals.see", "See the changes")}</a>}
+                    <li>
+                      <span class="dk-ptitle">{p.guide?.title} <span class="gd-note">{say("proposals.to", "by {who}").replace("{who}", p.author)} · {counts(p.changes)} · {pstate(p)}</span>
+                        {p.state === "declined" && p.note && <span class="dk-note">{say("proposals.note", "The author wrote:")} “{p.note}”</span>}
+                      </span>
+                      <span class="gd-lead"></span>
+                      {p.state === "draft" && !p.accepted && <a class="dk-act" href={`/guides/write/${p.id}`}>{say("edit", "Open")}</a>}
+                      {p.state !== "draft" && <a class="dk-act" href={`/guides/write/${p.id}/changes`}>{say("proposals.see", "See the changes")}</a>}
                     </li>
                   ))}
                 </ul>
@@ -178,49 +188,29 @@ const openDraft = (g: Mine) => g.versions.find((v) => v.state === "draft" || v.s
           </section>
         )}
 
-        <section class="dk-section">
-          <h2 class="dk-h2">{say("new", "Create a new guide")}</h2>
-          <form class="dk-form" data-new>
-            <label>
-              {say("new.title", "Title")}
-              <input name="title" type="text" required maxlength="140"
-                     placeholder={say("new.title.hint", "Shruti's Diablo IV Squirrel Guide for Warlocks")} />
+        <div id="start" class="dk-start">
+          <Console as="form" eyebrow={say("new", "Create a new guide")} data-new>
+            <TextField label={say("new.title", "Title")} name="title" required maxlength="140" placeholder={say("new.title.hint", "What the path gets someone to")} />
+            <TextField label={say("new.game", "Game")} name="game" required maxlength="80" list="dk-games" placeholder={say("new.game.hint", "Pick one, or name a new game")} hint={say("new.game.note", "A new game arrives with its first guide.")} />
+            <datalist id="dk-games">
+              {(games ?? []).map((g) => <option value={g.name} data-slug={g.slug} />)}
+            </datalist>
+            <TextField label={say("new.variants", "Ways a run can differ, if any")} name="variants" maxlength="200" optionalLabel placeholder={say("new.variants.hint", "Class · mode · platform")} hint={say("new.variants.note", "The fields a run checks in with, separated by commas. Leave empty if none.")} />
+            <div><Button type="submit">{say("new.go", "Create the guide")}</Button></div>
+            <p class="gd-hint" data-new-status></p>
+          </Console>
+          <div class="dk-side">
+            <label class="dk-drop" data-drop>
+              <span class="gd-eyebrow">{say("import", "Or import a guide file")}</span>
+              <span class="dk-drop-title">{say("import.drop", "Drop a guide file here")}</span>
+              <span class="dk-drop-body">{say("import.note", "The same guide.json the tracker reads and any guide's page offers to download. It is validated before anything is saved; one whose address matches a guide of yours opens as its next draft.")}</span>
+              <span class="dk-drop-btn"><Button type="button" variant="secondary" size="sm" data-import-button>{say("import.pick", "Choose a file")}</Button></span>
+              <input type="file" accept=".json,application/json" data-import class="dk-file-input" />
+              <span class="gd-hint" data-import-status></span>
             </label>
-            <label>
-              {say("new.game", "Game")}
-              <input name="game" type="text" required maxlength="80" list="dk-games"
-                     placeholder={say("new.game.hint", "Diablo IV")} />
-              <datalist id="dk-games">
-                {(games ?? []).map((g) => <option value={g.name} data-slug={g.slug} />)}
-              </datalist>
-            </label>
-            <label>
-              {say("new.variants", "Ways a run can differ, if any")}
-              <input name="variants" type="text" maxlength="200"
-                     placeholder={say("new.variants.hint", "Eternal, Seasonal")} />
-            </label>
-            <button type="submit" class="dk-btn">{say("new.go", "Create the guide")}</button>
-            <p class="dk-quiet" data-new-status></p>
-          </form>
-        </section>
-
-        <section class="dk-section">
-          <h2 class="dk-h2">{say("import", "Or import a guide file")}</h2>
-          <p class="dk-quiet">
-            {say("import.note",
-              "The same file the tracker reads and any guide's page offers to download. Importing one whose address matches a guide of yours opens it as the next draft.")}
-          </p>
-          <label class="dk-file">
-            {say("import.pick", "Choose a .guide.json file")}
-            <input type="file" accept=".json,application/json" data-import />
-          </label>
-          <p class="dk-quiet" data-import-status></p>
-        </section>
-
-        <p class="dk-foot">
-          {say("foot",
-            "What you write is yours. It goes up under your name once Shruti has read it, readers can say it was useful, and anyone can download the file.")}
-        </p>
+            <p class="dk-foot">{say("foot", "Agents may draft and submit. Nothing an agent does publishes. Every version is read by Shruti before it goes up.")}</p>
+          </div>
+        </div>
       </div>
     )}
   </div>
@@ -228,33 +218,28 @@ const openDraft = (g: Mine) => g.versions.find((v) => v.state === "draft" || v.s
 
 <style>
   .dk-wrap { padding-block: var(--space-6) var(--space-9); display: grid; gap: var(--space-7); font-family: var(--font-body); }
-  .dk-grid { display: grid; gap: var(--space-7); max-width: 46rem; }
-  .dk-h2 { margin: 0 0 var(--space-3); font-family: var(--font-display); font-weight: 600; font-size: var(--text-h3); color: var(--ink); }
-  .dk-quiet { margin: 0; font-size: var(--text-sm); color: var(--ink-faint); }
+  .dk-grid { display: grid; gap: var(--space-7); }
   .dk-how { margin: 0; padding-left: 1.4rem; display: grid; gap: 4px; max-width: var(--measure-ui); font-size: var(--text-sm); line-height: var(--leading-body); color: var(--ink-soft); }
   .dk-how li::marker { font-family: var(--font-mono); color: var(--ink-faint); }
-  .dk-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-4); }
-  .dk-guide { display: grid; gap: 6px; padding: var(--space-4); border: var(--border-w) solid var(--line); border-radius: var(--radius-md); background: var(--surface-card); }
-  .dk-guide-title { margin: 0; display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; font-weight: 600; color: var(--ink); }
-  .dk-guide-title a { color: inherit; }
-  .dk-game { font-size: var(--text-micro); font-weight: 600; letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; color: var(--ink-faint); }
-  .dk-versions { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
-  .dk-version { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: var(--text-sm); color: var(--ink-soft); }
-  .dk-vnum { color: var(--ink-faint); }
-  .dk-chip { font-size: var(--text-micro); font-weight: 600; letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; border: var(--border-w) solid var(--line); border-radius: var(--radius-full); padding: 1px 8px; color: var(--ink-faint); }
-  .dk-version[data-state="published"] .dk-chip { color: var(--accent); border-color: var(--accent); }
-  .dk-version[data-state="sent_back"] .dk-chip { color: var(--rose); border-color: var(--rose); }
-  .dk-chip.warn { color: var(--rose); border-color: var(--rose); }
-  .dk-edit { font-weight: 500; color: var(--accent); }
-  .dk-note { flex-basis: 100%; font-style: italic; }
-  .dk-form { display: grid; gap: 10px; max-width: 28rem; }
-  .dk-form label, .dk-file { display: grid; gap: 4px; font-size: var(--text-sm); color: var(--ink-soft); }
-  .dk-form input { font: inherit; padding: 8px 10px; border: var(--border-w) solid var(--line); border-radius: var(--radius-sm); background: var(--surface-page); color: var(--ink); }
-  .dk-btn { justify-self: start; font: 500 var(--text-sm) var(--font-body); padding: 8px 16px; border-radius: var(--radius-full); border: var(--border-w) solid var(--accent); background: var(--accent); color: var(--on-accent); cursor: pointer; text-decoration: none; }
-  .dk-btn.ghost { background: var(--surface-card); color: var(--ink); border-color: var(--line-strong); }
-  .dk-foot { margin: 0; max-width: var(--measure-ui); font-size: var(--text-sm); color: var(--ink-faint); }
-  .dk-h3 { font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-faint); margin: 14px 0 6px; font-weight: 600; }
-  .dk-proposal { display: grid; gap: 4px; padding: 12px 0; border-top: var(--border-w) solid var(--line); }
+  .dk-guide { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 16px; padding: 18px 0; border-bottom: 1px solid var(--line); }
+  .dk-main { display: grid; gap: 10px; min-width: 0; }
+  .dk-title { display: grid; gap: 3px; }
+  .dk-title a { color: inherit; text-decoration: none; }
+  .dk-title a:hover { color: var(--accent); }
+  .dk-vline { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; min-width: 0; }
+  .dk-note { flex-basis: 100%; font-style: italic; color: var(--ink-soft); font-size: 13px; }
+  .dk-act { font-size: 13px; font-weight: 500; white-space: nowrap; color: var(--accent); }
+  .dk-section { display: grid; gap: var(--space-3); }
+  .dk-h3 { margin: 10px 0 0; }
+  .dk-ptitle { display: grid; gap: 2px; min-width: 0; font-weight: 600; }
+  .dk-start { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: var(--space-6); align-items: start; scroll-margin-top: 80px; }
+  .dk-side { display: grid; gap: var(--space-5); align-content: start; }
+  .dk-drop { display: grid; gap: 10px; place-items: center; text-align: center; padding: 32px 20px; border: 1px dashed var(--line-strong); border-radius: 10px; background: color-mix(in srgb, var(--surface-veil) 40%, transparent); cursor: pointer; }
+  .dk-drop[data-over="true"] { border-color: var(--accent); background: var(--accent-wash); }
+  .dk-drop-title { font-weight: 600; }
+  .dk-drop-body { font-size: 14px; color: var(--ink-soft); max-width: 36ch; text-wrap: pretty; }
+  .dk-file-input { position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden; }
+  .dk-foot { margin: 0; font-family: var(--font-display); font-size: 17px; line-height: 1.6; color: var(--ink-soft); text-wrap: pretty; }
 </style>
 
 <script>
@@ -265,7 +250,6 @@ const openDraft = (g: Mine) => g.versions.find((v) => v.state === "draft" || v.s
       s.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 80);
     const token = () =>
       document.cookie.split("; ").find((c) => c.startsWith("shruti_csrf="))?.split("=")[1] ?? "";
-
     /* Saving a skeleton IS creating a guide: the server files it and answers
        with the version to open. */
     const file = async (body: unknown): Promise<{ ok: boolean; versionId?: number; detail?: string }> => {
@@ -277,7 +261,6 @@ const openDraft = (g: Mine) => g.versions.find((v) => v.state === "draft" || v.s
       const answer = await r.json().catch(() => ({}));
       return r.ok ? { ok: true, versionId: answer.versionId } : { ok: false, detail: answer.detail };
     };
-
     const form = desk.querySelector<HTMLFormElement>("[data-new]");
     const status = desk.querySelector<HTMLElement>("[data-new-status]");
     form?.addEventListener("submit", async (event) => {
@@ -302,11 +285,10 @@ const openDraft = (g: Mine) => g.versions.find((v) => v.state === "draft" || v.s
       if (r.ok && r.versionId) location.href = `/guides/write/${r.versionId}`;
       else if (status) status.textContent = r.detail || "That did not save. Try again.";
     });
-
     const pick = desk.querySelector<HTMLInputElement>("[data-import]");
     const importStatus = desk.querySelector<HTMLElement>("[data-import-status]");
-    pick?.addEventListener("change", async () => {
-      const chosen = pick.files?.[0];
+    const drop = desk.querySelector<HTMLElement>("[data-drop]");
+    const importFile = async (chosen: File | undefined) => {
       if (!chosen) return;
       let body: unknown;
       try {
@@ -319,8 +301,14 @@ const openDraft = (g: Mine) => g.versions.find((v) => v.state === "draft" || v.s
       const r = await file(body);
       if (r.ok && r.versionId) location.href = `/guides/write/${r.versionId}`;
       else if (importStatus) importStatus.textContent = r.detail || "That did not save. The file needs guide.id, guide.title and game.id at least.";
-    });
-
+    };
+    pick?.addEventListener("change", () => importFile(pick.files?.[0]));
+    desk.querySelector("[data-import-button]")?.addEventListener("click", (e) => { e.preventDefault(); pick?.click(); });
+    if (drop) {
+      drop.addEventListener("dragover", (e) => { e.preventDefault(); drop.dataset.over = "true"; });
+      drop.addEventListener("dragleave", () => { drop.dataset.over = "false"; });
+      drop.addEventListener("drop", (e) => { e.preventDefault(); drop.dataset.over = "false"; importFile(e.dataTransfer?.files?.[0]); });
+    }
     /* A new version starts from what is live, fetched from the reader API. */
     for (const button of desk.querySelectorAll<HTMLButtonElement>("[data-new-version]")) {
       button.addEventListener("click", async () => {

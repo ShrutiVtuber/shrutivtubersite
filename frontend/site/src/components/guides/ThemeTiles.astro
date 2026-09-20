@@ -1,0 +1,27 @@
+---
+/* Theme tiles (README §4.8): a 3-up of labels, each a plate in that theme, a
+ * radio and the theme's name; under it the one sentence about what a theme is.
+ * The radios carry `data-theme` so the page scripts read the chosen one with
+ * `input[data-theme]:checked`. */
+import Plate from "./Plate.astro";
+interface Props {
+  name: string;
+  value?: string;
+  themes: { value: string; label: string }[];
+  note?: string;
+  preset?: string;
+}
+const { name, value = "almanac", themes, note, preset = "now" } = Astro.props;
+---
+<div class="gd-themes" role="radiogroup">
+  {themes.map((t) => (
+    <label class="gd-theme">
+      <Plate theme={t.value} elements={preset} width={160} fluid aria={t.label} />
+      <span class="gd-theme-row">
+        <input type="radio" name={name} value={t.value} checked={t.value === value} data-theme />
+        {t.label}
+      </span>
+    </label>
+  ))}
+</div>
+{note && <p class="gd-hint">{note}</p>}

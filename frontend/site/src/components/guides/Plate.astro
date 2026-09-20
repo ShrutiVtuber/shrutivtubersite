@@ -1,0 +1,17 @@
+---
+/* A miniature of the stream canvas in its theme (README §4.7). Markup from
+ * lib/plate.ts; `labels` are say() strings per element kind and `aria` the
+ * accessible name. */
+import { plate, PRESETS, type PlateElement } from "../../lib/plate";
+interface Props {
+  theme: string;
+  elements?: PlateElement[] | string;
+  width: number;
+  fluid?: boolean;
+  labels?: Record<string, string>;
+  aria: string;
+}
+const { theme, elements = "now", width, fluid = false, labels, aria } = Astro.props;
+const els = typeof elements === "string" ? PRESETS[elements] ?? PRESETS.now : elements;
+---
+<Fragment set:html={plate({ theme, elements: els, width, fluid, labels, aria })} />

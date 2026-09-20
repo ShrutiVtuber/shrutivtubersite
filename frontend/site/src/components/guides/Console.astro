@@ -1,0 +1,28 @@
+---
+/* The console frame (README §4.6): not a card. Page ground, 1px --line-strong,
+ * radius 4, four corner marks. The site's fields sit inside it unchanged, and
+ * because the frame stands on the page ground, a field's card ground shows.
+ * Used for every form in the section, the reader's "Track this path" block,
+ * the tracker's provenance rail, the gate builder and the diff console. */
+interface Props {
+  as?: "form" | "div" | "section" | "aside" | "article";
+  eyebrow?: string;
+  note?: string;
+  class?: string;
+  [key: string]: unknown;
+}
+const { as: Tag = "div", eyebrow, note, class: klass, ...rest } = Astro.props;
+---
+<Tag class:list={["gd-console", klass]} {...rest}>
+  <span class="gd-corner" data-at="tl" aria-hidden="true"></span>
+  <span class="gd-corner" data-at="tr" aria-hidden="true"></span>
+  <span class="gd-corner" data-at="bl" aria-hidden="true"></span>
+  <span class="gd-corner" data-at="br" aria-hidden="true"></span>
+  {(eyebrow || note) && (
+    <div class="gd-console-head">
+      {eyebrow && <span class="gd-eyebrow">{eyebrow}</span>}
+      {note && <span class="gd-note">{note}</span>}
+    </div>
+  )}
+  <slot />
+</Tag>
