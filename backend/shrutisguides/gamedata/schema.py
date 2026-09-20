@@ -54,9 +54,13 @@ CREATE TABLE IF NOT EXISTS source (game TEXT NOT NULL, facet TEXT NOT NULL, body
 # glyphs), and those are split out on load.
 KINDS = (
     "class", "specialization", "skill", "tree", "board", "tab", "node", "glyph",
-    "slot", "base", "affix", "unique", "set", "runeword", "rune", "gem", "jewel", "charm", "flask",
+    "slot", "itemtype", "base", "affix", "unique", "set", "runeword", "rune", "gem", "jewel", "charm", "flask",
     "aspect", "tempering", "mercenary", "progression",
 )
+
+# The kinds that sit in an equipment slot; only these get the slot column
+# (a specialization's "slot: primary" is its own word, not a place on a body).
+SLOT_KINDS = ("base", "unique", "affix", "set", "runeword", "rune", "gem", "jewel", "charm", "flask", "aspect", "tempering", "itemtype")
 
 # pack file → the kind its top-level records are. Nested records are handled
 # by `load.py`'s splitters (see NESTED there).
@@ -66,6 +70,7 @@ FILES = {
     "tree.json": "tree",
     "tree-nodes.json": "node",
     "slots.json": "slot",
+    "item-types.json": "itemtype",
     "bases.json": "base",
     "affixes.json": "affix",
     "uniques.json": "unique",
@@ -83,8 +88,13 @@ FILES = {
 }
 
 # The relationships derived from a record's own fields: (field, rel, to_kind).
-# A field may hold one id or a list of ids; a missing field is nothing.
+# A field may hold one id or a list of ids; a missing field is nothing. A
+# link to a slot whose id is an item type's instead (affixes roll on "bow"
+# and "any armour", not on "main hand") is filed against the item type; the
+# item type's own `fits` links say which slots that reaches.
 LINKS: dict[str, tuple[tuple[str, str, str], ...]] = {
+    "slot": (("accepts", "accepts", "itemtype"),),
+    "itemtype": (("slot_ids", "fits", "slot"), ("parent_ids", "is-a", "itemtype"), ("class_ids", "of", "class")),
     "specialization": (("class_ids", "of", "class"),),
     "skill": (("prerequisites", "requires", "skill"), ("synergy_ids", "synergy", "skill"), ("upgrade_ids", "upgrade", "skill"),
               ("class_ids", "of", "class")),
@@ -92,10 +102,11 @@ LINKS: dict[str, tuple[tuple[str, str, str], ...]] = {
              ("ascendancy_id", "of", "specialization")),
     "glyph": (("class_ids", "of", "class"),),
     "board": (("class_ids", "of", "class"),),
-    "base": (("slot_id", "fits", "slot"), ("slot_ids", "fits", "slot"), ("class_ids", "of", "class"),
+    "base": (("slot_id", "fits", "slot"), ("slot_ids", "fits", "slot"), ("type", "is-a", "itemtype"), ("class_ids", "of", "class"),
              ("exceptional_id", "becomes", "base"), ("elite_id", "becomes", "base")),
-    "affix": (("slot_ids", "rolls-on", "slot"), ("applies_to", "rolls-on", "slot"), ("class_ids", "of", "class"), ("manual_id", "from", "tempering")),
-    "unique": (("base_id", "on", "base"), ("slot_id", "fits", "slot"), ("set_id", "in", "set"), ("class_ids", "of", "class")),
+    "affix": (("slot_ids", "rolls-on", "slot"), ("applies_to", "rolls-on", "slot"), ("item_types", "rolls-on", "itemtype"),
+              ("class_ids", "of", "class"), ("manual_id", "from", "tempering")),
+    "unique": (("base_id", "on", "base"), ("slot_id", "fits", "slot"), ("type", "is-a", "itemtype"), ("set_id", "in", "set"), ("class_ids", "of", "class")),
     "set": (("piece_ids", "piece", "unique"), ("pieces", "piece", "unique"), ("class_ids", "of", "class")),
     "runeword": (("rune_ids", "rune", "rune"), ("runes", "rune", "rune"), ("slot_ids", "fits", "slot"), ("base_types", "fits", "slot")),
     "aspect": (("slot_ids", "fits", "slot"), ("class_ids", "of", "class")),

@@ -53,17 +53,21 @@ class _Check:
         self.data, self.game, self.class_id = data, game, class_id
         self.cache: dict[tuple, bool] = {}
 
-    def known(self, kind: str, id: str, sub: str | list[str] | None = None, by_class: bool = False) -> bool:
-        key = (kind, id, tuple(sub) if isinstance(sub, list) else sub, by_class)
+    def known(self, kind: str, id: str, sub: str | list[str] | None = None, by_class: bool = False, slot_id: str | None = None) -> bool:
+        key = (kind, id, tuple(sub) if isinstance(sub, list) else sub, by_class, slot_id)
         if key not in self.cache:
-            self.cache[key] = self.data.exists_id(self.game, kind, id, sub=sub, class_id=self.class_id if by_class else None)
+            self.cache[key] = self.data.exists_id(self.game, kind, id, sub=sub, class_id=self.class_id if by_class else None, slot_id=slot_id)
         return self.cache[key]
 
     def record(self, kind: str, id: str) -> dict | None:
         return self.data.get(self.game, kind, id)
 
 
-def _clean_fields(spec: dict, raw: dict, chk: _Check, where: str, problems: list[str], chosen: dict | None = None) -> dict:
+SLOTTED = ("unique", "base", "aspect", "affix", "runeword")      # the kinds a gear choice must fit its slot with
+
+
+def _clean_fields(spec: dict, raw: dict, chk: _Check, where: str, problems: list[str], chosen: dict | None = None,
+                  slot_id: str | None = None) -> dict:
     out: dict = {}
     if not isinstance(raw, dict):
         return out
@@ -88,18 +92,24 @@ def _clean_fields(spec: dict, raw: dict, chk: _Check, where: str, problems: list
                 problems.append(f"{where}.{name}: '{s}' is not one of the choices")
         elif t == "id":
             s = slug(v)
-            if s and chk.known(f["kind"], s, f.get("sub"), f.get("by_class", False)):
+            fit = slot_id if f["kind"] in SLOTTED else None
+            if s and chk.known(f["kind"], s, f.get("sub"), f.get("by_class", False), fit):
                 out[name] = s
+            elif s and fit and chk.known(f["kind"], s, f.get("sub"), f.get("by_class", False)):
+                problems.append(f"{where}.{name}: '{s}' does not fit that slot")
             elif s:
                 problems.append(f"{where}.{name}: no {f['kind']} called '{s}'")
         elif t == "ids":
             ids: list[str] = []
+            fit = slot_id if f["kind"] in SLOTTED else None
             for x in (v if isinstance(v, list) else [v])[: int(f.get("max", 12)) + 12]:
                 s = slug(x)
                 if not s or s in ids:
                     continue
-                if chk.known(f["kind"], s, f.get("sub"), f.get("by_class", False)):
+                if chk.known(f["kind"], s, f.get("sub"), f.get("by_class", False), fit):
                     ids.append(s)
+                elif fit and chk.known(f["kind"], s, f.get("sub"), f.get("by_class", False)):
+                    problems.append(f"{where}.{name}: '{s}' does not fit that slot")
                 else:
                     problems.append(f"{where}.{name}: no {f['kind']} called '{s}'")
             if len(ids) > int(f.get("max", 12)):
@@ -178,7 +188,7 @@ def clean_plan(raw: Any, data: GameData) -> tuple[dict, list[str]]:
                 if s not in allowed:
                     problems.append(f"{sid}: no slot called '{s}'" + (" for this class" if class_id else ""))
                     continue
-                fields = _clean_fields(sec.get("fields"), choice, chk, f"{sid}.{s}", problems)
+                fields = _clean_fields(sec.get("fields"), choice, chk, f"{sid}.{s}", problems, slot_id=s)
                 if fields:
                     gear[s] = fields
             if gear:

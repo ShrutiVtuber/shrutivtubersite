@@ -93,9 +93,11 @@ class GameData:
             where.append("(e.class_ids = '[]' OR EXISTS (SELECT 1 FROM json_each(e.class_ids) WHERE value = ?))")
             args.append(class_id)
         if slot_id:
+            # in the slot itself; or linked to it; or linked to an item type the slot accepts
             where.append("(e.slot_id = ? OR EXISTS (SELECT 1 FROM link l WHERE l.game = e.game AND l.from_kind = e.kind AND l.from_id = e.id "
-                         "AND l.rel IN ('fits', 'rolls-on') AND l.to_id = ?))")
-            args.extend([slot_id, slot_id])
+                         "AND l.rel IN ('fits', 'rolls-on', 'is-a') AND (l.to_kind = 'slot' AND l.to_id = ? OR l.to_kind = 'itemtype' AND EXISTS ("
+                         "SELECT 1 FROM link t WHERE t.game = l.game AND t.from_kind = 'itemtype' AND t.from_id = l.to_id AND t.rel = 'fits' AND t.to_id = ?))))")
+            args.extend([slot_id, slot_id, slot_id])
         if group:
             where.append("e.grp = ?")
             args.append(group)
@@ -132,8 +134,9 @@ class GameData:
                                (game, kind, *ids[:MAX_LIMIT])).fetchall()
         return {r["id"]: r["name"] for r in rows}
 
-    def exists_id(self, game: str, kind: str, id: str, sub: str | list[str] | None = None, class_id: str | None = None) -> bool:
-        return bool(self.list(game, kind, ids=[id], sub=sub, class_id=class_id, limit=1, brief=True))
+    def exists_id(self, game: str, kind: str, id: str, sub: str | list[str] | None = None, class_id: str | None = None,
+                  slot_id: str | None = None) -> bool:
+        return bool(self.list(game, kind, ids=[id], sub=sub, class_id=class_id, slot_id=slot_id, limit=1, brief=True))
 
     def search(self, game: str, q: str, kinds: list[str] | None = None, class_id: str | None = None, limit: int = 40) -> list[dict]:
         match = fts_query(q)

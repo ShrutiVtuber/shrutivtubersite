@@ -26,7 +26,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
 
-from .schema import DDL, FILES, LINKS
+from .schema import DDL, FILES, LINKS, SLOT_KINDS
 
 SUMMARY_KEYS = ("summary", "effect_summary", "mechanic_summary", "effect", "description")
 GROUP_KEYS = ("group", "board_id", "tab_id", "tab", "tree_id", "category", "manual_id", "manual", "item_class", "family", "tier", "act")
@@ -243,7 +243,7 @@ def normalise(kind: str, rec: dict, position: int) -> dict | None:
     if kind == "tree":
         sub = slug(rec.get("kind"))
     grp = _text(_first(rec, GROUP_KEYS), 80)
-    slot_id, slot_ids = _slot(rec)
+    slot_id, slot_ids = _slot(rec) if kind in SLOT_KINDS else ("", [])
     tags = [str(t)[:40] for t in (rec.get("tags") or []) if isinstance(t, (str, int))] if isinstance(rec.get("tags"), list) else []
     level = _int(_first(rec, LEVEL_KEYS))
     summary = _text(_first(rec, SUMMARY_KEYS), MAX_SUMMARY)
@@ -255,7 +255,7 @@ def normalise(kind: str, rec: dict, position: int) -> dict | None:
             "tags": tags, "level_req": level, "summary": summary, "position": position, "data": data}
 
 
-def _links_of(game: str, row: dict) -> list[tuple]:
+def _links_of(game: str, row: dict, known: set[tuple[str, str]]) -> list[tuple]:
     out: list[tuple] = []
     data = row["data"]
     for fld, rel, to_kind in LINKS.get(row["kind"], ()):
@@ -264,11 +264,51 @@ def _links_of(game: str, row: dict) -> list[tuple]:
         else:
             targets = [slug(t) for t in _ids(data.get(fld)) if slug(t)]
         for t in targets:
-            if t and not (to_kind == row["kind"] and t == row["id"]):
-                out.append((game, row["kind"], row["id"], rel, to_kind, t, ""))
+            if not t or (to_kind == row["kind"] and t == row["id"]):
+                continue
+            kind_to = to_kind
+            if to_kind == "slot" and (to_kind, t) not in known and ("itemtype", t) in known:
+                kind_to = "itemtype"          # "rolls on bow": a type of item, not a place on the body
+            out.append((game, row["kind"], row["id"], rel, kind_to, t, ""))
     if row["slot_id"] and row["kind"] not in ("slot",) and not any(l[3] == "fits" for l in out):
         out.append((game, row["kind"], row["id"], "fits", "slot", row["slot_id"], ""))
     return list(dict.fromkeys(out))      # a field and its alias name the same link once
+
+
+def _item_types(game: str, rows: list[dict], seen: set[tuple[str, str]]) -> list[dict]:
+    """
+    The item types a pack names without describing: every id a slot
+    `accepts` and every `type` a base carries becomes an item type record —
+    with the slots that accept it — unless the pack wrote one itself, in
+    which case that record gains the slots it did not list.
+    """
+    slots_of: dict[str, list[str]] = {}
+    for r in rows:
+        if r["kind"] == "slot":
+            for t in _ids(r["data"].get("accepts")):
+                slots_of.setdefault(slug(t), []).append(r["id"])
+    for r in rows:
+        if r["kind"] in ("base", "unique") and r["data"].get("type") and r["slot_id"]:
+            slots_of.setdefault(slug(r["data"]["type"]), [])
+            if r["slot_id"] not in slots_of[slug(r["data"]["type"])]:
+                slots_of[slug(r["data"]["type"])].append(r["slot_id"])
+    made: list[dict] = []
+    for r in rows:
+        if r["kind"] == "itemtype":
+            mine = [slug(x) for x in _ids(r["data"].get("slot_ids") or r["data"].get("slot_id"))]
+            for sid in slots_of.get(r["id"], []):
+                if sid not in mine:
+                    mine.append(sid)
+            r["data"]["slot_ids"] = mine
+            r["slot_id"] = r["slot_id"] or (mine[0] if mine else "")
+    for pos, (tid, slot_ids) in enumerate(sorted(slots_of.items())):
+        if not tid or ("itemtype", tid) in seen:
+            continue
+        seen.add(("itemtype", tid))
+        made.append({"kind": "itemtype", "id": tid, "name": tid.replace("-", " ").title(), "sub": "", "grp": "", "class_ids": [],
+                     "slot_id": slot_ids[0] if slot_ids else "", "tags": [], "level_req": None, "summary": "", "position": 10_000 + pos,
+                     "data": {"id": tid, "name": tid.replace("-", " ").title(), "slot_ids": slot_ids, "synthesised": True}})
+    return made
 
 
 # ── the build itself ─────────────────────────────────────────────────────────
@@ -310,13 +350,14 @@ def load_game(con: sqlite3.Connection, folder: Path, report: Report) -> str | No
                 continue
             seen.add(key)
             rows.append(row)
+    rows.extend(_item_types(game, rows, seen))
     con.executemany(
         "INSERT INTO entity (game, kind, id, name, sub, grp, class_ids, slot_id, tags, level_req, summary, position, data) "
         "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         [(game, r["kind"], r["id"], r["name"], r["sub"], r["grp"], json.dumps(r["class_ids"]), r["slot_id"], json.dumps(r["tags"]),
           r["level_req"], r["summary"], r["position"], json.dumps(r["data"], ensure_ascii=False, separators=(",", ":"))) for r in rows])
     for r in rows:
-        links.extend(_links_of(game, r))
+        links.extend(_links_of(game, r, seen))
     con.executemany("INSERT INTO link (game, from_kind, from_id, rel, to_kind, to_id, note) VALUES (?, ?, ?, ?, ?, ?, ?)", links)
     # dangling links are reported, and kept: a pack fixed later makes them whole
     dangling = con.execute(
