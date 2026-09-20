@@ -32,6 +32,7 @@ services:
       - ./Caddyfile.internal:/etc/caddy/Caddyfile:ro
       - media:/srv/media:ro
       - packs:/srv/packs:ro
+      - gamedata:/srv/gamedata:ro
       - journal:/srv/journal:ro
       - caddy_data:/data
       - caddy_config:/config
@@ -125,6 +126,10 @@ services:
     volumes:
       - media:/app/media
       - packs:/app/packs
+      # The game database and its manifest, built from the guides repository's
+      # research packs by scripts/sync-gamedata.sh. Facts about games, All
+      # Rights Reserved as a compilation, served at runtime like the packs.
+      - gamedata:/app/gamedata
       - journal:/srv/journal:ro
       # ⚠ The Firebase service-account key, mounted read-only from OUTSIDE the
       # repo. It lives in ~/.secrets/shruti because it arrived as a download
@@ -206,6 +211,8 @@ volumes:
   caddy_config:
   packs:
     name: shruti_packs
+  gamedata:
+    name: shruti_gamedata
 
 networks:
   shruti:

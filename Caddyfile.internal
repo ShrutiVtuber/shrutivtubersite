@@ -80,6 +80,26 @@
 		header Access-Control-Allow-Origin "*"
 	}
 
+	# ── Game data ────────────────────────────────────────────────────────────
+	#
+	# The game database a self-hosted tracker pulls to plan builds offline:
+	# one SQLite file named by its digest, and a manifest that says which is
+	# current. Built by scripts/sync-gamedata.sh from the guides repository's
+	# research packs; facts about games, served at runtime, never in this
+	# repository. The manifest is never cached; the files are immutable.
+	handle /gamedata/manifest.json {
+		root * /srv
+		file_server
+		header Cache-Control "no-cache"
+		header Access-Control-Allow-Origin "*"
+	}
+	handle /gamedata/* {
+		root * /srv
+		file_server
+		header Cache-Control "public, max-age=31536000, immutable"
+		header Access-Control-Allow-Origin "*"
+	}
+
 	# ── Fonts ────────────────────────────────────────────────────────────────
 	#
 	# Every filename here carries a hash of its own contents

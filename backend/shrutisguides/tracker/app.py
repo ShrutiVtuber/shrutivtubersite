@@ -17,6 +17,7 @@ Run it:  uvicorn shrutisguides.tracker.app:app --host 0.0.0.0 --port 8210
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import secrets
@@ -33,6 +34,7 @@ from pydantic import BaseModel
 
 from shrutisguides import builds, engine, progress
 from shrutisguides.format.validate import validate
+from shrutisguides.gamedata import KINDS, GameData, clean_plan, plan_goals, plan_summary, plan_to_categories, recipe_for
 
 VERSION = "0.1.0"
 SITE = os.environ.get("SHRUTI_SITE_URL", "https://shrutivtuber.com").rstrip("/")
@@ -62,14 +64,33 @@ def db() -> sqlite3.Connection:
             description TEXT NOT NULL DEFAULT '', categories TEXT NOT NULL DEFAULT '[]',
             visible INTEGER NOT NULL DEFAULT 1, position INTEGER NOT NULL DEFAULT 0, UNIQUE(game_slug, name));
         CREATE TABLE IF NOT EXISTS build (
-            id INTEGER PRIMARY KEY, template_id INTEGER NOT NULL REFERENCES build_template(id), run_id INTEGER REFERENCES run(id),
-            name TEXT NOT NULL, variant TEXT NOT NULL DEFAULT '', goals TEXT NOT NULL DEFAULT '{}', updated_at TEXT NOT NULL);
+            id INTEGER PRIMARY KEY, template_id INTEGER REFERENCES build_template(id), run_id INTEGER REFERENCES run(id),
+            name TEXT NOT NULL, variant TEXT NOT NULL DEFAULT '', goals TEXT NOT NULL DEFAULT '{}', updated_at TEXT NOT NULL,
+            game_slug TEXT NOT NULL DEFAULT '', game_name TEXT NOT NULL DEFAULT '', plan TEXT NOT NULL DEFAULT '{}',
+            categories TEXT NOT NULL DEFAULT '[]');
         CREATE TABLE IF NOT EXISTS overlay (
             id INTEGER PRIMARY KEY, token TEXT NOT NULL UNIQUE, kind TEXT NOT NULL, run_id INTEGER REFERENCES run(id),
             build_id INTEGER REFERENCES build(id),
             routine_id TEXT NOT NULL DEFAULT '', theme TEXT NOT NULL DEFAULT 'almanac', motion TEXT NOT NULL DEFAULT 'reduced',
             label TEXT NOT NULL DEFAULT '', last_seen TEXT, layout TEXT NOT NULL DEFAULT '[]');
     """)
+    if "plan" not in {r["name"] for r in con.execute("PRAGMA table_info(build)").fetchall()}:
+        # An older tracker: every build stood on a template. A planned build
+        # stands on the game's data instead, so template_id may be empty —
+        # and SQLite cannot loosen a NOT NULL, so the table is rebuilt beside
+        # itself (never renamed away: overlays point at build(id)).
+        con.executescript("""
+            CREATE TABLE build_new (
+                id INTEGER PRIMARY KEY, template_id INTEGER REFERENCES build_template(id), run_id INTEGER REFERENCES run(id),
+                name TEXT NOT NULL, variant TEXT NOT NULL DEFAULT '', goals TEXT NOT NULL DEFAULT '{}', updated_at TEXT NOT NULL,
+                game_slug TEXT NOT NULL DEFAULT '', game_name TEXT NOT NULL DEFAULT '', plan TEXT NOT NULL DEFAULT '{}',
+                categories TEXT NOT NULL DEFAULT '[]');
+            INSERT INTO build_new (id, template_id, run_id, name, variant, goals, updated_at)
+                SELECT id, template_id, run_id, name, variant, goals, updated_at FROM build;
+            DROP TABLE build;
+            ALTER TABLE build_new RENAME TO build;
+        """)
+        con.commit()
     columns = {r["name"] for r in con.execute("PRAGMA table_info(overlay)").fetchall()}
     if "layout" not in columns:
         con.execute("ALTER TABLE overlay ADD COLUMN layout TEXT NOT NULL DEFAULT '[]'")
@@ -532,11 +553,31 @@ def _template_view(t: sqlite3.Row) -> dict:
             "game": {"slug": t["game_slug"], "name": t["game_name"]}, "categories": json.loads(t["categories"] or "[]")}
 
 
+def _categories_of(con: sqlite3.Connection, b: sqlite3.Row) -> list:
+    """A planned build carries its own categories; one made from a template reads the template's."""
+    own = json.loads(b["categories"] or "[]")
+    if own or not b["template_id"]:
+        return own
+    return _template_view(_template_row(con, b["template_id"]))["categories"]
+
+
 def _build_view(con: sqlite3.Connection, b: sqlite3.Row) -> dict:
-    t = _template_view(_template_row(con, b["template_id"]))
+    if b["template_id"]:
+        t = _template_view(_template_row(con, b["template_id"]))
+    else:
+        # A planned build shown in a template's shape, so the phone and the
+        # overlay — which read template.categories and template.game — need
+        # no second shape for it.
+        t = {"id": None, "name": "Planned", "description": "", "visible": True, "position": 0,
+             "game": {"slug": b["game_slug"], "name": b["game_name"]}, "categories": json.loads(b["categories"] or "[]")}
     goals = json.loads(b["goals"] or "{}")
-    return {"id": b["id"], "name": b["name"], "variant": b["variant"], "runId": b["run_id"], "template": t, "goals": goals,
-            "progress": builds.progress(t["categories"], goals), "updatedAt": b["updated_at"]}
+    view = {"id": b["id"], "name": b["name"], "variant": b["variant"], "runId": b["run_id"], "template": t, "goals": goals,
+            "progress": builds.progress(_categories_of(con, b), goals), "updatedAt": b["updated_at"]}
+    plan = json.loads(b["plan"] or "{}")
+    if plan:
+        view["plan"] = plan
+        view["planned"] = plan_summary(plan, gamedata())
+    return view
 
 
 def _build_element(view: dict) -> dict:
@@ -653,6 +694,170 @@ def create_build(body: BuildIn) -> dict:
     return _build_view(con, _build_row(con, cur.lastrowid))
 
 
+# ── the game data, and a build planned from it ───────────────────────────────
+#
+# The same database the site reads (shrutisguides.gamedata), pulled from it
+# as one file so the tracker plans offline. The planner's routes mirror the
+# site's /api/builds/plan exactly; the shared functions do the work.
+
+def gamedata() -> GameData:
+    return GameData(DATA / "gamedata.sqlite3")
+
+
+def _loaded(game: str) -> GameData:
+    d = gamedata()
+    if not d.exists() or d.game(game) is None:
+        raise HTTPException(404, "that game's data is not loaded — pull it from the site first")
+    return d
+
+
+@app.get("/api/gamedata/games")
+def gamedata_games() -> list[dict]:
+    return [{**g, "problems": len(g["problems"]), "planner": recipe_for(g["id"]) is not None} for g in gamedata().games()]
+
+
+@app.post("/api/gamedata/pull", status_code=201, dependencies=[Depends(owner)])
+def pull_gamedata() -> dict:
+    """The site's current game database, whole, checked against its digest and swapped in atomically."""
+    try:
+        m = httpx.get(f"{SITE}/api/gamedata/manifest", timeout=20)
+    except httpx.HTTPError as exc:
+        raise HTTPException(502, f"could not reach {SITE}: {type(exc).__name__}")
+    if m.status_code != 200:
+        raise HTTPException(502, f"{SITE} answered {m.status_code}")
+    manifest = m.json() if isinstance(m.json(), dict) else {}
+    url = str(manifest.get("url") or "")
+    if not url.startswith("/"):
+        raise HTTPException(502, f"{SITE} published no game data")
+    DATA.mkdir(parents=True, exist_ok=True)
+    tmp = DATA / ".gamedata.download"
+    digest = hashlib.sha256()
+    try:
+        with httpx.stream("GET", f"{SITE}{url}", timeout=300, follow_redirects=True) as r:
+            if r.status_code != 200:
+                raise HTTPException(502, f"{SITE} answered {r.status_code} for the file")
+            with open(tmp, "wb") as f:
+                for chunk in r.iter_bytes():
+                    f.write(chunk)
+                    digest.update(chunk)
+    except httpx.HTTPError as exc:
+        tmp.unlink(missing_ok=True)
+        raise HTTPException(502, f"the download failed: {type(exc).__name__}")
+    if manifest.get("digest") and not digest.hexdigest().startswith(str(manifest["digest"])):
+        tmp.unlink(missing_ok=True)
+        raise HTTPException(502, "the file did not match its digest")
+    os.replace(tmp, DATA / "gamedata.sqlite3")
+    return {"ok": True, "file": manifest.get("file", ""), "games": gamedata_games()}
+
+
+@app.get("/api/gamedata/{game}")
+def gamedata_game(game: str) -> dict:
+    g = _loaded(game).game(game)
+    return {**g, "problems": len(g["problems"]), "recipe": recipe_for(game)}
+
+
+@app.get("/api/gamedata/{game}/recipe")
+def gamedata_recipe(game: str) -> dict:
+    _loaded(game)
+    r = recipe_for(game)
+    if r is None:
+        raise HTTPException(404, "no planner for that game yet")
+    return r
+
+
+@app.get("/api/gamedata/{game}/search")
+def gamedata_search(game: str, q: str = Query(min_length=1, max_length=80), kinds: str = "", class_id: str = "", limit: int = Query(40, ge=1, le=200)) -> list[dict]:
+    wanted = [k for k in kinds.split(",") if k in KINDS]
+    return _loaded(game).search(game, q, kinds=wanted or None, class_id=class_id or None, limit=limit)
+
+
+@app.get("/api/gamedata/{game}/{kind}")
+def gamedata_records(game: str, kind: str, sub: str = "", class_id: str = "", slot_id: str = "", group: str = "", tag: str = "", q: str = "",
+                     ids: str = "", brief: bool = True, limit: int = Query(500, ge=1, le=5000), offset: int = Query(0, ge=0)) -> list[dict]:
+    if kind not in KINDS:
+        raise HTTPException(404, "no such kind")
+    return _loaded(game).list(game, kind, sub=[x for x in sub.split(",") if x] or None, class_id=class_id or None, slot_id=slot_id or None,
+                              group=group or None, tag=tag or None, q=q or None, ids=[i for i in ids.split(",") if i] or None,
+                              limit=limit, offset=offset, brief=brief)
+
+
+@app.get("/api/gamedata/{game}/{kind}/groups")
+def gamedata_groups(game: str, kind: str, class_id: str = "") -> list[dict]:
+    if kind not in KINDS:
+        raise HTTPException(404, "no such kind")
+    return _loaded(game).groups(game, kind, class_id=class_id or None)
+
+
+@app.get("/api/gamedata/{game}/{kind}/{id}")
+def gamedata_record(game: str, kind: str, id: str) -> dict:
+    if kind not in KINDS:
+        raise HTTPException(404, "no such kind")
+    d = _loaded(game)
+    r = d.get(game, kind, id)
+    if r is None:
+        raise HTTPException(404, "no such record")
+    return {**r, "links": d.links(game, kind, id), "linked_from": d.links(game, kind, id, direction="in")}
+
+
+class PlanIn(BaseModel):
+    game: str
+    name: str
+    variant: str = ""
+    run_id: int | None = None
+    plan: dict = {}
+
+
+class RePlanIn(BaseModel):
+    plan: dict = {}
+
+
+def _planned(raw_plan: dict, game_slug: str) -> tuple[dict, list, list[str]]:
+    d = gamedata()
+    plan, problems = clean_plan({**raw_plan, "game": game_slug}, d)
+    if not plan:
+        raise HTTPException(422, problems[0] if problems else "that plan cannot be read")
+    cats = plan_to_categories(plan, d)
+    if not cats:
+        raise HTTPException(422, "the plan chooses nothing yet")
+    return plan, cats, problems
+
+
+@app.post("/api/builds/plan", status_code=201, dependencies=[Depends(owner)])
+def create_planned_build(body: PlanIn) -> dict:
+    """A build from a plan: no template, the game's data instead."""
+    con = db()
+    slug = builds.ident(body.game, "game")
+    plan, cats, problems = _planned(body.plan, slug)
+    pack = gamedata().game(slug) or {}
+    name = body.name.strip()[:80]
+    if not name:
+        raise HTTPException(422, "a build needs a name")
+    run_id = body.run_id if body.run_id and con.execute("SELECT 1 FROM run WHERE id = ?", (body.run_id,)).fetchone() else None
+    variant = body.variant.strip()[:80] or plan_summary(plan, gamedata()).get("className", "")
+    cur = con.execute("INSERT INTO build (template_id, run_id, name, variant, goals, updated_at, game_slug, game_name, plan, categories) "
+                      "VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                      (run_id, name, variant, json.dumps(plan_goals(cats)), _now().isoformat(), slug, str(pack.get("name") or body.game)[:80],
+                       json.dumps(plan), json.dumps(cats)))
+    con.commit()
+    return {**_build_view(con, _build_row(con, cur.lastrowid)), "problems": problems}
+
+
+@app.put("/api/builds/{build_id}/plan", dependencies=[Depends(owner)])
+def replan_build(build_id: int, body: RePlanIn) -> dict:
+    """The plan changed: the categories are rewritten, and every goal whose id survives keeps its words and its state."""
+    con = db(); b = _build_row(con, build_id)
+    if b["template_id"] and not json.loads(b["plan"] or "{}"):
+        raise HTTPException(409, "this build was made from a template, not a plan")
+    if not b["game_slug"]:
+        raise HTTPException(409, "this build has no game to plan against")
+    plan, cats, problems = _planned(body.plan, b["game_slug"])
+    goals = plan_goals(cats, json.loads(b["goals"] or "{}"))
+    con.execute("UPDATE build SET plan = ?, categories = ?, goals = ?, updated_at = ? WHERE id = ?",
+                (json.dumps(plan), json.dumps(cats), json.dumps(goals), _now().isoformat(), build_id))
+    con.commit()
+    return {**_build_view(con, _build_row(con, build_id)), "problems": problems}
+
+
 @app.get("/api/builds/{build_id}", dependencies=[Depends(owner)])
 def one_build(build_id: int) -> dict:
     con = db()
@@ -680,8 +885,7 @@ def rename_build(build_id: int, body: BuildPatch) -> dict:
 @app.put("/api/builds/{build_id}/goals/{item_id}", dependencies=[Depends(owner)])
 def set_goal(build_id: int, item_id: str, body: dict) -> dict:
     con = db(); b = _build_row(con, build_id)
-    t = _template_view(_template_row(con, b["template_id"]))
-    if item_id not in builds.known_items(t["categories"]):
+    if item_id not in builds.known_items(_categories_of(con, b)):
         raise HTTPException(404, "no such goal in this build")
     goals = builds.apply_goal(json.loads(b["goals"] or "{}"), item_id, body)
     con.execute("UPDATE build SET goals = ?, updated_at = ? WHERE id = ?", (json.dumps(goals), _now().isoformat(), build_id)); con.commit()

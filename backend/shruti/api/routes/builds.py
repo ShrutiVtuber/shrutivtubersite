@@ -20,8 +20,10 @@ from sqlmodel import select
 
 from shrutisguides import builds as shared
 from shrutisguides.builds import clean_categories, item_state, parse_list  # noqa: F401  (re-exported for callers and tests)
+from shrutisguides.gamedata import clean_plan, plan_goals, plan_summary, plan_to_categories
 
 from shruti.api.deps import get_session, require_admin
+from shruti.api.routes.gamedata import data as gamedata
 from shruti.api.routes.practice import _reader, _refuse_if_suspended
 from shruti.models import OverlayToken
 from shruti.models.guides import Build, BuildTemplate, Game, GuideRun
@@ -31,8 +33,13 @@ router = APIRouter(prefix="/api/builds", tags=["builds"])
 
 # ── the shapes every surface reads ──────────────────────────────────────────
 
-def progress_of(template: BuildTemplate, build: Build) -> dict:
-    return shared.progress(template.categories or [], build.goals or {})
+def categories_of(template: BuildTemplate | None, build: Build) -> list:
+    """A planned build carries its own categories; one made from a template reads the template's."""
+    return build.categories or (template.categories if template else None) or []
+
+
+def progress_of(template: BuildTemplate | None, build: Build) -> dict:
+    return shared.progress(categories_of(template, build), build.goals or {})
 
 
 def build_element(view: dict) -> dict:
@@ -46,15 +53,29 @@ def _template_view(t: BuildTemplate, game: Game | None) -> dict:
             "categories": t.categories or []}
 
 
+def _planned_template(b: Build, game: Game | None) -> dict:
+    """
+    A planned build shown in the shape of a template, so the phone and the
+    overlay — which read `template.categories` and `template.game` — need
+    no second shape for it.
+    """
+    return {"id": None, "name": "Planned", "description": "", "visible": True, "position": 0,
+            "game": {"id": game.id, "slug": game.slug, "name": game.name} if game else None,
+            "categories": b.categories or []}
+
+
 async def _build_view(session: AsyncSession, b: Build) -> dict:
-    t = await session.get(BuildTemplate, b.template_id)
-    game = await session.get(Game, t.game_id) if t else None
-    empty = {"met": 0, "partly": 0, "total": 0, "ratio": 0.0, "categories": [], "next": [], "complete": False}
-    return {"id": b.id, "name": b.name, "variant": b.variant, "runId": b.run_id,
-            "template": _template_view(t, game) if t else None,
+    t = await session.get(BuildTemplate, b.template_id) if b.template_id else None
+    game = await session.get(Game, t.game_id if t else b.game_id) if (t or b.game_id) else None
+    view = {"id": b.id, "name": b.name, "variant": b.variant, "runId": b.run_id,
+            "template": _template_view(t, game) if t else _planned_template(b, game),
             "goals": b.goals or {},
-            "progress": progress_of(t, b) if t else empty,
+            "progress": progress_of(t, b),
             "updatedAt": b.updated_at.isoformat() if b.updated_at else None}
+    if b.plan:
+        view["plan"] = b.plan
+        view["planned"] = plan_summary(b.plan, gamedata())
+    return view
 
 
 async def _mine(session: AsyncSession, request: Request, build_id: int) -> tuple[Build, object]:
@@ -182,6 +203,83 @@ async def create_build(body: BuildIn, request: Request, session: AsyncSession = 
     return await _build_view(session, b)
 
 
+# ── a planned build: the game's own terms, written as goals ─────────────────
+
+class PlanIn(BaseModel):
+    """A plan in the game's own terms; see shrutisguides.gamedata.planner for the shape."""
+    game: str = Field(min_length=1, max_length=80)
+    name: str = Field(min_length=1, max_length=80)
+    variant: str = Field(default="", max_length=80)
+    run_id: int | None = None
+    plan: dict = Field(default_factory=dict)
+
+
+class RePlanIn(BaseModel):
+    plan: dict = Field(default_factory=dict)
+
+
+async def _game_row(session: AsyncSession, slug: str, name: str) -> Game:
+    game = (await session.execute(select(Game).where(Game.slug == slug))).scalars().first()
+    if game is None:
+        game = Game(slug=slug, name=name, variants=[])
+        session.add(game)
+        await session.flush()
+    return game
+
+
+def _planned(raw_plan: dict, game_slug: str) -> tuple[dict, list, list[str]]:
+    """The plan cleaned against the game's data, and the categories it makes. Refused in words when there is nothing to plan with."""
+    d = gamedata()
+    plan, problems = clean_plan({**raw_plan, "game": game_slug}, d)
+    if not plan:
+        raise HTTPException(422, problems[0] if problems else "that plan cannot be read")
+    cats = plan_to_categories(plan, d)
+    if not cats:
+        raise HTTPException(422, "the plan chooses nothing yet")
+    return plan, cats, problems
+
+
+@router.post("/plan", status_code=201)
+async def create_planned_build(body: PlanIn, request: Request, session: AsyncSession = Depends(get_session)) -> dict:
+    """A build from a plan: no template, the game's data instead. Answers with the build and what the plan could not keep."""
+    user = await _reader(request, session)
+    await _refuse_if_suspended(session, user)
+    slug = shared.ident(body.game, "game")
+    plan, cats, problems = _planned(body.plan, slug)
+    pack = gamedata().game(slug) or {}
+    game = await _game_row(session, slug, pack.get("name") or body.game.strip())
+    run_id = None
+    if body.run_id:
+        run = await session.get(GuideRun, body.run_id)
+        run_id = run.id if run is not None and run.user_id == user.id else None
+    b = Build(user_id=user.id, template_id=None, game_id=game.id, run_id=run_id, name=body.name.strip(),
+              variant=body.variant.strip() or plan_summary(plan, gamedata()).get("className", ""),
+              plan=plan, categories=cats, goals=plan_goals(cats))
+    session.add(b)
+    await session.commit()
+    await session.refresh(b)
+    return {**(await _build_view(session, b)), "problems": problems}
+
+
+@router.put("/{build_id}/plan")
+async def replan(build_id: int, body: RePlanIn, request: Request, session: AsyncSession = Depends(get_session)) -> dict:
+    """The plan changed: the categories are rewritten, and every goal whose id survives keeps its words and its state."""
+    b, _ = await _mine(session, request, build_id)
+    if not b.plan and b.template_id:
+        raise HTTPException(409, "this build was made from a template, not a plan")
+    game = await session.get(Game, b.game_id) if b.game_id else None
+    if game is None:
+        raise HTTPException(409, "this build has no game to plan against")
+    plan, cats, problems = _planned(body.plan, game.slug)
+    b.plan = plan
+    b.categories = cats
+    b.goals = plan_goals(cats, b.goals)
+    b.updated_at = datetime.now(timezone.utc)
+    await session.commit()
+    await session.refresh(b)
+    return {**(await _build_view(session, b)), "problems": problems}
+
+
 @router.get("/{build_id}")
 async def one(build_id: int, request: Request, session: AsyncSession = Depends(get_session)) -> dict:
     b, _ = await _mine(session, request, build_id)
@@ -221,8 +319,8 @@ class GoalIn(BaseModel):
 @router.put("/{build_id}/goals/{item_id}")
 async def set_goal(build_id: int, item_id: str, body: GoalIn, request: Request, session: AsyncSession = Depends(get_session)) -> dict:
     b, _ = await _mine(session, request, build_id)
-    t = await session.get(BuildTemplate, b.template_id)
-    if item_id not in shared.known_items(t.categories if t else []):
+    t = await session.get(BuildTemplate, b.template_id) if b.template_id else None
+    if item_id not in shared.known_items(categories_of(t, b)):
         raise HTTPException(404, "no such goal in this build")
     b.goals = shared.apply_goal(b.goals, item_id, body.model_dump(exclude_none=True))
     b.updated_at = datetime.now(timezone.utc)

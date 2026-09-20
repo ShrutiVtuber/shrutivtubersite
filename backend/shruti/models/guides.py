@@ -265,15 +265,26 @@ class Build(TimestampMixin, table=True):
     of goals, and each is met, partly met or not yet.
 
     `goals` is JSON keyed by item id: {target, want, have, met, note}.
+
+    A PLANNED build stands on no template: its `plan` is the person's
+    choices in the game's own terms (class, skills, the item wanted in each
+    slot, boards, glyphs — see `shrutisguides.gamedata.planner`), and its
+    `categories` are that plan written as a template of goals, kept here so
+    the phone, the overlay and this site read a planned build exactly as
+    they read one made from a template. Re-planning rewrites `categories`
+    and keeps every goal whose id survives.
     """
 
     __tablename__ = "build"
 
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: int = Field(index=True, foreign_key="site_user.id")
-    template_id: int = Field(index=True, foreign_key="build_template.id")
+    template_id: Optional[int] = Field(default=None, index=True, foreign_key="build_template.id")
+    game_id: Optional[int] = Field(default=None, index=True, foreign_key="guide_game.id")     # set when there is no template
     run_id: Optional[int] = Field(default=None, foreign_key="guide_run.id")
     name: str
     variant: str = ""                      # class, season, league — free text
     goals: dict = Field(default_factory=dict, sa_column=Column(JSONB, nullable=False, server_default="{}"))
+    plan: dict = Field(default_factory=dict, sa_column=Column(JSONB, nullable=False, server_default="{}"))
+    categories: list = Field(default_factory=list, sa_column=Column(JSONB, nullable=False, server_default="[]"))
     last_seen_at: Optional[datetime] = Field(default=None, sa_type=UTC_TS)
