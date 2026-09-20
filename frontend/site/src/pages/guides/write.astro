@@ -62,7 +62,7 @@ const openDraft = (g: Mine) => g.versions.find((v) => v.state === "draft" || v.s
 ---
 
 <BaseLayout
-  title={say("meta.title", "The desk — Squirrel Guides")}
+  title={say("meta.title", "Create a guide — Squirrel Guides")}
   description={say("meta.description", "Write a game guide as a path: phases, steps, routines and a codex.")}
   noindex
 >
@@ -71,11 +71,16 @@ const openDraft = (g: Mine) => g.versions.find((v) => v.state === "draft" || v.s
       <SectionHeader
         as="h1" glyph="✎"
         eyebrow={say("eyebrow", "Squirrel Guides")}
-        title={say("title", "The desk")}
+        title={say("title", "Create a guide")}
         body={say("lede",
           "Write a guide as a path: the phases, the steps in each, the routines that reset and the systems behind them. Everything you write is a draft until Shruti has read it.")}
       />
     </div>
+    <ol class="dk-how" aria-label={say("how.title", "How it works")}>
+      <li>{say("how.1", "Write it here as a path: the phases, the steps in each, the routines that reset, and the codex behind them.")}</li>
+      <li>{say("how.2", "Submit it. Shruti reads every guide before it goes up.")}</li>
+      <li>{say("how.3", "It is published under your name. Readers track it, and can suggest corrections that you accept or decline.")}</li>
+    </ol>
 
     {!me ? (
       <EmptyState as="h2" glyph="○"
@@ -88,7 +93,7 @@ const openDraft = (g: Mine) => g.versions.find((v) => v.state === "draft" || v.s
         <section class="dk-section">
           <h2 class="dk-h2">{say("mine", "Your guides")}</h2>
           {mine.length === 0 ? (
-            <p class="dk-quiet">{say("mine.none", "Nothing yet. Start one below, or import a guide file.")}</p>
+            <p class="dk-quiet">{say("mine.none", "Nothing yet. Create one below, or import a guide file.")}</p>
           ) : (
             <ul class="dk-list">
               {mine.map((g) => (
@@ -174,7 +179,7 @@ const openDraft = (g: Mine) => g.versions.find((v) => v.state === "draft" || v.s
         )}
 
         <section class="dk-section">
-          <h2 class="dk-h2">{say("new", "Start a new guide")}</h2>
+          <h2 class="dk-h2">{say("new", "Create a new guide")}</h2>
           <form class="dk-form" data-new>
             <label>
               {say("new.title", "Title")}
@@ -194,7 +199,7 @@ const openDraft = (g: Mine) => g.versions.find((v) => v.state === "draft" || v.s
               <input name="variants" type="text" maxlength="200"
                      placeholder={say("new.variants.hint", "Eternal, Seasonal")} />
             </label>
-            <button type="submit" class="dk-btn">{say("new.go", "Open the desk")}</button>
+            <button type="submit" class="dk-btn">{say("new.go", "Create the guide")}</button>
             <p class="dk-quiet" data-new-status></p>
           </form>
         </section>
@@ -226,6 +231,8 @@ const openDraft = (g: Mine) => g.versions.find((v) => v.state === "draft" || v.s
   .dk-grid { display: grid; gap: var(--space-7); max-width: 46rem; }
   .dk-h2 { margin: 0 0 var(--space-3); font-family: var(--font-display); font-weight: 600; font-size: var(--text-h3); color: var(--ink); }
   .dk-quiet { margin: 0; font-size: var(--text-sm); color: var(--ink-faint); }
+  .dk-how { margin: 0; padding-left: 1.4rem; display: grid; gap: 4px; max-width: var(--measure-ui); font-size: var(--text-sm); line-height: var(--leading-body); color: var(--ink-soft); }
+  .dk-how li::marker { font-family: var(--font-mono); color: var(--ink-faint); }
   .dk-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-4); }
   .dk-guide { display: grid; gap: 6px; padding: var(--space-4); border: var(--border-w) solid var(--line); border-radius: var(--radius-md); background: var(--surface-card); }
   .dk-guide-title { margin: 0; display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; font-weight: 600; color: var(--ink); }

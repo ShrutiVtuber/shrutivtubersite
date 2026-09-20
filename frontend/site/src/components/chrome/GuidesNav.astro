@@ -13,7 +13,7 @@ const ITEMS: [string, string][] = [
   ["/builds", say("builds", "Builds")],
   ["/groups", say("groups", "Groups")],
   ["/guides/overlays", say("layouts", "Layouts")],
-  ["/guides/write", say("desk", "The desk")],
+  ["/guides/write", say("desk", "Create a guide")],
 ];
 const current = (href: string) => {
   if (href === "/guides") return here === "/guides" || (here.startsWith("/guides/") && !here.startsWith("/guides/overlays") && !here.startsWith("/guides/write"));

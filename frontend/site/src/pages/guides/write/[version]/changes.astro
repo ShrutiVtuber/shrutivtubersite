@@ -26,7 +26,7 @@ const view = read.body as {
 const word = (c: string) => c === "added" ? say("change.added", "added") : c === "removed" ? say("change.removed", "removed") : say("change.changed", "changed");
 const show = (v: unknown) => v === undefined || v === null || v === "" ? say("field.empty", "— nothing —") : typeof v === "string" ? v : JSON.stringify(v);
 const WORDS = {
-  accepted: say("words.accepted", "Accepted. It is your draft now; open it from the desk and submit it when you are ready."),
+  accepted: say("words.accepted", "Accepted. It is your draft now; open it from your guides and submit it when you are ready."),
   declined: say("words.declined", "Declined, with your note."),
   needNote: say("words.need_note", "Say why — the note goes to the person who wrote it."),
   openDraft: say("words.open_draft", "You have an open draft of this guide. Submit or discard it first."),
@@ -88,7 +88,7 @@ const WORDS = {
         <div><Button type="button" variant="secondary" data-decline>{say("decide.decline", "Decline with this note")}</Button></div>
       </section>
     )}
-    <p class="back"><a href="/guides/write">{say("back", "Back to the desk")}</a></p>
+    <p class="back"><a href="/guides/write">{say("back", "Back to your guides")}</a></p>
   </article>
 </BaseLayout>
 
