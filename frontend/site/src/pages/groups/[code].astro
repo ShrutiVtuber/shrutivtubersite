@@ -9,6 +9,9 @@ import BaseLayout from "../../layouts/BaseLayout.astro";
 import { account, asReader } from "../../lib/account";
 import { copy } from "../../lib/copy";
 import { sigilSvg } from "../../lib/overlay-elements";
+import SelectField from "../../components/forms/SelectField.astro";
+import TextField from "../../components/forms/TextField.astro";
+import Button from "../../components/forms/Button.astro";
 
 const say = await copy("groups/[code]");
 const code = (Astro.params.code ?? "").toUpperCase();
@@ -77,7 +80,7 @@ const WORDS = {
           <button type="button" class="step" data-less aria-label={say("give.less", "One less")}>−</button>
           <input type="number" min="1" step="1" value="10" data-amount aria-label={say("give.amount", "Amount")} />
           <button type="button" class="step" data-more aria-label={say("give.more", "One more")}>+</button>
-          <button type="button" class="button" data-contribute>{say("give.button", "Contribute")}</button>
+          <Button type="button" data-contribute>{say("give.button", "Contribute")}</Button>
         </div>
         <p class="soft">{say("give.rule", "One number. Nobody is ranked, and nobody is reminded.")}</p>
       </section>
@@ -86,13 +89,13 @@ const WORDS = {
     <section class="join">
       {!me && (
         <p>
-          <a class="button" href={`/signin?next=${encodeURIComponent(`/groups/${g.code}`)}`}>{say("join.signin", "Sign in to join")}</a>
+          <Button href={`/signin?next=${encodeURIComponent(`/groups/${g.code}`)}`}>{say("join.signin", "Sign in to join")}</Button>
           <span class="soft"> {say("join.code_line", "Join with the code {code}.").replace("{code}", g.code)}</span>
         </p>
       )}
       {me && !g.member && !g.closed && (
         <p>
-          <button type="button" class="button" data-join>{say("join.button", "Join")}</button>
+          <Button type="button" data-join>{say("join.button", "Join")}</Button>
           <span class="soft"> {say("join.code_line", "Join with the code {code}.").replace("{code}", g.code)}</span>
         </p>
       )}
@@ -108,17 +111,15 @@ const WORDS = {
         <h2>{say("overlay.title", "The goal on stream")}</h2>
         <p class="soft">{say("overlay.text", "A browser source that draws this goal — the title, the count, one bar per tier, the crew. The URL is shown once.")}</p>
         <div class="mint">
-          <label><span>{say("overlay.theme", "Theme")}</span>
-            <select data-theme><option value="almanac">{say("overlay.almanac", "Almanac")}</option><option value="grimoire">{say("overlay.grimoire", "Grimoire")}</option><option value="plain">{say("overlay.plain", "Plain")}</option></select>
-          </label>
-          <label><span>{say("overlay.motion", "Motion")}</span>
-            <select data-motion><option value="reduced">{say("overlay.reduced", "Reduced")}</option><option value="full">{say("overlay.full", "Full")}</option><option value="still">{say("overlay.still", "Still")}</option></select>
-          </label>
-          <button type="button" class="button" data-mint>{say("overlay.mint", "Make an overlay")}</button>
+          <SelectField label={say("overlay.theme", "Theme")} name="theme" data-theme
+            options={[{ value: "almanac", label: say("overlay.almanac", "Almanac") }, { value: "grimoire", label: say("overlay.grimoire", "Grimoire") }, { value: "plain", label: say("overlay.plain", "Plain") }]} />
+          <SelectField label={say("overlay.motion", "Motion")} name="motion" data-motion
+            options={[{ value: "reduced", label: say("overlay.reduced", "Reduced") }, { value: "full", label: say("overlay.full", "Full") }, { value: "still", label: say("overlay.still", "Still") }]} />
+          <div><Button type="button" data-mint>{say("overlay.mint", "Make an overlay")}</Button></div>
         </div>
         <div class="minted" data-minted hidden>
-          <label><span>{say("overlay.url", "Browser source URL — shown once")}</span><input type="text" readonly data-url /></label>
-          <button type="button" class="link" data-copy>{say("overlay.copy", "Copy the URL")}</button>
+          <TextField label={say("overlay.url", "Browser source URL — shown once")} name="url" readonly data-url />
+          <div><Button type="button" variant="secondary" size="sm" data-copy>{say("overlay.copy", "Copy the URL")}</Button></div>
         </div>
         <div class="tokens" data-tokens hidden={tokens.length === 0}>
           {tokens.map((t) => (<div class="gp-token"><span>{t.label} · {t.theme}</span><button type="button" class="link" data-revoke={t.id}>{say("overlay.revoke", "Revoke")}</button></div>))}
@@ -132,7 +133,7 @@ const WORDS = {
   .group { max-width: 620px; margin: 0 auto; padding: var(--space-6) var(--space-4); display: grid; gap: var(--space-5); }
   .head { display: grid; grid-template-columns: 160px 1fr; gap: var(--space-4); align-items: center; }
   @media (max-width: 480px) { .head { grid-template-columns: 1fr; } }
-  .sigil :global(svg) { display: block; --gt-faint: var(--rule); --st-done: #E0A4BC; --st-now: #8FBEE8; }
+  .sigil :global(svg) { display: block; --gt-faint: var(--line); --st-done: #E0A4BC; --st-now: #8FBEE8; }
   .eyebrow { font-size: .8rem; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft); margin: 0 0 var(--space-1); }
   h1 { font-size: 1.9rem; line-height: 1.15; margin: 0; text-wrap: balance; }
   h2 { font-size: 1.05rem; margin: 0 0 var(--space-3); }
@@ -144,22 +145,22 @@ const WORDS = {
   .note { border-left: 2px solid var(--accent); padding-left: var(--space-3); }
   dl { margin: 0; display: grid; gap: var(--space-2); }
   dl div { display: flex; align-items: baseline; gap: var(--space-2); }
-  dl div::after { content: ""; order: 2; flex: 1; border-bottom: 1px dotted var(--rule); transform: translateY(-.3em); }
+  dl div::after { content: ""; order: 2; flex: 1; border-bottom: 1px dotted var(--line); transform: translateY(-.3em); }
   dt { order: 1; margin: 0; }
   dd { order: 3; margin: 0; }
   .stepper { display: flex; gap: var(--space-2); align-items: stretch; }
-  .stepper input { width: 6.5rem; font: inherit; font-family: var(--font-mono); text-align: center; padding: .5rem; border: 1px solid var(--rule); background: var(--paper); color: var(--ink); }
-  .step { font: inherit; width: 2.6rem; border: 1px solid var(--rule); background: var(--paper); color: var(--ink); cursor: pointer; }
+  .stepper input, .step { font: inherit; color: var(--ink); background: var(--surface-card); border: var(--border-w) solid var(--line); border-radius: var(--radius-sm); min-height: 44px; box-sizing: border-box; }
+  .stepper input:hover, .step:hover { border-color: var(--line-strong); }
+  .stepper input:focus-visible, .step:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; border-color: var(--accent); }
+  .stepper input { width: 6.5rem; font-family: var(--font-mono); text-align: center; padding: 10px; }
+  .step { width: 44px; cursor: pointer; }
   .join { display: grid; gap: var(--space-2); }
   .link { font: inherit; background: none; border: 0; padding: 0; color: var(--accent); text-decoration: underline; cursor: pointer; justify-self: start; }
   .mint { display: grid; grid-template-columns: 1fr 1fr auto; gap: var(--space-3); align-items: end; }
   @media (max-width: 480px) { .mint { grid-template-columns: 1fr; } }
-  label { display: grid; gap: var(--space-1); }
-  label span { font-size: .85rem; color: var(--ink-soft); }
-  select, .minted input { font: inherit; padding: .5rem .6rem; border: 1px solid var(--rule); background: var(--paper); color: var(--ink); width: 100%; }
   .minted { display: grid; gap: var(--space-2); margin-top: var(--space-3); }
   .tokens { display: grid; gap: var(--space-2); margin-top: var(--space-3); }
-  .gp-token { display: flex; justify-content: space-between; gap: var(--space-3); border-top: 1px solid var(--rule); padding-top: var(--space-2); }
+  .gp-token { display: flex; justify-content: space-between; gap: var(--space-3); border-top: var(--border-w) solid var(--line); padding-top: var(--space-2); }
 </style>
 
 <script>

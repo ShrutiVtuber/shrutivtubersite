@@ -6,6 +6,9 @@ import BaseLayout from "../../layouts/BaseLayout.astro";
 import { account, asReader } from "../../lib/account";
 import { copy } from "../../lib/copy";
 import { sigilSvg } from "../../lib/overlay-elements";
+import SelectField from "../../components/forms/SelectField.astro";
+import TextField from "../../components/forms/TextField.astro";
+import Button from "../../components/forms/Button.astro";
 
 const say = await copy("builds/[id]");
 const id = Astro.params.id ?? "";
@@ -86,13 +89,15 @@ const WORDS = {
     <section class="overlay">
       <h2>{say("overlay.title", "Overlay")}</h2>
       <div class="mint">
-        <label><span>{say("overlay.theme", "Theme")}</span><select data-theme><option value="almanac">{say("overlay.almanac", "Almanac")}</option><option value="grimoire">{say("overlay.grimoire", "Grimoire")}</option><option value="plain">{say("overlay.plain", "Plain")}</option></select></label>
-        <label><span>{say("overlay.motion", "Motion")}</span><select data-motion><option value="full">{say("overlay.ignite", "Ignite on met · 260 ms")}</option><option value="still">{say("overlay.none", "None")}</option></select></label>
-        <button type="button" class="button" data-mint>{say("overlay.mint", "Mint overlay")}</button>
+        <SelectField label={say("overlay.theme", "Theme")} name="theme" data-theme
+          options={[{ value: "almanac", label: say("overlay.almanac", "Almanac") }, { value: "grimoire", label: say("overlay.grimoire", "Grimoire") }, { value: "plain", label: say("overlay.plain", "Plain") }]} />
+        <SelectField label={say("overlay.motion", "Motion")} name="motion" data-motion
+          options={[{ value: "full", label: say("overlay.ignite", "Ignite on met · 260 ms") }, { value: "still", label: say("overlay.none", "None") }]} />
+        <div><Button type="button" data-mint>{say("overlay.mint", "Mint overlay")}</Button></div>
       </div>
       <div class="minted" data-minted hidden>
-        <label><span>{say("overlay.minted", "Minted · shown once")}</span><input type="text" readonly data-url /></label>
-        <div class="row"><button type="button" class="link" data-copy>{say("overlay.copy", "Copy")}</button><button type="button" class="link quiet" data-have-it>{say("overlay.have_it", "I have it")}</button></div>
+        <TextField label={say("overlay.minted", "Minted · shown once")} name="url" readonly data-url />
+        <div class="row"><Button type="button" variant="secondary" size="sm" data-copy>{say("overlay.copy", "Copy")}</Button><Button type="button" variant="ghost" size="sm" data-have-it>{say("overlay.have_it", "I have it")}</Button></div>
       </div>
       <p class="quiet">{say("overlay.text", "Tick from the phone; the stream follows within two seconds. A browser source in OBS, 1920 × 1080.")}</p>
       <div class="tokens" data-tokens hidden={tokens.length === 0}>
@@ -101,14 +106,13 @@ const WORDS = {
     </section>
     <section class="beside">
       <h2>{say("run.title", "Beside a run")}</h2>
-      <label><span>{say("run.pick", "Run")}</span>
-        <select data-run><option value="">{say("run.none", "No run")}</option>{runs.map((r) => <option value={r.id} selected={r.id === view.runId}>{r.name}</option>)}</select>
-      </label>
+      <SelectField label={say("run.pick", "Run")} name="run" data-run value={view.runId === null ? "" : String(view.runId)}
+        options={[{ value: "", label: say("run.none", "No run") }, ...runs.map((r) => ({ value: String(r.id), label: r.name }))]} />
       <p class="quiet">{say("run.note", "The run walks the path; the build fills the set. Both plates can share a layout.")}</p>
     </section>
     <section class="remove">
       <h2>{say("remove.title", "Remove")}</h2>
-      <button type="button" class="link quiet" data-delete>{say("delete", "Delete this build")}</button>
+      <div><Button type="button" variant="secondary" data-delete>{say("delete", "Delete this build")}</Button></div>
       <p class="quiet">{say("delete.note", "Removes the goals and stops the overlay. The template stays. You will be asked once.")}</p>
     </section>
     <p class="foot"><a href="/builds">{say("back", "All builds")}</a></p>
@@ -119,7 +123,7 @@ const WORDS = {
   .build { max-width: 720px; margin: 0 auto; padding: var(--space-6) var(--space-4); display: grid; gap: var(--space-5); }
   .head { display: grid; grid-template-columns: 160px 1fr; gap: var(--space-4); align-items: center; }
   @media (max-width: 520px) { .head { grid-template-columns: 1fr; } }
-  .ring :global(svg) { display: block; --gt-faint: var(--rule); --st-done: #E0A4BC; --st-now: #8FBEE8; }
+  .ring :global(svg) { display: block; --gt-faint: var(--line); --st-done: #E0A4BC; --st-now: #8FBEE8; }
   .eyebrow { font-size: .8rem; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft); margin: 0 0 var(--space-1); }
   h1 { font-size: 1.9rem; line-height: 1.15; margin: 0; text-wrap: balance; }
   h2 { font-size: 1.05rem; margin: 0 0 var(--space-2); display: flex; justify-content: space-between; align-items: baseline; }
@@ -131,8 +135,8 @@ const WORDS = {
   .cats :global(a.met) { color: var(--ink); }
   .cats :global(a.met .mono) { color: #E0A4BC; }
   .note { border-left: 2px solid var(--accent); padding-left: var(--space-3); }
-  .items { display: grid; gap: 0; border-top: 1px solid var(--rule); }
-  .item { padding: var(--space-3) 0; border-bottom: 1px solid var(--rule); display: grid; gap: var(--space-2); }
+  .items { display: grid; gap: 0; border-top: 1px solid var(--line); }
+  .item { padding: var(--space-3) 0; border-bottom: 1px solid var(--line); display: grid; gap: var(--space-2); }
   .line { display: flex; justify-content: space-between; gap: var(--space-3); align-items: baseline; }
   .label { font-weight: 600; }
   .item[data-state="met"] .label { color: var(--ink-soft); text-decoration: line-through; text-decoration-color: #E0A4BC; }
@@ -140,19 +144,20 @@ const WORDS = {
   .item[data-state="partial"] .state { color: #8FBEE8; }
   .state { color: var(--ink-soft); }
   .controls { display: flex; gap: var(--space-3); align-items: center; flex-wrap: wrap; }
-  .target { flex: 1 1 16rem; font: inherit; padding: .45rem .55rem; border: 1px solid var(--rule); background: var(--paper); color: var(--ink); }
+  .target, .want, .step { font: inherit; color: var(--ink); background: var(--surface-card); border: var(--border-w) solid var(--line); border-radius: var(--radius-sm); min-height: 44px; box-sizing: border-box; }
+  .target:hover, .want:hover, .step:hover { border-color: var(--line-strong); }
+  .target:focus-visible, .want:focus-visible, .step:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; border-color: var(--accent); }
+  .target { flex: 1 1 16rem; padding: 10px 12px; }
+  .target::placeholder { color: var(--ink-faint); }
   .tick { display: inline-flex; gap: 6px; align-items: center; color: var(--ink-soft); font-size: .9rem; }
-  .step { font: inherit; width: 2.4rem; height: 2.4rem; border: 1px solid var(--rule); background: var(--paper); color: var(--ink); cursor: pointer; }
+  .step { width: 44px; cursor: pointer; }
   .have { min-width: 2.5rem; text-align: center; font-size: 1.1rem; }
-  .want { width: 5rem; font: inherit; font-family: var(--font-mono); padding: .4rem .5rem; border: 1px solid var(--rule); background: var(--paper); color: var(--ink); }
+  .want { width: 5.5rem; font-family: var(--font-mono); padding: 10px 12px; }
   .unit { color: var(--ink-soft); }
   .mint { display: grid; grid-template-columns: 1fr 1fr auto; gap: var(--space-3); align-items: end; }
   @media (max-width: 520px) { .mint { grid-template-columns: 1fr; } }
-  label { display: grid; gap: 4px; }
-  label span { font-size: .85rem; color: var(--ink-soft); }
-  select, .minted input { font: inherit; padding: .5rem .6rem; border: 1px solid var(--rule); background: var(--paper); color: var(--ink); width: 100%; }
   .minted, .tokens { display: grid; gap: var(--space-2); margin-top: var(--space-3); }
-  .bd-token { display: flex; justify-content: space-between; gap: var(--space-3); border-top: 1px solid var(--rule); padding-top: var(--space-2); }
+  .bd-token { display: flex; justify-content: space-between; gap: var(--space-3); border-top: var(--border-w) solid var(--line); padding-top: var(--space-2); }
   .link { font: inherit; background: none; border: 0; padding: 0; color: var(--accent); text-decoration: underline; cursor: pointer; }
   .link.quiet { color: var(--ink-soft); }
   .foot { color: var(--ink-soft); }

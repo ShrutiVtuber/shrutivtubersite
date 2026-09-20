@@ -150,12 +150,42 @@
 .site-menu a:hover { color: var(--accent); }
 .site-menu a[aria-current="page"] { color: var(--accent); }
 .site-menu-rule { height: var(--space-3); }
-/* The menu: every page under its eyebrow, in columns where there is room. */
-.site-menu { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 0 var(--space-6); }
-.site-menu-group { display: grid; align-content: start; padding: 10px 0 4px; }
+/* The menu never moves the page. On a wide screen it is a panel that floats
+   under the bar, right-aligned, on the card surface with a shadow; on a phone
+   it is a drawer that comes out from the right over a veil. Either way the
+   page behind it holds still and does not scroll while it is open. */
+html.menu-open, html.menu-open body { overflow: hidden; }
+.site-header .page { position: relative; }
+.site-menu-veil { position: fixed; inset: 0; background: color-mix(in srgb, var(--ink) 34%, transparent); z-index: 41; }
+.site-menu-veil[hidden] { display: none; }
+.site-menu {
+  position: absolute; right: 0; top: calc(100% + 8px); z-index: 42;
+  width: min(720px, calc(100vw - 2 * var(--page-pad, 20px)));
+  background: var(--surface-card); border: var(--border-w) solid var(--line); border-radius: var(--radius-md);
+  box-shadow: var(--shadow-2); padding: 12px 20px 18px; display: grid; gap: 4px;
+}
+.site-menu[hidden] { display: none; }
+.site-menu-head { display: flex; align-items: center; justify-content: space-between; }
+.site-menu-close { font: 500 22px/1 var(--font-body); color: var(--ink-soft); background: none; border: 0; padding: 8px 10px; cursor: pointer; border-radius: var(--radius-sm); min-height: 44px; }
+.site-menu-close:hover { color: var(--accent); background: var(--accent-wash); }
+.site-menu-groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0 var(--space-5); }
+.site-menu-group { display: grid; align-content: start; padding: 6px 0 4px; }
 .site-menu-eyebrow { font: 600 var(--text-xs)/1 var(--font-body); letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-faint); padding: 10px 2px 8px; }
-.site-menu-group a { padding: 11px 2px; }
-@media (max-width: 560px) { .site-menu { grid-template-columns: 1fr 1fr; gap: 0 var(--space-4); } .site-menu-group a { min-height: 44px; } }
+.site-menu a { display: block; padding: 10px 2px; min-height: 44px; box-sizing: border-box; font: 500 var(--text-body)/1.2 var(--font-body); color: var(--ink); text-decoration: none; border-bottom: var(--border-w) solid var(--line); }
+.site-menu-group a:last-child { border-bottom: 0; }
+.site-menu a:hover { color: var(--accent); }
+.site-menu a[aria-current="page"] { color: var(--accent); }
+.site-menu-rule { display: none; }
+@media (max-width: 720px) {
+  .site-menu {
+    position: fixed; top: 0; right: 0; bottom: 0; width: min(360px, 88vw); border-radius: 0; border-width: 0 0 0 var(--border-w);
+    padding: 12px 20px calc(24px + env(safe-area-inset-bottom)); overflow-y: auto; box-shadow: var(--shadow-3);
+    animation: site-menu-in var(--dur-2) var(--ease-out) both;
+  }
+  .site-menu-groups { grid-template-columns: 1fr; }
+  @keyframes site-menu-in { from { transform: translateX(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+  @media (prefers-reduced-motion: reduce) { .site-menu { animation: none; } }
+}
 /* Squirrel Guides has a place of its own: a strip under the header on its pages. */
 .guides-nav { border-bottom: var(--border-w) solid var(--line); background: var(--surface-card); }
 .guides-nav .row { display: flex; align-items: center; gap: var(--space-4); min-height: 44px; flex-wrap: wrap; }

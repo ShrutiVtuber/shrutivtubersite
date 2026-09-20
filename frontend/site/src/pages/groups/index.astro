@@ -8,6 +8,8 @@
 import BaseLayout from "../../layouts/BaseLayout.astro";
 import SectionHeader from "../../components/brand/SectionHeader.astro";
 import EmptyState from "../../components/feedback/EmptyState.astro";
+import TextField from "../../components/forms/TextField.astro";
+import Button from "../../components/forms/Button.astro";
 import { account, asReader } from "../../lib/account";
 import { copy } from "../../lib/copy";
 
@@ -40,7 +42,9 @@ const WORDS = {
     <p class="note" data-note hidden></p>
 
     {groups.length === 0 ? (
-      <EmptyState title={say("empty.title", "You are in no group yet.")} text={say("empty.text", "Join one with a six-letter code, or start your own.")} />
+      <EmptyState title={say("empty.title", "You are in no group yet.")} body={say("empty.text", "Join one with a six-letter code, or start your own.")}>
+        <Button slot="action" href="#join" variant="secondary">{say("empty.action", "Join with a code")}</Button>
+      </EmptyState>
     ) : (
       <ul class="list">
         {groups.map((g) => (
@@ -57,24 +61,21 @@ const WORDS = {
     )}
 
     <div class="two">
-      <form class="card" data-join-form>
+      <form class="card" id="join" data-join-form>
         <h2>{say("join.title", "Join with a code")}</h2>
-        <label>
-          <span>{say("join.code", "Six letters, spoken on stream")}</span>
-          <input type="text" name="code" maxlength="6" autocapitalize="characters" spellcheck="false" placeholder="HEKATE" data-join-code />
-        </label>
-        <button type="submit" class="button">{say("join.button", "Join")}</button>
+        <TextField label={say("join.code", "Six letters, spoken on stream")} name="code" maxlength="6" autocapitalize="characters" spellcheck="false" placeholder="HEKATE" data-join-code />
+        <div><Button type="submit">{say("join.button", "Join")}</Button></div>
       </form>
-      <form class="card" data-start-form>
+      <form class="card" id="start" data-start-form>
         <h2>{say("start.title", "Start a group")}</h2>
-        <label><span>{say("start.name", "Name")}</span><input type="text" name="name" maxlength="80" placeholder={say("start.name_hint", "Squirrel stream crew")} data-name /></label>
-        <label><span>{say("start.goal", "The goal")}</span><input type="text" name="goal" maxlength="120" placeholder={say("start.goal_hint", "Empire to tier 5")} data-goal /></label>
+        <TextField label={say("start.name", "Name")} name="name" maxlength="80" placeholder={say("start.name_hint", "Squirrel stream crew")} data-name />
+        <TextField label={say("start.goal", "The goal")} name="goal" maxlength="120" placeholder={say("start.goal_hint", "Empire to tier 5")} data-goal />
         <div class="row">
-          <label><span>{say("start.target", "Target")}</span><input type="number" name="target" min="0" step="1" value="1200" data-target /></label>
-          <label><span>{say("start.tiers", "Tiers")}</span><input type="number" name="tiers" min="1" max="12" step="1" value="5" data-tiers /></label>
+          <TextField type="number" label={say("start.target", "Target")} name="target" min="0" step="1" value="1200" data-target />
+          <TextField type="number" label={say("start.tiers", "Tiers")} name="tiers" min="1" max="12" step="1" value="5" data-tiers />
         </div>
         <p class="hint">{say("start.hint", "The tiers are the sigil's arcs, filled as the crew contributes.")}</p>
-        <button type="submit" class="button">{say("start.button", "Start")}</button>
+        <div><Button type="submit">{say("start.button", "Start")}</Button></div>
       </form>
     </div>
   </section>
@@ -84,19 +85,16 @@ const WORDS = {
   .groups { max-width: 620px; margin: 0 auto; padding: var(--space-6) var(--space-4); display: grid; gap: var(--space-5); }
   .lede { color: var(--ink-soft); max-width: 60ch; }
   .note { color: var(--ink); border-left: 2px solid var(--accent); padding-left: var(--space-3); }
-  .list { list-style: none; margin: 0; padding: 0; display: grid; gap: 1px; background: var(--rule); border: 1px solid var(--rule); }
-  .list a { display: grid; grid-template-columns: 1fr auto; gap: var(--space-1) var(--space-3); padding: var(--space-3) var(--space-4); background: var(--paper); color: inherit; text-decoration: none; }
+  .list { list-style: none; margin: 0; padding: 0; display: grid; gap: 1px; background: var(--line); border: var(--border-w) solid var(--line); border-radius: var(--radius-md); overflow: hidden; }
+  .list a { display: grid; grid-template-columns: 1fr auto; gap: var(--space-1) var(--space-3); padding: var(--space-3) var(--space-4); background: var(--surface-card); color: inherit; text-decoration: none; }
   .list .name { font-weight: 600; }
   .list .goal { grid-column: 1; color: var(--ink-soft); }
   .list .mono { font-family: var(--font-mono); font-size: .85rem; color: var(--ink-soft); }
   .list .code { grid-column: 2; grid-row: 1; letter-spacing: .12em; }
   .two { display: grid; gap: var(--space-4); grid-template-columns: 1fr 1fr; }
   @media (max-width: 640px) { .two { grid-template-columns: 1fr; } }
-  .card { border: 1px solid var(--rule); padding: var(--space-4); display: grid; gap: var(--space-3); align-content: start; }
-  .card h2 { font-size: 1.1rem; margin: 0; }
-  label { display: grid; gap: var(--space-1); }
-  label span { font-size: .85rem; color: var(--ink-soft); }
-  input { font: inherit; padding: .5rem .6rem; border: 1px solid var(--rule); background: var(--paper); color: var(--ink); }
+  .card { border-top: var(--border-w) solid var(--line); padding-top: var(--space-4); display: grid; gap: var(--space-3); align-content: start; scroll-margin-top: 80px; }
+  .card h2 { font: 600 var(--text-h3) var(--font-display); margin: 0; }
   .row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); }
   .hint { font-size: .85rem; color: var(--ink-soft); margin: 0; }
 </style>

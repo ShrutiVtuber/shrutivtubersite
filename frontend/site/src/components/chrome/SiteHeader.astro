@@ -112,7 +112,13 @@ const current = (href: string) => (href === "/" ? here === "/" : here.startsWith
         </button>
       </div>
     </div>
+    <div class="site-menu-veil" data-nav-veil hidden></div>
     <nav id="site-menu" class="site-menu" aria-label={say("text.2", "Everything")} hidden>
+      <div class="site-menu-head">
+        <span class="site-menu-eyebrow">{say("text.32", "Everything")}</span>
+        <button type="button" class="site-menu-close" data-nav-close aria-label={say("text.33", "Close the menu")}>×</button>
+      </div>
+      <div class="site-menu-groups">
       {
         GROUPS.map(([name, hrefs]) => {
           const shown = hrefs.filter(visibleNav);
@@ -130,6 +136,7 @@ const current = (href: string) => (href === "/" ? here === "/" : here.startsWith
         <span class="site-menu-eyebrow">{say("group.you", "You")}</span>
         <a href={signedIn ? "/account" : "/signin"}>{signedIn ? say("account", "Account") : say("signin", "Sign in")}</a>
       </div>
+      </div>
     </nav>
   </div>
 </header>
@@ -143,6 +150,8 @@ const current = (href: string) => (href === "/" ? here === "/" : here.startsWith
     var toggle = document.querySelector("[data-nav-toggle]");
     var glyph = document.querySelector("[data-nav-glyph]");
     var menu = document.getElementById("site-menu");
+    var veil = document.querySelector("[data-nav-veil]");
+    var close = document.querySelector("[data-nav-close]");
     if (!header) return;
 
     var onScroll = function () {
@@ -152,11 +161,31 @@ const current = (href: string) => (href === "/" ? here === "/" : here.startsWith
     window.addEventListener("scroll", onScroll, { passive: true });
 
     if (!toggle || !menu) return;
+    /* The menu floats over the page — a panel under the bar on a wide screen, a
+       drawer from the right on a phone — and never moves what is under it.
+       While it is open the page does not scroll; Escape, the veil and the ×
+       close it, and focus returns to the button that opened it. */
+    var setOpen = function (open) {
+      toggle.setAttribute("aria-expanded", open ? "true" : "false");
+      menu.hidden = !open;
+      if (veil) veil.hidden = !open;
+      header.setAttribute("data-menu-open", open ? "true" : "false");
+      document.documentElement.classList.toggle("menu-open", open);
+      if (glyph) glyph.textContent = open ? "×" : "≡";
+      if (open) {
+        var first = menu.querySelector("a, button");
+        if (first) first.focus();
+      } else {
+        toggle.focus();
+      }
+    };
     toggle.addEventListener("click", function () {
-      var open = toggle.getAttribute("aria-expanded") === "true";
-      toggle.setAttribute("aria-expanded", open ? "false" : "true");
-      menu.hidden = open;
-      if (glyph) glyph.textContent = open ? "≡" : "×";
+      setOpen(toggle.getAttribute("aria-expanded") !== "true");
+    });
+    if (close) close.addEventListener("click", function () { setOpen(false); });
+    if (veil) veil.addEventListener("click", function () { setOpen(false); });
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape" && toggle.getAttribute("aria-expanded") === "true") setOpen(false);
     });
   })();
 </script>

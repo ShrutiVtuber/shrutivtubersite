@@ -7,6 +7,10 @@
  */
 import BaseLayout from "../../layouts/BaseLayout.astro";
 import SectionHeader from "../../components/brand/SectionHeader.astro";
+import EmptyState from "../../components/feedback/EmptyState.astro";
+import SelectField from "../../components/forms/SelectField.astro";
+import TextField from "../../components/forms/TextField.astro";
+import Button from "../../components/forms/Button.astro";
 import { site } from "../../lib/api";
 import { account, asReader } from "../../lib/account";
 import { copy } from "../../lib/copy";
@@ -48,7 +52,9 @@ const WORDS = {
     <p class="note" data-note hidden></p>
 
     {layouts.length === 0 ? (
-      <p class="quiet">{say("none", "Nothing shared yet.")}</p>
+      <EmptyState title={say("none", "Nothing shared yet.")} body={say("none.body", "Shruti shares a layout here once she has streamed with it. Your own overlays are made on a run's page, one element per browser source.")}>
+        <Button slot="action" href="/guides" variant="secondary">{say("none.action", "Start a run from a guide")}</Button>
+      </EmptyState>
     ) : (
       <ul class="list">
         {layouts.map((l) => (
@@ -66,15 +72,15 @@ const WORDS = {
                   <p class="quiet">{say("card.norun", "Start a run first — a layout draws a run's place.")} <a href="/guides">{say("card.guides", "The guides")}</a></p>
                 ) : (
                   <div class="use">
-                    <label><span>{say("card.run", "Run")}</span><select data-run>{runs.map((r) => <option value={r.id}>{r.name}</option>)}</select></label>
-                    <button type="button" class="button" data-use>{say("card.use", "Use this layout")}</button>
+                    <SelectField label={say("card.run", "Run")} name={`run-${l.id}`} data-run options={runs.map((r) => ({ value: String(r.id), label: r.name }))} />
+                    <div><Button type="button" data-use>{say("card.use", "Use this layout")}</Button></div>
                   </div>
                 )
               ) : (
                 <p class="quiet"><a href="/signin?next=%2Fguides%2Foverlays">{say("card.signin", "Sign in")}</a> {say("card.signin_rest", "to use a layout on a run of yours.")}</p>
               )}
               <div class="minted" data-minted hidden>
-                <label><span>{say("card.url", "Browser source URL — shown once")}</span><input type="text" readonly data-url /></label>
+                <TextField label={say("card.url", "Browser source URL — shown once")} name={`url-${l.id}`} readonly data-url />
               </div>
             </div>
           </li>
@@ -92,19 +98,18 @@ const WORDS = {
   .quiet, .soft { color: var(--ink-soft); }
   .mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: .85rem; margin: 0; }
   .list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-4); grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
-  .card { border: 1px solid var(--rule); display: grid; gap: 0; }
-  .thumb { width: 100%; height: auto; display: block; border-bottom: 1px solid var(--rule); }
+  .card { border: var(--border-w) solid var(--line); border-radius: var(--radius-md); background: var(--surface-card); overflow: hidden; display: grid; gap: 0; }
+  .thumb { width: 100%; height: auto; display: block; border-bottom: var(--border-w) solid var(--line); }
   .thumb .ground { fill: var(--surface-inset, #f2f0ec); }
-  .thumb .box { fill: var(--paper, #fff); stroke: var(--ink-soft); stroke-width: 4; }
+  .thumb .box { fill: var(--surface-card); stroke: var(--ink-soft); stroke-width: 4; }
   .thumb .box.guide-sigil { rx: 112; }
   .thumb .label { font: 40px var(--font-mono); fill: var(--ink-soft); }
   .body { padding: var(--space-3) var(--space-4); display: grid; gap: var(--space-2); }
   h2 { font-size: 1.05rem; margin: 0; }
   .use { display: grid; gap: var(--space-2); }
-  label { display: grid; gap: 4px; }
-  label span { font-size: .8rem; color: var(--ink-soft); }
-  select, input { font: inherit; padding: .45rem .55rem; border: 1px solid var(--rule); background: var(--paper); color: var(--ink); width: 100%; }
-  .minted { border-top: 1px solid var(--rule); padding-top: var(--space-2); }
+  /* A field on a card takes the page ground, or it disappears into the card. */
+  .body :global(.sh-f-ctrl) { background: var(--surface-page); }
+  .minted { border-top: var(--border-w) solid var(--line); padding-top: var(--space-2); }
 </style>
 
 <script>

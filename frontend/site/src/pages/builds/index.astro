@@ -4,6 +4,9 @@
 import BaseLayout from "../../layouts/BaseLayout.astro";
 import SectionHeader from "../../components/brand/SectionHeader.astro";
 import EmptyState from "../../components/feedback/EmptyState.astro";
+import SelectField from "../../components/forms/SelectField.astro";
+import TextField from "../../components/forms/TextField.astro";
+import Button from "../../components/forms/Button.astro";
 import { site } from "../../lib/api";
 import { account, asReader } from "../../lib/account";
 import { copy } from "../../lib/copy";
@@ -31,7 +34,9 @@ const WORDS = { needsName: say("words.needs_name", "A build needs a name."), nee
     <p class="note" data-note hidden></p>
 
     {builds.length === 0 ? (
-      <EmptyState title={say("empty.title", "No builds yet.")} text={say("empty.text", "Start one below from the game's template, then write your targets into the slots.")} />
+      <EmptyState title={say("empty.title", "No builds yet.")} body={say("empty.text", "Start one below from the game's template, then write your targets into the slots.")}>
+        <Button slot="action" href="#new" variant="secondary">{say("empty.action", "Start a build")}</Button>
+      </EmptyState>
     ) : (
       <ul class="list">
         {builds.map((b) => (
@@ -47,22 +52,18 @@ const WORDS = { needsName: say("words.needs_name", "A build needs a name."), nee
       </ul>
     )}
 
-    <form class="card" data-new-form>
+    <form class="card" id="new" data-new-form>
       <h2>{say("new.title", "Start a build")}</h2>
-      <label><span>{say("new.template", "Template")}</span>
-        <select data-template>
-          {list.map((t) => <option value={t.id}>{t.game?.name} · {t.name}</option>)}
-        </select>
-      </label>
+      <SelectField label={say("new.template", "Template")} name="template" data-template
+        options={list.map((t) => ({ value: String(t.id), label: `${t.game?.name ?? ""} · ${t.name}` }))} />
       {list.length === 0 && <p class="quiet">{say("new.none", "No templates yet. Shruti adds a game's template when the game is ready.")}</p>}
-      <label><span>{say("new.name", "Name")}</span><input type="text" data-name maxlength="80" placeholder={say("new.name_hint", "Squirrel · Season 15")} /></label>
-      <label><span>{say("new.variant", "Variant")}</span><input type="text" data-variant maxlength="80" placeholder={say("new.variant_hint", "Class · season or league")} /></label>
+      <TextField label={say("new.name", "Name")} name="name" data-name maxlength="80" placeholder={say("new.name_hint", "Squirrel · Season 15")} />
+      <TextField label={say("new.variant", "Variant")} name="variant" data-variant maxlength="80" placeholder={say("new.variant_hint", "Class · season or league")} />
       {runs.length > 0 && (
-        <label><span>{say("new.run", "Beside a run · optional")}</span>
-          <select data-run><option value="">{say("new.no_run", "No run")}</option>{runs.map((r) => <option value={r.id}>{r.name}</option>)}</select>
-        </label>
+        <SelectField label={say("new.run", "Beside a run · optional")} name="run" data-run
+          options={[{ value: "", label: say("new.no_run", "No run") }, ...runs.map((r) => ({ value: String(r.id), label: r.name }))]} />
       )}
-      <button type="submit" class="button">{say("new.go", "Start")}</button>
+      <div><Button type="submit">{say("new.go", "Start")}</Button></div>
     </form>
   </section>
 </BaseLayout>
@@ -72,16 +73,14 @@ const WORDS = { needsName: say("words.needs_name", "A build needs a name."), nee
   .lede { color: var(--ink-soft); max-width: 62ch; }
   .note { border-left: 2px solid var(--accent); padding-left: var(--space-3); }
   .quiet { color: var(--ink-soft); }
-  .list { list-style: none; margin: 0; padding: 0; display: grid; gap: 1px; background: var(--rule); border: 1px solid var(--rule); }
-  .list a { display: grid; gap: 4px; padding: var(--space-3) var(--space-4); background: var(--paper); color: inherit; text-decoration: none; }
+  .list { list-style: none; margin: 0; padding: 0; display: grid; gap: 1px; background: var(--line); border: var(--border-w) solid var(--line); border-radius: var(--radius-md); overflow: hidden; }
+  .list a { display: grid; gap: 4px; padding: var(--space-3) var(--space-4); background: var(--surface-card); color: inherit; text-decoration: none; }
+  .list a:hover .name { color: var(--accent); }
   .list .name { font-weight: 600; }
   .list .game { color: var(--ink-soft); }
   .mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: .85rem; color: var(--ink-soft); }
-  .card { border: 1px solid var(--rule); padding: var(--space-4); display: grid; gap: var(--space-3); }
-  .card h2 { font-size: 1.1rem; margin: 0; }
-  label { display: grid; gap: 4px; }
-  label span { font-size: .85rem; color: var(--ink-soft); }
-  input, select { font: inherit; padding: .5rem .6rem; border: 1px solid var(--rule); background: var(--paper); color: var(--ink); }
+  .card { border-top: var(--border-w) solid var(--line); padding-top: var(--space-4); display: grid; gap: var(--space-3); scroll-margin-top: 80px; }
+  .card h2 { font: 600 var(--text-h3) var(--font-display); margin: 0; }
 </style>
 
 <script>

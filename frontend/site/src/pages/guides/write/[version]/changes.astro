@@ -7,6 +7,8 @@
 import BaseLayout from "../../../../layouts/BaseLayout.astro";
 import { account, asReader } from "../../../../lib/account";
 import { copy } from "../../../../lib/copy";
+import TextArea from "../../../../components/forms/TextArea.astro";
+import Button from "../../../../components/forms/Button.astro";
 
 const say = await copy("guides/write/[version]/changes");
 const id = Astro.params.version ?? "";
@@ -80,13 +82,10 @@ const WORDS = {
         <h2>{say("decide.title", "Your call")}</h2>
         <p class="quiet">{say("decide.text", "Accepting makes it your open draft, credited to them; nothing is published until you submit it and Shruti reads it. Declining sends your note back.")}</p>
         <div class="row">
-          <button type="button" class="button" data-accept>{say("decide.accept", "Accept")}</button>
+          <Button type="button" data-accept>{say("decide.accept", "Accept")}</Button>
         </div>
-        <label class="declining">
-          <span>{say("decide.note", "Or decline, with a note to them")}</span>
-          <textarea rows="3" maxlength="1000" data-decline-note></textarea>
-        </label>
-        <button type="button" class="link" data-decline>{say("decide.decline", "Decline with this note")}</button>
+        <TextArea label={say("decide.note", "Or decline, with a note to them")} name="note" rows={3} maxlength={1000} data-decline-note />
+        <div><Button type="button" variant="secondary" data-decline>{say("decide.decline", "Decline with this note")}</Button></div>
       </section>
     )}
     <p class="back"><a href="/guides/write">{say("back", "Back to the desk")}</a></p>
@@ -102,11 +101,11 @@ const WORDS = {
   .mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: .9em; }
   .quiet { color: var(--ink-soft); }
   .note { border-left: 2px solid var(--accent); padding-left: var(--space-3); }
-  .note-was { border-left: 2px solid var(--rule); padding-left: var(--space-3); color: var(--ink-soft); margin: var(--space-2) 0 0; }
-  .list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; border-top: 1px solid var(--rule); }
-  .item { padding: var(--space-3) 0; border-bottom: 1px solid var(--rule); display: grid; gap: var(--space-2); }
+  .note-was { border-left: 2px solid var(--line); padding-left: var(--space-3); color: var(--ink-soft); margin: var(--space-2) 0 0; }
+  .list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; border-top: 1px solid var(--line); }
+  .item { padding: var(--space-3) 0; border-bottom: 1px solid var(--line); display: grid; gap: var(--space-2); }
   .line { margin: 0; display: flex; gap: var(--space-2); align-items: baseline; flex-wrap: wrap; }
-  .chip { font-family: var(--font-mono); font-size: .75rem; letter-spacing: .08em; text-transform: uppercase; padding: 1px 6px; border: 1px solid var(--rule); }
+  .chip { font-family: var(--font-mono); font-size: .75rem; letter-spacing: .08em; text-transform: uppercase; padding: 1px 6px; border: 1px solid var(--line); }
   .item.added .chip { border-color: #8FBEE8; }
   .item.removed .chip { border-color: var(--ink-soft); text-decoration: line-through; }
   .kind { color: var(--ink-soft); }
@@ -116,10 +115,7 @@ const WORDS = {
   .fields dd { margin: 0; display: grid; gap: 2px; }
   .before { color: var(--ink-soft); text-decoration: line-through; white-space: pre-wrap; }
   .after { white-space: pre-wrap; }
-  .decide { border: 1px solid var(--rule); padding: var(--space-4); display: grid; gap: var(--space-3); }
-  .declining { display: grid; gap: var(--space-1); }
-  .declining span { font-size: .85rem; color: var(--ink-soft); }
-  textarea { font: inherit; padding: .5rem .6rem; border: 1px solid var(--rule); background: var(--paper); color: var(--ink); width: 100%; }
+  .decide { border-top: var(--border-w) solid var(--line); padding-top: var(--space-4); display: grid; gap: var(--space-3); }
   .link { font: inherit; background: none; border: 0; padding: 0; color: var(--accent); text-decoration: underline; cursor: pointer; justify-self: start; }
 </style>
 
