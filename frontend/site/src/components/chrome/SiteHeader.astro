@@ -1,9 +1,10 @@
 ---
 /* Site header. Ported from the design bundle's `ui_kits/site/Chrome.jsx`.
  *
- * The prototype's hash routes (#home) become real paths. Everything else —
- * order, labels, the compact live badge, the scrolled state past 8px, the
- * Menu collapse below 960px — is as delivered.
+ * The prototype's hash routes (#home) become real paths. The bar carries six
+ * places; the menu carries every page, grouped by what a visitor came to
+ * do, on every width — rethought on 20 September 2026 when Guides went
+ * live and the eleven-item bar had run out of room.
  */
 import LiveBadge from "../brand/LiveBadge.astro";
 import type { BadgeState } from "../../lib/live";
@@ -35,19 +36,41 @@ const hidden = new Set(
 );
 const visible = (href: string) => !hidden.has(href);
 
+/* Every page the chrome reaches, grouped by what a visitor came to do. The
+   bar carries six; the menu carries all of them under their eyebrows, on
+   every width, so nothing is reachable only from a landing page.
+
+   NAV stays a flat array of tuples: the reachability test reads it. */
 const NAV: [string, string][] = [
   ["/", "Home"],
   ["/today", "Today"],
-  ["/about", "About"],
-  ["/work", "Work"],
-  ["/classes", "Classes"],
-  ["/shop", "Shop"],
-  ["/schedule", "Schedule"],
-  ["/videos", "Videos"],
   ["/guides", "Guides"],
+  ["/tools", "Instruments"],
   ["/horoscopes", "Horoscopes"],
   ["/journal", "Journal"],
+  ["/schedule", "Schedule"],
+  ["/videos", "Videos"],
+  ["/builds", "Builds"],
+  ["/groups", "Groups"],
+  ["/classes", "Classes"],
+  ["/newsletter", "The monthly letter"],
+  ["/about", "About"],
+  ["/work", "Work"],
+  ["/shop", "Shop"],
+  ["/support", "Support the work"],
+  ["/contact", "Contact"],
 ];
+const BAR = ["/today", "/guides", "/tools", "/horoscopes", "/journal", "/schedule"];
+const GROUPS: [string, string[]][] = [
+  [say("group.watch", "Watch"), ["/schedule", "/videos"]],
+  [say("group.play", "Play"), ["/guides", "/builds", "/groups"]],
+  [say("group.practice", "Practice"), ["/tools", "/horoscopes", "/classes"]],
+  [say("group.read", "Read"), ["/today", "/journal", "/newsletter"]],
+  [say("group.her", "Shruti"), ["/about", "/work", "/shop", "/support", "/contact"]],
+];
+const label = (href: string) => NAV.find(([h]) => h === href)?.[1] ?? href;
+/* /builds and /groups belong to the guides section: hidden with it. */
+const visibleNav = (href: string) => visible(href === "/builds" || href === "/groups" ? "/guides" : href);
 const current = (href: string) => (href === "/" ? here === "/" : here.startsWith(href));
 ---
 
@@ -66,9 +89,9 @@ const current = (href: string) => (href === "/" ? here === "/" : here.startsWith
       </a>
       <nav class="site-nav" aria-label={say("text.31", "Primary")}>
         {
-          NAV.filter(([href]) => visible(href)).map(([href, label]) => (
+          BAR.filter(visibleNav).map((href) => (
             <a href={href} aria-current={current(href) ? "page" : undefined}>
-              {label}
+              {label(href)}
             </a>
           ))
         }
@@ -76,7 +99,7 @@ const current = (href: string) => (href === "/" ? here === "/" : here.startsWith
       <div class="header-side">
         <LiveBadge compact status={live.status} href="/videos" />
         <a class="acct-link" href={signedIn ? "/account" : "/signin"}>
-          {signedIn ? "Account" : "Sign in"}
+          {signedIn ? say("account", "Account") : say("signin", "Sign in")}
         </a>
         <button
           type="button"
@@ -89,24 +112,24 @@ const current = (href: string) => (href === "/" ? here === "/" : here.startsWith
         </button>
       </div>
     </div>
-    <nav id="site-menu" class="site-menu" aria-label={say("text.2", "Primary, mobile")} hidden>
+    <nav id="site-menu" class="site-menu" aria-label={say("text.2", "Everything")} hidden>
       {
-        NAV.filter(([href]) => visible(href)).map(([href, label]) => (
-          <a href={href} aria-current={current(href) ? "page" : undefined}>
-            {label}
-          </a>
-        ))
+        GROUPS.map(([name, hrefs]) => {
+          const shown = hrefs.filter(visibleNav);
+          return shown.length ? (
+            <div class="site-menu-group">
+              <span class="site-menu-eyebrow">{name}</span>
+              {shown.map((href) => (
+                <a href={href} aria-current={current(href) ? "page" : undefined}>{label(href)}</a>
+              ))}
+            </div>
+          ) : null;
+        })
       }
-      <span class="site-menu-rule"></span>
-      {/* One link where two used to be. The menu listed the solar and lunar
-          stations — two of nine, picked because they were the two with no
-          other way in — and left the other seven reachable only from the
-          landing page. The hub covers all of them and is one item shorter. */}
-      <a href="/tools">{say("text.6", "Instruments")}</a>
-      <a href="/newsletter">{say("text.3", "The monthly letter")}</a>
-      <a href={signedIn ? "/account" : "/signin"}>{signedIn ? "Account" : "Sign in"}</a>
-      <a href="/support">{say("text.4", "Support the work")}</a>
-      <a href="/contact">{say("text.7", "Contact")}</a>
+      <div class="site-menu-group">
+        <span class="site-menu-eyebrow">{say("group.you", "You")}</span>
+        <a href={signedIn ? "/account" : "/signin"}>{signedIn ? say("account", "Account") : say("signin", "Sign in")}</a>
+      </div>
     </nav>
   </div>
 </header>

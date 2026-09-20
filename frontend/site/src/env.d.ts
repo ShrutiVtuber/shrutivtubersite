@@ -10,5 +10,6 @@ declare namespace App {
     previewingSection?: string;
     /** Which sections visitors may reach; the nav drops the rest. */
     sectionsLive?: Record<string, boolean>;
+    signedIn?: boolean;
   }
 }

@@ -8,6 +8,7 @@
 import "../styles/global.css";
 import "../styles/site.css";
 import SiteHeader from "../components/chrome/SiteHeader.astro";
+import GuidesNav from "../components/chrome/GuidesNav.astro";
 import SiteFooter from "../components/chrome/SiteFooter.astro";
 import CookieNotice from "../components/brand/CookieNotice.astro";
 import Beacon from "../components/insight/Beacon.astro";
@@ -213,7 +214,8 @@ const homeLd = isHome
     <a href="#main" class="skip-link">{say("text.2", "Skip to content")}</a>
     {/* Only when the operator is past the gate — see the component. */}
     {Astro.locals.bypassingHolding && <HoldingNotice />}
-    <SiteHeader live={badge} />
+    <SiteHeader live={badge} signedIn={Astro.locals.signedIn ?? false} />
+    {/^\/(guides|builds|groups)(\/|$)/.test(Astro.url.pathname) && <GuidesNav />}
     {bare ? <slot /> : <main id="main" class="site-main"><slot /></main>}
     <SiteFooter socials={socials} />
     <CookieNotice />

@@ -1,0 +1,31 @@
+---
+/* Squirrel Guides' own place on the site: a strip under the header on every
+ * page of the section — the guides, the builds, the groups, the layouts and
+ * the desk — so a person is never one wrong click from losing the section.
+ * Rendered only on those paths, which are gated with the section itself.
+ */
+import { copy } from "../../lib/copy";
+
+const say = await copy("component:GuidesNav");
+const here = Astro.url.pathname;
+const ITEMS: [string, string][] = [
+  ["/guides", say("guides", "Guides")],
+  ["/builds", say("builds", "Builds")],
+  ["/groups", say("groups", "Groups")],
+  ["/guides/overlays", say("layouts", "Layouts")],
+  ["/guides/write", say("desk", "The desk")],
+];
+const current = (href: string) => {
+  if (href === "/guides") return here === "/guides" || (here.startsWith("/guides/") && !here.startsWith("/guides/overlays") && !here.startsWith("/guides/write"));
+  return here === href || here.startsWith(href + "/");
+};
+---
+
+<div class="guides-nav">
+  <div class="page">
+    <div class="row">
+      <span class="eyebrow">{say("eyebrow", "Squirrel Guides")}</span>
+      {ITEMS.map(([href, name]) => <a href={href} aria-current={current(href) ? "page" : undefined}>{name}</a>)}
+    </div>
+  </div>
+</div>

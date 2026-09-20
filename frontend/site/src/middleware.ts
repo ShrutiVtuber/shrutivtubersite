@@ -129,6 +129,16 @@ async function siteState(): Promise<{ on: boolean; sections: Record<string, bool
   return holdingState;
 }
 
+async function isReader(token: string | undefined): Promise<boolean> {
+  if (!token) return false;
+  try {
+    const r = await fetch(`${SITE_API}/api/account/me`, { headers: { cookie: `shruti_reader=${token}` } });
+    return r.ok;
+  } catch {
+    return false;
+  }
+}
+
 async function isOperator(token: string | undefined): Promise<boolean> {
   if (!token) return false;
   try {
@@ -168,6 +178,10 @@ export const onRequest = defineMiddleware(async (context, next) => {
        They read what the gate decided rather than asking again — two sources
        for one answer is how a nav ends up pointing at a 404. */
     context.locals.sectionsLive = state.sections;
+    // Signed in, for the header's one link. Asked only when a reader cookie is
+    // present — a stranger costs nothing — and asked rather than assumed, so a
+    // stale cookie never shows "Account" to somebody who is not.
+    context.locals.signedIn = await isReader(context.cookies.get("shruti_reader")?.value);
 
     /* A section she has not published yet. Checked before the holding page so
        the two do not have to know about each other: while the holding page is

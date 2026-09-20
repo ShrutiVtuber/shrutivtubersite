@@ -97,7 +97,10 @@
    room to spare.
    ADDING A NAV ITEM MEANS CHECKING THIS NUMBER AGAIN. It went wrong the moment
    Classes and Shop arrived. */
-@media (max-width: 1160px) { .site-nav { display: none; } .nav-toggle { display: inline-flex; } }
+/* The bar carries six places and the menu carries all of them, so the toggle
+   is always there; only the bar folds away, and it has room to spare at 960. */
+.nav-toggle { display: inline-flex; }
+@media (max-width: 960px) { .site-nav { display: none; } }
 
 /* On a narrow phone the bar runs out of room: the brand, the live badge, a
    sign-in link and a menu button do not fit across 360px, and the header used
@@ -147,6 +150,20 @@
 .site-menu a:hover { color: var(--accent); }
 .site-menu a[aria-current="page"] { color: var(--accent); }
 .site-menu-rule { height: var(--space-3); }
+/* The menu: every page under its eyebrow, in columns where there is room. */
+.site-menu { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 0 var(--space-6); }
+.site-menu-group { display: grid; align-content: start; padding: 10px 0 4px; }
+.site-menu-eyebrow { font: 600 var(--text-xs)/1 var(--font-body); letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-faint); padding: 10px 2px 8px; }
+.site-menu-group a { padding: 11px 2px; }
+@media (max-width: 560px) { .site-menu { grid-template-columns: 1fr 1fr; gap: 0 var(--space-4); } .site-menu-group a { min-height: 44px; } }
+/* Squirrel Guides has a place of its own: a strip under the header on its pages. */
+.guides-nav { border-bottom: var(--border-w) solid var(--line); background: var(--surface-card); }
+.guides-nav .row { display: flex; align-items: center; gap: var(--space-4); min-height: 44px; flex-wrap: wrap; }
+.guides-nav .eyebrow { font: 600 var(--text-xs)/1 var(--font-body); letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-faint); white-space: nowrap; }
+.guides-nav a { font: 500 var(--text-sm)/1 var(--font-body); color: var(--ink-soft); text-decoration: none; padding: 12px 6px; border-bottom: 2px solid transparent; }
+.guides-nav a:hover { color: var(--ink); }
+.guides-nav a[aria-current="page"] { color: var(--accent); border-bottom-color: var(--accent); }
+@media (max-width: 560px) { .guides-nav .row { gap: var(--space-2); } .guides-nav .eyebrow { display: none; } }
 
 /* Footer */
 .site-footer {
