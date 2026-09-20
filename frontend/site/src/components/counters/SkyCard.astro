@@ -14,6 +14,7 @@
  * screen in her timezone, and this is not.
  */
 import { SITE_API } from "../../lib/api";
+import { SIGN_GLYPH } from "../../lib/wheel";
 import { copy } from "../../lib/copy";
 
 /* Every word here, editable from the admin. The defaults below are what
@@ -41,9 +42,10 @@ const GLYPH: Record<string, string> = {
   Sun: `☉︎${TEXT}`, Moon: `☾︎${TEXT}`, Mercury: `☿︎${TEXT}`, Venus: `♀︎${TEXT}`,
   Mars: `♂︎${TEXT}`, Jupiter: `♃︎${TEXT}`, Saturn: `♄︎${TEXT}`,
 };
-/* U+FE0E on every one, or a browser substitutes a colour-emoji font and the
-   marks stop taking the ink colour — the same trap as the overlay. */
-const SIGN_GLYPH = "♈︎♉︎♊︎♋︎♌︎♍︎♎︎♏︎♐︎♑︎♒︎♓︎".split("").map((g) => g + TEXT);
+/* The twelve signs come from lib/wheel — one definition, each glyph already
+   carrying U+FE0E so no browser swaps in a colour-emoji font. Splitting a
+   glyph string by "" here once gave 24 entries (sign, selector, sign, …):
+   six sectors blank and the rest drawn two signs deep. */
 const SIGNS = ["Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo",
                "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces"];
 
@@ -191,7 +193,7 @@ const athens = at
     border-radius: var(--radius-md);
   }
   .sky-card header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
-  .title { margin: 0; font-family: var(--font-display); font-size: var(--text-lg); }
+  .title { margin: 0; font-family: var(--font-display); font-size: var(--text-h4); }
   .at {
     margin: 0; font-family: var(--font-mono); font-variant-numeric: tabular-nums;
     font-size: var(--text-xs); color: var(--ink-faint);

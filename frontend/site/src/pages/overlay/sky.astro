@@ -16,6 +16,7 @@
 import "../../styles/global.css";
 import "../../styles/overlay.css";
 import { SITE_API } from "../../lib/api";
+import { SIGN_GLYPH } from "../../lib/wheel";
 
 export const prerender = false;
 
@@ -42,7 +43,6 @@ const GLYPH: Record<string, string> = {
 };
 /* U+FE0E on every one, or a client swaps in a colour-emoji font and the
    sector marks stop taking the ink colour. */
-const SIGN_GLYPH = "♈︎♉︎♊︎♋︎♌︎♍︎♎︎♏︎♐︎♑︎♒︎♓︎".split("").map((g) => g + TEXT);
 const SIGNS = ["Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo",
                "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces"];
 
