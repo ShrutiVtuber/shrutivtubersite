@@ -131,7 +131,9 @@ def test_a_persons_note_to_themselves_never_travels() -> None:
     assert "note" not in str(out) and "junk" not in out
     assert builds.public_goals(None) == {}
     assert "public_goals(" in code_of(builds._shared_view), "the shared page goes through it"
-    assert 'row.pop("note", None)' in code_of(builds._shared_view), "and so does the progress computed from them"
+    assert "shared.public_progress(" in code_of(builds._shared_view), "and so does the progress computed from them"
+    assert builds.public_goals is __import__("shrutisguides.builds", fromlist=["x"]).public_goals, \
+        "the rule lives in the shared package, so the tracker cannot disagree about what is private"
     assert "public_goals(" in code_of(builds.copy_shared_build), "and so does a copy"
 
 

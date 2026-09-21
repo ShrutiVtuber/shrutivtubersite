@@ -223,24 +223,17 @@ async def create_build(body: BuildIn, request: Request, session: AsyncSession = 
 # its owner for as long as it stands.
 
 ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ"          # no I or O: they read as digits on stream
-PRIVATE_GOAL_FIELDS = ("note",)                # ⚠ a person's own words to themselves never travel
+
+# ⚠ What a shared build may show is the shared package's rule, not this
+# server's: `public_goals` strips the note a person wrote to themselves and
+# `public_progress` strips it again from the rows computed out of them. The
+# self-hosted tracker calls the same two, so the two cannot come to disagree
+# about what is private.
+public_goals = shared.public_goals
 
 
 def _share_code() -> str:
     return "".join(secrets.choice(ALPHABET) for _ in range(6))
-
-
-def public_goals(goals: dict | None) -> dict:
-    """
-    The goals as somebody else may see them: what was aimed for and how far it
-    got, never the note a person wrote to themselves. The same rule the build
-    plate follows on stream, applied to the page.
-    """
-    out: dict = {}
-    for item_id, g in (goals or {}).items():
-        if isinstance(g, dict):
-            out[item_id] = {k: v for k, v in g.items() if k not in PRIVATE_GOAL_FIELDS}
-    return out
 
 
 async def _shared_view(session: AsyncSession, b: Build) -> dict:
@@ -248,21 +241,17 @@ async def _shared_view(session: AsyncSession, b: Build) -> dict:
     t = await session.get(BuildTemplate, b.template_id) if b.template_id else None
     game = await session.get(Game, t.game_id if t else b.game_id) if (t or b.game_id) else None
     goals = public_goals(b.goals)
-    # ⚠ The goals are stripped, and so is the progress computed from them: a
-    # row that still carried an empty `note` would be a note-shaped hole for
-    # somebody to fill later without noticing what it was for.
-    progress = shared.progress(categories_of(t, b), goals)
-    for category in progress.get("categories", []):
-        for row in category.get("items", []):
-            row.pop("note", None)
+    progress = shared.public_progress(categories_of(t, b), b.goals)
     view = {"code": b.share_code, "name": b.name, "variant": b.variant,
             "template": _template_view(t, game) if t else _planned_template(b, game),
             "goals": goals, "progress": progress,
             "sharedAt": b.shared_at.isoformat() if b.shared_at else None,
             "updatedAt": b.updated_at.isoformat() if b.updated_at else None}
     if b.plan:
-        view["plan"] = b.plan
-        view["planned"] = plan_summary(b.plan, gamedata())
+        # ⚠ The plan's own `notes` is the person's note about their plan, and
+        # is as private as a goal's. Stripped here, on the way out.
+        view["plan"] = {k: v for k, v in b.plan.items() if k != "notes"}
+        view["planned"] = {k: v for k, v in plan_summary(b.plan, gamedata()).items() if k != "notes"}
         view["sheet"] = compute_sheet(b.plan, gamedata())
     return view
 

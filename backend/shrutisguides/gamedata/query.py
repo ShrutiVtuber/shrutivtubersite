@@ -45,6 +45,10 @@ class GameData:
         """There, and readable by this process — an unreadable file is "not loaded", not a crash."""
         return self.path.is_file() and os.access(self.path, os.R_OK)
 
+    # ⚠ Every reader guards on `exists` first. A game whose data is not loaded
+    # is a working state — the planner still records a plan — and the promise
+    # only holds if asking for a record answers with nothing rather than
+    # throwing on a file that is not there.
     def _con(self) -> sqlite3.Connection:
         con = sqlite3.connect(f"file:{self.path}?mode=ro", uri=True)
         con.row_factory = sqlite3.Row
@@ -73,6 +77,8 @@ class GameData:
                 "counts": json.loads(r["counts"] or "{}"), "problems": json.loads(r["problems"] or "[]")}
 
     def kinds(self, game: str) -> dict[str, int]:
+        if not self.exists():
+            return {}
         with self._con() as con:
             return dict(con.execute("SELECT kind, COUNT(*) FROM entity WHERE game = ? GROUP BY kind", (game,)).fetchall())
 
@@ -85,6 +91,8 @@ class GameData:
         The records of one kind, filtered. `class_id` keeps records for that
         class AND records for any class; `q` is a prefix search on names.
         """
+        if not self.exists():
+            return []
         where = ["e.game = ?", "e.kind = ?"]
         args: list[Any] = [game, kind]
         if sub:
@@ -135,12 +143,14 @@ class GameData:
             return [_row(r, brief) for r in con.execute(sql, args).fetchall()]
 
     def get(self, game: str, kind: str, id: str) -> dict | None:
+        if not self.exists():
+            return None
         with self._con() as con:
             r = con.execute("SELECT * FROM entity WHERE game = ? AND kind = ? AND id = ?", (game, kind, id)).fetchone()
         return _row(r) if r else None
 
     def names(self, game: str, kind: str, ids: list[str]) -> dict[str, str]:
-        if not ids:
+        if not ids or not self.exists():
             return {}
         with self._con() as con:
             rows = con.execute("SELECT id, name FROM entity WHERE game = ? AND kind = ? AND id IN (%s)" % ",".join("?" * len(ids[:MAX_LIMIT])),
@@ -153,7 +163,7 @@ class GameData:
 
     def search(self, game: str, q: str, kinds: list[str] | None = None, class_id: str | None = None, limit: int = 40) -> list[dict]:
         match = fts_query(q)
-        if not match:
+        if not match or not self.exists():
             return []
         where = ["e.game = ?", "entity_fts MATCH ?"]
         args: list[Any] = [game, match]
@@ -171,6 +181,8 @@ class GameData:
 
     def links(self, game: str, kind: str, id: str, rel: str | None = None, direction: str = "out") -> list[dict]:
         """What this record points at (out), or what points at it (in), with the other end's name."""
+        if not self.exists():
+            return []
         if direction == "in":
             sql = ("SELECT l.rel, l.from_kind AS kind, l.from_id AS id, l.note, e.name FROM link l LEFT JOIN entity e "
                    "ON e.game = l.game AND e.kind = l.from_kind AND e.id = l.from_id WHERE l.game = ? AND l.to_kind = ? AND l.to_id = ?")
@@ -187,6 +199,8 @@ class GameData:
 
     def groups(self, game: str, kind: str, class_id: str | None = None) -> list[dict]:
         """The clusters a kind falls into (skill groups, boards, item classes), with counts."""
+        if not self.exists():
+            return []
         where, args = ["game = ?", "kind = ?", "grp != ''"], [game, kind]
         if class_id:
             where.append("(class_ids = '[]' OR EXISTS (SELECT 1 FROM json_each(entity.class_ids) WHERE value = ?))")
@@ -196,5 +210,7 @@ class GameData:
         return [{"group": r["grp"], "count": r["n"]} for r in rows]
 
     def sources(self, game: str) -> dict[str, str]:
+        if not self.exists():
+            return {}
         with self._con() as con:
             return {r["facet"]: r["body"] for r in con.execute("SELECT facet, body FROM source WHERE game = ? ORDER BY facet", (game,)).fetchall()}

@@ -252,6 +252,42 @@ def progress(categories: list[dict], goals: Any) -> dict:
             "categories": cats, "next": next_open, "complete": total_all > 0 and met_all == total_all}
 
 
+# ── what somebody else may see ───────────────────────────────────────────────
+
+PRIVATE_GOAL_FIELDS = ("note",)
+
+
+def public_goals(goals: Any) -> dict:
+    """
+    The goals as somebody else may see them: what was aimed for and how far
+    it got, never the note a person wrote to themselves.
+
+    ⚠ The same rule the plate follows on stream, applied to a shared page.
+    It lives here rather than in either server so the two cannot come to
+    disagree about what is private.
+    """
+    out: dict = {}
+    for item_id, g in (goals or {}).items() if isinstance(goals, dict) else ():
+        if isinstance(g, dict):
+            out[item_id] = {k: v for k, v in g.items() if k not in PRIVATE_GOAL_FIELDS}
+    return out
+
+
+def public_progress(categories: list[dict], goals: Any) -> dict:
+    """
+    Progress for a shared page: computed from the stripped goals, and stripped
+    again — a row still carrying an empty `note` would be a note-shaped hole
+    for somebody to fill later without noticing what it was for.
+    """
+    prog = progress(categories, public_goals(goals))
+    for category in prog.get("categories", []):
+        for row in category.get("items", []):
+            row.pop("note", None)
+    for row in prog.get("next", []):
+        row.pop("note", None)
+    return prog
+
+
 def element(name: str, variant: str, game: str, prog: dict) -> dict:
     """
     What the build plate draws: the eyebrow, the name, met of total, one arc

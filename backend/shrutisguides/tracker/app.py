@@ -68,14 +68,20 @@ def db() -> sqlite3.Connection:
             id INTEGER PRIMARY KEY, template_id INTEGER REFERENCES build_template(id), run_id INTEGER REFERENCES run(id),
             name TEXT NOT NULL, variant TEXT NOT NULL DEFAULT '', goals TEXT NOT NULL DEFAULT '{}', updated_at TEXT NOT NULL,
             game_slug TEXT NOT NULL DEFAULT '', game_name TEXT NOT NULL DEFAULT '', plan TEXT NOT NULL DEFAULT '{}',
-            categories TEXT NOT NULL DEFAULT '[]');
+            categories TEXT NOT NULL DEFAULT '[]', share_code TEXT, shared_at TEXT, forked_from_id INTEGER);
         CREATE TABLE IF NOT EXISTS overlay (
             id INTEGER PRIMARY KEY, token TEXT NOT NULL UNIQUE, kind TEXT NOT NULL, run_id INTEGER REFERENCES run(id),
             build_id INTEGER REFERENCES build(id),
             routine_id TEXT NOT NULL DEFAULT '', theme TEXT NOT NULL DEFAULT 'almanac', motion TEXT NOT NULL DEFAULT 'reduced',
             label TEXT NOT NULL DEFAULT '', last_seen TEXT, layout TEXT NOT NULL DEFAULT '[]');
     """)
-    if "plan" not in {r["name"] for r in con.execute("PRAGMA table_info(build)").fetchall()}:
+    _build_columns = {r["name"] for r in con.execute("PRAGMA table_info(build)").fetchall()}
+    if _build_columns and "share_code" not in _build_columns and "plan" in _build_columns:
+        # a tracker that already had planned builds, before sharing existed
+        for _add in ("share_code TEXT", "shared_at TEXT", "forked_from_id INTEGER"):
+            con.execute(f"ALTER TABLE build ADD COLUMN {_add}")
+        con.commit()
+    if "plan" not in _build_columns:
         # An older tracker: every build stood on a template. A planned build
         # stands on the game's data instead, so template_id may be empty —
         # and SQLite cannot loosen a NOT NULL, so the table is rebuilt beside
@@ -85,13 +91,16 @@ def db() -> sqlite3.Connection:
                 id INTEGER PRIMARY KEY, template_id INTEGER REFERENCES build_template(id), run_id INTEGER REFERENCES run(id),
                 name TEXT NOT NULL, variant TEXT NOT NULL DEFAULT '', goals TEXT NOT NULL DEFAULT '{}', updated_at TEXT NOT NULL,
                 game_slug TEXT NOT NULL DEFAULT '', game_name TEXT NOT NULL DEFAULT '', plan TEXT NOT NULL DEFAULT '{}',
-                categories TEXT NOT NULL DEFAULT '[]');
+                categories TEXT NOT NULL DEFAULT '[]', share_code TEXT, shared_at TEXT, forked_from_id INTEGER);
             INSERT INTO build_new (id, template_id, run_id, name, variant, goals, updated_at)
                 SELECT id, template_id, run_id, name, variant, goals, updated_at FROM build;
             DROP TABLE build;
             ALTER TABLE build_new RENAME TO build;
         """)
         con.commit()
+    # ⚠ After the migrations, never inside the opening script: on a tracker
+    # from before sharing the column does not exist yet and the script fails.
+    con.execute("CREATE UNIQUE INDEX IF NOT EXISTS build_share_code ON build (share_code) WHERE share_code IS NOT NULL")
     columns = {r["name"] for r in con.execute("PRAGMA table_info(overlay)").fetchall()}
     if "layout" not in columns:
         con.execute("ALTER TABLE overlay ADD COLUMN layout TEXT NOT NULL DEFAULT '[]'")
@@ -573,7 +582,8 @@ def _build_view(con: sqlite3.Connection, b: sqlite3.Row, with_sheet: bool = Fals
              "game": {"slug": b["game_slug"], "name": b["game_name"]}, "categories": json.loads(b["categories"] or "[]")}
     goals = json.loads(b["goals"] or "{}")
     view = {"id": b["id"], "name": b["name"], "variant": b["variant"], "runId": b["run_id"], "template": t, "goals": goals,
-            "progress": builds.progress(_categories_of(con, b), goals), "updatedAt": b["updated_at"]}
+            "progress": builds.progress(_categories_of(con, b), goals), "updatedAt": b["updated_at"],
+            "shareCode": b["share_code"], "forkedFrom": b["forked_from_id"]}
     plan = json.loads(b["plan"] or "{}")
     if plan:
         view["plan"] = plan
@@ -801,6 +811,108 @@ def gamedata_record(game: str, kind: str, id: str) -> dict:
     if r is None:
         raise HTTPException(404, "no such record")
     return {**r, "links": d.links(game, kind, id), "linked_from": d.links(game, kind, id, direction="in")}
+
+
+# ── a build somebody else can read, and one pulled from the site ────────────
+#
+# The same grammar as the site's: a six-letter code its owner mints, gives
+# out and takes back. ⚠ A code is not an overlay token — a token is shown
+# once and never listed; a code is meant to be said out loud.
+
+ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ"          # no I or O: they read as digits on stream
+
+
+def _shared_view(con: sqlite3.Connection, b: sqlite3.Row) -> dict:
+    """A shared build, with nothing about whoever owns it."""
+    view = _build_view(con, b)
+    goals = builds.public_goals(json.loads(b["goals"] or "{}"))
+    for key in ("runId", "shareCode", "forkedFrom"):
+        view.pop(key, None)
+    if isinstance(view.get("plan"), dict):
+        view["plan"] = {k: v for k, v in view["plan"].items() if k != "notes"}
+    if isinstance(view.get("planned"), dict):
+        view["planned"] = {k: v for k, v in view["planned"].items() if k != "notes"}
+    view |= {"code": b["share_code"], "goals": goals,
+             "progress": builds.public_progress(_categories_of(con, b), json.loads(b["goals"] or "{}")),
+             "sharedAt": b["shared_at"]}
+    return view
+
+
+def _by_code(con: sqlite3.Connection, code: str) -> sqlite3.Row:
+    row = con.execute("SELECT * FROM build WHERE share_code = ?", (code.upper(),)).fetchone()
+    if row is None:
+        raise HTTPException(404, "no build with that code")
+    return row
+
+
+@app.get("/api/builds/shared/{code}")
+def shared_build(code: str) -> dict:
+    """Read a shared build. No token — a code is given out to be used."""
+    return _shared_view(db(), _by_code(db(), code))
+
+
+@app.post("/api/builds/{build_id}/share", dependencies=[Depends(owner)])
+def share_build(build_id: int) -> dict:
+    """Give this build a code. Asking twice gives the same code back."""
+    con = db(); b = _build_row(con, build_id)
+    if b["share_code"]:
+        return {"code": b["share_code"], "sharedAt": b["shared_at"]}
+    for _attempt in range(8):
+        code = "".join(secrets.choice(ALPHABET) for _ in range(6))
+        if con.execute("SELECT 1 FROM build WHERE share_code = ?", (code,)).fetchone() is None:
+            now = _now().isoformat()
+            con.execute("UPDATE build SET share_code = ?, shared_at = ? WHERE id = ?", (code, now, build_id))
+            con.commit()
+            return {"code": code, "sharedAt": now}
+    raise HTTPException(503, "could not find a free code; try again")
+
+
+@app.delete("/api/builds/{build_id}/share", status_code=204, dependencies=[Depends(owner)])
+def unshare_build(build_id: int) -> None:
+    """Take the code back. Anybody who copied it keeps their copy — it is theirs now."""
+    con = db(); _build_row(con, build_id)
+    con.execute("UPDATE build SET share_code = NULL, shared_at = NULL WHERE id = ?", (build_id,))
+    con.commit()
+
+
+class PullSharedIn(BaseModel):
+    code: str
+
+
+@app.post("/api/builds/pull-shared", status_code=201, dependencies=[Depends(owner)])
+def pull_shared_build(body: PullSharedIn) -> dict:
+    """
+    Somebody else's build, from the site, onto this machine: the same targets
+    and none of their progress. You begin at nothing, because the point is to
+    walk it yourself.
+    """
+    code = "".join(ch for ch in body.code.upper() if ch.isalpha())[:12]
+    if not code:
+        raise HTTPException(422, "a code is six letters")
+    try:
+        r = httpx.get(f"{SITE}/api/builds/shared/{code}", timeout=20)
+    except httpx.HTTPError as exc:
+        raise HTTPException(502, f"could not reach {SITE}: {type(exc).__name__}")
+    if r.status_code == 404:
+        raise HTTPException(404, "no build with that code")
+    if r.status_code != 200:
+        raise HTTPException(502, f"{SITE} answered {r.status_code}")
+    src = r.json() if isinstance(r.json(), dict) else {}
+    template = src.get("template") or {}
+    cats = builds.clean_categories(template.get("categories"))
+    if not cats:
+        raise HTTPException(422, "that build has nothing in it")
+    goals = {i: {"target": str((g or {}).get("target") or "")}
+             for i, g in builds.public_goals(src.get("goals")).items() if (g or {}).get("target")}
+    game = template.get("game") or {}
+    con = db()
+    cur = con.execute("INSERT INTO build (template_id, run_id, name, variant, goals, updated_at, game_slug, game_name, plan, categories) "
+                      "VALUES (NULL, NULL, ?, ?, ?, ?, ?, ?, ?, ?)",
+                      (str(src.get("name") or "A build")[:80], str(src.get("variant") or "")[:80], json.dumps(goals),
+                       _now().isoformat(), str(game.get("slug") or "")[:80], str(game.get("name") or "")[:80],
+                       json.dumps(src.get("plan") or {}), json.dumps(cats)))
+    con.commit()
+    return _build_view(con, _build_row(con, cur.lastrowid), with_sheet=True)
 
 
 class SheetIn(BaseModel):
