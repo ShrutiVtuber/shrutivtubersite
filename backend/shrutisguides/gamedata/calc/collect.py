@@ -21,6 +21,7 @@ from typing import Iterator
 
 from ..query import GameData
 from ..recipes import recipe_for
+from .damage import hits
 from .games import module_for
 from .model import APPROXIMATE, Contribution, NOT_COUNTED, Pool, worst
 from .vocabulary import GROUPS, grouped, stat
@@ -181,9 +182,11 @@ def sheet(plan: dict, data: GameData) -> dict:
     for g, stats_in in grouped(ids):
         out_groups.append({"group": g, "rows": [rows[st.id] for st in stats_in]})
     uncounted = [c for sid in ids for c in pool.lines(sid) if c.state == NOT_COUNTED]
+    damage = hits(plan, data, pool)
     return {
         "game": game, "level": pool.level, "supported": module is not None,
         "groups": out_groups,
+        "damage": [h.as_dict() for h in damage],
         "state": worst([r["state"] for r in rows.values()]),
         "uncounted": {"lines": len(uncounted), "things": len({(c.source_kind, c.source_id) for c in uncounted})},
     }

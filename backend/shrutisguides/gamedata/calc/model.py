@@ -55,6 +55,11 @@ class Contribution:
     state: str = COUNTED
     bucket: str = ""               # for games whose "more" multipliers group (Diablo IV's)
     place: str = ""                # the gear place it came from, where that differs from the source
+    # ⚠ What the line is ABOUT, where the stat alone does not say: which skill
+    # a "+3 to Corpse Explosion" raises, which tab a "+2 to Summoning" raises.
+    # Without it the damage model cannot tell a bonus meant for this skill from
+    # one meant for another, and every skill would get every bonus.
+    param: str = ""
 
     def __post_init__(self) -> None:
         if self.form not in FORMS:

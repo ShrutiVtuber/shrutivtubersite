@@ -14,7 +14,8 @@ all skills` is one. The mapper returns a list, always.
 """
 from __future__ import annotations
 
-from ..model import APPROXIMATE, COUNTED, NOT_COUNTED, Contribution
+from ..damage import Hit, between
+from ..model import APPROXIMATE, COUNTED, NOT_COUNTED, Contribution, Step, worst
 
 GAME = "diablo-ii-resurrected"
 
@@ -72,7 +73,8 @@ TABLE: dict[str, tuple[object, str]] = {
 for _c in ("amazon", "assassin", "barbarian", "druid", "necromancer", "paladin", "sorceress", "warlock"):
     TABLE[f"{_c}-skills"] = ("skills-class", "flat")
 for _e in ("fire", "cold", "lightning", "poison", "magic"):
-    TABLE[f"{_e}-skills"] = ("skills-single", "flat")
+    # "+3 to Fire Skills" raises a whole tab, not one skill; the param says which
+    TABLE[f"{_e}-skills"] = ("skills-tab", "flat")
 
 # Facts we hold and cannot put a number on. They are LISTED, never silently dropped.
 UNCOUNTABLE = {
@@ -125,6 +127,24 @@ def base_for(plan: dict, data, pool) -> dict[str, float]:
     return base
 
 
+def _param(key: str, line: dict) -> str:
+    """
+    What a skill bonus is ABOUT. `+3 to Corpse Explosion` raises one skill;
+    `+2 to Summoning` raises one tab; `+1 to Sorceress skills` raises a
+    class's; `+1 to all skills` raises everything. The pack records the
+    target beside the line, and without carrying it here every skill in a
+    plan would take every bonus.
+    """
+    if key == "skill":
+        return str(line.get("skill_id") or "")
+    if key == "skill-tab":
+        cls, tab = line.get("class_id"), line.get("skill_tab_id")
+        return f"{cls}-{tab}" if cls and tab else str(tab or "")
+    if key.endswith("-skills"):
+        return key[: -len("-skills")]          # a class's name, or an element's
+    return ""
+
+
 def _number(line: dict) -> tuple[float | None, str]:
     """The value to count, and how sure we are. A range counts at its best roll, and says so."""
     for field in ("value",):
@@ -146,7 +166,8 @@ def map_line(line: dict, source: dict) -> list[Contribution]:
     key = str(line.get("stat") or "").strip()
     text = str(line.get("text") or line.get("stat") or "")[:160]
     common = dict(source_kind=source.get("kind", ""), source_id=source.get("id", ""),
-                  source_name=source.get("name", ""), text=text, place=source.get("place", ""))
+                  source_name=source.get("name", ""), text=text, place=source.get("place", ""),
+                  param=_param(key, line))
     if not key:
         return []
     value, sureness = _number(line)
@@ -167,3 +188,123 @@ def map_line(line: dict, source: dict) -> list[Contribution]:
         form = "per_level"
     names = stats if isinstance(stats, tuple) else (stats,)
     return [Contribution(stat=n, form=form, value=value, state=sureness, **common) for n in names]
+
+
+# ── what a skill hits for ────────────────────────────────────────────────────
+
+def planned_points(plan: dict, skill_id: str) -> int:
+    """The points a person put into a skill with their own hand."""
+    picks = ((plan.get("sections") or {}).get("skills") or {}).get("picks") or []
+    for p in picks:
+        if isinstance(p, dict) and p.get("id") == skill_id:
+            try:
+                return max(0, int(p.get("points") or 0))
+            except (TypeError, ValueError):
+                return 0
+    return 0
+
+
+def _tab_matches(param: str, skill: dict) -> bool:
+    """`+2 to Summoning` and `+3 to Fire Skills` both name a tab; the pack writes them differently."""
+    if not param:
+        return False
+    group = str(skill.get("group_id") or "").lower()
+    name = str(skill.get("group") or "").lower()
+    p = param.lower()
+    return p == group or p in group or p in name.replace(" ", "-")
+
+
+def effective_rank(skill: dict, points: int, pool) -> tuple[int, list[Contribution]]:
+    """
+    The rank a skill actually reaches: the points a person spent, plus every
+    bonus that is ABOUT this skill — all skills, this class's, this tab's,
+    this one by name. A bonus meant for another tab is not counted, which is
+    the whole reason a contribution carries what it is about.
+    """
+    rank, lines = float(points), []
+    for c in pool.lines("skills-all"):
+        rank += c.value
+        lines.append(c)
+    for c in pool.lines("skills-class"):
+        if c.param and c.param == str(skill.get("class_id") or ""):
+            rank += c.value
+            lines.append(c)
+    for c in pool.lines("skills-tab"):
+        if _tab_matches(c.param, skill):
+            rank += c.value
+            lines.append(c)
+    for c in pool.lines("skills-single"):
+        if c.param and c.param == skill.get("id"):
+            rank += c.value
+            lines.append(c)
+    return int(rank), lines
+
+
+def damage_for(plan: dict, data, pool, pick: dict) -> Hit | None:
+    """
+    One skill's damage, aimed at the number the game's own tooltip shows.
+
+    ⚠ Synergies count HARD POINTS only — the points a person spent, not the
+    rank gear lifts the skill to. Counting the gear twice would inflate every
+    number in the panel, and it is the mistake every hand-made spreadsheet
+    makes.
+    """
+    skill = data.get(GAME, "skill", str(pick.get("id") or ""))
+    if not skill:
+        return None
+    element = str(skill.get("damage_type") or "").lower()
+    table = skill.get("ranks_or_levels") or []
+    points = planned_points(plan, skill["id"])
+    rank, rank_lines = effective_rank(skill, points, pool)
+    hit = Hit(skill_id=skill["id"], skill_name=skill.get("name") or skill["id"], element=element, rank=rank)
+    if points <= 0:
+        hit.state, hit.why = NOT_COUNTED, "no points are planned into it"
+        return hit
+
+    key = next((k for k in (f"{element}_damage", "damage", "physical_damage", "magic_damage")
+                if any(k in (r.get("values") or {}) for r in table)), "")
+    if not key:
+        hit.state, hit.why = NOT_COUNTED, "the pack records no damage for this skill — it may not deal any"
+        return hit
+    band, sureness = between(table, rank, key)
+    if band is None:
+        hit.state, hit.why = NOT_COUNTED, "the pack records no damage at any rank"
+        return hit
+    low, high = band
+    hit.steps.append(Step("base", f"at rank {rank}" + (" (between the rows the pack records)" if sureness != COUNTED else ""),
+                          rank, high, rank_lines))
+    if sureness != COUNTED:
+        hit.why = "the rank falls between the ranks the pack records, so the damage is read across them"
+
+    # synergies: another skill's hard points, at so much a point
+    synergy_pct, synergy_lines = 0.0, []
+    for syn in (skill.get("synergies") or []):
+        if not isinstance(syn, dict):
+            continue
+        sid, per = str(syn.get("skill_id") or ""), syn.get("per_point")
+        if not sid or not isinstance(per, (int, float)):
+            continue
+        hard = planned_points(plan, sid)
+        if hard:
+            synergy_pct += hard * float(per)
+            other = data.get(GAME, "skill", sid) or {}
+            synergy_lines.append(Contribution(stat=f"damage-{element or 'physical'}", form="increased",
+                                              value=hard * float(per), source_kind="skill", source_id=sid,
+                                              source_name=other.get("name") or sid,
+                                              text=f"{hard} points at {per}% a point"))
+
+    # and whatever the gear adds to this element
+    gear_pct, gear_lines = 0.0, []
+    for c in pool.lines(f"damage-{element}") if element else ():
+        if c.form == "increased" and c.state != NOT_COUNTED:
+            gear_pct += c.value
+            gear_lines.append(c)
+
+    if synergy_pct or gear_pct:
+        low *= 1 + (synergy_pct + gear_pct) / 100.0
+        high *= 1 + (synergy_pct + gear_pct) / 100.0
+        hit.steps.append(Step("increased", "synergies and gear", synergy_pct + gear_pct, high, synergy_lines + gear_lines))
+
+    hit.low, hit.high = low, high
+    hit.state = worst([sureness] + [c.state for c in rank_lines + gear_lines])
+    return hit
