@@ -72,6 +72,7 @@ async def _build_view(session: AsyncSession, b: Build, with_sheet: bool = False)
             "template": _template_view(t, game) if t else _planned_template(b, game),
             "goals": b.goals or {},
             "progress": progress_of(t, b),
+            "shareCode": b.share_code, "forkedFrom": b.forked_from_id,
             "updatedAt": b.updated_at.isoformat() if b.updated_at else None}
     if b.plan:
         view["plan"] = b.plan
@@ -207,6 +208,127 @@ async def create_build(body: BuildIn, request: Request, session: AsyncSession = 
     await session.commit()
     await session.refresh(b)
     return await _build_view(session, b)
+
+
+# ── a build somebody else can read, and start their own from ────────────────
+#
+# A guide is published and read by her first, because it is writing put in
+# front of readers. A build is not that: it is one person's own set of goals,
+# and sharing it is their act alone. So it works the way a GROUP does — a
+# six-letter code, spoken on stream, given out to whoever they like, and
+# taken back whenever they want.
+#
+# ⚠ The code is not a secret in the way an overlay token is. A token is shown
+# once and never listed; a code is meant to be said out loud and is listed to
+# its owner for as long as it stands.
+
+ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ"          # no I or O: they read as digits on stream
+PRIVATE_GOAL_FIELDS = ("note",)                # ⚠ a person's own words to themselves never travel
+
+
+def _share_code() -> str:
+    return "".join(secrets.choice(ALPHABET) for _ in range(6))
+
+
+def public_goals(goals: dict | None) -> dict:
+    """
+    The goals as somebody else may see them: what was aimed for and how far it
+    got, never the note a person wrote to themselves. The same rule the build
+    plate follows on stream, applied to the page.
+    """
+    out: dict = {}
+    for item_id, g in (goals or {}).items():
+        if isinstance(g, dict):
+            out[item_id] = {k: v for k, v in g.items() if k not in PRIVATE_GOAL_FIELDS}
+    return out
+
+
+async def _shared_view(session: AsyncSession, b: Build) -> dict:
+    """A shared build, with nothing about the person who owns it."""
+    t = await session.get(BuildTemplate, b.template_id) if b.template_id else None
+    game = await session.get(Game, t.game_id if t else b.game_id) if (t or b.game_id) else None
+    goals = public_goals(b.goals)
+    # ⚠ The goals are stripped, and so is the progress computed from them: a
+    # row that still carried an empty `note` would be a note-shaped hole for
+    # somebody to fill later without noticing what it was for.
+    progress = shared.progress(categories_of(t, b), goals)
+    for category in progress.get("categories", []):
+        for row in category.get("items", []):
+            row.pop("note", None)
+    view = {"code": b.share_code, "name": b.name, "variant": b.variant,
+            "template": _template_view(t, game) if t else _planned_template(b, game),
+            "goals": goals, "progress": progress,
+            "sharedAt": b.shared_at.isoformat() if b.shared_at else None,
+            "updatedAt": b.updated_at.isoformat() if b.updated_at else None}
+    if b.plan:
+        view["plan"] = b.plan
+        view["planned"] = plan_summary(b.plan, gamedata())
+        view["sheet"] = compute_sheet(b.plan, gamedata())
+    return view
+
+
+async def _by_code(session: AsyncSession, code: str) -> Build:
+    b = (await session.execute(select(Build).where(Build.share_code == code.upper()))).scalar_one_or_none()
+    if b is None:
+        raise HTTPException(404, "no build with that code")
+    return b
+
+
+@router.get("/shared/{code}")
+async def shared_build(code: str, session: AsyncSession = Depends(get_session)) -> dict:
+    """Read a shared build. No account needed — a code is given out to be used."""
+    return await _shared_view(session, await _by_code(session, code))
+
+
+@router.post("/shared/{code}/copy", status_code=201)
+async def copy_shared_build(code: str, request: Request, session: AsyncSession = Depends(get_session)) -> dict:
+    """
+    Start your own from somebody else's: the same template or plan, the same
+    targets — and none of their progress. You begin at nothing, because the
+    point is to walk it yourself.
+    """
+    user = await _reader(request, session)
+    await _refuse_if_suspended(session, user)
+    src = await _by_code(session, code)
+    goals: dict = {}
+    for item_id, g in public_goals(src.goals).items():
+        target = str((g or {}).get("target") or "")
+        if target:
+            goals[item_id] = {"target": target}          # what to aim for; never how far they got
+    mine = Build(user_id=user.id, template_id=src.template_id, game_id=src.game_id, run_id=None,
+                 name=src.name, variant=src.variant, plan=dict(src.plan or {}),
+                 categories=list(src.categories or []), goals=goals, forked_from_id=src.id)
+    session.add(mine)
+    await session.commit()
+    await session.refresh(mine)
+    return await _build_view(session, mine, with_sheet=True)
+
+
+@router.post("/{build_id}/share")
+async def share_build(build_id: int, request: Request, session: AsyncSession = Depends(get_session)) -> dict:
+    """Give this build a code. Asking twice gives the same code back; the code is the build's, not a new thing each time."""
+    b, _ = await _mine(session, request, build_id)
+    if not b.share_code:
+        for _attempt in range(8):
+            code = _share_code()
+            if (await session.execute(select(Build.id).where(Build.share_code == code))).first() is None:
+                b.share_code = code
+                break
+        else:
+            raise HTTPException(503, "could not find a free code; try again")
+        b.shared_at = datetime.now(timezone.utc)
+        await session.commit()
+        await session.refresh(b)
+    return {"code": b.share_code, "sharedAt": b.shared_at.isoformat() if b.shared_at else None}
+
+
+@router.delete("/{build_id}/share", status_code=204)
+async def unshare_build(build_id: int, request: Request, session: AsyncSession = Depends(get_session)) -> None:
+    """Take the code back. Anybody who copied it keeps their copy — it is theirs now."""
+    b, _ = await _mine(session, request, build_id)
+    b.share_code = None
+    b.shared_at = None
+    await session.commit()
 
 
 # ── a planned build: the game's own terms, written as goals ─────────────────

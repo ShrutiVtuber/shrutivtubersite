@@ -287,4 +287,12 @@ class Build(TimestampMixin, table=True):
     goals: dict = Field(default_factory=dict, sa_column=Column(JSONB, nullable=False, server_default="{}"))
     plan: dict = Field(default_factory=dict, sa_column=Column(JSONB, nullable=False, server_default="{}"))
     categories: list = Field(default_factory=list, sa_column=Column(JSONB, nullable=False, server_default="[]"))
+
+    # ⚠ A share code is NOT an overlay token. A token is a secret shown once
+    # and never listed; a code is meant to be read out, like a group's — so it
+    # is listed to whoever owns the build and can be read again. Null means the
+    # build is nobody's business but its owner's, which is the default.
+    share_code: Optional[str] = Field(default=None, index=True, unique=True)
+    shared_at: Optional[datetime] = Field(default=None, sa_type=UTC_TS)
+    forked_from_id: Optional[int] = Field(default=None, index=True)
     last_seen_at: Optional[datetime] = Field(default=None, sa_type=UTC_TS)

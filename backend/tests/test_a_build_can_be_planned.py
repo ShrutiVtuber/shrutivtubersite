@@ -105,3 +105,62 @@ def test_nothing_about_a_person_and_nothing_red() -> None:
     body = re.sub(r'"""..*?"""', " ", inspect.getsource(gamedata), flags=re.S).lower()
     for word in ("streak", "days since", "percent", "inactive", "remind", "red"):
         assert word not in body
+
+
+# ── a build somebody else can read, and start their own from ────────────────
+
+def test_a_share_code_is_a_code_and_not_a_token() -> None:
+    """
+    ⚠ An overlay token is shown once and never listed. A share code is meant
+    to be said out loud and is listed to its owner for as long as it stands.
+    Confusing the two would either leak a token or make a code unusable.
+    """
+    source = inspect.getsource(builds)
+    assert "ALPHABET = " in source and '"I"' not in source, "no I or O: they read as digits on stream"
+    assert "shareCode" in code_of(builds._build_view), "the owner can read their own code back"
+    assert "secrets.choice" in code_of(builds._share_code)
+    assert "if not b.share_code:" in code_of(builds.share_build), "asking twice gives the same code"
+
+
+def test_a_persons_note_to_themselves_never_travels() -> None:
+    goals = {"helm": {"target": "Shroud of False Death", "met": True, "note": "the one I keep missing"},
+             "chest": {"partial": True, "note": "private"}, "junk": "not a mapping"}
+    out = builds.public_goals(goals)
+    assert out["helm"] == {"target": "Shroud of False Death", "met": True}
+    assert out["chest"] == {"partial": True}
+    assert "note" not in str(out) and "junk" not in out
+    assert builds.public_goals(None) == {}
+    assert "public_goals(" in code_of(builds._shared_view), "the shared page goes through it"
+    assert 'row.pop("note", None)' in code_of(builds._shared_view), "and so does the progress computed from them"
+    assert "public_goals(" in code_of(builds.copy_shared_build), "and so does a copy"
+
+
+def test_a_copy_takes_the_targets_and_none_of_the_progress() -> None:
+    body = code_of(builds.copy_shared_build)
+    assert '{"target": target}' in body, "what to aim for, and nothing about how far they got"
+    for word in ("met", "partial", "have"):
+        assert f'"{word}"' not in body, f"a copy must not inherit {word}"
+    assert "forked_from_id=src.id" in body and "run_id=None" in body
+    assert "share_code" not in body, "a copy is private until its owner shares it"
+
+
+def test_the_shared_routes_come_before_the_build_id_route() -> None:
+    source = inspect.getsource(builds)
+    assert source.index('@router.get("/shared/{code}")') < source.index('@router.get("/{build_id}")')
+    assert source.index('@router.post("/shared/{code}/copy"') < source.index('@router.get("/{build_id}")')
+
+
+def test_reading_a_shared_build_needs_no_account_but_copying_does() -> None:
+    assert "_reader(" not in code_of(builds.shared_build), "a code is given out to be used"
+    assert "_reader(" in code_of(builds.copy_shared_build) and "_refuse_if_suspended(" in code_of(builds.copy_shared_build)
+    assert "user_id" not in code_of(builds._shared_view), "nothing about the person who owns it"
+
+
+def test_the_columns_and_their_migration_exist() -> None:
+    b = Build(user_id=1, name="b", share_code="HEKATE", forked_from_id=3)
+    assert b.share_code == "HEKATE" and b.forked_from_id == 3
+    assert Build(user_id=1, name="b").share_code is None, "private is the default"
+    migration = (HERE / "alembic/versions/j8h5e1f6g743_shared_builds.py").read_text()
+    for column in ("share_code", "shared_at", "forked_from_id"):
+        assert f'sa.Column("{column}"' in migration
+    assert 'unique=True' in migration, "two builds cannot hold one code"
