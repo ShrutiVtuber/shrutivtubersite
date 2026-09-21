@@ -76,6 +76,21 @@ for _e in ("fire", "cold", "lightning", "poison", "magic"):
     # "+3 to Fire Skills" raises a whole tab, not one skill; the param says which
     TABLE[f"{_e}-skills"] = ("skills-tab", "flat")
 
+# ⚠ Stats that are another stat with an assumption on them. Diablo II writes
+# these as keys of their own rather than as a clause — "+50% damage to undead"
+# is enhanced damage waiting on what is being hit. Filed under the stat they
+# really are, with the assumption attached, they join the right row; filed
+# under their own names they would sit in `other` and never add up with
+# anything.
+CONDITIONAL: dict[str, tuple[str, str, str]] = {
+    "damage-vs-undead": ("damage-physical", "increased", "target-is-undead"),
+    "damage-vs-demons": ("damage-physical", "increased", "target-is-a-demon"),
+    "attack-rating-vs-undead": ("attack-rating", "flat", "target-is-undead"),
+    "attack-rating-vs-demons": ("attack-rating", "flat", "target-is-a-demon"),
+}
+
+CONDITION_NAMES = {"target-is-undead": "Against the undead", "target-is-a-demon": "Against demons"}
+
 # Facts we hold and cannot put a number on. They are LISTED, never silently dropped.
 UNCOUNTABLE = {
     "cast-on-striking", "cast-when-struck", "cast-on-attack", "cast-on-kill", "cast-on-level-up", "cast-when-you-die",
@@ -88,7 +103,6 @@ UNCOUNTABLE = {
     "maximum-durability", "repairs-durability", "replenishes-quantity", "stack-size", "maximum-stamina",
     "stamina-recovery", "slower-stamina-drain", "experience-gained", "vendor-prices-reduced", "extra-blood",
     "finishing-moves-keep-charges", "life-after-kill", "mana-after-kill", "life-after-demon-kill",
-    "damage-vs-undead", "damage-vs-demons", "attack-rating-vs-undead", "attack-rating-vs-demons",
     "fire-absorb", "cold-absorb", "lightning-absorb", "magic-absorb",
     "fire-absorb-percent", "cold-absorb-percent", "lightning-absorb-percent",
     "sunder-fire-immunity", "sunder-cold-immunity", "sunder-lightning-immunity",
@@ -173,6 +187,10 @@ def map_line(line: dict, source: dict) -> list[Contribution]:
     value, sureness = _number(line)
     per_level = key.endswith("-per-level")
     lookup = key[: -len("-per-level")] if per_level else key
+    if lookup in CONDITIONAL and value is not None:
+        stat, form, waits_on = CONDITIONAL[lookup]
+        return [Contribution(stat=stat, form="per_level" if per_level else form, value=value,
+                             state=sureness, condition=waits_on, **common)]
     if lookup in UNCOUNTABLE or key in UNCOUNTABLE or lookup not in TABLE:
         # a fact we hold and cannot compute with: its own row, its own name
         return [Contribution(stat=lookup, form="flat", value=float(value or 0.0), state=NOT_COUNTED, **common)]

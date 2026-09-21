@@ -841,9 +841,15 @@ def superseded(line: dict) -> str:
 # ordinary patterns, and the tail becomes an assumption the plan may make.
 
 _CONDITIONAL = re.compile(r"\b(?:while|whilst|during|if|when|whenever|unless)\b")
-# words that carry no meaning in an assumption's name
+# Words that carry no meaning in an assumption's name, stripped from the
+# front until something real is reached. ⚠ The one-and-two-letter entries are
+# what an apostrophe leaves behind: "you've stunned" arrives here as "you ve
+# stunned" once the punctuation is gone, and without them the assumption is
+# called "Ve stunned an enemy". Dropping them also merges "if you have
+# stunned" and "if you've stunned" into one assumption, which is right.
 _EMPTY = ("while", "whilst", "during", "if", "when", "whenever", "unless",
-          "you", "your", "have", "has", "are", "is", "been", "be", "a", "an", "the")
+          "you", "your", "have", "has", "had", "are", "is", "been", "be", "a", "an", "the",
+          "ve", "re", "ll", "s", "t", "d", "m")
 
 
 def condition_id(clause: str) -> str:
