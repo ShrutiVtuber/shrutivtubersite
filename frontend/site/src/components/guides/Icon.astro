@@ -1,0 +1,33 @@
+---
+/* One of the section's marks (README-planners §7).
+ *
+ * The mark sits AFTER the state dot and BEFORE the name, in its own 24px or
+ * 16px track. It inherits its colour: --ink in an ordinary row, --ink-faint
+ * where the row is faint. It is decoration to a screen reader — the name
+ * beside it is the content — so it is always aria-hidden.
+ *
+ * ⚠ Never fill it, never give it a second colour, never draw it above 24,
+ * and never let it carry state.
+ */
+import { MARKS, isMark } from "../../lib/marks";
+
+interface Props {
+  mark: string;
+  size?: 16 | 24;
+  class?: string;
+}
+const { mark, size = 16, class: klass = "" } = Astro.props;
+const d = isMark(mark) ? MARKS[mark] : "";
+---
+
+{d && (
+  <svg class:list={["gd-mark", klass]} width={size} height={size} viewBox="0 0 24 24" fill="none"
+       stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <path d={d} />
+  </svg>
+)}
+
+<style is:global>
+  /* its own track, so a row's columns do not shift when a mark is missing */
+  .gd-mark { display: block; flex: none; }
+</style>

@@ -1,0 +1,177 @@
+---
+/* The build planner (README-planners, 21 Sep 2026): a plan is the person's
+ * choices in the game's own terms, and the site writes them as the goals the
+ * phone ticks and the stream draws.
+ *
+ * The desk is two columns — a sections rail that is also a table of contents,
+ * and the chooser, which is the only column that needs width — with the plan
+ * as a drawer over the page. At 390 the rail becomes a chip row, the chooser
+ * takes the width, and the plan NEVER hides: a sticky bar raises it as a
+ * sheet, and the page keeps 96px of bottom padding so nothing is covered.
+ *
+ * ⚠ Nothing is computed here. The server cleans a plan, refuses what the data
+ * does not know and says why; this page shows what came back, refusals
+ * included. Every visible string is a say() default she edits in /admin/copy.
+ */
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import Head from "../../components/guides/Head.astro";
+import Console from "../../components/guides/Console.astro";
+import Empty from "../../components/guides/Empty.astro";
+import Icon from "../../components/guides/Icon.astro";
+import Button from "../../components/forms/Button.astro";
+import { site } from "../../lib/api";
+import { account } from "../../lib/account";
+import { copy } from "../../lib/copy";
+import { dataLine, type GamePack, type Recipe, type Row } from "../../lib/planner";
+
+const say = await copy("builds/plan");
+const me = await account(Astro);
+if (!me) return Astro.redirect("/signin?next=%2Fbuilds%2Fplan");
+
+const wanted = String(Astro.url.searchParams.get("game") || "").trim();
+const packs = (await site<GamePack[]>("/api/gamedata/games")) || [];
+const games: GamePack[] = Array.isArray(packs) ? packs : [];
+const pack = games.find((g) => g.id === wanted) || null;
+
+/* a tile names the sections that game's recipe has, so a person can see what
+ * planning it involves before choosing it */
+const recipes = Object.fromEntries(
+  (await Promise.all(games.filter((g) => g.planner).map(async (g) =>
+    [g.id, await site<Recipe>(`/api/gamedata/${g.id}/recipe`)] as const))).filter(([, r]) => r && Array.isArray(r.sections))
+);
+
+/* the recipe and the classes only matter once a game is chosen */
+const [recipeRead, classesRead] = pack
+  ? await Promise.all([
+      site<Recipe>(`/api/gamedata/${pack.id}/recipe`),
+      site<(Row & { resource?: string; resources?: string[] })[]>(`/api/gamedata/${pack.id}/class?limit=40&brief=false`),
+    ])
+  : [null, null];
+const recipe: Recipe | null = recipeRead && Array.isArray(recipeRead.sections) ? recipeRead : null;
+type ClassRow = Row & { resource?: string; resources?: string[] };
+const classes: ClassRow[] = Array.isArray(classesRead) ? classesRead : [];
+/* "Sorcerer · mana · Twenty-two enchantments…" — the resource is half of what
+ * tells somebody whether a class is theirs */
+const resourceOf = (c: ClassRow) => c.resource || (c.resources || [])[0] || "";
+const firstSentence = (text: string) => String(text || "").split(/(?<=\.)\s/)[0];
+
+const totalRecords = (g: GamePack) => Object.values(g.counts || {}).reduce((a, b) => a + b, 0);
+const sectionNames = (g: GamePack) => (recipes[g.id]?.sections || []).map((s) => s.name);
+const step = pack ? (classes.length ? "class" : "section") : "game";
+
+const WORDS = {
+  failed: say("words.failed", "That did not go through. Try again."),
+  needsName: say("words.needs_name", "A build needs a name."),
+};
+---
+
+<BaseLayout title={say("meta.title", "Plan a build — Squirrel Guides")}
+            description={say("meta.description", "Your choices in the game's own terms, written as the goals your phone ticks and the stream draws.")} noindex>
+  <div class="page gd-full pl" data-planner data-game={pack?.id || ""} data-step={step} data-words={JSON.stringify(WORDS)}>
+
+    <header class="pl-top">
+      <div class="pl-topline">
+        <span class="gd-eyebrow">{say("head.eyebrow", "Build planner")}</span>
+        {pack && <span class="gd-mono pl-data">{dataLine(pack)}</span>}
+      </div>
+      {!pack && (
+        <Head as="h1" title={say("head.title", "Plan a build")}
+              lede={say("head.lede", "A plan is your choices in the game's own terms. The site writes them as the goals your phone ticks and the stream draws. Pick the game first — each carries its own recipe.")} />
+      )}
+    </header>
+
+    {!pack && (
+      <section class="pl-games" aria-label={say("games.aria", "The games with data loaded")}>
+        {games.length === 0 && (
+          <Empty n={3} eyebrow={say("games.none_eyebrow", "Not loaded yet")}
+                 title={say("games.none_title", "No game's data has finished loading.")}
+                 body={say("games.none_body", "Data arrives with its patch, its season and the date it was gathered — until then there is nothing honest to plan from.")}
+                 action={say("games.none_action", "Back to builds")} href="/builds"
+                 ringAria={say("games.none_aria", "No game's data is loaded")} />
+        )}
+        {games.map((g) => (
+          <article class="pl-game" data-loaded={g.planner ? "yes" : "no"}>
+            <h2>{g.name}</h2>
+            <p class="gd-mono pl-game-line">
+              {say("games.records", "{n} records").replace("{n}", totalRecords(g).toLocaleString("en-GB"))}
+              {g.patch && <> · {g.patch.split(" (")[0]}</>}
+              {g.season && <> · {g.season.split(" (")[0].split(";")[0]}</>}
+            </p>
+            {g.planner ? (
+              <>
+                <p class="gd-soft pl-sections">{sectionNames(g).join(" · ")}</p>
+                <a class="pl-choose" href={`/builds/plan?game=${g.id}`}>{say("games.choose", "Plan for this")}</a>
+              </>
+            ) : (
+              <Console eyebrow={say("games.notloaded_eyebrow", "Not loaded yet")} class="pl-notloaded">
+                <p class="gd-soft">{say("games.notloaded", "This game's data has not finished loading. It arrives with its patch, its season and the date it was gathered — until then there is nothing honest to plan from.")}</p>
+              </Console>
+            )}
+          </article>
+        ))}
+      </section>
+    )}
+
+    {pack && classes.length > 0 && (
+      <section class="pl-classes" aria-labelledby="pl-class">
+        <div class="gd-head">
+          <span id="pl-class" class="gd-eyebrow">{say("classes.eyebrow", "Which class")}</span>
+          <p class="gd-note">
+            {say("classes.counts", "{classes} classes · {specs} specializations")
+              .replace("{classes}", String(pack.counts.class || classes.length))
+              .replace("{specs}", String(pack.counts.specialization || 0))}
+          </p>
+          <p class="gd-soft">{say("classes.lede", "The class names the variant when you do not.")}</p>
+        </div>
+        <ul class="pl-rows">
+          {classes.map((c) => (
+            <li>
+              <a class="pl-row" href={`/builds/plan?game=${pack.id}&class=${c.id}`} data-class={c.id}>
+                <span class="pl-row-mark"><Icon mark="kind-support" size={24} /></span>
+                <span class="pl-row-body">
+                  <span class="pl-row-name">{c.name}</span>
+                  <span class="gd-mono pl-row-meta">
+                    {[resourceOf(c), firstSentence(c.summary)].filter(Boolean).join(" · ")}
+                  </span>
+                </span>
+              </a>
+            </li>
+          ))}
+        </ul>
+      </section>
+    )}
+
+    <p class="gd-hint pl-affiliation">{say("foot.affiliation", "Not affiliated with or endorsed by Blizzard Entertainment or Grinding Gear Games; names are theirs, used to say what you are planning.")}</p>
+  </div>
+</BaseLayout>
+
+<style>
+  .pl { display: grid; gap: var(--space-6); padding-block: var(--space-6) var(--space-9); min-width: 0; }
+  .pl-top { display: grid; gap: 12px; }
+  .pl-topline { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+  .pl-data { font-size: 12px; color: var(--ink-faint); }
+
+  /* the games, as tiles a person chooses between */
+  .pl-games { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: var(--space-5); }
+  .pl-game { display: grid; gap: 10px; align-content: start; padding: 20px; border: 1px solid var(--line-strong); border-radius: 4px; background: var(--surface-page); }
+  .pl-game[data-loaded="no"] { opacity: .85; }
+  .pl-game h2 { margin: 0; font-family: var(--font-display); font-size: 24px; font-weight: 600; line-height: 1.2; }
+  .pl-game-line { font-size: 12px; color: var(--ink-faint); }
+  .pl-sections { font-size: 14px; text-wrap: pretty; }
+  .pl-choose { align-self: start; font-family: var(--font-body); font-size: 14px; font-weight: 500; color: var(--accent); text-decoration: none; border-bottom: 1px solid color-mix(in srgb, var(--accent) 55%, transparent); padding-bottom: 1px; }
+  .pl-choose:hover { color: var(--accent-hover); border-bottom-color: var(--accent-hover); }
+  .pl-notloaded { padding: 14px; }
+
+  /* the classes, as rows */
+  .pl-classes { display: grid; gap: var(--space-4); }
+  .pl-rows { margin: 0; padding: 0; list-style: none; display: grid; border-top: 1px solid var(--line-strong); }
+  .pl-row { display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: 12px; align-items: center; padding: 14px 0; border-bottom: 1px solid var(--line); color: inherit; text-decoration: none; }
+  .pl-row:hover { background: var(--surface-veil); }
+  .pl-row-mark { color: var(--ink-faint); }
+  .pl-row-body { display: grid; gap: 2px; min-width: 0; }
+  .pl-row-name { font-family: var(--font-display); font-size: 19px; font-weight: 600; }
+  .pl-row-meta { font-size: 12px; color: var(--ink-soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  .pl-affiliation { max-width: 66ch; }
+  @media (max-width: 600px) { .pl { padding-bottom: 96px; } }
+</style>
