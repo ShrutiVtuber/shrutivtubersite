@@ -96,8 +96,8 @@ LINKS: dict[str, tuple[tuple[str, str, str], ...]] = {
     "slot": (("accepts", "accepts", "itemtype"),),
     "itemtype": (("slot_ids", "fits", "slot"), ("parent_ids", "is-a", "itemtype"), ("class_ids", "of", "class")),
     "specialization": (("class_ids", "of", "class"),),
-    "skill": (("prerequisites", "requires", "skill"), ("synergy_ids", "synergy", "skill"), ("upgrade_ids", "upgrade", "skill"),
-              ("class_ids", "of", "class")),
+    "skill": (("prerequisites", "requires", "skill"), ("synergy_ids", "synergy", "skill"), ("class_ids", "of", "class")),
+    # a skill's upgrades live inside its record (the planner picks them from there), so they are not linked
     "node": (("connections", "connects", "node"), ("board_id", "on", "board"), ("tree_id", "on", "tree"),
              ("ascendancy_id", "of", "specialization")),
     "glyph": (("class_ids", "of", "class"),),

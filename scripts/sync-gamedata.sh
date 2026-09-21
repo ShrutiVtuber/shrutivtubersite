@@ -34,6 +34,7 @@ done
 ( cd "$TRACKER/server" && "${PYTHON:-.venv/bin/python}" -m shrutisguides.gamedata build "$RESEARCH" "$tmp/gamedata.sqlite3" ) || {
   echo "the build reported problems; read them above and fix the packs before publishing" >&2; exit 1; }
 
+chmod 644 "$tmp/gamedata.sqlite3"          # the container's user is not ours; the file must be readable by anyone
 sum="$(sha256sum "$tmp/gamedata.sqlite3" | cut -c1-16)"
 mv "$tmp/gamedata.sqlite3" "$tmp/gamedata-$sum.sqlite3"
 cp "$tmp/gamedata-$sum.sqlite3" "$tmp/gamedata.sqlite3"          # the backend opens this name; Caddy serves the digest name
@@ -52,6 +53,7 @@ manifest = {
 }
 with open(os.path.join(tmp, "manifest.json"), "w") as f:
     json.dump(manifest, f, indent=1)
+os.chmod(os.path.join(tmp, "manifest.json"), 0o644)
 print("games:", ", ".join(f"{g['name']} ({g['records']})" for g in manifest["games"]))
 PY
 )

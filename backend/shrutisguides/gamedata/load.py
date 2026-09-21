@@ -131,14 +131,14 @@ def _records(kind: str, payload: Any, game: str, report: Report) -> list[tuple[s
     """
     Every (kind, record) a file yields, nested ones included:
       classes.json   → class, and each class's specializations
-      tree.json      → tree, and its boards / glyphs / tabs / starts
+      tree.json      → tree, and its boards / glyphs / tabs (or groups) / starts
       tempering.json → tempering (manual), and any affix listed inside it
       progression.json → one progression record per top-level section
     """
     out: list[tuple[str, dict]] = []
     if kind == "progression" and isinstance(payload, dict):
         for key, value in payload.items():
-            if key in ("id", "name", "game", "notes", "sources"):
+            if key in ("id", "name", "game", "game_id", "patch", "league", "season", "researched_at", "sources", "source") or key.startswith("_"):
                 continue
             rec = dict(value) if isinstance(value, dict) else {"value": value}
             rec.setdefault("id", slug(key))
@@ -147,6 +147,19 @@ def _records(kind: str, payload: Any, game: str, report: Report) -> list[tuple[s
         return out
     if kind == "tree" and isinstance(payload, dict):
         payload = [payload]
+    if isinstance(payload, dict):
+        # A file wrapped as {"_meta": …, "rules": …, "<plural>": [records]}: the
+        # list is the records; the rules beside it are kept as progression.
+        lists = [(k, v) for k, v in payload.items() if isinstance(v, list) and v and isinstance(v[0], dict) and not k.startswith("_")]
+        if lists:
+            for key, value in payload.items():
+                if key.startswith("_") or key in ("game", "game_id", "patch", "season", "league", "researched_at", "sources", "source") or (key, value) in lists:
+                    continue
+                rec = dict(value) if isinstance(value, dict) else {"value": value}
+                rec.setdefault("id", slug(f"{kind}-{key}"))
+                rec.setdefault("name", f"{kind.capitalize()} — {key.replace('_', ' ').replace('-', ' ')}")
+                out.append(("progression", rec))
+            payload = [r for _, v in lists for r in v]
     if not isinstance(payload, list):
         report.problem(game, f"{kind}: the file is not a list of records")
         return out
@@ -164,7 +177,7 @@ def _records(kind: str, payload: Any, game: str, report: Report) -> list[tuple[s
             out.append(("class", rec))
         elif kind == "tree":
             rest = dict(rec)
-            for key, sub_kind in (("boards", "board"), ("glyphs", "glyph"), ("tabs", "tab"), ("starts", "start")):
+            for key, sub_kind in (("boards", "board"), ("glyphs", "glyph"), ("tabs", "tab"), ("groups", "tab"), ("starts", "start")):
                 items = rest.pop(key, None)
                 if isinstance(items, list):
                     for it in items:
@@ -180,6 +193,10 @@ def _records(kind: str, payload: Any, game: str, report: Report) -> list[tuple[s
             rest.setdefault("name", str(rest.get("kind") or "tree").replace("-", " ").capitalize())
             out.append(("tree", rest))
         elif kind == "tempering":
+            rec = dict(rec)
+            if not rec.get("affix_ids") and isinstance(rec.get("tiers"), list):
+                # Diablo IV's manuals list the affixes they offer per tier
+                rec["affix_ids"] = list(dict.fromkeys(slug(a) for t in rec["tiers"] if isinstance(t, dict) for a in _ids(t.get("affix_ids")) if slug(a)))
             affixes = rec.get("affixes")
             if isinstance(affixes, list) and affixes and isinstance(affixes[0], dict):
                 for a in affixes:
@@ -413,6 +430,7 @@ def build_database(research_root: Path | str, db_path: Path | str, games: list[s
         con.commit()
         con.execute("VACUUM")
         con.close()
+        os.chmod(tmp, 0o644)          # mkstemp makes it private; the file is served and read by other users
         os.replace(tmp, target)
     finally:
         if os.path.exists(tmp):

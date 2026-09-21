@@ -10,6 +10,7 @@ has thousands of nodes and a chooser needs names, not everything.
 from __future__ import annotations
 
 import json
+import os
 import re
 import sqlite3
 from pathlib import Path
@@ -41,7 +42,8 @@ class GameData:
         self.path = Path(path)
 
     def exists(self) -> bool:
-        return self.path.is_file()
+        """There, and readable by this process — an unreadable file is "not loaded", not a crash."""
+        return self.path.is_file() and os.access(self.path, os.R_OK)
 
     def _con(self) -> sqlite3.Connection:
         con = sqlite3.connect(f"file:{self.path}?mode=ro", uri=True)

@@ -131,6 +131,33 @@ def _clean_fields(spec: dict, raw: dict, chk: _Check, where: str, problems: list
     return out
 
 
+def gear_places(sec: dict, data: GameData, game: str, class_id: str) -> dict[str, str]:
+    """
+    The places a gear section offers, in order: {place id: slot id}. A slot
+    with `count` 2 is two places (`ring`, `ring-2`); a recipe may name its
+    slots outright or leave some out (sockets, the mercenary's).
+    """
+    if sec.get("slots"):
+        return {s: s for s in sec["slots"]}
+    out: dict[str, str] = {}
+    left_out = set(sec.get("exclude") or ())
+    for slot in data.list(game, "slot", class_id=class_id or None):
+        if slot["id"] in left_out:
+            continue
+        try:
+            count = max(1, min(12, int(slot.get("count") or 1)))
+        except (TypeError, ValueError):
+            count = 1
+        out[slot["id"]] = slot["id"]
+        for i in range(2, count + 1):
+            out[f"{slot['id']}-{i}"] = slot["id"]
+    return out
+
+
+def place_label(place: str, slot_id: str, name: str) -> str:
+    return name if place == slot_id else f"{name} {place[len(slot_id) + 1:]}"
+
+
 def clean_plan(raw: Any, data: GameData) -> tuple[dict, list[str]]:
     """The plan as the recipe allows it, and every reason a part of it was refused."""
     problems: list[str] = []
@@ -181,14 +208,14 @@ def clean_plan(raw: Any, data: GameData) -> tuple[dict, list[str]]:
             if picks or points:
                 plan["sections"][sid] = {"picks": picks, **({"points": points} if points else {})}
         elif sec["type"] == "gear":
-            allowed = sec.get("slots") or [s["id"] for s in data.list(game, "slot", class_id=class_id or None, brief=True)]
+            places = gear_places(sec, data, game, class_id)
             gear: dict = {}
             for slot_id, choice in (value.items() if isinstance(value, dict) else []):
                 s = slug(slot_id)
-                if s not in allowed:
+                if s not in places:
                     problems.append(f"{sid}: no slot called '{s}'" + (" for this class" if class_id else ""))
                     continue
-                fields = _clean_fields(sec.get("fields"), choice, chk, f"{sid}.{s}", problems, slot_id=s)
+                fields = _clean_fields(sec.get("fields"), choice, chk, f"{sid}.{s}", problems, slot_id=places[s])
                 if fields:
                     gear[s] = fields
             if gear:
@@ -229,8 +256,9 @@ class _Names:
                     want(sec["kind"], p.get("id"))
                     self._want_fields(fields, p, want)
             elif sec["type"] == "gear":
-                for slot_id, choice in value.items():
-                    want("slot", slot_id)
+                for place, choice in value.items():
+                    want("slot", place.rsplit("-", 1)[0] if place[-1:].isdigit() and "-" in place else place)
+                    want("slot", place)
                     self._want_fields(fields, choice, want)
         self.names = {kind: data.names(game, kind, sorted(ids)) for kind, ids in wanted.items()}
 
@@ -303,10 +331,12 @@ def plan_to_categories(plan: dict, data: GameData) -> list[dict]:
                 if total:
                     items.append({"id": f"{sid}-{pts['id']}", "label": pts["name"], "kind": "counter", "max": int(total), "unit": pts.get("unit", "")})
         elif sec["type"] == "gear":
-            order = sec.get("slots") or [s["id"] for s in data.list(plan["game"], "slot", brief=True)]
-            for slot_id in sorted(value, key=lambda s: order.index(s) if s in order else len(order)):
-                items.append({"id": f"{sid}-{slot_id}", "label": names.of("slot", slot_id), "kind": "slot",
-                              "hint": _clip(_detail(fields, value[slot_id], names), MAX_TEXT)})
+            places = gear_places(sec, data, plan["game"], plan.get("class_id", ""))
+            order = list(places)
+            for place in sorted(value, key=lambda s: order.index(s) if s in order else len(order)):
+                slot_id = places.get(place, place)
+                items.append({"id": f"{sid}-{place}", "label": place_label(place, slot_id, names.of("slot", slot_id)), "kind": "slot",
+                              "hint": _clip(_detail(fields, value[place], names), MAX_TEXT)})
         elif sec["type"] == "targets":
             for e in sec.get("entries", []):
                 if value.get(e["id"]):
@@ -360,8 +390,10 @@ def plan_summary(plan: dict, data: GameData) -> dict:
             if value.get("points"):
                 lines.append({"id": "points", "label": (sec.get("points") or {}).get("name", "Points"), "detail": str(value["points"])})
         elif sec["type"] == "gear":
-            for slot_id, choice in value.items():
-                lines.append({"id": slot_id, "label": names.of("slot", slot_id), "detail": _detail(fields, choice, names)})
+            places = gear_places(sec, data, plan["game"], plan.get("class_id", ""))
+            for place, choice in value.items():
+                slot_id = places.get(place, place)
+                lines.append({"id": place, "label": place_label(place, slot_id, names.of("slot", slot_id)), "detail": _detail(fields, choice, names)})
         elif sec["type"] == "targets":
             for e in sec.get("entries", []):
                 if value.get(e["id"]):
