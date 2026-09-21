@@ -2,9 +2,9 @@
 """One module per game: its own words, mapped into the vocabulary."""
 from __future__ import annotations
 
-from . import diablo_ii_resurrected
+from . import diablo_ii_resurrected, diablo_iv, path_of_exile_2
 
-MODULES = {m.GAME: m for m in (diablo_ii_resurrected,)}
+MODULES = {m.GAME: m for m in (diablo_ii_resurrected, diablo_iv, path_of_exile_2)}
 
 
 def module_for(game: str):

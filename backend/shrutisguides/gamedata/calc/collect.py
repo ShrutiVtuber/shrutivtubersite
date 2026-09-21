@@ -22,7 +22,7 @@ from typing import Iterator
 from ..query import GameData
 from ..recipes import recipe_for
 from .games import module_for
-from .model import Contribution, NOT_COUNTED, Pool, worst
+from .model import APPROXIMATE, Contribution, NOT_COUNTED, Pool, worst
 from .vocabulary import GROUPS, grouped, stat
 
 # The kinds that carry stat lines worth counting. A skill's own damage is the
@@ -47,24 +47,40 @@ def _best_tier(rec: dict) -> dict | None:
 
 
 def raw_lines(rec: dict) -> Iterator[dict]:
-    """Every stat-ish line on a record, however the pack shaped it."""
+    """
+    Every stat-ish line on a record, however the pack shaped it.
+
+    ⚠ An affix keeps its identity and its value in two different places. The
+    `stats` entry says WHICH stat and, for some games, which element — but
+    its numbers may be the engine's own budget rather than anything a person
+    reads (Diablo IV's fire resistance affix carries 2275–2800 there and
+    30–50 in its tier). The tiers say WHAT the roll is worth. So where a
+    record has both, the tier's numbers are given to the stat entry's
+    identity, and the entry's own numbers are passed over. Reading them the
+    other way round is how every resistance in a game ends up uncounted.
+    """
+    tier = _best_tier(rec)
+    tier_stats = [x for x in ((tier or {}).get("stats") or []) if isinstance(x, dict)]
+    tier_numbers = {k: tier[k] for k in ("min", "max", "value") if tier and k in tier} if tier else {}
+
     for key in ("stats", "affixes", "implicit", "effects", "bonuses"):
         v = rec.get(key)
-        if isinstance(v, list):
-            for x in v:
-                if isinstance(x, dict):
-                    yield x
-    tier = _best_tier(rec)
-    if tier:
-        got = False
-        for x in (tier.get("stats") or []):
-            if isinstance(x, dict):
-                got = True
+        if not isinstance(v, list):
+            continue
+        for x in v:
+            if not isinstance(x, dict):
+                continue
+            if key == "stats" and tier_numbers and not tier_stats:
+                yield {**x, **tier_numbers, "from_tier": True}
+            else:
                 yield x
-        if not got and any(k in tier for k in ("min", "max", "value")):
-            # the tier IS the line; the affix's own words name the stat
-            yield {**{k: tier[k] for k in ("min", "max", "value") if k in tier},
-                   "stat": rec.get("stat") or rec.get("id"), "text": rec.get("stat_text") or rec.get("name") or ""}
+
+    for x in tier_stats:                      # the tier carries its own stats (Diablo II's shape)
+        yield x
+    if tier and not tier_stats and tier_numbers and not isinstance(rec.get("stats"), list):
+        # no stat entry to give the numbers to: the record's own words name it
+        yield {**tier_numbers, "stat": rec.get("stat") or rec.get("id"),
+               "text": rec.get("stat_text") or rec.get("name") or ""}
 
 
 def chosen(plan: dict, data: GameData) -> Iterator[tuple[dict, dict]]:
@@ -84,6 +100,8 @@ def chosen(plan: dict, data: GameData) -> Iterator[tuple[dict, dict]]:
             yield {"kind": kind, "id": rid, "name": rec.get("name") or rid, "place": place}, rec
 
     def fields(spec: dict, choice: dict, place: str = "") -> Iterator[tuple[dict, dict]]:
+        if not isinstance(choice, dict):
+            return
         for name, f in (spec or {}).items():
             if f.get("type") == "id":
                 yield from take(f["kind"], choice.get(name) or "", place)
@@ -96,16 +114,24 @@ def chosen(plan: dict, data: GameData) -> Iterator[tuple[dict, dict]]:
         if not value:
             continue
         spec = sec.get("fields") or {}
+        # ⚠ A cleaned plan writes a pick as {"id": …} and a picks entry the
+        # same way, but this is a public function and a plan may arrive as a
+        # person's shorthand — a bare id, a bare list. Take both shapes here
+        # rather than crash on the short one.
         if sec["type"] == "pick":
-            yield from take(sec["kind"], value.get("id", ""))
-            yield from fields(spec, value)
+            choice = value if isinstance(value, dict) else {"id": value}
+            yield from take(sec["kind"], str(choice.get("id") or ""))
+            yield from fields(spec, choice)
         elif sec["type"] == "picks":
-            for p in value.get("picks", []):
-                yield from take(sec["kind"], p.get("id", ""))
+            picks = value.get("picks", []) if isinstance(value, dict) else value
+            for p in (picks if isinstance(picks, list) else []):
+                p = p if isinstance(p, dict) else {"id": p}
+                yield from take(sec["kind"], str(p.get("id") or ""))
                 yield from fields(spec, p)
-        elif sec["type"] == "gear":
+        elif sec["type"] == "gear" and isinstance(value, dict):
             for place, choice in value.items():
-                yield from fields(spec, choice, place)
+                if isinstance(choice, dict):
+                    yield from fields(spec, choice, place)
 
 
 def pool_for(plan: dict, data: GameData) -> Pool:
@@ -133,11 +159,21 @@ def sheet(plan: dict, data: GameData) -> dict:
     base_for = getattr(module, "base_for", None)
     base = dict(base_for(plan, data, pool) if base_for else (getattr(module, "BASE", {}) or {}))
     ids = sorted(set(pool.stats()) | set(base))
+    # ⚠ A stat whose base the pack does not record cannot be exact, however
+    # well its lines are counted: a Diablo IV character has life before any
+    # gear and the pack does not say how much, so the sum of the gear is not
+    # "maximum life". The game declares those stats and the row is marked
+    # approximate with the reason on it, rather than showing a confident
+    # number that is quietly missing its largest term.
+    incomplete = dict(getattr(module, "INCOMPLETE_BASE", {}) or {})
     rows: dict[str, dict] = {}
     for sid in ids:
         total = pool.total(sid, base=base.get(sid, 0.0), base_label="the character itself")
         s = stat(sid)
         row = total.as_dict() | {"name": s.name, "unit": s.unit, "group": s.group, "integer": s.integer}
+        if sid in incomplete:
+            row["state"] = worst([row["state"], APPROXIMATE])
+            row["why"] = incomplete[sid]
         if s.cap:
             row["cap"] = s.cap
         rows[sid] = row

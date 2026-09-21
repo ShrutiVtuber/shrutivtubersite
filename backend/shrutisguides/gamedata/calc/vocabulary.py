@@ -55,10 +55,17 @@ STATS: dict[str, Stat] = dict([
     # what keeps a character alive
     _s("life", "Maximum life", DEFENCE),
     _s("mana", "Maximum mana", DEFENCE),
+    # Diablo IV names its resource per class — Fury, Mana, Spirit, Essence,
+    # Ferocity — so `mana` would mislabel six classes of the eight.
+    _s("resource", "Maximum resource", DEFENCE),
     _s("energy-shield", "Energy shield", DEFENCE),
     _s("armour", "Armour", DEFENCE),
     _s("evasion", "Evasion", DEFENCE),
     _s("block", "Block chance", DEFENCE, "%"),
+    # Diablo IV has Dodge Chance AND Block Chance on the same character, and
+    # dodge is a chance rather than a rating, so neither `block` nor
+    # `evasion` is the same number.
+    _s("dodge-chance", "Dodge chance", DEFENCE, "%", integer=False),
     _s("life-regeneration", "Life regeneration", DEFENCE),
     _s("mana-regeneration", "Mana regeneration", DEFENCE),
     _s("damage-reduction", "Damage reduction", DEFENCE, "%"),
@@ -71,12 +78,20 @@ STATS: dict[str, Stat] = dict([
     _s("resistance-poison", "Poison resistance", DEFENCE, "%", cap="resistance-poison-max"),
     _s("resistance-chaos", "Chaos resistance", DEFENCE, "%", cap="resistance-chaos-max"),
     _s("resistance-magic", "Magic resistance", DEFENCE, "%", cap="resistance-magic-max"),
+    # ⚠ Diablo IV resists physical like any element, and it is not "all": a
+    # line naming it must not be spread across the other five.
+    _s("resistance-physical", "Physical resistance", DEFENCE, "%", cap="resistance-physical-max"),
+    _s("resistance-physical-max", "Physical resistance cap", DEFENCE, "%"),
+    # Shadow is Diablo IV's fifth element and is neither chaos nor magic: it
+    # has its own resistance on the character sheet and its own damage type.
+    _s("resistance-shadow", "Shadow resistance", DEFENCE, "%", cap="resistance-shadow-max"),
     _s("resistance-fire-max", "Fire resistance cap", DEFENCE, "%"),
     _s("resistance-cold-max", "Cold resistance cap", DEFENCE, "%"),
     _s("resistance-lightning-max", "Lightning resistance cap", DEFENCE, "%"),
     _s("resistance-poison-max", "Poison resistance cap", DEFENCE, "%"),
     _s("resistance-chaos-max", "Chaos resistance cap", DEFENCE, "%"),
     _s("resistance-magic-max", "Magic resistance cap", DEFENCE, "%"),
+    _s("resistance-shadow-max", "Shadow resistance cap", DEFENCE, "%"),
     # what it does to things
     _s("damage", "Damage", OFFENCE),
     _s("damage-min", "Minimum damage", OFFENCE),
@@ -88,6 +103,7 @@ STATS: dict[str, Stat] = dict([
     _s("damage-poison", "Poison damage", OFFENCE),
     _s("damage-chaos", "Chaos damage", OFFENCE),
     _s("damage-magic", "Magic damage", OFFENCE),
+    _s("damage-shadow", "Shadow damage", OFFENCE),
     _s("attack-rating", "Attack rating", OFFENCE),
     _s("critical-chance", "Critical strike chance", OFFENCE, "%", integer=False),
     _s("critical-damage", "Critical strike damage", OFFENCE, "%"),
@@ -110,10 +126,32 @@ STATS: dict[str, Stat] = dict([
     _s("skills-tab", "Skill tab", SKILLS),
     _s("skills-single", "Single skill", SKILLS),
     # the rest
+    # Diablo IV's Lucky Hit Chance: the chance a hit rolls for every
+    # "Lucky Hit:" effect the character carries. Nothing else names it.
+    _s("lucky-hit", "Lucky hit chance", UTILITY, "%", integer=False),
     _s("magic-find", "Magic find", UTILITY, "%"),
     _s("gold-find", "Gold find", UTILITY, "%"),
     _s("light-radius", "Light radius", UTILITY),
     _s("sockets", "Sockets", UTILITY),
+    # Seven Path of Exile 2 brought that nothing above says. Each is here
+    # because an unnamed stat lands in `other`, and these are not other: a
+    # person reads them in the same breath as life, armour and fire damage.
+    #
+    # ⚠ Spirit is a budget, not a number that grows — a build spends it on
+    # what it keeps running — but it is a pool beside life and mana and it
+    # belongs where they are.
+    #
+    # ⚠ Spell and attack damage are two brackets this game never adds
+    # together, so they cannot both be `damage`; minion damage and minion
+    # life are the character's build and not the character's body, and a
+    # summoner has no other row to read.
+    _s("spirit", "Spirit", DEFENCE),
+    _s("stun-threshold", "Stun threshold", DEFENCE),
+    _s("life-minion", "Minion life", DEFENCE),
+    _s("damage-spell", "Spell damage", OFFENCE, "%"),
+    _s("damage-attack", "Attack damage", OFFENCE, "%"),
+    _s("damage-minion", "Minion damage", OFFENCE, "%"),
+    _s("speed-skill", "Skill speed", SPEED, "%"),
 ])
 
 
