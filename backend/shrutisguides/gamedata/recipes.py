@@ -35,6 +35,7 @@ D4 = {
         {"id": "spec", "name": "Specialization", "type": "picks", "kind": "specialization", "by_class": True, "max": 16, "track": "check",
          "fields": {"note": {"type": "text"}}},
         {"id": "skills", "name": "Skills", "type": "picks", "kind": "skill", "by_class": True, "max": 24, "track": "check",
+         "sub": ["active", "ultimate"],        # the class-mechanic passives are the Specialization section's
          "fields": {"ranks": {"type": "int", "min": 1, "max": 5, "unit": "ranks"}, "upgrades": {"type": "within", "list": "upgrades", "max": 3}},
          "points": {"id": "skill-points", "name": "Skill points", "field": "ranks", "unit": "points"}},
         {"id": "gear", "name": "Gear", "type": "gear", "grid": True, "exclude": ["socket-gem", "charm", "seal"],
@@ -52,8 +53,8 @@ D4 = {
         {"id": "mercenary", "name": "Mercenary", "type": "picks", "kind": "mercenary", "max": 2, "track": "check",
          "fields": {"role": {"type": "choice", "options": ["hired", "reinforcement"]}, "skill": {"type": "within", "list": "skills", "max": 3}}},
         {"id": "targets", "name": "Numbers", "type": "targets",
-         "entries": [{"id": "level", "name": "Level", "max": 60, "unit": "levels"},
-                     {"id": "paragon-points", "name": "Paragon points", "max": 300, "unit": "points"},
+         "entries": [{"id": "level", "name": "Level", "max": 70, "unit": "levels"},
+                     {"id": "paragon-points", "name": "Paragon points", "max": 342, "unit": "points"},
                      {"id": "renown", "name": "Renown skill points", "max": 10, "unit": "points"}]},
     ],
 }

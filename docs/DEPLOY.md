@@ -219,6 +219,24 @@ exist and had been wrong for weeks — a hand-kept copy of something Alembic
 already knows is a second source that goes stale silently, which is the exact
 failure it was written to prevent.
 
+## Game data — 21 September 2026
+
+The build planners read one SQLite file of facts about each game (classes,
+skills, boards, items, affixes…) built from the guides repository's research
+packs. Like the language packs it is served at runtime from a volume and is
+never in this repository:
+
+    SHRUTI_HOST=deploy@159.195.251.161 ./scripts/sync-gamedata.sh
+
+builds the file from `~/Documents/development/shrutisgametracker/research`,
+names a copy by its digest, writes `manifest.json`, and copies all three into
+the `gamedata` volume on the server (`docker compose cp` into the backend).
+Without it, `/api/gamedata/games` answers `[]` and the planner says the game
+is not loaded — a working state. The file is also served whole at
+`/gamedata/<file>` for self-hosted trackers to pull; publishing it is a
+decision, not a side effect of a deploy — see `research/LICENSE-DATA.md` in
+the guides repository.
+
 ## Stripe went live — 2026-08-26
 
 Live keys installed on production; both membership tiers rebuilt in live mode
