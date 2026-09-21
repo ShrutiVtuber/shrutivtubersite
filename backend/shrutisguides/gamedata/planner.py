@@ -135,8 +135,12 @@ def gear_places(sec: dict, data: GameData, game: str, class_id: str) -> dict[str
     """
     The places a gear section offers, in order: {place id: slot id}. A slot
     with `count` 2 is two places (`ring`, `ring-2`); a recipe may name its
-    slots outright or leave some out (sockets, the mercenary's).
+    slots outright — as a list, or as a mapping when the place and the slot
+    whose items fill it differ (a mercenary wears the same helms a person
+    does) — or leave some out (sockets, the charms' own section).
     """
+    if isinstance(sec.get("slots"), dict):
+        return dict(sec["slots"])
     if sec.get("slots"):
         return {s: s for s in sec["slots"]}
     out: dict[str, str] = {}
@@ -154,8 +158,17 @@ def gear_places(sec: dict, data: GameData, game: str, class_id: str) -> dict[str
     return out
 
 
-def place_label(place: str, slot_id: str, name: str) -> str:
-    return name if place == slot_id else f"{name} {place[len(slot_id) + 1:]}"
+def place_label(place: str, slot_id: str, names: "_Names") -> str:
+    """
+    The place's own name where the pack has one (a mercenary's helm), the
+    slot's name with the place's suffix where the place is one of several
+    (`ring-2` → "Ring 2"), the slot's name otherwise.
+    """
+    own = names.known("slot", place)
+    if own:
+        return own
+    name = names.of("slot", slot_id)
+    return name if place == slot_id else f"{name} {place[len(slot_id) + 1:]}" if place.startswith(f"{slot_id}-") else f"{name} ({place})"
 
 
 def clean_plan(raw: Any, data: GameData) -> tuple[dict, list[str]]:
@@ -257,8 +270,10 @@ class _Names:
                     self._want_fields(fields, p, want)
             elif sec["type"] == "gear":
                 for place, choice in value.items():
-                    want("slot", place.rsplit("-", 1)[0] if place[-1:].isdigit() and "-" in place else place)
                     want("slot", place)
+                    want("slot", place.rsplit("-", 1)[0] if place[-1:].isdigit() and "-" in place else place)
+                    for mapped in ([sec["slots"].get(place)] if isinstance(sec.get("slots"), dict) else []):
+                        want("slot", mapped)
                     self._want_fields(fields, choice, want)
         self.names = {kind: data.names(game, kind, sorted(ids)) for kind, ids in wanted.items()}
 
@@ -273,6 +288,10 @@ class _Names:
 
     def of(self, kind: str, id: str) -> str:
         return self.names.get(kind, {}).get(id) or id.replace("-", " ")
+
+    def known(self, kind: str, id: str) -> str:
+        """The name the pack gives, or nothing — so a caller can tell a real record from a guess."""
+        return self.names.get(kind, {}).get(id, "")
 
 
 def _detail(fields: dict, choice: dict, names: _Names, chosen: dict | None = None) -> str:
@@ -335,7 +354,7 @@ def plan_to_categories(plan: dict, data: GameData) -> list[dict]:
             order = list(places)
             for place in sorted(value, key=lambda s: order.index(s) if s in order else len(order)):
                 slot_id = places.get(place, place)
-                items.append({"id": f"{sid}-{place}", "label": place_label(place, slot_id, names.of("slot", slot_id)), "kind": "slot",
+                items.append({"id": f"{sid}-{place}", "label": place_label(place, slot_id, names), "kind": "slot",
                               "hint": _clip(_detail(fields, value[place], names), MAX_TEXT)})
         elif sec["type"] == "targets":
             for e in sec.get("entries", []):
@@ -394,7 +413,7 @@ def plan_summary(plan: dict, data: GameData) -> dict:
             places = gear_places(sec, data, plan["game"], plan.get("class_id", ""))
             for place, choice in value.items():
                 slot_id = places.get(place, place)
-                lines.append({"id": place, "label": place_label(place, slot_id, names.of("slot", slot_id)), "detail": _detail(fields, choice, names)})
+                lines.append({"id": place, "label": place_label(place, slot_id, names), "detail": _detail(fields, choice, names)})
         elif sec["type"] == "targets":
             for e in sec.get("entries", []):
                 if value.get(e["id"]):

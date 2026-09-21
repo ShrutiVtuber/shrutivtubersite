@@ -95,10 +95,21 @@ class GameData:
             where.append("(e.class_ids = '[]' OR EXISTS (SELECT 1 FROM json_each(e.class_ids) WHERE value = ?))")
             args.append(class_id)
         if slot_id:
-            # in the slot itself; or linked to it; or linked to an item type the slot accepts
-            where.append("(e.slot_id = ? OR EXISTS (SELECT 1 FROM link l WHERE l.game = e.game AND l.from_kind = e.kind AND l.from_id = e.id "
-                         "AND l.rel IN ('fits', 'rolls-on', 'is-a') AND (l.to_kind = 'slot' AND l.to_id = ? OR l.to_kind = 'itemtype' AND EXISTS ("
-                         "SELECT 1 FROM link t WHERE t.game = l.game AND t.from_kind = 'itemtype' AND t.from_id = l.to_id AND t.rel = 'fits' AND t.to_id = ?))))")
+            # In the slot itself, or linked to it by name. Failing that — and ONLY
+            # failing that — through an item type the slot accepts, which is how a
+            # record that names a kind of item rather than a place on the body
+            # ("rolls on a bow", "any armour") finds its slots.
+            #
+            # ⚠ The hop is a fallback because item types group broadly: a helm and
+            # a chest piece are both "armor", so reaching through the type as well
+            # as the slot would offer a helm for the chest. A record that states
+            # its own slot has said all there is to say.
+            direct = ("e.slot_id = ? OR EXISTS (SELECT 1 FROM link l WHERE l.game = e.game AND l.from_kind = e.kind AND l.from_id = e.id "
+                      "AND l.rel IN ('fits', 'rolls-on') AND l.to_kind = 'slot' AND l.to_id = ?)")
+            through = ("e.slot_id = '' AND EXISTS (SELECT 1 FROM link l WHERE l.game = e.game AND l.from_kind = e.kind AND l.from_id = e.id "
+                       "AND l.rel IN ('fits', 'rolls-on', 'is-a') AND l.to_kind = 'itemtype' AND EXISTS ("
+                       "SELECT 1 FROM link t WHERE t.game = l.game AND t.from_kind = 'itemtype' AND t.from_id = l.to_id AND t.rel = 'fits' AND t.to_id = ?))")
+            where.append(f"(({direct}) OR ({through}))")
             args.extend([slot_id, slot_id, slot_id])
         if group:
             where.append("e.grp = ?")

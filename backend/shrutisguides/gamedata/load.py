@@ -272,7 +272,7 @@ def normalise(kind: str, rec: dict, position: int) -> dict | None:
             "tags": tags, "level_req": level, "summary": summary, "position": position, "data": data}
 
 
-def _links_of(game: str, row: dict, known: set[tuple[str, str]]) -> list[tuple]:
+def _links_of(game: str, row: dict, known: set[tuple[str, str]], by_id: dict[str, list[str]]) -> list[tuple]:
     out: list[tuple] = []
     data = row["data"]
     for fld, rel, to_kind in LINKS.get(row["kind"], ()):
@@ -284,8 +284,15 @@ def _links_of(game: str, row: dict, known: set[tuple[str, str]]) -> list[tuple]:
             if not t or (to_kind == row["kind"] and t == row["id"]):
                 continue
             kind_to = to_kind
-            if to_kind == "slot" and (to_kind, t) not in known and ("itemtype", t) in known:
-                kind_to = "itemtype"          # "rolls on bow": a type of item, not a place on the body
+            if (to_kind, t) not in known:
+                # The pack filed the thing under another kind: "rolls on bow" names
+                # an item type, not a slot; a set's piece may be a runeword item.
+                # When exactly one kind holds the id, the link goes there.
+                elsewhere = by_id.get(t, [])
+                if to_kind == "slot" and "itemtype" in elsewhere:
+                    kind_to = "itemtype"
+                elif len(elsewhere) == 1:
+                    kind_to = elsewhere[0]
             out.append((game, row["kind"], row["id"], rel, kind_to, t, ""))
     if row["slot_id"] and row["kind"] not in ("slot",) and not any(l[3] == "fits" for l in out):
         out.append((game, row["kind"], row["id"], "fits", "slot", row["slot_id"], ""))
@@ -373,8 +380,11 @@ def load_game(con: sqlite3.Connection, folder: Path, report: Report) -> str | No
         "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         [(game, r["kind"], r["id"], r["name"], r["sub"], r["grp"], json.dumps(r["class_ids"]), r["slot_id"], json.dumps(r["tags"]),
           r["level_req"], r["summary"], r["position"], json.dumps(r["data"], ensure_ascii=False, separators=(",", ":"))) for r in rows])
+    by_id: dict[str, list[str]] = {}
+    for kind, rid in seen:
+        by_id.setdefault(rid, []).append(kind)
     for r in rows:
-        links.extend(_links_of(game, r, seen))
+        links.extend(_links_of(game, r, seen, by_id))
     con.executemany("INSERT INTO link (game, from_kind, from_id, rel, to_kind, to_id, note) VALUES (?, ?, ?, ?, ?, ?, ?)", links)
     # dangling links are reported, and kept: a pack fixed later makes them whole
     dangling = con.execute(

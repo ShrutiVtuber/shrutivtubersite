@@ -71,7 +71,9 @@ POE2 = {
          "sub": ["notable", "keystone", "mastery", "ascendancy"],
          "fields": {"note": {"type": "text"}},
          "points": {"id": "passive-points", "name": "Passive points", "unit": "points"}},
-        {"id": "gear", "name": "Gear", "type": "gear", "grid": True, "exclude": ["flask", "charm", "jewel", "rune", "life-flask", "mana-flask"],
+        {"id": "gear", "name": "Gear", "type": "gear", "grid": True, # flasks, charms and jewels have their own sections; the socket "slots" are
+         # not places on the body; the transcendent limbs are a temporary device's
+         "exclude": ["flask", "charm", "jewel-socket", "rune-socket", "transcendent-arm", "transcendent-leg"],
          "fields": {"unique": {"type": "id", "kind": "unique"}, "base": {"type": "id", "kind": "base"},
                     "affixes": {"type": "ids", "kind": "affix", "sub": ["prefix", "suffix", "exclusive"], "max": 6},
                     "runes": {"type": "ids", "kind": "rune", "max": 3},
@@ -104,7 +106,9 @@ D2R = {
                     "note": {"type": "text"}}},
         {"id": "charms", "name": "Charms", "type": "picks", "kind": "charm", "max": 12, "track": "check", "fields": {"note": {"type": "text"}}},
         {"id": "mercenary", "name": "Mercenary", "type": "pick", "kind": "mercenary"},
-        {"id": "merc-gear", "name": "Mercenary gear", "type": "gear", "slots": ["mercenary-head", "mercenary-torso", "mercenary-weapon", "mercenary-off-hand"],
+        # the places are the mercenary's, the items are the ones a person wears
+        {"id": "merc-gear", "name": "Mercenary gear", "type": "gear",
+         "slots": {"mercenary-head": "head", "mercenary-torso": "torso", "mercenary-weapon": "weapon", "mercenary-off-hand": "off-hand"},
          "fields": {"runeword": {"type": "id", "kind": "runeword"}, "unique": {"type": "id", "kind": "unique"}, "base": {"type": "id", "kind": "base"},
                     "note": {"type": "text"}}},
         {"id": "targets", "name": "Numbers", "type": "targets",
