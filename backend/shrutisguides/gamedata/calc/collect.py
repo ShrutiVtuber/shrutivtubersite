@@ -24,7 +24,7 @@ from ..recipes import recipe_for
 from .damage import hits
 from .games import module_for
 from .model import APPROXIMATE, Contribution, NOT_COUNTED, Pool, worst
-from .vocabulary import GROUPS, grouped, stat
+from .vocabulary import GROUPS, OTHER, grouped, stat
 
 def condition_name(module, condition: str) -> str:
     """A game may name its common assumptions; anything else reads as its own words."""
@@ -193,10 +193,27 @@ def sheet(plan: dict, data: GameData) -> dict:
         if s.cap:
             row["cap"] = s.cap
         rows[sid] = row
+    # ⚠ Which rows earn a place. A row for a stat the vocabulary KNOWS is
+    # worth showing even when nothing in it could be counted — "your armour
+    # has three lines we could not add up" is a thing a person needs to read.
+    # A row for a name we never mapped, sitting at zero, is not a stat at
+    # all; it is noise with a number beside it, and a dozen of them make the
+    # panel look broken. Those stay in the uncounted summary, and in the
+    # breakdown of whatever stat they were filed against.
+    def earns_a_row(sid: str) -> bool:
+        return stat(sid).group != OTHER or any(c.state != NOT_COUNTED for c in pool.lines(sid))
+
+    shown = [i for i in ids if earns_a_row(i)]
     out_groups = []
-    for g, stats_in in grouped(ids):
+    for g, stats_in in grouped(shown):
         out_groups.append({"group": g, "rows": [rows[st.id] for st in stats_in]})
     uncounted = [c for sid in ids for c in pool.lines(sid) if c.state == NOT_COUNTED]
+    by_thing: dict[tuple[str, str], dict] = {}
+    for c in uncounted:
+        row = by_thing.setdefault((c.source_kind, c.source_id),
+                                  {"kind": c.source_kind, "id": c.source_id, "name": c.source_name,
+                                   "where": c.place, "lines": 0})
+        row["lines"] += 1
     damage = hits(plan, data, pool)
     # ⚠ The assumptions are drawn FROM THE BUILD, not from a fixed list: a
     # person is offered exactly the switches their own gear and nodes talk
@@ -219,5 +236,9 @@ def sheet(plan: dict, data: GameData) -> dict:
         "damage": [h.as_dict() for h in damage],
         "conditions": conditions,
         "state": worst([r["state"] for r in rows.values()]),
-        "uncounted": {"lines": len(uncounted), "things": len({(c.source_kind, c.source_id) for c in uncounted})},
+        # what could not be added up, and WHICH of a person's choices it came
+        # from — so the panel can point at the item rather than apologise in
+        # general
+        "uncounted": {"lines": len(uncounted), "things": len(by_thing),
+                      "from": sorted(by_thing.values(), key=lambda r: -r["lines"])[:10]},
     }

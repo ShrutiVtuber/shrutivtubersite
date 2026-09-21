@@ -34,7 +34,8 @@ higher, and the pack files them as their own record with bigger numbers
 """
 from __future__ import annotations
 
-from ..model import APPROXIMATE, COUNTED, NOT_COUNTED, Contribution
+from ..damage import Hit, between
+from ..model import APPROXIMATE, COUNTED, NOT_COUNTED, Contribution, Step, worst
 from ..vocabulary import stat as canonical
 
 GAME = "diablo-iv"
@@ -50,7 +51,9 @@ GAME = "diablo-iv"
 # real one, so life and the four attributes start at nothing and the panel
 # shows exactly what a person's choices grant. See diablo_iv_census.md.
 RESISTANCES = ("resistance-fire", "resistance-cold", "resistance-lightning", "resistance-poison", "resistance-shadow")
-BASE = {f"{r}-max": 70.0 for r in RESISTANCES}
+# physical is resisted too, and capped the same, but it is never one of "all"
+ALL_RESISTED = RESISTANCES + ("resistance-physical",)
+BASE = {f"{r}-max": 70.0 for r in ALL_RESISTED}
 
 # Damage rows are read as a percentage of what the character would do with
 # none of this: 100 is the unmodified skill, 480 is four-fold-and-some. Only
@@ -419,8 +422,14 @@ def map_line(line: dict, source: dict) -> list[Contribution]:
     raw = line.get("stat")
     key = _lookup(_key(raw))
     text = str(line.get("text") or line.get("display") or raw or "")[:160]
+    # ⚠ Every line carries WHAT IT IS ABOUT. `+2 Ranks of Chain Lightning` and
+    # `+2 Ranks of Fire Skills` are the same stat and the same number, and only
+    # the param says which skill a plan may count them towards. Without it
+    # every skill in a plan takes every rank bonus, which is the one mistake
+    # the damage model exists to avoid.
     common = dict(source_kind=source.get("kind", ""), source_id=source.get("id", ""),
-                  source_name=source.get("name", ""), text=text, place=source.get("place", ""))
+                  source_name=source.get("name", ""), text=text, place=source.get("place", ""),
+                  param=_param(line))
     if not key:
         return []
     # ⚠ The collector turns an affix's best TIER into a line named after the
@@ -482,7 +491,10 @@ def _parameterised(key: str, line: dict, value: float | None, sureness: str,
     element = ELEMENTS.get(param.lower(), "")
 
     if key in ("resistance", "resistance-all", "resistance-bonus-percent"):
-        name = f"resistance-{element}" if element and element != "physical" else "resistance-all"
+        # ⚠ Physical is a resistance of its own in this game, not "all of
+        # them". Letting it fall through to the unnamed case spread one line
+        # across five rows and told a person they had resistances they do not.
+        name = f"resistance-{element}" if element else "resistance-all"
         if name == "resistance-all":
             names = RESISTANCES               # an unnamed element is every element
         else:
@@ -519,3 +531,292 @@ def _parameterised(key: str, line: dict, value: float | None, sureness: str,
         return [Contribution(stat=stat_id, form="more", value=0.0, state=NOT_COUNTED, bucket=bucket, **common)]
     return [Contribution(stat=stat_id, form="more", value=value * _scale(line, stat_id, "more"),
                          state=sureness, bucket=bucket, **common)]
+
+
+# ── what a skill hits for ────────────────────────────────────────────────────
+#
+# ⚠ WHAT THE PACK ACTUALLY CARRIES, measured before this was written. A skill's
+# `ranks_or_levels` is one row per rank 1–15 and the row's `values` hold
+# `damage_pct` — a single number, never a pair, and that number is A PERCENTAGE
+# OF WEAPON DAMAGE for the skill's FIRST PAYLOAD. 164 of the pack's 194 actives
+# and ultimates carry one. The other 30 either deal no damage at all (Ice
+# Armor, the Paladin auras, the shouts) or have a formula the extraction could
+# not evaluate because it reads runtime state, and both say so below rather
+# than guess.
+#
+# ⚠ AND THE PACK CARRIES NO WEAPON DAMAGE. A base record holds the type's
+# attacks per second and its speed implicit and nothing else, because Diablo
+# IV's weapon damage is an item-power formula rather than a number per type.
+# So what this model reaches is the skill's percentage — scaled to the rank the
+# plan reaches and multiplied by the bonuses that are about this skill — and
+# NOT a damage figure. Every hit is approximate and says which half is missing.
+# `weapon_damage` below is the one place to change the day a pack carries it.
+
+# The tags that say what a hit lands as. No skill in the 3.2.1 pack carries two
+# of them, so the first found is the skill's element.
+#
+# ⚠ `holy` is here and is deliberately NOT in ELEMENTS: the vocabulary has no
+# holy row, so a Paladin's hit names its element truthfully while reading the
+# plain `damage` row — which is where the pack files holy multipliers anyway.
+ELEMENT_TAGS = ("fire", "cold", "lightning", "poison", "shadow", "holy", "physical")
+
+# The per-rank value a skill's damage is written under.
+DAMAGE_KEY = "damage_pct"
+
+# Where a weapon sits. An off-hand is a focus, a totem or a shield and swings
+# at nothing, so it is not one of these.
+WEAPON_HANDS = ("main-hand", "two-handed", "dual-wield", "ranged")
+
+# What a base's damage would be called, in each of the spellings a pack might
+# reasonably use. None of them is in the 3.2.1 pack; see `weapon_damage`.
+WEAPON_DAMAGE_KEYS = (("damage_min", "damage_max"), ("min_damage", "max_damage"),
+                      ("weapon_damage_min", "weapon_damage_max"))
+
+
+def _tag(param: str) -> str:
+    """
+    One skill category, however the pack spelled it.
+
+    ⚠ The same category reaches us under two names. An affix writes
+    `{"kind": "skill-tag", "id": "trap"}`; a paragon node writes the engine's
+    own `"Skill_Trap"`. Folding the case, the underscores and a leading
+    `skill-` makes them one word — and without that a plan's traps affix and
+    its traps node would read as two unrelated categories.
+    """
+    t = str(param or "").strip().lower().replace("_", "-")
+    return t[len("skill-"):] if t.startswith("skill-") else t
+
+
+def tags_of(skill: dict) -> set[str]:
+    """
+    Every category a skill belongs to: its own tags, and the tree cluster it
+    sits in. The cluster is already among the tags in this pack; it is taken
+    from `group` as well so a pack that stops writing it loses nothing.
+    """
+    out = {_tag(t) for t in (skill.get("tags") or []) if t}
+    out.add(_tag(str(skill.get("group") or "").replace(" ", "-")))
+    return {t for t in out if t}
+
+
+def element_of(skill: dict) -> str:
+    """What this skill's damage lands as, from its own tags."""
+    tags = tags_of(skill)
+    return next((e for e in ELEMENT_TAGS if e in tags), "")
+
+
+def planned_ranks(plan: dict, skill_id: str) -> int:
+    """
+    The ranks a person put into a skill with their own hand.
+
+    ⚠ A skill in the plan always has at least one. Diablo IV spends a point the
+    moment a skill is taken, and the plan's own field starts at one — so a pick
+    that names no number is one rank, not none. A skill that is not in the plan
+    is nought, which is how the caller tells the two apart.
+    """
+    for p in ((plan.get("sections") or {}).get("skills") or {}).get("picks") or []:
+        if isinstance(p, dict) and p.get("id") == skill_id:
+            try:
+                return max(1, int(p.get("ranks") or 1))
+            except (TypeError, ValueError):
+                return 1
+    return 0
+
+
+def effective_rank(skill: dict, ranks: int, pool) -> tuple[int, list[Contribution], int]:
+    """
+    The rank a skill actually reaches: the ranks a person spent, plus every
+    bonus that is ABOUT this skill — all skills, one of the categories it is
+    in, or this skill by name. A bonus meant for another skill or another
+    category is not taken, which is the whole reason a contribution carries
+    what it is about.
+
+    ⚠ Capped at the skill's own `max_rank`. Diablo IV stops a skill at fifteen
+    however much a plan piles on and the pack says so twice — on the skill and
+    in `progression.max_rank_per_active_skill`. Reading a rank table past its
+    last row would invent damage the game does not give. The third value is the
+    rank the plan asked for where the cap bit, and nought where it did not.
+    """
+    tags = tags_of(skill)
+    rank, lines = float(max(0, int(ranks))), []
+
+    def take(c: Contribution) -> None:
+        if pool.holds(c):
+            lines.append(c)
+
+    for c in pool.lines("skills-all"):
+        take(c)
+    for c in pool.lines("skills-tab"):
+        if _tag(c.param) in tags:
+            take(c)
+    for c in pool.lines("skills-single"):
+        if c.param and c.param == skill.get("id"):
+            take(c)
+    rank += sum(c.value for c in lines)
+
+    cap = int(skill.get("max_rank") or 0)
+    if cap > 0 and rank > cap:
+        return cap, lines, int(rank)
+    return int(rank), lines, 0
+
+
+def _banded(table: list[dict], key: str) -> list[dict]:
+    """
+    A Diablo IV rank table in the shape the shared reader wants.
+
+    ⚠ Diablo II writes a rank's damage as a low and a high; Diablo IV writes
+    ONE number, because what varies behind it is the weapon and not the skill.
+    `between` reads pairs, so the one number is handed to it as both ends. It
+    is not a range and must never be drawn as one.
+    """
+    rows = []
+    for r in table or []:
+        v = (r.get("values") or {}).get(key)
+        if isinstance(v, (int, float)) and not isinstance(v, bool):
+            rows.append({"rank": r.get("rank"), "values": {key: [float(v), float(v)]}})
+    return rows
+
+
+def bucket_applies(bucket: str, tags: set[str]) -> bool:
+    """
+    Whether one of Diablo IV's multiplier groups belongs in this skill's
+    tooltip number.
+
+    Three do. `all` is every skill's damage. `type` has already been narrowed
+    by the row it was read from, so reaching it here means it names this
+    skill's element or no element at all. `skill:<tag>` counts only where the
+    skill is in that category.
+
+    ⚠ Everything else is left out, and for two different reasons. The buckets
+    named after the enemy or a passing state — vulnerable, elites, fortified,
+    close — are what the tooltip is the damage BEFORE; counting them would give
+    a number nobody can check against their own screen. And a standalone `[x]`
+    multiplier is filed under the item it came from rather than the thing it
+    waits on, so this cannot tell an unconditional one from a conditional one
+    and will not guess. Both kinds are named in the hit's `why`, and the
+    panel's own damage row still multiplies every one of them.
+    """
+    if bucket in ("all", "type"):
+        return True
+    if bucket.startswith("skill:"):
+        return _tag(bucket[len("skill:"):]) in tags
+    return False
+
+
+def planned_weapon(plan: dict, data) -> tuple[dict, str]:
+    """The base in the plan's weapon hand, and the place it sits in."""
+    gear = (plan.get("sections") or {}).get("gear") or {}
+    if not isinstance(gear, dict):
+        return {}, ""
+    for place, choice in gear.items():
+        p = str(place or "").lower()
+        if not isinstance(choice, dict) or not any(p == h or p.startswith(f"{h}-") for h in WEAPON_HANDS):
+            continue
+        rec = data.get(GAME, "base", str(choice.get("base") or "")) or {}
+        if rec:
+            return rec, str(place)
+    return {}, ""
+
+
+def weapon_damage(plan: dict, data) -> tuple[tuple[float, float] | None, str]:
+    """
+    What the weapon in the plan's hand hits for — and today, nothing.
+
+    ⚠ THE PACK CARRIES NO WEAPON DAMAGE, and the census says so outright rather
+    than make one up: a base holds `attacks_per_second_base` and a speed
+    implicit, because Diablo IV's damage is an item-power formula and not a
+    number per type. So every skill that scales off the weapon — which is every
+    skill with a `damage_pct` — comes out as a percentage and is approximate.
+    This is the one place to change the day a pack carries the number.
+    """
+    rec, place = planned_weapon(plan, data)
+    stats = rec.get("stats") or {}
+    name = str(rec.get("name") or place or "")
+    for lo_key, hi_key in WEAPON_DAMAGE_KEYS:
+        lo, hi = stats.get(lo_key), stats.get(hi_key)
+        if isinstance(lo, (int, float)) and isinstance(hi, (int, float)) and not isinstance(lo, bool):
+            return (float(lo), float(hi)), name
+    return None, name
+
+
+def damage_for(plan: dict, data, pool, pick: dict) -> Hit | None:
+    """
+    One skill's damage, aimed at the number the game's own tooltip shows: what
+    the skill does before anything about the thing it hits.
+
+    The working is the rank the plan reaches, the percentage the pack records
+    at that rank, and then the multiplier buckets that are about THIS skill —
+    every skill's damage, this skill's element, a category this skill is in.
+    Nothing about the enemy, nothing that waits on a state, no simulation.
+    """
+    skill = data.get(GAME, "skill", str(pick.get("id") or ""))
+    if not skill:
+        return None
+    element = element_of(skill)
+    tags = tags_of(skill)
+    ranks = planned_ranks(plan, skill["id"]) or max(1, int(pick.get("ranks") or 1))
+    rank, rank_lines, asked = effective_rank(skill, ranks, pool)
+    hit = Hit(skill_id=skill["id"], skill_name=skill.get("name") or skill["id"], element=element, rank=rank)
+
+    if not (skill.get("ranks_or_levels") or []):
+        hit.state = NOT_COUNTED
+        hit.why = ("the pack records no per-rank table for this skill — its damage is a formula about "
+                   "things the data does not carry, such as attack speed or what is equipped")
+        return hit
+    table = _banded(skill.get("ranks_or_levels") or [], DAMAGE_KEY)
+    if not table:
+        hit.state = NOT_COUNTED
+        hit.why = "the pack's rank table for this skill records no damage — it may not deal any"
+        return hit
+
+    band, sureness = between(table, rank, DAMAGE_KEY)
+    percent = band[1]
+    hit.steps.append(Step("base", f"rank {rank} of {skill.get('max_rank') or rank}", rank, percent, rank_lines))
+
+    # the multipliers, one step per bucket: inside a bucket they add, between
+    # buckets they multiply — Diablo IV's whole damage model
+    applied: dict[str, list[Contribution]] = {}
+    left_out: list[Contribution] = []
+    for row in ["damage"] + ([f"damage-{element}"] if element else []):
+        for c in pool.lines(row):
+            if c.form != "more" or c.state == NOT_COUNTED or not pool.holds(c):
+                continue
+            if bucket_applies(c.bucket, tags):
+                applied.setdefault(c.bucket, []).append(c)
+            else:
+                left_out.append(c)
+    running = percent
+    for bucket, group in applied.items():
+        amount = sum(c.value for c in group)
+        running *= 1 + amount / 100.0
+        hit.steps.append(Step("more", bucket, amount, running, group))
+
+    why: list[str] = []
+    weapon, weapon_name = weapon_damage(plan, data)
+    if weapon is None:
+        hit.low = hit.high = running
+        why.append("the pack records no weapon damage, so this is the skill's percentage of a weapon "
+                   "and not a damage number")
+        states = [APPROXIMATE]
+    else:
+        hit.low, hit.high = running / 100.0 * weapon[0], running / 100.0 * weapon[1]
+        hit.steps.append(Step("more", f"{weapon_name}'s damage", weapon[1], hit.high))
+        states = [COUNTED]
+
+    if sureness != COUNTED:
+        why.append("the rank falls between the rows the pack records, so the damage is read across them")
+    if asked:
+        why.append(f"the plan reaches rank {asked} and the pack caps this skill at {rank}, "
+                   f"so the ranks past the cap are not counted")
+    standalone = sorted({c.bucket for c in left_out if c.bucket.startswith("× ")})
+    situational = sorted({c.bucket for c in left_out if not c.bucket.startswith("× ")})
+    if situational:
+        why.append("left out because they are about the thing being hit or a state that must hold: "
+                   + ", ".join(situational))
+    if standalone:
+        why.append(f"{len(standalone)} standalone [x] multipliers are left out — each is filed under the "
+                   "thing it came from, which does not say what it waits on")
+
+    hit.why = "; ".join(why)
+    hit.state = worst(states + [sureness] + [c.state for c in rank_lines] +
+                      [c.state for g in applied.values() for c in g])
+    return hit
