@@ -98,7 +98,16 @@ def chosen(plan: dict, data: GameData) -> Iterator[tuple[dict, dict]]:
         seen.add((kind, rid, place))
         rec = data.get(game, kind, rid)
         if rec:
-            yield {"kind": kind, "id": rid, "name": rec.get("name") or rid, "place": place}, rec
+            # ⚠ `type` and `group` travel with the source because a mapper
+            # sometimes has to know WHAT a thing is, not only that it was
+            # chosen. Path of Exile 2 needs both: `type` says whether an
+            # item carries armour or damage of its own, which is what
+            # decides whether `25% increased Armour` on it raises the item
+            # or the character; `group` is the pack's own mod group, and it
+            # says `Local…` outright. Both are filed columns every pack
+            # has, and a mapper that does not want them ignores them.
+            yield {"kind": kind, "id": rid, "name": rec.get("name") or rid, "place": place,
+                   "type": rec.get("type") or rec.get("sub") or "", "group": rec.get("group") or ""}, rec
 
     def fields(spec: dict, choice: dict, place: str = "") -> Iterator[tuple[dict, dict]]:
         if not isinstance(choice, dict):

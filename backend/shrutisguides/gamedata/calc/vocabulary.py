@@ -154,6 +154,46 @@ STATS: dict[str, Stat] = dict([
     _s("speed-skill", "Skill speed", SPEED, "%"),
 ])
 
+# ── the ailments and the statuses ────────────────────────────────────────────
+# ⚠ These earn canonical names, and here is the argument, because a shared
+# vocabulary that grows a bulge for one game stops being shared.
+#
+# A status is not decoration in an action RPG; it is a way of killing and a
+# way of dying, and a person builds AT it. A freeze build aims at freeze
+# buildup the way a crit build aims at critical strike chance, and reads the
+# number in the same breath. Path of Exile 2 alone puts nine hundred stat
+# lines on these rows — more than it puts on armour — and left unnamed every
+# one of them lands in `other`, under the rows nobody set a target for.
+#
+# The numbers are the same numbers for every status and the game says them
+# the same way, so this is a loop and not two hundred entries written out. BUILDUP is how fast
+# it lands, CHANCE is how often, MAGNITUDE is how hard it hits, DURATION is
+# how long it stays — all four are what a character does to something else,
+# so they are offence. THRESHOLD is how much this character takes before the
+# status lands on THEM, and the `on you` numbers are how bad it is once it
+# has: those are defence. A status a pack never mentions costs nothing here —
+# `grouped` only ever draws the rows a plan actually has.
+#
+# ⚠ Only the family is promoted. Everything else one game says alone — the
+# presence radius, the runic ward, the glory — stays under its own id in
+# `other`, which is where a stat with no second game to agree with belongs.
+_STATUSES = ("ignite", "freeze", "shock", "chill", "poison", "bleed", "bleeding", "stun", "daze",
+             "blind", "pin", "electrocute", "immobilisation", "maim", "withered", "hinder", "slow",
+             "exposure", "flammability", "curse", "curses", "ailment", "ailments",
+             "elemental-ailment", "elemental-ailments", "damaging-ailments", "non-damaging-ailments")
+for _status in _STATUSES:
+    _read = _status.replace("-", " ").capitalize()
+    for _suffix, _what, _group, _unit in (
+            ("chance", "chance", OFFENCE, "%"), ("buildup", "buildup", OFFENCE, "%"),
+            ("magnitude", "magnitude", OFFENCE, "%"), ("duration", "duration", OFFENCE, "%"),
+            ("threshold", "threshold", DEFENCE, ""),
+            ("duration-on-you", "duration on you", DEFENCE, "%"),
+            ("magnitude-on-you", "magnitude on you", DEFENCE, "%"),
+            ("effect-on-you", "effect on you", DEFENCE, "%")):
+        # setdefault: a status already named by hand above keeps that name
+        STATS.setdefault(f"{_status}-{_suffix}", Stat(f"{_status}-{_suffix}", f"{_read} {_what}",
+                                                      _group, _unit, integer=False))
+
 
 def stat(id: str) -> Stat:
     """The canonical stat, or one invented from the id so an unknown line still has a name and a group."""
