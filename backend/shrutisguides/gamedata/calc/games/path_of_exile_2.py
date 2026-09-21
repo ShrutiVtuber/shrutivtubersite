@@ -54,7 +54,8 @@ from __future__ import annotations
 
 import re
 
-from ..model import APPROXIMATE, COUNTED, NOT_COUNTED, Contribution
+from ..damage import Hit
+from ..model import APPROXIMATE, COUNTED, NOT_COUNTED, Contribution, Step, worst
 
 GAME = "path-of-exile-2"
 
@@ -942,3 +943,139 @@ def base_for(plan: dict, data, pool) -> dict[str, float]:
     if isinstance(cls.get("starting_spirit"), (int, float)):
         base["spirit"] = float(cls["starting_spirit"])
     return base
+
+
+# ── what a skill hits for ────────────────────────────────────────────────────
+#
+# ⚠ This game states its damage two ways and they are not interchangeable. A
+# SPELL carries its own band at each gem level — Fireball at level 10 is 59
+# to 88 fire, and that is the number. An ATTACK carries no damage of its own,
+# only a multiplier on the weapon in your hand, so it cannot be answered at
+# all without knowing which weapon the plan chose. Reading one as the other
+# would put a weapon's damage on a spell and nothing on an attack.
+
+# what a gem's own tags say its damage is raised by
+TAG_STATS = {"spell": "damage-spell", "attack": "damage-attack", "minion": "damage-minion"}
+
+
+def gem_level(skill: dict, pick: dict, pool) -> tuple[int, list[Contribution]]:
+    """
+    The level a gem actually reaches: the level the plan set it to, plus the
+    bonuses that are about it.
+
+    ⚠ Only `skills-all` and a bonus naming this gem are taken. This game also
+    grants levels to a whole tag — "+1 to Level of all Fire Spell Skills" —
+    and the pack does not record which tag those name, so they are left out
+    and the hit says the level may be understated.
+    """
+    try:
+        level = max(1, min(40, int(pick.get("level") or 1)))
+    except (TypeError, ValueError):
+        level = 1
+    lines: list[Contribution] = []
+    for c in pool.lines("skills-all"):
+        level += int(c.value)
+        lines.append(c)
+    for c in pool.lines("skills-single"):
+        if c.param and c.param == skill.get("id"):
+            level += int(c.value)
+            lines.append(c)
+    return level, lines
+
+
+def at_level(skill: dict, level: int) -> tuple[dict | None, str]:
+    """The gem's row at that level, or the nearest one below it, saying which."""
+    rows = [r for r in (skill.get("ranks_or_levels") or []) if isinstance(r, dict) and isinstance(r.get("level"), int)]
+    if not rows:
+        return None, NOT_COUNTED
+    rows.sort(key=lambda r: r["level"])
+    exact = [r for r in rows if r["level"] == level]
+    if exact:
+        return exact[0], COUNTED
+    below = [r for r in rows if r["level"] < level]
+    return (below[-1] if below else rows[0]), APPROXIMATE
+
+
+def weapon_damage(plan: dict, data) -> tuple[tuple[float, float] | None, str]:
+    """The physical damage of the weapon the plan put in the main hand, and where it came from."""
+    gear = (plan.get("sections") or {}).get("gear") or {}
+    choice = gear.get("main-hand") if isinstance(gear, dict) else None
+    if not isinstance(choice, dict):
+        return None, ""
+    base_id, name = choice.get("base"), ""
+    if not base_id and choice.get("unique"):
+        unique = data.get(GAME, "unique", choice["unique"]) or {}
+        base_id, name = unique.get("base_id"), unique.get("name") or ""
+    rec = data.get(GAME, "base", base_id) if base_id else None
+    band = ((rec or {}).get("stats") or {}).get("weapon", {}).get("physical_damage")
+    if isinstance(band, list) and len(band) == 2 and all(isinstance(x, (int, float)) for x in band):
+        return (float(band[0]), float(band[1])), name or (rec.get("name") if rec else "")
+    return None, ""
+
+
+def damage_for(plan: dict, data, pool, pick: dict) -> Hit | None:
+    """One gem's hit damage, aimed at the range the game's own tooltip shows."""
+    skill = data.get(GAME, "skill", str(pick.get("id") or ""))
+    if not skill or skill.get("kind") == "support":
+        return None
+    level, level_lines = gem_level(skill, pick, pool)
+    hit = Hit(skill_id=skill["id"], skill_name=skill.get("name") or skill["id"], rank=level)
+    row, sureness = at_level(skill, level)
+    if row is None:
+        hit.state, hit.why = NOT_COUNTED, "the pack records no levels for this gem"
+        return hit
+
+    element = str(row.get("damage_type") or "").lower()
+    hit.element = element
+    band = row.get("damage")
+    multiplier = row.get("damage_multiplier")
+    note = "" if sureness == COUNTED else f"the pack records no row at level {level}, so the nearest below it is read"
+
+    if isinstance(band, list) and len(band) == 2:
+        low, high = float(band[0]), float(band[1])
+        hit.steps.append(Step("base", f"the gem at level {row.get('level')}", level, high, level_lines))
+    elif isinstance(multiplier, (int, float)):
+        weapon, where = weapon_damage(plan, data)
+        if weapon is None:
+            hit.state = NOT_COUNTED
+            hit.why = "an attack does the weapon's damage, and the plan has not chosen one for the main hand"
+            return hit
+        low, high = weapon[0] * float(multiplier), weapon[1] * float(multiplier)
+        hit.steps.append(Step("base", f"{float(multiplier) * 100:g}% of {where or 'the weapon'}", level, high, level_lines))
+        # ⚠ The weapon's own affixes are not in this: only the base's damage is.
+        sureness = APPROXIMATE
+        note = note or "the weapon's base damage only; what its affixes add is not counted here"
+    else:
+        hit.state = NOT_COUNTED
+        hit.why = "the pack records no damage for this gem — it may not deal any"
+        return hit
+
+    wanted = {"damage"}
+    if element:
+        wanted.add(f"damage-{element}")
+    for tag in (skill.get("tags") or []):
+        if str(tag).lower() in TAG_STATS:
+            wanted.add(TAG_STATS[str(tag).lower()])
+
+    flat = [c for st in sorted(wanted) for c in pool.lines(st)
+            if c.form == "flat" and c.state != NOT_COUNTED and pool.holds(c) and st != "damage"]
+    if flat:
+        added = sum(c.value for c in flat)
+        low, high = low + added, high + added
+        hit.steps.append(Step("flat", "added", added, high, flat))
+
+    raised = [c for st in sorted(wanted) for c in pool.lines(st)
+              if c.form == "increased" and c.state != NOT_COUNTED and pool.holds(c)]
+    if raised:
+        pct = sum(c.value for c in raised)
+        low, high = low * (1 + pct / 100), high * (1 + pct / 100)
+        hit.steps.append(Step("increased", "increased", pct, high, raised))
+
+    for c in [c for st in sorted(wanted) for c in pool.lines(st)
+              if c.form == "more" and c.state != NOT_COUNTED and pool.holds(c)]:
+        low, high = low * (1 + c.value / 100), high * (1 + c.value / 100)
+        hit.steps.append(Step("more", c.source_name or "more", c.value, high, [c]))
+
+    hit.low, hit.high, hit.why = low, high, note
+    hit.state = worst([sureness] + [c.state for c in level_lines])
+    return hit
