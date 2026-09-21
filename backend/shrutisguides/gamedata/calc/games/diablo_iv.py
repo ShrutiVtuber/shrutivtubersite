@@ -741,25 +741,59 @@ def planned_weapon(plan: dict, data) -> tuple[dict, str]:
     return {}, ""
 
 
-def weapon_damage(plan: dict, data) -> tuple[tuple[float, float] | None, str]:
+def band_at(weapon: dict, item_power: int) -> tuple[float, float] | None:
     """
-    What the weapon in the plan's hand hits for — and today, nothing.
+    ⚠ The bands do not interpolate. The pack states the rule itself: the band
+    whose item power is the highest not above the item's own gives [low, high]
+    outright. Reading between two bands would invent a weapon that does not
+    exist.
+    """
+    bands = [b for b in (weapon.get("bands") or []) if isinstance(b, dict)
+             and isinstance(b.get("item_power"), (int, float))
+             and isinstance(b.get("damage"), list) and len(b["damage"]) == 2]
+    if not bands:
+        damage = weapon.get("damage")
+        if isinstance(damage, list) and len(damage) == 2:
+            return float(damage[0]), float(damage[1])
+        return None
+    bands.sort(key=lambda b: b["item_power"])
+    below = [b for b in bands if b["item_power"] <= item_power] or bands[:1]
+    chosen = below[-1]["damage"]
+    return float(chosen[0]), float(chosen[1])
 
-    ⚠ THE PACK CARRIES NO WEAPON DAMAGE, and the census says so outright rather
-    than make one up: a base holds `attacks_per_second_base` and a speed
-    implicit, because Diablo IV's damage is an item-power formula and not a
-    number per type. So every skill that scales off the weapon — which is every
-    skill with a `damage_pct` — comes out as a percentage and is approximate.
-    This is the one place to change the day a pack carries the number.
+
+def weapon_damage(plan: dict, data) -> tuple[tuple[float, float] | None, str, int]:
     """
-    rec, place = planned_weapon(plan, data)
-    stats = rec.get("stats") or {}
-    name = str(rec.get("name") or place or "")
-    for lo_key, hi_key in WEAPON_DAMAGE_KEYS:
-        lo, hi = stats.get(lo_key), stats.get(hi_key)
-        if isinstance(lo, (int, float)) and isinstance(hi, (int, float)) and not isinstance(lo, bool):
-            return (float(lo), float(hi)), name
-    return None, name
+    What the weapon in the plan's hand hits for, at the item power the plan
+    states for it.
+
+    Diablo IV holds a weapon's damage as four item-power curves — one per
+    speed class — and every base on a curve has the same damage, so the base
+    picks the curve and the ITEM POWER picks the band. A plan that does not
+    say its item power is read at the power the pack recorded the base's
+    headline damage for, and the hit says so.
+    """
+    gear = (plan.get("sections") or {}).get("gear") or {}
+    if not isinstance(gear, dict):
+        return None, "", 0
+    for place, choice in gear.items():
+        if not isinstance(choice, dict):
+            continue
+        base_id = choice.get("base")
+        name = ""
+        if not base_id and choice.get("unique"):
+            unique = data.get(GAME, "unique", choice["unique"]) or {}
+            base_id, name = unique.get("base_id"), str(unique.get("name") or "")
+        rec = data.get(GAME, "base", base_id) if base_id else None
+        weapon = ((rec or {}).get("stats") or {}).get("weapon")
+        if not isinstance(weapon, dict):
+            continue
+        stated = choice.get("item_power")
+        power = int(stated) if isinstance(stated, (int, float)) and not isinstance(stated, bool) else int(weapon.get("item_power") or 0)
+        band = band_at(weapon, power)
+        if band:
+            return band, (name or str(rec.get("name") or place)), power
+    return None, "", 0
 
 
 def damage_for(plan: dict, data, pool, pick: dict) -> Hit | None:
@@ -815,16 +849,19 @@ def damage_for(plan: dict, data, pool, pick: dict) -> Hit | None:
         hit.steps.append(Step("more", bucket, amount, running, group))
 
     why: list[str] = []
-    weapon, weapon_name = weapon_damage(plan, data)
+    weapon, weapon_name, item_power = weapon_damage(plan, data)
     if weapon is None:
         hit.low = hit.high = running
-        why.append("the pack records no weapon damage, so this is the skill's percentage of a weapon "
-                   "and not a damage number")
+        why.append("this is the skill's percentage of a weapon and not a damage number, because the plan "
+                   "has chosen no weapon to swing")
         states = [APPROXIMATE]
     else:
         hit.low, hit.high = running / 100.0 * weapon[0], running / 100.0 * weapon[1]
-        hit.steps.append(Step("more", f"{weapon_name}'s damage", weapon[1], hit.high))
-        states = [COUNTED]
+        hit.steps.append(Step("more", f"{weapon_name} at item power {item_power:,}", weapon[1], hit.high))
+        # ⚠ The base's damage only. What the weapon's own affixes add is not in
+        # this, and a person reading a damage number must not think it is.
+        why.append("the weapon's base damage at that item power; what its own affixes add is not counted here")
+        states = [APPROXIMATE]
 
     if sureness != COUNTED:
         why.append("the rank falls between the rows the pack records, so the damage is read across them")

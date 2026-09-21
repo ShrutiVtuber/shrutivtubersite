@@ -43,7 +43,11 @@ D4 = {
                     "affixes": {"type": "ids", "kind": "affix", "sub": "affix", "max": 4}, "greater": {"type": "ids", "kind": "affix", "sub": "affix", "max": 3},
                     "tempers": {"type": "ids", "kind": "affix", "sub": "tempering", "max": 2}, "gems": {"type": "ids", "kind": "gem", "max": 2},
                     "runes": {"type": "ids", "kind": "rune", "max": 2}, "runeword": {"type": "id", "kind": "runeword"},
-                    "masterwork": {"type": "int", "min": 0, "max": 12, "unit": "masterwork"}, "note": {"type": "text"}}},
+                    "masterwork": {"type": "int", "min": 0, "max": 12, "unit": "masterwork"},
+                    # ⚠ A weapon's damage is an item-power band in this game, so a
+                    # plan that wants a damage number has to say which power it means
+                    "item_power": {"type": "int", "min": 1, "max": 1000, "unit": "item power"},
+                    "note": {"type": "text"}}},
         {"id": "charms", "name": "Charms", "type": "picks", "kind": "charm", "by_class": True, "max": 12, "track": "check",
          "fields": {"note": {"type": "text"}}},
         {"id": "paragon", "name": "Paragon", "type": "picks", "kind": "board", "by_class": True, "max": 8, "track": "check",
