@@ -26,6 +26,12 @@ from .games import module_for
 from .model import APPROXIMATE, Contribution, NOT_COUNTED, Pool, worst
 from .vocabulary import GROUPS, grouped, stat
 
+def condition_name(module, condition: str) -> str:
+    """A game may name its common assumptions; anything else reads as its own words."""
+    named = dict(getattr(module, "CONDITION_NAMES", {}) or {})
+    return named.get(condition) or condition.replace("-", " ").strip().capitalize()
+
+
 # The kinds that carry stat lines worth counting. A skill's own damage is the
 # damage model's business (per game), not the pool's.
 STATTED = ("unique", "base", "affix", "aspect", "rune", "runeword", "gem", "jewel", "charm", "node", "glyph", "set", "flask", "tempering")
@@ -147,7 +153,7 @@ def chosen(plan: dict, data: GameData) -> Iterator[tuple[dict, dict]]:
 def pool_for(plan: dict, data: GameData) -> Pool:
     """Every contribution the plan makes. An empty pool means the game has no mapper yet."""
     game = plan.get("game", "")
-    pool = Pool(level=int(plan.get("level") or 1))
+    pool = Pool(level=int(plan.get("level") or 1), conditions=set(plan.get("conditions") or ()))
     module = module_for(game)
     if module is None:
         return pool
@@ -192,10 +198,26 @@ def sheet(plan: dict, data: GameData) -> dict:
         out_groups.append({"group": g, "rows": [rows[st.id] for st in stats_in]})
     uncounted = [c for sid in ids for c in pool.lines(sid) if c.state == NOT_COUNTED]
     damage = hits(plan, data, pool)
+    # ⚠ The assumptions are drawn FROM THE BUILD, not from a fixed list: a
+    # person is offered exactly the switches their own gear and nodes talk
+    # about, in the order of how much hangs on each. A panel of every
+    # assumption a game has would be unreadable and mostly irrelevant.
+    mentioned: dict[str, dict] = {}
+    for sid in ids:
+        for c in pool.lines(sid):
+            if not c.condition or c.state == NOT_COUNTED:
+                continue
+            row = mentioned.setdefault(c.condition, {"id": c.condition, "name": condition_name(module, c.condition),
+                                                     "held": c.condition in pool.conditions, "lines": 0, "stats": []})
+            row["lines"] += 1
+            if sid not in row["stats"]:
+                row["stats"].append(sid)
+    conditions = sorted(mentioned.values(), key=lambda r: (-r["lines"], r["id"]))
     return {
         "game": game, "level": pool.level, "supported": module is not None,
         "groups": out_groups,
         "damage": [h.as_dict() for h in damage],
+        "conditions": conditions,
         "state": worst([r["state"] for r in rows.values()]),
         "uncounted": {"lines": len(uncounted), "things": len({(c.source_kind, c.source_id) for c in uncounted})},
     }

@@ -131,6 +131,32 @@ def _clean_fields(spec: dict, raw: dict, chk: _Check, where: str, problems: list
     return out
 
 
+MAX_CONDITIONS = 80
+
+
+def held_conditions(raw: Any) -> list[str]:
+    """
+    The assumptions a plan makes, as a sorted list of ids. Accepts the shape a
+    page of switches sends ({id: true}) and the shape a file keeps (a list).
+
+    ⚠ Nothing is assumed by default. A number starts as what holds without
+    conditions and rises as a person says which are true — which is the
+    honest direction for it to move in.
+    """
+    if isinstance(raw, dict):
+        got = [k for k, v in raw.items() if v]
+    elif isinstance(raw, list):
+        got = raw
+    else:
+        return []
+    out: list[str] = []
+    for c in got:
+        s = slug(c, 120)
+        if s and s not in out:
+            out.append(s)
+    return sorted(out[:MAX_CONDITIONS])
+
+
 def gear_places(sec: dict, data: GameData, game: str, class_id: str) -> dict[str, str]:
     """
     The places a gear section offers, in order: {place id: slot id}. A slot
@@ -187,7 +213,8 @@ def clean_plan(raw: Any, data: GameData) -> tuple[dict, list[str]]:
         class_id = ""
     chk = _Check(data, game, class_id)
     plan: dict = {"game": game, "class_id": class_id, "level": _int(raw.get("level"), 1, MAX_LEVEL),
-                  "notes": _text(raw.get("notes"), MAX_NOTES), "sections": {}}
+                  "notes": _text(raw.get("notes"), MAX_NOTES), "conditions": held_conditions(raw.get("conditions")),
+                  "sections": {}}
     sections = raw.get("sections") if isinstance(raw.get("sections"), dict) else {}
     for sec in recipe["sections"]:
         sid, value = sec["id"], sections.get(sec["id"])

@@ -830,6 +830,39 @@ def superseded(line: dict) -> str:
     return "the item has several versions and the plan does not record which one"
 
 
+# ── a sentence with a condition on it ────────────────────────────────────────
+#
+# ⚠ `_STANDING` deliberately refuses a wildcard that would reach over a
+# condition, which is right — but it left every conditional line uncounted,
+# and there are more of those than of any other kind. They are not uncertain:
+# we know exactly what "40% increased Damage while you have Fortify" is
+# worth. What we do not know is whether Fortify is up. So the sentence is cut
+# in two — what it grants, and what it waits on — the head goes through the
+# ordinary patterns, and the tail becomes an assumption the plan may make.
+
+_CONDITIONAL = re.compile(r"\b(?:while|whilst|during|if|when|whenever|unless)\b")
+# words that carry no meaning in an assumption's name
+_EMPTY = ("while", "whilst", "during", "if", "when", "whenever", "unless",
+          "you", "your", "have", "has", "are", "is", "been", "be", "a", "an", "the")
+
+
+def condition_id(clause: str) -> str:
+    """`while you have Fortify` and `if you have Fortify` are one assumption."""
+    words = re.findall(r"[a-z]+", clause.lower())
+    while words and words[0] in _EMPTY:
+        words.pop(0)
+    return "-".join(words)[:120]
+
+
+def split_condition(shape: str) -> tuple[str, str]:
+    """A conditional sentence in two: what it grants, and the assumption it waits on."""
+    m = _CONDITIONAL.search(shape)
+    if not m or m.start() == 0:
+        return "", ""
+    head = shape[: m.start()].strip(" ,")
+    return (head, condition_id(shape[m.start():])) if head else ("", "")
+
+
 def map_line(line: dict, source: dict) -> list[Contribution]:
     """One of a record's stat lines, as contributions."""
     sentence = _wording(line)
@@ -840,6 +873,13 @@ def map_line(line: dict, source: dict) -> list[Contribution]:
                   source_name=source.get("name", ""), text=text, place=source.get("place", ""))
     shape = normalise(sentence)
     found = match(shape)
+    condition = ""
+    if found is None:
+        head, waits_on = split_condition(shape)
+        if head and waits_on:
+            again = match(head)
+            if again is not None:
+                found, condition = again, waits_on
     value, sureness = _number(line, sentence, span="# to #" in shape)
 
     held = (found is None or value is None or bool(superseded(line))
@@ -855,7 +895,8 @@ def map_line(line: dict, source: dict) -> list[Contribution]:
     # ⚠ Every `more` multiplier in this game applies on its own, so each gets
     # a bucket of its own: the pool adds only what shares one.
     bucket = ":".join((source.get("kind", ""), source.get("id", ""), common["place"], text)) if form == "more" else ""
-    return [Contribution(stat=s, form=form, value=sign * value, state=sureness, bucket=bucket, **common) for s in stats]
+    return [Contribution(stat=s, form=form, value=sign * value, state=sureness, bucket=bucket,
+                         condition=condition, **common) for s in stats]
 
 
 def _filed(shape: str) -> str:

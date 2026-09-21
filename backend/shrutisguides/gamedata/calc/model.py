@@ -60,6 +60,11 @@ class Contribution:
     # Without it the damage model cannot tell a bonus meant for this skill from
     # one meant for another, and every skill would get every bonus.
     param: str = ""
+    # ⚠ An assumption this line waits on — "while you have fortify". A line
+    # with one is NOT uncertainty: we know exactly what it is worth, we only
+    # do not know whether it is on. So it is held back until the plan says the
+    # assumption holds, and it never makes a total less trustworthy.
+    condition: str = ""
 
     def __post_init__(self) -> None:
         if self.form not in FORMS:
@@ -94,6 +99,8 @@ class Total:
     steps: list[Step] = field(default_factory=list)
     lines: list[Contribution] = field(default_factory=list)
     uncounted: list[Contribution] = field(default_factory=list)
+    # known quantities, waiting on an assumption the plan has not made
+    inactive: list[Contribution] = field(default_factory=list)
 
     @property
     def counted(self) -> bool:
@@ -102,7 +109,7 @@ class Total:
     def by_source(self) -> dict[str, list[Contribution]]:
         """The lines grouped the way the breakdown shows them: gear, tree, skills…"""
         out: dict[str, list[Contribution]] = {}
-        for c in self.lines + self.uncounted:
+        for c in self.lines + self.uncounted + self.inactive:
             out.setdefault(c.source_kind or "other", []).append(c)
         return out
 
@@ -112,6 +119,7 @@ class Total:
             "steps": [{"kind": s.kind, "label": s.label, "value": round(s.value, 4), "running": round(s.running, 4),
                        "lines": [_line(c) for c in s.lines]} for s in self.steps],
             "uncounted": [_line(c) for c in self.uncounted],
+            "inactive": [_line(c) | {"condition": c.condition} for c in self.inactive],
         }
 
 
@@ -131,8 +139,10 @@ class Pool:
     sums inside itself and multiplies against the others.
     """
 
-    def __init__(self, level: int = 1):
+    def __init__(self, level: int = 1, conditions: set[str] | None = None):
         self.level = max(1, int(level))
+        # the assumptions the plan has made; a line waiting on any other is held
+        self.conditions: set[str] = set(conditions or ())
         self._by_stat: dict[str, list[Contribution]] = {}
 
     def add(self, c: Contribution) -> None:
@@ -148,11 +158,20 @@ class Pool:
     def lines(self, stat: str) -> list[Contribution]:
         return list(self._by_stat.get(stat, ()))
 
+    def holds(self, c: Contribution) -> bool:
+        return not c.condition or c.condition in self.conditions
+
     def total(self, stat: str, base: float = 0.0, base_label: str = "base") -> Total:
-        counted = [c for c in self._by_stat.get(stat, ()) if c.state != NOT_COUNTED]
-        uncounted = [c for c in self._by_stat.get(stat, ()) if c.state == NOT_COUNTED]
-        t = Total(stat=stat, value=base, lines=counted, uncounted=uncounted,
-                  state=worst([c.state for c in self._by_stat.get(stat, ())]))
+        all_lines = self._by_stat.get(stat, ())
+        uncounted = [c for c in all_lines if c.state == NOT_COUNTED]
+        known = [c for c in all_lines if c.state != NOT_COUNTED]
+        counted = [c for c in known if self.holds(c)]
+        inactive = [c for c in known if not self.holds(c)]
+        # ⚠ An inactive line does NOT make the total less trustworthy: it is a
+        # known quantity the plan has not switched on. Only what we cannot
+        # compute with counts against the state.
+        t = Total(stat=stat, value=base, lines=counted, uncounted=uncounted, inactive=inactive,
+                  state=worst([c.state for c in counted + uncounted]))
         running = base
         if base:
             t.steps.append(Step("base", base_label, base, running))
