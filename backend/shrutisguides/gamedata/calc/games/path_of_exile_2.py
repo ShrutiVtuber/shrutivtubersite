@@ -1013,6 +1013,32 @@ def weapon_damage(plan: dict, data) -> tuple[tuple[float, float] | None, str]:
     return None, ""
 
 
+def minion_damage(data, skill: dict, level: int) -> tuple[tuple[float, float] | None, str, int, int]:
+    """
+    What the thing a gem summons hits for, at the level the gem is set to.
+
+    ⚠ A minion's level is TWICE the gem's — the game's own rule, recorded on
+    every row of the minion's table — so a gem at ten summons a minion of
+    twenty. A gem that summons several is answered with the first and says how
+    many others there are; adding them together would state a number nothing
+    in the game does.
+    """
+    ids = [i for i in (skill.get("minion_ids") or []) if isinstance(i, str)]
+    for index, minion_id in enumerate(ids):
+        minion = data.get(GAME, "minion", minion_id)
+        if not minion:
+            continue
+        rows = [r for r in (minion.get("per_level") or []) if isinstance(r, dict) and isinstance(r.get("level"), int)]
+        rows.sort(key=lambda r: r["level"])
+        at = [r for r in rows if r["level"] <= level] or rows[:1]
+        row = at[-1] if at else None
+        band = (row or {}).get("damage") if row else minion.get("damage")
+        if isinstance(band, list) and len(band) == 2 and all(isinstance(x, (int, float)) for x in band):
+            minion_level = int((row or {}).get("minion_level") or level * 2)
+            return (float(band[0]), float(band[1])), str(minion.get("name") or minion_id), minion_level, len(ids) - 1 - index
+    return None, "", 0, 0
+
+
 def damage_for(plan: dict, data, pool, pick: dict) -> Hit | None:
     """One gem's hit damage, aimed at the range the game's own tooltip shows."""
     skill = data.get(GAME, "skill", str(pick.get("id") or ""))
@@ -1045,6 +1071,20 @@ def damage_for(plan: dict, data, pool, pick: dict) -> Hit | None:
         # ⚠ The weapon's own affixes are not in this: only the base's damage is.
         sureness = APPROXIMATE
         note = note or "the weapon's base damage only; what its affixes add is not counted here"
+    elif skill.get("minion_ids"):
+        # ⚠ A summoning gem deals no damage itself; the thing it summons does.
+        # The minion's level is twice the gem's, which is the game's own rule
+        # and is recorded on every row — so the gem's level still drives it.
+        band, minion_name, minion_level, others = minion_damage(data, skill, level)
+        if band is None:
+            hit.state = NOT_COUNTED
+            hit.why = "this gem summons something the pack records no damage for"
+            return hit
+        low, high = band
+        hit.element = str((data.get(GAME, "minion", skill["minion_ids"][0]) or {}).get("damage_type") or "")
+        hit.steps.append(Step("base", f"{minion_name} at minion level {minion_level}", level, high, level_lines))
+        note = "a minion's own damage, not the gem's" + (f"; it summons {others + 1} and this is one" if others else "")
+        sureness = APPROXIMATE
     else:
         hit.state = NOT_COUNTED
         hit.why = "the pack records no damage for this gem — it may not deal any"

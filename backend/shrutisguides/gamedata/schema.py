@@ -55,7 +55,7 @@ CREATE TABLE IF NOT EXISTS source (game TEXT NOT NULL, facet TEXT NOT NULL, body
 KINDS = (
     "class", "specialization", "skill", "tree", "board", "tab", "node", "glyph",
     "slot", "itemtype", "base", "affix", "unique", "set", "runeword", "rune", "gem", "jewel", "charm", "flask",
-    "aspect", "tempering", "mercenary", "progression",
+    "aspect", "tempering", "mercenary", "progression", "minion",
 )
 
 # The kinds that sit in an equipment slot; only these get the slot column
@@ -67,6 +67,7 @@ SLOT_KINDS = ("base", "unique", "affix", "set", "runeword", "rune", "gem", "jewe
 FILES = {
     "classes.json": "class",
     "skills.json": "skill",
+    "minions.json": "minion",
     "tree.json": "tree",
     "tree-nodes.json": "node",
     "slots.json": "slot",
@@ -96,7 +97,10 @@ LINKS: dict[str, tuple[tuple[str, str, str], ...]] = {
     "slot": (("accepts", "accepts", "itemtype"),),
     "itemtype": (("slot_ids", "fits", "slot"), ("parent_ids", "is-a", "itemtype"), ("class_ids", "of", "class")),
     "specialization": (("class_ids", "of", "class"),),
-    "skill": (("prerequisites", "requires", "skill"), ("synergy_ids", "synergy", "skill"), ("class_ids", "of", "class")),
+    "skill": (("prerequisites", "requires", "skill"), ("synergy_ids", "synergy", "skill"), ("class_ids", "of", "class"),
+              ("minion_ids", "summons", "minion")),
+    # a minion's `summoned_by` is the same edge read backwards, so only the skill side is filed
+    "minion": (),
     # a skill's upgrades live inside its record (the planner picks them from there), so they are not linked
     "node": (("connections", "connects", "node"), ("board_id", "on", "board"), ("tree_id", "on", "tree"),
              ("ascendancy_id", "of", "specialization")),
