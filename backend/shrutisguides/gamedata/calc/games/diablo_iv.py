@@ -592,6 +592,14 @@ def tags_of(skill: dict) -> set[str]:
     Every category a skill belongs to: its own tags, and the tree cluster it
     sits in. The cluster is already among the tags in this pack; it is taken
     from `group` as well so a pack that stops writing it loses nothing.
+
+    ⚠ `core` and `primary-core` are TWO CATEGORIES and neither is short for the
+    other. `core` is the tree cluster — 43 skills. `primary-core` is the game's
+    own flag for what counts as a Core skill to an affix, and the pack writes
+    the affix to match: "+x% Ranks of Primary Core Skills". Ball Lightning
+    carries `mastery` and `primary-core` both — it sits in the Mastery cluster
+    and the game treats it as a Core skill — so folding one name into the other
+    would be wrong in both directions. They are matched exactly.
     """
     out = {_tag(t) for t in (skill.get("tags") or []) if t}
     out.add(_tag(str(skill.get("group") or "").replace(" ", "-")))
@@ -659,7 +667,7 @@ def effective_rank(skill: dict, ranks: int, pool) -> tuple[int, list[Contributio
     return int(rank), lines, 0
 
 
-def _banded(table: list[dict], key: str) -> list[dict]:
+def banded(table: list[dict], key: str) -> list[dict]:
     """
     A Diablo IV rank table in the shape the shared reader wants.
 
@@ -674,6 +682,22 @@ def _banded(table: list[dict], key: str) -> list[dict]:
         if isinstance(v, (int, float)) and not isinstance(v, bool):
             rows.append({"rank": r.get("rank"), "values": {key: [float(v), float(v)]}})
     return rows
+
+
+def bucket_name(bucket: str) -> str:
+    """
+    One multiplier group's name, with a category's two spellings folded into
+    one — see `_tag`.
+
+    ⚠ This is load-bearing arithmetic and not tidiness. Buckets ADD inside
+    themselves and MULTIPLY against each other, so a plan whose amulet says
+    `skill:lightning` and whose paragon node says `skill:skill-lightning` would
+    otherwise have its one category counted as two and multiplied together. The
+    mapper still writes both spellings, because a bucket's name is also what
+    the panel labels the step with and the pack's own word is the honest label
+    there; here, where the two are added up, they have to be one.
+    """
+    return f"skill:{_tag(bucket[len('skill:'):])}" if bucket.startswith("skill:") else bucket
 
 
 def bucket_applies(bucket: str, tags: set[str]) -> bool:
@@ -762,7 +786,7 @@ def damage_for(plan: dict, data, pool, pick: dict) -> Hit | None:
         hit.why = ("the pack records no per-rank table for this skill — its damage is a formula about "
                    "things the data does not carry, such as attack speed or what is equipped")
         return hit
-    table = _banded(skill.get("ranks_or_levels") or [], DAMAGE_KEY)
+    table = banded(skill.get("ranks_or_levels") or [], DAMAGE_KEY)
     if not table:
         hit.state = NOT_COUNTED
         hit.why = "the pack's rank table for this skill records no damage — it may not deal any"
@@ -781,7 +805,7 @@ def damage_for(plan: dict, data, pool, pick: dict) -> Hit | None:
             if c.form != "more" or c.state == NOT_COUNTED or not pool.holds(c):
                 continue
             if bucket_applies(c.bucket, tags):
-                applied.setdefault(c.bucket, []).append(c)
+                applied.setdefault(bucket_name(c.bucket), []).append(c)
             else:
                 left_out.append(c)
     running = percent
@@ -807,11 +831,22 @@ def damage_for(plan: dict, data, pool, pick: dict) -> Hit | None:
     if asked:
         why.append(f"the plan reaches rank {asked} and the pack caps this skill at {rank}, "
                    f"so the ranks past the cap are not counted")
-    standalone = sorted({c.bucket for c in left_out if c.bucket.startswith("× ")})
-    situational = sorted({c.bucket for c in left_out if not c.bucket.startswith("× ")})
+    # ⚠ Three different reasons a multiplier is not in the number, and the
+    # panel says which. A person who cannot see WHY a bonus they bought is
+    # missing will assume the whole number is wrong.
+    buckets = sorted({c.bucket for c in left_out})
+    standalone = [b for b in buckets if b.startswith("× ")]
+    categories = [b for b in buckets if b.startswith("skill:")]
+    unnamed = [b for b in buckets if b == "skill"]
+    situational = [b for b in buckets if b not in standalone + categories + unnamed]
     if situational:
-        why.append("left out because they are about the thing being hit or a state that must hold: "
-                   + ", ".join(situational))
+        why.append("left out, being about the thing hit or a state that must hold: " + ", ".join(situational))
+    if categories:
+        why.append("left out, naming a category this skill is not in: "
+                   + ", ".join(b[len("skill:"):] for b in categories))
+    if unnamed:
+        why.append("a damage bonus to one category of skills is left out, because the pack did not "
+                   "record which category")
     if standalone:
         why.append(f"{len(standalone)} standalone [x] multipliers are left out — each is filed under the "
                    "thing it came from, which does not say what it waits on")

@@ -18,12 +18,13 @@ from sqlalchemy import func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
-from shrutisguides import builds as shared
+from shrutisguides import buildfile, builds as shared
 from shrutisguides.builds import clean_categories, item_state, parse_list  # noqa: F401  (re-exported for callers and tests)
 from shrutisguides.gamedata import clean_plan, plan_goals, plan_summary, plan_to_categories
 from shrutisguides.gamedata.calc import sheet as compute_sheet
 
 from shruti.api.deps import get_session, require_admin
+from shruti.api.routes.accounts import _site_url
 from shruti.api.routes.gamedata import data as gamedata
 from shruti.api.routes.practice import _reader, _refuse_if_suspended
 from shruti.models import OverlayToken
@@ -261,6 +262,52 @@ async def _by_code(session: AsyncSession, code: str) -> Build:
     if b is None:
         raise HTTPException(404, "no build with that code")
     return b
+
+
+# ── a build as a file ───────────────────────────────────────────────────────
+#
+# A run already leaves as one JSON document; a build leaves the same way.
+# ⚠ Unlike a share, a file is the person's OWN copy and keeps the note they
+# wrote to themselves — see `shrutisguides.buildfile`.
+
+@router.get("/{build_id}/file")
+async def build_file(build_id: int, request: Request, session: AsyncSession = Depends(get_session)) -> dict:
+    """This build as a document: yours to keep, or to move to a server you run."""
+    b, _ = await _mine(session, request, build_id)
+    t = await session.get(BuildTemplate, b.template_id) if b.template_id else None
+    game = await session.get(Game, t.game_id if t else b.game_id) if (t or b.game_id) else None
+    return buildfile.to_file(
+        name=b.name, variant=b.variant,
+        game={"slug": game.slug, "name": game.name} if game else None,
+        plan=b.plan, categories=categories_of(t, b), goals=b.goals,
+        template=t.name if t else "", source=_site_url())
+
+
+class ImportIn(BaseModel):
+    file: dict = Field(default_factory=dict)
+    name: str = Field(default="", max_length=80)
+
+
+@router.post("/import", status_code=201)
+async def import_build(body: ImportIn, request: Request, session: AsyncSession = Depends(get_session)) -> dict:
+    """
+    A build file, read back. It arrives standing on its own categories rather
+    than on one of her templates, because the file may have come from another
+    server whose templates are not these.
+    """
+    user = await _reader(request, session)
+    await _refuse_if_suspended(session, user)
+    fields, problems = buildfile.read_file(body.file)
+    if not fields:
+        raise HTTPException(422, problems[0] if problems else "that file cannot be read")
+    game = await _game_row(session, fields["game_slug"], fields["game_name"] or fields["game_slug"]) if fields["game_slug"] else None
+    b = Build(user_id=user.id, template_id=None, game_id=game.id if game else None, run_id=None,
+              name=(body.name.strip() or fields["name"])[:80], variant=fields["variant"],
+              plan=fields["plan"], categories=fields["categories"], goals=fields["goals"])
+    session.add(b)
+    await session.commit()
+    await session.refresh(b)
+    return {**(await _build_view(session, b, with_sheet=True)), "problems": problems}
 
 
 @router.get("/shared/{code}")

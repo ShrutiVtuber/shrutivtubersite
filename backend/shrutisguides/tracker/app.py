@@ -32,7 +32,7 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Query
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from pydantic import BaseModel
 
-from shrutisguides import builds, engine, progress
+from shrutisguides import buildfile, builds, engine, progress
 from shrutisguides.format.validate import validate
 from shrutisguides.gamedata import KINDS, GameData, clean_plan, plan_goals, plan_summary, plan_to_categories, recipe_for
 from shrutisguides.gamedata.calc import sheet as compute_sheet
@@ -811,6 +811,48 @@ def gamedata_record(game: str, kind: str, id: str) -> dict:
     if r is None:
         raise HTTPException(404, "no such record")
     return {**r, "links": d.links(game, kind, id), "linked_from": d.links(game, kind, id, direction="in")}
+
+
+# ── a build as a file ───────────────────────────────────────────────────────
+#
+# ⚠ A file is the person's OWN copy and keeps the note they wrote to
+# themselves; a share is given away and does not.
+
+@app.get("/api/builds/{build_id}/file", dependencies=[Depends(owner)])
+def build_file(build_id: int) -> dict:
+    """This build as a document: yours to keep, or to carry to another server."""
+    con = db(); b = _build_row(con, build_id)
+    t = _template_view(_template_row(con, b["template_id"])) if b["template_id"] else None
+    game = t["game"] if t else {"slug": b["game_slug"], "name": b["game_name"]}
+    return buildfile.to_file(name=b["name"], variant=b["variant"], game=game,
+                             plan=json.loads(b["plan"] or "{}"), categories=_categories_of(con, b),
+                             goals=json.loads(b["goals"] or "{}"),
+                             template=t["name"] if t else "", source="this tracker")
+
+
+class ImportIn(BaseModel):
+    file: dict = {}
+    name: str = ""
+
+
+@app.post("/api/builds/import", status_code=201, dependencies=[Depends(owner)])
+def import_build(body: ImportIn) -> dict:
+    """
+    A build file, read back. It arrives standing on its own categories rather
+    than on a template, because the file may have come from a server whose
+    templates are not this one's.
+    """
+    fields, problems = buildfile.read_file(body.file)
+    if not fields:
+        raise HTTPException(422, problems[0] if problems else "that file cannot be read")
+    con = db()
+    cur = con.execute("INSERT INTO build (template_id, run_id, name, variant, goals, updated_at, game_slug, game_name, plan, categories) "
+                      "VALUES (NULL, NULL, ?, ?, ?, ?, ?, ?, ?, ?)",
+                      ((body.name.strip() or fields["name"])[:80], fields["variant"], json.dumps(fields["goals"]),
+                       _now().isoformat(), fields["game_slug"], fields["game_name"],
+                       json.dumps(fields["plan"]), json.dumps(fields["categories"])))
+    con.commit()
+    return {**_build_view(con, _build_row(con, cur.lastrowid), with_sheet=True), "problems": problems}
 
 
 # ── a build somebody else can read, and one pulled from the site ────────────

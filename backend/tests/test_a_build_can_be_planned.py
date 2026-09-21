@@ -166,3 +166,32 @@ def test_the_columns_and_their_migration_exist() -> None:
     for column in ("share_code", "shared_at", "forked_from_id"):
         assert f'sa.Column("{column}"' in migration
     assert 'unique=True' in migration, "two builds cannot hold one code"
+
+
+# ── a build as a file ───────────────────────────────────────────────────────
+
+def test_a_file_is_written_and_read_by_the_shared_package() -> None:
+    assert "buildfile.to_file(" in code_of(builds.build_file)
+    assert "buildfile.read_file(" in code_of(builds.import_build)
+    for name in ("_to_file", "_read_file", "FORMAT"):
+        assert not hasattr(builds, name), f"{name} is a local copy of the format"
+
+
+def test_a_file_keeps_your_own_words_and_a_share_does_not() -> None:
+    """⚠ The whole difference between the two: a file is yours, a share is given away."""
+    assert "public_goals(" not in code_of(builds.build_file), "your own file keeps your note"
+    assert "public_goals(" in code_of(builds._shared_view), "a shared one does not"
+    assert "goals=b.goals" in code_of(builds.build_file)
+
+
+def test_an_imported_build_stands_on_its_own_categories() -> None:
+    """A file may have come from another server, whose templates are not hers."""
+    body = code_of(builds.import_build)
+    assert "template_id=None" in body and 'categories=fields["categories"]' in body
+    assert "_refuse_if_suspended(" in body and "_reader(" in body
+    assert "run_id=None" in body, "a run here is not a run there"
+
+
+def test_the_import_route_comes_before_the_build_id_route() -> None:
+    source = inspect.getsource(builds)
+    assert source.index('@router.post("/import"') < source.index('@router.get("/{build_id}")')
