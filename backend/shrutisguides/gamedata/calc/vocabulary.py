@@ -1,0 +1,135 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+"""
+The stats a planner shows, named once for three games.
+
+Each game says its own thing — Diablo II's `defense`, Diablo IV's `armor` and
+Path of Exile 2's `armour` are one number to a person — so every pack's
+wording is mapped into the canonical names here, and the panel groups them
+the same way whichever game is open. A stat the vocabulary does not know is
+not dropped: it is carried with its own name, grouped under `other`, and the
+game's coverage note says how many there were.
+
+⚠ A cap is a fact about the game, not a judgement about a person. Nothing
+here scores anybody; `resistance-fire 68 of 75` is the same kind of sentence
+as `12 of 38 met`.
+"""
+from __future__ import annotations
+
+from dataclasses import dataclass
+
+ATTRIBUTE = "attribute"
+DEFENCE = "defence"
+OFFENCE = "offence"
+SPEED = "speed"
+SKILLS = "skills"
+UTILITY = "utility"
+OTHER = "other"
+
+# Panel order: what a character is, what keeps it alive, what it does, how
+# fast, its ranks, the rest, and last the stats the vocabulary does not know.
+GROUPS = (ATTRIBUTE, DEFENCE, OFFENCE, SPEED, SKILLS, UTILITY, OTHER)
+
+
+@dataclass(frozen=True, slots=True)
+class Stat:
+    id: str
+    name: str
+    group: str
+    unit: str = ""                 # "" a number · "%" a percentage · "s" seconds
+    cap: str = ""                  # the id of the stat that caps this one, if any
+    integer: bool = True
+
+
+def _s(id: str, name: str, group: str, unit: str = "", cap: str = "", integer: bool = True) -> tuple[str, Stat]:
+    return id, Stat(id, name, group, unit, cap, integer)
+
+
+STATS: dict[str, Stat] = dict([
+    # the four or five a character is made of
+    _s("strength", "Strength", ATTRIBUTE),
+    _s("dexterity", "Dexterity", ATTRIBUTE),
+    _s("intelligence", "Intelligence", ATTRIBUTE),
+    _s("vitality", "Vitality", ATTRIBUTE),
+    _s("energy", "Energy", ATTRIBUTE),
+    _s("willpower", "Willpower", ATTRIBUTE),
+    # what keeps a character alive
+    _s("life", "Maximum life", DEFENCE),
+    _s("mana", "Maximum mana", DEFENCE),
+    _s("energy-shield", "Energy shield", DEFENCE),
+    _s("armour", "Armour", DEFENCE),
+    _s("evasion", "Evasion", DEFENCE),
+    _s("block", "Block chance", DEFENCE, "%"),
+    _s("life-regeneration", "Life regeneration", DEFENCE),
+    _s("mana-regeneration", "Mana regeneration", DEFENCE),
+    _s("damage-reduction", "Damage reduction", DEFENCE, "%"),
+    _s("life-leech", "Life leech", DEFENCE, "%", integer=False),
+    _s("mana-leech", "Mana leech", DEFENCE, "%", integer=False),
+    # resistances, each against its own cap
+    _s("resistance-fire", "Fire resistance", DEFENCE, "%", cap="resistance-fire-max"),
+    _s("resistance-cold", "Cold resistance", DEFENCE, "%", cap="resistance-cold-max"),
+    _s("resistance-lightning", "Lightning resistance", DEFENCE, "%", cap="resistance-lightning-max"),
+    _s("resistance-poison", "Poison resistance", DEFENCE, "%", cap="resistance-poison-max"),
+    _s("resistance-chaos", "Chaos resistance", DEFENCE, "%", cap="resistance-chaos-max"),
+    _s("resistance-magic", "Magic resistance", DEFENCE, "%", cap="resistance-magic-max"),
+    _s("resistance-fire-max", "Fire resistance cap", DEFENCE, "%"),
+    _s("resistance-cold-max", "Cold resistance cap", DEFENCE, "%"),
+    _s("resistance-lightning-max", "Lightning resistance cap", DEFENCE, "%"),
+    _s("resistance-poison-max", "Poison resistance cap", DEFENCE, "%"),
+    _s("resistance-chaos-max", "Chaos resistance cap", DEFENCE, "%"),
+    _s("resistance-magic-max", "Magic resistance cap", DEFENCE, "%"),
+    # what it does to things
+    _s("damage", "Damage", OFFENCE),
+    _s("damage-min", "Minimum damage", OFFENCE),
+    _s("damage-max", "Maximum damage", OFFENCE),
+    _s("damage-physical", "Physical damage", OFFENCE),
+    _s("damage-fire", "Fire damage", OFFENCE),
+    _s("damage-cold", "Cold damage", OFFENCE),
+    _s("damage-lightning", "Lightning damage", OFFENCE),
+    _s("damage-poison", "Poison damage", OFFENCE),
+    _s("damage-chaos", "Chaos damage", OFFENCE),
+    _s("damage-magic", "Magic damage", OFFENCE),
+    _s("attack-rating", "Attack rating", OFFENCE),
+    _s("critical-chance", "Critical strike chance", OFFENCE, "%", integer=False),
+    _s("critical-damage", "Critical strike damage", OFFENCE, "%"),
+    _s("penetration-fire", "Enemy fire resistance", OFFENCE, "%"),
+    _s("penetration-cold", "Enemy cold resistance", OFFENCE, "%"),
+    _s("penetration-lightning", "Enemy lightning resistance", OFFENCE, "%"),
+    _s("penetration-poison", "Enemy poison resistance", OFFENCE, "%"),
+    _s("penetration-magic", "Enemy magic resistance", OFFENCE, "%"),
+    # how fast
+    _s("speed-attack", "Attack speed", SPEED, "%"),
+    _s("speed-cast", "Cast speed", SPEED, "%"),
+    _s("speed-recovery", "Hit recovery", SPEED, "%"),
+    _s("speed-block", "Block rate", SPEED, "%"),
+    _s("speed-movement", "Movement speed", SPEED, "%"),
+    _s("cooldown-reduction", "Cooldown reduction", SPEED, "%"),
+    _s("resource-cost-reduction", "Resource cost reduction", SPEED, "%"),
+    # ranks
+    _s("skills-all", "All skills", SKILLS),
+    _s("skills-class", "Class skills", SKILLS),
+    _s("skills-tab", "Skill tab", SKILLS),
+    _s("skills-single", "Single skill", SKILLS),
+    # the rest
+    _s("magic-find", "Magic find", UTILITY, "%"),
+    _s("gold-find", "Gold find", UTILITY, "%"),
+    _s("light-radius", "Light radius", UTILITY),
+    _s("sockets", "Sockets", UTILITY),
+])
+
+
+def stat(id: str) -> Stat:
+    """The canonical stat, or one invented from the id so an unknown line still has a name and a group."""
+    known = STATS.get(id)
+    if known:
+        return known
+    return Stat(id, id.replace("-", " ").strip().capitalize(), OTHER, "%" if id.endswith(("-percent", "-pct")) else "")
+
+
+def grouped(ids: list[str]) -> list[tuple[str, list[Stat]]]:
+    """The stats in panel order, grouped, for a page to draw."""
+    out: list[tuple[str, list[Stat]]] = []
+    for g in GROUPS:
+        in_group = [stat(i) for i in ids if stat(i).group == g]
+        if in_group:
+            out.append((g, in_group))
+    return out

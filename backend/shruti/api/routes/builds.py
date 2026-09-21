@@ -21,6 +21,7 @@ from sqlmodel import select
 from shrutisguides import builds as shared
 from shrutisguides.builds import clean_categories, item_state, parse_list  # noqa: F401  (re-exported for callers and tests)
 from shrutisguides.gamedata import clean_plan, plan_goals, plan_summary, plan_to_categories
+from shrutisguides.gamedata.calc import sheet as compute_sheet
 
 from shruti.api.deps import get_session, require_admin
 from shruti.api.routes.gamedata import data as gamedata
@@ -64,7 +65,7 @@ def _planned_template(b: Build, game: Game | None) -> dict:
             "categories": b.categories or []}
 
 
-async def _build_view(session: AsyncSession, b: Build) -> dict:
+async def _build_view(session: AsyncSession, b: Build, with_sheet: bool = False) -> dict:
     t = await session.get(BuildTemplate, b.template_id) if b.template_id else None
     game = await session.get(Game, t.game_id if t else b.game_id) if (t or b.game_id) else None
     view = {"id": b.id, "name": b.name, "variant": b.variant, "runId": b.run_id,
@@ -75,6 +76,11 @@ async def _build_view(session: AsyncSession, b: Build) -> dict:
     if b.plan:
         view["plan"] = b.plan
         view["planned"] = plan_summary(b.plan, gamedata())
+        if with_sheet:
+            # What the plan comes to. Off the list on purpose: a sheet walks
+            # every chosen record, and a page showing twenty builds wants
+            # twenty names, not twenty pools.
+            view["sheet"] = compute_sheet(b.plan, gamedata())
     return view
 
 
@@ -239,6 +245,27 @@ def _planned(raw_plan: dict, game_slug: str) -> tuple[dict, list, list[str]]:
     return plan, cats, problems
 
 
+class SheetIn(BaseModel):
+    """A plan to add up, saved or not — the planner asks as the person chooses."""
+    game: str = Field(min_length=1, max_length=80)
+    plan: dict = Field(default_factory=dict)
+
+
+@router.post("/sheet")
+async def plan_sheet(body: SheetIn) -> dict:
+    """
+    What a plan comes to: every stat it grants, each with the lines that made
+    it and how far it is to be trusted. Reads the game data and nothing about
+    anybody, so it needs no account — the planner calls it on every change.
+    """
+    d = gamedata()
+    slug = shared.ident(body.game, "game")
+    plan, problems = clean_plan({**body.plan, "game": slug}, d)
+    if not plan:
+        raise HTTPException(422, problems[0] if problems else "that plan cannot be read")
+    return {"plan": plan, "problems": problems, "summary": plan_summary(plan, d), "sheet": compute_sheet(plan, d)}
+
+
 @router.post("/plan", status_code=201)
 async def create_planned_build(body: PlanIn, request: Request, session: AsyncSession = Depends(get_session)) -> dict:
     """A build from a plan: no template, the game's data instead. Answers with the build and what the plan could not keep."""
@@ -258,7 +285,7 @@ async def create_planned_build(body: PlanIn, request: Request, session: AsyncSes
     session.add(b)
     await session.commit()
     await session.refresh(b)
-    return {**(await _build_view(session, b)), "problems": problems}
+    return {**(await _build_view(session, b, with_sheet=True)), "problems": problems}
 
 
 @router.put("/{build_id}/plan")
@@ -277,13 +304,13 @@ async def replan(build_id: int, body: RePlanIn, request: Request, session: Async
     b.updated_at = datetime.now(timezone.utc)
     await session.commit()
     await session.refresh(b)
-    return {**(await _build_view(session, b)), "problems": problems}
+    return {**(await _build_view(session, b, with_sheet=True)), "problems": problems}
 
 
 @router.get("/{build_id}")
 async def one(build_id: int, request: Request, session: AsyncSession = Depends(get_session)) -> dict:
     b, _ = await _mine(session, request, build_id)
-    return await _build_view(session, b)
+    return await _build_view(session, b, with_sheet=True)
 
 
 class BuildPatch(BaseModel):

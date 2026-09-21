@@ -40,7 +40,14 @@ def test_the_site_delegates_planning_to_the_shared_package() -> None:
 
 def test_the_plan_routes_come_before_the_build_id_route() -> None:
     source = inspect.getsource(builds)
-    assert source.index('@router.post("/plan"') < source.index('@router.get("/{build_id}")'), "/plan would otherwise be read as a build id"
+    for path in ('@router.post("/plan"', '@router.post("/sheet"'):
+        assert source.index(path) < source.index('@router.get("/{build_id}")'), f"{path} would otherwise be read as a build id"
+
+
+def test_a_sheet_is_computed_by_the_shared_package_and_kept_off_the_list() -> None:
+    assert "compute_sheet(" in code_of(builds.plan_sheet) and "compute_sheet(" in code_of(builds._build_view)
+    assert "with_sheet" in code_of(builds.one) and "with_sheet=True" in code_of(builds.create_planned_build)
+    assert "with_sheet" not in code_of(builds.my_builds), "a page of twenty builds does not walk twenty pools"
 
 
 def test_a_planned_build_stands_on_no_template() -> None:

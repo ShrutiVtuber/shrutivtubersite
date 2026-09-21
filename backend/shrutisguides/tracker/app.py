@@ -35,6 +35,7 @@ from pydantic import BaseModel
 from shrutisguides import builds, engine, progress
 from shrutisguides.format.validate import validate
 from shrutisguides.gamedata import KINDS, GameData, clean_plan, plan_goals, plan_summary, plan_to_categories, recipe_for
+from shrutisguides.gamedata.calc import sheet as compute_sheet
 
 VERSION = "0.1.0"
 SITE = os.environ.get("SHRUTI_SITE_URL", "https://shrutivtuber.com").rstrip("/")
@@ -561,7 +562,7 @@ def _categories_of(con: sqlite3.Connection, b: sqlite3.Row) -> list:
     return _template_view(_template_row(con, b["template_id"]))["categories"]
 
 
-def _build_view(con: sqlite3.Connection, b: sqlite3.Row) -> dict:
+def _build_view(con: sqlite3.Connection, b: sqlite3.Row, with_sheet: bool = False) -> dict:
     if b["template_id"]:
         t = _template_view(_template_row(con, b["template_id"]))
     else:
@@ -577,6 +578,9 @@ def _build_view(con: sqlite3.Connection, b: sqlite3.Row) -> dict:
     if plan:
         view["plan"] = plan
         view["planned"] = plan_summary(plan, gamedata())
+        if with_sheet:
+            # off the list on purpose: a sheet walks every chosen record
+            view["sheet"] = compute_sheet(plan, gamedata())
     return view
 
 
@@ -799,6 +803,22 @@ def gamedata_record(game: str, kind: str, id: str) -> dict:
     return {**r, "links": d.links(game, kind, id), "linked_from": d.links(game, kind, id, direction="in")}
 
 
+class SheetIn(BaseModel):
+    game: str
+    plan: dict = {}
+
+
+@app.post("/api/builds/sheet")
+def plan_sheet(body: SheetIn) -> dict:
+    """What a plan comes to, saved or not. Reads the game data and nothing about anybody."""
+    d = gamedata()
+    slug = builds.ident(body.game, "game")
+    plan, problems = clean_plan({**body.plan, "game": slug}, d)
+    if not plan:
+        raise HTTPException(422, problems[0] if problems else "that plan cannot be read")
+    return {"plan": plan, "problems": problems, "summary": plan_summary(plan, d), "sheet": compute_sheet(plan, d)}
+
+
 class PlanIn(BaseModel):
     game: str
     name: str
@@ -839,7 +859,7 @@ def create_planned_build(body: PlanIn) -> dict:
                       (run_id, name, variant, json.dumps(plan_goals(cats)), _now().isoformat(), slug, str(pack.get("name") or body.game)[:80],
                        json.dumps(plan), json.dumps(cats)))
     con.commit()
-    return {**_build_view(con, _build_row(con, cur.lastrowid)), "problems": problems}
+    return {**_build_view(con, _build_row(con, cur.lastrowid), with_sheet=True), "problems": problems}
 
 
 @app.put("/api/builds/{build_id}/plan", dependencies=[Depends(owner)])
@@ -855,13 +875,13 @@ def replan_build(build_id: int, body: RePlanIn) -> dict:
     con.execute("UPDATE build SET plan = ?, categories = ?, goals = ?, updated_at = ? WHERE id = ?",
                 (json.dumps(plan), json.dumps(cats), json.dumps(goals), _now().isoformat(), build_id))
     con.commit()
-    return {**_build_view(con, _build_row(con, build_id)), "problems": problems}
+    return {**_build_view(con, _build_row(con, build_id), with_sheet=True), "problems": problems}
 
 
 @app.get("/api/builds/{build_id}", dependencies=[Depends(owner)])
 def one_build(build_id: int) -> dict:
     con = db()
-    return _build_view(con, _build_row(con, build_id))
+    return _build_view(con, _build_row(con, build_id), with_sheet=True)
 
 
 class BuildPatch(BaseModel):
