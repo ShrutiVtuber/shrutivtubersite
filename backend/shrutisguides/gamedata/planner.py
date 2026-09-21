@@ -348,17 +348,18 @@ def plan_to_categories(plan: dict, data: GameData) -> list[dict]:
 
 def plan_goals(categories: list[dict], goals: Any = None) -> dict:
     """
-    Every slot's hint written in as its target, so the overlay and the phone
-    show the planned item before the person has said a word. Goals already
-    set keep their words and their state; goals for items the re-plan
-    dropped are let go.
+    Every planned item's detail written in as its target — the slot's item,
+    the skill's ranks and upgrades, the gem's supports — so the overlay's
+    next goals and the phone's rows show the plan before the person has
+    said a word. Goals already set keep their words and their state; goals
+    for items the re-plan dropped are let go.
     """
     out: dict = {}
     old = goals if isinstance(goals, dict) else {}
     for c in categories:
         for it in c.get("items", []):
             g = dict(old.get(it["id"]) or {}) if isinstance(old.get(it["id"]), dict) else {}
-            if it["kind"] == "slot" and it.get("hint") and not g.get("target"):
+            if it.get("hint") and not g.get("target"):
                 g["target"] = it["hint"]
             if g:
                 out[it["id"]] = g
