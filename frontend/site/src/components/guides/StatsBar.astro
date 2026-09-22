@@ -1,0 +1,77 @@
+---
+/* The numbers (README-planners §6): a sticky bar across the top of every
+ * planning surface, and of the build page afterwards.
+ *
+ * A few headline rows always; the rest on open, as dotted-leader indices in
+ * groups that DIFFER PER GAME — so they render from the sheet, never from a
+ * fixed set. It is the reason to plan here rather than in a notes app.
+ *
+ * ⚠ The three honesty states are typographic and share nothing with the
+ * state dot's four shapes, so "approximate" can never be misread as "partly
+ * met": ≈ is approximate, † is not counted, and counted looks like nothing
+ * at all. The key sits at the foot of the bar, always.
+ */
+import { copy } from "../../lib/copy";
+
+interface Props {
+  headline?: string[];
+  class?: string;
+}
+const { headline = ["life", "armour", "resistance-fire", "critical-chance", "damage", "skill-points"], class: klass = "" } = Astro.props;
+const say = await copy("component:stats");
+---
+
+<div class:list={["sb", klass]} data-stats data-headline={JSON.stringify(headline)} hidden>
+  <div class="sb-row" data-sb-headline></div>
+  <div class="sb-assume gd-mono" data-sb-assume hidden></div>
+  <div class="sb-open" data-sb-groups hidden></div>
+  <p class="sb-key gd-hint">
+    <span><sup class="gd-mono">≈</sup> {say("key.approximate", "approximate — something known is missing")}</span>
+    <span><sup class="gd-mono">†</sup> {say("key.uncounted", "not counted — the line is in the breakdown, out of the total")}</span>
+  </p>
+</div>
+
+<style is:global>
+  .sb { position: sticky; top: 0; z-index: 20; display: grid; gap: 8px;
+    padding: 10px clamp(16px, 4vw, 40px); margin: 0 calc(-1 * clamp(16px, 4vw, 40px));
+    background: var(--surface-page); border-bottom: 1px solid var(--line-strong); }
+  .sb[hidden] { display: none; }
+  .sb-row { display: flex; gap: 10px; overflow-x: auto; scrollbar-width: none; }
+  .sb-row::-webkit-scrollbar { display: none; }
+  .sb-stat { flex: none; display: grid; gap: 2px; text-align: left; padding: 6px 12px; cursor: pointer;
+    border: 1px solid transparent; border-radius: 4px; background: none; color: inherit; font: inherit; }
+  .sb-stat:hover { background: var(--surface-veil); }
+  .sb-stat[aria-expanded="true"] { border-color: var(--accent); background: var(--accent-wash); }
+  .sb-stat .sb-name { font-family: var(--font-body); font-size: 10px; font-weight: 600; letter-spacing: .12em;
+    text-transform: uppercase; color: var(--ink-faint); white-space: nowrap; }
+  .sb-stat .sb-figure { font-family: var(--font-mono); font-size: 16px; font-variant-numeric: tabular-nums; color: var(--ink); }
+  .sb-stat[data-state="not-counted"] .sb-figure, .sb-stat[data-state="not-counted"] .sb-name { color: var(--ink-faint); }
+  .sb-figure sup { font-family: var(--font-mono); font-size: 10px; color: var(--ink-faint); }
+  .sb-assume { font-size: 11px; color: var(--ink-faint); }
+  .sb-open { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px 24px; padding-top: 4px; }
+  .sb-group { display: grid; gap: 2px; align-content: start; }
+  .sb-group > p { margin: 0; }
+  .sb-line { display: flex; align-items: baseline; gap: 8px; font-size: 13px; padding: 3px 0; }
+  .sb-line .sb-lead { flex: 1; border-bottom: 1px dotted var(--line-strong); transform: translateY(-4px); }
+  .sb-line .sb-val { font-family: var(--font-mono); font-size: 14px; font-variant-numeric: tabular-nums; }
+  .sb-line .sb-cap { font-family: var(--font-mono); font-size: 11px; color: var(--ink-faint); }
+  .sb-line[data-state="not-counted"] { color: var(--ink-faint); }
+  .sb-key { display: flex; gap: 16px; flex-wrap: wrap; font-size: 11px; }
+  .sb-key sup { font-family: var(--font-mono); }
+
+  /* the breakdown: a popover under the number it explains */
+  .sb-pop { position: absolute; z-index: 25; width: min(420px, calc(100vw - 32px)); max-height: 420px; overflow-y: auto;
+    display: grid; gap: 10px; padding: 16px; background: var(--surface-page); border: 1px solid var(--line-strong);
+    border-radius: 4px; box-shadow: var(--shadow-3); }
+  @media (max-width: 900px) { .sb-pop { max-height: 50vh; } }
+  .sb-pop-head { display: grid; gap: 2px; }
+  .sb-pop-head .sb-figure { font-size: 28px; }
+  .sb-why { padding-left: 10px; border-left: 3px solid var(--line-strong); font-size: 13px; color: var(--ink-soft); }
+  .sb-step { display: grid; gap: 2px; }
+  .sb-step-head { display: flex; align-items: baseline; gap: 8px; font-size: 12px; font-weight: 600; }
+  .sb-step-head .sb-lead { flex: 1; border-bottom: 1px dotted var(--line-strong); transform: translateY(-4px); }
+  .sb-src { display: flex; align-items: baseline; gap: 8px; font-size: 12px; padding: 2px 0 2px 12px; color: var(--ink-soft); }
+  .sb-src .sb-val { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+  .sb-src[data-out="yes"] { color: var(--ink-faint); text-decoration: line-through; }
+  .sb-foot { display: flex; align-items: baseline; gap: 8px; padding-top: 8px; border-top: 1px solid var(--line-strong); font-size: 13px; }
+</style>

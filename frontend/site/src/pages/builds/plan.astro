@@ -18,6 +18,7 @@ import Head from "../../components/guides/Head.astro";
 import Console from "../../components/guides/Console.astro";
 import Empty from "../../components/guides/Empty.astro";
 import Icon from "../../components/guides/Icon.astro";
+import StatsBar from "../../components/guides/StatsBar.astro";
 import Button from "../../components/forms/Button.astro";
 import { site } from "../../lib/api";
 import { account } from "../../lib/account";
@@ -172,6 +173,8 @@ const WORDS = {
         </ul>
       </section>
     )}
+
+    {pack && step === "section" && klass && <StatsBar />}
 
     {pack && step === "section" && klass && recipe && (
       <div class="pl-work" data-work data-class={klass.id}>
@@ -377,6 +380,7 @@ const WORDS = {
 <script>
   import { MARKS } from "../../lib/marks";
   import { slotMark, kindMark } from "../../lib/planner";
+  import { drawAssumptions, drawBreakdown, drawGroups, drawHeadline, rowsOf } from "../../lib/statsbar";
 
   type Field = { type: string; kind?: string; sub?: string | string[]; max?: number; min?: number; unit?: string; options?: string[]; list?: string };
   type Section = { id: string; name: string; type: string; kind?: string; sub?: string | string[]; by_class?: boolean;
@@ -705,6 +709,68 @@ const WORDS = {
 
     /* ── the plan, everywhere it shows ────────────────────────────────── */
 
+    /* ── the numbers, as the choosing moves them ──────────────────────── */
+
+    const bar = document.querySelector<HTMLElement>("[data-stats]");
+    let sheetAsked: number | undefined;
+    let lastSheet: any = null;
+
+    function askForNumbers() {
+      if (!bar) return;
+      window.clearTimeout(sheetAsked);
+      /* ⚠ debounced: a person typing a number must not send a request a
+         keystroke, and the bar showing a figure one edit stale is worse than
+         it arriving a moment later */
+      sheetAsked = window.setTimeout(async () => {
+        const said = await post("/api/builds/sheet", { game, plan: planBody() });
+        if (!said?.sheet) return;
+        lastSheet = said.sheet;
+        drawBar(said.sheet);
+      }, 400);
+    }
+
+    function drawBar(sheet: any) {
+      if (!bar) return;
+      const wanted = JSON.parse(bar.dataset.headline || "[]") as string[];
+      /* ⚠ A bar with no headline number is worse than no bar: it is a rule
+         with a key under it and nothing to read. A plan whose only rows are
+         caps has nothing to say yet. */
+      const headline = drawHeadline(sheet, wanted);
+      bar.hidden = !headline;
+      if (!headline) return;
+      bar.querySelector("[data-sb-headline]")!.innerHTML = headline;
+      const assume = bar.querySelector<HTMLElement>("[data-sb-assume]")!;
+      const said = drawAssumptions(sheet);
+      assume.hidden = !said;
+      assume.textContent = said;
+      const groups = bar.querySelector<HTMLElement>("[data-sb-groups]")!;
+      if (!groups.hidden) groups.innerHTML = drawGroups(sheet);
+    }
+
+    bar?.addEventListener("click", (e) => {
+      const stat = (e.target as HTMLElement).closest<HTMLElement>("[data-stat]");
+      bar.querySelectorAll(".sb-pop").forEach((p) => p.remove());
+      if (!stat || !lastSheet) return;
+      const open = stat.getAttribute("aria-expanded") === "true";
+      bar.querySelectorAll("[data-stat]").forEach((b) => b.setAttribute("aria-expanded", "false"));
+      const groups = bar.querySelector<HTMLElement>("[data-sb-groups]")!;
+      if (open) { groups.hidden = true; return; }
+      stat.setAttribute("aria-expanded", "true");
+      groups.hidden = false;
+      groups.innerHTML = drawGroups(lastSheet);
+      const row = rowsOf(lastSheet)[stat.dataset.stat!];
+      if (!row) return;
+      stat.insertAdjacentHTML("afterend", drawBreakdown(row));
+      const pop = bar.querySelector<HTMLElement>(".sb-pop");
+      if (pop) {
+        /* ⚠ the last stats anchor right, so the popover never leaves the page */
+        const past = stat.getBoundingClientRect().left > window.innerWidth / 2;
+        pop.style.left = past ? "auto" : `${stat.offsetLeft}px`;
+        pop.style.right = past ? `${bar.clientWidth - stat.offsetLeft - stat.offsetWidth}px` : "auto";
+        pop.style.top = `${stat.offsetTop + stat.offsetHeight + 6}px`;
+      }
+    });
+
     function paint() {
       let choices = 0;
       const lines: string[] = [];
@@ -737,6 +803,7 @@ const WORDS = {
       const doneEl = work.querySelector<HTMLElement>("[data-done]");
       if (doneEl) doneEl.textContent = `${done} of ${recipe.sections.length} done`;
       if (current) panelCount.textContent = chosenCount(current) ? `${chosenCount(current)} chosen` : "";
+      askForNumbers();
     }
 
     /* ── the review, and starting the build ──────────────────────────── */
