@@ -1,0 +1,96 @@
+---
+/* Admin · Game data (README-planners §2.10): what is loaded, as an almanac
+ * index per game, with the problems noted at load as console rows at the
+ * foot — three rows of real trouble read better than a status table with
+ * three green ticks.
+ *
+ * ⚠ The data is served, never in the repository. Each game arrives as its
+ * own load with a patch, a season and the date it was gathered, and every
+ * planner page states that line.
+ */
+import AdminLayout from "../../layouts/AdminLayout.astro";
+import { site } from "../../lib/api";
+
+type Pack = {
+  id: string; name: string; patch: string; season: string; researched_at: string;
+  level_cap: number | null; counts: Record<string, number>; problems: number; planner: boolean;
+};
+const packs = (await site<Pack[]>("/api/gamedata/games")) || [];
+const games: Pack[] = Array.isArray(packs) ? packs : [];
+const total = games.reduce((sum, g) => sum + Object.values(g.counts || {}).reduce((a, b) => a + b, 0), 0);
+const problems = games.reduce((sum, g) => sum + (g.problems || 0), 0);
+const short = (v: string) => String(v || "").split(" (")[0].split(";")[0].trim();
+const NAMES: Record<string, string> = {
+  class: "classes", specialization: "specializations", skill: "skills", board: "paragon boards", node: "nodes",
+  glyph: "glyphs", tab: "skill tabs", slot: "slots", itemtype: "item types", base: "bases", affix: "affixes",
+  aspect: "aspects", tempering: "tempering manuals", unique: "uniques", set: "sets", runeword: "runewords",
+  rune: "runes", gem: "gems", jewel: "jewels", charm: "charms", flask: "flasks", minion: "minions",
+  mercenary: "mercenaries", progression: "progression", tree: "trees",
+};
+const named = (kind: string) => NAMES[kind] || kind;
+---
+
+<AdminLayout title="Game data">
+  <section class="adm-card gd-data">
+    <header>
+      <h1>Game data</h1>
+      <p class="lede">
+        What is loaded: {games.length} game{games.length === 1 ? "" : "s"} · {total.toLocaleString("en-GB")} records ·
+        {problems === 0 ? "no problems" : `${problems} problem${problems === 1 ? "" : "s"}`}
+      </p>
+    </header>
+
+    {games.length === 0 && (
+      <p class="none">No game's data is loaded. It arrives as its own file, served from the volume — see
+        <code>scripts/sync-gamedata.sh</code>.</p>
+    )}
+
+    {games.map((g) => {
+      const counts = Object.entries(g.counts || {}).sort((a, b) => b[1] - a[1]);
+      const records = counts.reduce((sum, [, n]) => sum + n, 0);
+      return (
+        <article class="game">
+          <div class="game-head">
+            <span class="dot" data-ok={g.problems === 0}></span>
+            <h2>{g.name}</h2>
+            <span class="mono">{short(g.patch)} · {short(g.season)}</span>
+          </div>
+          <div class="index">
+            {counts.map(([kind, n]) => (
+              <div class="row">
+                <span>{named(kind)}</span><span class="lead" aria-hidden="true"></span>
+                <span class="mono">{n.toLocaleString("en-GB")}</span>
+              </div>
+            ))}
+          </div>
+          <p class="mono foot">
+            {records.toLocaleString("en-GB")} records · gathered {g.researched_at} ·
+            {g.problems === 0 ? " no problems" : ` ${g.problems} problem${g.problems === 1 ? "" : "s"} noted at load`}
+            {g.planner ? "" : " · no planner for this game yet"}
+          </p>
+        </article>
+      );
+    })}
+
+    <p class="closing">The data is served, never in the repository. Each game arrives as its own load with a
+      patch, a season and the date it was gathered; the planner pages state that line. Nothing here is copied
+      from a wiki or a guide site, and no art, icon, font or screenshot is held.</p>
+  </section>
+</AdminLayout>
+
+<style>
+  .gd-data { display: grid; gap: 20px; }
+  .lede { margin: 4px 0 0; color: var(--ink-soft); }
+  .none { color: var(--ink-soft); }
+  .game { display: grid; gap: 8px; padding-top: 16px; border-top: 1px solid var(--line-strong); }
+  .game-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  .game-head h2 { margin: 0; font-size: 20px; }
+  .dot { width: 9px; height: 9px; border-radius: 999px; background: var(--ink-faint); align-self: center; }
+  .dot[data-ok="true"] { background: var(--rose); }
+  .index { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0 24px; }
+  .row { display: flex; align-items: baseline; gap: 8px; padding: 3px 0; font-size: 14px; }
+  .lead { flex: 1; border-bottom: 1px dotted var(--line-strong); transform: translateY(-4px); }
+  .mono { font-family: var(--font-mono); font-size: 12px; font-variant-numeric: tabular-nums; color: var(--ink-soft); }
+  .foot { color: var(--ink-faint); }
+  .closing { max-width: 66ch; color: var(--ink-soft); font-size: 14px; }
+</style>
