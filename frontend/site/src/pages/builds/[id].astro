@@ -46,6 +46,16 @@ const gridName = gridCat ? (cats.find((c) => c.id === gridCat.id)?.name ?? gridC
 const runName = runs.find((r) => r.id === view.runId)?.name ?? "";
 const firstOpenCat = cats.find((c) => c.items.some((it) => it.state !== "met")) ?? cats[0];
 const eyebrow = [view.template?.game?.name, view.variant, view.template?.name].filter(Boolean).join(" · ");
+/* ⚠ A planned build gains exactly two things on this page: one mono line in
+ * the head, and The plan as the last tab. Nothing else here moves. */
+const planned = (view as any).planned as
+  | { gameName: string; patch: string; season: string; className: string; choices: number;
+      sections: { id: string; name: string; lines: { id: string; label: string; detail: string }[] }[] }
+  | undefined;
+const shortly = (v: string) => String(v || "").split(" (")[0].split(";")[0].trim();
+const planLine = planned
+  ? [say("plan.on", "on a plan"), planned.gameName, shortly(planned.patch), shortly(planned.season)].filter(Boolean).join(" · ")
+  : "";
 const itemStates = (c: Cat) => c.items.map((it) => (it.state === "met" ? "d" : it.state === "partial" ? "n" : "o")).join("");
 const dotState = (s: string) => (s === "met" ? "met" : s === "partial" ? "partly" : "notyet");
 const KIND: Record<string, string> = { slot: say("kind.slot", "slot"), counter: say("kind.counter", "counter"), check: say("kind.check", "check") };
@@ -84,6 +94,7 @@ const WORDS = {
         <span class="gd-mono gd-soft meta"><span data-count>{WORDS.metOf.replace("{met}", String(view.progress.met)).replace("{total}", String(view.progress.total))}</span> · <span data-cats-complete>{WORDS.catsComplete.replace("{n}", String(catsComplete)).replace("{m}", String(cats.length))}</span></span>
         <span class="complete" data-complete hidden={!view.progress.complete}>{say("head.complete", "Complete — the build is on the character.")}</span>
         <span class="beside" data-beside hidden={view.progress.complete || !view.runId}>{say("head.beside", "beside the run")} <a href="#beside">{runName}</a></span>
+        {planLine && <span class="gd-mono planline">{planLine}</span>}
       </div>
     </header>
     <p class="gd-rule-note" data-note hidden></p>
@@ -95,13 +106,48 @@ const WORDS = {
             <StateDot state={c.total > 0 && c.met === c.total ? "met" : c.met > 0 || (c.partly ?? 0) > 0 ? "partly" : "notyet"} class="chip-dot" />{c.name}<span class="gd-count" data-chip-count>{c.met}/{c.total}</span>
           </button>
         ))}
+        {planned && (
+          <>
+            <span class="chip-divider" aria-hidden="true"></span>
+            <button type="button" class="gd-chip" role="tab" data-chip="__plan" aria-selected="false">
+              {say("plan.tab", "The plan")}<span class="gd-count">{planned.choices}</span>
+            </button>
+          </>
+        )}
       </div>
       <span class="gd-total" data-total>{view.progress.met} <span class="gd-faint">/ {view.progress.total}</span></span>
     </div>
 
+
     <section class="gd-now next" data-next aria-live="polite"></section>
 
     <div class="cats">
+      {planned && (
+        /* ⚠ a data-cat, not a panel of its own: the chip row's script switches
+           sections by that name, and a tab it cannot find throws before it
+           closes anything */
+        <section class="cat planpanel" id="cat-__plan" data-cat="__plan" data-open="false">
+          <div class="gd-head">
+            <span class="gd-eyebrow">{say("plan.eyebrow", "The plan")}</span>
+            <p class="gd-note">{say("plan.count", "{n} choices · {m} sections · read-only")
+              .replace("{n}", String(planned.choices)).replace("{m}", String(planned.sections.length))}</p>
+          </div>
+          <div class="items">
+            {planned.sections.map((sec) => (
+              <div class="planpart">
+                <p class="gd-eyebrow">{sec.name}</p>
+                {sec.lines.map((l) => (
+                  <div class="planrow"><span>{l.label}</span><span class="gd-mono">{l.detail}</span></div>
+                ))}
+              </div>
+            ))}
+            <p class="gd-hint">{say("plan.private", "The plan is private — never on stream.")}</p>
+            <a class="gd-chip planchange" href={`/builds/plan?game=${(view as any).plan?.game || ""}&class=${(view as any).plan?.class_id || ""}`}>
+              {say("plan.change", "Change the plan")}
+            </a>
+          </div>
+        </section>
+      )}
       {cats.map((c) => (
         <section class="cat" id={`cat-${c.id}`} data-cat={c.id} data-open={c.id === firstOpenCat?.id}>
           <button type="button" class="cat-head" data-cat-toggle aria-expanded={c.id === firstOpenCat?.id}>
@@ -261,3 +307,14 @@ const WORDS = {
   const root = document.querySelector<HTMLElement>("[data-build]");
   if (root) mountBuild(root);
 </script>
+
+<style>
+  .planline { font-size: 12px; color: var(--ink-faint); }
+  .chip-divider { flex: none; width: 1px; height: 20px; background: var(--line-strong); align-self: center; margin: 0 4px; }
+  .planpanel { display: grid; gap: 14px; }
+  .planpart { display: grid; gap: 2px; }
+  .planrow { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: baseline;
+    padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
+  .planrow .gd-mono { font-size: 12px; color: var(--ink-soft); max-width: 34ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .planchange { justify-self: start; text-decoration: none; }
+</style>
