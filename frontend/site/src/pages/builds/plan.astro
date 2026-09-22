@@ -392,6 +392,7 @@ const WORDS = {
   import { drawAssumptions, drawBreakdown, drawGroups, drawHeadline, rowsOf } from "../../lib/statsbar";
   import { drawRecord } from "../../lib/record";
   import { drawSynergyPanel, drawTab, type Tab, type Synergy } from "../../lib/tree-tabs";
+  import { cellKind, drawBoard, drawChain, type Board, type Cell } from "../../lib/tree-paragon";
 
   type Field = { type: string; kind?: string; sub?: string | string[]; max?: number; min?: number; unit?: string; options?: string[]; list?: string };
   type Section = { id: string; name: string; type: string; kind?: string; sub?: string | string[]; by_class?: boolean;
@@ -468,8 +469,7 @@ const WORDS = {
       else if (sec.type === "targets") showTargets(sec);
       else {
         await showChooser(sec);
-        /* the chooser is the way in by name; the tabs are the surface */
-        if (sec.id === "skills" && sec.track && sec.track !== "check") await showTabs(sec);
+        await showSurface(sec);
       }
       paint();
     }
@@ -529,6 +529,71 @@ const WORDS = {
       box.innerHTML = drawSynergyPanel(chosen, tabOf, nameOf, points, raisedBy);
     }
 
+    /* ── the paragon boards, where a game has them ────────────────────── */
+
+    const boardCells = new Map<string, Cell[]>();
+    let openBoard = "";
+
+    async function showBoards(sec: Section): Promise<boolean> {
+      const chosen = picksOf(sec).map((p) => p.id);
+      if (!chosen.length) return false;
+      const boards = (await Promise.all(chosen.map((id) => ask<Board>(`/api/gamedata/${game}/board/${id}`))))
+        .filter(Boolean) as Board[];
+      if (!boards.length) return false;
+      if (!openBoard || !boards.some((b) => b.id === openBoard)) openBoard = boards[0].id;
+      for (const b of boards) {
+        if (!boardCells.has(b.id)) {
+          const cells = (await ask<Cell[]>(`/api/gamedata/${game}/node?group=${b.id}&limit=1000&brief=false`)) || [];
+          boardCells.set(b.id, cells);
+          cells.forEach((c) => knownNames.set(c.id, c.name));
+        }
+      }
+      const cellsOf = (id: string) => boardCells.get(id) || [];
+      const taken = new Set<string>(((plan[sec.id] || {}).cells as string[]) || []);
+      const board = boards.find((b) => b.id === openBoard)!;
+      const box = document.createElement("div");
+      box.className = "pg-wrap";
+      box.innerHTML = `
+        ${drawChain(boards, cellsOf, taken, openBoard)}
+        <div class="pg-view">
+          ${drawBoard(board, cellsOf(board.id), taken, looking)}
+          <div class="pg-rail" data-cell-rail><p class="gd-hint">Take a cell to see what it grants.</p></div>
+        </div>
+        <p class="gd-hint pg-key">Hollow is not yet reachable · a ring is reachable · filled is allocated ·
+          blue is the one you are looking at. Gold marks a legendary nobody has taken. Reaching a far cell
+          means paying for every cell on the way.</p>`;
+      panel.prepend(box);
+
+      box.addEventListener("click", async (e) => {
+        const pick = (e.target as HTMLElement).closest<HTMLElement>("[data-board]");
+        if (pick) { openBoard = pick.dataset.board!; await showSection(sec); return; }
+        const cell = (e.target as HTMLElement).closest<HTMLElement>("[data-cell]");
+        if (!cell) return;
+        looking = cell.dataset.cell!;
+        const rec = cellsOf(board.id).find((c) => c.id === looking);
+        const rail = box.querySelector<HTMLElement>("[data-cell-rail]")!;
+        rail.innerHTML = rec ? `
+          <p class="gd-eyebrow">${escape(cellKind(rec))} · row ${rec.row} · column ${rec.col}</p>
+          <p class="pl-slot-name">${escape(rec.name)}</p>
+          ${(rec.stats || []).slice(0, 6).map((st: any) =>
+            `<div class="rc-row"><span>${escape(st.stat || st.text || "")}</span><span class="rc-lead"></span>
+             <span class="rc-val">${escape(st.display ?? st.value ?? "")}</span></div>`).join("")}
+          <button type="button" class="pl-read" data-read="node:${escape(rec.id)}">Open the record</button>`
+          : "";
+      });
+      return true;
+    }
+
+    /** The drawn surface a section has, if its game has one. */
+    const hasSurface = (sec: Section) =>
+      (sec.id === "skills" && !!sec.track && sec.track !== "check") || sec.kind === "board";
+
+    async function showSurface(sec: Section) {
+      /* the chooser is the way in by name; this is the surface */
+      if (sec.id === "skills" && sec.track && sec.track !== "check") await showTabs(sec);
+      if (sec.kind === "board") await showBoards(sec);
+    }
+
     async function showChooser(sec: Section) {
       const rows = (await ask<Row[]>(listPath(sec))) || [];
       rows.forEach((r) => knownNames.set(r.id, r.name));
@@ -572,6 +637,9 @@ const WORDS = {
           if (sec.max && picks.length >= sec.max) return;
           plan[sec.id] = { picks: [...picks, { id }] };
         }
+        /* ⚠ a surface is drawn FROM the picks, so choosing one has to redraw
+           it — otherwise a board a person just took never appears */
+        if (hasSurface(sec)) { showSection(sec); return; }
         draw();
         drawChosen(sec, rows);
         paint();
@@ -615,6 +683,7 @@ const WORDS = {
           });
           plan[sec.id] = { picks: picks2 };
         }
+        if (hasSurface(sec)) { showSection(sec); return; }
         drawChosen(sec, rows);
         panel.querySelector<HTMLInputElement>("[data-search]")?.dispatchEvent(new Event("input"));
         paint();
@@ -1050,4 +1119,28 @@ const WORDS = {
   .tt-tab-name[data-elsewhere="yes"] { color: var(--accent); }
   .tt-rule { grid-column: 1 / -1; font-size: 11px; color: var(--ink-faint); }
   .tt-key { max-width: 66ch; }
+</style>
+
+<style is:global>
+  .pg-wrap { display: grid; gap: 14px; }
+  .pg-chain { display: flex; align-items: center; gap: 8px; overflow-x: auto; padding: 12px;
+    border: 1px solid var(--line-strong); border-radius: 4px; scrollbar-width: none; }
+  .pg-chain::-webkit-scrollbar { display: none; }
+  .pg-link { flex: none; display: grid; gap: 4px; justify-items: center; border: 0; background: none; cursor: pointer; padding: 4px; }
+  .pg-link[aria-current="true"] .pg-mini { outline: 1px solid var(--accent); outline-offset: 2px; }
+  .pg-mini { width: 132px; height: 132px; }
+  @media (max-width: 600px) { .pg-mini { width: 108px; height: 108px; } }
+  .pg-link-name { font-family: var(--font-body); font-size: 11px; color: var(--ink-soft); max-width: 132px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pg-gate { flex: none; width: 62px; height: 3px; background: var(--rose); }
+  @media (max-width: 600px) { .pg-gate { width: 46px; } }
+  .pg-room { flex: none; padding: 20px 14px; border: 1px dashed var(--line-strong); border-radius: 4px;
+    font-size: 11px; color: var(--ink-faint); max-width: 132px; }
+  .pg-view { display: grid; grid-template-columns: minmax(0, 1fr) 260px; gap: 16px; align-items: start; }
+  @media (max-width: 900px) { .pg-view { grid-template-columns: minmax(0, 1fr); } }
+  .pg-board { width: 100%; height: 620px; background: var(--surface-inset); border: 1px solid var(--line-strong); border-radius: 4px; }
+  @media (max-width: 600px) { .pg-board { height: 360px; } }
+  .pg-cell { cursor: pointer; }
+  .pg-rail { display: grid; gap: 4px; align-content: start; }
+  .pg-key { max-width: 66ch; }
 </style>
