@@ -391,6 +391,7 @@ const WORDS = {
   import { slotMark, kindMark } from "../../lib/planner";
   import { drawAssumptions, drawBreakdown, drawGroups, drawHeadline, rowsOf } from "../../lib/statsbar";
   import { drawRecord } from "../../lib/record";
+  import { drawSynergyPanel, drawTab, type Tab, type Synergy } from "../../lib/tree-tabs";
 
   type Field = { type: string; kind?: string; sub?: string | string[]; max?: number; min?: number; unit?: string; options?: string[]; list?: string };
   type Section = { id: string; name: string; type: string; kind?: string; sub?: string | string[]; by_class?: boolean;
@@ -465,8 +466,67 @@ const WORDS = {
       panel.innerHTML = "";
       if (sec.type === "gear") await showGear(sec);
       else if (sec.type === "targets") showTargets(sec);
-      else await showChooser(sec);
+      else {
+        await showChooser(sec);
+        /* the chooser is the way in by name; the tabs are the surface */
+        if (sec.id === "skills" && sec.track && sec.track !== "check") await showTabs(sec);
+      }
       paint();
+    }
+
+    /* ── the skill tabs, where a game has them ────────────────────────── */
+
+    let tabs: Tab[] = [];
+    let looking = "";
+    const skillRecords = new Map<string, any>();
+
+    async function showTabs(sec: Section): Promise<boolean> {
+      if (!tabs.length) {
+        tabs = (await ask<Tab[]>(`/api/gamedata/${game}/tab?limit=40&brief=false&class_id=${classId}`)) || [];
+        tabs = tabs.filter((t) => (t.nodes || []).length);
+      }
+      if (!tabs.length) return false;
+      const points: Record<string, number> = {};
+      for (const pick of picksOf(sec)) points[pick.id] = Number(pick[sec.track!] ?? 0) || 0;
+      tabs.forEach((t) => (t.nodes || []).forEach((n) => knownNames.set(n.id, n.name)));
+      const chosen = looking ? await skillOf(looking) : null;
+
+      const box = document.createElement("div");
+      box.className = "tt-wrap";
+      box.innerHTML = `
+        <div class="tt-tabs">${tabs.map((t) => drawTab(t, points, looking, chosen?.synergies || [])).join("")}</div>
+        <div class="tt-panel" data-syn></div>
+        <p class="gd-hint tt-key">A skill with points is rose · the one you are looking at is blue ·
+          an arrow is heavy when its parent has points. Synergies read as type, never as lines across the page.</p>`;
+      panel.prepend(box);
+      await paintSynergies(sec, chosen, points);
+
+      box.addEventListener("click", async (e) => {
+        const cell = (e.target as HTMLElement).closest<HTMLElement>("[data-skill]");
+        if (!cell) return;
+        looking = cell.dataset.skill === looking ? "" : cell.dataset.skill!;
+        await showSection(sec);
+      });
+      return true;
+    }
+
+    async function skillOf(id: string) {
+      if (!skillRecords.has(id)) skillRecords.set(id, await ask<any>(`/api/gamedata/${game}/skill/${id}`));
+      return skillRecords.get(id);
+    }
+
+    async function paintSynergies(sec: Section, chosen: any, points: Record<string, number>) {
+      const box = panel.querySelector<HTMLElement>("[data-syn]");
+      if (!box) return;
+      const tabOf = (id: string) => tabs.find((t) => (t.nodes || []).some((n) => n.id === id))?.name || "";
+      /* what raises it: every skill in this class whose synergies name it */
+      const raisedBy: { id: string; name: string; per_point?: number }[] = [];
+      if (chosen) {
+        for (const l of (chosen.linked_from || [])) {
+          if (l.rel === "synergy") raisedBy.push({ id: l.id, name: l.name || l.id });
+        }
+      }
+      box.innerHTML = drawSynergyPanel(chosen, tabOf, nameOf, points, raisedBy);
     }
 
     async function showChooser(sec: Section) {
@@ -960,4 +1020,34 @@ const WORDS = {
   .rc-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; }
   .rc-chip { font-family: var(--font-mono); font-size: 11px; color: var(--ink-soft);
     border: 1px solid var(--line); border-radius: 4px; padding: 3px 8px; }
+</style>
+
+<style is:global>
+  .tt-wrap { display: grid; gap: 14px; }
+  .tt-tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+  @media (max-width: 700px) { .tt-tabs { grid-template-columns: minmax(0, 1fr); } }
+  .tt-tab { display: grid; gap: 8px; padding: 14px; border: 1px solid var(--line-strong); border-radius: 4px; background: var(--surface-page); }
+  .tt-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+  .tt-spent { font-size: 12px; color: var(--ink-faint); }
+  .tt-grid { position: relative; display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(6, 1fr);
+    gap: 6px; height: 420px; }
+  @media (max-width: 700px) { .tt-grid { height: 470px; } }
+  .tt-arrows { position: absolute; inset: 0; width: 100%; height: 100%; color: var(--line-strong); pointer-events: none; }
+  .tt-cell { position: relative; display: grid; align-content: center; gap: 2px; padding: 4px; cursor: pointer;
+    border: 1px solid var(--state-locked); border-radius: 4px; background: var(--surface-card); color: inherit; }
+  .tt-name { font-family: var(--font-body); font-size: 10.5px; font-weight: 500; line-height: 1.15; text-align: center; }
+  .tt-points { font-family: var(--font-mono); font-size: 11px; text-align: center; color: var(--ink-faint); }
+  .tt-cell[data-look="in"] { border: 1.5px solid var(--state-done); background: var(--rose-wash); }
+  .tt-cell[data-look="in"] .tt-points { color: var(--rose); }
+  .tt-cell[data-look="looking"] { border: 1.5px solid var(--state-now); background: var(--accent-wash); }
+  .tt-cell[data-look="raises"] { border: 1px solid var(--accent); }
+  .tt-panel { display: grid; gap: 12px; }
+  .tt-part { display: grid; gap: 2px; }
+  .tt-syn { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px; align-items: baseline;
+    padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
+  .tt-syn[data-taken="no"] { color: var(--ink-faint); }
+  .tt-tab-name { font-size: 11px; color: var(--ink-faint); }
+  .tt-tab-name[data-elsewhere="yes"] { color: var(--accent); }
+  .tt-rule { grid-column: 1 / -1; font-size: 11px; color: var(--ink-faint); }
+  .tt-key { max-width: 66ch; }
 </style>
