@@ -21,7 +21,7 @@ import Icon from "../../components/guides/Icon.astro";
 import StatsBar from "../../components/guides/StatsBar.astro";
 import Button from "../../components/forms/Button.astro";
 import { site } from "../../lib/api";
-import { account } from "../../lib/account";
+import { account, asReader } from "../../lib/account";
 import { copy } from "../../lib/copy";
 import { dataLine, type GamePack, type Recipe, type Row } from "../../lib/planner";
 
@@ -81,6 +81,13 @@ const availableIn = (sec: typeof sections[number]) => {
   return pack && sec.kind ? pack.counts[sec.kind] || 0 : 0;
 };
 
+/* ?build= means this is a re-plan: the planner opens with that plan loaded,
+ * and saving rewrites its goals rather than making a second build. */
+const changing = Number(Astro.url.searchParams.get("build") || 0) || 0;
+const loadedRead = changing ? await asReader(Astro, `/api/builds/${changing}`) : null;
+const loaded = loadedRead?.ok ? (loadedRead.body as any) : null;
+const loadedPlan = loaded?.plan && loaded.plan.game === pack?.id ? loaded.plan : null;
+
 const WORDS = {
   failed: say("words.failed", "That did not go through. Try again."),
   needsName: say("words.needs_name", "A build needs a name."),
@@ -89,7 +96,8 @@ const WORDS = {
 
 <BaseLayout title={say("meta.title", "Plan a build — Squirrel Guides")}
             description={say("meta.description", "Your choices in the game's own terms, written as the goals your phone ticks and the stream draws.")} noindex>
-  <div class="page gd-full pl" data-planner data-game={pack?.id || ""} data-step={step} data-words={JSON.stringify(WORDS)}>
+  <div class="page gd-full pl" data-planner data-game={pack?.id || ""} data-step={step} data-words={JSON.stringify(WORDS)}
+       data-build={changing || ""} data-loaded={loadedPlan ? JSON.stringify(loadedPlan.sections || {}) : ""}>
 
     <header class="pl-top">
       <div class="pl-topline">
@@ -416,7 +424,8 @@ const WORDS = {
 
     /** The person's choices. Nothing here is checked — the server does that. */
     const words = JSON.parse(root.dataset.words || "{}") as { failed: string; needsName: string };
-    const plan: Record<string, any> = {};
+    const changing = Number(root.dataset.build || 0) || 0;
+    const plan: Record<string, any> = root.dataset.loaded ? JSON.parse(root.dataset.loaded) : {};
     /* ⚠ Every record the chooser has drawn, by id. The plan holds ids because
        that is what the server reads; a person must never be shown one. */
     const knownNames = new Map<string, string>();
@@ -758,7 +767,11 @@ const WORDS = {
               <button type="button" class="pl-remove" data-drop="${escape(p.id)}">remove</button>
             </div>`).join("")
         : "";
-      box.onclick = (e) => {
+      /* ⚠ Delegated from the panel, not bound to the box. A section that
+         draws a surface re-renders around this list, and a handler bound to
+         a box that is then replaced stops firing without any error — the
+         remove button simply does nothing, which is the worst kind of bug. */
+      panel.onclick = (e) => {
         const el = (e.target as HTMLElement).closest<HTMLElement>("[data-drop],[data-more],[data-less]");
         if (!el) return;
         const id = el.dataset.drop || el.dataset.more || el.dataset.less!;
@@ -1047,12 +1060,23 @@ const WORDS = {
       const said = await post("/api/builds/sheet", body);
       const summary = said?.summary;
       const problems: string[] = said?.problems || [];
-      const runs = (await ask<{ id: number; name: string }[]>("/api/runs")) || [];
+      const runs = changing ? [] : (await ask<{ id: number; name: string }[]>("/api/runs")) || [];
+      /* ⚠ a re-plan says what it would do BEFORE it does it; nothing is
+         applied until a person agrees to the cost */
+      const ahead = changing ? await post(`/api/builds/${changing}/plan/preview`, { plan: planBody() }) : null;
+      const c = ahead?.changes?.counts;
       panel.innerHTML = `
         ${problems.length ? consoleRows("What the data could not keep", problems) : ""}
+        ${c ? `<div class="pl-refused"><p class="gd-eyebrow">Before it saves</p>
+          <p class="gd-mono">${c.kept} kept · ${c.gone} gone · ${c.new} new</p>
+          <p class="gd-hint">Re-planning rewrites the goals. Every goal that survives keeps your tick and
+            your words. Nothing is applied until you say so.</p>
+          ${(ahead.changes.costs || []).map((g: any) =>
+            `<p class="gd-mono">${escape(g.label)} — ${g.met ? "you had ticked this" : g.have ? `you had ${g.have} of it` : "your words on it"} — the goal is gone, and that with it</p>`).join("")}
+        </div>` : ""}
         <p class="gd-eyebrow">The plan · ${summary?.choices ?? 0} choices</p>
         <div class="pl-drawer-body">${summary ? planLinesOf(summary) : ""}</div>
-        <div class="pl-targets pl-start">
+        ${changing ? "" : `<div class="pl-targets pl-start">
           <div class="pl-target"><label for="pl-name">Name</label>
             <input class="pl-field" id="pl-name" data-name maxlength="80" placeholder="What to call this character"></div>
           <div class="pl-target"><label for="pl-variant">Variant</label>
@@ -1063,9 +1087,9 @@ const WORDS = {
               <option value="">None — a build can stand alone</option>
               ${runs.map((r) => `<option value="${r.id}">${escape(r.name)}</option>`).join("")}
             </select></div>
-        </div>
+        </div>`}
         <div class="pl-slot-actions">
-          <button type="button" class="pl-keep" data-start>Start the build</button>
+          <button type="button" class="pl-keep" data-start>${changing ? "Save the new plan" : "Start the build"}</button>
           <span class="gd-hint" data-saying></span>
         </div>
         <p class="gd-hint">This writes the grid from Gear, checks from the sections you picked, and counters from the numbers.
@@ -1075,9 +1099,9 @@ const WORDS = {
 
     const planBody = () => ({ class_id: classId, sections: plan });
 
-    async function post(path: string, body: unknown) {
+    async function post(path: string, body: unknown, method = "POST") {
       try {
-        const r = await fetch(path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+        const r = await fetch(path, { method, headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
         const said = await r.json().catch(() => null);
         return r.ok ? said : { problems: [said?.detail || words.failed] };
       } catch { return { problems: [words.failed] }; }
@@ -1094,6 +1118,12 @@ const WORDS = {
 
     async function start() {
       const saying = panel.querySelector<HTMLElement>("[data-saying]")!;
+      if (changing) {
+        const said = await post(`/api/builds/${changing}/plan`, { plan: planBody() }, "PUT");
+        if (said?.id) { window.location.href = `/builds/${changing}`; return; }
+        saying.textContent = (said?.problems || [words.failed])[0];
+        return;
+      }
       const name = (panel.querySelector<HTMLInputElement>("[data-name]")?.value || "").trim();
       if (!name) { saying.textContent = words.needsName; return; }
       saying.textContent = "";
