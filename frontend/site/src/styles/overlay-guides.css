@@ -95,7 +95,7 @@
 /* ── the now card · 900 wide at 72,72 ──────────────────────────────────── */
 .gov-now { left: 72px; top: 72px; width: 900px; padding: 34px 38px 32px; display: flex; flex-direction: column; gap: 18px; overflow: hidden; }
 .gov-now .title { font: var(--gt-display-weight) 54px/1.1 var(--gt-display); color: var(--gt-ink); }
-.gov-now .line { font: 400 30px/1.4 var(--font-body); color: var(--gt-soft); }
+.gov-now .line { font: 400 30px/1.4 var(--font-body); color: var(--gt-faint); }
 .gov-now .horizon { height: 1px; background: var(--gt-rule); margin-top: 6px; }
 /* The ignite: 3px, not 1.5 — at 720p a 1.5px rose line disappears. */
 .gov-now.ignite::before { content: ""; position: absolute; inset: -2px; border: 3px solid var(--st-done); border-radius: calc(var(--gt-radius) + 2px); pointer-events: none; animation: gov-ignite 300ms cubic-bezier(.2,.7,.3,1) forwards; }
@@ -157,7 +157,7 @@
 .gov-build .goal { display: flex; align-items: baseline; gap: 14px; min-width: 0; }
 .gov-build .goal .cat { flex: 0 0 150px; font-size: 18px; line-height: 1.2; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--gt-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .gov-build .goal .label { font-size: 26px; line-height: 1.2; font-weight: 600; white-space: nowrap; }
-.gov-build .goal .detail { min-width: 0; font-family: var(--gt-display); font-size: 26px; line-height: 1.2; color: var(--gt-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gov-build .goal .detail { min-width: 0; font-family: var(--gt-display); font-size: 26px; line-height: 1.2; color: var(--gt-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .gov-build .goal .leader { flex: 1 1 20px; min-width: 20px; border-bottom: 1px dotted var(--gt-faint); transform: translateY(-6px); }
 .gov-build .goal .word { font-size: 20px; line-height: 1.2; font-weight: 600; white-space: nowrap; color: var(--gt-faint); }
 .gov-build .goal .word.partly { color: var(--st-now); }
@@ -192,8 +192,8 @@
 .gov-ticker { left: 72px; bottom: 24px; width: 1776px; padding: 14px 28px; display: flex; gap: 20px; align-items: baseline; }
 .gov-ticker .names { display: flex; gap: 14px; flex-wrap: nowrap; overflow: hidden; white-space: nowrap; font-size: 26px; }
 .gov-ticker .sep { color: var(--gt-faint); }
-.gov-ticker .anon { font-style: italic; color: var(--gt-soft); }
-.gov-ticker .standing { color: var(--gt-soft); }
+.gov-ticker .anon { font-style: italic; color: var(--gt-faint); }
+.gov-ticker .standing { color: var(--gt-faint); }
 .gov-sky { left: 1416px; top: 320px; width: 432px; padding: 20px 28px; display: flex; flex-direction: column; gap: 6px; }
 .gov-sky .body { display: grid; grid-template-columns: 1fr auto auto; gap: 14px; align-items: baseline; font-size: 24px; }
 .gov-sky .where { font-size: 22px; }
@@ -208,12 +208,12 @@
 .gov-hours .ord, .gov-hours .day { font-size: 18px; color: var(--gt-faint); }
 .gov-countdown { left: 1416px; top: 560px; width: 432px; padding: 20px 28px; display: flex; flex-direction: column; gap: 4px; }
 .gov-countdown .figure { font-size: 64px; line-height: 1.05; font-variant-numeric: tabular-nums; }
-.gov-countdown .say { font-size: 22px; color: var(--gt-soft); }
+.gov-countdown .say { font-size: 22px; color: var(--gt-faint); }
 .gov-alerts { position: absolute; left: 1200px; top: 640px; width: 648px; }
 .gov-alert { position: relative; left: auto; top: auto; width: 100%; padding: 22px 30px; display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 18px; }
 .gov-alert .who { font-size: 34px; font-weight: 600; }
 .gov-alert .amount { font-size: 30px; }
-.gov-alert .message { flex-basis: 100%; font-size: 24px; color: var(--gt-soft); }
+.gov-alert .message { flex-basis: 100%; font-size: 24px; color: var(--gt-faint); }
 .gov-alert.enter { animation: gov-alert-in 260ms cubic-bezier(.2,.8,.2,1) both; }
 @keyframes gov-alert-in { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
 .gov-wheel { position: absolute; left: 1416px; top: 300px; width: 432px; height: 432px; border: 0; background: transparent; }
@@ -228,7 +228,7 @@
 /* The counter — auto width: label 22px eyebrow, number 72px mono tabular. */
 .gov-counter { left: 1416px; top: 300px; width: 432px; padding: 24px 32px; display: flex; flex-direction: column; gap: 4px; }
 .gov-counter .number { font-size: 72px; line-height: 1; font-variant-numeric: tabular-nums; }
-.gov-counter .of { font-size: 24px; color: var(--gt-soft); }
+.gov-counter .of { font-size: 24px; color: var(--gt-faint); }
 .gov-placed .gov-counter { left: auto; top: auto; }
 /* The goal — 860px: title 34, count 30 mono, tier bars 14px tall, the crew at 24. */
 .gov-goal { left: 72px; top: 300px; width: 860px; padding: 28px 32px; display: flex; flex-direction: column; gap: 14px; }
@@ -238,7 +238,7 @@
 .gov-goal .tier { flex: 1; height: 14px; background: var(--gt-faint); opacity: .9; position: relative; overflow: hidden; }
 .gov-goal .tier .fill { position: absolute; inset: 0 auto 0 0; background: var(--st-now); }
 .gov-goal .tier.done .fill { background: var(--st-done); }
-.gov-goal .crew { font-size: 24px; color: var(--gt-soft); }
+.gov-goal .crew { font-size: 24px; color: var(--gt-faint); }
 .gov-placed .gov-goal { left: auto; top: auto; }
 .gov-routine { left: 72px; bottom: 72px; width: 760px; padding: 28px 32px; display: flex; flex-direction: column; gap: 18px; }
 .gov-routine .head { display: flex; align-items: baseline; justify-content: space-between; }
@@ -258,8 +258,27 @@
 
 /* ── empty: no run selected ─────────────────────────────────────────────── */
 .gov-empty { left: 72px; top: 72px; width: 520px; padding: 30px 34px; display: flex; flex-direction: column; gap: 12px; background: var(--gt-panel-dim); border-color: color-mix(in srgb, var(--gt-border) 50%, transparent); }
-.gov-empty .say { font: var(--gt-display-weight) 34px/1.2 var(--gt-display); color: var(--gt-soft); }
+.gov-empty .say { font: var(--gt-display-weight) 34px/1.2 var(--gt-display); color: var(--gt-faint); }
 
 /* Motion is the overlay's own setting. Still: nothing moves, ever. Reduced:
    the Done moment collapses to an instant swap and one line. */
 .gov[data-motion="still"] *, .gov[data-motion="reduced"] .swap, .gov[data-motion="reduced"] .fill, .gov[data-motion="reduced"] .ring { transition: none !important; animation: none !important; }
+
+/* The plan on stream (README-planners §4.12). Nothing under 21px at 1920:
+   chat reads this at a distance, and a target line it cannot read is worse
+   than one that is not there. ⚠ The numbers, the glyph levels, the mercenary
+   and every note stay off — a plan is private. */
+.gov-sheet { display: grid; gap: 14px; align-content: start; }
+.gov-sheet-name { font-family: var(--gt-display); font-size: 76px; font-weight: var(--gt-display-weight, 600); line-height: 1.05; color: var(--gt-ink); }
+.gov-sheet-count { font-family: var(--gt-mono); font-size: 26px; font-variant-numeric: tabular-nums; color: var(--gt-faint); }
+.gov-sheet-sub { margin-top: 6px; font-size: 24px; }
+.gov-sheet-skills { font-family: var(--gt-display); font-size: 26px; line-height: 1.35; color: var(--gt-ink); }
+/* ⚠ a container that inherits the body's 16px would put unreadable text on
+   stream the moment anything unstyled lands inside it */
+.gov-sheet-grid { font-size: 21px; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px 18px; }
+.gov-sheet-slot { font-size: 21px; display: grid; gap: 4px; padding-top: 8px; border-top: 4px solid var(--gt-faint); min-width: 0; }
+.gov-sheet-slot[data-state="met"] { border-top-color: var(--st-done); }
+.gov-sheet-slot[data-state="partial"] { border-top-color: var(--st-now); }
+.gov-sheet-slot-name { font-family: var(--font-body); font-size: 21px; color: var(--gt-faint); }
+.gov-sheet-target { font-family: var(--font-mono); font-size: 21px; line-height: 1.3; color: var(--gt-ink);
+  overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }

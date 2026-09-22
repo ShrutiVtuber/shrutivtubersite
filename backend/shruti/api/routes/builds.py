@@ -20,7 +20,7 @@ from sqlmodel import select
 
 from shrutisguides import buildfile, builds as shared
 from shrutisguides.builds import clean_categories, item_state, parse_list  # noqa: F401  (re-exported for callers and tests)
-from shrutisguides.gamedata import clean_plan, plan_goals, plan_summary, plan_to_categories
+from shrutisguides.gamedata import clean_plan, plan_goals, plan_summary, plan_to_categories, stream_sheet
 from shrutisguides.gamedata.calc import sheet as compute_sheet
 
 from shruti.api.deps import get_session, require_admin
@@ -529,6 +529,7 @@ class BuildTokenIn(BaseModel):
     label: str = ""
     theme: str = "almanac"
     motion: str = "reduced"
+    kind: str = "build"          # "build" is the plate; "sheet" is the plan
 
 
 async def build_frame(session: AsyncSession, build_id: int | None) -> dict | None:
@@ -536,6 +537,18 @@ async def build_frame(session: AsyncSession, build_id: int | None) -> dict | Non
     if b is None:
         return None
     return build_element(await _build_view(session, b))
+
+
+async def sheet_frame(session: AsyncSession, build_id: int | None) -> dict | None:
+    """
+    The plan as chat sees it. A build with no plan has no sheet — there is
+    nothing to say about choices nobody made in the game's own terms.
+    """
+    b = await session.get(Build, build_id) if build_id else None
+    if b is None or not b.plan:
+        return None
+    t = await session.get(BuildTemplate, b.template_id) if b.template_id else None
+    return stream_sheet(b.plan, gamedata(), b.name, progress_of(t, b)) or None
 
 
 @router.get("/{build_id}/overlays")
@@ -555,7 +568,10 @@ async def mint_build_token(build_id: int, body: BuildTokenIn, request: Request, 
     await _refuse_if_suspended(session, user)
     await refuse_if_out_of_allowance(session, user)
     token = secrets.token_urlsafe(24)
-    row = OverlayToken(token=token, kind="build", label=body.label.strip()[:80] or b.name, user_id=user.id, build_id=b.id,
+    kind = body.kind if body.kind in ("build", "sheet") else "build"
+    if kind == "sheet" and not b.plan:
+        raise HTTPException(422, "a sheet shows a plan, and this build was not planned")
+    row = OverlayToken(token=token, kind=kind, label=body.label.strip()[:80] or b.name, user_id=user.id, build_id=b.id,
                        theme=body.theme if body.theme in THEMES else "almanac",
                        motion=body.motion if body.motion in MOTIONS else "reduced")
     session.add(row)

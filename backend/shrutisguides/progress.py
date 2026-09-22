@@ -24,7 +24,7 @@ REENTRY_AFTER = timedelta(hours=6)
 STATES = ("done", "skipped", "later", "open")
 GUIDE_KINDS = ("guide-now", "guide-sigil", "guide-path", "guide-routine", "guide-layout")
 ELEMENT_KINDS = ("guide-now", "guide-sigil", "guide-path", "guide-routine", "guide-goal", "counter", "text", "image",
-                 "ticker", "sky", "hours", "countdown", "alerts", "wheel", "build")
+                 "ticker", "sky", "hours", "countdown", "alerts", "wheel", "build", "sheet")
 # Two kinds that carry their own content — a line of text, a picture by its
 # https address — so a layout can hold a title card or a logo without a run.
 OWN_KINDS = ("text", "image")
@@ -52,6 +52,7 @@ DEFAULT_PLACES = {
     "alerts": {"x": 1200, "y": 640, "w": 648},
     "wheel": {"x": 1416, "y": 300, "w": 432},
     "build": {"x": 72, "y": 300, "w": 900},
+    "sheet": {"x": 72, "y": 96, "w": 1728},
 }
 THEMES = ("almanac", "grimoire", "plain")
 MOTIONS = ("full", "reduced", "still")

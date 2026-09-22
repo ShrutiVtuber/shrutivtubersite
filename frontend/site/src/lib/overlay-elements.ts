@@ -80,6 +80,28 @@ export async function drawElement(slot: HTMLElement, kind: string, prev: any, ne
     slot.innerHTML = `<div class="gov-plate gov-goal"><span class="gov-eyebrow">${esc(g.name)}</span><span class="title">${esc(g.goal)}</span><span class="gov-mono count">${esc(g.count)}${g.tiers ? ` · tier ${esc(g.tier)} of ${esc(g.tiers)}` : ""}</span><div class="tiers">${(g.parts ?? []).map((p: any) => `<span class="tier ${esc(p.state)}"><span class="fill" style="width:${(Math.max(0, Math.min(1, p.pct || 0)) * 100).toFixed(1)}%"></span></span>`).join("")}</div><span class="crew">${esc(line)}</span></div>`;
     return;
   }
+  if (kind === "sheet") {
+    /* ⚠ The plan on stream: the class, the name and its count, the skills as
+       words, and the gear grid five to a row. Never the numbers, the glyph
+       levels or a note — a plan is private, and a stream is not a
+       spreadsheet. Nothing under 21px at 1920: chat is reading this at a
+       distance. */
+    const e = next || {};
+    slot.innerHTML = `<div class="gov-plate gov-sheet">
+      <span class="gov-eyebrow">${esc(e.eyebrow || "")}</span>
+      <span class="gov-sheet-name">${esc(e.name || "")}</span>
+      <span class="gov-sheet-count">${esc(e.count || "")}</span>
+      ${(e.skills || []).length ? `<span class="gov-eyebrow gov-sheet-sub">Skills</span>
+        <span class="gov-sheet-skills">${(e.skills || []).map((x: string) => esc(x)).join(" · ")}</span>` : ""}
+      ${(e.slots || []).length ? `<span class="gov-eyebrow gov-sheet-sub">${esc(e.gridName || "Gear")}</span>
+        <div class="gov-sheet-grid">${(e.slots || []).map((s: any) => `
+          <div class="gov-sheet-slot" data-state="${esc(s.state)}">
+            <span class="gov-sheet-slot-name">${esc(s.label)}</span>
+            <span class="gov-sheet-target">${esc(s.target || "")}</span>
+          </div>`).join("")}</div>` : ""}
+    </div>`;
+    return;
+  }
   if (kind === "counter") {
     /* The site's counter as an element: label 22px eyebrow, number 72px mono
      * tabular. The host formats the numbers; this only places them. */

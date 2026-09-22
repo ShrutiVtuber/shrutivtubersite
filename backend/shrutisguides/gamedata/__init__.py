@@ -20,10 +20,10 @@ guides repository's `research/LICENSE-DATA.md`.
 from __future__ import annotations
 
 from .load import build_database, Report  # noqa: F401
-from .planner import clean_plan, plan_to_categories, plan_summary, plan_goals  # noqa: F401
+from .planner import clean_plan, plan_to_categories, plan_summary, plan_goals, stream_sheet  # noqa: F401
 from .query import GameData  # noqa: F401
 from .recipes import RECIPES, recipe_for  # noqa: F401
 from .schema import KINDS, FILES  # noqa: F401
 
-__all__ = ["build_database", "Report", "GameData", "clean_plan", "plan_to_categories", "plan_summary", "plan_goals",
+__all__ = ["build_database", "Report", "GameData", "clean_plan", "plan_to_categories", "plan_summary", "plan_goals", "stream_sheet",
            "RECIPES", "recipe_for", "KINDS", "FILES"]

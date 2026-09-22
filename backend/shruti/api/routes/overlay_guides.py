@@ -44,7 +44,7 @@ runs_router = APIRouter(prefix="/api/runs", tags=["runs"])
 
 GUIDE_KINDS, THEMES, MOTIONS = progress.GUIDE_KINDS, progress.THEMES, progress.MOTIONS
 # The site's one extra kind: a group's goal, bound to a group rather than a run.
-SITE_KINDS = GUIDE_KINDS + ("guide-goal", "build")
+SITE_KINDS = GUIDE_KINDS + ("guide-goal", "build", "sheet")
 
 
 def _stored(row: GuideRun) -> dict:
@@ -78,6 +78,20 @@ async def guide(t: str, v: str = "", session: AsyncSession = Depends(get_session
             "motion": token.motion, "run": None, "element": None, "version": ""}
     if token.kind == "guide-goal":
         return await _goal_frame(session, token, base)
+    if token.kind == "sheet":
+        # ⚠ The plan on stream answers "what are you playing?" and nothing
+        # that reads like a spreadsheet — see gamedata.planner.stream_sheet.
+        from shruti.api.routes.builds import sheet_frame
+        from shruti.models.guides import Build
+        element = await sheet_frame(session, token.build_id)
+        if element is not None:
+            b = await session.get(Build, token.build_id)
+            base["element"] = element
+            base["run"] = {"name": b.name, "guide": b.variant, "game": ""}
+            base["version"] = f"{b.updated_at.isoformat() if b.updated_at else ''}:{element.get('count', '')}"
+            if v and v.replace(" ", "+") == base["version"]:
+                return {"kind": token.kind, "theme": base["theme"], "motion": base["motion"], "version": base["version"], "unchanged": True}
+        return base
     if token.kind == "build":
         from shruti.api.routes.builds import build_frame
         from shruti.models.guides import Build

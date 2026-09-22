@@ -412,6 +412,59 @@ def plan_goals(categories: list[dict], goals: Any = None) -> dict:
     return out
 
 
+# ── the plan on stream ───────────────────────────────────────────────────────
+
+# ⚠ Chosen by what a section DRAWS FROM, never by its name: the section that
+# holds a class's specializations is "spec" in one game and "path" or
+# "ascendancy" in another, and a list of names would quietly miss one.
+STREAM_KINDS = ("skill", "specialization")
+
+
+def stream_sheet(plan: dict, data: GameData, name: str, progress: dict) -> dict:
+    """
+    What chat gets: the class, the build's name with its count, the skills as
+    words, and the gear grid with each slot's target.
+
+    ⚠ What chat does NOT get, and the reason this is not just the summary:
+    the numbers, the mercenary, the paragon board names, the glyph levels and
+    every note. A plan is private; this answers "what are you playing?" and
+    nothing that reads like a spreadsheet.
+    """
+    recipe = recipe_for(plan.get("game", ""))
+    if not recipe or not plan.get("sections"):
+        return {}
+    names = _Names(data, plan["game"], plan, recipe)
+    pack = data.game(plan["game"]) or {}
+
+    skills: list[str] = []
+    for sec in recipe["sections"]:
+        if sec.get("kind") not in STREAM_KINDS or sec["type"] not in ("pick", "picks"):
+            continue
+        value = plan["sections"].get(sec["id"])
+        if not value:
+            continue
+        picks = [value] if sec["type"] == "pick" else (value.get("picks") or [])
+        for p in picks[:14]:
+            if isinstance(p, dict) and p.get("id"):
+                skills.append(names.of(sec["kind"], p["id"]))
+
+    # the grid is the goals' own, so what chat sees agrees with the plate
+    grid = next((c for c in progress.get("categories", []) if c.get("grid")), None)
+    slots = [{"label": it["label"], "target": it.get("target") or "", "state": it["state"]}
+             for it in (grid or {}).get("items", []) if it["kind"] == "slot"][:25]
+
+    return {
+        "eyebrow": " · ".join(x for x in ("Build", pack.get("name", ""), names.of("class", plan.get("class_id", ""))
+                                          if plan.get("class_id") else "") if x),
+        "name": name,
+        "count": f"{progress.get('met', 0)} of {progress.get('total', 0)}",
+        "className": names.of("class", plan["class_id"]) if plan.get("class_id") else "",
+        "skills": skills,
+        "gridName": (grid or {}).get("name", ""),
+        "slots": slots,
+    }
+
+
 def plan_summary(plan: dict, data: GameData) -> dict:
     """The plan with names, for a page: the class, then each section's lines."""
     recipe = recipe_for(plan.get("game", ""))

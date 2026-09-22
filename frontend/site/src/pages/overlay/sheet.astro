@@ -1,0 +1,82 @@
+---
+/* The plan on stream: the class, the name and its count, the skills as words
+ * and the gear grid.
+ *
+ * ⚠ Never the numbers, the glyph levels, the mercenary or a note — a plan is
+ * private, and a stream is not a spreadsheet.
+ *
+ * `?t=` is the whole authentication and is never rendered into the page.
+ * A build that is gone is an empty frame; the overlay never blanks.
+ */
+import "../../styles/global.css";
+import "../../styles/overlay.css";
+import "../../styles/overlay-guides.css";
+import { SITE_API } from "../../lib/api";
+import { themeCss } from "../../lib/overlay-theme";
+
+export const prerender = false;
+
+const themeStyle = await themeCss();
+
+const token = Astro.url.searchParams.get("t") ?? "";
+let data: any = null;
+if (token) {
+  try {
+    const r = await fetch(`${SITE_API}/api/overlay/guide?t=${encodeURIComponent(token)}`);
+    if (r.ok) data = await r.json();
+  } catch {
+    /* Held, not blanked. */
+  }
+}
+const theme = data?.theme ?? "almanac";
+const motion = data?.motion ?? "reduced";
+const el = data?.element ?? null;
+const initial = JSON.stringify({ version: data?.version ?? "", element: el });
+---
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>guide · the plan</title>
+    <meta name="robots" content="noindex, nofollow" />
+    <style set:html={themeStyle}></style>
+  </head>
+  <body>
+    <div class="gov" data-theme={theme} data-motion={motion} data-token={token} data-initial={initial} data-kind="sheet">
+      <div data-slot></div>
+      <div class="gov-plate gov-empty" data-empty hidden={!!el}>
+        <span class="gov-eyebrow">Squirrel Guides</span>
+        <span class="say">No plan on this build.</span>
+      </div>
+    </div>
+  </body>
+</html>
+
+<script>
+  import { drawElement } from "../../lib/overlay-elements";
+  const root = document.querySelector<HTMLElement>(".gov")!;
+  const token = root.dataset.token || "";
+  let last: any = JSON.parse(root.dataset.initial || "{}");
+  const still = root.dataset.motion === "still", reduced = root.dataset.motion === "reduced";
+  const slot = root.querySelector<HTMLElement>("[data-slot]")!;
+  const empty = root.querySelector<HTMLElement>("[data-empty]")!;
+  const paint = async (prev: any, next: any) => {
+    empty.hidden = !!next;
+    await drawElement(slot, "sheet", prev, next, { still, reduced });
+  };
+  paint(null, last.element ?? null);
+  const tick = async () => {
+    if (!token) return;
+    try {
+      const r = await fetch(`/api/overlay/guide?t=${encodeURIComponent(token)}&v=${encodeURIComponent(last.version ?? "")}`, { cache: "no-store" });
+      if (!r.ok) return;
+      const next = await r.json();
+      if (next.unchanged) return;             /* nineteen polls in twenty */
+      if (next.version !== last.version) {
+        await paint(last.element ?? null, next.element ?? null);
+        last = { version: next.version, element: next.element ?? null };
+      }
+    } catch { /* offline: the last frame stands */ }
+  };
+  window.setInterval(tick, 2000);
+</script>
