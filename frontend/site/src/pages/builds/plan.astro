@@ -227,6 +227,15 @@ const WORDS = {
           <Button type="button" variant="primary" data-review>{say("plan.review", "Review")}</Button>
         </aside>
 
+        {/* one record whole — an almanac table in our type, never a tooltip */}
+        <aside class="pl-drawer pl-record" data-record hidden aria-label={say("record.aria", "One record")}>
+          <div class="pl-drawer-head">
+            <span class="gd-eyebrow">{say("record.eyebrow", "Read")}</span>
+            <button type="button" class="pl-close" data-close-record aria-label={say("record.close", "Close")}>✕</button>
+          </div>
+          <div data-record-body></div>
+        </aside>
+
         <div class="pl-bar" data-bar>
           <button type="button" class="pl-bar-open" data-open-plan>
             <span>{say("bar.plan", "The plan")}</span>
@@ -381,6 +390,7 @@ const WORDS = {
   import { MARKS } from "../../lib/marks";
   import { slotMark, kindMark } from "../../lib/planner";
   import { drawAssumptions, drawBreakdown, drawGroups, drawHeadline, rowsOf } from "../../lib/statsbar";
+  import { drawRecord } from "../../lib/record";
 
   type Field = { type: string; kind?: string; sub?: string | string[]; max?: number; min?: number; unit?: string; options?: string[]; list?: string };
   type Section = { id: string; name: string; type: string; kind?: string; sub?: string | string[]; by_class?: boolean;
@@ -486,7 +496,7 @@ const WORDS = {
               <span class="pl-pick-mark">${mark(kindMark(r as any))}</span>
               <span class="pl-pick-name">${escape(r.name)}</span>
               <span class="pl-pick-meta">${taken.has(r.id) ? "chosen" : escape(r.group || "")}</span>
-            </button></li>`).join("")
+            </button><button type="button" class="pl-read" data-read="${escape(sec.kind)}:${escape(r.id)}">Read</button></li>`).join("")
           : `<li><p class="gd-soft">Nothing here is called “${escape(needle)}”. Clear the search to see all ${rows.length}.</p></li>`;
       };
       search?.addEventListener("input", draw);
@@ -877,6 +887,28 @@ const WORDS = {
       saying.textContent = (made?.problems || [words.failed])[0];
     }
 
+    /* ── one record whole ─────────────────────────────────────────────── */
+
+    const record = document.querySelector<HTMLElement>("[data-record]");
+    let packSeen: any = null;
+
+    async function readRecord(kind: string, id: string) {
+      if (!record) return;
+      if (!packSeen) packSeen = await ask<any>(`/api/gamedata/${game}`);
+      const rec = await ask<any>(`/api/gamedata/${game}/${kind}/${id}`);
+      if (!rec) return;
+      record.querySelector("[data-record-body]")!.innerHTML = drawRecord(rec, packSeen);
+      record.hidden = false;
+    }
+    document.querySelector("[data-close-record]")?.addEventListener("click", () => { record!.hidden = true; });
+    work.addEventListener("click", (e) => {
+      const read = (e.target as HTMLElement).closest<HTMLElement>("[data-read]");
+      if (!read) return;
+      e.stopPropagation();
+      const [kind, id] = read.dataset.read!.split(":");
+      readRecord(kind, id);
+    });
+
     document.querySelectorAll("[data-review]").forEach((b) => b.addEventListener("click", review));
     document.querySelectorAll("[data-open-plan]").forEach((b) => b.addEventListener("click", () => { drawer.hidden = false; }));
     document.querySelectorAll("[data-close-plan]").forEach((b) => b.addEventListener("click", () => { drawer.hidden = true; }));
@@ -910,4 +942,22 @@ const WORDS = {
   .pl-refused { display: grid; gap: 6px; padding: 16px; border: 1px solid var(--line-strong); border-radius: 4px; }
   .pl-refused .gd-mono { font-size: 13px; color: var(--ink-soft); }
   .pl-start { padding-top: 8px; border-top: 1px solid var(--line-strong); }
+</style>
+
+<style is:global>
+  .pl-record { z-index: 45; }
+  .pl-read { border: 0; background: none; color: var(--accent); font-family: var(--font-body); font-size: 12px;
+    cursor: pointer; padding: 4px 8px; justify-self: end; }
+  .pl-read:hover { color: var(--accent-hover); text-decoration: underline; }
+  .pl-list > li { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; }
+  .rc-head { display: grid; gap: 4px; }
+  .rc-part { display: grid; gap: 2px; padding-top: 10px; }
+  .rc-row { display: flex; align-items: baseline; gap: 8px; padding: 4px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
+  .rc-lead { flex: 1; border-bottom: 1px dotted var(--line-strong); transform: translateY(-4px); }
+  .rc-val { font-family: var(--font-mono); font-size: 12px; font-variant-numeric: tabular-nums; color: var(--ink-soft); }
+  /* the top tier is the only mark this drawer gives */
+  .rc-top .rc-val, .rc-top > span:first-child { color: var(--rose); }
+  .rc-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; }
+  .rc-chip { font-family: var(--font-mono); font-size: 11px; color: var(--ink-soft);
+    border: 1px solid var(--line); border-radius: 4px; padding: 3px 8px; }
 </style>
