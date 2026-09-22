@@ -97,10 +97,13 @@ const WORDS = {
         {/* ⚠ On the desk this is the only way to raise the plan — the phone's
             bar is display:none here. Without it the drawer is unreachable. */}
         {pack && step === "section" && (
-          <button type="button" class="pl-show-plan" data-open-plan>
-            {say("head.show_plan", "The plan")}
-            <span class="gd-mono" data-bar-count>{say("bar.none", "nothing yet")}</span>
-          </button>
+          <span class="pl-head-actions">
+            <button type="button" class="pl-show-plan" data-open-plan>
+              {say("head.show_plan", "The plan")}
+              <span class="gd-mono" data-bar-count>{say("bar.none", "nothing yet")}</span>
+            </button>
+            <button type="button" class="pl-show-plan" data-review>{say("head.review", "Review")}</button>
+          </span>
         )}
       </div>
       {!pack && (
@@ -245,7 +248,8 @@ const WORDS = {
     background: none; color: var(--ink); font-family: var(--font-body); font-size: 13px; padding: 6px 12px; cursor: pointer; }
   .pl-show-plan:hover { background: var(--surface-veil); }
   .pl-show-plan .gd-mono { font-size: 12px; color: var(--ink-faint); }
-  @media (max-width: 600px) { .pl-show-plan { display: none; } }
+  .pl-head-actions { display: inline-flex; gap: 8px; }
+  @media (max-width: 600px) { .pl-head-actions { display: none; } }
 
   /* the games, as tiles a person chooses between */
   .pl-games { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: var(--space-5); }
@@ -394,6 +398,7 @@ const WORDS = {
     const planLines = document.querySelector<HTMLElement>("[data-plan-lines]")!;
 
     /** The person's choices. Nothing here is checked — the server does that. */
+    const words = JSON.parse(root.dataset.words || "{}") as { failed: string; needsName: string };
     const plan: Record<string, any> = {};
     /* ⚠ Every record the chooser has drawn, by id. The plan holds ids because
        that is what the server reads; a person must never be shown one. */
@@ -551,7 +556,12 @@ const WORDS = {
       const places = slots.filter((s) => !left.has(s.id));
       panel.innerHTML = `<ul class="pl-list">${places.map((s) => {
         const chosen = (plan[sec.id] || {})[s.id];
-        const target = chosen ? Object.values(chosen).filter(Boolean).join(" · ") : "";
+        /* ⚠ the plan holds ids; a slot row must read in words */
+        const target = chosen ? Object.entries(chosen)
+          .filter(([, v]) => v !== "" && v != null && !(Array.isArray(v) && !v.length))
+          .map(([k, v]) => Array.isArray(v) ? v.map((x) => nameOf(String(x))).join(", ")
+            : typeof v === "number" ? `${v} ${sec.fields?.[k]?.unit || ""}`.trim() : nameOf(String(v)))
+          .join(" · ") : "";
         return `<li><button type="button" class="pl-slot" data-slot="${escape(s.id)}">
           <span class="gd-dot" data-state="${chosen ? "now" : "open"}" aria-hidden="true"></span>
           <span class="pl-slot-mark">${mark(slotMark(s.id), 24)}</span>
@@ -560,6 +570,118 @@ const WORDS = {
             <span class="pl-slot-target" data-empty="${target ? "no" : "yes"}">${escape(target || "not chosen yet")}</span>
           </span></button></li>`;
       }).join("")}</ul>`;
+      panel.querySelectorAll<HTMLElement>("[data-slot]").forEach((b) =>
+        b.addEventListener("click", () => openSlot(sec, b.dataset.slot!)));
+    }
+
+    /** The fields a gear choice carries, in the spec's three groups. */
+    const WEARS = ["aspect", "affixes", "greater", "tempers", "gems", "runes", "runeword", "sockets", "jewels"];
+    const HOW_FAR = ["masterwork", "item_power", "quality", "ethereal", "note"];
+
+    async function openSlot(sec: Section, slotId: string) {
+      const slot = slots.find((s) => s.id === slotId);
+      const chosen = { ...((plan[sec.id] || {})[slotId] || {}) };
+      const fields = Object.entries(sec.fields || {});
+      const pickers = await Promise.all(fields
+        .filter(([, f]) => f.type === "id" || f.type === "ids")
+        .map(async ([name, f]) => {
+          const params = new URLSearchParams({ limit: "300", brief: "true", slot_id: slotId });
+          if (f.sub) params.set("sub", Array.isArray(f.sub) ? f.sub.join(",") : f.sub);
+          if (classId) params.set("class_id", classId);
+          const rows = (await ask<Row[]>(`/api/gamedata/${game}/${f.kind}?${params}`)) || [];
+          rows.forEach((r) => knownNames.set(r.id, r.name));
+          return [name, f, rows] as const;
+        }));
+
+      const group = (which: string[]) => pickers.filter(([n]) => which.includes(n));
+      const what = pickers.filter(([n]) => !WEARS.includes(n) && !HOW_FAR.includes(n));
+      const numbers = fields.filter(([n, f]) => HOW_FAR.includes(n) && (f.type === "int" || f.type === "text" || f.type === "choice"));
+
+      const chooser = ([name, f, rows]: readonly [string, Field, Row[]]) => {
+        const many = f.type === "ids";
+        const taken: string[] = many ? (chosen[name] || []) : chosen[name] ? [chosen[name]] : [];
+        return `<div class="pl-target">
+          <label for="f-${escape(name)}">${escape(name.replace(/_/g, " "))}${many && f.max ? ` <span class="gd-hint">up to ${f.max}</span>` : ""}</label>
+          <select class="pl-field" id="f-${escape(name)}" data-field="${escape(name)}" data-many="${many ? "yes" : "no"}">
+            <option value="">${rows.length ? `— choose from ${rows.length} —` : "— nothing fits this slot —"}</option>
+            ${rows.map((r) => `<option value="${escape(r.id)}">${escape(r.name)}</option>`).join("")}
+          </select>
+          ${taken.length ? `<p class="pl-slot-target">${taken.map((t) => `<button type="button" class="pl-remove" data-unset="${escape(name)}:${escape(t)}">${escape(nameOf(t))} ✕</button>`).join(" ")}</p>` : ""}
+        </div>`;
+      };
+
+      panel.innerHTML = `
+        <button type="button" class="pl-remove" data-back-to-slots>← ${escape(sec.name)}</button>
+        <h3 class="gd-h3">${escape(slot?.name || slotId)}</h3>
+        ${what.length ? `<p class="gd-eyebrow">What</p><div class="pl-targets">${what.map(chooser).join("")}</div>` : ""}
+        ${group(WEARS).length ? `<p class="gd-eyebrow">What it wears</p><div class="pl-targets">${group(WEARS).map(chooser).join("")}</div>` : ""}
+        ${numbers.length ? `<p class="gd-eyebrow">How far</p><div class="pl-targets">${numbers.map(([name, f]) => `
+          <div class="pl-target">
+            <label for="n-${escape(name)}">${escape(name.replace(/_/g, " "))}</label>
+            ${f.type === "choice"
+              ? `<select class="pl-field" id="n-${escape(name)}" data-plain="${escape(name)}">${(f.options || []).map((o) => `<option value="${escape(o)}"${chosen[name] === o ? " selected" : ""}>${escape(o || "—")}</option>`).join("")}</select>`
+              : `<input class="pl-field" id="n-${escape(name)}" data-plain="${escape(name)}" type="${f.type === "int" ? "number" : "text"}"
+                   ${f.type === "int" ? `min="${f.min ?? 0}" max="${f.max ?? 999999}"` : `maxlength="120"`} value="${escape(chosen[name] ?? "")}">`}
+          </div>`).join("")}</div>` : ""}
+        <div class="pl-writes">
+          <p class="gd-eyebrow">The goal this writes</p>
+          <p class="gd-mono" data-writes></p>
+        </div>
+        <div class="pl-slot-actions">
+          <button type="button" class="pl-keep" data-keep>Keep this slot</button>
+          <button type="button" class="pl-remove" data-clear>Clear it</button>
+        </div>`;
+
+      const writes = panel.querySelector<HTMLElement>("[data-writes]")!;
+      const shown = () => Object.entries(chosen)
+        .filter(([, v]) => v !== "" && v != null && !(Array.isArray(v) && !v.length))
+        .map(([k, v]) => Array.isArray(v) ? v.map((x) => nameOf(String(x))).join(", ") : (typeof v === "number" ? `${v} ${sec.fields?.[k]?.unit || ""}`.trim() : nameOf(String(v))))
+        .join(" · ");
+      const repaint = () => { writes.textContent = shown() || "nothing chosen yet"; };
+      repaint();
+
+      panel.addEventListener("change", (e) => {
+        const sel = (e.target as HTMLElement).closest<HTMLSelectElement | HTMLInputElement>("[data-field],[data-plain]");
+        if (!sel) return;
+        if (sel.dataset.field) {
+          const name = sel.dataset.field;
+          const many = (sel as HTMLElement).dataset.many === "yes";
+          if (!sel.value) return;
+          if (many) {
+            const at: string[] = chosen[name] || [];
+            const cap = sec.fields?.[name]?.max ?? 12;
+            if (!at.includes(sel.value) && at.length < cap) chosen[name] = [...at, sel.value];
+          } else chosen[name] = sel.value;
+          (sel as HTMLSelectElement).value = "";
+        } else {
+          const name = sel.dataset.plain!;
+          const f = sec.fields?.[name];
+          chosen[name] = f?.type === "int" ? Number(sel.value) || undefined : sel.value || undefined;
+          if (chosen[name] === undefined) delete chosen[name];
+        }
+        openSlotAgain();
+      });
+      const openSlotAgain = () => {
+        const box = plan[sec.id] || (plan[sec.id] = {});
+        box[slotId] = chosen;
+        openSlot(sec, slotId);
+      };
+      panel.querySelector("[data-back-to-slots]")?.addEventListener("click", () => showSection(sec));
+      panel.querySelector("[data-keep]")?.addEventListener("click", () => {
+        const box = plan[sec.id] || (plan[sec.id] = {});
+        if (Object.keys(chosen).length) box[slotId] = chosen; else delete box[slotId];
+        showSection(sec);
+      });
+      panel.querySelector("[data-clear]")?.addEventListener("click", () => {
+        delete (plan[sec.id] || {})[slotId];
+        showSection(sec);
+      });
+      panel.querySelectorAll<HTMLElement>("[data-unset]").forEach((btn) => btn.addEventListener("click", () => {
+        const [name, value] = btn.dataset.unset!.split(":");
+        if (Array.isArray(chosen[name])) chosen[name] = chosen[name].filter((x: string) => x !== value);
+        else delete chosen[name];
+        openSlotAgain();
+      }));
     }
 
     function showTargets(sec: Section) {
@@ -617,6 +739,78 @@ const WORDS = {
       if (current) panelCount.textContent = chosenCount(current) ? `${chosenCount(current)} chosen` : "";
     }
 
+    /* ── the review, and starting the build ──────────────────────────── */
+
+    async function review() {
+      drawer.hidden = true;
+      current = null;
+      panelName.textContent = "Read it back, then start the build";
+      panelCount.textContent = "";
+      panelLede.textContent = "";
+      const body = { game, plan: { ...planBody() } };
+      const said = await post("/api/builds/sheet", body);
+      const summary = said?.summary;
+      const problems: string[] = said?.problems || [];
+      const runs = (await ask<{ id: number; name: string }[]>("/api/runs")) || [];
+      panel.innerHTML = `
+        ${problems.length ? consoleRows("What the data could not keep", problems) : ""}
+        <p class="gd-eyebrow">The plan · ${summary?.choices ?? 0} choices</p>
+        <div class="pl-drawer-body">${summary ? planLinesOf(summary) : ""}</div>
+        <div class="pl-targets pl-start">
+          <div class="pl-target"><label for="pl-name">Name</label>
+            <input class="pl-field" id="pl-name" data-name maxlength="80" placeholder="What to call this character"></div>
+          <div class="pl-target"><label for="pl-variant">Variant</label>
+            <input class="pl-field" id="pl-variant" data-variant maxlength="80" value="${escape(summary?.className || "")}">
+            <p class="gd-hint">The class named it. Change it if you like.</p></div>
+          <div class="pl-target"><label for="pl-run">Beside a run</label>
+            <select class="pl-field" id="pl-run" data-run>
+              <option value="">None — a build can stand alone</option>
+              ${runs.map((r) => `<option value="${r.id}">${escape(r.name)}</option>`).join("")}
+            </select></div>
+        </div>
+        <div class="pl-slot-actions">
+          <button type="button" class="pl-keep" data-start>Start the build</button>
+          <span class="gd-hint" data-saying></span>
+        </div>
+        <p class="gd-hint">This writes the grid from Gear, checks from the sections you picked, and counters from the numbers.
+          You may overwrite any target's words afterwards.</p>`;
+      panel.querySelector("[data-start]")?.addEventListener("click", start);
+    }
+
+    const planBody = () => ({ class_id: classId, sections: plan });
+
+    async function post(path: string, body: unknown) {
+      try {
+        const r = await fetch(path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+        const said = await r.json().catch(() => null);
+        return r.ok ? said : { problems: [said?.detail || words.failed] };
+      } catch { return { problems: [words.failed] }; }
+    }
+
+    const consoleRows = (head: string, rows: string[]) => `
+      <div class="pl-refused"><p class="gd-eyebrow">${escape(head)}</p>
+        ${rows.map((r) => `<p class="gd-mono">${escape(r)}</p>`).join("")}
+        <p class="gd-hint">The rest of the plan is kept.</p></div>`;
+
+    const planLinesOf = (summary: any) => (summary.sections || []).map((sec: any) =>
+      `<p class="pl-plan-head">${escape(sec.name)}</p>` + (sec.lines || []).map((l: any) =>
+        `<div class="pl-plan-line"><span>${escape(l.label)}</span><span>${escape(l.detail || "")}</span></div>`).join("")).join("");
+
+    async function start() {
+      const saying = panel.querySelector<HTMLElement>("[data-saying]")!;
+      const name = (panel.querySelector<HTMLInputElement>("[data-name]")?.value || "").trim();
+      if (!name) { saying.textContent = words.needsName; return; }
+      saying.textContent = "";
+      const runId = Number(panel.querySelector<HTMLSelectElement>("[data-run]")?.value || 0);
+      const made = await post("/api/builds/plan", {
+        game, name, variant: (panel.querySelector<HTMLInputElement>("[data-variant]")?.value || "").trim(),
+        run_id: runId || null, plan: planBody(),
+      });
+      if (made?.id) { window.location.href = `/builds/${made.id}`; return; }
+      saying.textContent = (made?.problems || [words.failed])[0];
+    }
+
+    document.querySelectorAll("[data-review]").forEach((b) => b.addEventListener("click", review));
     document.querySelectorAll("[data-open-plan]").forEach((b) => b.addEventListener("click", () => { drawer.hidden = false; }));
     document.querySelectorAll("[data-close-plan]").forEach((b) => b.addEventListener("click", () => { drawer.hidden = true; }));
     work.addEventListener("click", (e) => {
@@ -634,3 +828,19 @@ const WORDS = {
     })();
   }
 </script>
+
+<style is:global>
+  .pl-writes { display: grid; gap: 6px; padding: 14px; background: var(--surface-inset); border-radius: 4px; }
+  .pl-writes .gd-mono { font-size: 13px; color: var(--ink); text-wrap: pretty; }
+  .pl-slot-actions { display: flex; align-items: center; gap: 12px; }
+  .pl-keep { font-family: var(--font-body); font-size: 14px; font-weight: 600; color: var(--on-accent);
+    background: var(--accent); border: 1px solid var(--accent); border-radius: 4px; padding: 10px 18px; min-height: 40px; cursor: pointer; }
+  .pl-keep:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+  .pl-keep:active { transform: translateY(1px); }
+</style>
+
+<style is:global>
+  .pl-refused { display: grid; gap: 6px; padding: 16px; border: 1px solid var(--line-strong); border-radius: 4px; }
+  .pl-refused .gd-mono { font-size: 13px; color: var(--ink-soft); }
+  .pl-start { padding-top: 8px; border-top: 1px solid var(--line-strong); }
+</style>
