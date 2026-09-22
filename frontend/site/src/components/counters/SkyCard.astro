@@ -208,7 +208,16 @@ const athens = at
 
   .rim { fill: none; stroke: var(--line); stroke-width: 1; }
   .spoke { stroke: var(--line); stroke-width: 1; }
-  .sg { fill: var(--ink-faint); font-size: 13px; opacity: .55; }
+  /* ⚠ Every glyph here needs AstroSymbols named on it. Commissioner has no
+     zodiac and no planets, so without this each one falls back to whatever
+     the reader happens to have installed — which drew half a zodiac garbled
+     on one machine and clean on another, and is not a thing a chart may
+     depend on. The face is declared in tokens/fonts-local.css. */
+  .sg, .bg, .glyph { font-family: "AstroSymbols", var(--font-body); }
+  /* ⚠ .55 opacity on --ink-faint measured 4.4:1 against the dusk ground —
+     under the 4.5:1 this site holds itself to, and it read as unfinished
+     rather than as quiet. A sign nothing sits in is still a sign. */
+  .sg { fill: var(--ink-soft); font-size: 13px; opacity: .85; }
   /* A sector holding a body is inked. Everything else recedes, so the wheel
      reads as where things ARE rather than as twelve equal labels. */
   .sg.on { fill: var(--accent); opacity: 1; }

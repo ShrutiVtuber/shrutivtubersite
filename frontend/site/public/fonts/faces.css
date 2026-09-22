@@ -299,3 +299,28 @@
   src: url('https://shrutivtuber.com/fonts/notoserifdevanagari-ec0d331a.woff2') format('woff2');
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
+
+/* ── AstroSymbols ────────────────────────────────────────────────────────────
+ *
+ * ⚠ Written by hand, not fetched: the faces above come from Google Fonts and
+ * are regenerated, this one does not.
+ *
+ * The charts write `font-family="AstroSymbols"` into their SVG, and that SVG
+ * is served to browsers. Until this block existed the name resolved to
+ * nothing and every sign, planet and aspect glyph fell back to whatever the
+ * reader's machine happened to have — so half a zodiac came out doubled or
+ * garbled on one machine and clean on another. A chart is not allowed to
+ * depend on what somebody has installed.
+ *
+ * 3.5KB: a 29-codepoint cut of DejaVu Sans under the DejaVu Fonts License,
+ * which permits subsetting and redistribution. The same file the server
+ * rasterises share cards with — see frontend/site/fonts-render/README.md.
+ */
+@font-face {
+  font-family: 'AstroSymbols';
+  font-style: normal;
+  font-weight: 400;
+  font-display: block;
+  src: url('https://shrutivtuber.com/fonts/astrosymbols-0f66b2b3.woff2') format('woff2');
+  unicode-range: U+00B0, U+2032-2033, U+211E, U+2609-260B, U+263D-2640, U+2642-2653;
+}

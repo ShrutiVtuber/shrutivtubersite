@@ -19,6 +19,13 @@ They exist because the rasteriser cannot use what the site ships:
 | `EBGaramond.ttf` | her display face, upright, pinned to 500 |
 | `AstroSymbols.ttf` | a 5.6KB cut of DejaVu Sans — the 29 codepoints the wheel prints, and nothing else |
 
+⚠ **AstroSymbols is the exception to the sentence above.** It is served to
+browsers as well, as `public/fonts/astrosymbols-*.woff2`, because the charts
+name it in SVG that browsers render. It was not, once, and every glyph in a
+wheel fell back to whatever the reader had installed — half a zodiac came out
+garbled on one machine and clean on another. Rebuild the woff2 from this file
+whenever this file changes.
+
 Do not edit these. Rebuild them:
 
 ```bash
