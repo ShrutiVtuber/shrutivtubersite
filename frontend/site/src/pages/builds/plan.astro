@@ -393,6 +393,7 @@ const WORDS = {
   import { drawRecord } from "../../lib/record";
   import { drawSynergyPanel, drawTab, type Tab, type Synergy } from "../../lib/tree-tabs";
   import { cellKind, drawBoard, drawChain, type Board, type Cell } from "../../lib/tree-paragon";
+  import { PRESETS, ZOOM_MAX, ZOOM_MIN, ZOOM_STEP, bounds, depth, drawTree, fitFor, nodeKind, type Node as TreeNode } from "../../lib/tree-passive";
 
   type Field = { type: string; kind?: string; sub?: string | string[]; max?: number; min?: number; unit?: string; options?: string[]; list?: string };
   type Section = { id: string; name: string; type: string; kind?: string; sub?: string | string[]; by_class?: boolean;
@@ -584,14 +585,103 @@ const WORDS = {
       return true;
     }
 
+    /* ── the passive tree, where a game has one ───────────────────────── */
+
+    let treeNodes: TreeNode[] = [];
+    let zoom: number = PRESETS.mid;
+    let pan = { x: 0, y: 0 };
+
+    async function showTree(sec: Section): Promise<boolean> {
+      if (!treeNodes.length) {
+        /* the chooser lists what can be named; the canvas draws everything */
+        treeNodes = (await ask<TreeNode[]>(`/api/gamedata/${game}/node?limit=5000&brief=false`)) || [];
+        treeNodes.forEach((n) => knownNames.set(n.id, n.name));
+      }
+      if (!treeNodes.length) return false;
+      const taken = new Set(picksOf(sec).map((p) => p.id));
+      const box = document.createElement("div");
+      box.className = "pt-wrap";
+      const middle = bounds(treeNodes);
+      /* ⚠ the real tree spans tens of thousands of units; the presets are
+         multiples of the scale that fits it, never absolute */
+      const fit = fitFor(treeNodes);
+      const home = () => { zoom = fit * PRESETS.mid; pan = { x: -(middle.minX + middle.maxX) / 2, y: -(middle.minY + middle.maxY) / 2 }; };
+      if (!pan.x && !pan.y) home();
+      box.innerHTML = `
+        <div class="pt-tools">
+          <button type="button" class="pl-read" data-zoom="out" aria-label="Zoom out">−</button>
+          <span class="gd-mono" data-zoom-at></span>
+          <button type="button" class="pl-read" data-zoom="in" aria-label="Zoom in">+</button>
+          <button type="button" class="pl-read" data-zoom="home">Home</button>
+          <span class="gd-mono pt-budget" data-budget></span>
+        </div>
+        <div class="pt-canvas">
+          <svg viewBox="-620 -360 1240 720" role="img" aria-label="The passive tree">
+            <g data-stage></g>
+          </svg>
+        </div>
+        <div class="pt-rail" data-node-rail><p class="gd-hint">Take a node to see what it grants.</p></div>
+        <p class="gd-hint pt-key">Hollow is not yet reachable · a ring is reachable · filled is allocated ·
+          blue is the one you are looking at. Names arrive as you zoom in: keystones first, then notables.
+          The small nodes are counted, never named.</p>`;
+      panel.prepend(box);
+      const stage = box.querySelector<SVGGElement>("[data-stage]")!;
+      const paintTree = () => {
+        stage.setAttribute("transform", `scale(${zoom}) translate(${pan.x} ${pan.y})`);
+        stage.innerHTML = drawTree(treeNodes, taken, looking, zoom, fit);
+        box.querySelector("[data-zoom-at]")!.textContent = `${Math.round(depth(zoom, fit) * 100)}%`;
+        const budget = sec.points ? Number((plan[sec.id] || {}).points || 0) : 0;
+        box.querySelector("[data-budget]")!.textContent =
+          `${picksOf(sec).length} chosen${budget ? ` · ${budget} points` : ""}`;
+      };
+      paintTree();
+
+      box.addEventListener("click", (e) => {
+        const z = (e.target as HTMLElement).closest<HTMLElement>("[data-zoom]");
+        if (z) {
+          if (z.dataset.zoom === "home") { home(); looking = ""; }
+          else zoom = Math.max(fit * ZOOM_MIN, Math.min(fit * ZOOM_MAX, zoom * (z.dataset.zoom === "in" ? ZOOM_STEP : 1 / ZOOM_STEP)));
+          paintTree();
+          return;
+        }
+        const node = (e.target as HTMLElement).closest<SVGElement>("[data-node]");
+        if (!node) return;
+        looking = node.getAttribute("data-node")!;
+        const rec = treeNodes.find((n) => n.id === looking);
+        const rail = box.querySelector<HTMLElement>("[data-node-rail]")!;
+        rail.innerHTML = rec ? `
+          <p class="gd-eyebrow">${escape(nodeKind(rec))}</p>
+          <p class="pl-slot-name">${escape(rec.name)}</p>
+          ${((rec as any).stats || []).slice(0, 6).map((st: any) =>
+            `<div class="rc-row"><span>${escape(st.stat || st.text || "")}</span><span class="rc-lead"></span>
+             <span class="rc-val">${escape(st.value ?? "")}</span></div>`).join("")}
+          <button type="button" class="pl-read" data-read="node:${escape(rec.id)}">Open the record</button>` : "";
+        paintTree();
+      });
+
+      /* one finger drags the canvas; nothing animates by itself */
+      const canvas = box.querySelector<HTMLElement>(".pt-canvas")!;
+      let from: { x: number; y: number } | null = null;
+      canvas.addEventListener("pointerdown", (e) => { from = { x: e.clientX, y: e.clientY }; canvas.setPointerCapture(e.pointerId); });
+      canvas.addEventListener("pointermove", (e) => {
+        if (!from) return;
+        pan = { x: pan.x + (e.clientX - from.x) / zoom, y: pan.y + (e.clientY - from.y) / zoom };
+        from = { x: e.clientX, y: e.clientY };
+        stage.setAttribute("transform", `scale(${zoom}) translate(${pan.x} ${pan.y})`);
+      });
+      canvas.addEventListener("pointerup", () => { from = null; });
+      return true;
+    }
+
     /** The drawn surface a section has, if its game has one. */
     const hasSurface = (sec: Section) =>
-      (sec.id === "skills" && !!sec.track && sec.track !== "check") || sec.kind === "board";
+      (sec.id === "skills" && !!sec.track && sec.track !== "check") || sec.kind === "board" || sec.kind === "node";
 
     async function showSurface(sec: Section) {
       /* the chooser is the way in by name; this is the surface */
       if (sec.id === "skills" && sec.track && sec.track !== "check") await showTabs(sec);
       if (sec.kind === "board") await showBoards(sec);
+      if (sec.kind === "node") await showTree(sec);
     }
 
     async function showChooser(sec: Section) {
@@ -1143,4 +1233,21 @@ const WORDS = {
   .pg-cell { cursor: pointer; }
   .pg-rail { display: grid; gap: 4px; align-content: start; }
   .pg-key { max-width: 66ch; }
+</style>
+
+<style is:global>
+  .pt-wrap { display: grid; gap: 12px; }
+  .pt-tools { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .pt-budget { margin-left: auto; font-size: 12px; color: var(--ink-faint); }
+  .pt-canvas { position: relative; height: 620px; background: var(--surface-inset);
+    border: 1px solid var(--line-strong); border-radius: 4px; overflow: hidden; touch-action: none; cursor: grab; }
+  .pt-canvas:active { cursor: grabbing; }
+  @media (max-width: 600px) { .pt-canvas { height: 460px; } }
+  .pt-canvas svg { width: 100%; height: 100%; display: block; }
+  .pt-edges { stroke: var(--line-strong); stroke-width: 3; opacity: .6; }
+  .pt-node { cursor: pointer; }
+  .pt-label { fill: var(--ink-soft); font-family: var(--font-body); paint-order: stroke;
+    stroke: var(--surface-inset); stroke-width: 6px; stroke-linejoin: round; }
+  .pt-rail { display: grid; gap: 4px; }
+  .pt-key { max-width: 66ch; }
 </style>
