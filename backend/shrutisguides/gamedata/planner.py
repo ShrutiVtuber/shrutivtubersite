@@ -465,6 +465,39 @@ def stream_sheet(plan: dict, data: GameData, name: str, progress: dict) -> dict:
     }
 
 
+def what_changes(before: list[dict], after: list[dict], goals: Any) -> dict:
+    """
+    What a re-plan would do to the goals a person already has — kept, gone,
+    new — so it can be read BEFORE it is saved.
+
+    ⚠ The comparison is between the ITEMS, not between the goals that happen
+    to have something in them. A person who loses five slots they had not yet
+    filled has still lost five slots, and telling them "nothing gone" because
+    they had not ticked those yet would be a lie of the most annoying kind.
+    What a lost item CARRIED — a tick, their own words — travels with it, so
+    the ones that cost something are the ones that read loudest.
+    """
+    now = goals if isinstance(goals, dict) else {}
+    was = {it["id"]: it for c in before or [] for it in c.get("items", [])}
+    will = {it["id"]: it for c in after or [] for it in c.get("items", [])}
+
+    def carried(item_id: str, label: str) -> dict:
+        g = now.get(item_id) if isinstance(now.get(item_id), dict) else {}
+        # ⚠ `partial` and a count are progress as much as `met` is; a person
+        # who was halfway has something to lose too
+        return {"id": item_id, "label": label, "met": bool(g.get("met")),
+                "partly": bool(g.get("partial")), "have": _int(g.get("have"), 0, builds.MAX_COUNT) or 0,
+                "words": str(g.get("target") or "")[:120]}
+
+    kept = [carried(i, will[i]["label"]) for i in was if i in will]
+    gone = [carried(i, was[i]["label"]) for i in was if i not in will]
+    new = [{"id": i, "label": will[i]["label"]} for i in will if i not in was]
+    return {"kept": kept, "gone": gone, "new": new,
+            "counts": {"kept": len(kept), "gone": len(gone), "new": len(new)},
+            # ⚠ what it actually costs: the gone items somebody had put something into
+            "costs": [g for g in gone if g["met"] or g["partly"] or g["have"] or g["words"]]}
+
+
 def plan_summary(plan: dict, data: GameData) -> dict:
     """The plan with names, for a page: the class, then each section's lines."""
     recipe = recipe_for(plan.get("game", ""))

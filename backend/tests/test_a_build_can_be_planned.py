@@ -195,3 +195,14 @@ def test_an_imported_build_stands_on_its_own_categories() -> None:
 def test_the_import_route_comes_before_the_build_id_route() -> None:
     source = inspect.getsource(builds)
     assert source.index('@router.post("/import"') < source.index('@router.get("/{build_id}")')
+
+
+def test_a_re_plan_can_be_read_before_it_is_done() -> None:
+    """⚠ The whole of 'nothing applied silently' for a re-plan."""
+    assert "what_changes(" in code_of(builds.preview_replan) and "what_changes(" in code_of(builds.replan)
+    body = code_of(builds.preview_replan)
+    for writes in ("session.add", "session.commit", "b.plan =", "b.goals ="):
+        assert writes not in body, f"{writes}: a preview must not change anything"
+    assert "changes" in code_of(builds.replan), "and saving says what it did"
+    source = inspect.getsource(builds)
+    assert source.index('@router.post("/{build_id}/plan/preview")') < source.index('@router.get("/{build_id}")')

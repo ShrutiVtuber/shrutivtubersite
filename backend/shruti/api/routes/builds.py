@@ -20,7 +20,7 @@ from sqlmodel import select
 
 from shrutisguides import buildfile, builds as shared
 from shrutisguides.builds import clean_categories, item_state, parse_list  # noqa: F401  (re-exported for callers and tests)
-from shrutisguides.gamedata import clean_plan, plan_goals, plan_summary, plan_to_categories, stream_sheet
+from shrutisguides.gamedata import clean_plan, plan_goals, plan_summary, plan_to_categories, stream_sheet, what_changes
 from shrutisguides.gamedata.calc import sheet as compute_sheet
 
 from shruti.api.deps import get_session, require_admin
@@ -446,6 +446,24 @@ async def create_planned_build(body: PlanIn, request: Request, session: AsyncSes
     return {**(await _build_view(session, b, with_sheet=True)), "problems": problems}
 
 
+@router.post("/{build_id}/plan/preview")
+async def preview_replan(build_id: int, body: RePlanIn, request: Request, session: AsyncSession = Depends(get_session)) -> dict:
+    """
+    What re-planning would do, read before it is done: which goals are kept
+    with their ticks and their words, which are gone, which are new.
+
+    ⚠ Nothing is applied here. This is the whole of "nothing applied
+    silently" for a re-plan — a person sees the cost before they agree to it.
+    """
+    b, _ = await _mine(session, request, build_id)
+    game = await session.get(Game, b.game_id) if b.game_id else None
+    if game is None:
+        raise HTTPException(409, "this build has no game to plan against")
+    plan, cats, problems = _planned(body.plan, game.slug)
+    return {"problems": problems, "changes": what_changes(categories_of(None, b), cats, b.goals),
+            "summary": plan_summary(plan, gamedata())}
+
+
 @router.put("/{build_id}/plan")
 async def replan(build_id: int, body: RePlanIn, request: Request, session: AsyncSession = Depends(get_session)) -> dict:
     """The plan changed: the categories are rewritten, and every goal whose id survives keeps its words and its state."""
@@ -456,13 +474,14 @@ async def replan(build_id: int, body: RePlanIn, request: Request, session: Async
     if game is None:
         raise HTTPException(409, "this build has no game to plan against")
     plan, cats, problems = _planned(body.plan, game.slug)
+    changes = what_changes(categories_of(None, b), cats, b.goals)
     b.plan = plan
     b.categories = cats
     b.goals = plan_goals(cats, b.goals)
     b.updated_at = datetime.now(timezone.utc)
     await session.commit()
     await session.refresh(b)
-    return {**(await _build_view(session, b, with_sheet=True)), "problems": problems}
+    return {**(await _build_view(session, b, with_sheet=True)), "problems": problems, "changes": changes}
 
 
 @router.get("/{build_id}")
