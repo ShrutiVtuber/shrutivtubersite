@@ -57,7 +57,28 @@ const firstSentence = (text: string) => String(text || "").split(/(?<=\.)\s/)[0]
 
 const totalRecords = (g: GamePack) => Object.values(g.counts || {}).reduce((a, b) => a + b, 0);
 const sectionNames = (g: GamePack) => (recipes[g.id]?.sections || []).map((s) => s.name);
-const step = pack ? (classes.length ? "class" : "section") : "game";
+/* a class is chosen by ?class=; until then the class step stands */
+const chosenClass = String(Astro.url.searchParams.get("class") || "").trim();
+const klass = classes.find((c) => c.id === chosenClass) || null;
+const step = !pack ? "game" : !klass ? "class" : "section";
+
+/* the sections rail, and what each will ask for. A section renders from its
+ * recipe — a new one needs no new design. */
+const sections = recipe ? recipe.sections : [];
+const sectionKindCount = async (sec: typeof sections[number]) => {
+  if (!pack || !sec.kind || sec.type === "gear" || sec.type === "targets") return 0;
+  const params = new URLSearchParams({ limit: "1", brief: "true" });
+  if (sec.by_class && klass) params.set("class_id", klass.id);
+  if (sec.sub) params.set("sub", Array.isArray(sec.sub) ? sec.sub.join(",") : sec.sub);
+  const rows = await site<Row[]>(`/api/gamedata/${pack.id}/${sec.kind}?${params}`);
+  return Array.isArray(rows) ? rows.length : 0;
+};
+/* the counts a rail row shows come from the pack, not from a second round trip */
+const availableIn = (sec: typeof sections[number]) => {
+  if (sec.type === "targets") return (sec.entries || []).length;
+  if (sec.type === "gear") return 0;
+  return pack && sec.kind ? pack.counts[sec.kind] || 0 : 0;
+};
 
 const WORDS = {
   failed: say("words.failed", "That did not go through. Try again."),
@@ -73,6 +94,14 @@ const WORDS = {
       <div class="pl-topline">
         <span class="gd-eyebrow">{say("head.eyebrow", "Build planner")}</span>
         {pack && <span class="gd-mono pl-data">{dataLine(pack)}</span>}
+        {/* ⚠ On the desk this is the only way to raise the plan — the phone's
+            bar is display:none here. Without it the drawer is unreachable. */}
+        {pack && step === "section" && (
+          <button type="button" class="pl-show-plan" data-open-plan>
+            {say("head.show_plan", "The plan")}
+            <span class="gd-mono" data-bar-count>{say("bar.none", "nothing yet")}</span>
+          </button>
+        )}
       </div>
       {!pack && (
         <Head as="h1" title={say("head.title", "Plan a build")}
@@ -112,7 +141,7 @@ const WORDS = {
       </section>
     )}
 
-    {pack && classes.length > 0 && (
+    {pack && step === "class" && classes.length > 0 && (
       <section class="pl-classes" aria-labelledby="pl-class">
         <div class="gd-head">
           <span id="pl-class" class="gd-eyebrow">{say("classes.eyebrow", "Which class")}</span>
@@ -141,6 +170,68 @@ const WORDS = {
       </section>
     )}
 
+    {pack && step === "section" && klass && recipe && (
+      <div class="pl-work" data-work data-class={klass.id}>
+        {/* the rail is a stepper AND a table of contents: every section is
+            reachable at any time, and nothing is lost between them */}
+        <nav class="pl-rail" aria-label={say("rail.aria", "The plan's sections")}>
+          <div class="pl-rail-head">
+            <span class="gd-eyebrow">{say("rail.eyebrow", "Sections")}</span>
+            <span class="gd-mono pl-rail-done" data-done>{say("rail.done", "0 of {n} done").replace("{n}", String(sections.length))}</span>
+          </div>
+          <ul class="pl-rail-list">
+            {sections.map((sec, i) => (
+              <li>
+                <button type="button" class="pl-rail-row" data-section={sec.id} aria-current={i === 0 ? "step" : undefined}>
+                  <span class="gd-dot" data-state="open" data-for={sec.id} aria-hidden="true"></span>
+                  <span class="pl-rail-name">{sec.name}</span>
+                  <span class="gd-mono pl-rail-count" data-count={sec.id}>
+                    {availableIn(sec) ? availableIn(sec).toLocaleString("en-GB") : ""}
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+          <p class="gd-hint">{say("rail.note", "Every section is reachable at any time. Nothing is lost between them.")}</p>
+        </nav>
+
+        <section class="pl-panel" data-panel aria-live="polite">
+          <div class="pl-panel-head">
+            <h2 class="gd-h2" data-panel-name>{sections[0]?.name}</h2>
+            <span class="gd-mono pl-panel-count" data-panel-count></span>
+          </div>
+          <p class="gd-soft" data-panel-lede></p>
+          <div data-panel-body></div>
+        </section>
+      </div>
+    )}
+
+    {pack && step === "section" && klass && (
+      <>
+        {/* the plan is a drawer on the desk and a sheet on the phone, and it
+            never hides: the bar below is the phone's guarantee */}
+        <aside class="pl-drawer" data-drawer hidden aria-label={say("plan.aria", "The plan so far")}>
+          <div class="pl-drawer-head">
+            <span class="gd-eyebrow">{say("plan.eyebrow", "The plan so far")}</span>
+            <button type="button" class="pl-close" data-close-plan aria-label={say("plan.close", "Hide the plan")}>✕</button>
+          </div>
+          <p class="gd-mono pl-drawer-count" data-plan-count>{say("plan.none", "nothing chosen yet")}</p>
+          <div class="pl-drawer-body" data-plan-lines></div>
+          <p class="gd-hint">{say("plan.unsaved", "Nothing is saved until you start the build.")}</p>
+          <Button type="button" variant="primary" data-review>{say("plan.review", "Review")}</Button>
+        </aside>
+
+        <div class="pl-bar" data-bar>
+          <button type="button" class="pl-bar-open" data-open-plan>
+            <span>{say("bar.plan", "The plan")}</span>
+            <span class="gd-mono" data-bar-count>{say("bar.none", "nothing yet")}</span>
+            <span aria-hidden="true">▴</span>
+          </button>
+          <Button type="button" variant="primary" size="sm" data-review>{say("plan.review", "Review")}</Button>
+        </div>
+      </>
+    )}
+
     <p class="gd-hint pl-affiliation">{say("foot.affiliation", "Not affiliated with or endorsed by Blizzard Entertainment or Grinding Gear Games; names are theirs, used to say what you are planning.")}</p>
   </div>
 </BaseLayout>
@@ -150,6 +241,11 @@ const WORDS = {
   .pl-top { display: grid; gap: 12px; }
   .pl-topline { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
   .pl-data { font-size: 12px; color: var(--ink-faint); }
+  .pl-show-plan { display: inline-flex; align-items: baseline; gap: 8px; border: 1px solid var(--line-strong); border-radius: 4px;
+    background: none; color: var(--ink); font-family: var(--font-body); font-size: 13px; padding: 6px 12px; cursor: pointer; }
+  .pl-show-plan:hover { background: var(--surface-veil); }
+  .pl-show-plan .gd-mono { font-size: 12px; color: var(--ink-faint); }
+  @media (max-width: 600px) { .pl-show-plan { display: none; } }
 
   /* the games, as tiles a person chooses between */
   .pl-games { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: var(--space-5); }
@@ -175,3 +271,366 @@ const WORDS = {
   .pl-affiliation { max-width: 66ch; }
   @media (max-width: 600px) { .pl { padding-bottom: 96px; } }
 </style>
+
+<style>
+  /* the desk is 264 and the rest: the chooser is the only column that needs width */
+  .pl-work { display: grid; grid-template-columns: 264px minmax(0, 1fr); gap: var(--space-6); align-items: start; }
+  @media (max-width: 900px) { .pl-work { grid-template-columns: minmax(0, 1fr); } }
+
+  .pl-rail { display: grid; gap: 12px; position: sticky; top: 16px; align-content: start; }
+  .pl-rail-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+  .pl-rail-done { font-size: 12px; color: var(--ink-faint); }
+  .pl-rail-list { margin: 0; padding: 0; list-style: none; display: grid; border-top: 1px solid var(--line-strong); }
+  .pl-rail-row { width: 100%; display: grid; grid-template-columns: 15px minmax(0, 1fr) auto; gap: 10px; align-items: center;
+    padding: 10px 0; border: 0; border-bottom: 1px solid var(--line); background: none; color: inherit; text-align: left;
+    font-family: var(--font-body); font-size: 14px; cursor: pointer; }
+  .pl-rail-row:hover { background: var(--surface-veil); }
+  .pl-rail-row[aria-current="step"] .pl-rail-name { color: var(--accent); font-weight: 500; }
+  .pl-rail-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pl-rail-count { font-size: 12px; color: var(--ink-faint); }
+
+  .pl-panel { display: grid; gap: 14px; min-width: 0; }
+  .pl-panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  .pl-panel-count { font-size: 13px; color: var(--ink-soft); }
+
+  /* the plan: a drawer over the page on the desk, a sheet on the phone */
+  .pl-drawer { position: fixed; top: 0; right: 0; bottom: 0; width: min(400px, 92vw); z-index: 40;
+    display: grid; gap: 12px; align-content: start; padding: 20px; overflow-y: auto;
+    background: var(--surface-page); border-left: 1px solid var(--line-strong); box-shadow: var(--shadow-3); }
+  .pl-drawer[hidden] { display: none; }
+  .pl-drawer-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .pl-drawer-count { font-size: 12px; color: var(--ink-faint); }
+  .pl-drawer-body { display: grid; gap: 4px; }
+  .pl-close { border: 0; background: none; color: var(--ink-faint); font-size: 16px; cursor: pointer; padding: 4px; }
+  .pl-close:hover { color: var(--ink); }
+
+  /* ⚠ the phone's guarantee: the plan is always one thumb away, and the page
+     keeps 96px of bottom padding so the bar covers nothing */
+  .pl-bar { display: none; }
+  @media (max-width: 600px) {
+    .pl-bar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; display: flex; align-items: center; gap: 12px;
+      padding: 10px clamp(16px, 4vw, 40px); background: var(--surface-card); border-top: 1px solid var(--line-strong); }
+    .pl-bar-open { flex: 1; display: flex; align-items: baseline; gap: 8px; border: 0; background: none; color: inherit;
+      font-family: var(--font-body); font-size: 14px; cursor: pointer; padding: 8px 0; text-align: left; }
+    .pl-bar-open .gd-mono { font-size: 12px; color: var(--ink-faint); }
+    .pl-drawer { top: auto; height: 78vh; width: 100%; border-left: 0; border-top: 1px solid var(--line-strong); border-radius: 16px 16px 0 0; }
+  }
+</style>
+
+<style is:global>
+  /* ⚠ Astro's scoped styles never reach markup a script writes. Everything
+     the planner renders below is styled here, globally, on purpose. */
+  .pl-search { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: end; }
+  .pl-field { width: 100%; font-family: var(--font-body); font-size: 16px; color: var(--ink); background: var(--surface-card);
+    border: 1px solid var(--line); border-radius: 4px; padding: 10px 12px; min-height: 44px; }
+  .pl-field:hover { border-color: var(--line-strong); }
+  .pl-field:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .pl-points { position: sticky; top: 0; z-index: 2; display: flex; align-items: baseline; gap: 10px;
+    padding: 8px 0; background: var(--surface-page); border-bottom: 1px solid var(--line); }
+  .pl-points b { font-family: var(--font-mono); font-size: 22px; font-weight: 400; font-variant-numeric: tabular-nums; }
+  .pl-list { margin: 0; padding: 0; list-style: none; display: grid; border-top: 1px solid var(--line-strong); }
+  .pl-pick { width: 100%; display: grid; grid-template-columns: 16px minmax(0, 1fr) auto; gap: 12px; align-items: center;
+    padding: 10px 0; border: 0; border-bottom: 1px solid var(--line); background: none; color: inherit; text-align: left;
+    font-family: var(--font-body); font-size: 14px; cursor: pointer; }
+  .pl-pick:hover { background: var(--surface-veil); }
+  .pl-pick[data-chosen="yes"] { color: var(--ink-faint); }
+  .pl-pick-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pl-pick-mark { color: var(--ink-faint); display: grid; }
+  .pl-pick-meta { font-family: var(--font-mono); font-size: 12px; color: var(--ink-faint); white-space: nowrap; }
+  .pl-chosen { display: grid; gap: 8px; }
+  .pl-chosen-row { display: grid; grid-template-columns: 16px minmax(0, 1fr) auto auto; gap: 10px; align-items: center;
+    padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
+  .pl-chosen-detail { font-family: var(--font-mono); font-size: 12px; color: var(--ink-soft); overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap; }
+  .pl-remove { border: 0; background: none; color: var(--ink-faint); cursor: pointer; font-size: 13px; padding: 2px 6px; }
+  .pl-remove:hover { color: var(--ink); }
+  .pl-step { display: inline-flex; align-items: center; gap: 6px; }
+  .pl-step button { min-width: 28px; min-height: 28px; border: 1px solid var(--line); border-radius: 4px;
+    background: var(--surface-card); color: var(--ink); cursor: pointer; font-family: var(--font-mono); font-size: 13px; }
+  .pl-step button:hover { border-color: var(--line-strong); }
+  .pl-step output { font-family: var(--font-mono); font-size: 13px; font-variant-numeric: tabular-nums; min-width: 4ch; text-align: center; }
+  .pl-slot { display: grid; grid-template-columns: 15px 24px minmax(0, 1fr); gap: 12px; align-items: center;
+    padding: 12px 0; border-bottom: 1px solid var(--line); width: 100%; border-left: 0; border-right: 0; border-top: 0;
+    background: none; color: inherit; text-align: left; cursor: pointer; font-family: var(--font-body); font-size: 14px; }
+  .pl-slot:hover { background: var(--surface-veil); }
+  .pl-slot-mark { color: var(--ink-faint); display: grid; }
+  .pl-slot-body { display: grid; gap: 2px; min-width: 0; }
+  .pl-slot-name { font-size: 15px; }
+  .pl-slot-target { font-family: var(--font-mono); font-size: 12px; color: var(--ink-soft);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pl-slot-target[data-empty="yes"] { color: var(--ink-faint); font-style: italic; }
+  .pl-targets { display: grid; gap: 14px; }
+  .pl-target { display: grid; gap: 4px; }
+  .pl-target label { font-size: 14px; font-weight: 600; }
+  .pl-plan-line { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: baseline;
+    padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
+  .pl-plan-line span:last-child { font-family: var(--font-mono); font-size: 12px; color: var(--ink-soft);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 22ch; }
+  .pl-plan-head { font-family: var(--font-body); font-size: 12px; font-weight: 600; letter-spacing: .14em;
+    text-transform: uppercase; color: var(--ink-faint); padding-top: 12px; }
+</style>
+
+<script>
+  import { MARKS } from "../../lib/marks";
+  import { slotMark, kindMark } from "../../lib/planner";
+
+  type Field = { type: string; kind?: string; sub?: string | string[]; max?: number; min?: number; unit?: string; options?: string[]; list?: string };
+  type Section = { id: string; name: string; type: string; kind?: string; sub?: string | string[]; by_class?: boolean;
+                   max?: number; grid?: boolean; track?: string; slots?: string[] | Record<string, string>; exclude?: string[];
+                   fields?: Record<string, Field>; points?: { id: string; name: string; field?: string; unit?: string };
+                   entries?: { id: string; name: string; max?: number; unit?: string }[] };
+  type Row = { kind: string; id: string; name: string; sub: string; group: string; slot_id: string; level_req: number | null; summary: string };
+
+  const root = document.querySelector<HTMLElement>("[data-planner]");
+  const work = document.querySelector<HTMLElement>("[data-work]");
+  if (root && work) {
+    const game = root.dataset.game || "";
+    const classId = work.dataset.class || "";
+    const panel = work.querySelector<HTMLElement>("[data-panel-body]")!;
+    const panelName = work.querySelector<HTMLElement>("[data-panel-name]")!;
+    const panelCount = work.querySelector<HTMLElement>("[data-panel-count]")!;
+    const panelLede = work.querySelector<HTMLElement>("[data-panel-lede]")!;
+    const drawer = document.querySelector<HTMLElement>("[data-drawer]")!;
+    const planLines = document.querySelector<HTMLElement>("[data-plan-lines]")!;
+
+    /** The person's choices. Nothing here is checked — the server does that. */
+    const plan: Record<string, any> = {};
+    /* ⚠ Every record the chooser has drawn, by id. The plan holds ids because
+       that is what the server reads; a person must never be shown one. */
+    const knownNames = new Map<string, string>();
+    const nameOf = (id: string) => knownNames.get(id) || id.replace(/-/g, " ");
+    let recipe: { sections: Section[] } = { sections: [] };
+    let current: Section | null = null;
+    let slots: Row[] = [];
+
+    const ask = async <T,>(path: string): Promise<T | null> => {
+      try {
+        const r = await fetch(path, { headers: { accept: "application/json" } });
+        return r.ok ? ((await r.json()) as T) : null;
+      } catch { return null; }
+    };
+
+    const mark = (name: string, size = 16) => {
+      const d = (MARKS as Record<string, string>)[name];
+      if (!d) return "";
+      return `<svg class="gd-mark" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+        stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${d}"/></svg>`;
+    };
+    const escape = (t: unknown) => String(t ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c] as string));
+
+    /* ── what a section asks the game for ─────────────────────────────── */
+
+    const listPath = (sec: Section, extra: Record<string, string> = {}) => {
+      const params = new URLSearchParams({ limit: "400", brief: "true", ...extra });
+      if (sec.by_class && classId) params.set("class_id", classId);
+      if (sec.sub) params.set("sub", Array.isArray(sec.sub) ? sec.sub.join(",") : sec.sub);
+      return `/api/gamedata/${game}/${sec.kind}?${params}`;
+    };
+
+    const picksOf = (sec: Section): any[] => (plan[sec.id]?.picks ?? []);
+    const chosenCount = (sec: Section) => {
+      if (sec.type === "gear") return Object.keys(plan[sec.id] || {}).length;
+      if (sec.type === "targets") return Object.keys(plan[sec.id] || {}).length;
+      if (sec.type === "pick") return plan[sec.id] ? 1 : 0;
+      return picksOf(sec).length;
+    };
+
+    /* ── the panel ────────────────────────────────────────────────────── */
+
+    async function showSection(sec: Section) {
+      current = sec;
+      panelName.textContent = sec.name;
+      panelLede.textContent = "";
+      work.querySelectorAll<HTMLElement>("[data-section]").forEach((b) =>
+        b.setAttribute("aria-current", b.dataset.section === sec.id ? "step" : "false"));
+      panel.innerHTML = "";
+      if (sec.type === "gear") await showGear(sec);
+      else if (sec.type === "targets") showTargets(sec);
+      else await showChooser(sec);
+      paint();
+    }
+
+    async function showChooser(sec: Section) {
+      const rows = (await ask<Row[]>(listPath(sec))) || [];
+      rows.forEach((r) => knownNames.set(r.id, r.name));
+      const clusters = Array.from(new Set(rows.map((r) => r.group).filter(Boolean)));
+      panel.innerHTML = `
+        ${sec.points ? `<div class="pl-points"><b data-spent>0</b><span class="gd-eyebrow">${escape(sec.points.name)}</span></div>` : ""}
+        <div class="pl-search">
+          <input class="pl-field" type="search" data-search placeholder="Search ${rows.length} ${escape(sec.name.toLowerCase())}" aria-label="Search ${escape(sec.name)}">
+          ${clusters.length > 1 ? `<select class="pl-field" data-cluster aria-label="Cluster"><option value="">Every cluster</option>${clusters.map((c) => `<option>${escape(c)}</option>`).join("")}</select>` : ""}
+        </div>
+        <ul class="pl-list" data-rows></ul>
+        <div class="pl-chosen" data-chosen></div>`;
+      const listEl = panel.querySelector<HTMLElement>("[data-rows]")!;
+      const search = panel.querySelector<HTMLInputElement>("[data-search]");
+      const cluster = panel.querySelector<HTMLSelectElement>("[data-cluster]");
+
+      const draw = () => {
+        const needle = (search?.value || "").trim().toLowerCase();
+        const group = cluster?.value || "";
+        const taken = new Set(sec.type === "pick" ? [plan[sec.id]?.id] : picksOf(sec).map((p) => p.id));
+        const shown = rows.filter((r) => (!group || r.group === group) && (!needle || r.name.toLowerCase().includes(needle))).slice(0, 120);
+        listEl.innerHTML = shown.length
+          ? shown.map((r) => `
+            <li><button type="button" class="pl-pick" data-add="${escape(r.id)}" data-chosen="${taken.has(r.id) ? "yes" : "no"}">
+              <span class="pl-pick-mark">${mark(kindMark(r as any))}</span>
+              <span class="pl-pick-name">${escape(r.name)}</span>
+              <span class="pl-pick-meta">${taken.has(r.id) ? "chosen" : escape(r.group || "")}</span>
+            </button></li>`).join("")
+          : `<li><p class="gd-soft">Nothing here is called “${escape(needle)}”. Clear the search to see all ${rows.length}.</p></li>`;
+      };
+      search?.addEventListener("input", draw);
+      cluster?.addEventListener("change", draw);
+      listEl.addEventListener("click", (e) => {
+        const btn = (e.target as HTMLElement).closest<HTMLElement>("[data-add]");
+        if (!btn) return;
+        const id = btn.dataset.add!;
+        if (sec.type === "pick") plan[sec.id] = { id };
+        else {
+          const picks = picksOf(sec);
+          if (picks.some((p) => p.id === id)) return;
+          if (sec.max && picks.length >= sec.max) return;
+          plan[sec.id] = { picks: [...picks, { id }] };
+        }
+        draw();
+        drawChosen(sec, rows);
+        paint();
+      });
+      draw();
+      drawChosen(sec, rows);
+    }
+
+    function drawChosen(sec: Section, rows: Row[]) {
+      const box = panel.querySelector<HTMLElement>("[data-chosen]");
+      if (!box) return;
+      const names = new Map(rows.map((r) => [r.id, r.name]));
+      const picks = sec.type === "pick" ? (plan[sec.id] ? [plan[sec.id]] : []) : picksOf(sec);
+      const track = sec.track && sec.track !== "check" ? sec.fields?.[sec.track] : null;
+      box.innerHTML = picks.length
+        ? `<p class="gd-eyebrow">Chosen · ${picks.length}${sec.max ? ` of ${sec.max}` : ""}</p>` +
+          picks.map((p) => `
+            <div class="pl-chosen-row">
+              <span class="pl-pick-mark">${mark(kindMark({ kind: sec.kind || "", sub: "" } as any))}</span>
+              <span class="pl-pick-name">${escape(names.get(p.id) || p.id)}</span>
+              ${track ? `<span class="pl-step">
+                <button type="button" data-less="${escape(p.id)}" aria-label="Fewer">−</button>
+                <output>${p[sec.track!] ?? track.min ?? 1}</output>
+                <button type="button" data-more="${escape(p.id)}" aria-label="More">+</button>
+              </span>` : `<span class="pl-chosen-detail"></span>`}
+              <button type="button" class="pl-remove" data-drop="${escape(p.id)}">remove</button>
+            </div>`).join("")
+        : "";
+      box.onclick = (e) => {
+        const el = (e.target as HTMLElement).closest<HTMLElement>("[data-drop],[data-more],[data-less]");
+        if (!el) return;
+        const id = el.dataset.drop || el.dataset.more || el.dataset.less!;
+        if (el.dataset.drop) {
+          if (sec.type === "pick") delete plan[sec.id];
+          else plan[sec.id] = { picks: picksOf(sec).filter((p) => p.id !== id) };
+        } else if (track && sec.track) {
+          const picks2 = picksOf(sec).map((p) => {
+            if (p.id !== id) return p;
+            const at = Number(p[sec.track!] ?? track.min ?? 1) + (el.dataset.more ? 1 : -1);
+            return { ...p, [sec.track!]: Math.max(track.min ?? 1, Math.min(track.max ?? 99, at)) };
+          });
+          plan[sec.id] = { picks: picks2 };
+        }
+        drawChosen(sec, rows);
+        panel.querySelector<HTMLInputElement>("[data-search]")?.dispatchEvent(new Event("input"));
+        paint();
+      };
+    }
+
+    async function showGear(sec: Section) {
+      if (!slots.length) {
+        slots = (await ask<Row[]>(`/api/gamedata/${game}/slot?limit=100&brief=true&class_id=${classId}`)) || [];
+        slots.forEach((r) => knownNames.set(r.id, r.name));
+      }
+      const left = new Set(sec.exclude || []);
+      const places = slots.filter((s) => !left.has(s.id));
+      panel.innerHTML = `<ul class="pl-list">${places.map((s) => {
+        const chosen = (plan[sec.id] || {})[s.id];
+        const target = chosen ? Object.values(chosen).filter(Boolean).join(" · ") : "";
+        return `<li><button type="button" class="pl-slot" data-slot="${escape(s.id)}">
+          <span class="gd-dot" data-state="${chosen ? "now" : "open"}" aria-hidden="true"></span>
+          <span class="pl-slot-mark">${mark(slotMark(s.id), 24)}</span>
+          <span class="pl-slot-body">
+            <span class="pl-slot-name">${escape(s.name)}</span>
+            <span class="pl-slot-target" data-empty="${target ? "no" : "yes"}">${escape(target || "not chosen yet")}</span>
+          </span></button></li>`;
+      }).join("")}</ul>`;
+    }
+
+    function showTargets(sec: Section) {
+      panel.innerHTML = `<div class="pl-targets">${(sec.entries || []).map((e) => `
+        <div class="pl-target">
+          <label for="t-${escape(e.id)}">${escape(e.name)}</label>
+          <input class="pl-field" id="t-${escape(e.id)}" data-target="${escape(e.id)}" type="number" inputmode="numeric"
+                 min="0" max="${e.max ?? 999999}" placeholder="${e.max ?? ""}" value="${(plan[sec.id] || {})[e.id] ?? ""}">
+        </div>`).join("")}</div>
+      <p class="gd-hint">Each becomes one counter: have of want, met when have reaches want. Nobody is told how far from it you are.</p>`;
+      panel.querySelectorAll<HTMLInputElement>("[data-target]").forEach((input) => {
+        input.addEventListener("change", () => {
+          const at = Number(input.value);
+          const box = plan[sec.id] || (plan[sec.id] = {});
+          if (Number.isFinite(at) && at > 0) box[input.dataset.target!] = at;
+          else delete box[input.dataset.target!];
+          paint();
+        });
+      });
+    }
+
+    /* ── the plan, everywhere it shows ────────────────────────────────── */
+
+    function paint() {
+      let choices = 0;
+      const lines: string[] = [];
+      for (const sec of recipe.sections) {
+        const n = chosenCount(sec);
+        choices += n;
+        const dot = work.querySelector<HTMLElement>(`[data-for="${sec.id}"]`);
+        if (dot) dot.dataset.state = n ? "done" : "open";
+        const count = work.querySelector<HTMLElement>(`[data-count="${sec.id}"]`);
+        if (count && n) count.textContent = String(n);
+        if (n) {
+          lines.push(`<p class="pl-plan-head">${escape(sec.name)}</p>`);
+          const picks = sec.type === "pick" ? [plan[sec.id]] : sec.type === "picks" ? picksOf(sec) : [];
+          for (const p of picks) {
+            const at = sec.track && sec.track !== "check" ? p[sec.track] : null;
+            lines.push(`<div class="pl-plan-line"><span>${escape(nameOf(p.id))}</span><span>${at ? escape(`${at} ${sec.fields?.[sec.track!]?.unit || ""}`.trim()) : ""}</span></div>`);
+          }
+          if (sec.type === "gear") for (const [place, ch] of Object.entries(plan[sec.id] || {}))
+            lines.push(`<div class="pl-plan-line"><span>${escape(nameOf(place))}</span><span>${escape(Object.values(ch as object).filter(Boolean).map((v) => nameOf(String(v))).join(" · "))}</span></div>`);
+          if (sec.type === "targets") for (const [k, v] of Object.entries(plan[sec.id] || {})) {
+            const entry = (sec.entries || []).find((e) => e.id === k);
+            lines.push(`<div class="pl-plan-line"><span>${escape(entry?.name || nameOf(k))}</span><span>${escape(`${v} ${entry?.unit || ""}`.trim())}</span></div>`);
+          }
+        }
+      }
+      planLines.innerHTML = lines.join("");
+      const said = choices === 1 ? "1 choice" : `${choices} choices`;
+      document.querySelectorAll("[data-plan-count],[data-bar-count]").forEach((el) => { el.textContent = choices ? said : "nothing chosen yet"; });
+      const done = recipe.sections.filter((s) => chosenCount(s)).length;
+      const doneEl = work.querySelector<HTMLElement>("[data-done]");
+      if (doneEl) doneEl.textContent = `${done} of ${recipe.sections.length} done`;
+      if (current) panelCount.textContent = chosenCount(current) ? `${chosenCount(current)} chosen` : "";
+    }
+
+    document.querySelectorAll("[data-open-plan]").forEach((b) => b.addEventListener("click", () => { drawer.hidden = false; }));
+    document.querySelectorAll("[data-close-plan]").forEach((b) => b.addEventListener("click", () => { drawer.hidden = true; }));
+    work.addEventListener("click", (e) => {
+      const btn = (e.target as HTMLElement).closest<HTMLElement>("[data-section]");
+      if (!btn) return;
+      const sec = recipe.sections.find((s) => s.id === btn.dataset.section);
+      if (sec) showSection(sec);
+    });
+
+    (async () => {
+      const got = await ask<{ sections: Section[] }>(`/api/gamedata/${game}/recipe`);
+      if (!got) return;
+      recipe = got;
+      if (recipe.sections[0]) await showSection(recipe.sections[0]);
+    })();
+  }
+</script>
