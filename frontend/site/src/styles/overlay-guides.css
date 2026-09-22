@@ -270,7 +270,7 @@
    and every note stay off — a plan is private. */
 .gov-sheet { display: grid; gap: 14px; align-content: start; }
 .gov-sheet-name { font-family: var(--gt-display); font-size: 76px; font-weight: var(--gt-display-weight, 600); line-height: 1.05; color: var(--gt-ink); }
-.gov-sheet-count { font-family: var(--gt-mono); font-size: 26px; font-variant-numeric: tabular-nums; color: var(--gt-faint); }
+.gov-sheet-count { font-family: var(--font-mono); font-size: 26px; font-variant-numeric: tabular-nums; color: var(--gt-faint); }
 .gov-sheet-sub { margin-top: 6px; font-size: 24px; }
 .gov-sheet-skills { font-family: var(--gt-display); font-size: 26px; line-height: 1.35; color: var(--gt-ink); }
 /* ⚠ a container that inherits the body's 16px would put unreadable text on
