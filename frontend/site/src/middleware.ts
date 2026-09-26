@@ -256,5 +256,16 @@ export const onRequest = defineMiddleware(async (context, next) => {
     }
   }
 
+  /* Swara Studio: a language asked for with ?lang= is kept in the school's
+     cookie, so a plain /carnatic/… link on the next page stays in it. A
+     visitor who arrives from a Tamil search result without ever touching the
+     switcher would otherwise drop back to English at the first click. */
+  if (path === "/carnatic" || path.startsWith("/carnatic/")) {
+    const asked = context.url.searchParams.get("lang");
+    if (asked && ["en", "ta", "te", "kn"].includes(asked) && context.cookies.get("swara_lang")?.value !== asked) {
+      context.cookies.set("swara_lang", asked, { path: "/carnatic", maxAge: 60 * 60 * 24 * 365, sameSite: "lax" });
+    }
+  }
+
   return next();
 });

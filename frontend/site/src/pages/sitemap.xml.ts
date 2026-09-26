@@ -19,6 +19,8 @@ import type { APIRoute } from "astro";
 
 import { site, SITE_API, SITE_URL } from "../lib/api";
 import { paths as journalPaths, read as readJournal } from "../lib/journal/parse";
+import { lessons as carnaticLessons, ragas as carnaticRagas, talas as carnaticTalas } from "../lib/carnatic/data";
+import { lessonList } from "../lib/carnatic/lessons";
 
 
 /* One origin for the whole site, read at runtime. See lib/env.ts. */
@@ -163,6 +165,32 @@ export const GET: APIRoute = async () => {
     const games = (await site<{ slug: string; guides: number }[]>("/api/guides/games")) ?? [];
     for (const g of games) {
       if (g.guides > 0) add(`/guides/${g.slug}`, "0.6", "weekly");
+    }
+  }
+
+  /* Swara Studio, the Carnatic music school: its front pages, then every
+     raga, melakarta, tala and lesson page the synced data has. Each page is
+     also served in Tamil, Telugu and Kannada with ?lang= and says so with
+     hreflang, so only the English address is listed here. The dashboard,
+     settings and the review queue are noindex and left out. Until
+     the data is synced (scripts/sync-carnatic-data.sh) only the fixed pages
+     are listed. */
+  if (reachable("/carnatic")) {
+    for (const [path, priority] of [
+      ["/carnatic", "0.9"], ["/carnatic/ragas", "0.8"], ["/carnatic/talas", "0.7"],
+      ["/carnatic/path", "0.7"], ["/carnatic/lessons", "0.7"], ["/carnatic/gamakas", "0.7"],
+      ["/carnatic/practice/tuner", "0.8"], ["/carnatic/practice/tala", "0.7"], ["/carnatic/practice/quiz", "0.6"],
+      ["/carnatic/compose", "0.6"], ["/carnatic/listen", "0.5"], ["/carnatic/support", "0.4"],
+      ...["voice", "venu", "veena", "violin", "mridangam"].map((i) => [`/carnatic/instruments/${i}`, "0.6"]),
+    ]) add(path, priority, "monthly");
+    try {
+      const [rg, tl, ls] = await Promise.all([carnaticRagas(), carnaticTalas(), carnaticLessons()]);
+      for (const m of rg?.melakartas ?? []) add(`/carnatic/ragas/melakarta/${m.number}`, "0.5", "monthly");
+      for (const r of [...(rg?.janyas ?? []), ...(rg?.performed ?? [])]) add(`/carnatic/ragas/${encodeURIComponent(r.id)}`, "0.6", "monthly");
+      for (const x of tl?.practical ?? []) if (x.slug) add(`/carnatic/talas/${x.slug}`, "0.5", "monthly");
+      if (ls) for (const l of lessonList(ls, (id) => id)) add(`/carnatic/lessons/${l.slug}`, "0.5", "monthly");
+    } catch {
+      /* The data is not synced here; the fixed pages above still stand. */
     }
   }
 
