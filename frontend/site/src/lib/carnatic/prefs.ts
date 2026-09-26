@@ -51,7 +51,7 @@ function fromCookie(astro: any): Partial<Settings> {
 
 export async function visitor(astro: any): Promise<{ me: Me; settings: Settings }> {
   const signedIn = Boolean(astro.locals?.signedIn);
-  let me: Me = { signedIn: false, limits: { partsPerSong: 2 }, settings: null };
+  let me: Me = { signedIn: false, limits: { partsPerSong: null }, settings: null };
   if (signedIn) {
     const r = await asReader(astro, "/api/carnatic/me");
     if (r.ok && r.body) me = r.body as Me;

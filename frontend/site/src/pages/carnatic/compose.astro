@@ -6,9 +6,9 @@
  * underline, so the composer decides.
  *
  * Nothing is a wall: signed out, the song is kept in this browser. Signed in,
- * it is saved to the account and can be published as a sheet. Songs have up
- * to two parts; Swaras supporters have no limit (the owner's rule). The web
- * explains the limit; the app never mentions it.
+ * it is saved to the account and can be published as a sheet. A song may
+ * have any number of parts, for everybody: nothing in the school is gated
+ * (the owner's rule of 26 Sep 2026).
  */
 import SwaraLayout from "../../layouts/SwaraLayout.astro";
 import Hero from "../../components/carnatic/Hero.astro";
@@ -40,7 +40,7 @@ if (me.signedIn) {
   }
 }
 const boot = { ragas: ragaOptions, talas: talaOptions, song, mine, script: swaraScript(settings, lang), tamil: settings.tamilStyle,
-               limit: me.limits?.partsPerSong ?? 2, signedIn: me.signedIn, instrument: settings.instrument };
+               signedIn: me.signedIn, instrument: settings.instrument };
 const playLine = say("playLine", "drone Sa = {sa} · tala clicks on · {tuning}").replace("{sa}", settings.sa).replace("{tuning}", settings.playbackTuning === "equal" ? say("et", "equal temperament") : say("ji", "just intonation"));
 ---
 <SwaraLayout title={say("meta.title", "Compose · Swara Studio")} noindex={me.signedIn}
@@ -69,7 +69,6 @@ const playLine = say("playLine", "drone Sa = {sa} · tala clicks on · {tuning}"
             <button type="button" data-add="strokes">+ {say("addStrokes", "Mridangam strokes")}</button>
             <button type="button" data-add="melody">+ {say("addMelody", "Second melody")}</button>
           </div>
-          <p class="sw-note" data-limit-note hidden>{say("limit", "Free songs have up to 2 parts. Swaras supporters can add more.")} <a href={L("/carnatic/support")}>{say("supportLink", "Support Swara Studio")}</a></p>
         </div>
         <div class="sw-card cp-play">
           <p class="t-eyebrow sw-eyebrow">{say("playback", "Playback")}</p>
@@ -163,9 +162,6 @@ const playLine = say("playLine", "drone Sa = {sa} · tala clicks on · {tuning}"
     $("[data-parts]").innerHTML = song.parts.map((p: any) => `<div class="cp-part"><span>${p.kind === "strokes" ? "Mridangam strokes" : `Melody · ${p.instrument}`}</span>
       <button type="button" class="cp-ms" data-mute="${p.id}" aria-pressed="${p.muted ? "true" : "false"}" title="Mute">M</button>
       ${p.id === "melody" ? "" : `<button type="button" class="cp-ms" data-remove="${p.id}" title="Remove this part">×</button>`}</div>`).join("");
-    const atLimit = B.limit !== null && song.parts.length >= B.limit;
-    $("[data-add-part]").hidden = atLimit;
-    $("[data-limit-note]").hidden = !atLimit;
     const flag = $("[data-flag]");
     flag.hidden = out.size === 0;
     const name = B.ragas.find((x: any) => x.id === song.raga)?.name ?? song.raga;

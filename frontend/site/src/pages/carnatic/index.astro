@@ -127,7 +127,7 @@ const portrait = tr("landing.portrait");
 
   <hr class="sw-rule" />
 
-  <section class="sw-section lp-teacher" aria-labelledby="lp-teacher">
+  <section class="sw-section lp-note" aria-labelledby="lp-note">
     <figure class="lp-portrait">
       {portrait ? (
         <picture>
@@ -142,7 +142,7 @@ const portrait = tr("landing.portrait");
       <figcaption class="sw-mono">{tr("landing.portraitCaption")}</figcaption>
     </figure>
     <div class="lp-note">
-      <p id="lp-teacher" class="t-eyebrow sw-eyebrow rose">{tr("landing.welcomeEyebrow")}</p>
+      <p id="lp-note" class="t-eyebrow sw-eyebrow rose">{tr("landing.welcomeEyebrow")}</p>
       <p class="sw-prose">{tr("landing.welcome")}</p>
       <p class="lp-sign">{say("sign", "Shruti Swara")}</p>
     </div>
@@ -231,7 +231,7 @@ const portrait = tr("landing.portrait");
   .lp-tool:hover { border-color: var(--accent); }
   .lp-spec { font: 13px / 1.5 var(--font-mono); color: var(--rose); }
   .lp-tool-h { font-family: var(--font-display); font-size: 22px; color: var(--ink); }
-  .lp-teacher { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 28px 48px; align-items: start; }
+  .lp-note { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 28px 48px; align-items: start; }
   .lp-portrait { margin: 0; display: grid; gap: 10px; justify-items: start; }
   .lp-plate { width: 170px; height: 170px; border-radius: 12px; display: block; object-fit: cover; }
   .lp-note { display: grid; gap: 14px; }
@@ -247,7 +247,7 @@ const portrait = tr("landing.portrait");
   .lp-j-h { font-family: var(--font-display); font-size: 19px; color: var(--ink); }
   .lp-jlist a:hover .lp-j-h { color: var(--accent); }
   @media (max-width: 899px) {
-    .lp-three, .lp-tools, .lp-teacher, .lp-two { grid-template-columns: minmax(0, 1fr); }
+    .lp-three, .lp-tools, .lp-note, .lp-two { grid-template-columns: minmax(0, 1fr); }
     .lp-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   }
   @media (max-width: 599px) {

@@ -46,7 +46,7 @@ function writeLocal(s: Record<string, any>) {
 export function boot(): Boot {
   if (state) return state;
   const el = document.getElementById("swara-boot");
-  const b: Boot = el ? JSON.parse(el.textContent || "{}") : { lang: "en", signedIn: false, supporter: false, partsPerSong: 2, settings: {}, settingsUpdatedAt: null };
+  const b: Boot = el ? JSON.parse(el.textContent || "{}") : { lang: "en", signedIn: false, supporter: false, partsPerSong: null, settings: {}, settingsUpdatedAt: null };
   /* Signed in, the account is the truth (it came with the page). Signed out,
      what this browser kept wins over the defaults the server assumed. */
   b.settings = b.signedIn ? { ...readLocal(), ...b.settings } : { ...b.settings, ...readLocal() };
