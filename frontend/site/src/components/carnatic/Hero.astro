@@ -1,0 +1,18 @@
+---
+/* The page's one sky: an eyebrow, the title, a line under it, and whatever
+   the page puts beside the veil (the first line on the landing page). The
+   sky is the design system's art-absent state and needs no image. */
+interface Props { eyebrow?: string; title: string; lede?: string; titleLang?: string }
+const { eyebrow, title, lede, titleLang } = Astro.props;
+---
+<section class="sky sw-hero" aria-labelledby="sw-title">
+  <div class="sky-veil sw-hero-veil">
+    {eyebrow && <p class="t-eyebrow sw-eyebrow">{eyebrow}</p>}
+    <h1 id="sw-title" lang={titleLang}>{title}</h1>
+    <slot name="under" />
+    {lede && <p class="sw-lede">{lede}</p>}
+    <slot />
+  </div>
+  {Astro.slots.has("side") && <div class="sw-hero-side"><slot name="side" /></div>}
+  <div class="sky-horizon"></div>
+</section>

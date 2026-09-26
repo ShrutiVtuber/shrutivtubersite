@@ -1,0 +1,8 @@
+---
+/* A phrase or a scale as a row of notes, drawn by lib/carnatic/render.ts. */
+import { phraseHtml } from "../../lib/carnatic/render";
+import type { Script, TamilStyle } from "../../lib/carnatic/notation";
+interface Props { line: string; script: Script; tamil?: TamilStyle; subs?: boolean; size?: string; class?: string }
+const { line, script, tamil = "grantha", subs = false, size, class: klass } = Astro.props;
+---
+<span class:list={["sn-script-" + script, klass]} style={size ? `--sn-size:${size}` : undefined} set:html={phraseHtml(line, { script, tamil, subs })} />

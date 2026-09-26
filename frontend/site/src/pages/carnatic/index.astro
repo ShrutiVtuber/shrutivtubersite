@@ -1,0 +1,255 @@
+---
+/* Swara Studio's front door, /carnatic (handoff: Carnatic Landing).
+ *
+ * The music is the subject: no devotional framing, none of the site's
+ * astronomical marks. Everything here is free and needs no account; signing
+ * in only keeps progress across devices. A Swaras supporter sees a thank-you
+ * where the invitation would be.
+ */
+import SwaraLayout from "../../layouts/SwaraLayout.astro";
+import Hero from "../../components/carnatic/Hero.astro";
+import Button from "../../components/forms/Button.astro";
+import Badge from "../../components/navigation/Badge.astro";
+import Chip from "../../components/carnatic/Chip.astro";
+import { hrefIn, langOf, words } from "../../lib/carnatic/i18n";
+import { lessons, manifest } from "../../lib/carnatic/data";
+import { visitor, swaraScript } from "../../lib/carnatic/prefs";
+import { avartanamHtml } from "../../lib/carnatic/render";
+import { schoolClasses, schoolJournal } from "../../lib/carnatic/catalogue";
+
+const lang = langOf(Astro);
+const t = await words(lang);
+const L = (p: string) => hrefIn(lang, p);
+const { me, settings } = await visitor(Astro);
+const script = swaraScript(settings, lang);
+const [data, m] = await Promise.all([lessons(), manifest()]);
+const counts = m?.counts;
+
+const firstLine = avartanamHtml(
+  { counts: [["S"], ["R"], ["G"], ["M"], ["P"], ["D"], ["N"], ["S'"]], angas: [4, 2, 2] },
+  { script, tamil: settings.tamilStyle },
+);
+
+const sets = (id: string) => data?.sets?.find((s: any) => s.id === id)?.items?.filter((i: any) => !i.optional).length;
+const STEPS: [string, string, string][] = [
+  [t("set.sarali_varisai"), String(sets("sarali_varisai") ?? 14), "/carnatic/path#sarali_varisai"],
+  [t("set.janta_varisai"), String(sets("janta_varisai") ?? 12), "/carnatic/path#janta_varisai"],
+  [t("set.dhatu_varisai"), String(sets("dhatu_varisai") ?? 3), "/carnatic/path#dhatu_varisai"],
+  [t("set.sthayi"), `${sets("tara_sthayi_varisai") ?? 5} + ${sets("mandra_sthayi_varisai") ?? 5}`, "/carnatic/path#tara_sthayi_varisai"],
+  [t("set.alankaram"), String(sets("alankaram") ?? 7), "/carnatic/path#alankaram"],
+  [t("set.geethams"), t("set.geethamsNote"), "/carnatic/path#geethams"],
+  [t("set.varnams"), "", "/carnatic/path#varnams"],
+];
+
+const TOOLS = [
+  { spec: "Pa · Sa · Sa · Sa", h: t("landing.tool1h"), p: t("landing.tool1p"), href: "/carnatic/practice/tuner" },
+  { spec: "I₄ O O", h: t("landing.tool2h"), p: t("landing.tool2p"), href: "/carnatic/practice/tala" },
+  { spec: t("landing.tool3spec", { m: counts?.melakartas ?? 72, r: (counts?.janyas ?? 62) + (counts?.performed ?? 12) }), h: t("landing.tool3h"), p: t("landing.tool3p"), href: "/carnatic/ragas" },
+  { spec: t("landing.tool4spec"), h: t("landing.tool4h"), p: t("landing.tool4p"), href: "/carnatic/instruments/venu" },
+  { spec: t("landing.tool5spec"), h: t("landing.tool5h"), p: t("landing.tool5p"), href: "/carnatic/gamakas" },
+  { spec: t("landing.tool6spec"), h: t("landing.tool6h"), p: t("landing.tool6p"), href: "/carnatic/practice/quiz" },
+];
+
+const [classes, journal] = await Promise.all([schoolClasses(t, data), schoolJournal()]);
+/* The portrait is an art slot: the site's square avatar by default, editable
+   (and blankable, for the art-absent sky plate) as the copy key landing.portrait. */
+const portrait = t("landing.portrait");
+---
+
+<SwaraLayout title={t("landing.title")} description={t("landing.meta")}
+             jsonLd={{ "@context": "https://schema.org", "@type": "EducationalOrganization", name: "Swara Studio",
+                       description: t("landing.meta"), url: "https://shrutivtuber.com/carnatic",
+                       parentOrganization: { "@type": "Organization", name: "Shruti", url: "https://shrutivtuber.com" } }}>
+  <Hero eyebrow={t("landing.eyebrow")} title={t("landing.h1")} lede={t("landing.lede")}>
+    <div class="lp-cta">
+      <Button href={L("/carnatic/path")} size="lg">{t("landing.start")}</Button>
+      <Button href={L("/carnatic/practice/tuner")} variant="secondary" size="lg">{t("landing.tuner")}</Button>
+    </div>
+    <div slot="side" class="sky-veil lp-first">
+      <p class="t-eyebrow sw-eyebrow">{t("landing.firstLine")}</p>
+      <div class:list={["lp-line", "sn-script-" + script]} set:html={firstLine} />
+      <p class="sw-mono">Mayamalavagowla · Adi · 60 / min</p>
+    </div>
+  </Hero>
+
+  <section class="sw-section lp-who" aria-labelledby="lp-who">
+    <h2 id="lp-who" class="sw-h2">{t("landing.whoH")}</h2>
+    <div class="lp-three">
+      {[1, 2, 3].map((n) => (
+        <div class="lp-who-col">
+          <h3 class="sw-h4">{t(`landing.who${n}h` as any)}</h3>
+          <p class="sw-p">{t(`landing.who${n}p` as any)}</p>
+        </div>
+      ))}
+    </div>
+  </section>
+
+  <hr class="sw-rule" />
+
+  <section class="sw-section" aria-labelledby="lp-path">
+    <p class="t-eyebrow sw-eyebrow rose">{t("landing.pathEyebrow")}</p>
+    <h2 id="lp-path" class="sw-h2 lp-big">{t("landing.pathH")}</h2>
+    <p class="lp-lead">{t("landing.pathP")}</p>
+    <ol class="lp-steps">
+      {STEPS.map(([name, n, href], i) => (
+        <li><a href={L(href)} class="lp-step" aria-current={i === 0 ? "step" : undefined}>
+          <span class="sw-mono">{String(i + 1).padStart(2, "0")}</span>
+          <span class="lp-step-name">{name}</span>
+          {n && <span class="sw-mono">{n}</span>}
+        </a></li>
+      ))}
+    </ol>
+    <div class="lp-begin">
+      <Button href={L("/carnatic/path?item=sarali_01")}>{t("landing.begin")}</Button>
+      {!me.signedIn && <span class="sw-note">{t("landing.noAccount")}</span>}
+    </div>
+  </section>
+
+  <hr class="sw-rule" />
+
+  <section class="sw-section" aria-labelledby="lp-tools">
+    <div class="lp-headline">
+      <h2 id="lp-tools" class="sw-h2 lp-big">{t("landing.toolsH")}</h2>
+      <p class="sw-p">{t("landing.toolsP")}</p>
+    </div>
+    <div class="lp-tools">
+      {TOOLS.map((tool) => (
+        <a class="lp-tool" href={L(tool.href)}>
+          <span class="lp-spec">{tool.spec}</span>
+          <span class="lp-tool-h">{tool.h}</span>
+          <span class="sw-p">{tool.p}</span>
+        </a>
+      ))}
+    </div>
+  </section>
+
+  <hr class="sw-rule" />
+
+  <section class="sw-section lp-teacher" aria-labelledby="lp-teacher">
+    <figure class="lp-portrait">
+      {portrait ? (
+        <picture>
+          {portrait === "/brand/avatar-square.png" && <source type="image/avif" srcset="/brand/avatar-square.avif" />}
+          {portrait === "/brand/avatar-square.png" && <source type="image/webp" srcset="/brand/avatar-square.webp" />}
+          <img class="lp-plate" src={portrait} alt={t("landing.portraitAlt")} width="170" height="170" loading="lazy" />
+        </picture>
+      ) : (
+        /* Art-absent: the sky plate. */
+        <div class="sky lp-plate" role="img" aria-label={t("landing.portraitAlt")}><div class="sky-horizon"></div></div>
+      )}
+      <figcaption class="sw-mono">{t("landing.portraitCaption")}</figcaption>
+    </figure>
+    <div class="lp-note">
+      <p id="lp-teacher" class="t-eyebrow sw-eyebrow rose">{t("landing.welcomeEyebrow")}</p>
+      <p class="sw-prose">{t("landing.welcome")}</p>
+      <p class="lp-sign">Shruti Swara</p>
+    </div>
+  </section>
+
+  <hr class="sw-rule" />
+
+  <section class="sw-section" aria-labelledby="lp-classes" data-filters>
+    <h2 id="lp-classes" class="sw-h2">{t("landing.classesH")}</h2>
+    <p class="lp-lead">{t("landing.classesP")}</p>
+    <div class="sw-chips" role="group" aria-label={t("landing.classesH")}>
+      {classes.filters.map(([key, label], i) => <Chip active={i === 0} data-filter={key}>{label}</Chip>)}
+    </div>
+    <ul class="lp-rows">
+      {classes.rows.map((row) => (
+        <li data-kind={row.kind}>
+          <a href={L(row.href)} class="sw-dotrow">
+            <span class="lp-row-h">{row.title}</span>
+            <Badge tone={row.kind === "self" ? "neutral" : "accent"}>{row.kindLabel}</Badge>
+            <span class="leader" aria-hidden="true"></span>
+            <span class="sw-mono">{row.meta}</span>
+          </a>
+        </li>
+      ))}
+    </ul>
+  </section>
+
+  <hr class="sw-rule" />
+
+  <section class="sw-section lp-two">
+    <div class="lp-support">
+      <h2 class="sw-h2">{t("landing.supportH")}</h2>
+      {me.supporter ? <p class="sw-p">{t("landing.thanks")}</p> : (
+        <>
+          <p class="sw-p">{t("landing.supportP")}</p>
+          <div><Button href={L("/carnatic/support")} variant="secondary">{t("landing.supportCta")}</Button></div>
+        </>
+      )}
+    </div>
+    <div class="lp-journal">
+      <h2 class="sw-h2">{t("landing.journalH")}</h2>
+      {journal.length ? (
+        <ul class="lp-jlist">
+          {journal.map((e) => (
+            <li><a href={e.href}><span class="lp-j-h">{e.title}</span><span class="sw-mono">{e.meta}</span></a></li>
+          ))}
+        </ul>
+      ) : (
+        <p class="sw-p">{t("landing.journalEmpty")} <a href="/journal/">{t("landing.journalAll")}</a></p>
+      )}
+    </div>
+  </section>
+</SwaraLayout>
+
+<script>
+  /* The catalogue's format filter. With no script every row shows. */
+  document.querySelectorAll<HTMLElement>("[data-filters]").forEach((box) => {
+    const chips = box.querySelectorAll<HTMLButtonElement>("[data-filter]");
+    chips.forEach((chip) => chip.addEventListener("click", () => {
+      const want = chip.dataset.filter;
+      chips.forEach((c) => c.setAttribute("aria-pressed", String(c === chip)));
+      box.querySelectorAll<HTMLElement>("li[data-kind]").forEach((li) => {
+        li.hidden = want !== "all" && li.dataset.kind !== want;
+      });
+    }));
+  });
+</script>
+
+<style>
+  .lp-cta { display: flex; gap: 10px; flex-wrap: wrap; padding-top: 10px; }
+  .lp-first { padding: 18px; display: grid; gap: 12px; }
+  .lp-line { --sl-cell: 44px; }
+  .lp-three { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 28px; }
+  .lp-who-col { display: grid; gap: 8px; align-content: start; border-top: 1px solid var(--ink); padding-top: 22px; }
+  .lp-big { font-size: clamp(2rem, 3.4vw, 2.25rem); font-weight: 500; }
+  .lp-lead { margin: 0; font: 16px / 1.6 var(--font-body); color: var(--ink-soft); max-width: 660px; text-wrap: pretty; }
+  .lp-steps { list-style: none; margin: 8px 0 0; padding: 0; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 8px; }
+  .lp-step { display: grid; gap: 6px; align-content: start; min-height: 100%; padding: 12px; border: 1px solid var(--line-strong); border-radius: 6px; background: var(--surface-card); text-decoration: none; color: var(--ink); }
+  .lp-step:hover { border-color: var(--accent); }
+  .lp-step[aria-current] { background: var(--accent-wash); border-color: var(--accent); }
+  .lp-step-name { font: 600 var(--text-sm) / 1.35 var(--font-body); }
+  .lp-begin { display: flex; gap: 12px 20px; align-items: center; flex-wrap: wrap; padding-top: 10px; }
+  .lp-headline { display: flex; gap: 8px 20px; align-items: baseline; flex-wrap: wrap; }
+  .lp-tools { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+  .lp-tool { display: grid; gap: 8px; align-content: start; padding: 18px; background: var(--surface-card); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow-1); text-decoration: none; }
+  .lp-tool:hover { border-color: var(--accent); }
+  .lp-spec { font: 13px / 1.5 var(--font-mono); color: var(--rose); }
+  .lp-tool-h { font-family: var(--font-display); font-size: 22px; color: var(--ink); }
+  .lp-teacher { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 28px 48px; align-items: start; }
+  .lp-portrait { margin: 0; display: grid; gap: 10px; justify-items: start; }
+  .lp-plate { width: 170px; height: 170px; border-radius: 12px; display: block; object-fit: cover; }
+  .lp-note { display: grid; gap: 14px; }
+  .lp-sign { margin: 0; font-family: var(--font-display); font-style: italic; font-size: 20px; color: var(--ink-soft); }
+  .lp-rows { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--line); }
+  .lp-rows .sw-dotrow { text-decoration: none; color: var(--ink); align-items: center; }
+  .lp-rows .sw-dotrow:hover .lp-row-h { color: var(--accent); }
+  .lp-row-h { font: 600 16px / 1.35 var(--font-body); }
+  .lp-two { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 28px 64px; align-items: start; }
+  .lp-support, .lp-journal { display: grid; gap: 14px; align-content: start; }
+  .lp-jlist { list-style: none; margin: 0; padding: 0; }
+  .lp-jlist a { display: grid; gap: 4px; padding: 12px 0; border-bottom: 1px solid var(--line); text-decoration: none; }
+  .lp-j-h { font-family: var(--font-display); font-size: 19px; color: var(--ink); }
+  .lp-jlist a:hover .lp-j-h { color: var(--accent); }
+  @media (max-width: 899px) {
+    .lp-three, .lp-tools, .lp-teacher, .lp-two { grid-template-columns: minmax(0, 1fr); }
+    .lp-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+  @media (max-width: 599px) {
+    .lp-cta :global(.sh-btn) { width: 100%; }
+    .lp-begin :global(.sh-btn) { width: 100%; }
+  }
+</style>

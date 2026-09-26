@@ -1,0 +1,108 @@
+---
+/* One tala (Web Learn Practice, "tala"): the common way to keep it first,
+ * selected; the ways some schools keep it beside it, each with a line of
+ * attribution; how to keep it; the konnakol; the hand. */
+import SwaraLayout from "../../../layouts/SwaraLayout.astro";
+import Hero from "../../../components/carnatic/Hero.astro";
+import TalaGrid from "../../../components/carnatic/TalaGrid.astro";
+import Hand from "../../../components/carnatic/Hand.astro";
+import Chip from "../../../components/carnatic/Chip.astro";
+import Button from "../../../components/forms/Button.astro";
+import ConfidenceNote from "../../../components/carnatic/ConfidenceNote.astro";
+import { hrefIn, langOf, words } from "../../../lib/carnatic/i18n";
+import { talas } from "../../../lib/carnatic/data";
+import { HOW, NADAI, type Tala } from "../../../lib/carnatic/talas";
+import { copy } from "../../../lib/copy";
+import { notFound } from "../../../lib/carnatic/notfound";
+
+const lang = langOf(Astro);
+const t = await words(lang);
+const say = await copy("carnatic.tala");
+const L = (p: string) => hrefIn(lang, p);
+const data = await talas();
+const tala: Tala | undefined = data?.practical?.find((x: Tala) => x.slug === Astro.params.slug);
+if (!tala) return notFound(Astro);
+
+/* The one alternative that is a tala of its own: rupaka's 6-count suladi form. */
+const pair: Record<string, string> = { rupaka_3count: "rupaka_chaturasra", rupaka_chaturasra: "rupaka_3count" };
+const other: Tala | undefined = pair[tala.id] ? data.practical.find((x: Tala) => x.id === pair[tala.id]) : undefined;
+const isChapu = tala.id.includes("chapu");
+const syllables = isChapu ? String(tala.konnakol ?? "").split(" ") : tala.counts.map(() => "ta ka di mi");
+const otherSyl = other ? other.counts.map(() => "ta ka di mi") : [];
+const [lede, how] = HOW[tala.id] ?? [tala.notes ?? "", ""];
+/* Variants recorded in the data, other than the default itself. */
+const variants = (tala.variants ?? []).filter((v: any) => !/^Default\./.test(v.description ?? "") && !["each_kriya_twice", "three_claps", "claps_1_3_4"].includes(v.id));
+const first = (s: string) => (s ?? "").split(/(?<=\.)\s/)[0];
+const commonLabel = tala.id === "rupaka_3count" ? "Clap, clap, wave · common" : tala.id === "rupaka_chaturasra" ? "O I₄ · 6 counts · the suladi form" : `${tala.shape} · common`;
+const otherLabel = tala.id === "rupaka_3count" ? "O I₄ · 6 counts · some schools" : "Clap, clap, wave · in practice today";
+const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+---
+<SwaraLayout title={`${tala.name} tala · Swara Studio`}
+             description={`${tala.name}: ${lede} How to keep it with your hand, its konnakol, and the ways some schools keep it.`}
+             crumbs={[[t("crumb.learn"), L("/carnatic/lessons")], [t("crumb.talasShort"), L("/carnatic/talas")], [tala.name]]}>
+  <Hero eyebrow={say("eyebrow", "Tala")} title={tala.name} lede={say(`lede.${tala.id}`, lede)} />
+
+  <div class="sw-cols">
+    <div class="sw-main">
+      <section class="sw-card tp-card" data-schools>
+        <div class="tp-chips">
+          <span class="t-eyebrow sw-eyebrow">{say("someSchools", "Some schools")}</span>
+          <Chip active data-view="common">{commonLabel}</Chip>
+          {other && <Chip data-view="other">{otherLabel}</Chip>}
+        </div>
+        <div data-pane="common"><TalaGrid tala={tala} syllables={syllables} pips={false} /></div>
+        {other && <div data-pane="other" hidden><TalaGrid tala={other} syllables={otherSyl} pips={false} /></div>}
+        <p class="sw-note">{tala.id === "rupaka_3count" ? say("rupakaNote", "Most common in practice today. Konnakol shown in chatusra nadai. The rupaka alankaram uses the 6-count textbook form.") : isChapu ? say("chapuNote", "Counts between the claps are silent by default.") : say("nadaiNote", "Konnakol shown in chatusra nadai.")}</p>
+        {variants.length > 0 && (
+          <div class="tp-variants">
+            <p class="t-eyebrow sw-eyebrow">{say("alsoH", "Also kept this way")}</p>
+            <ul>
+              {variants.map((v: any) => (
+                <li><span class="sw-p">{cap(first(v.description).replace(/^Default\.\s*/, ""))}</span> <ConfidenceNote level={v.confidence ?? "medium"} sources={v.sources ?? []} /></li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </section>
+
+      <section class="sw-section tp-how">
+        <h2 class="sw-h3">{say("howH", "How to keep it")}</h2>
+        <p class="sw-prose">{say(`how.${tala.id}`, how)}</p>
+        {tala.eduppu && <p class="sw-p">{say("deshadiHist", "The historical form is a 4-count tala shown as a wave and three beats; it is not taught as a separate tala today.")}</p>}
+      </section>
+
+      <section class="sw-section">
+        <h2 class="sw-h3">{say("konnakolH", "Konnakol reference")}</h2>
+        <div class="sw-inset tp-konn">
+          {isChapu ? syllables.map((s, i) => <span><b>{s}</b><small>count {i + 1}</small></span>)
+                   : NADAI.map(([name, n, syl]) => <span><b>{syl}</b><small>{name} · {n} per count</small></span>)}
+        </div>
+      </section>
+    </div>
+
+    <aside class="sw-aside">
+      <Hand />
+      <Button href={L(`/carnatic/practice/tala?tala=${tala.id}`)}>{say("tryIt", "Try it in the trainer")}</Button>
+    </aside>
+  </div>
+</SwaraLayout>
+
+<script>
+  document.querySelectorAll<HTMLElement>("[data-schools]").forEach((box) => {
+    box.querySelectorAll<HTMLButtonElement>("[data-view]").forEach((chip) => chip.addEventListener("click", () => {
+      box.querySelectorAll<HTMLButtonElement>("[data-view]").forEach((c) => c.setAttribute("aria-pressed", String(c === chip)));
+      box.querySelectorAll<HTMLElement>("[data-pane]").forEach((p) => { p.hidden = p.dataset.pane !== chip.dataset.view; });
+    }));
+  });
+</script>
+
+<style>
+  .tp-card { display: grid; gap: 14px; }
+  .tp-chips { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .tp-variants ul { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 6px; }
+  .tp-how { padding-top: 0; }
+  .tp-konn { display: flex; flex-wrap: wrap; gap: 14px 22px; }
+  .tp-konn span { display: grid; gap: 4px; }
+  .tp-konn b { font: 400 21px / 1.2 var(--font-display); color: var(--ink); }
+  .tp-konn small { font: 10px / 1.2 var(--font-mono); color: var(--ink-faint); }
+</style>

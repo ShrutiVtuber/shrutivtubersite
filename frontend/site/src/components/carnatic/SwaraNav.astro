@@ -1,0 +1,95 @@
+---
+/* Swara Studio's own strip under the site header, on every /carnatic page
+ * (handoff README §2): the lockup (name in EB Garamond, the descriptor as an
+ * eyebrow beneath it, translated; the name is not), the school's six places,
+ * and the language switcher.
+ *
+ * At phone width the six places fold into the site's one Menu (its
+ * "Carnatic music school" group) and the strip keeps the lockup and the
+ * languages, as drawn.
+ *
+ * ⚠ Nothing from the rest of the site's identity is here: no astronomical
+ * glyphs, no moon-phase marks, no seal. The school's only ornaments are the
+ * notation marks | || , ;
+ */
+import { hrefIn, LANG_LABEL, LANG_NAME, LANGS, langOf, words } from "../../lib/carnatic/i18n";
+
+const lang = langOf(Astro);
+const t = await words(lang);
+const here = Astro.url.pathname;
+
+const ITEMS: [string, string, string[]][] = [
+  ["/carnatic/lessons", t("nav.learn"), ["/carnatic/lessons", "/carnatic/ragas", "/carnatic/talas", "/carnatic/instruments", "/carnatic/gamakas", "/carnatic/path"]],
+  ["/carnatic/practice/tuner", t("nav.practice"), ["/carnatic/practice"]],
+  ["/carnatic/compose", t("nav.compose"), ["/carnatic/compose", "/carnatic/sheets"]],
+  ["/carnatic/listen", t("nav.listen"), ["/carnatic/listen"]],
+  ["/journal/", t("nav.journal"), []],
+  ["/carnatic/support", t("nav.support"), ["/carnatic/support"]],
+];
+const current = (prefixes: string[]) => prefixes.some((p) => here === p || here.startsWith(p + "/"));
+
+/* The same page in another language: this address with ?lang= swapped. */
+const inLang = (l: string) => {
+  const u = new URL(Astro.url);
+  if (l === "en") u.searchParams.delete("lang");
+  else u.searchParams.set("lang", l);
+  return u.pathname + (u.search || "") + u.hash;
+};
+---
+
+<div class="sw-strip" data-swara-strip lang={lang === "en" ? undefined : lang}>
+  <div class="page sw-strip-row">
+    <a class="sw-lockup" href={hrefIn(lang, "/carnatic")}>
+      <span class="sw-name">{t("brand.name")}</span>
+      <span class="sw-desc" data-indic={lang !== "en" || undefined}>{t("brand.desc")}</span>
+    </a>
+    <nav class="sw-nav" aria-label={t("nav.aria")}>
+      {ITEMS.map(([href, label, prefixes]) => (
+        <a href={href.startsWith("/carnatic") ? hrefIn(lang, href) : href} aria-current={current(prefixes) ? "page" : undefined}>{label}</a>
+      ))}
+    </nav>
+    <div class="sw-langs" role="group" aria-label={t("nav.languages")}>
+      {LANGS.map((l) => (
+        <a href={inLang(l)} lang={l} hreflang={l} data-set-lang={l}
+           aria-current={l === lang ? "true" : undefined} title={LANG_NAME[l]}>{LANG_LABEL[l]}</a>
+      ))}
+      {lang !== "en" && (
+        <span class="sw-unverified" title={t("unverified.lang")}>{t("unverified")}</span>
+      )}
+    </div>
+  </div>
+</div>
+
+<script>
+  /* Remember the chosen language, so a bare /carnatic link keeps it. */
+  document.querySelectorAll<HTMLAnchorElement>("[data-set-lang]").forEach((a) => {
+    a.addEventListener("click", () => {
+      document.cookie = `swara_lang=${a.dataset.setLang}; path=/carnatic; max-age=${60 * 60 * 24 * 365}; samesite=lax`;
+    });
+  });
+</script>
+
+<style>
+  .sw-strip { background: var(--surface-veil); border-bottom: var(--border-w) solid var(--line); }
+  .sw-strip-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 28px; min-height: 54px; padding-top: 10px; padding-bottom: 10px; }
+  .sw-lockup { display: grid; gap: 2px; text-decoration: none; line-height: 1; flex: none; }
+  .sw-name { font-family: var(--font-display); font-size: 19px; font-weight: 500; color: var(--ink); }
+  .sw-desc { font-family: var(--font-body); font-size: 9.5px; font-weight: 600; letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; color: var(--ink-faint); line-height: 1.3; }
+  .sw-desc[data-indic] { letter-spacing: var(--tracking-eyebrow-indic); text-transform: none; font-size: 11px; }
+  .sw-nav { display: flex; gap: 18px; flex-wrap: wrap; font-family: var(--font-body); font-size: var(--text-sm); }
+  .sw-nav a { color: var(--ink-soft); text-decoration: none; padding: 4px 0; }
+  .sw-nav a:hover { color: var(--accent-hover); }
+  .sw-nav a[aria-current="page"] { color: var(--ink); box-shadow: 0 1px 0 var(--accent); }
+  .sw-langs { margin-left: auto; display: flex; align-items: center; gap: 10px; font-family: var(--font-body); font-size: var(--text-xs); }
+  .sw-langs a { color: var(--ink-soft); text-decoration: none; }
+  .sw-langs a:hover { color: var(--accent-hover); }
+  .sw-langs a[aria-current="true"] { color: var(--ink); font-weight: 600; }
+  .sw-unverified { font-family: var(--font-mono); font-size: 10px; color: var(--ink-faint); border-bottom: 1px dotted var(--line-strong); cursor: help; }
+  @media (max-width: 899px) {
+    .sw-nav { display: none; }
+  }
+  @media (max-width: 480px) {
+    .sw-strip-row { gap: 8px 16px; }
+    .sw-langs { gap: 8px; }
+  }
+</style>

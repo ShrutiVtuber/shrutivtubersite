@@ -1,0 +1,170 @@
+---
+/* Tuner and drone (handoff: Web Learn Practice, screen "tuner").
+ *
+ * The readout is the swara relative to YOUR Sa with its octave word
+ * ("G₃ madhya"); the cents are small and labelled "vs equal temperament".
+ * Sa and Pa are anchored (an ink rule, heavier lanes). The trace matters more
+ * than a needle: a kampita a needle would call out of tune reads correctly as
+ * a line. Red is never used for "wrong": deviation is distance, in accent blue.
+ *
+ * Microphone states — asking, working, denied — are all reachable; denied,
+ * the drone keeps working. The headphones hint is always there while listening.
+ */
+import SwaraLayout from "../../../layouts/SwaraLayout.astro";
+import Hero from "../../../components/carnatic/Hero.astro";
+import DroneControl from "../../../components/carnatic/DroneControl.astro";
+import { hrefIn, langOf, words } from "../../../lib/carnatic/i18n";
+import { visitor } from "../../../lib/carnatic/prefs";
+import { copy } from "../../../lib/copy";
+
+const lang = langOf(Astro);
+const t = await words(lang);
+const say = await copy("carnatic.tuner");
+const { settings } = await visitor(Astro);
+const LANES: [string, string][] = [["P", "P"], ["M2", "M₂"], ["M1", "M₁"], ["G3", "G₃"], ["G2", "G₂"], ["R2", "R₂"], ["R1", "R₁"], ["S", "S"]];
+---
+
+<SwaraLayout title={say("meta.title", "Tuner and drone · Swara Studio")}
+             description={say("meta.description", "A tanpura drone in just intonation relative to your Sa, and a tuner that reads your pitch as a swara with its octave and draws it as a line. Free, in the browser, no account.")}
+             crumbs={[[t("crumb.practice"), hrefIn(lang, "/carnatic/practice/tuner")], [say("crumb", "Tuner and drone")]]}>
+  <Hero eyebrow={t("crumb.practice")} title={say("title", "Tuner and drone")} lede={say("lede", "Tune to your Sa, then watch your pitch as a line.")} />
+
+  <div class="tn">
+    <DroneControl settings={settings} />
+
+    <section class="sw-card tn-mic" aria-labelledby="tn-mic" data-tuner data-sa={settings.sa}>
+      <div class="tn-states">
+        <h2 id="tn-mic" class="t-eyebrow sw-eyebrow">{say("mic", "Microphone")}</h2>
+        <span class="sw-chip" data-state="asking" aria-pressed="false">{say("asking", "Asking")}</span>
+        <span class="sw-chip" data-state="working" aria-pressed="false">{say("working", "Working")}</span>
+        <span class="sw-chip" data-state="denied" aria-pressed="false">{say("denied", "Denied")}</span>
+        <button type="button" class="tn-listen" data-listen>{say("listen", "Listen")}</button>
+      </div>
+
+      <div class="tn-read" aria-live="polite">
+        <span class="tn-swara" data-swara>–<sub></sub></span>
+        <span class="tn-oct" data-octave>{say("idle", "press Listen")}</span>
+        <span class="tn-cents"><span data-cents>&nbsp;</span><small>{say("vsEt", "vs equal temperament")}</small></span>
+      </div>
+
+      <div class="tn-plot" role="img" aria-label={say("traceLabel", "Your pitch over the last four seconds, against the swaras")}>
+        <div class="tn-lanes">
+          {LANES.map(([id, label]) => <span data-lane={id} class:list={[(id === "S" || id === "P") && "anchor"]}>{label}</span>)}
+        </div>
+        <canvas data-trace width="1200" height="340"></canvas>
+      </div>
+
+      <p class="tn-denied sw-p" data-denied hidden>{say("deniedP", "The microphone is off for this page, so there is no trace. The drone still works. To use the tuner, allow the microphone in your browser's site settings and press Listen again.")}</p>
+
+      <div class="tn-hint">
+        <span class="sw-mono">{say("headphonesH", "Headphones")}</span>
+        <span class="sw-p">{say("headphones", "The drone leaks into the microphone and pulls the reading towards Sa. Headphones give the most honest trace.")}</span>
+      </div>
+    </section>
+  </div>
+</SwaraLayout>
+
+<script>
+  import { Mic, readSwara } from "../../../lib/carnatic/client/pitch";
+  import { settings } from "../../../lib/carnatic/client/state";
+  import { pitchHz } from "../../../lib/carnatic/notation";
+
+  const box = document.querySelector<HTMLElement>("[data-tuner]")!;
+  const canvas = box.querySelector<HTMLCanvasElement>("[data-trace]")!;
+  const swaraEl = box.querySelector<HTMLElement>("[data-swara]")!;
+  const octEl = box.querySelector<HTMLElement>("[data-octave]")!;
+  const centsEl = box.querySelector<HTMLElement>("[data-cents]")!;
+  const denied = box.querySelector<HTMLElement>("[data-denied]")!;
+  const listen = box.querySelector<HTMLButtonElement>("[data-listen]")!;
+  const mic = new Mic();
+  let saHz = pitchHz(settings().sa || box.dataset.sa || "C3");
+  document.addEventListener("swara:sa", (e) => { saHz = (e as CustomEvent).detail; });
+
+  const setState = (s: string) => {
+    box.querySelectorAll<HTMLElement>("[data-state]").forEach((c) => c.setAttribute("aria-pressed", String(c.dataset.state === s)));
+    denied.hidden = s !== "denied";
+  };
+
+  /* The last four seconds, in semitones above Sa (null for silence). */
+  const history: (number | null)[] = [];
+  const RATE = 20;
+  const LEN = RATE * 4;
+  const css = getComputedStyle(document.documentElement);
+
+  function draw() {
+    const g = canvas.getContext("2d")!;
+    const w = canvas.width, h = canvas.height;
+    g.clearRect(0, 0, w, h);
+    const lanes = [0, 1, 2, 3, 4, 5, 6, 7];                  // S … P, bottom to top
+    const y = (semis: number) => h - 10 - (semis / 7) * (h - 20);
+    for (const s of lanes) {
+      const anchor = s === 0 || s === 7;
+      g.strokeStyle = anchor ? css.getPropertyValue("--ink").trim() : css.getPropertyValue("--line").trim();
+      g.lineWidth = anchor ? 2 : 1;
+      g.beginPath(); g.moveTo(0, y(s)); g.lineTo(w, y(s)); g.stroke();
+    }
+    g.strokeStyle = css.getPropertyValue("--accent").trim();
+    g.lineWidth = 3;
+    g.lineJoin = "round";
+    g.beginPath();
+    let pen = false;
+    history.forEach((v, i) => {
+      const x = (i / (LEN - 1)) * w;
+      if (v === null) { pen = false; return; }
+      /* Folded into one octave for the lanes: the octave word says which. */
+      const within = ((v % 12) + 12) % 12;
+      const clamped = Math.min(7.6, within);
+      if (!pen) { g.moveTo(x, y(clamped)); pen = true; } else g.lineTo(x, y(clamped));
+    });
+    g.stroke();
+  }
+
+  let timer: number | null = null;
+  const SUB: Record<string, string> = { "1": "₁", "2": "₂", "3": "₃" };
+  listen.addEventListener("click", async () => {
+    if (timer !== null) {
+      window.clearInterval(timer); timer = null; mic.stop(); setState("idle"); listen.textContent = "Listen";
+      return;
+    }
+    setState("asking");
+    const s = await mic.start();
+    setState(s);
+    if (s !== "working") return;
+    listen.textContent = "Stop";
+    timer = window.setInterval(() => {
+      const hz = mic.read();
+      if (hz) {
+        const r = readSwara(hz, saHz);
+        const [letter, v] = [r.name[0], r.name.slice(1)];
+        swaraEl.innerHTML = `${letter}<sub>${SUB[v] ? v : ""}</sub>`;
+        octEl.textContent = r.octaveWord;
+        centsEl.textContent = `${r.cents > 0 ? "+" : r.cents < 0 ? "−" : "±"}${Math.abs(r.cents)} ¢`;
+        history.push(r.semis);
+      } else history.push(null);
+      while (history.length > LEN) history.shift();
+      draw();
+    }, 1000 / RATE);
+  });
+  draw();
+</script>
+
+<style>
+  .tn { display: grid; grid-template-columns: minmax(0, 380px) minmax(0, 1fr); gap: 24px; padding-top: 24px; align-items: start; }
+  .tn-mic { display: grid; gap: 18px; }
+  .tn-states { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .tn-states h2 { margin-right: 4px; }
+  .tn-states .sw-chip { cursor: default; }
+  .tn-listen { margin-left: auto; appearance: none; border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent); background: transparent; color: var(--accent); border-radius: var(--radius-sm); font: 600 var(--text-sm) / 1 var(--font-body); padding: 9px 16px; cursor: pointer; }
+  .tn-read { display: flex; align-items: flex-end; gap: 12px 24px; flex-wrap: wrap; }
+  .tn-swara { font: 400 64px / 1 var(--font-notation); color: var(--ink); min-width: 80px; }
+  .tn-swara sub { font-size: .45em; vertical-align: -.1em; }
+  .tn-oct { font: 26px / 1.2 var(--font-display); color: var(--ink-soft); padding-bottom: 6px; }
+  .tn-cents { display: grid; gap: 2px; font: 14px / 1.2 var(--font-mono); color: var(--ink-soft); padding-bottom: 8px; }
+  .tn-cents small { font-size: 10px; color: var(--ink-faint); }
+  .tn-plot { position: relative; display: grid; grid-template-columns: 26px minmax(0, 1fr); background: var(--surface-inset); border-radius: 6px; overflow: hidden; }
+  .tn-lanes { display: flex; flex-direction: column; justify-content: space-between; padding: 2px 0 2px 8px; font: 11px / 1 var(--font-mono); color: var(--ink-soft); }
+  .tn-lanes .anchor { color: var(--ink); font-weight: 600; }
+  .tn-plot canvas { width: 100%; height: 180px; display: block; }
+  .tn-hint { display: flex; gap: 12px; align-items: baseline; padding: 12px 14px; border: 1px solid var(--line); border-radius: 8px; }
+  @media (max-width: 899px) { .tn { grid-template-columns: minmax(0, 1fr); } }
+</style>

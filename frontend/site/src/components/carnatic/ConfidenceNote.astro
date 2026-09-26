@@ -1,0 +1,19 @@
+---
+/* The confidence note (Foundations v2 §10b). High confidence shows NOTHING.
+   Medium: "Some sources differ", a dotted underline, open to see the sources.
+   Low: the specific advice given ("Fingering varies by flute; check by ear").
+   Never rose, never red, never an icon or a badge. */
+import { words, langOf } from "../../lib/carnatic/i18n";
+interface Props { level?: string | null; text?: string | null; sources?: string[] }
+const { level, text, sources = [] } = Astro.props;
+const t = await words(langOf(Astro));
+const lv = (level ?? "").toLowerCase();
+const shown = lv.startsWith("medium") || lv.startsWith("low") || lv.startsWith("unknown") || lv.includes("disputed");
+const words_ = text || (lv.startsWith("medium") ? t("conf.medium") : t("conf.low"));
+---
+{shown && (sources.length ? (
+  <details class="sw-conf-wrap">
+    <summary><span class="sw-conf">{words_}</span></summary>
+    <ul class="sw-conf-sources">{sources.map((s) => <li>{/^https?:/.test(s) ? <a href={s} rel="noopener nofollow">{s.replace(/^https?:\/\/(www\.)?/, "")}</a> : s}</li>)}</ul>
+  </details>
+) : <span class="sw-conf">{words_}</span>)}

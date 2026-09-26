@@ -49,6 +49,14 @@ const NAV: [string, string][] = [
      below is overridden there by an editable string). */
   ["/play", "Play"],
   ["/tools", "Instruments"],
+  /* Swara Studio, the Carnatic music school (26 Sep 2026). Its six places
+     are the menu's own group; the bar carries the school's front door. */
+  ["/carnatic", "Carnatic music school"],
+  ["/carnatic/lessons", "Learn"],
+  ["/carnatic/practice/tuner", "Practice"],
+  ["/carnatic/compose", "Compose"],
+  ["/carnatic/listen", "Listen"],
+  ["/carnatic/support", "Support the school"],
   ["/horoscopes", "Horoscopes"],
   ["/journal", "Journal"],
   ["/schedule", "Schedule"],
@@ -64,9 +72,12 @@ const NAV: [string, string][] = [
   ["/support", "Support the work"],
   ["/contact", "Contact"],
 ];
+/* The bar is tight: the school is "Carnatic school" there (as the design's
+   header mock has it) and "Carnatic music school" in the menu. */
+const BAR_LABEL: Record<string, string> = { "/carnatic": say("bar.carnatic", "Carnatic school") };
 /* Play, not Guides: /play is the games wing's front door and Guides is one of
    its rooms. The bar names the door; the menu's Play group lists the rooms. */
-const BAR = ["/today", "/play", "/tools", "/horoscopes", "/journal", "/schedule"];
+const BAR = ["/today", "/play", "/tools", "/carnatic", "/horoscopes", "/journal", "/schedule"];
 /* A group whose first page is its own overview gets a heading that links to
    it: the Play group's heading opens /play, and /play is also its first item,
    "Overview", so the door is there for somebody who does not click headings. */
@@ -74,19 +85,22 @@ const GROUPS: [string, string[]][] = [
   [say("group.watch", "Watch"), ["/schedule", "/videos"]],
   [say("group.play", "Play"), ["/play", "/guides", "/builds", "/groups", "/ledger"]],
   [say("group.practice", "Practice"), ["/tools", "/horoscopes", "/classes"]],
+  [say("group.carnatic", "Carnatic music school"), ["/carnatic", "/carnatic/lessons", "/carnatic/practice/tuner", "/carnatic/compose", "/carnatic/listen", "/carnatic/support"]],
   [say("group.read", "Read"), ["/today", "/journal", "/newsletter"]],
   [say("group.her", "Shruti"), ["/about", "/work", "/shop", "/support", "/contact"]],
 ];
-const OVERVIEWS: Record<string, string> = { "/play": say("group.play.overview", "Overview") };
+const OVERVIEWS: Record<string, string> = { "/play": say("group.play.overview", "Overview"), "/carnatic": say("group.carnatic.overview", "Overview") };
 const label = (href: string) => NAV.find(([h]) => h === href)?.[1] ?? href;
 const itemLabel = (href: string) => OVERVIEWS[href] ?? label(href);
 /* /play, /builds, /groups and /ledger belong to the guides section: hidden with it. */
-const visibleNav = (href: string) => visible(["/play", "/builds", "/groups", "/ledger"].includes(href) ? "/guides" : href);
+const visibleNav = (href: string) => visible(["/play", "/builds", "/groups", "/ledger"].includes(href) ? "/guides" : href.startsWith("/carnatic") ? "/carnatic" : href);
 const current = (href: string) => (href === "/" ? here === "/" : here.startsWith(href));
 /* In the bar, Play stands for the whole games wing: it is the current place
    on a guide, a build, a group or a ledger as much as on /play itself. */
 const WING = ["/play", "/guides", "/builds", "/groups", "/ledger"];
 const currentInBar = (href: string) => (href === "/play" ? WING.some((w) => here.startsWith(w)) : current(href));
+/* In the menu, the school's front door is current only on itself. */
+const currentInMenu = (href: string) => (href === "/carnatic" ? here === "/carnatic" : current(href));
 ---
 
 <header class="site-header" data-scrolled="false">
@@ -106,7 +120,7 @@ const currentInBar = (href: string) => (href === "/play" ? WING.some((w) => here
         {
           BAR.filter(visibleNav).map((href) => (
             <a href={href} aria-current={currentInBar(href) ? "page" : undefined}>
-              {label(href)}
+              {BAR_LABEL[href] ?? label(href)}
             </a>
           ))
         }
@@ -144,7 +158,7 @@ const currentInBar = (href: string) => (href === "/play" ? WING.some((w) => here
                 ? <a class="site-menu-eyebrow site-menu-heading" href={overview}>{name}</a>
                 : <span class="site-menu-eyebrow">{name}</span>}
               {shown.map((href) => (
-                <a href={href} aria-current={current(href) ? "page" : undefined}>{itemLabel(href)}</a>
+                <a href={href} aria-current={currentInMenu(href) ? "page" : undefined}>{itemLabel(href)}</a>
               ))}
             </div>
           ) : null;

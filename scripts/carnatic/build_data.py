@@ -422,7 +422,7 @@ def build_ragas(root: Path, gaps: str) -> dict:
 
 # ── talas ───────────────────────────────────────────────────────────────────
 
-ACTION = {"beat": "clap", "finger": "finger", "wave": "wave", "silent": "silent", "rest": "silent"}
+ACTION = {"beat": "clap", "finger": "finger", "wave": "wave", "silent": "silent", "rest": "silent", "none": "silent"}
 
 
 def counts_of(kriya: list[dict]) -> list[dict]:

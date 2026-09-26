@@ -9,6 +9,7 @@ import "../styles/global.css";
 import "../styles/site.css";
 import SiteHeader from "../components/chrome/SiteHeader.astro";
 import GuidesNav from "../components/chrome/GuidesNav.astro";
+import SwaraNav from "../components/carnatic/SwaraNav.astro";
 import SiteFooter from "../components/chrome/SiteFooter.astro";
 import CookieNotice from "../components/brand/CookieNotice.astro";
 import Beacon from "../components/insight/Beacon.astro";
@@ -70,10 +71,16 @@ interface Props {
    * whether a pasted URL becomes a card or stays a bare link.
    */
   oembed?: string;
+  /** The page's language, where it is not English (Swara Studio's Tamil,
+      Telugu and Kannada pages). */
+  lang?: string;
+  /** The same page in other languages, for `hreflang`: [lang, site-relative href]. */
+  alternates?: [string, string][];
 }
 const { title, description = "", bare = false, noindex = false,
         ogImage, ogImageAlt, jsonLd: pageLd = null, canonical,
-        feed, oembed} = Astro.props;
+        feed, oembed, lang = "en", alternates = []} = Astro.props;
+const inSchool = /^\/carnatic(\/|$)/.test(Astro.url.pathname);
 
 const [live, links] = await Promise.all([
   site<LiveStatus>(PATHS.live),
@@ -135,13 +142,14 @@ const homeLd = isHome
 ---
 
 <!doctype html>
-<html lang="en">
+<html lang={lang}>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{title}</title>
     {description && <meta name="description" content={description} />}
     <link rel="canonical" href={new URL(canonical ?? Astro.url.pathname, siteUrl).href} />
+    {alternates.map(([l, href]) => <link rel="alternate" hreflang={l} href={new URL(href, siteUrl).href} />)}
     {noindex && <meta name="robots" content={say("text.3", "noindex, nofollow")} />}
     {feed && (
       <link rel="alternate" type="application/rss+xml"
@@ -216,6 +224,7 @@ const homeLd = isHome
     {Astro.locals.bypassingHolding && <HoldingNotice />}
     <SiteHeader live={badge} signedIn={Astro.locals.signedIn ?? false} />
     {/^\/(guides|builds|groups|tracker|ledger|play)(\/|$)/.test(Astro.url.pathname) && <GuidesNav />}
+    {inSchool && <SwaraNav />}
     {bare ? <slot /> : <main id="main" class="site-main"><slot /></main>}
     <SiteFooter socials={socials} />
     <CookieNotice />

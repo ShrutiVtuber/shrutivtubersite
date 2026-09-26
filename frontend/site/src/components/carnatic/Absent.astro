@@ -1,0 +1,10 @@
+---
+/* The school's data has not been synced: a designed state, not an error. */
+import { words, langOf } from "../../lib/carnatic/i18n";
+const t = await words(langOf(Astro));
+---
+<div class="sw-empty" role="status">
+  <span class="marks" aria-hidden="true">| ||</span>
+  <h2>{t("data.absentH")}</h2>
+  <p>{t("data.absentP")}</p>
+</div>

@@ -83,6 +83,9 @@ const ELSEWHERE: [string, string][] = [
   ["/contact", "Contact"],
 ];
 const year = new Date().getUTCFullYear();
+/* Swara Studio (/carnatic) uses none of the site's magickal marks — no seal,
+   no glyphs (handoff hard rule 1) — and says what the school is instead. */
+const school = /^\/carnatic(\/|$)/.test(Astro.url.pathname);
 ---
 
 <footer class="site-footer">
@@ -90,7 +93,9 @@ const year = new Date().getUTCFullYear();
     <div class="cols">
       <div>
         <span class="brand-word footer-brand">{say("text.3", "Shruti")}</span>
-        <p class="footer-thesis">{say("text.2", "Instruments for magick, built live from Athens.")}</p>
+        <p class="footer-thesis">{school
+          ? say("school.thesis", "Swara Studio is the Carnatic music school of shrutivtuber.com.")
+          : say("text.2", "Instruments for magick, built live from Athens.")}</p>
         <SocialLinkRow links={socials} size={16} />
       </div>
       <div>
@@ -150,7 +155,7 @@ const year = new Date().getUTCFullYear();
         {" · "}
         <a href={LICENCE_URL} rel="noopener license">{say("text.8", "AGPL-3.0")}</a>
       </p>
-      <span class="seal seal-ring" title={say("text.1", "Soror Eu. A.")}>{say("text.9", "S∴E.A.")}</span>
+      {!school && <span class="seal seal-ring" title={say("text.1", "Soror Eu. A.")}>{say("text.9", "S∴E.A.")}</span>}
     </div>
   </div>
 </footer>

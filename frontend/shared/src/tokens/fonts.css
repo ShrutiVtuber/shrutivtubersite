@@ -12,3 +12,5 @@
  * own CSS, which is why a Latin reader never downloads the Devanagari subsets.
  */
 @import url('./fonts-local.css');
+/* Tamil, Telugu and Kannada (Swara Studio, 26 Sep 2026), same approach. */
+@import url('./fonts-indic.css');

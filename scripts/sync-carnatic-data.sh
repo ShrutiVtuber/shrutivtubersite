@@ -14,10 +14,19 @@
 #   ./scripts/sync-carnatic-data.sh                 # local stack
 #   SHRUTI_HOST=deploy@159.195.251.161 ./scripts/sync-carnatic-data.sh   # production
 #
-# SWARA_RESEARCH overrides where the research is read from.
+# SWARA_RESEARCH overrides where the research is read from. By default it is
+# the `research` worktree of the swara-studio repository (research edits are
+# committed there, on the research branch, apart from the app's checkout),
+# falling back to the main checkout.
 set -euo pipefail
 
-RESEARCH="${SWARA_RESEARCH:-$HOME/Documents/development/swara-studio/research}"
+if [ -z "${SWARA_RESEARCH:-}" ]; then
+  for candidate in "$HOME/Documents/development/swara-studio-research/research" \
+                   "$HOME/Documents/development/swara-studio/research"; do
+    if [ -d "$candidate" ]; then SWARA_RESEARCH="$candidate"; break; fi
+  done
+fi
+RESEARCH="${SWARA_RESEARCH:-$HOME/Documents/development/swara-studio-research/research}"
 [ -d "$RESEARCH" ] || { echo "no research at $RESEARCH — set SWARA_RESEARCH" >&2; exit 1; }
 [ -f "$RESEARCH/LICENSE-DATA.md" ] || { echo "research/LICENSE-DATA.md is missing; the data is not published without it" >&2; exit 1; }
 

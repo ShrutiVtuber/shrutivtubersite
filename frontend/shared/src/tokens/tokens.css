@@ -13,6 +13,8 @@
 @import "./fonts.css";
 @import "./spacing.css";
 @import "./effects.css";
+/* Swara Studio's notation tokens: new, and nothing above changes for them. */
+@import "./notation.css";
 /* Print is a designed medium here, not an afterthought: it owns page geometry,
    forces Dawn on paper and repeats table headers. Pages must not write print
    CSS of their own. */

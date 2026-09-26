@@ -1,0 +1,88 @@
+---
+/* Every Swara Studio page: the site's own shell (BaseLayout: header, footer,
+ * tokens), the school's strip beneath the header, the page in its language,
+ * and the few things every school page shares — the visitor's settings for
+ * the browser's scripts, and the drone's mini bar.
+ *
+ * The page is `.page.sw` inside BaseLayout's `bare` slot so the breadcrumb
+ * sits straight under the strip, as drawn.
+ */
+import "../styles/carnatic.css";
+import BaseLayout from "./BaseLayout.astro";
+import { LANGS, langOf, words } from "../lib/carnatic/i18n";
+import { visitor } from "../lib/carnatic/prefs";
+
+interface Props {
+  title: string;
+  description?: string;
+  noindex?: boolean;
+  jsonLd?: Record<string, unknown> | null;
+  /** Breadcrumb: [label, href?][]; the last is the current page. */
+  crumbs?: [string, string?][];
+  /** Pages that print (the song sheet) drop the page wrapper's width. */
+  wide?: boolean;
+}
+const { title, description, noindex = false, jsonLd = null, crumbs = [], wide = false } = Astro.props;
+const lang = langOf(Astro);
+const t = await words(lang);
+const { me, settings } = await visitor(Astro);
+
+/* hreflang: the same address in each language. The English one is the bare
+   path, which is also x-default. */
+const base = new URL(Astro.url);
+base.searchParams.delete("lang");
+const at = (l: string) => {
+  const u = new URL(base);
+  if (l !== "en") u.searchParams.set("lang", l);
+  return u.pathname + u.search;
+};
+const alternates: [string, string][] = [...LANGS.map((l) => [l, at(l)] as [string, string]), ["x-default", at("en")]];
+const canonical = at(lang);
+
+const boot = {
+  lang,
+  signedIn: me.signedIn,
+  supporter: Boolean(me.supporter),
+  partsPerSong: me.limits?.partsPerSong ?? 2,
+  settings,
+  settingsUpdatedAt: me.settingsUpdatedAt ?? null,
+};
+---
+
+<BaseLayout title={title} description={description} noindex={noindex} jsonLd={jsonLd} lang={lang}
+            alternates={noindex ? [] : alternates} canonical={canonical} bare>
+  <main id="main" class:list={["sw", wide ? "sw-wide" : "page"]} lang={lang} data-swara>
+    {crumbs.length > 0 && (
+      <nav class="sw-crumbs sw-noprint" aria-label={t("crumb.breadcrumb")}>
+        {crumbs.map(([label, href], i) => (
+          <>
+            {i > 0 && <span aria-hidden="true">/</span>}
+            {href && i < crumbs.length - 1 ? <a href={href}>{label}</a> : <span aria-current="page">{label}</span>}
+          </>
+        ))}
+      </nav>
+    )}
+    <slot />
+  </main>
+  <div class="sw-minibar" data-minibar hidden>
+    <span class="dot" aria-hidden="true"></span>
+    <span class="mono" data-minibar-label></span>
+    <button type="button" data-minibar-stop>{t("drone.miniStop")}</button>
+  </div>
+  <script type="application/json" id="swara-boot" set:html={JSON.stringify(boot)} />
+</BaseLayout>
+
+<script>
+  import { boot, onDrone, stopDrone } from "../lib/carnatic/client/state";
+  boot();
+  const bar = document.querySelector<HTMLElement>("[data-minibar]");
+  const label = document.querySelector<HTMLElement>("[data-minibar-label]");
+  document.querySelector("[data-minibar-stop]")?.addEventListener("click", () => stopDrone());
+  onDrone((on, text) => {
+    if (!bar) return;
+    /* The page's own drone control shows the state already; the bar is for
+       when that control has scrolled out of view or lives on another page. */
+    bar.hidden = !on || document.querySelector("[data-drone-control]") !== null;
+    if (label) label.textContent = text;
+  });
+</script>

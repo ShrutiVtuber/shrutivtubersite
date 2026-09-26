@@ -1,0 +1,56 @@
+---
+/* The hand (Foundations v2 §04). An art slot: until illustrations exist it
+ * shows this diagram, its designed art-absent state. A filled palm is a clap;
+ * a lit finger a finger count (little, ring, middle, index, thumb, then little
+ * again); a dashed palm the wave, palm turned up; a dotted palm a silent count.
+ *
+ * Keyframes (driven by the page's clock through data-state / data-finger):
+ * a clap lifts at −120 ms and lands ON the count; a finger folds over 0–90 ms;
+ * a wave turns over 0–160 ms; a silent count does not move. Under reduced
+ * motion the hand swaps state at 0 ms.
+ */
+interface Props { label?: string; caption?: string; eyebrow?: string }
+const { label = "Clap", caption = "count 1 · samam", eyebrow = "Hand · art-absent" } = Astro.props;
+---
+<div class="sw-card hand" data-hand data-state="clap" data-finger="">
+  <p class="t-eyebrow sw-eyebrow">{eyebrow}</p>
+  <div class="hand-art" aria-hidden="true">
+    <svg viewBox="0 0 120 90" width="100%" height="150">
+      <g class="fingers">
+        <rect data-f="little" x="30" y="16" width="10" height="22" rx="5" />
+        <rect data-f="ring" x="42" y="10" width="10" height="28" rx="5" />
+        <rect data-f="middle" x="54" y="7" width="10" height="31" rx="5" />
+        <rect data-f="index" x="66" y="10" width="10" height="28" rx="5" />
+        <rect data-f="thumb" x="79" y="22" width="10" height="18" rx="5" />
+      </g>
+      <rect class="palm" x="36" y="44" width="46" height="34" rx="12" />
+    </svg>
+  </div>
+  <p class="hand-label" data-hand-label>{label}</p>
+  <p class="sw-mono" data-hand-caption>{caption}</p>
+  <slot />
+</div>
+
+<style>
+  .hand { display: grid; gap: 10px; align-content: start; }
+  .hand-art { background: var(--surface-inset); border-radius: 8px; padding: 12px; display: grid; place-items: center; }
+  .hand svg { max-width: 220px; overflow: visible; }
+  .hand .fingers rect { fill: var(--surface-card); stroke: var(--line-strong); stroke-width: 1.2; transition: fill 90ms var(--ease-out); }
+  .hand .palm { fill: var(--ink); stroke: var(--ink); stroke-width: 1.5; transition: transform 120ms var(--ease-out), fill 160ms var(--ease-out); transform-origin: 59px 61px; }
+  .hand .fingers { opacity: 0; transition: opacity 90ms var(--ease-out); }
+  .hand[data-state="finger"] .fingers, .hand[data-state="wave"] .fingers { opacity: 1; }
+  .hand[data-state="finger"] .palm { fill: var(--surface-card); stroke: var(--line-strong); }
+  .hand[data-state="finger"][data-finger="little"] [data-f="little"],
+  .hand[data-state="finger"][data-finger="ring"] [data-f="ring"],
+  .hand[data-state="finger"][data-finger="middle"] [data-f="middle"],
+  .hand[data-state="finger"][data-finger="index"] [data-f="index"],
+  .hand[data-state="finger"][data-finger="thumb"] [data-f="thumb"] { fill: var(--accent); stroke: var(--accent); }
+  .hand[data-state="wave"] .palm { fill: transparent; stroke-dasharray: 5 4; transform: scaleY(-1); }
+  .hand[data-state="silent"] .palm { fill: transparent; stroke: var(--ink-faint); stroke-dasharray: 1.5 4; }
+  .hand[data-lifting] .palm { transform: translateY(-8px); }
+  .hand-label { margin: 0; font: 30px / 1.1 var(--font-display); color: var(--ink); }
+  .hand .sw-mono { margin: 0; }
+  @media (prefers-reduced-motion: reduce) {
+    .hand .palm, .hand .fingers, .hand .fingers rect { transition: none; }
+  }
+</style>

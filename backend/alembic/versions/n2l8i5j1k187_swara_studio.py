@@ -45,6 +45,13 @@ def _user(**kw):
 
 
 def upgrade() -> None:
+    # The section starts hidden, as Squirrel Guides did (d7f2a4c9e0b1): the
+    # school is published from Settings when she says so, not by a deploy.
+    op.execute(
+        "INSERT INTO site_setting (key, value, created_at, updated_at) "
+        "VALUES ('page.carnatic', '0', now(), now()) "
+        "ON CONFLICT (key) DO NOTHING"
+    )
     op.create_table(
         "carnatic_profile",
         _user(primary_key=True),
@@ -151,6 +158,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    op.execute("DELETE FROM site_setting WHERE key = 'page.carnatic'")
     for table in ("carnatic_device_link", "carnatic_review", "carnatic_comment", "carnatic_like",
                   "carnatic_post", "carnatic_song", "carnatic_practice_day", "carnatic_progress",
                   "carnatic_profile"):

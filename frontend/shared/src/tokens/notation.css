@@ -1,0 +1,27 @@
+/* Swara Studio: the notation tokens (handoff README §4, "New").
+ *
+ * The sargam line is the school's signature component: one avartanam, each
+ * count a fixed column, octave dots above and below the glyph (never the
+ * ASCII S' or .P), gamaka marks in rose above. Scripts get their own glyph
+ * size so all four sit at the same optical height.
+ */
+:root{
+  --font-notation:"JetBrains Mono","Noto Sans Tamil","Noto Sans Telugu","Noto Sans Kannada","Noto Sans Math",monospace;
+  --notation-size-lat:24px; --notation-size-ta:20px; --notation-size-te:22px; --notation-size-kn:22px;
+  /* A 4px dot in an 8px row above and below the glyph. */
+  --notation-dot:4px;
+  --notation-dot-row:8px;
+  /* One 1px ink line per speed above the first, 2px apart. */
+  --notation-speed-line:1px;
+  --notation-speed-gap:2px;
+  /* Tamil, Telugu and Kannada body text; prose runs looser. Indic scripts are
+     never letter-spaced, eyebrows included. */
+  --leading-indic:1.8;
+  --leading-indic-prose:1.9;
+  --tracking-eyebrow-indic:0;
+  /* The hand: a clap lifts this long before the count and lands ON it. */
+  --kriya-anticipation:120ms;
+  /* Tap scoring windows, either side of the clap. */
+  --tap-perfect:30ms;
+  --tap-ontime:80ms;
+}

@@ -1,0 +1,93 @@
+---
+/* The tala library (Web Learn Practice, "talas"): the eleven practical talas
+ * and Deshadi first, then the 35 suladi talas as a table with the everyday
+ * cells highlighted. */
+import SwaraLayout from "../../../layouts/SwaraLayout.astro";
+import Hero from "../../../components/carnatic/Hero.astro";
+import Absent from "../../../components/carnatic/Absent.astro";
+import { hrefIn, langOf, words } from "../../../lib/carnatic/i18n";
+import { talas } from "../../../lib/carnatic/data";
+import { CARD_NOTE, EVERYDAY_SULADI, type Tala } from "../../../lib/carnatic/talas";
+import { copy } from "../../../lib/copy";
+
+const lang = langOf(Astro);
+const t = await words(lang);
+const say = await copy("carnatic.talas");
+const L = (p: string) => hrefIn(lang, p);
+const data = await talas();
+const practical: Tala[] = data?.practical ?? [];
+const FAMILIES = ["dhruva", "matya", "rupaka", "jhampa", "triputa", "ata", "eka"];
+const JATIS: [string, number][] = [["tisra", 3], ["chaturasra", 4], ["khanda", 5], ["misra", 7], ["sankeerna", 9]];
+const suladi = (fam: string, jati: string) => data?.suladi?.find((s: any) => s.family === fam && s.jati === jati);
+const cap = (s: string) => s[0].toUpperCase() + s.slice(1);
+const countsLabel = (tl: Tala) => tl.id === "deshadi" ? "as Adi" : t("gen.counts", { n: tl.counts.length });
+---
+<SwaraLayout title={say("meta.title", "Tala library · Swara Studio")}
+             description={say("meta.description", "The talas in everyday Carnatic use — Adi, rupaka, misra and khanda chapu and more — with how to keep each with your hand, then the full system of 35 suladi talas.")}
+             crumbs={[[t("crumb.learn"), L("/carnatic/lessons")], [t("crumb.talas")]]}>
+  <Hero eyebrow={say("eyebrow", "Talas")} title={t("crumb.talas")} lede={say("lede", "The talas in everyday use come first, then the full system of 35.")} />
+  {!data ? <div class="sw-section"><Absent /></div> : (
+    <>
+      <section class="sw-section" aria-labelledby="tl-p">
+        <h2 id="tl-p" class="sw-h2">{say("practical", "Practical talas")}</h2>
+        <div class="tl-grid">
+          {practical.map((tl) => (
+            <a class="tl-card" href={L(`/carnatic/talas/${tl.slug}`)}>
+              <span class="tl-head"><span class="tl-name">{tl.name}</span><span class="sw-mono">{countsLabel(tl)}</span></span>
+              <span class="sw-mono tl-shape">{tl.shape}</span>
+              <span class="tl-dots" aria-hidden="true">{tl.counts.map((c) => <i class={c.action} />)}</span>
+              <span class="sw-p">{say(`note.${tl.id}`, CARD_NOTE[tl.id] ?? "")}</span>
+            </a>
+          ))}
+        </div>
+        <p class="sw-note">{say("legend", "Filled dot: clap. Small ring: finger count. Outlined ring: wave. Dotted ring: silent count.")}</p>
+      </section>
+
+      <section class="sw-section" aria-labelledby="tl-35">
+        <h2 id="tl-35" class="sw-h2">{say("suladiH", "The 35 suladi talas")}</h2>
+        <p class="sw-p tl-lead">{say("suladiP", "Seven talas, each in five jatis. The jati sets the length of the laghu (I); a drutam (O) is 2 counts and an anudrutam (U) is 1. Each cell shows the counts per cycle. Highlighted cells are the ones in everyday use.")}</p>
+        <div class="tl-table-wrap">
+          <table class="sw-table tl-table">
+            <thead><tr><th>Tala</th><th class="angas">angas</th>{JATIS.map(([j, n]) => <th class="c">{cap(j)}<small>I = {n}</small></th>)}</tr></thead>
+            <tbody>
+              {FAMILIES.map((fam) => {
+                const any = suladi(fam, "chaturasra");
+                return (
+                  <tr>
+                    <th scope="row">{cap(fam)}</th>
+                    <td class="angas">{any?.angaNotation?.replace(/\d/g, "")}</td>
+                    {JATIS.map(([j]) => { const s = suladi(fam, j); return <td class:list={["c", s && EVERYDAY_SULADI.has(s.id) && "on"]} title={s?.name ?? ""}>{s?.aksharas}</td>; })}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </>
+  )}
+</SwaraLayout>
+
+<style>
+  .tl-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+  .tl-card { display: grid; gap: 10px; align-content: start; padding: 16px; background: var(--surface-card); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow-1); text-decoration: none; }
+  .tl-card:hover { border-color: var(--accent); }
+  .tl-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  .tl-name { font: 22px / 1.2 var(--font-display); color: var(--ink); }
+  .tl-shape { color: var(--ink-soft); }
+  .tl-dots { display: flex; flex-wrap: wrap; gap: 4px; }
+  .tl-dots i { width: 13px; height: 13px; border-radius: 99px; box-sizing: border-box; }
+  .tl-dots .clap { background: var(--ink); }
+  .tl-dots .finger { border: 1px solid var(--ink-soft); transform: scale(.8); }
+  .tl-dots .wave { border: 1.5px solid var(--ink); }
+  .tl-dots .silent { border: 1.5px dotted var(--ink-faint); }
+  .tl-lead { max-width: 64ch; }
+  .tl-table-wrap { overflow-x: auto; }
+  .tl-table th small { display: block; font: 10px / 1.4 var(--font-mono); color: var(--ink-faint); font-weight: 400; }
+  .tl-table td.c, .tl-table th.c { text-align: center; font-family: var(--font-mono); color: var(--ink); }
+  .tl-table td.on { background: var(--accent-wash); color: var(--accent); }
+  .tl-table tbody th { border-bottom: 1px solid var(--line); }
+  .tl-table .angas { font-family: var(--font-mono); color: var(--ink-soft); }
+  @media (max-width: 1023px) { .tl-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (max-width: 599px) { .tl-grid { grid-template-columns: minmax(0, 1fr); } }
+</style>

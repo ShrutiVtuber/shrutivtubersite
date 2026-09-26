@@ -1,0 +1,11 @@
+---
+/* A pill: a toggle (aria-pressed) or a link (aria-current). The design
+   system's Tag, carrying its own attributes so a page's script can find it. */
+interface Props { active?: boolean; href?: string; [key: string]: any }
+const { active = false, href, class: klass, ...rest } = Astro.props;
+---
+{href ? (
+  <a class:list={["sw-chip", klass]} href={href} aria-current={active ? "page" : undefined} {...rest}><slot /></a>
+) : (
+  <button type="button" class:list={["sw-chip", klass]} aria-pressed={active ? "true" : "false"} {...rest}><slot /></button>
+)}

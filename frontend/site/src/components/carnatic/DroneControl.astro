@@ -1,0 +1,114 @@
+---
+/* The drone control (Foundations v2 §05b): one control, full size on the
+ * tuner and folded into the mini bar elsewhere. Pa–Sa–Sa–Sa is the default;
+ * Ma–Sa–Sa–Sa for ragas without Pa; Ni–Sa–Sa–Sa is an advanced setting
+ * labelled "mostly Hindustani"; mute Pa is a toggle, suggested for ragas with
+ * M₂ and no Pa. Just intonation relative to Sa, always.
+ */
+import { words, langOf } from "../../lib/carnatic/i18n";
+import { pitchHz } from "../../lib/carnatic/notation";
+import type { Settings } from "../../lib/carnatic/prefs";
+
+interface Props { settings: Settings; compact?: boolean; suggest?: "pa" | "ma" | "ni" | "mute"; showSa?: boolean }
+const { settings, compact = false, suggest, showSa = true } = Astro.props;
+const t = await words(langOf(Astro));
+const tuning = suggest ?? settings.droneTuning ?? "pa";
+const hz = pitchHz(settings.sa);
+const TUNINGS: [string, string, string][] = [
+  ["pa", t("drone.pa"), t("drone.paNote")], ["ma", t("drone.ma"), t("drone.maNote")],
+  ["ni", t("drone.ni"), t("drone.niNote")], ["mute", t("drone.mute"), t("drone.muteNote")],
+];
+/* Kattai names only the pitch class (instruments/venu.json kattaiNote). */
+const SAS: [string, string][] = settings.instrument === "venu"
+  ? [["C5", "C · 1 kattai"], ["D5", "D · 2 kattai"], ["E5", "E · 3 kattai"], ["F5", "F · 4 kattai"], ["G5", "G · 5 kattai"]]
+  : settings.instrument === "veena" ? [["D3", "D · 2 kattai"], ["D#3", "D♯ · 2½ kattai"], ["E3", "E · 3 kattai"], ["F3", "F · 4 kattai"]]
+  : [["C3", "C · 1 kattai"], ["D3", "D · 2 kattai"], ["E3", "E · 3 kattai"], ["F3", "F · 4 kattai"], ["G3", "G · 5 kattai"], ["A3", "A · 6 kattai"]];
+const flute = settings.instrument === "venu" ? `${settings.flute} flute${settings.flute === "E" ? " (medium)" : ""}. ` : "";
+---
+<div class:list={["sw-card dc", compact && "dc-compact"]} data-drone-control data-suggest={suggest ?? ""}>
+  <p class="t-eyebrow sw-eyebrow">{t("drone.eyebrow")}</p>
+  <button type="button" class="dc-toggle" data-drone-toggle aria-pressed="false"
+          data-on={t("drone.off")} data-off={t("drone.on")}>{t("drone.on")}</button>
+  <div class="sw-chips" role="radiogroup" aria-label={t("drone.tuning")}>
+    {TUNINGS.map(([id, label, note]) => (
+      <button type="button" class="sw-chip" role="radio" data-tuning={id} title={note}
+              aria-checked={id === tuning ? "true" : "false"} aria-pressed={id === tuning ? "true" : "false"}>{label}</button>
+    ))}
+  </div>
+  <p class="sw-note" data-tuning-note>{TUNINGS.find(([id]) => id === tuning)?.[2]}</p>
+  {showSa && !compact && (
+    <div class="dc-sa">
+      <p class="t-eyebrow sw-eyebrow">{t("drone.sa")}</p>
+      <div class="sw-chips">
+        {SAS.map(([sa, label]) => (
+          <button type="button" class="sw-chip" data-sa={sa} aria-pressed={sa === settings.sa ? "true" : "false"}>{label}</button>
+        ))}
+      </div>
+    </div>
+  )}
+  <p class="sw-mono dc-hz" data-sa-line>Sa = {settings.sa.replace("#", "♯")} · {hz.toFixed(1)} Hz</p>
+  <p class="sw-note">{flute}{t("drone.ji")}</p>
+  <label class="dc-vol"><span class="sw-p">{t("drone.volume")}</span>
+    <input type="range" min="0" max="100" value="60" data-drone-volume />
+  </label>
+</div>
+
+<script>
+  import { settings, setSettings, startDrone, stopDrone, theDrone, onDrone, notifyDrone } from "../../lib/carnatic/client/state";
+  import { pitchHz } from "../../lib/carnatic/notation";
+
+  for (const box of document.querySelectorAll<HTMLElement>("[data-drone-control]")) {
+    const toggle = box.querySelector<HTMLButtonElement>("[data-drone-toggle]")!;
+    const note = box.querySelector<HTMLElement>("[data-tuning-note]");
+    const saLine = box.querySelector<HTMLElement>("[data-sa-line]");
+    let tuning = (box.querySelector<HTMLElement>('[data-tuning][aria-checked="true"]')?.dataset.tuning ?? "pa") as any;
+    const paint = () => {
+      const on = theDrone().playing;
+      toggle.setAttribute("aria-pressed", String(on));
+      toggle.textContent = on ? toggle.dataset.on! : toggle.dataset.off!;
+    };
+    toggle.addEventListener("click", () => {
+      if (theDrone().playing) stopDrone(); else startDrone(tuning);
+      paint();
+    });
+    box.querySelectorAll<HTMLButtonElement>("[data-tuning]").forEach((b) => b.addEventListener("click", () => {
+      tuning = b.dataset.tuning as any;
+      box.querySelectorAll<HTMLButtonElement>("[data-tuning]").forEach((x) => {
+        x.setAttribute("aria-checked", String(x === b)); x.setAttribute("aria-pressed", String(x === b));
+      });
+      if (note) note.textContent = b.title;
+      /* A raga page's suggestion is for that raga; the tuner's choice is the default. */
+      if (!box.dataset.suggest) setSettings({ droneTuning: tuning });
+      theDrone().retune(pitchHz(settings().sa), tuning);
+    }));
+    box.querySelectorAll<HTMLButtonElement>("[data-sa]").forEach((b) => b.addEventListener("click", () => {
+      box.querySelectorAll<HTMLButtonElement>("[data-sa]").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+      setSettings({ sa: b.dataset.sa });
+      const hz = pitchHz(b.dataset.sa!);
+      if (saLine) saLine.textContent = `Sa = ${b.dataset.sa!.replace("#", "♯")} · ${hz.toFixed(1)} Hz`;
+      theDrone().retune(hz, tuning);
+      notifyDrone();
+      document.dispatchEvent(new CustomEvent("swara:sa", { detail: hz }));
+    }));
+    const vol = box.querySelector<HTMLInputElement>("[data-drone-volume]");
+    vol?.addEventListener("input", () => {
+      const v = Number(vol.value) / 100;
+      theDrone().setVolume(v);
+      setSettings({ droneVolume: v });
+    });
+    if (vol && typeof settings().droneVolume === "number") vol.value = String(Math.round(settings().droneVolume * 100));
+    onDrone(paint);
+  }
+</script>
+
+<style>
+  .dc { display: grid; gap: 14px; align-content: start; }
+  .dc-toggle { appearance: none; border: 0; border-radius: var(--radius-sm); background: var(--accent); color: var(--on-accent); font: 600 var(--text-sm) / 1 var(--font-body); padding: 12px 18px; min-height: 40px; cursor: pointer; }
+  .dc-toggle:hover { background: var(--accent-hover); }
+  .dc-toggle:active { transform: translateY(1px); }
+  .dc-toggle[aria-pressed="true"] { background: var(--accent-wash); color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+  .dc-sa { display: grid; gap: 8px; }
+  .dc-hz { font-size: 14px; color: var(--ink); margin: 0; }
+  .dc-vol { display: flex; gap: 12px; align-items: center; }
+  .dc-vol input { flex: 1; accent-color: var(--accent); }
+</style>

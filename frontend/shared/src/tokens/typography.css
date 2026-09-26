@@ -1,8 +1,11 @@
 /* Shruti — type system. Display/prose: EB Garamond. UI: Commissioner. Data/code: JetBrains Mono.
    Devanagari fallbacks: Noto Serif Devanagari (serif), Mukta (sans). */
 :root{
-  --font-display:"EB Garamond","Noto Serif Devanagari",Georgia,"Times New Roman",serif;
-  --font-body:"Commissioner","Mukta",-apple-system,"Segoe UI",system-ui,sans-serif;
+  /* Extended for Swara Studio (handoff README §4): Noto added to each stack in
+     stack order, the way Devanagari already works, so no per-script markup is
+     needed. unicode-range keeps a Latin reader from downloading any of it. */
+  --font-display:"EB Garamond","Noto Serif Devanagari","Noto Serif Tamil","Noto Serif Telugu","Noto Serif Kannada",Georgia,"Times New Roman",serif;
+  --font-body:"Commissioner","Mukta","Noto Sans Tamil","Noto Sans Telugu","Noto Sans Kannada",-apple-system,"Segoe UI",system-ui,sans-serif;
   --font-mono:"JetBrains Mono","Noto Sans Devanagari",ui-monospace,"SF Mono",Menlo,monospace;
   /* Scale */
   --text-hero:clamp(2.5rem,6vw,3.75rem); /* @kind spacing */

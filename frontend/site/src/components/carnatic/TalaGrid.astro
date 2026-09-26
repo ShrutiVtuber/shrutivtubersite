@@ -1,0 +1,67 @@
+---
+/* The tala grid (Foundations v2 §04): counts grouped by anga, the samam with
+ * an ink border, the nadai's pips filling within each count, konnakol under
+ * the grid. The playhead (accent wash) is moved by lib/carnatic/client/talaview.ts.
+ */
+import { actionLabel, type Tala } from "../../lib/carnatic/talas";
+
+interface Props { tala: Tala; syllables?: string[]; nadai?: number; pips?: boolean; angaLabels?: boolean; id?: string }
+const { tala, syllables = [], nadai = 4, pips = true, angaLabels = false, id } = Astro.props;
+const groups: { size: number; start: number }[] = [];
+let at = 0;
+for (const size of tala.angas) { groups.push({ size, start: at }); at += size; }
+const angaName = (i: number) => {
+  const c = tala.counts[groups[i].start];
+  const size = groups[i].size;
+  if (tala.id.includes("chapu")) return String(size);
+  if (size === 1) return "U anudrutam";
+  if (size === 2 && tala.counts[groups[i].start + 1]?.action === "wave") return "O drutam";
+  return `I${"₀₁₂₃₄₅₆₇₈₉"[size] ?? size} laghu`;
+};
+---
+<div class="tg" data-tala-grid id={id} style={`--tg-n:${tala.counts.length}`}>
+  {groups.map((g, gi) => (
+    <div class="tg-anga" style={`flex:${g.size} 1 0`}>
+      {angaLabels && <p class="tg-anga-name">{angaName(gi)}</p>}
+      <div class="tg-cells">
+        {tala.counts.slice(g.start, g.start + g.size).map((c, k) => {
+          const i = g.start + k;
+          return (
+            <div class:list={["tg-cell", c.samam && "samam", i === tala.counts.length - 1 && "last"]} data-index={i}
+                 data-action={c.action} data-finger={c.finger ?? ""}>
+              <span class="tg-n">{c.n}{c.samam ? " · samam" : ""}</span>
+              <span class:list={["tg-act", c.action]}>{actionLabel(c)}</span>
+              {syllables.length > 0 && <span class="tg-syl">{syllables[i] ?? ""}</span>}
+              {pips && <span class="tg-pips" aria-hidden="true">{Array.from({ length: nadai }, () => <i />)}</span>}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  ))}
+  <span class="tg-end" aria-hidden="true"></span>
+</div>
+
+<style>
+  .tg { display: flex; gap: 0; align-items: stretch; min-width: 0; }
+  .tg-anga { display: grid; gap: 8px; align-content: start; min-width: 0; padding-right: 8px; margin-right: 8px; border-right: 1px solid var(--ink); }
+  .tg-anga:last-of-type { border-right: 0; margin-right: 0; }
+  .tg-anga-name { margin: 0; font: 600 var(--text-xs) / 1 var(--font-body); letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; color: var(--ink-soft); }
+  .tg-cells { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 6px; }
+  .tg-cell { display: grid; gap: 6px; align-content: start; padding: 10px 8px; min-height: 84px; border: 1px solid var(--line-strong); border-radius: 6px; background: var(--surface-card); min-width: 0; }
+  .tg-cell.samam { border-color: var(--ink); }
+  .tg-cell.is-now { background: var(--accent-wash); border-color: var(--accent); }
+  .tg-cell.is-now .tg-act { color: var(--accent); }
+  .tg-n { font: 10px / 1.3 var(--font-mono); color: var(--ink-faint); white-space: nowrap; }
+  .tg-act { font: 600 var(--text-sm) / 1.2 var(--font-body); color: var(--ink); }
+  .tg-act.silent { color: var(--ink-faint); }
+  .tg-syl { font: 17px / 1.2 var(--font-display); color: var(--ink-soft); white-space: nowrap; overflow: hidden; }
+  .tg-pips { display: flex; gap: 3px; }
+  .tg-pips i { flex: 1; height: 3px; border-radius: 2px; background: var(--line); }
+  .tg-pips i.on { background: var(--accent); }
+  .tg-end { width: 4px; border-left: 1px solid var(--ink); border-right: 1px solid var(--ink); margin-left: 4px; }
+  @media (max-width: 599px) {
+    .tg { overflow-x: auto; }
+    .tg-cell { min-width: 58px; }
+  }
+</style>

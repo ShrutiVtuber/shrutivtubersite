@@ -40,7 +40,9 @@ export default defineConfig({
     // the same way.
     server: {
       proxy: {
-        "/api": { target: "http://127.0.0.1:8200", changeOrigin: true },
+        /* SHRUTI_DEV_API points a dev server at a different backend (a
+           branch's own, on another port) without editing this file. */
+        "/api": { target: process.env.SHRUTI_DEV_API || "http://127.0.0.1:8200", changeOrigin: true },
       },
     },
   },

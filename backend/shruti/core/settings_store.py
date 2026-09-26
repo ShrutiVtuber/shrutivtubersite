@@ -56,6 +56,10 @@ SECTIONS = {
     # Squirrel Guides. Starts HIDDEN (migration d7f2a4c9e0b1 writes the row):
     # her words were that the links appear "when it's ready".
     "guides": "page.guides",
+    # Swara Studio, the Carnatic music school. Starts HIDDEN (migration
+    # n2l8i5j1k187 writes the row): its script names await a native reader and
+    # it is published from Settings when she says so.
+    "carnatic": "page.carnatic",
 }
 
 # Which URL prefixes belong to each, so the middleware and the sitemap agree
@@ -65,6 +69,7 @@ SECTION_PATHS = {
     "horoscopes": ("/horoscopes",),
     "classes": ("/classes",),
     "guides": ("/guides", "/groups", "/builds", "/ledger", "/play"),
+    "carnatic": ("/carnatic",),
 }
 
 

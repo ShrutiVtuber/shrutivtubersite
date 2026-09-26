@@ -97,6 +97,8 @@ const SECTION_PATHS: Record<string, string> = {
   "/ledger": "guides",
   /* The Play hub is the wing's front door, and goes when the wing goes. */
   "/play": "guides",
+  /* Swara Studio, the Carnatic music school. */
+  "/carnatic": "carnatic",
 };
 
 function sectionOf(path: string): string | null {

@@ -1,0 +1,206 @@
+---
+/* The tala trainer (Web Learn Practice, "trainer"; Foundations v2 §04, §04b).
+ *
+ * Learn: the hand performs each count slowly while the syllables are shown.
+ * Follow: count along with the audio; nothing is scored.
+ * Play: tap on the claps. Version 1 scores CLAPS ONLY: perfect ±30 ms, on
+ * time ±80 ms, otherwise early or late. A tap on a finger count or a wave says
+ * so and is not scored. No lives, no streak to break, and no red.
+ *
+ * Konnakol is shown, not spoken: the recorded voice comes later (DECISIONS
+ * tala §10); until then the call and response is syllables with click cues.
+ */
+import SwaraLayout from "../../../layouts/SwaraLayout.astro";
+import Hero from "../../../components/carnatic/Hero.astro";
+import TalaGrid from "../../../components/carnatic/TalaGrid.astro";
+import Hand from "../../../components/carnatic/Hand.astro";
+import Chip from "../../../components/carnatic/Chip.astro";
+import Absent from "../../../components/carnatic/Absent.astro";
+import { hrefIn, langOf, words } from "../../../lib/carnatic/i18n";
+import { talas } from "../../../lib/carnatic/data";
+import { NADAI, type Tala } from "../../../lib/carnatic/talas";
+import { visitor } from "../../../lib/carnatic/prefs";
+import { copy } from "../../../lib/copy";
+
+const lang = langOf(Astro);
+const t = await words(lang);
+const say = await copy("carnatic.trainer");
+const L = (p: string) => hrefIn(lang, p);
+const { settings } = await visitor(Astro);
+const data = await talas();
+const practical: Tala[] = data?.practical ?? [];
+const wanted = Astro.url.searchParams.get("tala") ?? "adi";
+const tala = practical.find((x) => x.id === wanted || x.slug === wanted) ?? practical[0];
+const mode = (["learn", "follow", "play"].includes(Astro.url.searchParams.get("mode") ?? "") ? Astro.url.searchParams.get("mode") : "follow") as string;
+const nadaiName = Astro.url.searchParams.get("nadai") ?? "chatusra";
+const nadai = NADAI.find(([n]) => n === nadaiName) ?? NADAI[1];
+const isChapu = tala?.id.includes("chapu");
+const syllables = tala ? (isChapu ? String(tala.konnakol ?? "").split(" ") : tala.counts.map(() => nadai[2])) : [];
+const tempo = settings.tempo ?? 60;
+const claps = tala ? tala.counts.filter((c) => c.action === "clap").map((c) => c.n) : [];
+---
+<SwaraLayout title={say("meta.title", "Tala trainer · Swara Studio")}
+             description={say("meta.description", "Learn to keep Carnatic talas with your hand: watch the hand, count along, then tap the claps and see whether you are early or late. Adi, rupaka, the chapu talas and more.")}
+             crumbs={[[t("crumb.practice"), L("/carnatic/practice/tuner")], [say("crumb", "Tala trainer")]]}>
+  <Hero eyebrow={t("crumb.practice")} title={say("title", "Tala trainer")} lede={say("lede", "Learn the hand, follow along, then tap the claps.")} />
+  {!tala ? <div class="sw-section"><Absent /></div> : (
+    <div class="tr" data-trainer data-tala={JSON.stringify(tala.counts)} data-tempo={tempo} data-nadai={nadai[1]} data-mode={mode}>
+      <div class="sw-toolbar">
+        <div class="sw-seg" role="group" aria-label={say("modeLabel", "Mode")}>
+          {["learn", "follow", "play"].map((m) => <button type="button" data-mode-btn={m} aria-pressed={m === mode ? "true" : "false"}>{say(`mode.${m}`, m[0].toUpperCase() + m.slice(1))}</button>)}
+        </div>
+        <span class="sw-mono tr-meta" data-meta>{tala.name} · speed 1 · {nadai[0]} nadai · <span data-bpm>{tempo}</span> / min</span>
+        <Chip data-call>{say("call", "Konnakol call and response")}</Chip>
+        <span class="spacer"></span>
+        <button type="button" class="tr-go" data-go aria-pressed="false">{t("gen.play")}</button>
+      </div>
+
+      <div class="tr-pick">
+        <span class="t-eyebrow sw-eyebrow">{say("talaH", "Tala")}</span>
+        <div class="sw-chips">{practical.map((x) => <Chip href={L(`/carnatic/practice/tala?tala=${x.id}&mode=${mode}`)} active={x.id === tala.id}>{x.name}</Chip>)}</div>
+        {!isChapu && (
+          <>
+            <span class="t-eyebrow sw-eyebrow">{say("nadaiH", "Nadai")}</span>
+            <div class="sw-chips">{NADAI.map(([n, k]) => <Chip href={L(`/carnatic/practice/tala?tala=${tala.id}&mode=${mode}&nadai=${n}`)} active={n === nadai[0]}>{n[0].toUpperCase() + n.slice(1)} {k}</Chip>)}</div>
+          </>
+        )}
+        <span class="t-eyebrow sw-eyebrow">{say("tempoH", "Tempo")}</span>
+        <div class="sw-chips">{[40, 48, 60, 70, 80].map((b) => <Chip data-tempo-btn={b} active={b === tempo}>{b} / min</Chip>)}</div>
+      </div>
+
+      <div class="tr-body">
+        <div class="tr-left">
+          <p class="t-eyebrow sw-eyebrow tr-turn" data-turn hidden></p>
+          <TalaGrid tala={tala} syllables={syllables} nadai={nadai[1]} angaLabels={!isChapu} />
+          <p class="sw-note" data-mode-note>{
+            mode === "learn" ? say("note.learn", "Learn: the hand performs each count slowly while the syllables are shown.")
+            : mode === "play" ? say("note.play", "Play: tap on the claps. Timing is shown as perfect, on time, early or late.")
+            : say("note.follow", "Follow: count along with the audio. Nothing is scored.")
+          }</p>
+        </div>
+        <div class="tr-right">
+          <div data-hand-wrap hidden={mode === "play"}><Hand /></div>
+          <div class="tr-play" data-play-wrap hidden={mode !== "play"}>
+            <button type="button" class="tr-tap" data-tap>{say("tap", "Tap")}</button>
+            <div class="tr-strip" aria-hidden="true"><span>early</span><i data-marker></i><span>late</span></div>
+            <p class="tr-scores" aria-live="polite">
+              <span><b data-score="perfect">0</b> {say("perfect", "perfect")}</span>
+              <span><b data-score="ontime">0</b> {say("ontime", "on time")}</span>
+              <span><b data-score="off">0</b> {say("off", "early or late")}</span>
+            </p>
+            <p class="sw-note" data-tap-note>{say("claps", "v1 scores the claps on counts {c} only. Other counts are shown, not scored.").replace("{c}", claps.join(", ").replace(/, (\d+)$/, " and $1"))}</p>
+            <p class="sw-note">{say("space", "Space works too.")}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  )}
+</SwaraLayout>
+
+<script>
+  import { TalaClock, rate } from "../../../lib/carnatic/client/tala";
+  import { bindTalaView } from "../../../lib/carnatic/client/talaview";
+  import { ctx } from "../../../lib/carnatic/client/audio";
+
+  const root = document.querySelector<HTMLElement>("[data-trainer]");
+  if (root) {
+    const counts = JSON.parse(root.dataset.tala!);
+    let mode = root.dataset.mode!;
+    let bpm = Number(root.dataset.tempo);
+    const clock = new TalaClock(counts, mode === "learn" ? Math.min(bpm, 40) : bpm);
+    clock.nadai = Number(root.dataset.nadai);
+    const grid = root.querySelector<HTMLElement>("[data-tala-grid]");
+    const hand = root.querySelector<HTMLElement>("[data-hand]");
+    const turn = root.querySelector<HTMLElement>("[data-turn]")!;
+    let call = false;
+    bindTalaView(clock, grid, hand, (i) => {
+      if (call && i === 0) {
+        const cycle = clock.times[clock.times.length - 1]?.cycle ?? 0;
+        turn.textContent = cycle % 2 === 0 ? "Call: listen and watch" : "Response: your turn";
+      }
+    });
+    const go = root.querySelector<HTMLButtonElement>("[data-go]")!;
+    const paint = () => { go.textContent = clock.playing ? "Pause" : "Play"; go.setAttribute("aria-pressed", String(clock.playing)); };
+    go.addEventListener("click", () => { clock.playing ? clock.stop() : clock.start(); paint(); });
+
+    root.querySelectorAll<HTMLButtonElement>("[data-mode-btn]").forEach((b) => b.addEventListener("click", () => {
+      mode = b.dataset.modeBtn!;
+      root.querySelectorAll("[data-mode-btn]").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+      root.querySelector<HTMLElement>("[data-hand-wrap]")!.hidden = mode === "play";
+      root.querySelector<HTMLElement>("[data-play-wrap]")!.hidden = mode !== "play";
+      const notes: Record<string, string> = {
+        learn: "Learn: the hand performs each count slowly while the syllables are shown.",
+        follow: "Follow: count along with the audio. Nothing is scored.",
+        play: "Play: tap on the claps. Timing is shown as perfect, on time, early or late.",
+      };
+      root.querySelector<HTMLElement>("[data-mode-note]")!.textContent = notes[mode];
+      clock.bpm = mode === "learn" ? Math.min(bpm, 40) : bpm;
+      root.querySelector<HTMLElement>("[data-bpm]")!.textContent = String(clock.bpm);
+      if (clock.playing) clock.start();
+    }));
+    root.querySelectorAll<HTMLButtonElement>("[data-tempo-btn]").forEach((b) => b.addEventListener("click", () => {
+      bpm = Number(b.dataset.tempoBtn);
+      root.querySelectorAll("[data-tempo-btn]").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+      clock.bpm = mode === "learn" ? Math.min(bpm, 40) : bpm;
+      root.querySelector<HTMLElement>("[data-bpm]")!.textContent = String(clock.bpm);
+      if (clock.playing) clock.start();
+    }));
+    root.querySelector<HTMLButtonElement>("[data-call]")?.addEventListener("click", (e) => {
+      call = !call;
+      (e.currentTarget as HTMLElement).setAttribute("aria-pressed", String(call));
+      turn.hidden = !call;
+      turn.textContent = "Call: listen and watch";
+    });
+
+    /* Scoring: claps only. */
+    const scores = { perfect: 0, ontime: 0, off: 0 };
+    const marker = root.querySelector<HTMLElement>("[data-marker]")!;
+    const note = root.querySelector<HTMLElement>("[data-tap-note]")!;
+    const baseNote = note.textContent;
+    const tap = () => {
+      if (!clock.playing) { clock.start(); paint(); return; }
+      const now = ctx().currentTime;
+      const hit = clock.nearest(now);
+      if (!hit) return;
+      const c = counts[hit.index];
+      if (c.action !== "clap") {
+        note.textContent = `Count ${c.n} is ${c.action === "finger" ? "a finger count" : c.action === "wave" ? "a wave" : "silent"}: shown, not scored.`;
+        return;
+      }
+      note.textContent = baseNote;
+      const ms = hit.delta * 1000;
+      const r = rate(ms);
+      if (r === "perfect") scores.perfect++; else if (r === "ontime") scores.ontime++; else scores.off++;
+      for (const [k, v] of Object.entries(scores)) root.querySelector<HTMLElement>(`[data-score="${k}"]`)!.textContent = String(v);
+      marker.style.left = `${50 + Math.max(-50, Math.min(50, (ms / 150) * 50))}%`;
+      marker.dataset.rating = r;
+    };
+    root.querySelector("[data-tap]")!.addEventListener("pointerdown", (e) => { e.preventDefault(); tap(); });
+    document.addEventListener("keydown", (e) => {
+      if (e.code === "Space" && mode === "play" && !(e.target as HTMLElement)?.closest("input, textarea, select")) { e.preventDefault(); tap(); }
+    });
+  }
+</script>
+
+<style>
+  .tr { display: grid; gap: 18px; padding-top: 12px; }
+  .tr-meta { font-size: 13px; color: var(--ink-soft); }
+  .tr-go { appearance: none; border: 0; border-radius: var(--radius-sm); background: var(--accent); color: var(--on-accent); font: 600 var(--text-sm) / 1 var(--font-body); padding: 12px 22px; cursor: pointer; }
+  .tr-go[aria-pressed="true"] { background: var(--accent-wash); color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+  .tr-pick { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px 16px; align-items: center; }
+  .tr-body { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 380px); gap: 24px; align-items: start; }
+  .tr-left { display: grid; gap: 12px; min-width: 0; }
+  .tr-turn { color: var(--accent); }
+  .tr-play { display: grid; gap: 12px; }
+  .tr-tap { appearance: none; min-height: 180px; border: 1px solid var(--accent); border-radius: 8px; background: var(--accent-wash); color: var(--accent); font: 40px / 1 var(--font-display); cursor: pointer; touch-action: manipulation; }
+  .tr-tap:active { transform: translateY(1px); }
+  .tr-strip { position: relative; display: flex; justify-content: space-between; align-items: end; height: 30px; padding: 4px 8px; border-radius: 6px; font: 10px / 1 var(--font-mono); color: var(--ink-faint);
+    background: linear-gradient(90deg, var(--surface-inset) 0 25%, var(--surface-veil) 25% 40%, var(--accent-wash) 40% 60%, var(--surface-veil) 60% 75%, var(--surface-inset) 75%); }
+  .tr-strip i { position: absolute; top: 4px; bottom: 4px; width: 2px; left: 50%; background: var(--ink); }
+  .tr-scores { margin: 0; display: flex; gap: 18px; flex-wrap: wrap; font: 14px / 1.3 var(--font-mono); color: var(--ink-soft); }
+  .tr-scores b { font: 500 24px / 1 var(--font-body); color: var(--ink); margin-right: 4px; }
+  @media (max-width: 899px) {
+    .tr-body { grid-template-columns: minmax(0, 1fr); }
+    .tr-pick { grid-template-columns: minmax(0, 1fr); }
+  }
+</style>
