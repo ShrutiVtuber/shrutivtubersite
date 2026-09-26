@@ -22,7 +22,7 @@
  * elements") in the section's own languages only: a head with the ring sigil,
  * as /guides has; the rooms as cards, each with its drawn mark in a ring and
  * one sentence, the handoff's Needs / Games / On stream lines kept whole
- * behind a native <details>; the games as cards with their theme's plate;
+ * in a panel each card opens (a modal <dialog>, or its #address without script); the games as cards with their theme's plate;
  * the fits-together tree in rings and hairlines; the streamer path as numbered
  * markers on one line. No new hue, no art, no emoji, and still no script.
  *
@@ -279,21 +279,41 @@ const invite = typeof discord?.invite === "string" && discord.invite.trim() ? di
                   </p>
                 )}
               </div>
-              <details class="ph-more">
-                <summary>{r.stream ? MORE : MORE_SHORT}</summary>
-                <div class="ph-more-body">
-                  <p class="ph-what">{r.what}</p>
-                  <dl class="ph-facts">
-                    <dt>{say("row.needs", "Needs")}</dt><dd>{r.needs}</dd>
-                    <dt>{say("row.games", "Games")}</dt><dd>{r.games}</dd>
-                    {r.stream && <><dt>{say("row.stream", "On stream")}</dt><dd>{r.stream}</dd></>}
-                  </dl>
-                </div>
-              </details>
+              <a class="ph-more" href={`#more-${r.id}`} data-more={r.id} aria-haspopup="dialog">
+                {r.stream ? MORE : MORE_SHORT}
+              </a>
             </li>
           );
         })}
       </ol>
+
+      {/* One panel per room, opened from its card's last row. With scripting
+          it is a modal <dialog> (focus held, Escape closes, the page behind
+          dimmed); without, the same link targets it by its #address and CSS
+          shows it — so the page still works with scripting off. */}
+      {[...cardRooms, ...(selfRoom ? [selfRoom] : [])].map((r) => (
+        <dialog id={`more-${r.id}`} class="ph-modal" aria-labelledby={`more-${r.id}-name`}>
+          <div class="ph-modal-head">
+            <RoomMark mark={r.id} />
+            <div class="ph-room-name">
+              <h3 id={`more-${r.id}-name`}>{r.name}</h3>
+              {r.path && <p class="gd-mono ph-path">{r.path}</p>}
+            </div>
+            <a class="ph-modal-close" href="#rooms" data-close>{say("room.close", "Close")}</a>
+          </div>
+          <p class="ph-what">{r.what}</p>
+          <dl class="ph-facts">
+            <dt>{say("row.needs", "Needs")}</dt><dd>{r.needs}</dd>
+            <dt>{say("row.games", "Games")}</dt><dd>{r.games}</dd>
+            {r.stream && <><dt>{say("row.stream", "On stream")}</dt><dd>{r.stream}</dd></>}
+          </dl>
+          <div class="ph-modal-foot">
+            {r.href
+              ? <Button variant="primary" size="md" href={r.href}>{r.step}</Button>
+              : <p class="ph-soon">{r.soon}</p>}
+          </div>
+        </dialog>
+      ))}
     </section>
 
     {index.length > 0 && (
@@ -373,6 +393,18 @@ const invite = typeof discord?.invite === "string" && discord.invite.trim() ? di
       </ul>
     </section>
   </div>
+<script>
+  /* Progressive: the links work as #addresses without this. With it, each
+     opens its room's panel as a real modal and gives focus back on close. */
+  document.querySelectorAll<HTMLAnchorElement>("[data-more]").forEach((link) => {
+    const dialog = document.getElementById(`more-${link.dataset.more}`) as HTMLDialogElement | null;
+    if (!dialog || typeof dialog.showModal !== "function") return;
+    link.addEventListener("click", (e) => { e.preventDefault(); dialog.showModal(); });
+    dialog.querySelector("[data-close]")?.addEventListener("click", (e) => { e.preventDefault(); dialog.close(); });
+    dialog.addEventListener("click", (e) => { if (e.target === dialog) dialog.close(); });   // the backdrop
+    dialog.addEventListener("close", () => link.focus());
+  });
+</script>
 </BaseLayout>
 
 <style>
@@ -424,16 +456,27 @@ const invite = typeof discord?.invite === "string" && discord.invite.trim() ? di
   .ph-left { margin: 0; display: grid; gap: 2px; font-size: 14px; min-width: 0; overflow-wrap: anywhere; }
   .ph-left-label { font-size: 12px; color: var(--ink-faint); }
 
-  /* The disclosure: a hairline, a sentence-case summary with a drawn chevron. */
-  .ph-more { margin: 0 -22px; border-top: 1px solid var(--line); min-width: 0; }
-  .ph-more summary { list-style: none; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 13px 22px 14px; font: 500 13px/1.3 var(--font-body); color: var(--ink-soft); border-radius: 0 0 9px 9px; }
-  .ph-more summary::-webkit-details-marker { display: none; }
-  .ph-more summary::after { content: ""; flex: none; width: 7px; height: 7px; margin-right: 3px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: translateY(-2px) rotate(45deg); transition: transform var(--dur-1) var(--ease-out); }
-  .ph-more[open] summary::after { transform: translateY(2px) rotate(-135deg); }
-  .ph-more summary:hover { color: var(--accent-hover); }
-  .ph-more summary:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
-  .ph-more[open] summary { color: var(--ink); }
-  .ph-more-body { display: grid; gap: 12px; padding: 0 22px 20px; }
+  /* The card's last row: a hairline and a link that opens the room's panel. */
+  .ph-more { margin: 0 -22px; border-top: 1px solid var(--line); min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 13px 22px 14px; font: 500 13px/1.3 var(--font-body); color: var(--ink-soft); text-decoration: none; border-radius: 0 0 9px 9px; }
+  .ph-more::after { content: ""; flex: none; width: 7px; height: 7px; margin-right: 3px; border-right: 1.5px solid currentColor; border-top: 1.5px solid currentColor; transform: rotate(45deg); }
+  .ph-more:hover { color: var(--accent-hover); }
+  .ph-more:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+  /* The room's panel. A <dialog> opened with showModal() — or, with no
+     script, the :target of the card's link, drawn the same way. */
+  .ph-modal { border: var(--border-w) solid var(--line-strong); border-radius: var(--radius-lg); background: var(--surface-card); color: var(--ink); box-shadow: var(--shadow-3); padding: 24px; width: min(560px, calc(100% - 32px)); max-height: min(85vh, 720px); overflow: auto; }
+  .ph-modal::backdrop { background: color-mix(in srgb, var(--surface-inset) 70%, transparent); }
+  .ph-modal:target:not([open]) { display: grid; position: fixed; inset: 0; margin: auto; height: fit-content; z-index: 60; }
+  .ph-modal[open], .ph-modal:target { gap: 16px; }
+  .ph-modal[open] { display: grid; }
+  .ph-modal-head { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 14px; }
+  .ph-modal-head h3 { margin: 0; }
+  .ph-modal-close { font: 500 13px/1 var(--font-body); color: var(--ink-soft); text-decoration: none; padding: 10px 12px; min-height: 44px; display: inline-flex; align-items: center; border-radius: 4px; }
+  .ph-modal-close:hover { color: var(--accent-hover); background: var(--accent-wash); }
+  .ph-modal-close:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .ph-modal-foot { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; padding-top: 4px; }
+  .ph-modal .ph-what { font-size: 15px; }
+  .ph-modal .ph-facts { font-size: 14px; }
   .ph-what { margin: 0; font-size: 14px; line-height: 1.55; color: var(--ink); text-wrap: pretty; }
   .ph-facts { margin: 0; display: grid; grid-template-columns: minmax(5.5em, auto) minmax(0, 1fr); gap: 6px 14px; font-size: 13px; line-height: 1.5; }
   .ph-facts dt { color: var(--ink-faint); }
@@ -442,7 +485,7 @@ const invite = typeof discord?.invite === "string" && discord.invite.trim() ? di
   /* Run it yourself: the console frame across the width — page ground, corner marks, no shadow. */
   .ph-room-wide { grid-column: 1 / -1; grid-row: auto; grid-template-rows: none; grid-template-columns: minmax(0, 1fr); gap: 14px; padding: 22px 22px 0; background: var(--surface-page); border-color: var(--line-strong); border-radius: 4px; box-shadow: none; }
   .ph-room-wide .ph-more { margin: 0 -22px; }
-  .ph-room-wide .ph-more summary { border-radius: 0; }
+  .ph-room-wide .ph-more { border-radius: 0; }
   @container (min-width: 760px) {
     .ph-room-wide { grid-template-columns: minmax(220px, 1fr) minmax(0, 1.4fr) auto; align-items: center; column-gap: 32px; }
     .ph-room-wide .ph-more { grid-column: 1 / -1; }
