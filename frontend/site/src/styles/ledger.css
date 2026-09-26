@@ -178,6 +178,10 @@
 .lg-stair-mark { position: absolute; top: 0; bottom: 0; border-left: 1px solid var(--ink-faint); }
 .lg-stair-mark[data-style="dotted"] { border-left-style: dotted; }
 .lg-stair-mark[data-style="dashed"] { border-left-style: dashed; }
+/* ⚠ A mark in the right half hangs its label to the LEFT of the line: at
+   390 a label such as "best · every customer buys · $25.63" hung to the
+   right ran 60px past the screen, and the whole page scrolled sideways. */
+.lg-stair-mark[data-side="left"] .lg-stair-label { left: auto; right: 4px; }
 .lg-stair-label { position: absolute; left: 4px; white-space: nowrap; font-family: var(--font-mono); font-size: 11px; color: var(--ink-soft); background: var(--surface-page); padding: 0 2px; border-radius: 999px; }
 .lg-stair-axis { margin: 0; display: flex; justify-content: space-between; gap: 8px; font-family: var(--font-mono); font-size: 11px; color: var(--ink-faint); }
 .lg-stair-note { margin: 0; padding-left: 12px; border-left: 3px solid var(--line-strong); font-size: 14px; color: var(--ink-soft); }

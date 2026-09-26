@@ -79,7 +79,7 @@ export function drawStair(stair: Stair, o: { product: string; unitsAtEdge?: numb
           <path d="${d}" fill="none" stroke="currentColor" stroke-width="1.5" vector-effect="non-scaling-stroke"/>
         </svg>
         ${marks.map((m, i) => `
-          <div class="lg-stair-mark" data-style="${m.style}" style="left:${pct(m.p)}">
+          <div class="lg-stair-mark" data-style="${m.style}" data-side="${X(m.p) / VW > 0.5 ? "left" : "right"}" style="left:${pct(m.p)}">
             <span class="lg-stair-label" style="top:${TOPS[i] ?? 40}px">${escape(m.label)}</span>
           </div>`).join("")}
       </div>

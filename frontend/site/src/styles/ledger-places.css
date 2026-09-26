@@ -84,7 +84,11 @@
 
 /* ── Calculators ─────────────────────────────────────────────────────────── */
 .lc-consoles { display: flex; flex-direction: column; gap: 32px; min-width: 0; }
-.lc-console { gap: 16px; min-width: 0; scroll-margin-top: 24px; }
+/* minmax(0, 1fr): the console is a grid, and an auto track took the width of
+   its widest child — the staircase — so the page scrolled 500px sideways at
+   390 once the data had loaded. */
+.lc-console { gap: 16px; min-width: 0; scroll-margin-top: 24px; grid-template-columns: minmax(0, 1fr); }
+.lc-console > *, .lg-stair, .lg-stair > * { min-width: 0; }
 .lc-chip-run { display: contents; }
 .lc-scroll-chips { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: thin; padding-bottom: 2px; }
 .lc-select { width: auto; max-width: 100%; min-height: 36px; font-size: 14px; flex: 0 1 auto; min-width: 0; }
