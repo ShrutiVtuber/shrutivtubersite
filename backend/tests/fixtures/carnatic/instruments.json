@@ -1,0 +1,6 @@
+{"format": 1,
+ "venu": {"fingerings": [
+   {"swara": "S", "sthayi": "madhya", "holes": "CCOOOOOO", "blow": "normal", "kind": "primary", "confidence": "high"},
+   {"swara": "D1", "sthayi": "tara", "holes": "CHOOCOOO", "blow": "overblow_hard", "kind": "primary", "confidence": "low"}]},
+ "mridangam": {"strokes": [
+   {"id": "chapu", "scripts": {"ta": {"text": "சாப்பு", "sourced": false}, "te": {"text": "చాపు", "sourced": false}, "kn": {"text": "ಛಾಪು", "sourced": true}}}]}}

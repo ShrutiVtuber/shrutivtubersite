@@ -11,7 +11,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from shruti.api.routes import (
-    accounts, admin, billing, charts, classes, collab, community, content,
+    accounts, admin, billing, carnatic, charts, classes, collab, community, content,
     builds, devices, gamedata, groups, guides, ledger, ledger_stream, overlay_guides, runs,
     horoscopes,
     insight, journal, live, media, newsletter, packs, passkeys, places,
@@ -167,4 +167,5 @@ app.include_router(billing.router)
 app.include_router(media.router)
 app.include_router(packs.router)
 app.include_router(videos.router)
+app.include_router(carnatic.router)
 app.include_router(admin.router)

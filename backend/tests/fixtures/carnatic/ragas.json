@@ -1,0 +1,26 @@
+{
+  "format": 1,
+  "meta": {"note": "A hand-written fixture for the tests: two melakartas and one janya, in the shape build_data.py writes. Not a copy of the research."},
+  "melakartas": [
+    {"number": 15, "id": "mayamalavagowla", "name": "Mayamalavagowla", "iso": "Māyāmāḷavagauḷa", "aliases": [],
+     "chakra": {"number": 3, "name": "Agni", "position": 3}, "madhyama": "M1",
+     "swaras": ["S", "R1", "G3", "M1", "P", "D1", "N3"], "arohana": "S R1 G3 M1 P D1 N3 S'", "avarohana": "S' N3 D1 P M1 G3 R1 S",
+     "vivadi": [], "katapayadi": {"aksharas": ["mā", "yā"], "digits": [5, 1]}, "dikshitar": "Mayamalavagaula",
+     "scripts": {"ta": {"grantha": "மாயாமாளவகௌளை", "pure": null}, "te": "మాయామాళవగౌళ", "kn": null},
+     "confidence": {"scripts": "low"}, "janyas": [], "performed": null},
+    {"number": 28, "id": "harikambhoji", "name": "Harikambhoji", "iso": "Harikāmbhoji", "aliases": [],
+     "chakra": {"number": 5, "name": "Bana", "position": 4}, "madhyama": "M1",
+     "swaras": ["S", "R2", "G3", "M1", "P", "D2", "N2"], "arohana": "S R2 G3 M1 P D2 N2 S'", "avarohana": "S' N2 D2 P M1 G3 R2 S",
+     "vivadi": [], "katapayadi": {"aksharas": ["ha", "ri"], "digits": [8, 2]}, "dikshitar": null,
+     "scripts": {"ta": {"grantha": "ஹரிகாம்போஜி", "pure": null}, "te": "హరికాంభోజి", "kn": "ಹರಿಕಾಂಭೋಜಿ"},
+     "confidence": {"scripts": "low"}, "janyas": ["mohanam"], "performed": null}
+  ],
+  "janyas": [
+    {"id": "mohanam", "kind": "janya", "name": "Mohanam", "parent": {"number": 28, "name": "Harikambhoji"},
+     "arohana": "S R2 G3 P D2 S'", "avarohana": "S' D2 P G3 R2 S", "confidence": "medium",
+     "confidenceReason": "fixture", "tier": 1, "order": 1,
+     "scripts": {"ta": {"grantha": "மோகனம்", "pure": null}, "te": "మోహనం", "kn": null}}
+  ],
+  "performed": [],
+  "aliases": {"Mohana": "mohanam"}
+}

@@ -130,6 +130,10 @@ services:
       # research packs by scripts/sync-gamedata.sh. Facts about games, All
       # Rights Reserved as a compilation, served at runtime like the packs.
       - gamedata:/app/gamedata
+      # Swara Studio's data (ragas, talas, lessons, instruments), built from
+      # the private swara-studio research by scripts/sync-carnatic-data.sh.
+      # All Rights Reserved as a compilation, served at runtime, never here.
+      - carnatic:/app/carnatic
       - journal:/srv/journal:ro
       # ⚠ The Firebase service-account key, mounted read-only from OUTSIDE the
       # repo. It lives in ~/.secrets/shruti because it arrived as a download
@@ -213,6 +217,8 @@ volumes:
     name: shruti_packs
   gamedata:
     name: shruti_gamedata
+  carnatic:
+    name: shruti_carnatic
 
 networks:
   shruti:

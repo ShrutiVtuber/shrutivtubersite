@@ -1,0 +1,18 @@
+{
+ "format": 1,
+ "digest": "fixture00000000",
+ "built_at": "2026-09-26T00:00:00+00:00",
+ "files": [
+  {
+   "name": "ragas.json",
+   "digest": "ddd2e65e1dd8ccca",
+   "bytes": 1959
+  },
+  {
+   "name": "instruments.json",
+   "digest": "82d3590cf148003c",
+   "bytes": 503
+  }
+ ],
+ "license": "fixture"
+}

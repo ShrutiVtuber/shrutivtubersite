@@ -834,6 +834,10 @@ async def _everything_else(user: User, session: AsyncSession) -> dict:
         Build, Group, GroupContribution, GroupMember, Guide, GuideReport, GuideRun, GuideVersion,
         GuideVote,
     )
+    from shruti.models.carnatic import (
+        CarnaticComment, CarnaticDeviceLink, CarnaticLike, CarnaticPost, CarnaticPracticeDay,
+        CarnaticProfile, CarnaticProgress, CarnaticSong,
+    )
     from shruti.models.ledger import Ledger, LedgerBusiness, LedgerWeek
     from shruti.models.practice import (
         PracticeBlock, PracticeComment, PracticeReading, PracticeReport, PracticeStrike,
@@ -891,6 +895,17 @@ async def _everything_else(user: User, session: AsyncSession) -> dict:
         "lessonProgress": await rows(LessonProgress, LessonProgress.user_id == uid),
         "supporter": await rows(Supporter, Supporter.user_id == uid),
         "hosting": await rows(Hosting, Hosting.user_id == uid),
+        # Swara Studio (models/carnatic.py): all of it goes with the account.
+        "carnatic": {
+            "settings": await rows(CarnaticProfile, CarnaticProfile.user_id == uid),
+            "progress": await rows(CarnaticProgress, CarnaticProgress.user_id == uid),
+            "practiceDays": await rows(CarnaticPracticeDay, CarnaticPracticeDay.user_id == uid),
+            "songs": await rows(CarnaticSong, CarnaticSong.user_id == uid),
+            "listenPosts": await rows(CarnaticPost, CarnaticPost.user_id == uid),
+            "likes": await rows(CarnaticLike, CarnaticLike.user_id == uid),
+            "comments": await rows(CarnaticComment, CarnaticComment.user_id == uid),
+            "appSignIns": await rows(CarnaticDeviceLink, CarnaticDeviceLink.user_id == uid),
+        },
     }
 
 
@@ -981,6 +996,7 @@ async def erase(user: User, session: AsyncSession) -> dict:
             "account", "email address", "preferences", "nativity", "saved charts and comparisons",
             "passkeys and devices", "newsletter subscription", "drafts", "runs",
             "builds you had not shared", "votes and reports", "class progress", "ledgers",
+            "Swara Studio settings, progress, practice log, songs, sheets and Listen posts",
         ],
         "kept": [
             "a consent given/withdrawn record with dates and no birth data",
