@@ -1,0 +1,146 @@
+---
+/* Quizzes (Web Learn Practice, "quiz"): swara by ear relative to your Sa with
+ * the drone playing, raga from a PHRASE (never from its scale alone: the
+ * research warns against that), tala counting, and venu fingering. Beginners
+ * hear only the seven swaras of Mayamalavagowla; all twelve unlock as they
+ * go. A wrong answer is explained, never counted against a streak, never red. */
+import SwaraLayout from "../../../layouts/SwaraLayout.astro";
+import Hero from "../../../components/carnatic/Hero.astro";
+import Chip from "../../../components/carnatic/Chip.astro";
+import { hrefIn, langOf, words } from "../../../lib/carnatic/i18n";
+import { instruments, ragas, talas } from "../../../lib/carnatic/data";
+import { visitor } from "../../../lib/carnatic/prefs";
+import { copy } from "../../../lib/copy";
+
+const lang = langOf(Astro);
+const t = await words(lang);
+const say = await copy("carnatic.quiz");
+const L = (p: string) => hrefIn(lang, p);
+const { settings } = await visitor(Astro);
+const [r, tl, inst] = await Promise.all([ragas(), talas(), instruments()]);
+const KINDS = [["ear", say("tab.ear", "Swara by ear")], ["phrase", say("tab.phrase", "Raga from phrase")], ["tala", say("tab.tala", "Tala counting")], ["finger", say("tab.finger", "Fingering")]] as const;
+const kind = (KINDS.find(([k]) => k === Astro.url.searchParams.get("kind"))?.[0] ?? "ear") as string;
+const phrases = (r?.janyas ?? []).filter((x) => (x.tier ?? 9) <= 2 && x.prayogas.length && x.confidence !== "low")
+  .map((x) => ({ name: x.name, id: x.id, scale: `${x.arohana} ${x.avarohana}`.replace(/!\w/g, ""), lines: x.prayogas.map((p) => p.sargam).slice(0, 3) }));
+const talaChoices = (tl?.practical ?? []).filter((x: any) => ["adi", "rupaka_3count", "misra_chapu", "khanda_chapu", "tisra_triputa"].includes(x.id)).map((x: any) => ({ id: x.id, name: x.name, counts: x.counts }));
+const fingers = (inst?.venu?.fingerings ?? []).filter((f: any) => f.sthayi === "madhya" && f.holes && ["primary", "cross-fingering"].includes(f.kind) && f.confidence === "high").map((f: any) => ({ swara: f.swara, holes: f.holes }));
+const HEAD: Record<string, [string, string]> = {
+  ear: [say("title.ear", "Swara by ear"), say("lede.ear", "Relative to your Sa, with the drone playing.")],
+  phrase: [say("title.phrase", "Raga from a phrase"), say("lede.phrase", "A characteristic phrase, played over the drone. Which raga?")],
+  tala: [say("title.tala", "Tala counting"), say("lede.tala", "One cycle of claps, fingers and waves. Which tala?")],
+  finger: [say("title.finger", "Fingering"), say("lede.finger", "A venu fingering in the middle octave. Which swara?")],
+};
+---
+<SwaraLayout title={`${HEAD[kind][0]} · quizzes · Swara Studio`} description={say("meta.description", "Carnatic ear training and quizzes: swaras by ear against your Sa, ragas from their characteristic phrases, tala counting and venu fingering. No streaks and no lives.")}
+             crumbs={[[t("crumb.practice"), L("/carnatic/practice/tuner")], [HEAD[kind][0]]]}>
+  <Hero eyebrow={say("eyebrow", "Quizzes")} title={HEAD[kind][0]} lede={HEAD[kind][1]} />
+  <div class="sw-toolbar"><div class="sw-chips">{KINDS.map(([k, label]) => <Chip href={L(`/carnatic/practice/quiz?kind=${k}`)} active={k === kind}>{label}</Chip>)}</div></div>
+  <section class="sw-card qz" data-quiz={kind} aria-live="polite">
+    <div class="qz-top"><span class="t-eyebrow sw-eyebrow" data-progress>Question 1 of 10</span><span class="sw-mono" data-meta>{kind === "ear" || kind === "phrase" ? `drone on · Sa = ${settings.sa}` : ""}</span></div>
+    <h2 class="qz-q" data-question>{kind === "ear" ? say("q.ear", "Which swara did you hear over the drone?") : kind === "phrase" ? say("q.phrase", "Which raga is this phrase from?") : kind === "tala" ? say("q.tala", "Which tala was that?") : say("q.finger", "Which swara is this fingering?")}</h2>
+    <div class="qz-stage" data-stage></div>
+    <div><button type="button" class="qz-again" data-again>{kind === "finger" ? say("next", "Next question") : say("again", "Play again")}</button></div>
+    <div class="qz-answers" data-answers></div>
+    <p class="qz-feedback" data-feedback></p>
+    <p class="sw-note">{kind === "ear" ? say("note.ear", "Beginners hear only the seven swaras of Mayamalavagowla; all twelve unlock as you go. Wrong answers are explained, never counted against a streak.") : say("note.other", "Wrong answers are explained, never counted against a streak.")}</p>
+  </section>
+  <script type="application/json" id="qz-data" set:html={JSON.stringify({ phrases, talas: talaChoices, fingers })} />
+</SwaraLayout>
+
+<script>
+  import { settings, startDrone, theDrone } from "../../../lib/carnatic/client/state";
+  import { playLine } from "../../../lib/carnatic/client/phrase";
+  import { ctx, talaSound, playNote } from "../../../lib/carnatic/client/audio";
+  import { pitchHz, ratio, inline } from "../../../lib/carnatic/notation";
+
+  const box = document.querySelector<HTMLElement>("[data-quiz]");
+  const data = JSON.parse(document.getElementById("qz-data")?.textContent || "{}");
+  if (box) {
+    const kind = box.dataset.quiz!;
+    const answers = box.querySelector<HTMLElement>("[data-answers]")!;
+    const feedback = box.querySelector<HTMLElement>("[data-feedback]")!;
+    const progress = box.querySelector<HTMLElement>("[data-progress]")!;
+    const stage = box.querySelector<HTMLElement>("[data-stage]")!;
+    const SEMI: Record<string, number> = { S: 0, R1: 1, R2: 2, G2: 3, G3: 4, M1: 5, M2: 6, P: 7, D1: 8, D2: 9, N2: 10, N3: 11 };
+    const BEGINNER = ["S", "R1", "G3", "M1", "P", "D1", "N3"];
+    let right = 0, n = 0, answer = "", replay = () => {};
+    const pick = <T,>(xs: T[]) => xs[Math.floor(Math.random() * xs.length)];
+    const shuffle = <T,>(xs: T[]) => xs.map((x) => [Math.random(), x] as const).sort((a, b) => a[0] - b[0]).map(([, x]) => x);
+    const buttons = (opts: string[], label: (o: string) => string) => {
+      answers.innerHTML = "";
+      for (const o of opts) {
+        const b = document.createElement("button");
+        b.type = "button"; b.className = "qz-a"; b.textContent = label(o);
+        b.addEventListener("click", () => choose(o, b, label));
+        answers.appendChild(b);
+      }
+    };
+    const choose = (o: string, b: HTMLButtonElement, label: (o: string) => string) => {
+      if (answers.dataset.done) return;
+      answers.dataset.done = "1";
+      answers.querySelectorAll<HTMLButtonElement>(".qz-a").forEach((x) => { if (x.textContent === label(answer)) x.classList.add("right"); });
+      if (o === answer) { right++; feedback.textContent = "Yes."; }
+      else {
+        b.classList.add("chosen");
+        feedback.textContent = kind === "ear"
+          ? `That was ${label(answer)}. You chose ${label(o)}, ${Math.abs(SEMI[o] - SEMI[answer])} semitone${Math.abs(SEMI[o] - SEMI[answer]) === 1 ? "" : "s"} ${SEMI[o] > SEMI[answer] ? "above" : "below"} it. Listen again and compare.`
+          : `It was ${label(answer)}. Play it again and listen for what makes it that one.`;
+      }
+      window.setTimeout(next, 1800);
+    };
+    const next = () => {
+      n++;
+      if (n > 10) { progress.textContent = "Done"; feedback.textContent = `${right} of 10 this round. Start another whenever you like.`; answers.innerHTML = ""; n = 0; right = 0; window.setTimeout(next, 2500); return; }
+      delete answers.dataset.done;
+      feedback.textContent = "";
+      progress.textContent = `Question ${n} of 10`;
+      const sa = pitchHz(settings().sa || "C3");
+      if (kind === "ear") {
+        const pool = right >= 7 || localStorage.getItem("swara.quiz.all") === "1" ? Object.keys(SEMI) : BEGINNER;
+        if (pool.length === 12) try { localStorage.setItem("swara.quiz.all", "1"); } catch { /* storage blocked */ }
+        answer = pick(pool);
+        replay = () => { if (!theDrone().playing) startDrone(); playNote({ hz: sa * ratio(SEMI[answer], settings().playbackTuning), at: ctx().currentTime + 0.3, dur: 1.2 }); };
+        buttons(Object.keys(SEMI).filter((k) => pool.includes(k)), (o) => inline(o, "lat"));
+      } else if (kind === "phrase") {
+        const q = pick(data.phrases);
+        answer = q.name;
+        const line = pick(q.lines);
+        replay = () => { if (!theDrone().playing) startDrone(); playLine(line, { saHz: sa, tuning: settings().playbackTuning, scale: q.scale }); };
+        buttons(shuffle([q.name, ...shuffle(data.phrases.filter((x: any) => x.name !== q.name)).slice(0, 3).map((x: any) => x.name)]), (o) => o);
+      } else if (kind === "tala") {
+        const q = pick(data.talas);
+        answer = q.name;
+        replay = () => { const at = ctx().currentTime + 0.2; q.counts.forEach((c: any, i: number) => talaSound(c.action, at + i * 0.75, { samam: c.samam, finger: c.finger })); };
+        buttons(shuffle(data.talas.map((x: any) => x.name)), (o) => o);
+      } else {
+        const q = pick(data.fingers);
+        answer = q.swara;
+        stage.innerHTML = `<div class="qz-flute" aria-label="a fingering">${[...q.holes].map((h: string) => `<i class="h-${h}"></i>`).join("")}</div>`;
+        replay = () => next();
+        buttons(shuffle([...new Set(data.fingers.map((x: any) => x.swara))] as string[]).slice(0, 12), (o) => inline(o, "lat"));
+      }
+      /* The first question waits for a press: browsers only sound after one. */
+      if (kind !== "finger" && n > 1) replay();
+    };
+    box.querySelector("[data-again]")!.addEventListener("click", () => replay());
+    next();
+  }
+</script>
+
+<style>
+  .qz { max-width: 770px; margin: 24px auto 0; padding: 24px; display: grid; gap: 18px; }
+  .qz-top { display: flex; justify-content: space-between; }
+  .qz-q { margin: 0; font: 30px / 1.2 var(--font-display); color: var(--ink); }
+  .qz-again { appearance: none; border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent); background: transparent; color: var(--accent); border-radius: var(--radius-sm); font: 600 var(--text-sm) / 1 var(--font-body); padding: 12px 18px; cursor: pointer; }
+  .qz-answers { display: grid; grid-template-columns: repeat(auto-fill, minmax(66px, 1fr)); gap: 6px; }
+  .qz-answers :global(.qz-a) { appearance: none; min-height: 52px; border: 1px solid var(--line-strong); border-radius: 4px; background: var(--surface-page); color: var(--accent); font: 17px / 1.2 var(--font-notation); cursor: pointer; padding: 6px; }
+  [data-quiz="phrase"] .qz-answers, [data-quiz="tala"] .qz-answers { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  [data-quiz="phrase"] .qz-answers :global(.qz-a), [data-quiz="tala"] .qz-answers :global(.qz-a) { font-family: var(--font-display); font-size: 20px; }
+  .qz-answers :global(.qz-a.right) { background: var(--accent-wash); border-color: var(--accent); }
+  .qz-answers :global(.qz-a.chosen) { border-style: dashed; color: var(--ink-soft); }
+  .qz-feedback { margin: 0; min-height: 1.5em; font: var(--text-sm) / 1.5 var(--font-body); color: var(--ink); }
+  .qz-stage :global(.qz-flute) { display: flex; gap: 14px; justify-content: center; padding: 14px; border-radius: 99px; background: var(--surface-inset); }
+  .qz-stage :global(.qz-flute i) { width: 24px; height: 24px; border-radius: 99px; border: 1.5px solid var(--ink-soft); box-sizing: border-box; }
+  .qz-stage :global(.qz-flute .h-C) { background: var(--ink); border-color: var(--ink); }
+  .qz-stage :global(.qz-flute .h-H) { background: linear-gradient(90deg, var(--ink) 50%, transparent 50%); }
+</style>

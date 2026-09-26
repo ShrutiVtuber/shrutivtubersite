@@ -1,0 +1,117 @@
+---
+/* The gamaka library (Web Learn Practice, "gamakas"; Foundations v2 §06).
+ * Everyday names first, with the textbook term beside them: most map onto the
+ * panchadasa (fifteen) list, not the dasavidha (ten). Signs adapted from
+ * Subbarama Dikshitar's Sangita Sampradaya Pradarsini (1904). Each curve is
+ * schematic and draws left to right as its sound plays; with reduced motion
+ * it appears whole. */
+import SwaraLayout from "../../layouts/SwaraLayout.astro";
+import Hero from "../../components/carnatic/Hero.astro";
+import Absent from "../../components/carnatic/Absent.astro";
+import ConfidenceNote from "../../components/carnatic/ConfidenceNote.astro";
+import { hrefIn, langOf, words } from "../../lib/carnatic/i18n";
+import { gamakas } from "../../lib/carnatic/data";
+import { visitor } from "../../lib/carnatic/prefs";
+import { copy } from "../../lib/copy";
+
+const lang = langOf(Astro);
+const t = await words(lang);
+const say = await copy("carnatic.gamakas");
+const L = (p: string) => hrefIn(lang, p);
+const { settings } = await visitor(Astro);
+const data = await gamakas();
+const inst = ["venu", "veena", "violin"].includes(settings.instrument) ? settings.instrument : "venu";
+
+/* Schematic pitch against time, in a 330 × 84 box: y 60 is the note, y 20 the note above. */
+const W = 330;
+const path = (id: string) => {
+  const pts: [number, number][] = [];
+  const at = (x: number, y: number) => pts.push([x, y]);
+  switch (id) {
+    case "kampita": at(0, 60); at(50, 60); for (let i = 0; i < 2; i++) { const b = 60 + i * 70; for (let k = 0; k <= 20; k++) at(b + k * 3, 60 - 40 * Math.sin((k / 20) * Math.PI)); } at(W, 60); break;
+    case "jaru-up": for (let k = 0; k <= 40; k++) { const x = (k / 40) * W; const p = Math.min(1, Math.max(0, (x - 40) / 220)); at(x, 60 - 40 * (p * p * (3 - 2 * p))); } break;
+    case "nokku": at(0, 60); at(150, 60); at(160, 18); at(172, 60); at(W, 60); break;
+    case "odukkal": at(0, 26); at(150, 26); at(162, 66); at(176, 26); at(W, 26); break;
+    case "orikkai": at(0, 60); at(280, 60); at(300, 22); at(W, 22); break;
+    case "sphurita": at(0, 26); at(170, 26); at(182, 66); at(194, 26); at(W, 26); break;
+    case "pratyahata": at(0, 60); at(150, 60); at(162, 18); at(174, 60); at(W, 60); break;
+    case "ravai": at(0, 60); at(150, 60); at(158, 16); at(168, 60); at(W, 60); break;
+    default: at(0, 60); at(160, 60); at(166, 36); at(172, 60); at(W, 60);
+  }
+  return pts.map(([x, y], i) => `${i ? "L" : "M"}${x.toFixed(1)} ${y.toFixed(1)}`).join(" ");
+};
+---
+<SwaraLayout title={say("meta.title", "Gamaka library · Swara Studio")}
+             description={say("meta.description", "Kampita, jaru, nokku, odukkal, orikkai, sphurita, pratyahata, ravai and khandippu: each as a pitch curve you can hear, with its textbook name, its sign after the SSP (1904) and how it is made on the venu, veena and violin.")}
+             crumbs={[[t("crumb.learn"), L("/carnatic/lessons")], [say("crumb", "Gamaka library")]]}>
+  <Hero eyebrow={say("eyebrow", "Gamakas")} title={say("title", "Gamaka library")} lede={say("lede", "Each gamaka as a pitch curve, with audio and how it is made on your instrument.")} />
+  {!data ? <div class="sw-section"><Absent /></div> : (
+    <>
+      <div class="gm-grid">
+        {data.gamakas.map((g: any) => (
+          <article class="gm-card">
+            <header class="gm-head">
+              <h2 class="gm-name">{g.name}</h2>
+              <span class="sw-mono">{g.term}{g.list ? ` · ${g.list}` : ""}</span>
+              <span class="gm-sign" title={`Sign after the SSP, written ${g.signPlacement === "before" ? "before" : "above"} the note`}>{g.sign}</span>
+            </header>
+            <svg class="gm-curve" viewBox={`0 0 ${W} 84`} preserveAspectRatio="none" role="img" aria-label={`${g.name}: pitch over time`}>
+              <line x1="0" x2={W} y1="20" y2="20" class="lane" /><line x1="0" x2={W} y1="60" y2="60" class="lane" />
+              <path d={path(g.curve)} class="trace" pathLength="1" />
+            </svg>
+            <p class="sw-p">{g.definition}{g.textbookNote ? ` ${g.textbookNote}` : ""} <ConfidenceNote level={g.confidence} /></p>
+            {g.on?.[inst] && <p class="gm-on"><b>On the {inst}:</b> {g.on[inst]}</p>}
+            <button type="button" class="gm-listen" data-gamaka={g.curve === "jaru-up" ? "jaru-up" : g.id}>Listen</button>
+          </article>
+        ))}
+      </div>
+      <p class="sw-note gm-foot">{say("foot", "Everyday names first, with the textbook term beside them: most map onto the panchadasa (fifteen) list, not the dasavidha (ten). Signs adapted from Subbarama Dikshitar's Sangita Sampradaya Pradarsini (1904). The curves are schematic.")}</p>
+      <section class="sw-section">
+        <h2 class="sw-h3">{say("listsH", "The two textbook lists")}</h2>
+        <p class="sw-p"><b>Dasavidha (10):</b> {data.meta.lists.dasavidha.join(", ")}.</p>
+        <p class="sw-p"><b>Panchadasa (15, Sangita Ratnakara):</b> {data.meta.lists.panchadasa.join(", ")}.</p>
+        <p class="sw-note">{data.meta.lists.trap}</p>
+      </section>
+    </>
+  )}
+</SwaraLayout>
+
+<script>
+  import { playNote, ctx } from "../../lib/carnatic/client/audio";
+  import { settings } from "../../lib/carnatic/client/state";
+  import { pitchHz } from "../../lib/carnatic/notation";
+  document.querySelectorAll<HTMLButtonElement>("[data-gamaka]").forEach((b) => b.addEventListener("click", () => {
+    const sa = pitchHz(settings().sa || "C3");
+    const g3 = sa * 5 / 4, m1 = sa * 4 / 3, r2 = sa * 9 / 8;
+    const at = ctx().currentTime + 0.05;
+    const kind = b.dataset.gamaka!;
+    if (kind === "sphurita" || kind === "pratyahata") {
+      playNote({ hz: g3, at, dur: 0.45 });
+      playNote({ hz: g3, at: at + 0.5, dur: 0.6, gamaka: kind, lowerHz: r2, upperHz: m1 });
+    } else {
+      playNote({ hz: g3, at, dur: 1.4, gamaka: kind, fromHz: r2, upperHz: m1, lowerHz: r2 });
+    }
+    const card = b.closest(".gm-card");
+    const trace = card?.querySelector<SVGPathElement>(".trace");
+    if (trace && !matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      trace.animate([{ strokeDashoffset: 1 }, { strokeDashoffset: 0 }], { duration: 1400, easing: "linear" });
+    }
+  }));
+</script>
+
+<style>
+  .gm-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; padding-top: 24px; }
+  .gm-card { display: grid; gap: 12px; align-content: start; padding: 16px; background: var(--surface-card); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow-1); }
+  .gm-head { display: flex; gap: 8px; align-items: baseline; }
+  .gm-name { margin: 0; font: 24px / 1.2 var(--font-display); color: var(--ink); }
+  .gm-sign { margin-left: auto; font: 16px / 1 var(--font-notation); color: var(--rose); cursor: help; }
+  .gm-curve { width: 100%; height: 84px; background: var(--surface-inset); border-radius: 4px; }
+  .gm-curve .lane { stroke: var(--line-strong); stroke-width: 1; vector-effect: non-scaling-stroke; }
+  .gm-curve .trace { fill: none; stroke: var(--accent); stroke-width: 2; stroke-dasharray: 1; stroke-dashoffset: 0; vector-effect: non-scaling-stroke; stroke-linejoin: round; }
+  .gm-on { margin: 0; padding-top: 10px; border-top: 1px solid var(--line); font: var(--text-xs) / 1.5 var(--font-body); color: var(--ink-soft); }
+  .gm-on b { color: var(--ink); }
+  .gm-listen { justify-self: start; appearance: none; background: none; border: 0; color: var(--accent); font: 600 var(--text-sm) / 1 var(--font-body); padding: 8px 14px; cursor: pointer; }
+  .gm-foot { padding-top: 12px; }
+  @media (max-width: 1023px) { .gm-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (max-width: 599px) { .gm-grid { grid-template-columns: minmax(0, 1fr); } }
+</style>

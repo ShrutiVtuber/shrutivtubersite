@@ -1,0 +1,483 @@
+---
+/* The five instrument pages (Web Learn Practice: venu, veena, violin,
+ * mridangam, voice). Notation stays primary everywhere; the instrument is a
+ * second view of the same swaras, drawn for the visitor's Sa.
+ *
+ * Venu: eight holes, each closed, open or half (a half-disc, never a grey
+ * tint); hole 1 nearest the blowing hole; hole 8 open in normal playing; a
+ * left-handed mirror. Low and unknown rows are flagged "fingering varies by
+ * flute; check by ear" and kept out of graded exercises.
+ * Veena: 24 frets over two octaves, the four playing strings, the three side
+ * strings noted, not drawn. Violin: Sa–Pa–Sa–Pa, marks on a continuous board,
+ * "a guide to placement". Mridangam: ink for the valanthalai, rose for the
+ * thoppi, both for both heads; Latin stroke names first. Voice: find your Sa.
+ */
+import SwaraLayout from "../../../layouts/SwaraLayout.astro";
+import Hero from "../../../components/carnatic/Hero.astro";
+import Absent from "../../../components/carnatic/Absent.astro";
+import Chip from "../../../components/carnatic/Chip.astro";
+import ConfidenceNote from "../../../components/carnatic/ConfidenceNote.astro";
+import Button from "../../../components/forms/Button.astro";
+import { hrefIn, langOf, words } from "../../../lib/carnatic/i18n";
+import { gamakas, instruments, ragaById, ragas } from "../../../lib/carnatic/data";
+import { visitor, swaraScript, DEFAULT_SA } from "../../../lib/carnatic/prefs";
+import { letter, numeral, pitchHz, ratio, semitones, tokenize, variantsOf, inline } from "../../../lib/carnatic/notation";
+import { notFound } from "../../../lib/carnatic/notfound";
+import { copy } from "../../../lib/copy";
+
+const INST = ["venu", "veena", "violin", "mridangam", "voice"] as const;
+type Inst = typeof INST[number];
+const inst = Astro.params.inst as Inst;
+if (!INST.includes(inst)) return notFound(Astro);
+const lang = langOf(Astro);
+const t = await words(lang);
+const say = await copy(`carnatic.${inst}`);
+const L = (p: string) => hrefIn(lang, p);
+const { settings } = await visitor(Astro);
+const script = swaraScript(settings, lang);
+const tamil = settings.tamilStyle;
+const [data, gam, all] = await Promise.all([instruments(), gamakas(), ragas()]);
+
+/* The raga drawn on the board: ?raga=<id> or ?raga=mela-<n>. */
+const ragaParam = Astro.url.searchParams.get("raga") ?? (inst === "venu" ? "mela-15" : "mohanam");
+let ragaName = "", scale = "";
+if (ragaParam.startsWith("mela-")) {
+  const m = all?.melakartas.find((x) => x.number === Number(ragaParam.slice(5)));
+  if (m) { ragaName = m.name; scale = `${m.arohana} ${m.avarohana}`; }
+} else {
+  const r = await ragaById(ragaParam);
+  if (r) { ragaName = r.name; scale = `${r.arohana} ${r.avarohana}`.replace(/!\w/g, ""); }
+}
+const vars = variantsOf(scale);
+const inRaga = new Set<number>();
+for (const tk of tokenize(scale)) if (tk.kind === "note" && tk.swara) inRaga.add(semitones(tk.swara, tk.variant ?? vars[tk.swara]));
+const swarasOfRaga = [...new Set(tokenize(scale).filter((x) => x.kind === "note" && (x.octave ?? 0) === 0).map((x) => x.swara + (x.variant ?? "")))];
+const NAME_OF_SEMI: Record<number, string> = {};
+for (const s of swarasOfRaga) NAME_OF_SEMI[semitones(s[0] as any, Number(s.slice(1)) || null)] = s;
+const glyph = (name: string, octave: number) => {
+  const up = octave > 0 ? "<i></i>".repeat(octave) : "", dn = octave < 0 ? "<i></i>".repeat(-octave) : "";
+  const v = name.slice(1);
+  return `<span class="bd-mark"><span class="bd-up">${up}</span><span>${letter(name[0] as any, script, tamil)}${v && !"SP".includes(name[0]) ? `<sub>${numeral(Number(v), script)}</sub>` : ""}</span><span class="bd-dn">${dn}</span></span>`;
+};
+/* Each instrument page is drawn for that instrument's Sa: the visitor's own
+   when it is their instrument, otherwise the default for it (DECISIONS,
+   26 Sep 2026), and the flute's from the flute they chose. */
+const fluteSa = settings.flute.endsWith(" bass") ? `${settings.flute.replace(" bass", "")}4` : `${settings.flute}5`;
+const instSa = settings.instrument === inst ? settings.sa : inst === "venu" ? fluteSa : (DEFAULT_SA as any)[inst];
+const saHz = pitchHz(instSa);
+const RAGA_CHOICES: [string, string][] = [["mela-15", "Mayamalavagowla"], ["mohanam", "Mohanam"], ["mela-29", "Sankarabharanam"], ["mela-65", "Kalyani"], ["bhairavi", "Bhairavi"], ["hamsadhwani", "Hamsadhwani"]];
+
+const META: Record<Inst, string> = {
+  venu: `${settings.flute} flute · Sa = ${instSa.replace("#", "♯")} · change in settings`,
+  veena: `Sa = ${instSa.replace("#", "♯")} · 3 kattai · change in settings`,
+  violin: `Sa = ${instSa.replace(/\d$/, "").replace("#", "♯")} · follows the singer you accompany`,
+  mridangam: "Tuned to your Sa",
+  voice: `Default Sa = C · 1 kattai until you run the finder`,
+};
+const TITLES: Record<Inst, [string, string]> = {
+  venu: ["Venu", "The Carnatic bamboo flute: eight finger holes, open, closed or half-covered, and a blowing register for each octave."],
+  veena: ["Veena", "Twenty-four frets over two octaves, four playing strings and three side strings."],
+  violin: ["Violin", "Tuned Sa–Pa–Sa–Pa and played seated. Gamakas live in the slides."],
+  mridangam: ["Mridangam", "Two heads, two hands, and a syllable for every stroke."],
+  voice: ["Voice", "Choosing your Sa, knowing your range, and singing in akaram."],
+};
+/* The order each is taught in (DECISIONS instruments §11 for the flute; the
+   lesson sequences in instruments/*.json). The first step is free, like
+   everything else here. */
+const PATH: Record<Inst, string[]> = {
+  venu: ["Blowing and madhya Sa", "Madhya S to G", "Mandra octave", "The G₃–M₁ register break", "Varisais, then tara"],
+  veena: ["Posture and the right-hand plucks", "Sa and Pa on the Sarani", "Sarali varisai on one string", "First deflections"],
+  violin: ["Tuning Sa–Pa–Sa–Pa", "First position swaras", "Sarali varisai with the bow", "Slides for jaru"],
+  mridangam: (data?.mridangam?.lessonSequence ?? []).slice(0, 4).map((s: any) => s.title.replace(/ - /g, ", ")),
+  voice: ["Finding your Sa", "Sa and Pa with the drone", "Sarali varisai in swaras", "The same in akaram"],
+};
+
+/* ── venu ── */
+const venuRows = (data?.venu?.fingerings ?? []) as any[];
+const octave = Astro.url.searchParams.get("octave") ?? "madhya";
+const left = settings.hand === "left";
+const fingerOf = (name: string, sthayi: string) => {
+  const rows = venuRows.filter((f) => f.swara === name && f.sthayi === sthayi);
+  return rows.find((f) => f.kind === "primary") ?? rows.find((f) => f.kind === "cross-fingering") ?? rows[0] ?? null;
+};
+const venuTable = swarasOfRaga.map((name) => ({ name, row: fingerOf(name, octave) }));
+const holeSvg = (holes: string | null, size = 12) => {
+  const cells = (holes ?? "????????").split("").map((h, i) => {
+    const cx = 6 + i * (size + 4);
+    if (h === "C") return `<circle cx="${cx}" cy="6" r="${size / 2 - 1}" class="h-c"/>`;
+    if (h === "H") return `<circle cx="${cx}" cy="6" r="${size / 2 - 1}" class="h-o"/><path d="M${cx} ${1} A${size / 2 - 1} ${size / 2 - 1} 0 0 0 ${cx} ${11} Z" class="h-c"/>`;
+    return `<circle cx="${cx}" cy="6" r="${size / 2 - 1}" class="h-o"/>`;
+  });
+  const w = 8 * (size + 4);
+  return `<svg viewBox="0 0 ${w} 12" width="${w}" height="12" aria-hidden="true" ${left ? 'style="transform:scaleX(-1)"' : ""}>${cells.join("")}</svg>`;
+};
+const selected = venuTable[0];
+const offsetOf = (name: string) => semitones(name[0] as any, Number(name.slice(1)) || null) + (octave === "tara" ? 12 : octave === "mandra" ? -12 : 0);
+const BLOW: Record<string, string> = { normal: "normal", overblow: "overblown", overblow_hard: "overblown hard" };
+
+/* ── veena ── */
+const VEENA = [["Sarani", "Sa · madhya", 0], ["Panchamam", "Pa · mandra", -5], ["Mandaram", "Sa · mandra", -12], ["Anumandram", "Pa · anumandra", -17]] as const;
+const FRETS = 24;
+const widths = Array.from({ length: FRETS + 1 }, (_, f) => (f === 0 ? 0.9 : Math.max(Math.pow(2, -f / 12), 0.25)));
+const total = widths.reduce((a, b) => a + b, 0);
+const fretX = (f: number) => widths.slice(0, f).reduce((a, b) => a + b, 0) / total * 100 + (widths[f] / total * 100) / 2;
+const fretLine = (f: number) => widths.slice(0, f + 1).reduce((a, b) => a + b, 0) / total * 100;
+const markAt = (semi: number) => {
+  const within = ((semi % 12) + 12) % 12;
+  if (!inRaga.has(within)) return null;
+  const name = NAME_OF_SEMI[within] ?? "S";
+  return glyph(name, Math.floor(semi / 12));
+};
+
+/* ── violin ── */
+const VIOLIN = [["Pa", "madhya", 7], ["Sa", "madhya", 0], ["Pa", "mandra", -5], ["Sa", "mandra", -12]] as const;
+const violinRows = VIOLIN.map(([name, sthayi, off]) => {
+  const str = data?.violin?.strings?.find((x: any) => x.openOffset === off);
+  const pos: { at: number; finger: string }[] = [{ at: 0, finger: "open" }];
+  for (const [fg, list] of Object.entries<any>(str?.positions?.["1"] ?? {})) {
+    for (const p of list) pos.push({ at: p.semitonesAboveOpen, finger: fg });
+  }
+  const seen = new Set<number>();
+  const marks = pos.filter((p) => {
+    if (seen.has(p.at) || !inRaga.has((((off + p.at) % 12) + 12) % 12)) return false;
+    seen.add(p.at);
+    return true;
+  });
+  return { name, sthayi, off, marks };
+});
+const vx = (s: number) => (Math.log2(1 + s / 7) / Math.log2(2)) * 92 + 3;
+
+/* ── mridangam ── */
+const md = data?.mridangam;
+const STROKES = ["tha", "thom", "gumki", "nam", "dhi", "ki", "ta", "mi", "chapu", "arai_chapu", "dheem"];
+const strokeRows = [
+  ...STROKES.map((id) => md?.strokes?.find((s: any) => s.id === id)).filter(Boolean).map((s: any) => ({ id: s.id, name: s.id.replace("_", " "), head: s.hand === "L" ? "thoppi" : "valanthalai", scripts: s.scripts, confidence: s.confidence })),
+  ...["tham", "thom_dhi"].map((id) => md?.combinations?.find((c: any) => c.id === id)).filter(Boolean).map((c: any) => ({ id: c.id, name: c.name ?? c.id, head: "both", scripts: c.scripts, confidence: c.confidence })),
+];
+const ADI_STROKES = ["tha", "dhi", "thom", "nam", "tha", "dhi", "thom", "nam"];
+const thoppi = new Set(["tha", "thom", "gumki"]);
+const strokeScript = (s: any) => lang !== "en" ? s.scripts?.[lang]?.text : null;
+const gamakaFor = (gam?.gamakas ?? []).filter((g: any) => g.on?.[inst]).slice(0, 4);
+---
+<SwaraLayout title={`${TITLES[inst][0]} · instruments · Swara Studio`} description={say("meta.description", TITLES[inst][1])}
+             crumbs={[[t("crumb.learn"), L("/carnatic/lessons")], [t("crumb.instruments"), L("/carnatic/instruments/venu")], [TITLES[inst][0]]]}>
+  <Hero eyebrow={say("eyebrow", "Instrument")} title={say("title", TITLES[inst][0])} lede={say("lede", TITLES[inst][1])} />
+  <div class="sw-toolbar">
+    <div class="sw-chips">{INST.map((i) => <Chip href={L(`/carnatic/instruments/${i}`)} active={i === inst}>{i[0].toUpperCase() + i.slice(1)}</Chip>)}</div>
+    <span class="spacer"></span>
+    <span class="sw-mono">{META[inst]}</span>
+  </div>
+  {!data ? <div class="sw-section"><Absent /></div> : (
+  <div class="sw-cols">
+    <div class="sw-main">
+      {(inst === "venu" || inst === "veena" || inst === "violin") && (
+        <form class="in-raga" method="get">
+          {lang !== "en" && <input type="hidden" name="lang" value={lang} />}
+          <label class="t-eyebrow sw-eyebrow" for="in-raga">Raga</label>
+          <select id="in-raga" name="raga" onchange="this.form.submit()">
+            {RAGA_CHOICES.map(([id, name]) => <option value={id} selected={id === ragaParam}>{name}</option>)}
+          </select>
+          {inst === "venu" && <input type="hidden" name="octave" value={octave} />}
+          <noscript><button type="submit">Show</button></noscript>
+        </form>
+      )}
+
+      {inst === "venu" && (
+        <>
+          <div class="sw-card vn-card" data-venu>
+            <div class="vn-flute" aria-hidden="true" style={left ? "transform:scaleX(-1)" : undefined}>
+              <span class="vn-blow"></span>
+              {(selected?.row?.holes ?? "OOOOOOOO").split("").map((h: string) => <span class:list={["vn-hole", `h-${h}`]}></span>)}
+            </div>
+            <div class="vn-pick">
+              <span class="t-eyebrow sw-eyebrow">Swara</span>
+              <div class="sw-chips">{venuTable.map((v, i) => <Chip data-hole={v.row?.holes ?? ""} data-info={`${v.name} · ${octave} · ${BLOW[v.row?.blow] ?? ""}${v.row?.kind === "cross-fingering" ? " · cross-fingering" : ""} · confidence ${v.row?.confidence ?? "unknown"}`} active={i === 0}>{inline(v.name, "lat")}</Chip>)}</div>
+              <span class="spacer"></span>
+              <div class="sw-chips">{["mandra", "madhya", "tara"].map((o) => <Chip href={L(`/carnatic/instruments/venu?raga=${ragaParam}&octave=${o}`)} active={o === octave}>{o[0].toUpperCase() + o.slice(1)}</Chip>)}</div>
+            </div>
+            <p class="sw-mono" data-info-line>{selected ? `${selected.name} · ${octave} · ${BLOW[selected.row?.blow] ?? ""} · confidence ${selected.row?.confidence ?? "unknown"}` : ""}</p>
+            <p class="sw-note">Closed: filled · Open: ring · Half: a half-disc in the direction the finger rolls. Hole 1 is nearest the blowing hole; hole 8 stays open in normal playing.{left ? " Left-handed view." : ""}</p>
+          </div>
+          <section class="sw-section">
+            <h2 class="sw-h3">{say("notesH", "Notes for your Sa")}</h2>
+            <table class="sw-table vn-table">
+              <thead><tr><th>Swara</th><th>Fingering</th><th>Register</th><th class="r">Pitch · just</th></tr></thead>
+              <tbody>
+                {venuTable.map((v) => {
+                  const off = offsetOf(v.name);
+                  return (
+                    <tr>
+                      <td class="sw" set:html={glyph(v.name, octave === "tara" ? 1 : octave === "mandra" ? -1 : 0)} />
+                      <td set:html={v.row?.holes ? holeSvg(v.row.holes) : "—"} />
+                      <td>{BLOW[v.row?.blow] ?? ""}{v.row?.kind === "cross-fingering" ? " · cross-fingering" : ""} {["low", "unknown"].includes(v.row?.confidence) && <><br /><ConfidenceNote level="low" text="Fingering varies by flute; check by ear." /></>}</td>
+                      <td class="r mono">{(saHz * ratio(off)).toFixed(1)} Hz</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+            <p class="sw-note">From research/instruments/venu.json (Anubodh, Dasarathy, rasikas.org). Pitches are just intonation from Sa = {instSa}. Low-confidence and unknown fingerings are kept out of graded exercises.</p>
+          </section>
+        </>
+      )}
+
+      {inst === "veena" && (
+        <div class="sw-card bd-card">
+          <p class="sw-mono">{ragaName} · 24 frets over two octaves · swaras of the raga only</p>
+          <div class="bd">
+            {VEENA.map(([name, sub, off], si) => (
+              <div class="bd-row">
+                <span class="bd-label"><b>{name}</b><small>{sub}</small></span>
+                <div class="bd-board">
+                  <span class="bd-string" style={`height:${1 + si * 0.6}px`}></span>
+                  {Array.from({ length: FRETS + 1 }, (_, f) => <span class:list={["bd-fret", f === 0 && "nut"]} style={`left:${fretLine(f)}%`}></span>)}
+                  {Array.from({ length: FRETS + 1 }, (_, f) => { const mk = markAt(off + f); return mk ? <span class="bd-at" style={`left:${fretX(f)}%`} set:html={mk} /> : null; })}
+                </div>
+              </div>
+            ))}
+          </div>
+          <p class="sw-note">Side (tala) strings: madhya Sa, madhya Pa, tara Sa, unfretted, noted not drawn. Tuning check: panchamam fret 5 = open sarani; mandaram fret 7 = open panchamam. Turn a phone sideways for the full board.</p>
+        </div>
+      )}
+
+      {inst === "violin" && (
+        <div class="sw-card bd-card">
+          <p class="sw-mono">{ragaName} · Sa–Pa–Sa–Pa, low to high · first position · a guide to placement, not fingering: players shift and slide</p>
+          <div class="bd">
+            {violinRows.map((row) => (
+              <div class="bd-row vl-row">
+                <span class="bd-label"><b>{row.name}</b><small>{row.sthayi}</small></span>
+                <div class="bd-board vl-board">
+                  <span class="bd-string"></span><span class="bd-fret nut" style="left:0"></span>
+                  {row.marks.map((mk) => (
+                    <span class="bd-at vl-at" style={`left:${vx(mk.at)}%`}><span set:html={markAt(row.off + mk.at)} /><small>{mk.finger === "open" ? "open" : `finger ${mk.finger}`}</small></span>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+          <p class="sw-note">The violin is fretless, so positions are marks on a continuous board. <ConfidenceNote level="low" text="Which finger players use for each swara varies; one scholarly source." /></p>
+        </div>
+      )}
+
+      {inst === "mridangam" && (
+        <>
+          <div class="sw-card md-heads">
+            <div class="md-head thoppi"><span>open head</span><b>Thoppi · left</b><small>bass · thom, gumki</small></div>
+            <span class="md-join" aria-hidden="true"></span>
+            <div class="md-head val"><span class="md-centre">centre</span><b>Valanthalai · right</b><small>rim · edge · centre</small></div>
+          </div>
+          <section class="sw-section">
+            <h2 class="sw-h3">{say("mapH", "Stroke map")}</h2>
+            <div class="md-chips">
+              {strokeRows.map((s) => (
+                <div class:list={["md-chip", s.head]}>
+                  <span class="md-name">{s.name}{strokeScript(s) && <span class="sw-unv" lang={lang} title={t("unverified.title")}> {strokeScript(s)}</span>}</span>
+                  <span class="md-dots" aria-hidden="true"><i class="l"></i><i class="r"></i></span>
+                  <small>{s.head === "both" ? "both heads" : s.head}</small>
+                </div>
+              ))}
+            </div>
+            <p class="sw-note">Ink: valanthalai (right). Rose: thoppi (left). Both: both heads. The Latin stroke name comes first; only ಛಾಪು and ಧೀಂ are sourced script spellings, the rest are candidates for a native reader.</p>
+          </section>
+          <section class="sw-section">
+            <h2 class="sw-h3">{say("cycleH", "A cycle of Adi in strokes")}</h2>
+            <div class="md-cycle">
+              {ADI_STROKES.map((s, i) => <span class:list={["md-c", thoppi.has(s) && "l", (i === 3 || i === 5) && "bar"]}><small>{i + 1}{i === 0 ? " · samam" : ""}</small>{s}</span>)}
+            </div>
+            <p class="sw-note">Lesson 1 of the Annamalai University BFA syllabus: the four basic strokes, one per count, then doubled and tripled, each in three speeds.</p>
+          </section>
+        </>
+      )}
+
+      {inst === "voice" && (
+        <>
+          <div class="sw-card vo-find" data-finder>
+            <p class="t-eyebrow sw-eyebrow">{say("findH", "Find your Sa")}</p>
+            <p class="sw-p">{say("findP", "Sing \"aa\" as low as is comfortable, then as high as is comfortable. We suggest a Sa that puts mandra Pa near your floor and tara Pa near your ceiling.")}</p>
+            <div class="vo-buttons">
+              <button type="button" class="vo-btn" data-measure="floor">{say("floor", "Sing your lowest")}</button>
+              <button type="button" class="vo-btn" data-measure="ceiling">{say("ceiling", "Sing your highest")}</button>
+            </div>
+            <p class="sw-mono" data-range-line>floor · — &nbsp; ceiling · —</p>
+            <p class="vo-result"><span data-suggest>Sa = {settings.sa}</span> <span class="sw-mono" data-suggest-meta></span></p>
+            <div class="vo-buttons"><Button data-use disabled>{say("use", "Use this Sa")}</Button></div>
+            <p class="sw-note" data-rule>{say("rule", "Rule: Sa = your floor + 5 semitones (so mandra Pa sits on the floor), then check that tara Pa (Sa + 19) is under your ceiling. If it isn't, tara Pa may strain, and you can move Sa later. Typical results: men C3–D♯3, women F♯3–A3. Confirm by singing mandra Pa, Sa, Pa, tara Sa and tara Pa against the drone.")}</p>
+          </div>
+          <section class="sw-section">
+            <h2 class="sw-h3">Akaram</h2>
+            <p class="sw-prose">{say("akaram", "Akaram is singing the phrase on the vowel \"a\" instead of the swara names. It is how gamakas are practised with the voice, because a held vowel shows every movement of pitch. Each exercise in the path can be sung with swaras or in akaram.")}</p>
+          </section>
+          <section class="sw-section">
+            <h2 class="sw-h3">{say("rangeH", "Range warnings")}</h2>
+            <div class="vo-range"><span class="sw-mono">Range</span><span class="sw-p">{say("rangeP", "When a line reaches tara Pa, above your comfortable ceiling, the player says so. Sing it an octave lower or leave that note out for now.")}</span></div>
+          </section>
+        </>
+      )}
+
+      {gamakaFor.length > 0 && (
+        <section class="sw-section">
+          <h2 class="sw-h3">Gamakas on the {inst}</h2>
+          {inst === "veena" && <p class="sw-prose">{say("veenaGamaka", "Most gamakas are made by pulling the string sideways across a fret, raising the pitch without moving the finger. A kampita is a repeated pull and release; a jaru is a slide along the string.")}</p>}
+          {inst === "veena" && <p class="sw-p"><ConfidenceNote level="medium" text="Some sources differ: how far one fret's deflection is taken varies by player and school." /></p>}
+          <div class="in-gam">{gamakaFor.map((g: any) => <div class="in-gam-row"><b>{g.name}</b><span class="sw-p">{g.on[inst]}</span></div>)}</div>
+        </section>
+      )}
+      {inst === "violin" && (
+        <section class="sw-section vl-held">
+          <div class="sky sw-art-absent vl-art"><span>Illustration to come · seated, scroll on the foot</span></div>
+          <div><h2 class="sw-h3">How it is held and played</h2>
+          <p class="sw-prose">The Carnatic violin is played seated, the scroll resting on the right foot, so the left hand can slide freely. Gamakas are made mostly by sliding a finger along the string rather than by vibrato.</p></div>
+        </section>
+      )}
+    </div>
+    <aside class="sw-aside">
+      <div class="sw-card in-path">
+        <p class="t-eyebrow sw-eyebrow">{inst === "mridangam" ? "Lessons" : "Beginner path"} · {inst}</p>
+        <ol>{PATH[inst].map((s, i) => <li><span class="sw-mono">{String(i + 1).padStart(2, "0")}</span><span>{s}</span>{i === 0 && <span class="sw-mono">{t("gen.free")}</span>}</li>)}</ol>
+      </div>
+      {inst === "venu" && (
+        <div class="in-posture"><p class="t-eyebrow sw-eyebrow">Posture</p><div class="sky sw-art-absent in-post-art"><span>Illustration to come · holding the venu</span></div></div>
+      )}
+    </aside>
+  </div>
+  )}
+</SwaraLayout>
+
+<script>
+  /* Venu: pick a swara, see its fingering. */
+  document.querySelectorAll<HTMLElement>("[data-venu]").forEach((box) => {
+    const holes = box.querySelectorAll<HTMLElement>(".vn-hole");
+    const info = box.querySelector<HTMLElement>("[data-info-line]");
+    box.querySelectorAll<HTMLElement>("[data-hole]").forEach((chip) => chip.addEventListener("click", () => {
+      box.querySelectorAll("[data-hole]").forEach((c) => c.setAttribute("aria-pressed", String(c === chip)));
+      const h = chip.dataset.hole || "OOOOOOOO";
+      holes.forEach((el, i) => { el.className = `vn-hole h-${h[i] ?? "O"}`; });
+      if (info) info.textContent = chip.dataset.info || "";
+    }));
+  });
+
+  /* Voice: find your Sa from the lowest and highest notes sung. */
+  import { Mic } from "../../../lib/carnatic/client/pitch";
+  import { setSettings } from "../../../lib/carnatic/client/state";
+  const finder = document.querySelector<HTMLElement>("[data-finder]");
+  if (finder) {
+    const NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+    const KATTAI: Record<string, string> = { C: "1", "C#": "1½", D: "2", "D#": "2½", E: "3", F: "4", "F#": "4½", G: "5", "G#": "5½", A: "6", "A#": "6½", B: "7" };
+    const midi = (hz: number) => 69 + 12 * Math.log2(hz / 440);
+    const name = (m: number) => `${NAMES[((m % 12) + 12) % 12]}${Math.floor(m / 12) - 1}`;
+    const got: Record<string, number> = {};
+    const mic = new Mic();
+    const line = finder.querySelector<HTMLElement>("[data-range-line]")!;
+    const sug = finder.querySelector<HTMLElement>("[data-suggest]")!;
+    const meta = finder.querySelector<HTMLElement>("[data-suggest-meta]")!;
+    const use = finder.querySelector<HTMLButtonElement>("[data-use]")!;
+    let suggested = "";
+    finder.querySelectorAll<HTMLButtonElement>("[data-measure]").forEach((b) => b.addEventListener("click", async () => {
+      if (mic.state !== "working" && (await mic.start()) !== "working") { line.textContent = "The microphone is off; the finder needs it. You can still pick a Sa in the tuner."; return; }
+      const label = b.textContent;
+      b.textContent = "Listening…";
+      const heard: number[] = [];
+      const until = performance.now() + 2500;
+      await new Promise<void>((done) => {
+        const tick = () => { const hz = mic.read(); if (hz) heard.push(midi(hz)); if (performance.now() < until) requestAnimationFrame(tick); else done(); };
+        tick();
+      });
+      b.textContent = label;
+      if (heard.length < 5) return;
+      heard.sort((a, z) => a - z);
+      got[b.dataset.measure!] = Math.round(heard[Math.floor(heard.length / 2)]);
+      line.textContent = `floor · ${got.floor ? name(got.floor) : "—"}   ceiling · ${got.ceiling ? name(got.ceiling) : "—"}`;
+      if (got.floor) {
+        const sa = got.floor + 5;
+        suggested = name(sa);
+        sug.textContent = `Sa = ${suggested.replace("#", "♯")}`;
+        meta.textContent = `${KATTAI[NAMES[((sa % 12) + 12) % 12]]} kattai · ${(440 * Math.pow(2, (sa - 69) / 12)).toFixed(1)} Hz${got.ceiling && got.ceiling < sa + 19 ? " · tara Pa may strain; you can move Sa later" : ""}`;
+        use.disabled = false;
+        use.removeAttribute("data-disabled");
+      }
+    }));
+    use.addEventListener("click", () => { if (suggested) { setSettings({ sa: suggested }); use.textContent = "Saved"; } });
+  }
+</script>
+
+<style>
+  .in-raga { display: flex; gap: 10px; align-items: center; }
+  .in-raga select { font: 14px / 1.3 var(--font-body); padding: 8px 10px; border: 1px solid var(--line-strong); border-radius: 4px; background: var(--surface-card); color: var(--ink); }
+  .vn-card { display: grid; gap: 14px; }
+  .vn-flute { display: flex; align-items: center; justify-content: space-around; gap: 6px; padding: 10px 18px; border: 1px solid var(--line-strong); border-radius: 99px; background: var(--surface-inset); }
+  .vn-blow { width: 26px; height: 14px; border-radius: 99px; border: 1.5px solid var(--ink); }
+  .vn-hole { width: 26px; height: 26px; border-radius: 99px; border: 1.5px solid var(--ink-soft); box-sizing: border-box; }
+  .vn-hole.h-C { background: var(--ink); border-color: var(--ink); }
+  .vn-hole.h-H { background: linear-gradient(90deg, var(--ink) 50%, transparent 50%); border-color: var(--ink); }
+  .vn-pick { display: flex; gap: 8px 14px; align-items: center; flex-wrap: wrap; }
+  .vn-pick .spacer { flex: 1; }
+  .vn-table td.sw { width: 60px; }
+  .vn-table .r { text-align: right; }
+  .vn-table .mono { font-family: var(--font-mono); color: var(--ink); }
+  .vn-table :global(svg .h-c) { fill: var(--ink); }
+  .vn-table :global(svg .h-o) { fill: none; stroke: var(--ink-soft); stroke-width: 1; }
+  :global(.bd-mark) { display: inline-grid; justify-items: center; grid-template-rows: 6px auto 6px; font: 14px / 1 var(--font-notation); color: var(--ink); }
+  :global(.bd-mark sub) { font-size: .6em; vertical-align: -.2em; }
+  :global(.bd-up), :global(.bd-dn) { display: flex; gap: 2px; align-items: center; }
+  :global(.bd-up i), :global(.bd-dn i) { width: 3px; height: 3px; border-radius: 99px; background: currentColor; display: block; }
+  .bd-card { display: grid; gap: 12px; }
+  .bd { display: grid; gap: 4px; overflow-x: auto; }
+  .bd-row { display: grid; grid-template-columns: 110px minmax(560px, 1fr); align-items: center; }
+  .bd-label { display: grid; gap: 2px; }
+  .bd-label b { font: 600 14px / 1.2 var(--font-body); color: var(--ink); }
+  .bd-label small { font: 10px / 1.2 var(--font-mono); color: var(--ink-faint); }
+  .bd-board { position: relative; height: 42px; background: var(--surface-inset); }
+  .bd-string { position: absolute; left: 0; right: 0; top: 50%; background: var(--ink-soft); height: 1px; }
+  .bd-fret { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--line-strong); }
+  .bd-fret.nut { width: 3px; background: var(--ink); }
+  .bd-at { position: absolute; top: 50%; transform: translate(-50%, -50%); background: var(--surface-card); border: 1px solid var(--ink); border-radius: 6px; padding: 1px 3px; }
+  .vl-board { height: 50px; }
+  .vl-row { margin-bottom: 14px; }
+  .vl-at { border-radius: 99px; display: grid; justify-items: center; padding: 2px 5px; }
+  .vl-at small { position: absolute; top: 100%; font: 9px / 1.4 var(--font-mono); color: var(--ink-faint); white-space: nowrap; }
+  .vl-held { display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: 20px; }
+  .vl-art { min-height: 180px; }
+  .md-heads { display: flex; align-items: center; justify-content: center; gap: 24px; padding: 20px; }
+  .md-head { display: grid; justify-items: center; gap: 6px; text-align: center; }
+  .md-head > span:first-child { width: 150px; height: 150px; border-radius: 99px; display: grid; place-items: center; font: 13px / 1 var(--font-body); color: var(--ink); }
+  .md-head.thoppi > span { background: var(--rose-wash); border: 1.5px solid var(--rose); }
+  .md-head.val > span { width: 130px; height: 130px; border: 1.5px solid var(--ink); color: var(--surface-card); font-size: 11px;
+    background: radial-gradient(circle, var(--ink) 0 28px, var(--surface-card) 29px 50px, var(--line-strong) 51px 52px, var(--surface-card) 53px); }
+  .md-centre::after { content: ""; }
+  .md-head b { font: 600 16px / 1.2 var(--font-body); color: var(--ink); }
+  .md-head small { font: 11px / 1.3 var(--font-mono); color: var(--ink-soft); }
+  .md-join { width: 120px; height: 1px; background: var(--line-strong); }
+  .md-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .md-chip { display: grid; grid-template-columns: auto auto; gap: 4px 12px; align-items: center; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-card); min-width: 96px; }
+  .md-chip.thoppi { background: var(--rose-wash); border-color: color-mix(in srgb, var(--rose) 30%, transparent); }
+  .md-chip.both { background: var(--surface-veil); }
+  .md-name { font: 20px / 1.2 var(--font-display); color: var(--ink); }
+  .md-name .sw-unv { font-size: 15px; color: var(--ink-soft); }
+  .md-dots { display: flex; gap: 3px; justify-self: end; }
+  .md-dots i { width: 10px; height: 10px; border-radius: 99px; box-sizing: border-box; }
+  .md-dots .l { border: 1px solid var(--rose); }
+  .md-dots .r { background: var(--ink); }
+  .md-chip.thoppi .md-dots .l, .md-chip.both .md-dots .l { background: var(--rose); }
+  .md-chip.thoppi .md-dots .r { background: none; border: 1px solid var(--ink); }
+  .md-chip small { grid-column: 1 / -1; font: 10px / 1.2 var(--font-mono); color: var(--ink-faint); }
+  .md-cycle { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); }
+  .md-c { display: grid; justify-items: center; gap: 4px; padding: 6px 4px; font: 20px / 1.2 var(--font-display); color: var(--ink); border-radius: 4px; }
+  .md-c small { font: 10px / 1 var(--font-mono); color: var(--ink-faint); }
+  .md-c.l { background: var(--rose-wash); }
+  .md-c.bar { border-right: 1px solid var(--ink); border-radius: 4px 0 0 4px; }
+  .md-c:last-child { border-right: 3px double var(--ink); }
+  .vo-find { display: grid; gap: 12px; }
+  .vo-buttons { display: flex; gap: 8px; flex-wrap: wrap; }
+  .vo-btn { appearance: none; border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent); background: transparent; color: var(--accent); border-radius: var(--radius-sm); font: 600 var(--text-sm) / 1 var(--font-body); padding: 11px 16px; cursor: pointer; }
+  .vo-result { margin: 0; font: 30px / 1.2 var(--font-display); color: var(--ink); display: flex; gap: 12px; align-items: baseline; flex-wrap: wrap; }
+  .vo-range { display: flex; gap: 12px; align-items: baseline; padding: 12px 14px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-inset); }
+  .in-gam { border-top: 1px solid var(--line); }
+  .in-gam-row { display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: 16px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+  .in-gam-row b { font: 600 15px / 1.4 var(--font-body); color: var(--ink); }
+  .in-path ol { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 10px; }
+  .in-path li { display: grid; grid-template-columns: 26px minmax(0, 1fr) auto; gap: 8px; font: 15px / 1.3 var(--font-body); color: var(--ink); align-items: baseline; }
+  .in-posture { display: grid; gap: 8px; }
+  .in-post-art { min-height: 150px; }
+  @media (max-width: 599px) { .vl-held { grid-template-columns: minmax(0, 1fr); } .md-heads { flex-direction: column; } .md-join { width: 1px; height: 30px; } .md-cycle { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+</style>
