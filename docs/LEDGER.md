@@ -6,7 +6,7 @@ This page holds the three contracts the parts are built against. Change a contra
 
 ## Decisions
 
-- **The reckoning runs in the browser.** Every change re-reckons at once (handoff: "no debounce is needed"), and planning works signed out. `frontend/site/src/lib/ledger/engine.ts` is a pure module: no DOM, no fetch. It is tested with `node --test` against figures worked out from the research. The server stores plans and weeks; it does not compute them.
+- **The reckoning runs in the browser.** Every change re-reckons at once (handoff: "no debounce is needed"), and planning works signed out. `frontend/site/src/lib/ledger/engine.ts` is a pure module: no DOM, no fetch. It is tested with `node --test` against figures worked out from the research. The server stores plans and weeks; it does not compute them. The one exception is Contract 5: the app is native, so the Astro server runs the same engine for it.
 - **The data is served, never committed here.** The compiled facts are `LicenseRef-All-Rights-Reserved`, like every research pack. They live in `shrutisgametracker/research/big-ambitions/ledger.json` with `sources-ledger.md` and `coverage-ledger.md`. `scripts/sync-gamedata.sh` copies them into the `gamedata` volume as `ledger-big-ambitions.json`, and `GET /api/ledger/data` serves the file. When it is missing, the Ledger says the game's data is not loaded, which is a working state.
 - **Stack:** Astro 5 SSR with plain TypeScript module scripts that mount onto server-rendered markup, as `/builds/plan` does. No UI framework. Every visible string goes through `copy()` / `say()`. (The handoff says "Astro 6, islands", but the site is not built that way.)
 - **Section:** `/ledger` belongs to the `guides` section, so it is hidden with it. Both `SECTION_PATHS` maps must be updated together.
@@ -144,6 +144,55 @@ Minting uses the same fair use as every overlay and never charges. The theme def
 ```
 
 A week's total is money in minus the lines written. It is never cash, a note, an unopened plan, another ledger, or where a week came from. Plans are cut to the engine's keys (`PLAN_KEYS`). The words and the change sentences (A2) are in `frontend/site/src/lib/ledger/stream.ts`. The planner builds `{label, delta}` with `changeLabel()` and its own reckoning.
+
+## Contract 5 — the Ledger reckoned for the app (`POST /ledger/reckon.json`)
+
+The Squirrel Guides app is native and cannot run the engine, and the figures must never differ between the phone, the website and the stream. So the Astro server runs the same engine for it. It is an Astro route because the engine is TypeScript and Caddy sends `/api/*` to Python: `frontend/site/src/pages/ledger/reckon.json.ts`, with the handler in `lib/ledger/reckon.ts` (`reckonRoute`). Tests: `frontend/site/test/ledger-reckon-endpoint.test.mjs`.
+
+**Request** (`content-type: application/json`, anything else is 415; 1 MB at most):
+
+```jsonc
+// one plan: the lighter planner after each change, a business's week against its plan
+{ "plan": {engine keys},                        // 64 KB at most, hours 7 × 24 of 0–9, as the backend checks a plan
+  "ctx": { "difficulty": "normal", "courses": [], "custom": {…}?, "importIndex": 0.9? },   // the ledger's
+  "previous": {engine keys}? }                   // the plan before the change: adds `change`
+// a company's rows: up to 50, answered in the order sent (the ledger's order; never sorted)
+{ "plans": [{ "id": 12, "plan": {…} }, …], "ctx": {…} }
+```
+
+**Answer** (200; `Cache-Control: no-store`). Money is rounded to the dollar and payback to a tenth of a day, as the headlines are. `honesty` is `counted | approximate | not-counted`. A null value is a dash, never $0.
+
+```jsonc
+{ "game": { "version": "1.0", "build": "3682" },
+  "state": "ok",                         // the engine's: ok · no-type · no-building · not-a-shop · cannot-open · closed · no-customers
+  "week": { "moneyIn": {"value": 93561, "honesty": "approximate"}, "goods": {…}, "wages": {…}, "rent": {…},
+            "ads": {…}, "deliveries": {…}, "total": {"value": 73171, "honesty": "approximate", "loss": false} },
+  "setup": {"value": 28090, "honesty": "counted"},
+  "paybackDays": {"value": 2.7, "honesty": "approximate"},
+  "customers": {"value": 1459, "honesty": "approximate"},       // a week
+  "limit": { "state": "held", "reason": null, "by": "registers", "hours": 47, "cap": 20, "would": 30,
+             "fix": { "kind": "register", "label": "Add a second register", "note": "You can undo it, and Review shows before against after.",
+                      "cost": {"value": 1370, …}, "weeklyCost": {"value": 1680, …}, "worth": {"value": 12845, …} } | null,
+             "sentence": "Held at 20 customers an hour by one register, for 47 hours of the week. 30 would come. A second register ($1,370 with its cabinet) and a cashier ($1,680 a week) are worth $12,845 a week.",
+             "first": "Held at 20 customers an hour by one register, for 47 hours of the week.",
+             "note": "held · 47 h", "head": "Registers" },
+  "missing": [{ "path": "fixtures · cash register", "text": "A gift shop needs a cash register or a checkout counter to open. Add one under Fixtures." }],
+  "bar": { "week": "$73,171", "loss": null, "payback": "2.7 days", "limit": "Registers" },   // the figures bar, as the site writes it
+  "change": { "label": "A second register", "delta": 12845, "sentence": "A second register · the week +$12,845", "caret": "▲" } }
+  // `change` only when `previous` was sent; null when the two plans are the same
+// a batch: { "game", "results": [{ "id": 12, …the same keys, without change… }] }
+//          a row the engine cannot read at all is { "id", "state": null, "unreadable": true }
+```
+
+**The words are the website's.** The sentences go through the same helpers and the same `copy()` scopes as the pages, so an edit in the admin reads the same everywhere. `limit.sentence`, `note`, `head` and `fix.label` use `limit.ts` in the words of `component:WhatLimitsIt`. `limit.first` is `kept.ts firstSentence`, as a company's rows show it. `missing` is `limit.ts missingRows` in `ledger/plan`'s words. `change` is `stream.ts changeLabel` (with `component:StreamSwitch`'s `stream.ch*` labels) and `changeLine`, as the planner's switch sends it and the overlay prints it. `bar` uses `component:LedgerStats`' `unit.days` and `loss`.
+
+**Refusals** are `{detail}` in plain words: 400 (not JSON), 413 (a plan past 64 KB, a body past 1 MB, more than 50 plans), 415 (not `application/json`), 422 (a shape the backend would refuse), 405 (not POST). **503** means the game's data is not loaded, and the answer says so in a sentence (`Retry-After: 60`). The pack is `loadPack()`'s, kept for a minute.
+
+**Why it needs no session and no CSRF token.** It reads nothing about anybody and writes nothing. The plan arrives in the body, and the answer is arithmetic on it and the game's facts. No cookie is read. A cross-site page cannot make a browser send it anyway: `application/json` is not a simple content type, so the browser asks for a preflight, which this route never grants, and a simple `text/plain` POST is refused with 415. The app is native, so it sends no Origin and needs no CORS. None is sent, and in particular no wildcard. Astro's `checkOrigin` is off site-wide (see `astro.config.mjs`), and the site's own CSRF check is the double-submit token that forms carry. Neither applies to this route. The middleware skips it too, and mints no CSRF cookie for it.
+
+**Section.** It is in the guides section (`SECTION_PATHS["/ledger"]`). Hidden with the section, it is a JSON 404 (`{"detail":"Not found"}`), except for the operator. The holding page does not swallow it, just as it does not swallow `/api/*`. `SECTION_MACHINES` in `middleware.ts` names it.
+
+**For the app.** The app needs a connection to plan. When the answer does not arrive, show the last one and say that it is the last known; the endpoint keeps nothing. The address is on the site's origin (`https://shrutivtuber.com/ledger/reckon.json`), not under `/api/`. A self-hosted tracker has no Ledger and answers 404 here. The app reads its plans and ctx from Contract 3 (`GET /api/ledger/ledgers/{id}`: `keptPlan` else `plan`, and the ledger's `difficulty`, `courses`, `custom`) and posts them here.
 
 ## Next — the plan on stream (after the backend lands; design in `design/requests/ledger-overlays-addendum-plan-on-stream.md`)
 

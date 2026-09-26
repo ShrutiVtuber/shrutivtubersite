@@ -154,7 +154,29 @@ async function isOperator(token: string | undefined): Promise<boolean> {
   }
 }
 
+/* Machine endpoints that live inside a section, not under /api/.
+ *
+ * /ledger/reckon.json is the Ledger's engine for the app (docs/LEDGER.md
+ * Contract 5): a native client POSTs a plan and reads JSON. It goes when the
+ * guides section goes, as a JSON 404 rather than the HTML page. The holding
+ * page does not apply, as it does not to /api/*: it is not a page anybody
+ * sees. No CSRF cookie is minted for it (nothing here is a form) and no
+ * reader session is asked about (it reads none). */
+const SECTION_MACHINES = new Set(["/ledger/reckon.json"]);
+
 export const onRequest = defineMiddleware(async (context, next) => {
+  if (SECTION_MACHINES.has(context.url.pathname)) {
+    const section = sectionOf(context.url.pathname);
+    if (section && (await siteState()).sections[section] === false
+        && !(await isOperator(context.cookies.get(ADMIN_COOKIE)?.value))) {
+      return new Response(JSON.stringify({ detail: "Not found" }), {
+        status: 404,
+        headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" },
+      });
+    }
+    return next();
+  }
+
   const secure =
     context.url.protocol === "https:" ||
     context.request.headers.get("x-forwarded-proto") === "https";
