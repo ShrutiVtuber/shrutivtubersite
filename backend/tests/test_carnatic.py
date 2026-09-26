@@ -52,7 +52,7 @@ def test_nothing_published_is_a_working_state(monkeypatch, tmp_path) -> None:
     monkeypatch.setattr(rules, "DATA_DIR", tmp_path)
     assert rules.manifest() is None and rules.data("ragas.json") is None
     with pytest.raises(HTTPException) as e:
-        routes.data_manifest(response=type("R", (), {"headers": {}})())
+        routes.data_manifest(request=type("R", (), {"headers": {}})())
     assert e.value.status_code == 404
 
 
@@ -221,6 +221,8 @@ def test_the_window_fills_and_empties() -> None:
 def test_literal_routes_come_before_the_ones_that_would_swallow_them() -> None:
     source = inspect.getsource(routes)
     assert source.index('"/listen/comments/{comment_id}"') < source.index('"/listen/{post_id}"')
+    assert source.index('"/listen/comments/{comment_id}/report"') < source.index('"/listen/{post_id}/report"')
+    assert source.index('"/data/version"') < source.index('"/data/{name}"')
     assert source.index('"/device-link/redeem"') < source.index('"/device-link/{link_id}/status"')
     assert source.index('"/sheets/{slug}"') < source.index('"/songs/{song_id}"') or "/songs/sheets" not in source
 
@@ -229,11 +231,10 @@ def test_every_table_goes_with_the_account_from_the_first_migration() -> None:
     versions = ROOT / "backend" / "alembic" / "versions"
     if not versions.is_dir():
         versions = ROOT / "alembic" / "versions"
-    path = next(versions.glob("n2l8i5j1k187_*.py"))
-    text = path.read_text()
+    text = "".join(next(versions.glob(f"{rev}_*.py")).read_text() for rev in ("n2l8i5j1k187", "o3m9j6k2l298"))
     models = (BACKEND / "models" / "carnatic.py").read_text()
     tables = [t for t in re.findall(r'__tablename__ = "(carnatic_\w+)"', models) if t != "carnatic_review"]
-    assert len(tables) == 8
+    assert len(tables) == 9
     for table in tables:
         assert f'("{table}", "user_id")' in text, f"{table} must be in NOBODYS_BUT_THEIRS"
     assert text.count("ondelete=\"CASCADE\"") >= 3
@@ -308,3 +309,99 @@ def test_katapayadi_reads_right_to_left() -> None:
     assert b.katapayadi(rec)["digits"] == [8, 2]
     with pytest.raises(b.BuildError):
         b.katapayadi({**rec, "number": 82})
+
+
+# ── the data version, for the app ──────────────────────────────────────────
+
+class _Req:
+    def __init__(self, etag: str | None = None):
+        self.headers = {"if-none-match": etag} if etag else {}
+
+
+def test_the_version_is_the_manifests_digest_and_answers_304(published) -> None:
+    import json as _json
+    digest = rules.manifest()["digest"]
+    r = routes.data_version(_Req())
+    assert _json.loads(r.body)["digest"] == digest and r.headers["etag"] == f'"{digest}"'
+    assert routes.data_version(_Req(f'"{digest}"')).status_code == 304
+    assert routes.data_manifest(_Req(f'"{digest}"')).status_code == 304
+
+
+# ── Listen, for the website and the app alike ──────────────────────────────
+
+def test_a_post_can_be_read_alone_and_a_hidden_one_cannot() -> None:
+    src = inspect.getsource(routes.listen_post)
+    assert "_visible_post" in src and "_post_view" in src
+
+
+def test_sharing_commenting_and_reporting_are_rate_limited() -> None:
+    assert (routes.SHARED_BY_USER.limit, routes.SHARED_BY_USER.seconds) == (10, 3600)
+    assert (routes.COMMENTED_BY_USER.limit, routes.COMMENTED_BY_USER.seconds) == (30, 600)
+    assert (routes.REPORTED_BY_USER.limit, routes.REPORTED_BY_USER.seconds) == (30, 3600)
+    for fn in (routes.share, routes.comment, routes._report):
+        assert "SLOW_DOWN" in inspect.getsource(fn), fn.__name__
+
+
+def test_a_report_is_once_per_person_and_hides_nothing() -> None:
+    src = inspect.getsource(routes._report)
+    assert "existing is None" in src
+    assert "hidden" not in src, "a report must not hide anything by itself; hiding is the operator's"
+    models = (BACKEND / "models" / "carnatic.py").read_text()
+    assert 'UniqueConstraint("user_id", "post_id"' in models and 'UniqueConstraint("user_id", "comment_id"' in models
+
+
+def test_reports_are_listed_first_in_moderation() -> None:
+    src = inspect.getsource(routes.admin_moderation)
+    assert "CarnaticReport" in src and '"reports"' in src and "sort(" in src
+
+
+def test_a_persons_reports_are_in_their_export() -> None:
+    accounts = (BACKEND / "api" / "routes" / "accounts.py").read_text()
+    assert '"reports": await rows(CarnaticReport, CarnaticReport.user_id == uid)' in accounts
+
+
+# ── varnams and abbreviations in the build ─────────────────────────────────
+
+_RAGAS = {"janyas": [
+    {"id": "begada", "name": "Begada", "aliases": [], "arohana": "S G3 R2 G3 M1 P D2 P S'",
+     "avarohana": "S' N3 D2 P M1 G3 R2 S", "anya": [{"swara": "N2"}]},
+    {"id": "hamsadhwani", "name": "Hamsadhwani", "aliases": ["Hamsadvani"], "arohana": "S R2 G3 P N3 S'",
+     "avarohana": "S' N3 P G3 R2 S", "anya": []},
+], "performed": []}
+_ADI = {"chaturasra_jati_triputa": [4, 2, 2]}
+
+
+def test_a_varnam_may_name_its_ragas_anya_swara() -> None:
+    b = _build_data()
+    scale = b.raga_scale(_RAGAS, "Begada")
+    assert "N2" in scale["allowed"] and b.check_varnam_token("N2", scale["allowed"])
+    assert not b.check_varnam_token("N1", scale["allowed"])
+    assert b.raga_scale(_RAGAS, "hamsadvani")["id"] == "hamsadhwani"
+
+
+def test_a_varnam_that_does_not_check_out_is_left_out_with_a_warning() -> None:
+    b = _build_data()
+    b.WARNINGS.clear()
+    bad = {"id": "jalajakshi", "raga": "Hamsadhwani", "tala": "chaturasra_jati_triputa",
+           "sections": [{"section": "pallavi", "lines": [{"segments": [["M", "G", "R", "S"], ["N", "P"], ["G", "R"]]}]}]}
+    assert b.build_varnam(bad, _ADI, _RAGAS) is None
+    assert b.WARNINGS and "jalajakshi" in b.WARNINGS[0]
+
+
+def test_a_varnams_hold_becomes_one_token_per_unit() -> None:
+    b = _build_data()
+    good = {"id": "inta_chalamu", "title": "Inta chalamu", "raga": "Begada", "tala": "chaturasra_jati_triputa",
+            "sections": [{"section": "pallavi", "lines": [{"segments": [["P", "N2", ";"], ["M", "G"], ["R", "S"]]}]}]}
+    rec = b.build_varnam(good, _ADI, _RAGAS)
+    assert rec["sections"][0]["lines"][0]["segments"][0] == ["P", "N2", ",", ","]
+    assert rec["raga_scale"]["avarohana"].startswith("S' N3") and rec["ragaId"] == "begada"
+
+
+def test_abbreviations_are_spelled_out_for_readers() -> None:
+    b = _build_data()
+    assert b.expand("PPN: 'There is endless debate'").startswith("P. P. Narayanaswami:")
+    assert b.expand("the GNB school; GNB again") == "the G. N. Balasubramaniam (GNB) school; GNB again"
+    assert b.expand("in SSP's reading") == "in Sangita Sampradaya Pradarsini's reading"
+    assert b.expand("https://example.org/PPN") == "https://example.org/PPN"
+    out = b.expand_all({"note": "PPN", "sargam": "S R G", "source_url": "PPN"})
+    assert out == {"note": "P. P. Narayanaswami", "sargam": "S R G", "source_url": "PPN"}

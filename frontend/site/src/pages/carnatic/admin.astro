@@ -20,6 +20,8 @@ const show = Astro.url.searchParams.get("show") ?? "open";
 const filter = Astro.url.searchParams.get("lang") ?? "";
 const visible = items.filter((i) => (show === "all" || !i.review) && (!filter || i.lang === filter || (filter === "facts" && i.key.startsWith("fact:"))));
 const hiddenCount = (mod.body?.posts ?? []).filter((p: any) => p.hidden).length + (mod.body?.comments ?? []).filter((c: any) => c.hidden).length;
+const reportedCount = mod.body?.reported ?? 0;
+const reportsLabel = (n: number, reasons: string[]) => n ? say("reports", "{n} reported").replace("{n}", String(n)) + (reasons.length ? ": " + reasons.join(" / ") : "") : "";
 const footLine = say("foot", "Reviewers and consultants see the same queue. Confirming clears the public \"unverified\" or confidence note; correcting replaces the text with yours and clears it. Showing {n} of {total}.").replace("{n}", String(Math.min(visible.length, 400))).replace("{total}", String(visible.length));
 ---
 <SwaraLayout title={say("meta.title", "Review queue · Swara Studio")} noindex>
@@ -28,7 +30,7 @@ const footLine = say("foot", "Reviewers and consultants see the same queue. Conf
     <div class="sw-chips">
       <Chip href="/carnatic/admin" active={tab === "queue"}>{say("tab.queue", "Review queue")} · {queue.body?.open ?? 0}</Chip>
       <Chip href="/admin/classes">{say("tab.lessons", "Lessons")}</Chip>
-      <Chip href="/carnatic/admin?tab=moderation" active={tab === "moderation"}>{say("tab.moderation", "Moderation")} · {hiddenCount}</Chip>
+      <Chip href="/carnatic/admin?tab=moderation" active={tab === "moderation"}>{say("tab.moderation", "Moderation")} · {reportedCount ? say("tab.reported", "{n} reported").replace("{n}", String(reportedCount)) : hiddenCount}</Chip>
     </div>
     <span class="spacer"></span>
     {tab === "queue" && (
@@ -64,11 +66,11 @@ const footLine = say("foot", "Reviewers and consultants see the same queue. Conf
     <div class="aq-mod">
       <h2 class="sw-h3">{say("mod.posts", "Listen posts")}</h2>
       <table class="sw-table">
-        <tbody>{(mod.body?.posts ?? []).map((p: any) => <tr><td>{p.title}<small>{p.url}</small></td><td>{p.hidden ? "hidden" : "shown"}</td><td><button type="button" data-hide-post={p.id} data-hidden={String(p.hidden)}>{p.hidden ? "Show" : "Hide"}</button></td></tr>)}</tbody>
+        <tbody>{(mod.body?.posts ?? []).map((p: any) => <tr><td>{p.title}<small>{p.url}</small>{p.reports > 0 && <small class="aq-rep">{reportsLabel(p.reports, p.reasons)}</small>}</td><td>{p.hidden ? "hidden" : "shown"}</td><td><button type="button" data-hide-post={p.id} data-hidden={String(p.hidden)}>{p.hidden ? "Show" : "Hide"}</button></td></tr>)}</tbody>
       </table>
       <h2 class="sw-h3">{say("mod.comments", "Comments")}</h2>
       <table class="sw-table">
-        <tbody>{(mod.body?.comments ?? []).map((c: any) => <tr><td>{c.body}</td><td>{c.hidden ? "hidden" : "shown"}</td><td><button type="button" data-hide-comment={c.id} data-hidden={String(c.hidden)}>{c.hidden ? "Show" : "Hide"}</button></td></tr>)}</tbody>
+        <tbody>{(mod.body?.comments ?? []).map((c: any) => <tr><td>{c.body}{c.reports > 0 && <small class="aq-rep">{reportsLabel(c.reports, c.reasons)}</small>}</td><td>{c.hidden ? "hidden" : "shown"}</td><td><button type="button" data-hide-comment={c.id} data-hidden={String(c.hidden)}>{c.hidden ? "Show" : "Hide"}</button></td></tr>)}</tbody>
       </table>
     </div>
   )}
@@ -105,4 +107,5 @@ const footLine = say("foot", "Reviewers and consultants see the same queue. Conf
   .aq-act button, .aq-mod button { appearance: none; font: 600 var(--text-sm) / 1 var(--font-body); padding: 9px 14px; border-radius: var(--radius-sm); cursor: pointer; background: transparent; color: var(--accent); border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent); }
   .aq-act .aq-link { border-color: transparent; }
   .aq-foot { padding-top: 16px; }
+  .aq-rep { color: var(--ink) !important; }
 </style>

@@ -60,7 +60,9 @@ const INSTRUMENTS = ["venu", "voice", "veena", "violin", "mridangam"];
   {items.length === 0 ? (
     <div class="sw-empty ls-empty"><span class="marks" aria-hidden="true">| |</span><h2>{say("emptyH", "Nothing shared yet")}</h2><p>{say("emptyP", "When members share a performance or a song, it appears here, with its player one press away.")}</p></div>
   ) : (
-    <div class="ls-grid" data-listen>
+    <div class="ls-grid" data-listen data-signed-in={me.signedIn ? "1" : ""}
+         data-t-report={say("report", "Report")} data-t-reported={say("reported", "Reported. Thank you; Shruti will look at it.")}
+         data-t-why={say("reportWhy", "What is wrong with it? (optional)")}>
       {items.map((it) => (
         <article class="ls-card" data-post={it.id}>
           <div class="sky ls-player" data-player={it.player.kind} data-url={it.player.url}>
@@ -75,12 +77,13 @@ const INSTRUMENTS = ["venu", "voice", "veena", "violin", "mridangam"];
             <p class="sw-p">{it.author}{it.instrument ? ` · ${it.instrument}` : ""}</p>
             <div class="sw-chips">{it.raga && <Badge>{ragaName(it.raga)}</Badge>}{it.tala && <Badge>{it.tala}</Badge>}</div>
             <div class="ls-meta">
-              <button type="button" class="ls-like" data-like={it.id} aria-pressed={it.liked ? "true" : "false"} disabled={!me.signedIn}><span data-likes>{it.likes}</span> likes</button>
-              <details data-comments={it.id}><summary>{it.comments} comments</summary><div class="ls-comments" data-comment-list></div>
+              <button type="button" class="ls-like" data-like={it.id} aria-pressed={it.liked ? "true" : "false"} disabled={!me.signedIn}><span data-likes>{it.likes}</span> {say("likes", "likes")}</button>
+              <details data-comments={it.id}><summary>{it.comments} {say("comments", "comments")}</summary><div class="ls-comments" data-comment-list></div>
                 {me.signedIn && <form data-comment-form><input name="body" maxlength="1000" required placeholder={say("commentHint", "Say something kind about the music")} /><button type="submit">{say("post", "Post")}</button></form>}
               </details>
               <span class="spacer"></span>
               {it.sheetSlug && <a href={L(`/carnatic/sheets/${it.sheetSlug}`)}>{say("learn", "Learn to play it")}</a>}
+              {me.signedIn && !it.mine && <button type="button" class="ls-report" data-report-post={it.id}>{say("report", "Report")}</button>}
             </div>
           </div>
         </article>
@@ -111,6 +114,15 @@ const INSTRUMENTS = ["venu", "voice", "veena", "violin", "mridangam"];
     f.src = src; f.allow = "autoplay; encrypted-media; fullscreen"; f.loading = "lazy"; f.title = "Player"; f.className = "ls-frame";
     box.replaceChildren(f);
   }));
+  /* Reporting flags a post or comment for Shruti; it hides nothing by itself. */
+  const grid = document.querySelector<HTMLElement>("[data-listen]");
+  const report = async (url: string, btn: HTMLButtonElement) => {
+    const reason = prompt(grid?.dataset.tWhy ?? "What is wrong with it? (optional)", "");
+    if (reason === null) return;
+    const r = await fetch(url, { method: "POST", headers: { "content-type": "application/json", "x-csrf-token": csrf() }, body: JSON.stringify({ reason: reason.slice(0, 300) }) });
+    if (r.ok) { btn.disabled = true; btn.textContent = grid?.dataset.tReported ?? "Reported."; }
+  };
+  document.querySelectorAll<HTMLButtonElement>("[data-report-post]").forEach((b) => b.addEventListener("click", () => report(`/api/carnatic/listen/${b.dataset.reportPost}/report`, b)));
   document.querySelectorAll<HTMLButtonElement>("[data-like]").forEach((b) => b.addEventListener("click", async () => {
     const on = b.getAttribute("aria-pressed") !== "true";
     const r = await fetch(`/api/carnatic/listen/${b.dataset.like}/like`, { method: on ? "PUT" : "DELETE", headers: { "x-csrf-token": csrf() } });
@@ -123,7 +135,16 @@ const INSTRUMENTS = ["venu", "voice", "veena", "violin", "mridangam"];
     const load = async () => {
       const r = await fetch(`/api/carnatic/listen/${d.dataset.comments}/comments`);
       const b = r.ok ? await r.json() : { items: [] };
-      list.replaceChildren(...b.items.map((c: any) => { const p = document.createElement("p"); p.className = "sw-p"; p.textContent = `${c.author}: ${c.body}`; return p; }));
+      list.replaceChildren(...b.items.map((c: any) => {
+        const p = document.createElement("p"); p.className = "sw-p"; p.textContent = `${c.author}: ${c.body} `;
+        if (grid?.dataset.signedIn && !c.mine) {
+          const btn = document.createElement("button"); btn.type = "button"; btn.className = "ls-report";
+          btn.textContent = grid.dataset.tReport ?? "Report";
+          btn.addEventListener("click", () => report(`/api/carnatic/listen/comments/${c.id}/report`, btn));
+          p.append(btn);
+        }
+        return p;
+      }));
     };
     d.addEventListener("toggle", () => { if (d.open) load(); });
     d.querySelector<HTMLFormElement>("[data-comment-form]")?.addEventListener("submit", async (e) => {
@@ -165,6 +186,8 @@ const INSTRUMENTS = ["venu", "voice", "veena", "violin", "mridangam"];
   .ls-meta .spacer { flex: 1; }
   .ls-like { appearance: none; background: none; border: 0; color: var(--ink-soft); font: inherit; cursor: pointer; padding: 0; }
   .ls-like[aria-pressed="true"] { color: var(--accent); }
+  :global(.ls-report) { appearance: none; background: none; border: 0; padding: 0; font: 12px / 1.4 var(--font-body); color: var(--ink-faint); cursor: pointer; text-decoration: underline dotted; }
+  :global(.ls-report:disabled) { cursor: default; text-decoration: none; }
   .ls-meta details summary { cursor: pointer; }
   .ls-comments { display: grid; gap: 4px; padding: 6px 0; }
   @media (max-width: 1023px) { .ls-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

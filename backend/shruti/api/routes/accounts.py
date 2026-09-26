@@ -836,7 +836,7 @@ async def _everything_else(user: User, session: AsyncSession) -> dict:
     )
     from shruti.models.carnatic import (
         CarnaticComment, CarnaticDeviceLink, CarnaticLike, CarnaticPost, CarnaticPracticeDay,
-        CarnaticProfile, CarnaticProgress, CarnaticSong,
+        CarnaticProfile, CarnaticProgress, CarnaticReport, CarnaticSong,
     )
     from shruti.models.ledger import Ledger, LedgerBusiness, LedgerWeek
     from shruti.models.practice import (
@@ -904,6 +904,7 @@ async def _everything_else(user: User, session: AsyncSession) -> dict:
             "listenPosts": await rows(CarnaticPost, CarnaticPost.user_id == uid),
             "likes": await rows(CarnaticLike, CarnaticLike.user_id == uid),
             "comments": await rows(CarnaticComment, CarnaticComment.user_id == uid),
+            "reports": await rows(CarnaticReport, CarnaticReport.user_id == uid),
             "appSignIns": await rows(CarnaticDeviceLink, CarnaticDeviceLink.user_id == uid),
         },
     }

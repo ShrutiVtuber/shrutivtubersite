@@ -125,6 +125,29 @@ class CarnaticComment(TimestampMixin, table=True):
     hidden: bool = False
 
 
+class CarnaticReport(TimestampMixin, table=True):
+    """
+    A member flagging a Listen post or comment for the operator to look at.
+
+    One report per person per thing (a second press changes nothing), and a
+    report hides nothing by itself: the review queue's Moderation tab lists
+    reported items first, and hiding is her decision. It is the reporter's
+    row, so it goes with the reporter's account.
+    """
+
+    __tablename__ = "carnatic_report"
+    __table_args__ = (
+        UniqueConstraint("user_id", "post_id", name="uq_carnatic_report_post"),
+        UniqueConstraint("user_id", "comment_id", name="uq_carnatic_report_comment"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(index=True, foreign_key="site_user.id", ondelete="CASCADE")
+    post_id: Optional[int] = Field(default=None, index=True, foreign_key="carnatic_post.id", ondelete="CASCADE")
+    comment_id: Optional[int] = Field(default=None, index=True, foreign_key="carnatic_comment.id", ondelete="CASCADE")
+    reason: str = ""
+
+
 class CarnaticReview(TimestampMixin, table=True):
     """
     A reviewer's verdict on one item of the data: a script name a native reader

@@ -34,7 +34,7 @@ from shruti.core.sessions import issue_session
 from shruti.models.accounts import Supporter, User
 from shruti.models.carnatic import (
     CarnaticComment, CarnaticDeviceLink, CarnaticLike, CarnaticPost, CarnaticPracticeDay,
-    CarnaticProfile, CarnaticProgress, CarnaticReview, CarnaticSong,
+    CarnaticProfile, CarnaticProgress, CarnaticReport, CarnaticReview, CarnaticSong,
 )
 
 router = APIRouter(prefix="/api/carnatic", tags=["carnatic"])
@@ -43,6 +43,13 @@ router = APIRouter(prefix="/api/carnatic", tags=["carnatic"])
 FAILED_BY_CLIENT = rules.Window(limit=10)
 FAILED_CODES = rules.Window(limit=100)
 CREATED_BY_USER = rules.Window(limit=30)
+# Listen, the same for the website and the app (API.md §6): a person may
+# share 10 performances an hour, write 30 comments in 10 minutes and file
+# 30 reports an hour. Past that, 429 SLOW_DOWN.
+SHARED_BY_USER = rules.Window(limit=10, seconds=3600)
+COMMENTED_BY_USER = rules.Window(limit=30, seconds=600)
+REPORTED_BY_USER = rules.Window(limit=30, seconds=3600)
+SLOW_DOWN = {"code": "SLOW_DOWN", "detail": "That is a lot at once. Please wait a little and try again."}
 
 
 def _now() -> datetime:
@@ -84,13 +91,32 @@ async def is_supporter(user: User | None, session: AsyncSession) -> bool:
 # ── the data ────────────────────────────────────────────────────────────────
 
 @router.get("/data/manifest")
-def data_manifest(response: Response) -> dict:
+def data_manifest(request: Request):
     """What is published: every file with its digest. 404 means nothing is yet."""
     m = rules.manifest()
     if m is None:
         raise HTTPException(404, "The school's data has not been published yet.")
-    response.headers["Cache-Control"] = "no-cache"
-    return m
+    etag = f'"{m.get("digest", "")}"'
+    if request.headers.get("if-none-match") == etag:
+        return Response(status_code=304, headers={"ETag": etag, "Cache-Control": "no-cache"})
+    return JSONResponse(m, headers={"ETag": etag, "Cache-Control": "no-cache"})
+
+
+@router.get("/data/version")
+def data_version(request: Request):
+    """
+    The cheapest question the app can ask: has anything changed? The digest
+    is the manifest's own (a hash over every file's digest), so an unchanged
+    digest means every file is unchanged.
+    """
+    m = rules.manifest()
+    if m is None:
+        raise HTTPException(404, "The school's data has not been published yet.")
+    etag = f'"{m.get("digest", "")}"'
+    if request.headers.get("if-none-match") == etag:
+        return Response(status_code=304, headers={"ETag": etag, "Cache-Control": "no-cache"})
+    return JSONResponse({"format": m.get("format"), "digest": m.get("digest"), "built_at": m.get("built_at")},
+                        headers={"ETag": etag, "Cache-Control": "no-cache"})
 
 
 @router.get("/data/{name}")
@@ -440,7 +466,9 @@ async def listen(raga: str = "", tala: str = "", instrument: str = "", before: i
 
 
 @router.post("/listen", status_code=201)
-async def share(body: PostIn, user: User = Depends(require_user), session: AsyncSession = Depends(get_session)) -> dict:
+async def share(body: PostIn, user: User = Depends(require_user), session: AsyncSession = Depends(get_session)):
+    if SHARED_BY_USER.full(str(user.id)):
+        return JSONResponse(status_code=429, content=SLOW_DOWN)
     player = rules.player_of(body.url)
     if player is None:
         raise HTTPException(422, "Share a YouTube, SoundCloud, Vimeo or Bandcamp link.")
@@ -454,6 +482,7 @@ async def share(body: PostIn, user: User = Depends(require_user), session: Async
                        raga=body.raga, tala=body.tala, player=player, url=body.url.strip())
     session.add(row)
     await session.commit()
+    SHARED_BY_USER.add(str(user.id))
     await session.refresh(row)
     return await _post_view(row, user, session)
 
@@ -478,6 +507,13 @@ async def delete_post(post_id: int, user: User = Depends(require_user),
     await session.delete(p)
     await session.commit()
     return Response(status_code=204)
+
+
+@router.get("/listen/{post_id}")
+async def listen_post(post_id: int, viewer: User | None = Depends(current_user),
+                      session: AsyncSession = Depends(get_session)) -> dict:
+    """One post, as the list shows it. A hidden post is not found, for anyone."""
+    return await _post_view(await _visible_post(post_id, session), viewer, session)
 
 
 async def _visible_post(post_id: int, session: AsyncSession) -> CarnaticPost:
@@ -519,13 +555,52 @@ async def comments(post_id: int, viewer: User | None = Depends(current_user),
 
 @router.post("/listen/{post_id}/comments", status_code=201)
 async def comment(post_id: int, body: CommentIn, user: User = Depends(require_user),
-                  session: AsyncSession = Depends(get_session)) -> dict:
+                  session: AsyncSession = Depends(get_session)):
     await _visible_post(post_id, session)
+    if COMMENTED_BY_USER.full(str(user.id)):
+        return JSONResponse(status_code=429, content=SLOW_DOWN)
     row = CarnaticComment(post_id=post_id, user_id=user.id, body=body.body.strip())
     session.add(row)
     await session.commit()
+    COMMENTED_BY_USER.add(str(user.id))
     await session.refresh(row)
     return {"id": row.id, "author": _public_name(user), "mine": True, "body": row.body, "createdAt": _iso(row.created_at)}
+
+
+class ReportIn(BaseModel):
+    reason: str = Field(default="", max_length=300)
+
+
+async def _report(user: User, reason: str, session: AsyncSession, *, post_id: int | None = None,
+                  comment_id: int | None = None):
+    """One report per person per thing; a second is accepted and changes nothing."""
+    col = CarnaticReport.post_id if post_id is not None else CarnaticReport.comment_id
+    ref = post_id if post_id is not None else comment_id
+    existing = (await session.execute(select(CarnaticReport).where(
+        CarnaticReport.user_id == user.id, col == ref))).scalar_one_or_none()
+    if existing is None:
+        if REPORTED_BY_USER.full(str(user.id)):
+            return JSONResponse(status_code=429, content=SLOW_DOWN)
+        session.add(CarnaticReport(user_id=user.id, post_id=post_id, comment_id=comment_id, reason=reason.strip()))
+        await session.commit()
+        REPORTED_BY_USER.add(str(user.id))
+    return {"reported": True}
+
+
+@router.post("/listen/comments/{comment_id}/report")
+async def report_comment(comment_id: int, body: ReportIn, user: User = Depends(require_user),
+                         session: AsyncSession = Depends(get_session)):
+    c = await session.get(CarnaticComment, comment_id)
+    if c is None or c.hidden:
+        raise HTTPException(404, "No such comment.")
+    return await _report(user, body.reason, session, comment_id=comment_id)
+
+
+@router.post("/listen/{post_id}/report")
+async def report_post(post_id: int, body: ReportIn, user: User = Depends(require_user),
+                      session: AsyncSession = Depends(get_session)):
+    await _visible_post(post_id, session)
+    return await _report(user, body.reason, session, post_id=post_id)
 
 
 # ── signing in on the app ───────────────────────────────────────────────────
@@ -732,12 +807,32 @@ async def admin_review(body: ReviewIn, operator: str = Depends(require_admin),
 
 @router.get("/admin/moderation")
 async def admin_moderation(_: str = Depends(require_admin), session: AsyncSession = Depends(get_session)) -> dict:
+    reports = (await session.execute(select(CarnaticReport))).scalars().all()
+    by_post: dict[int, list[str]] = {}
+    by_comment: dict[int, list[str]] = {}
+    for r in reports:
+        target = by_post.setdefault(r.post_id, []) if r.post_id is not None else by_comment.setdefault(r.comment_id, [])
+        target.append(r.reason)
     posts = (await session.execute(select(CarnaticPost).order_by(CarnaticPost.id.desc()).limit(100))).scalars().all()
     comments_ = (await session.execute(select(CarnaticComment).order_by(CarnaticComment.id.desc()).limit(100))).scalars().all()
+    # Reported things first, however old: a report older than the 100 newest
+    # must not fall off the list.
+    seen_posts = {p.id for p in posts}
+    posts = [*(await session.execute(select(CarnaticPost).where(CarnaticPost.id.in_(
+        [i for i in by_post if i not in seen_posts] or [-1])))).scalars().all(), *posts]
+    seen_comments = {c.id for c in comments_}
+    comments_ = [*(await session.execute(select(CarnaticComment).where(CarnaticComment.id.in_(
+        [i for i in by_comment if i not in seen_comments] or [-1])))).scalars().all(), *comments_]
+    posts.sort(key=lambda p: (-len(by_post.get(p.id, [])), -p.id))
+    comments_.sort(key=lambda c: (-len(by_comment.get(c.id, [])), -c.id))
     return {
-        "posts": [{"id": p.id, "title": p.title, "url": p.url, "hidden": p.hidden, "createdAt": _iso(p.created_at)} for p in posts],
-        "comments": [{"id": c.id, "postId": c.post_id, "body": c.body, "hidden": c.hidden, "createdAt": _iso(c.created_at)}
+        "posts": [{"id": p.id, "title": p.title, "url": p.url, "hidden": p.hidden, "createdAt": _iso(p.created_at),
+                   "reports": len(by_post.get(p.id, [])), "reasons": [x for x in by_post.get(p.id, []) if x]}
+                  for p in posts],
+        "comments": [{"id": c.id, "postId": c.post_id, "body": c.body, "hidden": c.hidden, "createdAt": _iso(c.created_at),
+                      "reports": len(by_comment.get(c.id, [])), "reasons": [x for x in by_comment.get(c.id, []) if x]}
                      for c in comments_],
+        "reported": len(by_post) + len(by_comment),
     }
 
 
