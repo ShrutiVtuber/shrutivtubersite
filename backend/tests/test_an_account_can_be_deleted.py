@@ -60,6 +60,26 @@ def _migration():
     return module
 
 
+def _cascading_since() -> set[tuple[str, str]]:
+    """
+    Foreign keys to site_user that later revisions create ON DELETE CASCADE
+    from the start, each naming them in its own `NOBODYS_BUT_THEIRS` (the
+    Ledger's l0j7g3h8i965 is the first).
+    """
+    versions = ROOT / "backend" / "alembic" / "versions"
+    if not versions.is_dir():
+        versions = ROOT / "alembic" / "versions"
+    found = set()
+    for path in versions.glob("*.py"):
+        if path.name.startswith("k9i6f2g7h854_") or "NOBODYS_BUT_THEIRS" not in path.read_text():
+            continue
+        spec = importlib.util.spec_from_file_location(path.stem, path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        found |= set(module.NOBODYS_BUT_THEIRS)
+    return found
+
+
 def _foreign_keys_to_users() -> set[tuple[str, str]]:
     """(table, column) for every model field pointing at site_user."""
     found = set()
@@ -89,7 +109,7 @@ def test_every_foreign_key_to_a_user_is_answered_for() -> None:
     m = _migration()
     answered = (
         {(t, c) for t, c, *_rest in m.KEPT_WITHOUT_A_NAME}
-        | set(m.NOBODYS_BUT_THEIRS) | ANSWERED_EARLIER | CLEARED_BY_ERASE
+        | set(m.NOBODYS_BUT_THEIRS) | ANSWERED_EARLIER | CLEARED_BY_ERASE | _cascading_since()
     )
     keys = _foreign_keys_to_users()
     assert len(keys) > 25, "found too few foreign keys — the parse has broken, not the schema"

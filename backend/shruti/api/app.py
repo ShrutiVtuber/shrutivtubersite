@@ -12,7 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from shruti.api.routes import (
     accounts, admin, billing, charts, classes, collab, community, content,
-    builds, devices, gamedata, groups, guides, overlay_guides, runs,
+    builds, devices, gamedata, groups, guides, ledger, overlay_guides, runs,
     horoscopes,
     insight, journal, live, media, newsletter, packs, passkeys, places,
     offers, practice, standing,
@@ -153,6 +153,7 @@ app.include_router(runs.router)
 app.include_router(groups.router)
 app.include_router(builds.router)
 app.include_router(gamedata.router)
+app.include_router(ledger.router)
 app.include_router(overlay_guides.router)
 app.include_router(overlay_guides.runs_router)
 app.include_router(standing.router)

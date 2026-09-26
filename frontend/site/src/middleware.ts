@@ -94,6 +94,7 @@ const SECTION_PATHS: Record<string, string> = {
   "/guides": "guides",
   "/groups": "guides",
   "/builds": "guides",
+  "/ledger": "guides",
 };
 
 function sectionOf(path: string): string | null {

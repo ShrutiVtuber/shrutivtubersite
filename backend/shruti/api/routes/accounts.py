@@ -834,6 +834,7 @@ async def _everything_else(user: User, session: AsyncSession) -> dict:
         Build, Group, GroupContribution, GroupMember, Guide, GuideReport, GuideRun, GuideVersion,
         GuideVote,
     )
+    from shruti.models.ledger import Ledger, LedgerBusiness, LedgerWeek
     from shruti.models.practice import (
         PracticeBlock, PracticeComment, PracticeReading, PracticeReport, PracticeStrike,
         PracticeVote, PracticeWork,
@@ -847,6 +848,17 @@ async def _everything_else(user: User, session: AsyncSession) -> dict:
 
     works = (await session.execute(select(PracticeWork).where(PracticeWork.user_id == uid))).scalars().all()
     work_ids = [w.id for w in works]
+
+    # The Ledger, nested as it is kept: a ledger, its businesses, their weeks.
+    ledgers = await rows(Ledger, Ledger.user_id == uid)
+    businesses = await rows(LedgerBusiness, LedgerBusiness.ledger_id.in_([g["id"] for g in ledgers])) if ledgers else []
+    weeks = await rows(LedgerWeek, LedgerWeek.business_id.in_([b["id"] for b in businesses])) if businesses else []
+    for b in businesses:
+        b["weeks"] = sorted((w for w in weeks if w["business_id"] == b["id"]), key=lambda w: w["n"])
+    ledgers.sort(key=lambda g: (g["position"], g["id"]))
+    for g in ledgers:
+        g["businesses"] = sorted((b for b in businesses if b["ledger_id"] == g["id"]),
+                                 key=lambda b: (b["position"], b["id"]))
     return {
         "guides": await rows(Guide, Guide.created_by == uid),
         "guideVersions": await rows(GuideVersion, (GuideVersion.created_by == uid)
@@ -858,6 +870,7 @@ async def _everything_else(user: User, session: AsyncSession) -> dict:
         "groupMemberships": await rows(GroupMember, GroupMember.user_id == uid),
         "groupContributions": await rows(GroupContribution, GroupContribution.user_id == uid),
         "builds": await rows(Build, Build.user_id == uid),
+        "ledgers": ledgers,
         "overlays": await rows(OverlayToken, OverlayToken.user_id == uid),
         "practiceWorks": [_plain(w) for w in works],
         "practiceReadings": await rows(PracticeReading, PracticeReading.work_id.in_(work_ids)) if work_ids else [],
@@ -890,8 +903,8 @@ async def delete_account(
     Immediate, irreversible, no grace period — and it reaches the list.
 
     WHAT GOES: the account, the email address, the preferences, the nativity,
-    saved charts and their comparisons, drafts, runs, unshared builds, passkeys,
-    devices, votes, reports, blocks, and the newsletter subscription.
+    saved charts and their comparisons, drafts, runs, unshared builds, ledgers,
+    passkeys, devices, votes, reports, blocks, and the newsletter subscription.
 
     WHAT STAYS, WITHOUT THEIR NAME: what they made public, because other
     people are following it (see `erase`). They agreed to that before they
@@ -967,7 +980,7 @@ async def erase(user: User, session: AsyncSession) -> dict:
         "deleted": [
             "account", "email address", "preferences", "nativity", "saved charts and comparisons",
             "passkeys and devices", "newsletter subscription", "drafts", "runs",
-            "builds you had not shared", "votes and reports", "class progress",
+            "builds you had not shared", "votes and reports", "class progress", "ledgers",
         ],
         "kept": [
             "a consent given/withdrawn record with dates and no birth data",
