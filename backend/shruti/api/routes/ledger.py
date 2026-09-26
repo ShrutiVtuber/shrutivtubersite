@@ -62,7 +62,7 @@ LINES = MONEY_LINES + COUNT_LINES
 # One JSON file in the gamedata volume, put there by scripts/sync-gamedata.sh.
 # Its absence is a working state: the Ledger says so and planning waits.
 
-_pack_cache: dict[str, Any] = {"key": None, "body": None, "game": None}
+_pack_cache: dict[str, Any] = {"key": None, "body": None, "game": None, "places": {}}
 
 
 def _pack() -> tuple[bytes, dict] | None:
@@ -76,7 +76,11 @@ def _pack() -> tuple[bytes, dict] | None:
             parsed = json.loads(body)
             if not isinstance(parsed, dict):
                 return None
-            _pack_cache.update(key=key, body=body, game=parsed.get("game") or {})
+            hoods = {h.get("id"): h.get("name") for h in parsed.get("neighbourhoods") or [] if isinstance(h, dict)}
+            places = {b["id"]: {"buildingId": b["id"], "address": b.get("address"),
+                                "neighbourhood": hoods.get(b.get("neighbourhood"))}
+                      for b in parsed.get("buildings") or [] if isinstance(b, dict) and b.get("id")}
+            _pack_cache.update(key=key, body=body, game=parsed.get("game") or {}, places=places)
         return _pack_cache["body"], _pack_cache["game"]
     except (OSError, ValueError):
         return None
@@ -201,9 +205,30 @@ def _ledger_view(g: Ledger) -> dict:
             "createdAt": _iso(g.created_at), "updatedAt": _iso(g.updated_at)}
 
 
+def _week_total(w: LedgerWeek) -> float | None:
+    """
+    The week, as the Ledger reads it everywhere: money in, less every line of
+    money out that was written. A line not written is not counted, never
+    zero; with no money in there is no week to total.
+    """
+    if w.money_in is None:
+        return None
+    return w.money_in - sum(v for v in (w.goods, w.wages, w.rent, w.ads, w.deliveries) if v is not None)
+
+
+def _place_of(b: LedgerBusiness) -> dict | None:
+    """Where the business stands, named from the pack, so a client needs no pack to say it."""
+    plan = b.kept_plan or b.plan or {}
+    building = plan.get("buildingId") if isinstance(plan, dict) else None
+    if not building or _pack() is None:
+        return None
+    return _pack_cache["places"].get(building)
+
+
 def _week_view(w: LedgerWeek) -> dict:
-    """⚠ Every line as stored: a null stays null on the way out."""
-    return {"n": w.n, "moneyIn": w.money_in, "goods": w.goods, "wages": w.wages, "rent": w.rent,
+    """⚠ Every line as stored: a null stays null on the way out. `total` is the
+    server's reading of the week, so the app shows it rather than adding it up."""
+    return {"n": w.n, "total": _week_total(w), "moneyIn": w.money_in, "goods": w.goods, "wages": w.wages, "rent": w.rent,
             "ads": w.ads, "deliveries": w.deliveries, "units": w.units, "customers": w.customers,
             "note": w.note, "updatedAt": _iso(w.updated_at)}
 
@@ -211,7 +236,8 @@ def _week_view(w: LedgerWeek) -> dict:
 def _business_view(b: LedgerBusiness, weeks: list[LedgerWeek]) -> dict:
     return {"id": b.id, "ledgerId": b.ledger_id, "name": b.name, "plan": b.plan or {},
             "keptPlan": b.kept_plan, "opened": b.opened_at is not None, "openedAt": _iso(b.opened_at),
-            "position": b.position, "weeks": [_week_view(w) for w in sorted(weeks, key=lambda w: w.n)],
+            "position": b.position, "place": _place_of(b),
+            "weeks": [_week_view(w) for w in sorted(weeks, key=lambda w: w.n)],
             "createdAt": _iso(b.created_at), "updatedAt": _iso(b.updated_at)}
 
 

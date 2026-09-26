@@ -289,3 +289,13 @@ async def _keep_a_ledger_and_leave(monkeypatch):
         assert weeks_left == 0, "a week outlived its business"
         assert await s.get(Ledger, ids["theirs"]) is not None, "somebody else's ledger went too"
     await engine.dispose()
+
+
+def test_the_server_totals_a_week_and_never_counts_a_blank() -> None:
+    """The app shows the week the server reads; it adds nothing up itself."""
+    from shruti.api.routes.ledger import _week_total
+    from shruti.models.ledger import LedgerWeek
+
+    assert _week_total(LedgerWeek(business_id=1, n=1, money_in=100.0, goods=30.0, wages=None, rent=10.0)) == 60.0
+    assert _week_total(LedgerWeek(business_id=1, n=1, money_in=None, goods=30.0)) is None
+    assert _week_total(LedgerWeek(business_id=1, n=1, money_in=50.0)) == 50.0
