@@ -11,12 +11,12 @@ import type { Settings } from "../../lib/carnatic/prefs";
 
 interface Props { settings: Settings; compact?: boolean; suggest?: "pa" | "ma" | "ni" | "mute"; showSa?: boolean }
 const { settings, compact = false, suggest, showSa = true } = Astro.props;
-const t = await words(langOf(Astro));
+const tr = await words(langOf(Astro));
 const tuning = suggest ?? settings.droneTuning ?? "pa";
 const hz = pitchHz(settings.sa);
 const TUNINGS: [string, string, string][] = [
-  ["pa", t("drone.pa"), t("drone.paNote")], ["ma", t("drone.ma"), t("drone.maNote")],
-  ["ni", t("drone.ni"), t("drone.niNote")], ["mute", t("drone.mute"), t("drone.muteNote")],
+  ["pa", tr("drone.pa"), tr("drone.paNote")], ["ma", tr("drone.ma"), tr("drone.maNote")],
+  ["ni", tr("drone.ni"), tr("drone.niNote")], ["mute", tr("drone.mute"), tr("drone.muteNote")],
 ];
 /* Kattai names only the pitch class (instruments/venu.json kattaiNote). */
 const SAS: [string, string][] = settings.instrument === "venu"
@@ -26,10 +26,10 @@ const SAS: [string, string][] = settings.instrument === "venu"
 const flute = settings.instrument === "venu" ? `${settings.flute} flute${settings.flute === "E" ? " (medium)" : ""}. ` : "";
 ---
 <div class:list={["sw-card dc", compact && "dc-compact"]} data-drone-control data-suggest={suggest ?? ""}>
-  <p class="t-eyebrow sw-eyebrow">{t("drone.eyebrow")}</p>
+  <p class="t-eyebrow sw-eyebrow">{tr("drone.eyebrow")}</p>
   <button type="button" class="dc-toggle" data-drone-toggle aria-pressed="false"
-          data-on={t("drone.off")} data-off={t("drone.on")}>{t("drone.on")}</button>
-  <div class="sw-chips" role="radiogroup" aria-label={t("drone.tuning")}>
+          data-on={tr("drone.off")} data-off={tr("drone.on")}>{tr("drone.on")}</button>
+  <div class="sw-chips" role="radiogroup" aria-label={tr("drone.tuning")}>
     {TUNINGS.map(([id, label, note]) => (
       <button type="button" class="sw-chip" role="radio" data-tuning={id} title={note}
               aria-checked={id === tuning ? "true" : "false"} aria-pressed={id === tuning ? "true" : "false"}>{label}</button>
@@ -38,7 +38,7 @@ const flute = settings.instrument === "venu" ? `${settings.flute} flute${setting
   <p class="sw-note" data-tuning-note>{TUNINGS.find(([id]) => id === tuning)?.[2]}</p>
   {showSa && !compact && (
     <div class="dc-sa">
-      <p class="t-eyebrow sw-eyebrow">{t("drone.sa")}</p>
+      <p class="t-eyebrow sw-eyebrow">{tr("drone.sa")}</p>
       <div class="sw-chips">
         {SAS.map(([sa, label]) => (
           <button type="button" class="sw-chip" data-sa={sa} aria-pressed={sa === settings.sa ? "true" : "false"}>{label}</button>
@@ -46,9 +46,9 @@ const flute = settings.instrument === "venu" ? `${settings.flute} flute${setting
       </div>
     </div>
   )}
-  <p class="sw-mono dc-hz" data-sa-line>Sa = {settings.sa.replace("#", "♯")} · {hz.toFixed(1)} Hz</p>
-  <p class="sw-note">{flute}{t("drone.ji")}</p>
-  <label class="dc-vol"><span class="sw-p">{t("drone.volume")}</span>
+  <p class="sw-mono dc-hz" data-sa-line>{"Sa = " + settings.sa.replace("#", "♯") + " · " + hz.toFixed(1) + " Hz"}</p>
+  <p class="sw-note">{flute}{tr("drone.ji")}</p>
+  <label class="dc-vol"><span class="sw-p">{tr("drone.volume")}</span>
     <input type="range" min="0" max="100" value="60" data-drone-volume />
   </label>
 </div>

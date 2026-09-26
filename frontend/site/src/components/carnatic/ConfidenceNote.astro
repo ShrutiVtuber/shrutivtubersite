@@ -6,10 +6,10 @@
 import { words, langOf } from "../../lib/carnatic/i18n";
 interface Props { level?: string | null; text?: string | null; sources?: string[] }
 const { level, text, sources = [] } = Astro.props;
-const t = await words(langOf(Astro));
+const tr = await words(langOf(Astro));
 const lv = (level ?? "").toLowerCase();
 const shown = lv.startsWith("medium") || lv.startsWith("low") || lv.startsWith("unknown") || lv.includes("disputed");
-const words_ = text || (lv.startsWith("medium") ? t("conf.medium") : t("conf.low"));
+const words_ = text || (lv.startsWith("medium") ? tr("conf.medium") : tr("conf.low"));
 ---
 {shown && (sources.length ? (
   <details class="sw-conf-wrap">

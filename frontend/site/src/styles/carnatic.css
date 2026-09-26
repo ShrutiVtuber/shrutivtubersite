@@ -20,8 +20,8 @@
 
 /* The one sky each page is allowed, spent on the hero. */
 .sw-hero { border-radius: 16px; margin-top: 12px; padding: clamp(20px, 4vw, 40px) clamp(16px, 4vw, 40px); display: flex; gap: 24px 40px; align-items: flex-end; flex-wrap: wrap; }
-.sw-hero-veil { position: relative; flex: 1 1 520px; max-width: 760px; padding: clamp(18px, 3vw, 28px); display: grid; gap: 10px; }
-.sw-hero h1 { margin: 0; font-family: var(--font-display); font-size: clamp(2.5rem, 5vw, 3.5rem); line-height: 1.1; font-weight: 500; letter-spacing: -0.01em; color: var(--ink); text-wrap: balance; }
+.sw-hero-veil { position: relative; min-width: 0; flex: 1 1 520px; max-width: 760px; padding: clamp(18px, 3vw, 28px); display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
+.sw-hero h1 { margin: 0; font-family: var(--font-display); font-size: clamp(2.5rem, 5vw, 3.5rem); line-height: 1.1; font-weight: 500; letter-spacing: -0.01em; color: var(--ink); text-wrap: balance; overflow-wrap: break-word; }
 .sw-hero .sw-lede { margin: 0; font: 15px / 1.55 var(--font-body); color: var(--ink-soft); max-width: 62ch; text-wrap: pretty; }
 .sw-hero-side { position: relative; flex: 0 1 400px; min-width: min(100%, 300px); }
 
@@ -130,12 +130,23 @@ details.sw-conf-wrap > summary::-webkit-details-marker { display: none; }
 .sw-minibar .mono { font-family: var(--font-mono); }
 .sw-minibar button { appearance: none; border: 0; background: none; color: var(--accent); font: 600 var(--text-xs) / 1 var(--font-body); cursor: pointer; padding: 4px; }
 
+/* A quiet row of links to a hub's neighbours (Learn's references, Practice's
+   other tools). Plain addresses: the language rides in the swara_lang cookie. */
+.sw-also a { color: var(--accent); text-decoration: none; }
+.sw-also a:hover { text-decoration: underline; }
+.sw-also-row { margin: 12px 0 0; }
+
 @media print {
   .sw-strip, .sw-minibar, .sw-noprint { display: none !important; }
 }
 @media (max-width: 599px) {
   .sw-hero { padding: 16px; }
   .sw-hero-veil { padding: 16px; }
+  /* Tamil, Telugu and Kannada words run long: at display size one word is
+     wider than a phone's veil. */
+  .sw-hero h1:is(:lang(ta), :lang(te), :lang(kn)) { font-size: 2rem; }
+  /* …and so does a button's label, which may wrap here rather than push. */
+  .sw .sh-btn { white-space: normal; text-align: center; }
   .sn { --sn-size: 20px; }
 }
 

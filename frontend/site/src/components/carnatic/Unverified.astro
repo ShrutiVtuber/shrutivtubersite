@@ -5,8 +5,8 @@
 import { words, langOf } from "../../lib/carnatic/i18n";
 interface Props { text: string; verified?: boolean; lang?: string; label?: boolean }
 const { text, verified = false, lang, label = true } = Astro.props;
-const t = await words(langOf(Astro));
+const tr = await words(langOf(Astro));
 ---
 {verified ? <span lang={lang}>{text}</span> : (
-  <span class="sw-unv-wrap"><span class="sw-unv" lang={lang} title={t("unverified.title")}>{text}</span>{label && <span class="sw-unv-label" title={t("unverified.title")}>{t("unverified")}</span>}</span>
+  <span class="sw-unv-wrap"><span class="sw-unv" lang={lang} title={tr("unverified.title")}>{text}</span>{label && <span class="sw-unv-label" title={tr("unverified.title")}>{tr("unverified")}</span>}</span>
 )}

@@ -13,8 +13,8 @@ import { visitor } from "../../../lib/carnatic/prefs";
 import { copy } from "../../../lib/copy";
 
 const lang = langOf(Astro);
-const t = await words(lang);
-const say = await copy("carnatic.quiz");
+const tr = await words(lang);
+const say = await copy("carnatic/practice/quiz");
 const L = (p: string) => hrefIn(lang, p);
 const { settings } = await visitor(Astro);
 const [r, tl, inst] = await Promise.all([ragas(), talas(), instruments()]);
@@ -32,11 +32,11 @@ const HEAD: Record<string, [string, string]> = {
 };
 ---
 <SwaraLayout title={`${HEAD[kind][0]} · quizzes · Swara Studio`} description={say("meta.description", "Carnatic ear training and quizzes: swaras by ear against your Sa, ragas from their characteristic phrases, tala counting and venu fingering. No streaks and no lives.")}
-             crumbs={[[t("crumb.practice"), L("/carnatic/practice/tuner")], [HEAD[kind][0]]]}>
+             crumbs={[[tr("crumb.practice"), L("/carnatic/practice/tuner")], [HEAD[kind][0]]]}>
   <Hero eyebrow={say("eyebrow", "Quizzes")} title={HEAD[kind][0]} lede={HEAD[kind][1]} />
   <div class="sw-toolbar"><div class="sw-chips">{KINDS.map(([k, label]) => <Chip href={L(`/carnatic/practice/quiz?kind=${k}`)} active={k === kind}>{label}</Chip>)}</div></div>
   <section class="sw-card qz" data-quiz={kind} aria-live="polite">
-    <div class="qz-top"><span class="t-eyebrow sw-eyebrow" data-progress>Question 1 of 10</span><span class="sw-mono" data-meta>{kind === "ear" || kind === "phrase" ? `drone on · Sa = ${settings.sa}` : ""}</span></div>
+    <div class="qz-top"><span class="t-eyebrow sw-eyebrow" data-progress>{say("progress.first", "Question 1 of 10")}</span><span class="sw-mono" data-meta>{kind === "ear" || kind === "phrase" ? `drone on · Sa = ${settings.sa}` : ""}</span></div>
     <h2 class="qz-q" data-question>{kind === "ear" ? say("q.ear", "Which swara did you hear over the drone?") : kind === "phrase" ? say("q.phrase", "Which raga is this phrase from?") : kind === "tala" ? say("q.tala", "Which tala was that?") : say("q.finger", "Which swara is this fingering?")}</h2>
     <div class="qz-stage" data-stage></div>
     <div><button type="button" class="qz-again" data-again>{kind === "finger" ? say("next", "Next question") : say("again", "Play again")}</button></div>

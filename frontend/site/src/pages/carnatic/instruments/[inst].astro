@@ -19,7 +19,7 @@ import Chip from "../../../components/carnatic/Chip.astro";
 import ConfidenceNote from "../../../components/carnatic/ConfidenceNote.astro";
 import Button from "../../../components/forms/Button.astro";
 import { hrefIn, langOf, words } from "../../../lib/carnatic/i18n";
-import { gamakas, instruments, ragaById, ragas } from "../../../lib/carnatic/data";
+import { cleared, gamakas, instruments, ragaById, ragas, reviews } from "../../../lib/carnatic/data";
 import { visitor, swaraScript, DEFAULT_SA } from "../../../lib/carnatic/prefs";
 import { letter, numeral, pitchHz, ratio, semitones, tokenize, variantsOf, inline } from "../../../lib/carnatic/notation";
 import { notFound } from "../../../lib/carnatic/notfound";
@@ -30,13 +30,13 @@ type Inst = typeof INST[number];
 const inst = Astro.params.inst as Inst;
 if (!INST.includes(inst)) return notFound(Astro);
 const lang = langOf(Astro);
-const t = await words(lang);
-const say = await copy(`carnatic.${inst}`);
+const tr = await words(lang);
+const say = await copy("carnatic/instruments/[inst]");
 const L = (p: string) => hrefIn(lang, p);
 const { settings } = await visitor(Astro);
 const script = swaraScript(settings, lang);
 const tamil = settings.tamilStyle;
-const [data, gam, all] = await Promise.all([instruments(), gamakas(), ragas()]);
+const [data, gam, all, rv] = await Promise.all([instruments(), gamakas(), ragas(), reviews()]);
 
 /* The raga drawn on the board: ?raga=<id> or ?raga=mela-<n>. */
 const ragaParam = Astro.url.searchParams.get("raga") ?? (inst === "venu" ? "mela-15" : "mohanam");
@@ -93,7 +93,10 @@ const PATH: Record<Inst, string[]> = {
 };
 
 /* ── venu ── */
-const venuRows = (data?.venu?.fingerings ?? []) as any[];
+/* A fingering a reviewer has confirmed (fact:venu:… in the queue) loses its
+   "varies by flute" note. */
+const venuRows = ((data?.venu?.fingerings ?? []) as any[]).map((f) =>
+  cleared(rv, `fact:venu:${f.sthayi}-${f.swara}-${f.kind ?? "primary"}`) ? { ...f, confidence: "high" } : f);
 const octave = Astro.url.searchParams.get("octave") ?? "madhya";
 const left = settings.hand === "left";
 const fingerOf = (name: string, sthayi: string) => {
@@ -159,9 +162,9 @@ const thoppi = new Set(["tha", "thom", "gumki"]);
 const strokeScript = (s: any) => lang !== "en" ? s.scripts?.[lang]?.text : null;
 const gamakaFor = (gam?.gamakas ?? []).filter((g: any) => g.on?.[inst]).slice(0, 4);
 ---
-<SwaraLayout title={`${TITLES[inst][0]} · instruments · Swara Studio`} description={say("meta.description", TITLES[inst][1])}
-             crumbs={[[t("crumb.learn"), L("/carnatic/lessons")], [t("crumb.instruments"), L("/carnatic/instruments/venu")], [TITLES[inst][0]]]}>
-  <Hero eyebrow={say("eyebrow", "Instrument")} title={say("title", TITLES[inst][0])} lede={say("lede", TITLES[inst][1])} />
+<SwaraLayout title={`${TITLES[inst][0]} · instruments · Swara Studio`} description={say(inst + ".meta.description", TITLES[inst][1])}
+             crumbs={[[tr("crumb.learn"), L("/carnatic/lessons")], [tr("crumb.instruments"), L("/carnatic/instruments/venu")], [TITLES[inst][0]]]}>
+  <Hero eyebrow={say("eyebrow", "Instrument")} title={say(inst + ".title", TITLES[inst][0])} lede={say(inst + ".lede", TITLES[inst][1])} />
   <div class="sw-toolbar">
     <div class="sw-chips">{INST.map((i) => <Chip href={L(`/carnatic/instruments/${i}`)} active={i === inst}>{i[0].toUpperCase() + i.slice(1)}</Chip>)}</div>
     <span class="spacer"></span>
@@ -272,7 +275,7 @@ const gamakaFor = (gam?.gamakas ?? []).filter((g: any) => g.on?.[inst]).slice(0,
             <div class="md-chips">
               {strokeRows.map((s) => (
                 <div class:list={["md-chip", s.head]}>
-                  <span class="md-name">{s.name}{strokeScript(s) && <span class="sw-unv" lang={lang} title={t("unverified.title")}> {strokeScript(s)}</span>}</span>
+                  <span class="md-name">{s.name}{strokeScript(s) && <span class="sw-unv" lang={lang} title={tr("unverified.title")}> {strokeScript(s)}</span>}</span>
                   <span class="md-dots" aria-hidden="true"><i class="l"></i><i class="r"></i></span>
                   <small>{s.head === "both" ? "both heads" : s.head}</small>
                 </div>
@@ -334,7 +337,7 @@ const gamakaFor = (gam?.gamakas ?? []).filter((g: any) => g.on?.[inst]).slice(0,
     <aside class="sw-aside">
       <div class="sw-card in-path">
         <p class="t-eyebrow sw-eyebrow">{inst === "mridangam" ? "Lessons" : "Beginner path"} · {inst}</p>
-        <ol>{PATH[inst].map((s, i) => <li><span class="sw-mono">{String(i + 1).padStart(2, "0")}</span><span>{s}</span>{i === 0 && <span class="sw-mono">{t("gen.free")}</span>}</li>)}</ol>
+        <ol>{PATH[inst].map((s, i) => <li><span class="sw-mono">{String(i + 1).padStart(2, "0")}</span><span>{s}</span>{i === 0 && <span class="sw-mono">{tr("gen.free")}</span>}</li>)}</ol>
       </div>
       {inst === "venu" && (
         <div class="in-posture"><p class="t-eyebrow sw-eyebrow">Posture</p><div class="sky sw-art-absent in-post-art"><span>Illustration to come · holding the venu</span></div></div>

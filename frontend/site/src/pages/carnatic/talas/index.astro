@@ -11,8 +11,8 @@ import { CARD_NOTE, EVERYDAY_SULADI, type Tala } from "../../../lib/carnatic/tal
 import { copy } from "../../../lib/copy";
 
 const lang = langOf(Astro);
-const t = await words(lang);
-const say = await copy("carnatic.talas");
+const tr = await words(lang);
+const say = await copy("carnatic/talas");
 const L = (p: string) => hrefIn(lang, p);
 const data = await talas();
 const practical: Tala[] = data?.practical ?? [];
@@ -20,12 +20,12 @@ const FAMILIES = ["dhruva", "matya", "rupaka", "jhampa", "triputa", "ata", "eka"
 const JATIS: [string, number][] = [["tisra", 3], ["chaturasra", 4], ["khanda", 5], ["misra", 7], ["sankeerna", 9]];
 const suladi = (fam: string, jati: string) => data?.suladi?.find((s: any) => s.family === fam && s.jati === jati);
 const cap = (s: string) => s[0].toUpperCase() + s.slice(1);
-const countsLabel = (tl: Tala) => tl.id === "deshadi" ? "as Adi" : t("gen.counts", { n: tl.counts.length });
+const countsLabel = (tl: Tala) => tl.id === "deshadi" ? "as Adi" : tr("gen.counts", { n: tl.counts.length });
 ---
 <SwaraLayout title={say("meta.title", "Tala library · Swara Studio")}
              description={say("meta.description", "The talas in everyday Carnatic use — Adi, rupaka, misra and khanda chapu and more — with how to keep each with your hand, then the full system of 35 suladi talas.")}
-             crumbs={[[t("crumb.learn"), L("/carnatic/lessons")], [t("crumb.talas")]]}>
-  <Hero eyebrow={say("eyebrow", "Talas")} title={t("crumb.talas")} lede={say("lede", "The talas in everyday use come first, then the full system of 35.")} />
+             crumbs={[[tr("crumb.learn"), L("/carnatic/lessons")], [tr("crumb.talas")]]}>
+  <Hero eyebrow={say("eyebrow", "Talas")} title={tr("crumb.talas")} lede={say("lede", "The talas in everyday use come first, then the full system of 35.")} />
   {!data ? <div class="sw-section"><Absent /></div> : (
     <>
       <section class="sw-section" aria-labelledby="tl-p">

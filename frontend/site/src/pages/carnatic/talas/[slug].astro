@@ -16,8 +16,8 @@ import { copy } from "../../../lib/copy";
 import { notFound } from "../../../lib/carnatic/notfound";
 
 const lang = langOf(Astro);
-const t = await words(lang);
-const say = await copy("carnatic.tala");
+const tr = await words(lang);
+const say = await copy("carnatic/talas/[slug]");
 const L = (p: string) => hrefIn(lang, p);
 const data = await talas();
 const tala: Tala | undefined = data?.practical?.find((x: Tala) => x.slug === Astro.params.slug);
@@ -39,7 +39,7 @@ const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 ---
 <SwaraLayout title={`${tala.name} tala · Swara Studio`}
              description={`${tala.name}: ${lede} How to keep it with your hand, its konnakol, and the ways some schools keep it.`}
-             crumbs={[[t("crumb.learn"), L("/carnatic/lessons")], [t("crumb.talasShort"), L("/carnatic/talas")], [tala.name]]}>
+             crumbs={[[tr("crumb.learn"), L("/carnatic/lessons")], [tr("crumb.talasShort"), L("/carnatic/talas")], [tala.name]]}>
   <Hero eyebrow={say("eyebrow", "Tala")} title={tala.name} lede={say(`lede.${tala.id}`, lede)} />
 
   <div class="sw-cols">

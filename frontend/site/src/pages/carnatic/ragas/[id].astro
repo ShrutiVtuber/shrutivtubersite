@@ -13,7 +13,7 @@ import Badge from "../../../components/navigation/Badge.astro";
 import ConfidenceNote from "../../../components/carnatic/ConfidenceNote.astro";
 import Unverified from "../../../components/carnatic/Unverified.astro";
 import { hrefIn, langOf, words } from "../../../lib/carnatic/i18n";
-import { featured as loadFeatured, ragaById, ragas, reviews } from "../../../lib/carnatic/data";
+import { cleared, featured as loadFeatured, ragaById, ragas, reviews } from "../../../lib/carnatic/data";
 import { visitor, swaraScript } from "../../../lib/carnatic/prefs";
 import { allScriptNames, ragaKey, scriptName, type IndicLang } from "../../../lib/carnatic/names";
 import { phraseHtml } from "../../../lib/carnatic/render";
@@ -22,12 +22,19 @@ import { ragaView } from "../../../lib/carnatic/ragapage";
 import { notFound } from "../../../lib/carnatic/notfound";
 
 const lang = langOf(Astro);
-const t = await words(lang);
+const tr = await words(lang);
 const L = (p: string) => hrefIn(lang, p);
 const { settings } = await visitor(Astro);
 const [r, all, feat, rv] = await Promise.all([ragaById(Astro.params.id ?? ""), ragas(), loadFeatured(), reviews()]);
 if (!r || !all) return notFound(Astro);
 const v = ragaView(r, all, feat, lang);
+/* A consultant who has confirmed this raga's lakshana (fact:raga:id in the
+   review queue) clears its confidence notes: the page then reads as high. */
+if (cleared(rv, `fact:raga:${r.id}`)) {
+  v.confidence = "high";
+  v.confidenceNote = "";
+  v.phrases.forEach((p) => { p.confidence = "high"; });
+}
 const script = swaraScript(settings, lang);
 const tamil = settings.tamilStyle;
 const key = ragaKey(r);
@@ -46,44 +53,44 @@ const noPa = !/\bP\b/.test(`${r.arohana} ${r.avarohana}`);
 const hasM2 = /M2/.test(`${r.arohana} ${r.avarohana}`);
 /* DECISIONS §12: Ma tuning for ragas without Pa; mute Pa for M₂ without Pa (our inference, low). */
 const suggest = noPa ? (hasM2 ? "mute" : "ma") : "pa";
-const ROLE_LABEL = { jiva: t("raga.jiva"), nyasa: t("raga.nyasa"), graha: t("raga.graha") };
+const ROLE_LABEL = { jiva: tr("raga.jiva"), nyasa: tr("raga.nyasa"), graha: tr("raga.graha") };
 const iso = r.iso ?? "";
 const description = `${r.name}: ${r.kind === "janya" ? `a janya raga of melakarta ${r.parent.number} ${r.parent.name}` : `melakarta ${r.parent.number}`}. Characteristic phrases, arohana ${r.arohana.replace(/!\w/g, "")}, avarohana ${r.avarohana}, gamaka character and well-known compositions, with sources.`;
 const jsonLd = { "@context": "https://schema.org", "@type": "DefinedTerm", name: r.name, alternateName: [iso, ...names.map((n) => n.text)].filter(Boolean),
   description, inDefinedTermSet: "https://shrutivtuber.com/carnatic/ragas" };
 ---
 <SwaraLayout title={`${r.name} raga · Swara Studio`} description={description} jsonLd={jsonLd}
-             crumbs={[[t("crumb.learn"), L("/carnatic/lessons")], [t("crumb.ragas"), L("/carnatic/ragas")], [title]]}>
+             crumbs={[[tr("crumb.learn"), L("/carnatic/lessons")], [tr("crumb.ragas"), L("/carnatic/ragas")], [title]]}>
   <Hero eyebrow={v.kind} title={title} titleLang={own ? lang : undefined}>
     <p class="rp-names" slot="under">
       {others.length > 0 && (
-        <span class:list={["rp-scripts", anyUnverified && "sw-unv"]} title={anyUnverified ? t("unverified.title") : undefined}>
+        <span class:list={["rp-scripts", anyUnverified && "sw-unv"]} title={anyUnverified ? tr("unverified.title") : undefined}>
           {others.map((n, i) => <>{i > 0 && <span class="rp-dot" aria-hidden="true">·</span>}<span lang={n.lang}>{n.text}</span></>)}
         </span>
       )}
-      {anyUnverified && <span class="sw-unv-label" title={t("unverified.title")}>{t("unverified")}</span>}
+      {anyUnverified && <span class="sw-unv-label" title={tr("unverified.title")}>{tr("unverified")}</span>}
       {iso && <span class="sw-mono">ISO 15919 · {iso}</span>}
     </p>
   </Hero>
 
   <div class="sw-toolbar" data-raga data-scale={`${r.arohana} ${r.avarohana}`} data-script={script} data-tamil={tamil} data-subs={settings.subscripts}>
-    <span class="t-eyebrow sw-eyebrow">{t("raga.script")}</span>
-    <div class="sw-chips" role="group" aria-label={t("raga.script")}>
+    <span class="t-eyebrow sw-eyebrow">{tr("raga.script")}</span>
+    <div class="sw-chips" role="group" aria-label={tr("raga.script")}>
       {[["lat", "Latin"], ["ta", "தமிழ்"], ["te", "తెలుగు"], ["kn", "ಕನ್ನಡ"]].map(([id, label]) => <Chip data-script-btn={id} active={id === script}>{label}</Chip>)}
     </div>
     <span class="spacer"></span>
-    <button type="button" class="rp-drone" data-raga-drone={suggest} aria-pressed="false" data-on={t("raga.dronePlaying")} data-off={t("raga.drone")}>{t("raga.drone")}</button>
+    <button type="button" class="rp-drone" data-raga-drone={suggest} aria-pressed="false" data-on={tr("raga.dronePlaying")} data-off={tr("raga.drone")}>{tr("raga.drone")}</button>
   </div>
 
   <div class="sw-cols">
     <div class="sw-main">
       <section class="sw-section" aria-labelledby="rp-ph">
-        <div class="rp-head"><h2 id="rp-ph" class="sw-h2">{t("raga.phrases")}</h2>{v.cited && <span class="sw-mono">{t("raga.cited", { who: v.cited })}</span>}</div>
-        {v.phrases.length === 0 && <p class="sw-p">{t("raga.noPhrases")}</p>}
+        <div class="rp-head"><h2 id="rp-ph" class="sw-h2">{tr("raga.phrases")}</h2>{v.cited && <span class="sw-mono">{tr("raga.cited", { who: v.cited })}</span>}</div>
+        {v.phrases.length === 0 && <p class="sw-p">{tr("raga.noPhrases")}</p>}
         <div class="rp-phrases">
           {v.phrases.map((p) => (
             <div class="rp-phrase">
-              <button type="button" class="rp-play" data-play={p.line} aria-label={t("raga.play")} title={t("raga.play")}><span aria-hidden="true"></span></button>
+              <button type="button" class="rp-play" data-play={p.line} aria-label={tr("raga.play")} title={tr("raga.play")}><span aria-hidden="true"></span></button>
               <div class:list={["rp-line", "sn-script-" + script]} data-line={p.line} data-subs={p.subs?.join(",")} set:html={draw(p.line, p.subs ?? false)} />
               <p class="rp-pnote">{p.note} {!v.featured ? null : <ConfidenceNote level={p.confidence} />}</p>
             </div>
@@ -91,7 +98,7 @@ const jsonLd = { "@context": "https://schema.org", "@type": "DefinedTerm", name:
         </div>
         {v.character.filter((c) => c.text).length > 0 && (
           <div class="sw-inset rp-char">
-            <p class="t-eyebrow sw-eyebrow rose">{t("raga.gamaka")}</p>
+            <p class="t-eyebrow sw-eyebrow rose">{tr("raga.gamaka")}</p>
             {v.character.filter((c) => c.text).map((c) => (
               <p class="sw-prose">{c.text}{c.who && <span class="rp-who"> {c.who}</span>} {c.confidence && <ConfidenceNote level={c.confidence} />}</p>
             ))}
@@ -100,24 +107,24 @@ const jsonLd = { "@context": "https://schema.org", "@type": "DefinedTerm", name:
       </section>
 
       <section class="sw-section" aria-labelledby="rp-sc">
-        <h2 id="rp-sc" class="sw-h3">{t("raga.scale")}</h2>
-        {[[t("raga.aro"), v.arohana], [t("raga.ava"), v.avarohana]].map(([label, line]) => (
+        <h2 id="rp-sc" class="sw-h3">{tr("raga.scale")}</h2>
+        {[[tr("raga.aro"), v.arohana], [tr("raga.ava"), v.avarohana]].map(([label, line]) => (
           <div class="rp-scale">
             <span class="sw-p">{label}</span>
             <div class:list={["rp-sline", "sn-script-" + script]} data-line={line} data-subs="1" set:html={draw(line, true)} />
           </div>
         ))}
         {v.scaleNote && <p class="sw-p">{v.scaleNote}</p>}
-        <p class="sw-note">{t("raga.key")}</p>
+        <p class="sw-note">{tr("raga.key")}</p>
       </section>
 
       <section class="sw-section" aria-labelledby="rp-ro">
-        <h2 id="rp-ro" class="sw-h3">{t("raga.roles")}</h2>
+        <h2 id="rp-ro" class="sw-h3">{tr("raga.roles")}</h2>
         <div class="rp-roles">
           {v.roles.map((ro) => (
             <div class="rp-role">
               <span class="sw-h4">{ROLE_LABEL[ro.key]}</span>
-              {ro.value ? <span class="rp-rv">{ro.value.split(" ").map((s) => inline(s, script, tamil)).join("  ")}</span> : <span class="sw-p">{t("raga.notShown")}</span>}
+              {ro.value ? <span class="rp-rv">{ro.value.split(" ").map((s) => inline(s, script, tamil)).join("  ")}</span> : <span class="sw-p">{tr("raga.notShown")}</span>}
               {ro.note && <span class="rp-rnote"><ConfidenceNote level={ro.confidence === "high" ? "medium" : ro.confidence} text={ro.note} sources={ro.sources} /></span>}
             </div>
           ))}
@@ -125,32 +132,32 @@ const jsonLd = { "@context": "https://schema.org", "@type": "DefinedTerm", name:
       </section>
 
       <section class="sw-section" aria-labelledby="rp-va">
-        <h2 id="rp-va" class="sw-h3">{t("raga.variants")}</h2>
+        <h2 id="rp-va" class="sw-h3">{tr("raga.variants")}</h2>
         {v.variant ? (
           <>
             <p class="sw-p">{v.variant.intro}</p>
             <div class="sw-schools" data-schools>
               {v.variant.options.map((o, i) => (
                 <button type="button" class="sw-school" aria-pressed={i === 0 ? "true" : "false"}>
-                  <span class="sw-school-head">{i === 0 ? t("raga.common") : t("raga.some")}<span class="sw-school-mark">{t("raga.shown")}</span></span>
+                  <span class="sw-school-head">{i === 0 ? tr("raga.common") : tr("raga.some")}<span class="sw-school-mark">{tr("raga.shown")}</span></span>
                   <span class:list={["rp-vline", "sn-script-" + script]} data-line={o.line} set:html={draw(o.line)} />
                   <span class="sw-school-attr">{o.attr}</span>
                 </button>
               ))}
             </div>
           </>
-        ) : <p class="sw-p">{t("raga.noVariants")}</p>}
+        ) : <p class="sw-p">{tr("raga.noVariants")}</p>}
         {v.disagreements.length > 0 && (
           <details class="rp-dis">
-            <summary class="sw-p">{t("raga.disagreements")} ({v.disagreements.length})</summary>
+            <summary class="sw-p">{tr("raga.disagreements")} ({v.disagreements.length})</summary>
             <ul>{v.disagreements.map((d) => <li class="sw-p">{d}</li>)}</ul>
           </details>
         )}
       </section>
 
       <section class="sw-section" aria-labelledby="rp-co">
-        <h2 id="rp-co" class="sw-h3">{t("raga.comps")}</h2>
-        {v.compositions.length === 0 ? <p class="sw-p">{t("raga.noComps")}</p> : (
+        <h2 id="rp-co" class="sw-h3">{tr("raga.comps")}</h2>
+        {v.compositions.length === 0 ? <p class="sw-p">{tr("raga.noComps")}</p> : (
           <div class="rp-comps">
             {v.compositions.map((c) => (
               <div class="sw-dotrow">
@@ -162,35 +169,35 @@ const jsonLd = { "@context": "https://schema.org", "@type": "DefinedTerm", name:
           </div>
         )}
         {v.compositionsNote && <p class="sw-note">{v.compositionsNote}</p>}
-        <div class="rp-rec"><span class="sw-mono">{t("raga.recording")}</span><span class="sw-note">{t("raga.recordingP")}</span></div>
+        <div class="rp-rec"><span class="sw-mono">{tr("raga.recording")}</span><span class="sw-note">{tr("raga.recordingP")}</span></div>
       </section>
 
       {v.tradition && (
         <section class="rp-trad">
-          <div class="rp-head"><h2 class="sw-h4">{t("raga.tradition")}</h2><span class="sw-mono">{t("raga.traditional")}</span></div>
-          <p class="sw-p">{v.featured ? v.tradition : t("raga.traditionPrefix", { text: v.tradition })}</p>
+          <div class="rp-head"><h2 class="sw-h4">{tr("raga.tradition")}</h2><span class="sw-mono">{tr("raga.traditional")}</span></div>
+          <p class="sw-p">{v.featured ? v.tradition : tr("raga.traditionPrefix", { text: v.tradition })}</p>
         </section>
       )}
     </div>
 
     <aside class="sw-aside">
       <div class="sw-card rp-parent">
-        <p class="t-eyebrow sw-eyebrow">{t("raga.parent")}</p>
+        <p class="t-eyebrow sw-eyebrow">{tr("raga.parent")}</p>
         <a href={L(`/carnatic/ragas/melakarta/${r.parent.number}`)} class="rp-plink"><span class="sw-mono">{r.parent.number}</span><span>{parent?.name ?? r.parent.name}</span></a>
         <div class="sw-chips">{v.tags.map((g) => <Badge>{g}</Badge>)}</div>
       </div>
       {related.length > 0 && (
         <div class="rp-rel">
-          <p class="t-eyebrow sw-eyebrow">{t("raga.related")}</p>
+          <p class="t-eyebrow sw-eyebrow">{tr("raga.related")}</p>
           <div class="sw-chips">{related.map((x) => <a class="sw-chip" href={L(`/carnatic/ragas/${x.id}`)}>{x.name}</a>)}</div>
         </div>
       )}
       <div class="rp-src">
-        <p class="t-eyebrow sw-eyebrow">{t("raga.sources")}</p>
-        {v.confidenceNote ? <ConfidenceNote level={v.confidence === "high" ? "medium" : v.confidence} text={v.confidenceNote} /> : <p class="sw-note">{t("raga.high")}</p>}
-        <p class="sw-note">{t("raga.sourceNote")}</p>
+        <p class="t-eyebrow sw-eyebrow">{tr("raga.sources")}</p>
+        {v.confidenceNote ? <ConfidenceNote level={v.confidence === "high" ? "medium" : v.confidence} text={v.confidenceNote} /> : <p class="sw-note">{tr("raga.high")}</p>}
+        <p class="sw-note">{tr("raga.sourceNote")}</p>
         <details>
-          <summary class="rp-view">{t("raga.viewSources")}</summary>
+          <summary class="rp-view">{tr("raga.viewSources")}</summary>
           <ul class="rp-srclist">{v.sources.map((s) => <li>{/^https?:/.test(s) ? <a href={s} rel="noopener nofollow">{s.replace(/^https?:\/\/(www\.)?/, "").slice(0, 70)}</a> : s}</li>)}</ul>
         </details>
       </div>

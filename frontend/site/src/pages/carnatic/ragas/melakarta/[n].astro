@@ -13,9 +13,11 @@ import { allScriptNames, scriptName, type IndicLang } from "../../../../lib/carn
 import { phraseHtml } from "../../../../lib/carnatic/render";
 import { letter } from "../../../../lib/carnatic/notation";
 import { notFound } from "../../../../lib/carnatic/notfound";
+import { copy } from "../../../../lib/copy";
 
 const lang = langOf(Astro);
-const t = await words(lang);
+const tr = await words(lang);
+const say = await copy("carnatic/ragas/melakarta/[n]");
 const L = (p: string) => hrefIn(lang, p);
 const { settings } = await visitor(Astro);
 const [data, rv] = await Promise.all([ragas(), reviews()]);
@@ -37,22 +39,23 @@ const draw = (line: string) => phraseHtml(line, { script, tamil, subs: true });
 const [d1, d2] = m.katapayadi.digits;
 const kUsed = m.katapayadi.used ?? m.katapayadi.aksharas;
 const description = `Melakarta ${m.number}, ${m.name}: ${m.arohana} · ${m.avarohana}. ${m.chakra.name} chakra, position ${m.chakra.position}; the katapayadi of its name; its janya ragas${m.dikshitar ? `; the Dikshitar-school raga ${m.dikshitar}` : ""}.`;
+const chakraLine = say("chakraLine", "{name} chakra · {n}, position {p}").replace("{name}", m.chakra.name).replace("{n}", String(m.chakra.number)).replace("{p}", String(m.chakra.position));
 ---
 <SwaraLayout title={`${m.number} ${m.name} · melakarta · Swara Studio`} description={description}
-             crumbs={[[t("crumb.learn"), L("/carnatic/lessons")], [t("crumb.ragas"), L("/carnatic/ragas")], [`${m.number} · ${m.name}`]]}>
-  <Hero eyebrow={t("mela.kind", { n: m.number })} title={own?.text ?? m.name} titleLang={own ? lang : undefined}>
+             crumbs={[[tr("crumb.learn"), L("/carnatic/lessons")], [tr("crumb.ragas"), L("/carnatic/ragas")], [`${m.number} · ${m.name}`]]}>
+  <Hero eyebrow={tr("mela.kind", { n: m.number })} title={own?.text ?? m.name} titleLang={own ? lang : undefined}>
     <p class="mp-names" slot="under">
-      {others.length > 0 && <span class:list={[anyUnverified && "sw-unv"]} title={anyUnverified ? t("unverified.title") : undefined}>{others.map((x, i) => <>{i > 0 && <span class="mp-dot">·</span>}<span lang={x.lang}>{x.text}</span></>)}</span>}
-      {anyUnverified && <span class="sw-unv-label">{t("unverified")}</span>}
+      {others.length > 0 && <span class:list={[anyUnverified && "sw-unv"]} title={anyUnverified ? tr("unverified.title") : undefined}>{others.map((x, i) => <>{i > 0 && <span class="mp-dot">·</span>}<span lang={x.lang}>{x.text}</span></>)}</span>}
+      {anyUnverified && <span class="sw-unv-label">{tr("unverified")}</span>}
       {m.iso && <span class="sw-mono">ISO 15919 · {m.iso}</span>}
     </p>
-    {m.dikshitar && <p class="sw-p mp-dik">{t("mela.dikshitar")} · <i>{m.dikshitar}</i> <span class="sw-note">{t("mela.dikshitarNote")}</span></p>}
+    {m.dikshitar && <p class="sw-p mp-dik">{tr("mela.dikshitar")} · <i>{m.dikshitar}</i> <span class="sw-note">{tr("mela.dikshitarNote")}</span></p>}
   </Hero>
 
   <div class="sw-cols">
     <div class="sw-main">
       <section class="sw-section">
-        <h2 class="sw-h3">{t("mela.seven")}</h2>
+        <h2 class="sw-h3">{tr("mela.seven")}</h2>
         <div class="mp-seven">
           {m.swaras.map((sw) => (
             <div class="mp-sw">
@@ -63,36 +66,36 @@ const description = `Melakarta ${m.number}, ${m.name}: ${m.arohana} · ${m.avaro
         </div>
       </section>
       <section class="sw-section">
-        <h2 class="sw-h3">{t("mela.scale")}</h2>
-        {[[t("raga.aro"), m.arohana], [t("raga.ava"), m.avarohana]].map(([label, line]) => (
+        <h2 class="sw-h3">{tr("mela.scale")}</h2>
+        {[[tr("raga.aro"), m.arohana], [tr("raga.ava"), m.avarohana]].map(([label, line]) => (
           <div class="mp-scale"><span class="sw-p">{label}</span><span class={`mp-line sn-script-${script}`} set:html={draw(line)} /></div>
         ))}
-        {m.vivadi.length > 0 && <p class="sw-note">{t("mela.vivadi", { pairs: m.vivadi.join(", ") })}</p>}
+        {m.vivadi.length > 0 && <p class="sw-note">{tr("mela.vivadi", { pairs: m.vivadi.join(", ") })}</p>}
       </section>
       <section class="sw-section">
-        <h2 class="sw-h3">{t("mela.ktp")}</h2>
+        <h2 class="sw-h3">{tr("mela.ktp")}</h2>
         <div class="sw-inset mp-ktp">
           <span><i>{kUsed[0]}</i><small>{d1}</small></span>
           <span><i>{kUsed[1]}</i><small>{d2}</small></span>
-          <span class="sw-p">{t("mela.reverse")}</span>
+          <span class="sw-p">{tr("mela.reverse")}</span>
           <b>{m.number}</b>
         </div>
-        <p class="sw-note">{t("mela.ktpP")}{m.katapayadi.rule.startsWith("first") ? " This name uses the first consonant of a conjunct, one of the exceptions Sambamoorthy lists." : ""}{m.katapayadi.note ? ` ${m.katapayadi.note}` : ""}</p>
+        <p class="sw-note">{tr("mela.ktpP")}{m.katapayadi.rule.startsWith("first") ? " This name uses the first consonant of a conjunct, one of the exceptions Sambamoorthy lists." : ""}{m.katapayadi.note ? ` ${m.katapayadi.note}` : ""}</p>
       </section>
       <section class="sw-section">
-        <h2 class="sw-h3">{t("mela.janyaOf")}</h2>
-        {janyas.length === 0 && !performed ? <p class="sw-p">{t("mela.noJanya")}</p> : (
+        <h2 class="sw-h3">{tr("mela.janyaOf")}</h2>
+        {janyas.length === 0 && !performed ? <p class="sw-p">{tr("mela.noJanya")}</p> : (
           <div class="mp-janyas">
             {performed && (
               <a class="sw-dotrow mp-jrow" href={L(`/carnatic/ragas/${performed.id}`)}>
                 <span class="mp-jn">{performed.name}</span><span class="leader" aria-hidden="true"></span>
-                <span class="sw-p">the melakarta as a raga</span><span class="mp-jl">{t("mela.page")}</span>
+                <span class="sw-p">the melakarta as a raga</span><span class="mp-jl">{tr("mela.page")}</span>
               </a>
             )}
             {janyas.map((r) => (
               <a class="sw-dotrow mp-jrow" href={L(`/carnatic/ragas/${r.id}`)}>
                 <span class="mp-jn">{r.name}</span><span class="leader" aria-hidden="true"></span>
-                <span class="sw-p">{r.classification.jati}{r.classification.vakra ? " · vakra" : ""}</span><span class="mp-jl">{t("mela.page")}</span>
+                <span class="sw-p">{r.classification.jati}{r.classification.vakra ? " · vakra" : ""}</span><span class="mp-jl">{tr("mela.page")}</span>
               </a>
             ))}
           </div>
@@ -101,13 +104,13 @@ const description = `Melakarta ${m.number}, ${m.name}: ${m.arohana} · ${m.avaro
     </div>
     <aside class="sw-aside">
       <div class="sw-card mp-place">
-        <p class="t-eyebrow sw-eyebrow">{t("mela.place")}</p>
-        <p class="sw-p mp-ch">{m.chakra.name} chakra · {m.chakra.number}, position {m.chakra.position}</p>
-        <p class="sw-mono">{m.number <= 36 ? t("mela.suddhaM") : t("mela.pratiM")}</p>
+        <p class="t-eyebrow sw-eyebrow">{tr("mela.place")}</p>
+        <p class="sw-p mp-ch">{chakraLine}</p>
+        <p class="sw-mono">{m.number <= 36 ? tr("mela.suddhaM") : tr("mela.pratiM")}</p>
         <div class="mp-row">{chakraRow.map((x) => <a href={L(`/carnatic/ragas/melakarta/${x.number}`)} aria-current={x.number === m.number ? "page" : undefined}>{x.number}</a>)}</div>
       </div>
-      <button type="button" class="mp-play" data-play-scale={`${m.arohana} ${m.avarohana}`}>{t("mela.drone")}</button>
-      <p class="sw-note">{t("mela.note")}</p>
+      <button type="button" class="mp-play" data-play-scale={`${m.arohana} ${m.avarohana}`}>{tr("mela.drone")}</button>
+      <p class="sw-note">{tr("mela.note")}</p>
     </aside>
   </div>
 </SwaraLayout>

@@ -15,8 +15,8 @@ import { visitor } from "../../lib/carnatic/prefs";
 import { copy } from "../../lib/copy";
 
 const lang = langOf(Astro);
-const t = await words(lang);
-const say = await copy("carnatic.gamakas");
+const tr = await words(lang);
+const say = await copy("carnatic/gamakas");
 const L = (p: string) => hrefIn(lang, p);
 const { settings } = await visitor(Astro);
 const data = await gamakas();
@@ -43,7 +43,7 @@ const path = (id: string) => {
 ---
 <SwaraLayout title={say("meta.title", "Gamaka library · Swara Studio")}
              description={say("meta.description", "Kampita, jaru, nokku, odukkal, orikkai, sphurita, pratyahata, ravai and khandippu: each as a pitch curve you can hear, with its textbook name, its sign after the SSP (1904) and how it is made on the venu, veena and violin.")}
-             crumbs={[[t("crumb.learn"), L("/carnatic/lessons")], [say("crumb", "Gamaka library")]]}>
+             crumbs={[[tr("crumb.learn"), L("/carnatic/lessons")], [say("crumb", "Gamaka library")]]}>
   <Hero eyebrow={say("eyebrow", "Gamakas")} title={say("title", "Gamaka library")} lede={say("lede", "Each gamaka as a pitch curve, with audio and how it is made on your instrument.")} />
   {!data ? <div class="sw-section"><Absent /></div> : (
     <>
@@ -68,8 +68,8 @@ const path = (id: string) => {
       <p class="sw-note gm-foot">{say("foot", "Everyday names first, with the textbook term beside them: most map onto the panchadasa (fifteen) list, not the dasavidha (ten). Signs adapted from Subbarama Dikshitar's Sangita Sampradaya Pradarsini (1904). The curves are schematic.")}</p>
       <section class="sw-section">
         <h2 class="sw-h3">{say("listsH", "The two textbook lists")}</h2>
-        <p class="sw-p"><b>Dasavidha (10):</b> {data.meta.lists.dasavidha.join(", ")}.</p>
-        <p class="sw-p"><b>Panchadasa (15, Sangita Ratnakara):</b> {data.meta.lists.panchadasa.join(", ")}.</p>
+        <p class="sw-p"><b>{say("list.dasavidha", "Dasavidha (10):")}</b> {data.meta.lists.dasavidha.join(", ")}.</p>
+        <p class="sw-p"><b>{say("list.panchadasa", "Panchadasa (15, Sangita Ratnakara):")}</b> {data.meta.lists.panchadasa.join(", ")}.</p>
         <p class="sw-note">{data.meta.lists.trap}</p>
       </section>
     </>

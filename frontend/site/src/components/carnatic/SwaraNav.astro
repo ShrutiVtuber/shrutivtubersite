@@ -15,16 +15,16 @@
 import { hrefIn, LANG_LABEL, LANG_NAME, LANGS, langOf, words } from "../../lib/carnatic/i18n";
 
 const lang = langOf(Astro);
-const t = await words(lang);
+const tr = await words(lang);
 const here = Astro.url.pathname;
 
 const ITEMS: [string, string, string[]][] = [
-  ["/carnatic/lessons", t("nav.learn"), ["/carnatic/lessons", "/carnatic/ragas", "/carnatic/talas", "/carnatic/instruments", "/carnatic/gamakas", "/carnatic/path"]],
-  ["/carnatic/practice/tuner", t("nav.practice"), ["/carnatic/practice"]],
-  ["/carnatic/compose", t("nav.compose"), ["/carnatic/compose", "/carnatic/sheets"]],
-  ["/carnatic/listen", t("nav.listen"), ["/carnatic/listen"]],
-  ["/journal/", t("nav.journal"), []],
-  ["/carnatic/support", t("nav.support"), ["/carnatic/support"]],
+  ["/carnatic/lessons", tr("nav.learn"), ["/carnatic/lessons", "/carnatic/ragas", "/carnatic/talas", "/carnatic/instruments", "/carnatic/gamakas", "/carnatic/path"]],
+  ["/carnatic/practice/tuner", tr("nav.practice"), ["/carnatic/practice"]],
+  ["/carnatic/compose", tr("nav.compose"), ["/carnatic/compose", "/carnatic/sheets"]],
+  ["/carnatic/listen", tr("nav.listen"), ["/carnatic/listen"]],
+  ["/journal/", tr("nav.journal"), []],
+  ["/carnatic/support", tr("nav.support"), ["/carnatic/support"]],
 ];
 const current = (prefixes: string[]) => prefixes.some((p) => here === p || here.startsWith(p + "/"));
 
@@ -40,21 +40,21 @@ const inLang = (l: string) => {
 <div class="sw-strip" data-swara-strip lang={lang === "en" ? undefined : lang}>
   <div class="page sw-strip-row">
     <a class="sw-lockup" href={hrefIn(lang, "/carnatic")}>
-      <span class="sw-name">{t("brand.name")}</span>
-      <span class="sw-desc" data-indic={lang !== "en" || undefined}>{t("brand.desc")}</span>
+      <span class="sw-name">{tr("brand.name")}</span>
+      <span class="sw-desc" data-indic={lang !== "en" || undefined}>{tr("brand.desc")}</span>
     </a>
-    <nav class="sw-nav" aria-label={t("nav.aria")}>
+    <nav class="sw-nav" aria-label={tr("nav.aria")}>
       {ITEMS.map(([href, label, prefixes]) => (
         <a href={href.startsWith("/carnatic") ? hrefIn(lang, href) : href} aria-current={current(prefixes) ? "page" : undefined}>{label}</a>
       ))}
     </nav>
-    <div class="sw-langs" role="group" aria-label={t("nav.languages")}>
+    <div class="sw-langs" role="group" aria-label={tr("nav.languages")}>
       {LANGS.map((l) => (
         <a href={inLang(l)} lang={l} hreflang={l} data-set-lang={l}
            aria-current={l === lang ? "true" : undefined} title={LANG_NAME[l]}>{LANG_LABEL[l]}</a>
       ))}
       {lang !== "en" && (
-        <span class="sw-unverified" title={t("unverified.lang")}>{t("unverified")}</span>
+        <span class="sw-unverified" title={tr("unverified.lang")}>{tr("unverified")}</span>
       )}
     </div>
   </div>

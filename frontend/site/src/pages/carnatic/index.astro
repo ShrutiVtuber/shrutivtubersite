@@ -12,13 +12,15 @@ import Button from "../../components/forms/Button.astro";
 import Badge from "../../components/navigation/Badge.astro";
 import Chip from "../../components/carnatic/Chip.astro";
 import { hrefIn, langOf, words } from "../../lib/carnatic/i18n";
+import { copy } from "../../lib/copy";
 import { lessons, manifest } from "../../lib/carnatic/data";
 import { visitor, swaraScript } from "../../lib/carnatic/prefs";
 import { avartanamHtml } from "../../lib/carnatic/render";
 import { schoolClasses, schoolJournal } from "../../lib/carnatic/catalogue";
 
 const lang = langOf(Astro);
-const t = await words(lang);
+const tr = await words(lang);
+const say = await copy("carnatic");
 const L = (p: string) => hrefIn(lang, p);
 const { me, settings } = await visitor(Astro);
 const script = swaraScript(settings, lang);
@@ -32,53 +34,53 @@ const firstLine = avartanamHtml(
 
 const sets = (id: string) => data?.sets?.find((s: any) => s.id === id)?.items?.filter((i: any) => !i.optional).length;
 const STEPS: [string, string, string][] = [
-  [t("set.sarali_varisai"), String(sets("sarali_varisai") ?? 14), "/carnatic/path#sarali_varisai"],
-  [t("set.janta_varisai"), String(sets("janta_varisai") ?? 12), "/carnatic/path#janta_varisai"],
-  [t("set.dhatu_varisai"), String(sets("dhatu_varisai") ?? 3), "/carnatic/path#dhatu_varisai"],
-  [t("set.sthayi"), `${sets("tara_sthayi_varisai") ?? 5} + ${sets("mandra_sthayi_varisai") ?? 5}`, "/carnatic/path#tara_sthayi_varisai"],
-  [t("set.alankaram"), String(sets("alankaram") ?? 7), "/carnatic/path#alankaram"],
-  [t("set.geethams"), t("set.geethamsNote"), "/carnatic/path#geethams"],
-  [t("set.varnams"), "", "/carnatic/path#varnams"],
+  [tr("set.sarali_varisai"), String(sets("sarali_varisai") ?? 14), "/carnatic/path#sarali_varisai"],
+  [tr("set.janta_varisai"), String(sets("janta_varisai") ?? 12), "/carnatic/path#janta_varisai"],
+  [tr("set.dhatu_varisai"), String(sets("dhatu_varisai") ?? 3), "/carnatic/path#dhatu_varisai"],
+  [tr("set.sthayi"), `${sets("tara_sthayi_varisai") ?? 5} + ${sets("mandra_sthayi_varisai") ?? 5}`, "/carnatic/path#tara_sthayi_varisai"],
+  [tr("set.alankaram"), String(sets("alankaram") ?? 7), "/carnatic/path#alankaram"],
+  [tr("set.geethams"), tr("set.geethamsNote"), "/carnatic/path#geethams"],
+  [tr("set.varnams"), "", "/carnatic/path#varnams"],
 ];
 
 const TOOLS = [
-  { spec: "Pa · Sa · Sa · Sa", h: t("landing.tool1h"), p: t("landing.tool1p"), href: "/carnatic/practice/tuner" },
-  { spec: "I₄ O O", h: t("landing.tool2h"), p: t("landing.tool2p"), href: "/carnatic/practice/tala" },
-  { spec: t("landing.tool3spec", { m: counts?.melakartas ?? 72, r: (counts?.janyas ?? 62) + (counts?.performed ?? 12) }), h: t("landing.tool3h"), p: t("landing.tool3p"), href: "/carnatic/ragas" },
-  { spec: t("landing.tool4spec"), h: t("landing.tool4h"), p: t("landing.tool4p"), href: "/carnatic/instruments/venu" },
-  { spec: t("landing.tool5spec"), h: t("landing.tool5h"), p: t("landing.tool5p"), href: "/carnatic/gamakas" },
-  { spec: t("landing.tool6spec"), h: t("landing.tool6h"), p: t("landing.tool6p"), href: "/carnatic/practice/quiz" },
+  { spec: "Pa · Sa · Sa · Sa", h: tr("landing.tool1h"), p: tr("landing.tool1p"), href: "/carnatic/practice/tuner" },
+  { spec: "I₄ O O", h: tr("landing.tool2h"), p: tr("landing.tool2p"), href: "/carnatic/practice/tala" },
+  { spec: tr("landing.tool3spec", { m: counts?.melakartas ?? 72, r: (counts?.janyas ?? 62) + (counts?.performed ?? 12) }), h: tr("landing.tool3h"), p: tr("landing.tool3p"), href: "/carnatic/ragas" },
+  { spec: tr("landing.tool4spec"), h: tr("landing.tool4h"), p: tr("landing.tool4p"), href: "/carnatic/instruments/venu" },
+  { spec: tr("landing.tool5spec"), h: tr("landing.tool5h"), p: tr("landing.tool5p"), href: "/carnatic/gamakas" },
+  { spec: tr("landing.tool6spec"), h: tr("landing.tool6h"), p: tr("landing.tool6p"), href: "/carnatic/practice/quiz" },
 ];
 
-const [classes, journal] = await Promise.all([schoolClasses(t, data), schoolJournal()]);
+const [classes, journal] = await Promise.all([schoolClasses(tr, data), schoolJournal()]);
 /* The portrait is an art slot: the site's square avatar by default, editable
    (and blankable, for the art-absent sky plate) as the copy key landing.portrait. */
-const portrait = t("landing.portrait");
+const portrait = tr("landing.portrait");
 ---
 
-<SwaraLayout title={t("landing.title")} description={t("landing.meta")}
+<SwaraLayout title={tr("landing.title")} description={tr("landing.meta")}
              jsonLd={{ "@context": "https://schema.org", "@type": "EducationalOrganization", name: "Swara Studio",
-                       description: t("landing.meta"), url: "https://shrutivtuber.com/carnatic",
+                       description: tr("landing.meta"), url: "https://shrutivtuber.com/carnatic",
                        parentOrganization: { "@type": "Organization", name: "Shruti", url: "https://shrutivtuber.com" } }}>
-  <Hero eyebrow={t("landing.eyebrow")} title={t("landing.h1")} lede={t("landing.lede")}>
+  <Hero eyebrow={tr("landing.eyebrow")} title={tr("landing.h1")} lede={tr("landing.lede")}>
     <div class="lp-cta">
-      <Button href={L("/carnatic/path")} size="lg">{t("landing.start")}</Button>
-      <Button href={L("/carnatic/practice/tuner")} variant="secondary" size="lg">{t("landing.tuner")}</Button>
+      <Button href={L("/carnatic/path")} size="lg">{tr("landing.start")}</Button>
+      <Button href={L("/carnatic/practice/tuner")} variant="secondary" size="lg">{tr("landing.tuner")}</Button>
     </div>
     <div slot="side" class="sky-veil lp-first">
-      <p class="t-eyebrow sw-eyebrow">{t("landing.firstLine")}</p>
+      <p class="t-eyebrow sw-eyebrow">{tr("landing.firstLine")}</p>
       <div class:list={["lp-line", "sn-script-" + script]} set:html={firstLine} />
-      <p class="sw-mono">Mayamalavagowla · Adi · 60 / min</p>
+      <p class="sw-mono">{say("first.meta", "Mayamalavagowla · Adi · 60 / min")}</p>
     </div>
   </Hero>
 
   <section class="sw-section lp-who" aria-labelledby="lp-who">
-    <h2 id="lp-who" class="sw-h2">{t("landing.whoH")}</h2>
+    <h2 id="lp-who" class="sw-h2">{tr("landing.whoH")}</h2>
     <div class="lp-three">
       {[1, 2, 3].map((n) => (
         <div class="lp-who-col">
-          <h3 class="sw-h4">{t(`landing.who${n}h` as any)}</h3>
-          <p class="sw-p">{t(`landing.who${n}p` as any)}</p>
+          <h3 class="sw-h4">{tr(`landing.who${n}h` as any)}</h3>
+          <p class="sw-p">{tr(`landing.who${n}p` as any)}</p>
         </div>
       ))}
     </div>
@@ -87,9 +89,9 @@ const portrait = t("landing.portrait");
   <hr class="sw-rule" />
 
   <section class="sw-section" aria-labelledby="lp-path">
-    <p class="t-eyebrow sw-eyebrow rose">{t("landing.pathEyebrow")}</p>
-    <h2 id="lp-path" class="sw-h2 lp-big">{t("landing.pathH")}</h2>
-    <p class="lp-lead">{t("landing.pathP")}</p>
+    <p class="t-eyebrow sw-eyebrow rose">{tr("landing.pathEyebrow")}</p>
+    <h2 id="lp-path" class="sw-h2 lp-big">{tr("landing.pathH")}</h2>
+    <p class="lp-lead">{tr("landing.pathP")}</p>
     <ol class="lp-steps">
       {STEPS.map(([name, n, href], i) => (
         <li><a href={L(href)} class="lp-step" aria-current={i === 0 ? "step" : undefined}>
@@ -100,8 +102,8 @@ const portrait = t("landing.portrait");
       ))}
     </ol>
     <div class="lp-begin">
-      <Button href={L("/carnatic/path?item=sarali_01")}>{t("landing.begin")}</Button>
-      {!me.signedIn && <span class="sw-note">{t("landing.noAccount")}</span>}
+      <Button href={L("/carnatic/path?item=sarali_01")}>{tr("landing.begin")}</Button>
+      {!me.signedIn && <span class="sw-note">{tr("landing.noAccount")}</span>}
     </div>
   </section>
 
@@ -109,8 +111,8 @@ const portrait = t("landing.portrait");
 
   <section class="sw-section" aria-labelledby="lp-tools">
     <div class="lp-headline">
-      <h2 id="lp-tools" class="sw-h2 lp-big">{t("landing.toolsH")}</h2>
-      <p class="sw-p">{t("landing.toolsP")}</p>
+      <h2 id="lp-tools" class="sw-h2 lp-big">{tr("landing.toolsH")}</h2>
+      <p class="sw-p">{tr("landing.toolsP")}</p>
     </div>
     <div class="lp-tools">
       {TOOLS.map((tool) => (
@@ -131,27 +133,27 @@ const portrait = t("landing.portrait");
         <picture>
           {portrait === "/brand/avatar-square.png" && <source type="image/avif" srcset="/brand/avatar-square.avif" />}
           {portrait === "/brand/avatar-square.png" && <source type="image/webp" srcset="/brand/avatar-square.webp" />}
-          <img class="lp-plate" src={portrait} alt={t("landing.portraitAlt")} width="170" height="170" loading="lazy" />
+          <img class="lp-plate" src={portrait} alt={tr("landing.portraitAlt")} width="170" height="170" loading="lazy" />
         </picture>
       ) : (
         /* Art-absent: the sky plate. */
-        <div class="sky lp-plate" role="img" aria-label={t("landing.portraitAlt")}><div class="sky-horizon"></div></div>
+        <div class="sky lp-plate" role="img" aria-label={tr("landing.portraitAlt")}><div class="sky-horizon"></div></div>
       )}
-      <figcaption class="sw-mono">{t("landing.portraitCaption")}</figcaption>
+      <figcaption class="sw-mono">{tr("landing.portraitCaption")}</figcaption>
     </figure>
     <div class="lp-note">
-      <p id="lp-teacher" class="t-eyebrow sw-eyebrow rose">{t("landing.welcomeEyebrow")}</p>
-      <p class="sw-prose">{t("landing.welcome")}</p>
-      <p class="lp-sign">Shruti Swara</p>
+      <p id="lp-teacher" class="t-eyebrow sw-eyebrow rose">{tr("landing.welcomeEyebrow")}</p>
+      <p class="sw-prose">{tr("landing.welcome")}</p>
+      <p class="lp-sign">{say("sign", "Shruti Swara")}</p>
     </div>
   </section>
 
   <hr class="sw-rule" />
 
   <section class="sw-section" aria-labelledby="lp-classes" data-filters>
-    <h2 id="lp-classes" class="sw-h2">{t("landing.classesH")}</h2>
-    <p class="lp-lead">{t("landing.classesP")}</p>
-    <div class="sw-chips" role="group" aria-label={t("landing.classesH")}>
+    <h2 id="lp-classes" class="sw-h2">{tr("landing.classesH")}</h2>
+    <p class="lp-lead">{tr("landing.classesP")}</p>
+    <div class="sw-chips" role="group" aria-label={tr("landing.classesH")}>
       {classes.filters.map(([key, label], i) => <Chip active={i === 0} data-filter={key}>{label}</Chip>)}
     </div>
     <ul class="lp-rows">
@@ -172,16 +174,16 @@ const portrait = t("landing.portrait");
 
   <section class="sw-section lp-two">
     <div class="lp-support">
-      <h2 class="sw-h2">{t("landing.supportH")}</h2>
-      {me.supporter ? <p class="sw-p">{t("landing.thanks")}</p> : (
+      <h2 class="sw-h2">{tr("landing.supportH")}</h2>
+      {me.supporter ? <p class="sw-p">{tr("landing.thanks")}</p> : (
         <>
-          <p class="sw-p">{t("landing.supportP")}</p>
-          <div><Button href={L("/carnatic/support")} variant="secondary">{t("landing.supportCta")}</Button></div>
+          <p class="sw-p">{tr("landing.supportP")}</p>
+          <div><Button href={L("/carnatic/support")} variant="secondary">{tr("landing.supportCta")}</Button></div>
         </>
       )}
     </div>
     <div class="lp-journal">
-      <h2 class="sw-h2">{t("landing.journalH")}</h2>
+      <h2 class="sw-h2">{tr("landing.journalH")}</h2>
       {journal.length ? (
         <ul class="lp-jlist">
           {journal.map((e) => (
@@ -189,7 +191,7 @@ const portrait = t("landing.portrait");
           ))}
         </ul>
       ) : (
-        <p class="sw-p">{t("landing.journalEmpty")} <a href="/journal/">{t("landing.journalAll")}</a></p>
+        <p class="sw-p">{tr("landing.journalEmpty")} <a href="/journal/">{tr("landing.journalAll")}</a></p>
       )}
     </div>
   </section>

@@ -16,27 +16,33 @@ import { visitor } from "../../../lib/carnatic/prefs";
 import { copy } from "../../../lib/copy";
 
 const lang = langOf(Astro);
-const t = await words(lang);
-const say = await copy("carnatic.lessons");
+const tr = await words(lang);
+const say = await copy("carnatic/lessons");
 const L = (p: string) => hrefIn(lang, p);
 const { me } = await visitor(Astro);
 const data = await lessons();
-const list = lessonList(data, (id) => t(`set.${id}` as any));
-const classes = (await schoolClasses(t, data)).rows.filter((r) => r.kind !== "self");
-const setLabel = (id: string) => t(`set.${id}` as any);
+const list = lessonList(data, (id) => tr(`set.${id}` as any));
+const classes = (await schoolClasses(tr, data)).rows.filter((r) => r.kind !== "self");
+const setLabel = (id: string) => tr(`set.${id}` as any);
 ---
 <SwaraLayout title={say("meta.title", "Lessons and classes · Swara Studio")}
              description={say("meta.description", "Self-paced Carnatic lessons in the traditional order, from sarali varisai to the Malahari geethams, and live classes and workshops in one catalogue.")}
-             crumbs={[[t("crumb.learn"), L("/carnatic/lessons")], [say("crumb", "Lessons and classes")]]}>
+             crumbs={[[tr("crumb.learn"), L("/carnatic/lessons")], [say("crumb", "Lessons and classes")]]}>
   <Hero eyebrow={say("eyebrow", "Lessons")} title={say("title", "Lessons and classes")} lede={say("lede", "Self-paced lessons and live classes in one catalogue.")} />
   {!data ? <div class="sw-section"><Absent /></div> : (
   <div class="lc" data-catalogue data-signed-in={me.signedIn ? "1" : ""}>
     <div class="sw-toolbar">
       <div class="sw-chips">
-        <Chip active data-f="all">{t("gen.all")}</Chip><Chip data-f="self">Self-paced</Chip><Chip data-f="live">Live classes</Chip><Chip data-f="workshop">Workshops</Chip>
+        <Chip active data-f="all">{tr("gen.all")}</Chip><Chip data-f="self">{say("f.self", "Self-paced")}</Chip><Chip data-f="live">{say("f.live", "Live classes")}</Chip><Chip data-f="workshop">{say("f.workshop", "Workshops")}</Chip>
       </div>
       <span class="spacer"></span>
-      <a class="sw-p" href={L("/carnatic/path")}>{say("toPath", "Open the path and player")}</a>
+      <nav class="sw-p sw-also" aria-label={say("refAria", "More in Learn")}>
+        <a href="/carnatic/path">{say("toPath", "Open the path and player")}</a> ·
+        <a href="/carnatic/ragas">{say("ref.ragas", "Ragas")}</a> ·
+        <a href="/carnatic/talas">{say("ref.talas", "Talas")}</a> ·
+        <a href="/carnatic/gamakas">{say("ref.gamakas", "Gamakas")}</a> ·
+        <a href="/carnatic/instruments/venu">{say("ref.instruments", "Instruments")}</a>
+      </nav>
     </div>
     <ul class="lc-list">
       {list.map((l, i) => (
@@ -45,7 +51,7 @@ const setLabel = (id: string) => t(`set.${id}` as any);
             <a class="lc-row" href={L(`/carnatic/lessons/${l.slug}`)}>
               <span class="sw-mono lc-n">{String(i + 1).padStart(2, "0")}</span>
               <span class="lc-main"><span class="lc-h">{l.name}</span><span class="sw-p">{say("beginnerPath", "Beginner path")} · {setLabel(l.set)}{l.item.raga !== "Mayamalavagowla" ? ` · ${l.item.raga}` : ""}</span></span>
-              <Badge>Self-paced</Badge>
+              <Badge>{say("f.self", "Self-paced")}</Badge>
               <span class="lc-bar" aria-hidden="true"><i data-progress={l.id}></i></span>
               <span class="sw-mono lc-state" data-state={l.id}></span>
             </a>

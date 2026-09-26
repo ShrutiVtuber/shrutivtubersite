@@ -19,7 +19,7 @@ import { phraseHtml } from "../../../lib/carnatic/render";
 import { inline } from "../../../lib/carnatic/notation";
 
 const lang = langOf(Astro);
-const t = await words(lang);
+const tr = await words(lang);
 const L = (p: string) => hrefIn(lang, p);
 const { settings } = await visitor(Astro);
 const script = swaraScript(settings, lang);
@@ -55,32 +55,32 @@ const melaJson = JSON.stringify(Object.fromEntries(melas.map((m) => [m.number, {
 const SWARA_FILTERS = ["R1", "R2", "G2", "G3", "M1", "M2", "D1", "D2", "N2", "N3"];
 const swarasOf = (r: any) => [...new Set(`${r.arohana} ${r.avarohana}`.split(/\s+/).map((x: string) => x.replace(/[.',!av]/g, "").replace(/^\./, "")).filter((x: string) => /^[RGMDN][123]$/.test(x)))];
 ---
-<SwaraLayout title={`${t("ragas.title")} · Swara Studio`} description={t("ragas.meta")}
-             crumbs={[[t("crumb.learn"), L("/carnatic/lessons")], [t("crumb.ragas")]]}>
-  <Hero title={t("ragas.title")} lede={t("ragas.lede")}>
+<SwaraLayout title={`${tr("ragas.title")} · Swara Studio`} description={tr("ragas.meta")}
+             crumbs={[[tr("crumb.learn"), L("/carnatic/lessons")], [tr("crumb.ragas")]]}>
+  <Hero title={tr("ragas.title")} lede={tr("ragas.lede")}>
     <form class="rx-search" role="search" method="get" data-search-form>
       {lang !== "en" && <input type="hidden" name="lang" value={lang} />}
       <input type="hidden" name="view" value={view} data-view-field />
-      <label for="rx-q" class="sw-h4">{t("ragas.search")}</label>
-      <input id="rx-q" name="q" type="search" value={q} placeholder={t("ragas.searchPh")} autocomplete="off" data-q />
+      <label for="rx-q" class="sw-h4">{tr("ragas.search")}</label>
+      <input id="rx-q" name="q" type="search" value={q} placeholder={tr("ragas.searchPh")} autocomplete="off" data-q />
     </form>
   </Hero>
   {!data ? <div class="sw-section"><Absent /></div> : (
   <div class="rx" data-explorer data-view={view}>
     <div class="rx-bar">
       <div class="sw-seg" role="group">
-        <a href={L(`/carnatic/ragas${q ? `?q=${encodeURIComponent(q)}` : ""}`)} data-view-btn="mela" aria-current={view === "mela" ? "page" : undefined}>{t("ragas.viewMela")}</a>
-        <a href={L(`/carnatic/ragas?view=janya${q ? `&q=${encodeURIComponent(q)}` : ""}`)} data-view-btn="janya" aria-current={view === "janya" ? "page" : undefined}>{t("ragas.viewJanya")}</a>
+        <a href={L(`/carnatic/ragas${q ? `?q=${encodeURIComponent(q)}` : ""}`)} data-view-btn="mela" aria-current={view === "mela" ? "page" : undefined}>{tr("ragas.viewMela")}</a>
+        <a href={L(`/carnatic/ragas?view=janya${q ? `&q=${encodeURIComponent(q)}` : ""}`)} data-view-btn="janya" aria-current={view === "janya" ? "page" : undefined}>{tr("ragas.viewJanya")}</a>
       </div>
-      <span class="sw-mono" data-count-mela hidden={view !== "mela"}>{t("ragas.melaCount")}</span>
-      <span class="sw-mono" data-count-janya hidden={view !== "janya"}>{t("ragas.janyaCount", { n: janyas.length })}</span>
+      <span class="sw-mono" data-count-mela hidden={view !== "mela"}>{tr("ragas.melaCount")}</span>
+      <span class="sw-mono" data-count-janya hidden={view !== "janya"}>{tr("ragas.janyaCount", { n: janyas.length })}</span>
     </div>
 
     <section class="rx-mela" data-pane="mela" hidden={view !== "mela"}>
       <div class="rx-halves">
         {[0, 1].map((h) => (
           <div class="rx-half">
-            <p class="t-eyebrow sw-eyebrow rx-half-h">{h === 0 ? t("ragas.suddha") : t("ragas.prati")}</p>
+            <p class="t-eyebrow sw-eyebrow rx-half-h">{h === 0 ? tr("ragas.suddha") : tr("ragas.prati")}</p>
             {half(h).map((row) => (
               <div class="rx-row">
                 <span class="rx-chakra"><b>{row.name}</b><small>{row.n}</small></span>
@@ -101,36 +101,36 @@ const swarasOf = (r: any) => [...new Set(`${r.arohana} ${r.avarohana}`.split(/\s
               <p class="rx-d-title"><span class="rx-d-n" data-d-n>{first.number}</span> <span data-d-name>{first.name}</span></p>
               <p class="sw-mono" data-d-chakra>{first.chakra.name} chakra · {first.chakra.number}, position {first.chakra.position}</p>
               <div data-d-swaras class="sn-script-lat" set:html={phraseHtml(first.swaras.join(" "), { script, tamil: settings.tamilStyle, subs: true })} />
-              <p class="sw-p" data-d-janyas>{(pagesByParent.get(first.number) ?? []).length ? t("ragas.janyaPages", { list: (pagesByParent.get(first.number) ?? []).join(", ") }) : ""}</p>
-              <Button href={L(`/carnatic/ragas/melakarta/${first.number}`)} variant="secondary" data-d-open>{t("ragas.openMela")}</Button>
+              <p class="sw-p" data-d-janyas>{(pagesByParent.get(first.number) ?? []).length ? tr("ragas.janyaPages", { list: (pagesByParent.get(first.number) ?? []).join(", ") }) : ""}</p>
+              <Button href={L(`/carnatic/ragas/melakarta/${first.number}`)} variant="secondary" data-d-open>{tr("ragas.openMela")}</Button>
             </>
           )}
         </aside>
       </div>
-      <p class="sw-note">{t("ragas.gridKey")}</p>
+      <p class="sw-note">{tr("ragas.gridKey")}</p>
       <script type="application/json" id="rx-melas" set:html={melaJson} />
     </section>
 
     <section class="rx-janya" data-pane="janya" hidden={view !== "janya"}>
       <form class="rx-filters" data-filters onsubmit="return false">
-        <label class="t-eyebrow sw-eyebrow" for="rx-parent">{t("ragas.parent")}</label>
+        <label class="t-eyebrow sw-eyebrow" for="rx-parent">{tr("ragas.parent")}</label>
         <select id="rx-parent" data-f-parent>
-          <option value="">{t("ragas.anyParent")}</option>
+          <option value="">{tr("ragas.anyParent")}</option>
           {[...pagesByParent.keys()].sort((a, b) => a - b).map((n) => <option value={n}>{n} · {melas.find((m) => m.number === n)?.name}</option>)}
         </select>
-        <p class="t-eyebrow sw-eyebrow">{t("ragas.present")}</p>
+        <p class="t-eyebrow sw-eyebrow">{tr("ragas.present")}</p>
         <div class="sw-chips">{SWARA_FILTERS.map((s) => <Chip data-f-swara={s}>{inline(s, "lat")}</Chip>)}</div>
-        <p class="t-eyebrow sw-eyebrow">{t("ragas.count")}</p>
+        <p class="t-eyebrow sw-eyebrow">{tr("ragas.count")}</p>
         <div class="sw-chips">{[[5, "audava"], [6, "shadava"], [7, "sampurna"]].map(([n, w]) => <Chip data-f-count={n}>{w}</Chip>)}</div>
-        <p class="t-eyebrow sw-eyebrow">{t("ragas.movement")}</p>
-        <div class="sw-chips"><Chip data-f-vakra>{t("ragas.vakra")}</Chip><Chip data-f-hind>{t("ragas.hindustani")}</Chip></div>
-        <button type="button" class="rx-clear" data-clear>{t("ragas.clear")}</button>
+        <p class="t-eyebrow sw-eyebrow">{tr("ragas.movement")}</p>
+        <div class="sw-chips"><Chip data-f-vakra>{tr("ragas.vakra")}</Chip><Chip data-f-hind>{tr("ragas.hindustani")}</Chip></div>
+        <button type="button" class="rx-clear" data-clear>{tr("ragas.clear")}</button>
       </form>
       <div class="rx-list-wrap">
         <div class="rx-sort">
-          <span class="sw-p">{t("ragas.sort")}</span>
-          <Chip active data-sort="order">{t("ragas.sortLearn")}</Chip>
-          <Chip data-sort="az">{t("ragas.sortAz")}</Chip>
+          <span class="sw-p">{tr("ragas.sort")}</span>
+          <Chip active data-sort="order">{tr("ragas.sortLearn")}</Chip>
+          <Chip data-sort="az">{tr("ragas.sortAz")}</Chip>
         </div>
         <ul class="rx-list" data-list>
           {janyas.map((r) => {
@@ -141,7 +141,7 @@ const swarasOf = (r: any) => [...new Set(`${r.arohana} ${r.avarohana}`.split(/\s
                 <a href={L(`/carnatic/ragas/${r.id}`)} class="rx-item">
                   <span class="sw-mono rx-tier">T{r.tier}</span>
                   <span class="rx-name">{r.name}
-                    {sn && <span class:list={["rx-script", !sn.verified && "sw-unv"]} lang={sn.lang} title={sn.verified ? undefined : t("unverified.title")}>{sn.text}</span>}
+                    {sn && <span class:list={["rx-script", !sn.verified && "sw-unv"]} lang={sn.lang} title={sn.verified ? undefined : tr("unverified.title")}>{sn.text}</span>}
                   </span>
                   <span class="sw-mono rx-parent">{r.parent.number} · {r.parent.name}</span>
                   <span class="rx-scale"><span set:html={phraseHtml(r.arohana.replace(/!\w/g, ""), { script, tamil: settings.tamilStyle, subs: true })} />
@@ -157,11 +157,11 @@ const swarasOf = (r: any) => [...new Set(`${r.arohana} ${r.avarohana}`.split(/\s
         </ul>
         <div class="sw-empty" data-empty hidden>
           <span class="marks" aria-hidden="true">| |</span>
-          <h2>{t("ragas.emptyH")}</h2>
-          <p data-empty-q data-template={t("ragas.emptyQ", { q: "{q}" })}>{t("ragas.emptyF")}</p>
-          <button type="button" class="sh-btn-like" data-clear>{t("ragas.clear")}</button>
+          <h2>{tr("ragas.emptyH")}</h2>
+          <p data-empty-q data-template={tr("ragas.emptyQ", { q: "{q}" })}>{tr("ragas.emptyF")}</p>
+          <button type="button" class="sh-btn-like" data-clear>{tr("ragas.clear")}</button>
         </div>
-        <p class="sw-note">{t("ragas.sampleNote", { n: janyas.length })} {showScripts && <span>Names in <span class="sw-unv">dotted underline</span> are {t("unverified")}: {t("unverified.title").toLowerCase()}.</span>}</p>
+        <p class="sw-note">{tr("ragas.sampleNote", { n: janyas.length })} {showScripts && <span>Names in <span class="sw-unv">dotted underline</span> are {tr("unverified")}: {tr("unverified.title").toLowerCase()}.</span>}</p>
       </div>
     </section>
   </div>

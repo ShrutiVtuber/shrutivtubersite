@@ -24,7 +24,7 @@ interface Props {
 }
 const { title, description, noindex = false, jsonLd = null, crumbs = [], wide = false } = Astro.props;
 const lang = langOf(Astro);
-const t = await words(lang);
+const tr = await words(lang);
 const { me, settings } = await visitor(Astro);
 
 /* hreflang: the same address in each language. The English one is the bare
@@ -53,7 +53,7 @@ const boot = {
             alternates={noindex ? [] : alternates} canonical={canonical} bare>
   <main id="main" class:list={["sw", wide ? "sw-wide" : "page"]} lang={lang} data-swara>
     {crumbs.length > 0 && (
-      <nav class="sw-crumbs sw-noprint" aria-label={t("crumb.breadcrumb")}>
+      <nav class="sw-crumbs sw-noprint" aria-label={tr("crumb.breadcrumb")}>
         {crumbs.map(([label, href], i) => (
           <>
             {i > 0 && <span aria-hidden="true">/</span>}
@@ -67,7 +67,7 @@ const boot = {
   <div class="sw-minibar" data-minibar hidden>
     <span class="dot" aria-hidden="true"></span>
     <span class="mono" data-minibar-label></span>
-    <button type="button" data-minibar-stop>{t("drone.miniStop")}</button>
+    <button type="button" data-minibar-stop>{tr("drone.miniStop")}</button>
   </div>
   <script type="application/json" id="swara-boot" set:html={JSON.stringify(boot)} />
 </BaseLayout>

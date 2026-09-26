@@ -18,16 +18,19 @@ import { visitor } from "../../../lib/carnatic/prefs";
 import { copy } from "../../../lib/copy";
 
 const lang = langOf(Astro);
-const t = await words(lang);
-const say = await copy("carnatic.tuner");
+const tr = await words(lang);
+const say = await copy("carnatic/practice/tuner");
 const { settings } = await visitor(Astro);
 const LANES: [string, string][] = [["P", "P"], ["M2", "M₂"], ["M1", "M₁"], ["G3", "G₃"], ["G2", "G₂"], ["R2", "R₂"], ["R1", "R₁"], ["S", "S"]];
 ---
 
 <SwaraLayout title={say("meta.title", "Tuner and drone · Swara Studio")}
              description={say("meta.description", "A tanpura drone in just intonation relative to your Sa, and a tuner that reads your pitch as a swara with its octave and draws it as a line. Free, in the browser, no account.")}
-             crumbs={[[t("crumb.practice"), hrefIn(lang, "/carnatic/practice/tuner")], [say("crumb", "Tuner and drone")]]}>
-  <Hero eyebrow={t("crumb.practice")} title={say("title", "Tuner and drone")} lede={say("lede", "Tune to your Sa, then watch your pitch as a line.")} />
+             crumbs={[[tr("crumb.practice"), hrefIn(lang, "/carnatic/practice/tuner")], [say("crumb", "Tuner and drone")]]}>
+  <Hero eyebrow={tr("crumb.practice")} title={say("title", "Tuner and drone")} lede={say("lede", "Tune to your Sa, then watch your pitch as a line.")} />
+  <nav class="sw-p sw-also sw-also-row" aria-label={say("alsoAria", "More in Practice")}>
+    {say("also", "Also in Practice:")} <a href="/carnatic/practice/tala">{say("also.tala", "Tala trainer")}</a> · <a href="/carnatic/practice/quiz">{say("also.quiz", "Quizzes")}</a>
+  </nav>
 
   <div class="tn">
     <DroneControl settings={settings} />
@@ -44,7 +47,7 @@ const LANES: [string, string][] = [["P", "P"], ["M2", "M₂"], ["M1", "M₁"], [
       <div class="tn-read" aria-live="polite">
         <span class="tn-swara" data-swara>–<sub></sub></span>
         <span class="tn-oct" data-octave>{say("idle", "press Listen")}</span>
-        <span class="tn-cents"><span data-cents>&nbsp;</span><small>{say("vsEt", "vs equal temperament")}</small></span>
+        <span class="tn-cents"><span data-cents>{"\u00a0"}</span><small>{say("vsEt", "vs equal temperament")}</small></span>
       </div>
 
       <div class="tn-plot" role="img" aria-label={say("traceLabel", "Your pitch over the last four seconds, against the swaras")}>

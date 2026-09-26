@@ -18,8 +18,8 @@ import { avartanamHtml, toCounts } from "../../lib/carnatic/render";
 import { copy } from "../../lib/copy";
 
 const lang = langOf(Astro);
-const t = await words(lang);
-const say = await copy("carnatic.path");
+const tr = await words(lang);
+const say = await copy("carnatic/path");
 const L = (p: string) => hrefIn(lang, p);
 const { me, settings } = await visitor(Astro);
 const [data, tl, inst] = await Promise.all([lessons(), talas(), instruments()]);
@@ -35,7 +35,7 @@ const sets = SET_ORDER.map((id) => data?.sets?.find((s: any) => s.id === id)).fi
 const optional = settings.eighthAlankaram;
 const exercises = sets.flatMap((s: any) => s.items.filter((i: any) => optional || !i.optional).map((i: any) => ({
   id: i.id, set: s.id, title: i.title,
-  name: `${t(`set.${s.id}` as any)} ${s.id === "geethams" ? "" : String(s.items.indexOf(i) + 1)}`.trim(),
+  name: `${tr(`set.${s.id}` as any)} ${s.id === "geethams" ? "" : String(s.items.indexOf(i) + 1)}`.trim(),
   counts: countsFor(i.tala, i.practicalTala), angas: i.angas,
   notes: i.sections.flatMap((sec: any) => sec.lines.flatMap((l: any) => l.segments.flat())),
   repeats: i.repeats,
@@ -50,7 +50,7 @@ const venu = settings.instrument === "venu" ? (inst?.venu?.fingerings ?? []).fil
 ---
 <SwaraLayout title={say("meta.title", "The beginner path · Swara Studio")}
              description={say("meta.description", "The traditional Carnatic beginner sequence: sarali, janta and dhatu varisai, tara and mandra sthayi, the alankarams in their suladi talas and the Malahari geethams, played with the drone and the tala at three speeds.")}
-             crumbs={[[t("crumb.learn"), L("/carnatic/lessons")], [say("crumb", "Your path")]]}>
+             crumbs={[[tr("crumb.learn"), L("/carnatic/lessons")], [say("crumb", "Your path")]]}>
   <Hero eyebrow={say("eyebrow", "Beginner path")} title={say("title", "Your path")}
         lede={say("lede", "In the traditional order: 50 items by default, all in Mayamalavagowla until the Malahari geethams. Speed 1 is 60 counts a minute (range 40–70); speeds 2 and 3 double the notes, never the tala.")} />
   {!data || !current ? <div class="sw-section"><Absent /></div> : (
@@ -60,8 +60,8 @@ const venu = settings.instrument === "venu" ? (inst?.venu?.fingerings ?? []).fil
         const items = exercises.filter((e) => e.set === s.id);
         return (
           <section class:list={["pa-set", s.id === current.set && "on"]} id={s.id}>
-            <div class="pa-set-head"><h2 class="pa-set-h">{t(`set.${s.id}` as any)}{s.id === "alankaram" ? " · one per suladi tala" : s.id === "geethams" ? " · Malahari" : ""}</h2>
-              <span class="sw-mono" data-set-count={s.id}>{t("gen.exercises", { n: items.length })}</span></div>
+            <div class="pa-set-head"><h2 class="pa-set-h">{tr(`set.${s.id}` as any)}{s.id === "alankaram" ? " · one per suladi tala" : s.id === "geethams" ? " · Malahari" : ""}</h2>
+              <span class="sw-mono" data-set-count={s.id}>{tr("gen.exercises", { n: items.length })}</span></div>
             <div class="pa-blocks">
               {items.map((e) => (
                 <a href={L(`/carnatic/path?item=${e.id}`)} class:list={["pa-block", e.id === current.id && "now"]} data-item={e.id} title={e.title ?? e.name} aria-label={`${e.name}${e.title ? `: ${e.title}` : ""}`}>
@@ -73,7 +73,7 @@ const venu = settings.instrument === "venu" ? (inst?.venu?.fingerings ?? []).fil
         );
       })}
       <section class="pa-set" id="varnams">
-        <div class="pa-set-head"><h2 class="pa-set-h">{t("set.varnams")} · {t("gen.coming")}</h2><span class="sw-mono">{t("gen.exercises", { n: 0 })}</span></div>
+        <div class="pa-set-head"><h2 class="pa-set-h">{tr("set.varnams")} · {tr("gen.coming")}</h2><span class="sw-mono">{tr("gen.exercises", { n: 0 })}</span></div>
         <ul class="pa-varnams">{(data.varnamsComing ?? []).map((v: any) => <li class="sw-p">{v.title} · <a href={L(`/carnatic/ragas/${v.raga}`)}>{v.raga[0].toUpperCase() + v.raga.slice(1)}</a></li>)}</ul>
       </section>
       <p class="sw-note">{say("key", "Each block is one exercise; its three bars are speeds 1, 2 and 3.")} {say("count", "52 exercises and geethams at launch, with the 8th alankaram's two versions off by default.")}</p>
@@ -88,15 +88,15 @@ const venu = settings.instrument === "venu" ? (inst?.venu?.fingerings ?? []).fil
       </div>
       {current.title && <p class="sw-note" data-ex-title>{current.title}</p>}
       <div class="sw-chips pa-speeds" role="group">
-        {[1, 2, 3].map((s) => <Chip data-speed={s} active={s === 1}>{t("gen.speed", { n: s })}</Chip>)}
-        {settings.fourthSpeed && <Chip data-speed="4">{t("gen.speed", { n: 4 })}</Chip>}
+        {[1, 2, 3].map((s) => <Chip data-speed={s} active={s === 1}>{tr("gen.speed", { n: s })}</Chip>)}
+        {settings.fourthSpeed && <Chip data-speed="4">{tr("gen.speed", { n: 4 })}</Chip>}
         <Chip data-updown>{say("updown", "Up and down · 12321")}</Chip>
         <Chip data-loop>{say("loop", "Loop")}</Chip>
       </div>
       <div class:list={["pa-line", "sn-script-" + script]} data-line set:html={first} />
       <div class="pa-venu" data-venu hidden={venu.length === 0}></div>
       <div class="pa-controls">
-        <button type="button" class="pa-go" data-go>{t("gen.play")}</button>
+        <button type="button" class="pa-go" data-go>{tr("gen.play")}</button>
         <span class="sw-mono" data-status>drone on · tala on · hand shown · <span data-bpm>{settings.tempo}</span> / min</span>
         <label class="pa-tempo"><span class="sw-p">{say("tempo", "Tempo")}</span><input type="range" min="40" max="70" value={settings.tempo} data-tempo /></label>
       </div>

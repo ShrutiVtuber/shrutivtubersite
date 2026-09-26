@@ -111,3 +111,7 @@ export async function reviews(): Promise<Record<string, Review>> {
   reviewCache = { at: now, value: body?.items ?? reviewCache?.value ?? {} };
   return reviewCache.value;
 }
+
+/** A reviewer has confirmed or corrected this item: its note or mark goes. */
+export const cleared = (rv: Record<string, Review>, key: string): boolean =>
+  rv[key]?.status === "confirmed" || rv[key]?.status === "corrected";

@@ -16,12 +16,12 @@ import { copy } from "../../../lib/copy";
 import { schoolJournal } from "../../../lib/carnatic/catalogue";
 
 const lang = langOf(Astro);
-const t = await words(lang);
-const say = await copy("carnatic.lesson");
+const tr = await words(lang);
+const say = await copy("carnatic/lessons/[slug]");
 const L = (p: string) => hrefIn(lang, p);
 const { me, settings } = await visitor(Astro);
 const data = await lessons();
-const list = lessonList(data, (id) => t(`set.${id}` as any));
+const list = lessonList(data, (id) => tr(`set.${id}` as any));
 const idx = list.findIndex((l) => l.slug === Astro.params.slug);
 if (idx < 0) return notFound(Astro);
 const l = list[idx];
@@ -33,9 +33,10 @@ const lede = l.set === "sarali_varisai" && l.n === 1 ? say("lede.sarali1", "The 
 const journal = await schoolJournal(1);
 const talaName = (l.item.practicalTala ?? l.item.tala).replace(/_/g, " ").replace("rupaka chaturasra", "rupaka, 6-count").replace(/^\w/, (c: string) => c.toUpperCase());
 const STEPS = [say("step1", "Listen to the line with the drone"), say("step2", "Sing or play speed 1"), say("step3", "Keep the tala with your hand"), say("step4", "Speeds 2 and 3")];
+const droneLine = say("droneLine", "drone Sa = {sa} · {tala} · {tempo} / min").replace("{sa}", settings.sa).replace("{tala}", talaName).replace("{tempo}", String(settings.tempo));
 ---
 <SwaraLayout title={`${l.name} · Swara Studio`} description={`${l.name}${l.title ? `: ${l.title}` : ""}. ${SET_PROSE[l.set] ?? ""}`.slice(0, 300)}
-             crumbs={[[t("crumb.learn"), L("/carnatic/lessons")], [t("crumb.lessons"), L("/carnatic/lessons")], [l.name]]}>
+             crumbs={[[tr("crumb.learn"), L("/carnatic/lessons")], [tr("crumb.lessons"), L("/carnatic/lessons")], [l.name]]}>
   <Hero eyebrow={say("eyebrow", "Lesson {n} · Beginner path").replace("{n}", String(idx + 1))} title={l.name} lede={lede} />
   <div class="sw-cols" data-lesson={l.id} data-signed-in={me.signedIn ? "1" : ""}>
     <div class="sw-main">
@@ -48,11 +49,11 @@ const STEPS = [say("step1", "Listen to the line with the drone"), say("step2", "
       </div>
       <p class="sw-prose">{say(`prose.${l.set}`, SET_PROSE[l.set] ?? "")}</p>
       <div class="sw-card ls-line">
-        <p class="t-eyebrow sw-eyebrow">{l.name} · {t("gen.speed", { n: 1 })}</p>
+        <p class="t-eyebrow sw-eyebrow">{l.name} · {tr("gen.speed", { n: 1 })}</p>
         <div class:list={["sn-script-" + script]} set:html={firstAv} />
         <div class="ls-play">
           <Button href={L(`/carnatic/path?item=${l.id}`)} size="sm">{say("playAlong", "Play along")}</Button>
-          <span class="sw-mono">drone Sa = {settings.sa} · {talaName} · {settings.tempo} / min</span>
+          <span class="sw-mono">{droneLine}</span>
         </div>
       </div>
       <div class="ls-foot">
@@ -68,7 +69,7 @@ const STEPS = [say("step1", "Listen to the line with the drone"), say("step2", "
         <ul>{STEPS.map((s, i) => <li data-step={i}><i></i>{s}</li>)}</ul>
       </div>
       {journal.length > 0 && (
-        <div class="ls-journal"><p class="t-eyebrow sw-eyebrow">{t("raga.journal")}</p><a href={journal[0].href}>{journal[0].title}</a></div>
+        <div class="ls-journal"><p class="t-eyebrow sw-eyebrow">{tr("raga.journal")}</p><a href={journal[0].href}>{journal[0].title}</a></div>
       )}
     </aside>
   </div>
