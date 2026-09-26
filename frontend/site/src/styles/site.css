@@ -118,6 +118,18 @@
   .nav-toggle { font-size: 0; gap: 0; padding: 8px 10px; }
   .nav-toggle span { font-size: 17px; }
   .brand .brand-word { font-size: 22px; }
+  /* ⚠ That was still not enough: the side group is `flex: none`, so it never
+     gave anything back, and the page still moved 17px sideways at 390 and 34px
+     at 360 on every page (measured 26 September 2026). The badge keeps its
+     dot always, and its word whenever she IS live — that word is the point.
+     Offline, the dot alone says it; the word stays in the page for a screen
+     reader (it is the badge's status text) and leaves only the eye. */
+  .site-header .sh-live { gap: 6px; padding: 6px 10px; min-width: 44px; justify-content: center; }
+  .site-header .sh-live:not([data-status="live"]) .sh-word {
+    position: absolute; width: 1px; height: 1px; overflow: hidden;
+    clip-path: inset(50%); white-space: nowrap;
+  }
+  .acct-link { padding: 9px 8px; letter-spacing: 0.04em; }
 }
 .nav-toggle:hover { border-color: var(--accent); color: var(--accent); }
 .acct-link {

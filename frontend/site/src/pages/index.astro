@@ -465,7 +465,7 @@ const INSTRUMENTS = [
     margin: var(--space-3) 0 0;
     padding: 0;
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
     gap: var(--space-3) var(--space-5);
   }
   .ai-list li { display: flex; gap: 10px; align-items: baseline; }
@@ -477,7 +477,7 @@ const INSTRUMENTS = [
 
   .instruments {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr));
     gap: var(--space-3);
   }
   .instrument {

@@ -116,5 +116,8 @@ const isLive = live?.status === "live";
   }
   .h-go:hover { text-decoration: underline; }
 
-  @media (max-width: 640px) { .h-cards { grid-template-columns: 1fr; } }
+  /* minmax(0, 1fr), not 1fr: a bare 1fr is minmax(auto, 1fr), so the widest
+     word in a card set the column's floor and pushed the home page 14px
+     sideways at 320. */
+  @media (max-width: 640px) { .h-cards { grid-template-columns: minmax(0, 1fr); } }
 </style>
