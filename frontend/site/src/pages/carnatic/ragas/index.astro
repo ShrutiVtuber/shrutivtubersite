@@ -1,0 +1,329 @@
+---
+/* The raga explorer (handoff: Raga Explorer): the 72 melakartas as a grid of
+ * twelve chakras in two halves, and the janya ragas as a filterable list in
+ * learning order. Search knows most spellings (the normaliser in names.ts)
+ * and the scripts. Everything is rendered on the server; the browser only
+ * filters, so the page works without a script.
+ */
+import SwaraLayout from "../../../layouts/SwaraLayout.astro";
+import Hero from "../../../components/carnatic/Hero.astro";
+import Absent from "../../../components/carnatic/Absent.astro";
+import Chip from "../../../components/carnatic/Chip.astro";
+import Badge from "../../../components/navigation/Badge.astro";
+import Button from "../../../components/forms/Button.astro";
+import { hrefIn, langOf, words } from "../../../lib/carnatic/i18n";
+import { ragas, reviews } from "../../../lib/carnatic/data";
+import { visitor, swaraScript } from "../../../lib/carnatic/prefs";
+import { allScriptNames, normalise, ragaKey, scriptName, type IndicLang } from "../../../lib/carnatic/names";
+import { phraseHtml } from "../../../lib/carnatic/render";
+import { inline } from "../../../lib/carnatic/notation";
+
+const lang = langOf(Astro);
+const t = await words(lang);
+const L = (p: string) => hrefIn(lang, p);
+const { settings } = await visitor(Astro);
+const script = swaraScript(settings, lang);
+const [data, rv] = await Promise.all([ragas(), reviews()]);
+const view = Astro.url.searchParams.get("view") === "janya" ? "janya" : "mela";
+const q = (Astro.url.searchParams.get("q") ?? "").slice(0, 60);
+const shownLang: IndicLang = lang === "en" ? "ta" : lang;
+const showScripts = settings.otherScripts !== "hide";
+
+const melas = data?.melakartas ?? [];
+const janyas = data?.janyas ?? [];
+const pagesByParent = new Map<number, string[]>();
+for (const r of janyas) pagesByParent.set(r.parent.number, [...(pagesByParent.get(r.parent.number) ?? []), r.name]);
+
+const searchKeys = (names: string[], scripts: string[]) =>
+  JSON.stringify([...new Set(names.map(normalise)), ...scripts]);
+const melaKeys = (m: any) => searchKeys([m.name, ...(m.aliases ?? []), m.iso ?? "", m.dikshitar ?? "", String(m.number)],
+  allScriptNames(m.scripts, settings.tamilStyle, rv, `script:mela:${m.number}`).map((s) => s.text));
+const janyaKeys = (r: any) => searchKeys([r.name, ...(r.aliases ?? []), r.iso ?? ""],
+  allScriptNames(r.scripts, settings.tamilStyle, rv, ragaKey(r)).map((s) => s.text));
+
+const CHAKRAS = ["Indu", "Netra", "Agni", "Veda", "Bana", "Rutu", "Rishi", "Vasu", "Brahma", "Disi", "Rudra", "Aditya"];
+const half = (h: number) => Array.from({ length: 6 }, (_, row) => ({
+  n: h * 6 + row + 1, name: CHAKRAS[h * 6 + row],
+  cells: melas.filter((m) => m.chakra.number === h * 6 + row + 1).sort((a, b) => a.number - b.number),
+}));
+const first = melas.find((m) => m.number === 15) ?? melas[0];
+const melaJson = JSON.stringify(Object.fromEntries(melas.map((m) => [m.number, {
+  name: m.name, chakra: `${m.chakra.name} chakra · ${m.chakra.number}, position ${m.chakra.position}`,
+  swaras: phraseHtml(m.swaras.join(" "), { script, tamil: settings.tamilStyle, subs: true }),
+  janyas: (pagesByParent.get(m.number) ?? []).join(", "),
+}])));
+const SWARA_FILTERS = ["R1", "R2", "G2", "G3", "M1", "M2", "D1", "D2", "N2", "N3"];
+const swarasOf = (r: any) => [...new Set(`${r.arohana} ${r.avarohana}`.split(/\s+/).map((x: string) => x.replace(/[.',!av]/g, "").replace(/^\./, "")).filter((x: string) => /^[RGMDN][123]$/.test(x)))];
+---
+<SwaraLayout title={`${t("ragas.title")} · Swara Studio`} description={t("ragas.meta")}
+             crumbs={[[t("crumb.learn"), L("/carnatic/lessons")], [t("crumb.ragas")]]}>
+  <Hero title={t("ragas.title")} lede={t("ragas.lede")}>
+    <form class="rx-search" role="search" method="get" data-search-form>
+      {lang !== "en" && <input type="hidden" name="lang" value={lang} />}
+      <input type="hidden" name="view" value={view} data-view-field />
+      <label for="rx-q" class="sw-h4">{t("ragas.search")}</label>
+      <input id="rx-q" name="q" type="search" value={q} placeholder={t("ragas.searchPh")} autocomplete="off" data-q />
+    </form>
+  </Hero>
+  {!data ? <div class="sw-section"><Absent /></div> : (
+  <div class="rx" data-explorer data-view={view}>
+    <div class="rx-bar">
+      <div class="sw-seg" role="group">
+        <a href={L(`/carnatic/ragas${q ? `?q=${encodeURIComponent(q)}` : ""}`)} data-view-btn="mela" aria-current={view === "mela" ? "page" : undefined}>{t("ragas.viewMela")}</a>
+        <a href={L(`/carnatic/ragas?view=janya${q ? `&q=${encodeURIComponent(q)}` : ""}`)} data-view-btn="janya" aria-current={view === "janya" ? "page" : undefined}>{t("ragas.viewJanya")}</a>
+      </div>
+      <span class="sw-mono" data-count-mela hidden={view !== "mela"}>{t("ragas.melaCount")}</span>
+      <span class="sw-mono" data-count-janya hidden={view !== "janya"}>{t("ragas.janyaCount", { n: janyas.length })}</span>
+    </div>
+
+    <section class="rx-mela" data-pane="mela" hidden={view !== "mela"}>
+      <div class="rx-halves">
+        {[0, 1].map((h) => (
+          <div class="rx-half">
+            <p class="t-eyebrow sw-eyebrow rx-half-h">{h === 0 ? t("ragas.suddha") : t("ragas.prati")}</p>
+            {half(h).map((row) => (
+              <div class="rx-row">
+                <span class="rx-chakra"><b>{row.name}</b><small>{row.n}</small></span>
+                {row.cells.map((m) => (
+                  <a class:list={["rx-cell", m.vivadi.length > 0 && "vivadi"]} href={L(`/carnatic/ragas/melakarta/${m.number}`)}
+                     data-mela={m.number} data-keys={melaKeys(m)} aria-pressed={m.number === first?.number ? "true" : "false"}
+                     title={m.vivadi.length ? `Vivadi: ${m.vivadi.join(", ")}` : undefined}>
+                    <small>{m.number}</small><span>{m.name}</span>
+                  </a>
+                ))}
+              </div>
+            ))}
+          </div>
+        ))}
+        <aside class="sw-card rx-detail" data-detail aria-live="polite">
+          {first && (
+            <>
+              <p class="rx-d-title"><span class="rx-d-n" data-d-n>{first.number}</span> <span data-d-name>{first.name}</span></p>
+              <p class="sw-mono" data-d-chakra>{first.chakra.name} chakra · {first.chakra.number}, position {first.chakra.position}</p>
+              <div data-d-swaras class="sn-script-lat" set:html={phraseHtml(first.swaras.join(" "), { script, tamil: settings.tamilStyle, subs: true })} />
+              <p class="sw-p" data-d-janyas>{(pagesByParent.get(first.number) ?? []).length ? t("ragas.janyaPages", { list: (pagesByParent.get(first.number) ?? []).join(", ") }) : ""}</p>
+              <Button href={L(`/carnatic/ragas/melakarta/${first.number}`)} variant="secondary" data-d-open>{t("ragas.openMela")}</Button>
+            </>
+          )}
+        </aside>
+      </div>
+      <p class="sw-note">{t("ragas.gridKey")}</p>
+      <script type="application/json" id="rx-melas" set:html={melaJson} />
+    </section>
+
+    <section class="rx-janya" data-pane="janya" hidden={view !== "janya"}>
+      <form class="rx-filters" data-filters onsubmit="return false">
+        <label class="t-eyebrow sw-eyebrow" for="rx-parent">{t("ragas.parent")}</label>
+        <select id="rx-parent" data-f-parent>
+          <option value="">{t("ragas.anyParent")}</option>
+          {[...pagesByParent.keys()].sort((a, b) => a - b).map((n) => <option value={n}>{n} · {melas.find((m) => m.number === n)?.name}</option>)}
+        </select>
+        <p class="t-eyebrow sw-eyebrow">{t("ragas.present")}</p>
+        <div class="sw-chips">{SWARA_FILTERS.map((s) => <Chip data-f-swara={s}>{inline(s, "lat")}</Chip>)}</div>
+        <p class="t-eyebrow sw-eyebrow">{t("ragas.count")}</p>
+        <div class="sw-chips">{[[5, "audava"], [6, "shadava"], [7, "sampurna"]].map(([n, w]) => <Chip data-f-count={n}>{w}</Chip>)}</div>
+        <p class="t-eyebrow sw-eyebrow">{t("ragas.movement")}</p>
+        <div class="sw-chips"><Chip data-f-vakra>{t("ragas.vakra")}</Chip><Chip data-f-hind>{t("ragas.hindustani")}</Chip></div>
+        <button type="button" class="rx-clear" data-clear>{t("ragas.clear")}</button>
+      </form>
+      <div class="rx-list-wrap">
+        <div class="rx-sort">
+          <span class="sw-p">{t("ragas.sort")}</span>
+          <Chip active data-sort="order">{t("ragas.sortLearn")}</Chip>
+          <Chip data-sort="az">{t("ragas.sortAz")}</Chip>
+        </div>
+        <ul class="rx-list" data-list>
+          {janyas.map((r) => {
+            const sn = showScripts ? scriptName(r.scripts, shownLang, settings.tamilStyle, rv, ragaKey(r)) : null;
+            return (
+              <li data-row data-keys={janyaKeys(r)} data-order={r.order} data-az={r.name} data-parent={r.parent.number}
+                  data-swaras={swarasOf(r).join(" ")} data-count={r.classification.aro} data-vakra={String(r.classification.vakra)} data-hind={String(r.hindustani)}>
+                <a href={L(`/carnatic/ragas/${r.id}`)} class="rx-item">
+                  <span class="sw-mono rx-tier">T{r.tier}</span>
+                  <span class="rx-name">{r.name}
+                    {sn && <span class:list={["rx-script", !sn.verified && "sw-unv"]} lang={sn.lang} title={sn.verified ? undefined : t("unverified.title")}>{sn.text}</span>}
+                  </span>
+                  <span class="sw-mono rx-parent">{r.parent.number} · {r.parent.name}</span>
+                  <span class="rx-scale"><span set:html={phraseHtml(r.arohana.replace(/!\w/g, ""), { script, tamil: settings.tamilStyle, subs: true })} />
+                    <Badge>{r.classification.jati}</Badge>
+                    {r.classification.vakra && <Badge tone="faint">vakra</Badge>}
+                    {r.classification.bhashanga && <Badge tone="faint">bhashanga</Badge>}
+                    {r.hindustani && <Badge tone="faint">Hindustani-derived</Badge>}
+                  </span>
+                </a>
+              </li>
+            );
+          })}
+        </ul>
+        <div class="sw-empty" data-empty hidden>
+          <span class="marks" aria-hidden="true">| |</span>
+          <h2>{t("ragas.emptyH")}</h2>
+          <p data-empty-q data-template={t("ragas.emptyQ", { q: "{q}" })}>{t("ragas.emptyF")}</p>
+          <button type="button" class="sh-btn-like" data-clear>{t("ragas.clear")}</button>
+        </div>
+        <p class="sw-note">{t("ragas.sampleNote", { n: janyas.length })} {showScripts && <span>Names in <span class="sw-unv">dotted underline</span> are {t("unverified")}: {t("unverified.title").toLowerCase()}.</span>}</p>
+      </div>
+    </section>
+  </div>
+  )}
+</SwaraLayout>
+
+<script>
+  import { normalise } from "../../../lib/carnatic/names";
+
+  const root = document.querySelector<HTMLElement>("[data-explorer]");
+  if (root) {
+    const qIn = document.querySelector<HTMLInputElement>("[data-q]")!;
+    const viewField = document.querySelector<HTMLInputElement>("[data-view-field]");
+    const melas = JSON.parse(document.getElementById("rx-melas")?.textContent || "{}");
+    const state = { swaras: new Set<string>(), counts: new Set<string>(), vakra: false, hind: false, parent: "", sort: "order" };
+
+    const matches = (el: HTMLElement, query: string) => {
+      if (!query) return true;
+      const keys: string[] = JSON.parse(el.dataset.keys || "[]");
+      const n = normalise(query);
+      return keys.some((k) => (n && k.includes(n)) || k.includes(query.trim()));
+    };
+
+    const apply = () => {
+      const query = qIn.value.trim();
+      /* The grid: dim what does not match. */
+      root.querySelectorAll<HTMLElement>("[data-mela]").forEach((c) => c.classList.toggle("dim", !matches(c, query)));
+      /* The list. */
+      let shown = 0;
+      const rows = Array.from(root.querySelectorAll<HTMLElement>("[data-row]"));
+      for (const r of rows) {
+        const sw = new Set((r.dataset.swaras || "").split(" "));
+        const ok = matches(r, query)
+          && (!state.parent || r.dataset.parent === state.parent)
+          && [...state.swaras].every((s) => sw.has(s))
+          && (!state.counts.size || state.counts.has(r.dataset.count!))
+          && (!state.vakra || r.dataset.vakra === "true")
+          && (!state.hind || r.dataset.hind === "true");
+        r.hidden = !ok;
+        if (ok) shown++;
+      }
+      const list = root.querySelector<HTMLElement>("[data-list]")!;
+      rows.sort((a, b) => state.sort === "az" ? a.dataset.az!.localeCompare(b.dataset.az!) : Number(a.dataset.order) - Number(b.dataset.order))
+        .forEach((r) => list.appendChild(r));
+      const empty = root.querySelector<HTMLElement>("[data-empty]")!;
+      empty.hidden = shown > 0;
+      const p = root.querySelector<HTMLElement>("[data-empty-q]")!;
+      if (query) p.textContent = p.dataset.template!.replace("{q}", query);
+      root.querySelector<HTMLElement>("[data-count-janya]")!.textContent = root.querySelector<HTMLElement>("[data-count-janya]")!.textContent!.replace(/^\d+/, String(shown));
+    };
+
+    qIn.addEventListener("input", () => {
+      apply();
+      const u = new URL(location.href);
+      if (qIn.value) u.searchParams.set("q", qIn.value); else u.searchParams.delete("q");
+      history.replaceState(null, "", u);
+    });
+    document.querySelector("[data-search-form]")?.addEventListener("submit", (e) => { e.preventDefault(); apply(); });
+
+    root.querySelectorAll<HTMLAnchorElement>("[data-view-btn]").forEach((a) => a.addEventListener("click", (e) => {
+      e.preventDefault();
+      const v = a.dataset.viewBtn!;
+      root.dataset.view = v;
+      if (viewField) viewField.value = v;
+      root.querySelectorAll("[data-view-btn]").forEach((x) => x.toggleAttribute("aria-current", x === a));
+      root.querySelectorAll<HTMLElement>("[data-pane]").forEach((p) => { p.hidden = p.dataset.pane !== v; });
+      root.querySelector<HTMLElement>("[data-count-mela]")!.hidden = v !== "mela";
+      root.querySelector<HTMLElement>("[data-count-janya]")!.hidden = v !== "janya";
+      const u = new URL(location.href);
+      if (v === "janya") u.searchParams.set("view", "janya"); else u.searchParams.delete("view");
+      history.replaceState(null, "", u);
+    }));
+
+    /* Selecting a mela shows it on the right; a second press opens its page. */
+    root.querySelectorAll<HTMLAnchorElement>("[data-mela]").forEach((cell) => cell.addEventListener("click", (e) => {
+      if (cell.getAttribute("aria-pressed") === "true" || matchMedia("(max-width: 899px)").matches) return;
+      e.preventDefault();
+      root.querySelectorAll("[data-mela]").forEach((c) => c.setAttribute("aria-pressed", String(c === cell)));
+      const m = melas[cell.dataset.mela!];
+      const d = root.querySelector<HTMLElement>("[data-detail]")!;
+      d.querySelector("[data-d-n]")!.textContent = cell.dataset.mela!;
+      d.querySelector("[data-d-name]")!.textContent = m.name;
+      d.querySelector("[data-d-chakra]")!.textContent = m.chakra;
+      d.querySelector("[data-d-swaras]")!.innerHTML = m.swaras;
+      d.querySelector("[data-d-janyas]")!.textContent = m.janyas ? `Janya pages: ${m.janyas}` : "";
+      d.querySelector<HTMLAnchorElement>("[data-d-open]")!.href = cell.href;
+    }));
+
+    const toggle = (sel: string, fn: (el: HTMLElement, on: boolean) => void) =>
+      root.querySelectorAll<HTMLElement>(sel).forEach((el) => el.addEventListener("click", () => {
+        const on = el.getAttribute("aria-pressed") !== "true";
+        el.setAttribute("aria-pressed", String(on));
+        fn(el, on);
+        apply();
+      }));
+    toggle("[data-f-swara]", (el, on) => on ? state.swaras.add(el.dataset.fSwara!) : state.swaras.delete(el.dataset.fSwara!));
+    toggle("[data-f-count]", (el, on) => on ? state.counts.add(el.dataset.fCount!) : state.counts.delete(el.dataset.fCount!));
+    toggle("[data-f-vakra]", (_el, on) => { state.vakra = on; });
+    toggle("[data-f-hind]", (_el, on) => { state.hind = on; });
+    root.querySelector<HTMLSelectElement>("[data-f-parent]")?.addEventListener("change", (e) => { state.parent = (e.target as HTMLSelectElement).value; apply(); });
+    root.querySelectorAll<HTMLElement>("[data-sort]").forEach((el) => el.addEventListener("click", () => {
+      state.sort = el.dataset.sort!;
+      root.querySelectorAll("[data-sort]").forEach((x) => x.setAttribute("aria-pressed", String(x === el)));
+      apply();
+    }));
+    root.querySelectorAll("[data-clear]").forEach((b) => b.addEventListener("click", () => {
+      state.swaras.clear(); state.counts.clear(); state.vakra = false; state.hind = false; state.parent = "";
+      root.querySelectorAll("[data-f-swara],[data-f-count],[data-f-vakra],[data-f-hind]").forEach((x) => x.setAttribute("aria-pressed", "false"));
+      const sel = root.querySelector<HTMLSelectElement>("[data-f-parent]"); if (sel) sel.value = "";
+      qIn.value = "";
+      apply();
+    }));
+    apply();
+  }
+</script>
+
+<style>
+  .rx-search { display: grid; gap: 8px; padding-top: 8px; }
+  .rx-search input { font: 16px / 1.3 var(--font-body); padding: 12px 12px; border: 1px solid var(--line-strong); border-radius: 4px; background: var(--surface-card); color: var(--ink); width: 100%; box-sizing: border-box; }
+  .rx-bar { display: flex; gap: 12px 16px; align-items: center; flex-wrap: wrap; padding: 16px 0; border-bottom: 1px solid var(--line); margin-top: 16px; }
+  .rx-mela { display: grid; gap: 14px; padding-top: 20px; }
+  .rx-halves { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 335px); gap: 12px 32px; align-items: start; }
+  .rx-half { grid-column: 1; display: grid; gap: 6px; }
+  .rx-half-h { color: var(--ink); margin-top: 8px; }
+  .rx-detail { grid-column: 2; grid-row: 1 / span 2; position: sticky; top: 90px; display: grid; gap: 12px; padding: 18px; }
+  .rx-row { display: grid; grid-template-columns: 66px repeat(6, minmax(0, 1fr)); gap: 4px; }
+  .rx-chakra { display: grid; align-content: center; gap: 2px; }
+  .rx-chakra b { font: 600 13px / 1.2 var(--font-body); color: var(--ink); }
+  .rx-chakra small { font: 10px / 1 var(--font-mono); color: var(--ink-faint); }
+  .rx-cell { display: grid; gap: 4px; align-content: start; min-height: 52px; padding: 8px; border: 1px solid var(--line-strong); border-radius: 3px; text-decoration: none; background: transparent; min-width: 0; }
+  .rx-cell.vivadi { border-style: dashed; }
+  .rx-cell small { font: 10px / 1 var(--font-mono); color: var(--ink-faint); }
+  .rx-cell span { font: 12.5px / 1.2 var(--font-body); color: var(--ink); overflow-wrap: anywhere; }
+  .rx-cell:hover { border-color: var(--accent); }
+  .rx-cell[aria-pressed="true"] { background: var(--accent-wash); border: 1px solid var(--accent); }
+  .rx-cell[aria-pressed="true"] span { color: var(--accent); }
+  .rx-cell.dim { opacity: .28; }
+  .rx-d-title { margin: 0; display: flex; gap: 10px; align-items: baseline; font: 26px / 1.1 var(--font-display); color: var(--ink); }
+  .rx-d-n { color: var(--ink-faint); font-family: var(--font-mono); font-size: 22px; }
+  .rx-janya { display: grid; grid-template-columns: minmax(0, 312px) minmax(0, 1fr); gap: 32px; padding-top: 20px; align-items: start; }
+  .rx-filters { display: grid; gap: 10px; align-content: start; }
+  .rx-filters select { font: 15px / 1.3 var(--font-body); padding: 11px 12px; border: 1px solid var(--line-strong); border-radius: 4px; background: var(--surface-card); color: var(--ink); }
+  .rx-filters .t-eyebrow { margin-top: 10px; }
+  .rx-clear, .sh-btn-like { appearance: none; justify-self: start; background: none; border: 0; color: var(--accent); font: 500 var(--text-sm) / 1 var(--font-body); padding: 12px 0; cursor: pointer; }
+  .sw-empty .sh-btn-like { border: 1px solid var(--line-strong); border-radius: 4px; padding: 12px 16px; justify-self: center; }
+  .rx-sort { display: flex; gap: 8px; align-items: center; padding-bottom: 10px; border-bottom: 1px solid var(--line); }
+  .rx-list { list-style: none; margin: 0; padding: 0; }
+  .rx-item { display: grid; grid-template-columns: 38px minmax(0, 1fr) auto; grid-template-areas: "tier name parent" ". scale scale"; gap: 6px 0; padding: 14px 2px; border-bottom: 1px solid var(--line); text-decoration: none; }
+  .rx-item:hover .rx-name { color: var(--accent); }
+  .rx-tier { grid-area: tier; padding-top: 6px; }
+  .rx-name { grid-area: name; font: 21px / 1.2 var(--font-display); color: var(--ink); display: flex; gap: 12px; align-items: baseline; flex-wrap: wrap; }
+  .rx-script { font-size: 17px; color: var(--ink-soft); }
+  .rx-parent { grid-area: parent; color: var(--ink-soft); padding-top: 4px; }
+  .rx-scale { grid-area: scale; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .rx-scale :global(.sn) { --sn-size: 14px; color: var(--ink-soft); grid-template-rows: 0 5px auto 5px; }
+  .rx-scale :global(.sn-g) { display: none; }
+  .rx-scale :global(.sn-up i), .rx-scale :global(.sn-dn i) { width: 3px; height: 3px; }
+  .rx-scale > span:first-child { display: contents; }
+  @media (max-width: 899px) {
+    .rx-halves, .rx-janya { grid-template-columns: minmax(0, 1fr); }
+    .rx-detail { display: none; }
+    .rx-row { grid-template-columns: 52px repeat(6, minmax(58px, 1fr)); overflow-x: auto; }
+    .rx-half { overflow-x: auto; }
+  }
+</style>

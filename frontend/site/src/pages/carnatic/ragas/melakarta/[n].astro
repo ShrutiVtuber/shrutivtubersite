@@ -1,0 +1,158 @@
+---
+/* A melakarta (handoff: Raga Explorer, screen "mela"): its seven swaras, its
+ * scale straight up and down, how its number comes from its name
+ * (katapayadi), its janya ragas, and its place in the 12 × 6 system. The
+ * Dikshitar-school raga on the same swaras is a different raga, not another
+ * spelling — and where both schools use one name, nothing is shown. */
+import SwaraLayout from "../../../../layouts/SwaraLayout.astro";
+import Hero from "../../../../components/carnatic/Hero.astro";
+import { hrefIn, langOf, words, type Lang } from "../../../../lib/carnatic/i18n";
+import { ragas, reviews } from "../../../../lib/carnatic/data";
+import { visitor, swaraScript } from "../../../../lib/carnatic/prefs";
+import { allScriptNames, scriptName, type IndicLang } from "../../../../lib/carnatic/names";
+import { phraseHtml } from "../../../../lib/carnatic/render";
+import { letter } from "../../../../lib/carnatic/notation";
+import { notFound } from "../../../../lib/carnatic/notfound";
+
+const lang = langOf(Astro);
+const t = await words(lang);
+const L = (p: string) => hrefIn(lang, p);
+const { settings } = await visitor(Astro);
+const [data, rv] = await Promise.all([ragas(), reviews()]);
+const n = Number(Astro.params.n);
+const m = data?.melakartas.find((x) => x.number === n);
+if (!m || !data) return notFound(Astro);
+const script = swaraScript(settings, lang);
+const tamil = settings.tamilStyle;
+const base = `script:mela:${m.number}`;
+const own = lang !== "en" ? scriptName(m.scripts, lang as IndicLang, tamil, rv, base) : null;
+const others = settings.otherScripts === "hide" ? [] : [...(own ? [{ lang: "en", text: m.name, verified: true }] : []), ...allScriptNames(m.scripts, tamil, rv, base).filter((x) => x.lang !== lang)];
+const anyUnverified = others.some((x) => !x.verified);
+const janyas = data.janyas.filter((r) => r.parent.number === m.number).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+const performed = m.performed ? data.performed.find((r) => r.id === m.performed) : null;
+const chakraRow = data.melakartas.filter((x) => x.chakra.number === m.chakra.number).sort((a, b) => a.number - b.number);
+const NAMES: Record<string, string> = { S: "Shadja", P: "Panchama" };
+const nameOf = (sw: string) => NAMES[sw] ?? (m.swarasthanaNames[sw] ?? "").replace(/(\w+) (\w+)/, (_x, a, b) => `${a[0].toUpperCase()}${a.slice(1)} ${b.replace(/m$/, "")}`);
+const draw = (line: string) => phraseHtml(line, { script, tamil, subs: true });
+const [d1, d2] = m.katapayadi.digits;
+const kUsed = m.katapayadi.used ?? m.katapayadi.aksharas;
+const description = `Melakarta ${m.number}, ${m.name}: ${m.arohana} · ${m.avarohana}. ${m.chakra.name} chakra, position ${m.chakra.position}; the katapayadi of its name; its janya ragas${m.dikshitar ? `; the Dikshitar-school raga ${m.dikshitar}` : ""}.`;
+---
+<SwaraLayout title={`${m.number} ${m.name} · melakarta · Swara Studio`} description={description}
+             crumbs={[[t("crumb.learn"), L("/carnatic/lessons")], [t("crumb.ragas"), L("/carnatic/ragas")], [`${m.number} · ${m.name}`]]}>
+  <Hero eyebrow={t("mela.kind", { n: m.number })} title={own?.text ?? m.name} titleLang={own ? lang : undefined}>
+    <p class="mp-names" slot="under">
+      {others.length > 0 && <span class:list={[anyUnverified && "sw-unv"]} title={anyUnverified ? t("unverified.title") : undefined}>{others.map((x, i) => <>{i > 0 && <span class="mp-dot">·</span>}<span lang={x.lang}>{x.text}</span></>)}</span>}
+      {anyUnverified && <span class="sw-unv-label">{t("unverified")}</span>}
+      {m.iso && <span class="sw-mono">ISO 15919 · {m.iso}</span>}
+    </p>
+    {m.dikshitar && <p class="sw-p mp-dik">{t("mela.dikshitar")} · <i>{m.dikshitar}</i> <span class="sw-note">{t("mela.dikshitarNote")}</span></p>}
+  </Hero>
+
+  <div class="sw-cols">
+    <div class="sw-main">
+      <section class="sw-section">
+        <h2 class="sw-h3">{t("mela.seven")}</h2>
+        <div class="mp-seven">
+          {m.swaras.map((sw) => (
+            <div class="mp-sw">
+              <span class={`mp-glyph sn-script-${script}`} set:html={draw(sw)} />
+              <span class="mp-swn">{nameOf(sw)}</span>
+            </div>
+          ))}
+        </div>
+      </section>
+      <section class="sw-section">
+        <h2 class="sw-h3">{t("mela.scale")}</h2>
+        {[[t("raga.aro"), m.arohana], [t("raga.ava"), m.avarohana]].map(([label, line]) => (
+          <div class="mp-scale"><span class="sw-p">{label}</span><span class={`mp-line sn-script-${script}`} set:html={draw(line)} /></div>
+        ))}
+        {m.vivadi.length > 0 && <p class="sw-note">{t("mela.vivadi", { pairs: m.vivadi.join(", ") })}</p>}
+      </section>
+      <section class="sw-section">
+        <h2 class="sw-h3">{t("mela.ktp")}</h2>
+        <div class="sw-inset mp-ktp">
+          <span><i>{kUsed[0]}</i><small>{d1}</small></span>
+          <span><i>{kUsed[1]}</i><small>{d2}</small></span>
+          <span class="sw-p">{t("mela.reverse")}</span>
+          <b>{m.number}</b>
+        </div>
+        <p class="sw-note">{t("mela.ktpP")}{m.katapayadi.rule.startsWith("first") ? " This name uses the first consonant of a conjunct, one of the exceptions Sambamoorthy lists." : ""}{m.katapayadi.note ? ` ${m.katapayadi.note}` : ""}</p>
+      </section>
+      <section class="sw-section">
+        <h2 class="sw-h3">{t("mela.janyaOf")}</h2>
+        {janyas.length === 0 && !performed ? <p class="sw-p">{t("mela.noJanya")}</p> : (
+          <div class="mp-janyas">
+            {performed && (
+              <a class="sw-dotrow mp-jrow" href={L(`/carnatic/ragas/${performed.id}`)}>
+                <span class="mp-jn">{performed.name}</span><span class="leader" aria-hidden="true"></span>
+                <span class="sw-p">the melakarta as a raga</span><span class="mp-jl">{t("mela.page")}</span>
+              </a>
+            )}
+            {janyas.map((r) => (
+              <a class="sw-dotrow mp-jrow" href={L(`/carnatic/ragas/${r.id}`)}>
+                <span class="mp-jn">{r.name}</span><span class="leader" aria-hidden="true"></span>
+                <span class="sw-p">{r.classification.jati}{r.classification.vakra ? " · vakra" : ""}</span><span class="mp-jl">{t("mela.page")}</span>
+              </a>
+            ))}
+          </div>
+        )}
+      </section>
+    </div>
+    <aside class="sw-aside">
+      <div class="sw-card mp-place">
+        <p class="t-eyebrow sw-eyebrow">{t("mela.place")}</p>
+        <p class="sw-p mp-ch">{m.chakra.name} chakra · {m.chakra.number}, position {m.chakra.position}</p>
+        <p class="sw-mono">{m.number <= 36 ? t("mela.suddhaM") : t("mela.pratiM")}</p>
+        <div class="mp-row">{chakraRow.map((x) => <a href={L(`/carnatic/ragas/melakarta/${x.number}`)} aria-current={x.number === m.number ? "page" : undefined}>{x.number}</a>)}</div>
+      </div>
+      <button type="button" class="mp-play" data-play-scale={`${m.arohana} ${m.avarohana}`}>{t("mela.drone")}</button>
+      <p class="sw-note">{t("mela.note")}</p>
+    </aside>
+  </div>
+</SwaraLayout>
+
+<script>
+  import { playLine } from "../../../../lib/carnatic/client/phrase";
+  import { settings, startDrone, theDrone } from "../../../../lib/carnatic/client/state";
+  import { pitchHz } from "../../../../lib/carnatic/notation";
+  document.querySelectorAll<HTMLButtonElement>("[data-play-scale]").forEach((b) => b.addEventListener("click", () => {
+    if (!theDrone().playing) startDrone();
+    playLine(b.dataset.playScale!, { saHz: pitchHz(settings().sa || "C3"), tuning: settings().playbackTuning, unit: 0.5 });
+  }));
+</script>
+
+<style>
+  .mp-names { margin: 0; display: flex; gap: 6px 12px; flex-wrap: wrap; align-items: baseline; font-family: var(--font-display); font-size: 17px; color: var(--ink-soft); }
+  .mp-dot { color: var(--line-strong); padding: 0 4px; }
+  .mp-names .sw-mono { font-size: 12px; }
+  .mp-dik { margin: 0; }
+  .mp-dik i { font-family: var(--font-display); font-size: 18px; color: var(--ink); }
+  .mp-seven { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); border: 1px solid var(--line); border-radius: 8px; background: var(--surface-card); }
+  .mp-sw { display: grid; justify-items: center; gap: 12px; padding: 14px 4px; border-right: 1px solid var(--line); text-align: center; }
+  .mp-sw:last-child { border-right: 0; }
+  .mp-glyph :global(.sn-g) { display: none; }
+  .mp-glyph :global(.sn) { grid-template-rows: 0 6px auto 6px; }
+  .mp-swn { font: 11px / 1.3 var(--font-body); color: var(--ink-soft); }
+  .mp-scale { display: flex; gap: 8px 16px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--line); }
+  .mp-scale > .sw-p { width: 110px; flex: none; }
+  .mp-line :global(.sn) { --sn-size: 18px; grid-template-rows: 0 6px auto 6px; }
+  .mp-line :global(.sn-g) { display: none; }
+  .mp-ktp { display: flex; align-items: center; gap: 22px; padding: 22px 18px; }
+  .mp-ktp span { display: grid; justify-items: center; gap: 4px; }
+  .mp-ktp i { font: italic 30px / 1 var(--font-display); color: var(--ink); }
+  .mp-ktp small { font: 13px / 1 var(--font-mono); color: var(--ink-soft); }
+  .mp-ktp b { font: 400 32px / 1 var(--font-mono); color: var(--ink); }
+  .mp-janyas { border-top: 1px solid var(--line); }
+  .mp-jrow { text-decoration: none; }
+  .mp-jn { font: 20px / 1.3 var(--font-display); color: var(--ink); }
+  .mp-jrow:hover .mp-jn { color: var(--accent); }
+  .mp-jl { font: 11px / 1 var(--font-mono); color: var(--accent); }
+  .mp-place { display: grid; gap: 10px; }
+  .mp-ch { color: var(--ink); margin: 0; }
+  .mp-row { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 4px; }
+  .mp-row a { text-align: center; font: 11px / 1 var(--font-mono); color: var(--ink-soft); background: var(--surface-veil); border: 1px solid var(--line); padding: 8px 0; border-radius: 3px; text-decoration: none; }
+  .mp-row a[aria-current] { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+  .mp-play { appearance: none; border: 0; border-radius: var(--radius-sm); background: var(--accent); color: var(--on-accent); font: 600 var(--text-sm) / 1 var(--font-body); padding: 13px 18px; cursor: pointer; }
+  @media (max-width: 599px) { .mp-swn { font-size: 9px; } }
+</style>

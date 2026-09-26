@@ -26,7 +26,7 @@ export const DEFAULT_SA: Record<Settings["instrument"], string> = {
 };
 
 export const DEFAULTS: Settings = {
-  lang: "en", swaraLetters: "latin", tamilStyle: "grantha", theme: "system", instrument: "voice",
+  lang: "en", swaraLetters: "interface", tamilStyle: "grantha", theme: "system", instrument: "voice",
   hand: "right", sa: DEFAULT_SA.voice, flute: "E", droneTuning: "pa", playbackTuning: "just",
   subscripts: "info", otherScripts: "show", tempo: 60, fourthSpeed: false, eighthAlankaram: false,
 };

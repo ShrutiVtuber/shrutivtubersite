@@ -224,7 +224,7 @@ an older one's fields); values are checked.
 
 ```json
 {
-  "lang": "en",                 "swaraLetters": "latin",     "tamilStyle": "grantha",
+  "lang": "en",                 "swaraLetters": "interface",     "tamilStyle": "grantha",
   "theme": "system",            "instrument": "venu",        "hand": "right",
   "sa": "E5",                   "flute": "E",                "droneTuning": "pa",
   "playbackTuning": "just",     "subscripts": "info",        "otherScripts": "show",
@@ -235,7 +235,7 @@ an older one's fields); values are checked.
 | Key | Values | Default |
 |---|---|---|
 | `lang` | `en` `ta` `te` `kn` | `en` |
-| `swaraLetters` | `latin`, `interface` (letters of `lang`) | `latin` |
+| `swaraLetters` | `latin`, `interface` (letters of `lang`; Latin when `lang` is `en`) | `interface` |
 | `tamilStyle` | `grantha` (ஸ, ஸ்ரீ), `pure` (ச, சிறீ) | `grantha` |
 | `theme` | `dawn` `dusk` `system` | `system` |
 | `instrument` | `voice` `venu` `veena` `violin` `mridangam` | `voice` |

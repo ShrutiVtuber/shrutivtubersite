@@ -83,7 +83,7 @@ INSTRUMENTS = ("voice", "venu", "veena", "violin", "mridangam")
 DEFAULT_SA = {"voice": "C3", "venu": "E5", "veena": "E3", "violin": "E4", "mridangam": "C3"}
 
 DEFAULTS = {
-    "lang": "en", "swaraLetters": "latin", "tamilStyle": "grantha", "theme": "system",
+    "lang": "en", "swaraLetters": "interface", "tamilStyle": "grantha", "theme": "system",
     "instrument": "voice", "hand": "right", "sa": DEFAULT_SA["voice"], "flute": "E",
     "droneTuning": "pa", "playbackTuning": "just", "subscripts": "info", "otherScripts": "show",
     "tempo": 60, "fourthSpeed": False, "eighthAlankaram": False,

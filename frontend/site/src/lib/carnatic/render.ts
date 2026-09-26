@@ -19,7 +19,7 @@ export interface DrawOptions {
   script: Script;
   tamil?: TamilStyle;
   /** Variant subscripts: always, or only where they add information. */
-  subs?: boolean;
+  subs?: boolean | string[];
   /** Mark notes outside the raga with a dotted underline (the composer's flag). */
   outside?: Set<string>;
 }
@@ -35,7 +35,8 @@ export function noteHtml(t: Token, o: DrawOptions, extraClass = ""): string {
   }
   const up = (t.octave ?? 0) > 0 ? `<i></i>`.repeat(Math.min(2, t.octave ?? 0)) : "";
   const dn = (t.octave ?? 0) < 0 ? `<i></i>`.repeat(Math.min(2, -(t.octave ?? 0))) : "";
-  const sub = o.subs && t.variant ? `<sub>${numeral(t.variant, o.script)}</sub>` : "";
+  const wantSub = Array.isArray(o.subs) ? o.subs.includes(t.swara) : o.subs;
+  const sub = wantSub && t.variant ? `<sub>${numeral(t.variant, o.script)}</sub>` : "";
   const sign = t.gamaka ? GAMAKA_SIGN[t.gamaka] ?? "" : "";
   const g = sign && !signBefore(t.gamaka)
     ? `<span class="sn-g" title="${esc(gamakaName(t.gamaka!))}">${esc(sign)}</span>` : `<span class="sn-g"></span>`;
@@ -61,7 +62,7 @@ export function phraseText(line: string, o: DrawOptions): string {
   const sub = "₀₁₂₃";
   return tokenize(line).map((t) => {
     if (t.kind !== "note" || !t.swara) return t.raw;
-    const v = o.subs && t.variant ? (o.script === "kn" ? numeral(t.variant, "kn") : sub[t.variant]) : "";
+    const v = (Array.isArray(o.subs) ? o.subs.includes(t.swara) : o.subs) && t.variant ? (o.script === "kn" ? numeral(t.variant, "kn") : sub[t.variant]) : "";
     const dot = (t.octave ?? 0) > 0 ? "̇" : (t.octave ?? 0) < 0 ? "̣" : "";
     return letter(t.swara, o.script, o.tamil) + dot + v;
   }).join(" ");

@@ -1,0 +1,278 @@
+---
+/* A raga page (handoff: Raga Page). Phrases first, on cards you can play over
+ * the drone; the arohana and avarohana second, labelled "summary scale"; then
+ * the swaras with a role, the variants (the common form first and selected,
+ * "some schools" beside it, attributed, nothing marked wrong), the well-known
+ * compositions, and time and rasa only in the "About this raga's tradition"
+ * box. High confidence shows nothing; anything below it carries the quiet note.
+ */
+import SwaraLayout from "../../../layouts/SwaraLayout.astro";
+import Hero from "../../../components/carnatic/Hero.astro";
+import Chip from "../../../components/carnatic/Chip.astro";
+import Badge from "../../../components/navigation/Badge.astro";
+import ConfidenceNote from "../../../components/carnatic/ConfidenceNote.astro";
+import Unverified from "../../../components/carnatic/Unverified.astro";
+import { hrefIn, langOf, words } from "../../../lib/carnatic/i18n";
+import { featured as loadFeatured, ragaById, ragas, reviews } from "../../../lib/carnatic/data";
+import { visitor, swaraScript } from "../../../lib/carnatic/prefs";
+import { allScriptNames, ragaKey, scriptName, type IndicLang } from "../../../lib/carnatic/names";
+import { phraseHtml } from "../../../lib/carnatic/render";
+import { inline } from "../../../lib/carnatic/notation";
+import { ragaView } from "../../../lib/carnatic/ragapage";
+import { notFound } from "../../../lib/carnatic/notfound";
+
+const lang = langOf(Astro);
+const t = await words(lang);
+const L = (p: string) => hrefIn(lang, p);
+const { settings } = await visitor(Astro);
+const [r, all, feat, rv] = await Promise.all([ragaById(Astro.params.id ?? ""), ragas(), loadFeatured(), reviews()]);
+if (!r || !all) return notFound(Astro);
+const v = ragaView(r, all, feat, lang);
+const script = swaraScript(settings, lang);
+const tamil = settings.tamilStyle;
+const key = ragaKey(r);
+const names = allScriptNames(r.scripts, tamil, rv, key);
+const own = lang !== "en" ? scriptName(r.scripts, lang as IndicLang, tamil, rv, key) : null;
+const title = own?.text ?? r.name;
+const others = settings.otherScripts === "hide" ? [] : [
+  ...(own ? [{ lang: "en", text: r.name, verified: true, key: "" }] : []),
+  ...names.filter((n) => n.lang !== lang),
+];
+const anyUnverified = others.some((n) => !n.verified);
+const draw = (line: string, subs: boolean | string[] = false) => phraseHtml(line, { script, tamil, subs: settings.subscripts === "always" || subs });
+const parent = all.melakartas.find((m) => m.number === r.parent.number);
+const related = v.related.map((id) => [...all.janyas, ...all.performed].find((x) => x.id === id)).filter(Boolean) as typeof all.janyas;
+const noPa = !/\bP\b/.test(`${r.arohana} ${r.avarohana}`);
+const hasM2 = /M2/.test(`${r.arohana} ${r.avarohana}`);
+/* DECISIONS §12: Ma tuning for ragas without Pa; mute Pa for M₂ without Pa (our inference, low). */
+const suggest = noPa ? (hasM2 ? "mute" : "ma") : "pa";
+const ROLE_LABEL = { jiva: t("raga.jiva"), nyasa: t("raga.nyasa"), graha: t("raga.graha") };
+const iso = r.iso ?? "";
+const description = `${r.name}: ${r.kind === "janya" ? `a janya raga of melakarta ${r.parent.number} ${r.parent.name}` : `melakarta ${r.parent.number}`}. Characteristic phrases, arohana ${r.arohana.replace(/!\w/g, "")}, avarohana ${r.avarohana}, gamaka character and well-known compositions, with sources.`;
+const jsonLd = { "@context": "https://schema.org", "@type": "DefinedTerm", name: r.name, alternateName: [iso, ...names.map((n) => n.text)].filter(Boolean),
+  description, inDefinedTermSet: "https://shrutivtuber.com/carnatic/ragas" };
+---
+<SwaraLayout title={`${r.name} raga · Swara Studio`} description={description} jsonLd={jsonLd}
+             crumbs={[[t("crumb.learn"), L("/carnatic/lessons")], [t("crumb.ragas"), L("/carnatic/ragas")], [title]]}>
+  <Hero eyebrow={v.kind} title={title} titleLang={own ? lang : undefined}>
+    <p class="rp-names" slot="under">
+      {others.length > 0 && (
+        <span class:list={["rp-scripts", anyUnverified && "sw-unv"]} title={anyUnverified ? t("unverified.title") : undefined}>
+          {others.map((n, i) => <>{i > 0 && <span class="rp-dot" aria-hidden="true">·</span>}<span lang={n.lang}>{n.text}</span></>)}
+        </span>
+      )}
+      {anyUnverified && <span class="sw-unv-label" title={t("unverified.title")}>{t("unverified")}</span>}
+      {iso && <span class="sw-mono">ISO 15919 · {iso}</span>}
+    </p>
+  </Hero>
+
+  <div class="sw-toolbar" data-raga data-scale={`${r.arohana} ${r.avarohana}`} data-script={script} data-tamil={tamil} data-subs={settings.subscripts}>
+    <span class="t-eyebrow sw-eyebrow">{t("raga.script")}</span>
+    <div class="sw-chips" role="group" aria-label={t("raga.script")}>
+      {[["lat", "Latin"], ["ta", "தமிழ்"], ["te", "తెలుగు"], ["kn", "ಕನ್ನಡ"]].map(([id, label]) => <Chip data-script-btn={id} active={id === script}>{label}</Chip>)}
+    </div>
+    <span class="spacer"></span>
+    <button type="button" class="rp-drone" data-raga-drone={suggest} aria-pressed="false" data-on={t("raga.dronePlaying")} data-off={t("raga.drone")}>{t("raga.drone")}</button>
+  </div>
+
+  <div class="sw-cols">
+    <div class="sw-main">
+      <section class="sw-section" aria-labelledby="rp-ph">
+        <div class="rp-head"><h2 id="rp-ph" class="sw-h2">{t("raga.phrases")}</h2>{v.cited && <span class="sw-mono">{t("raga.cited", { who: v.cited })}</span>}</div>
+        {v.phrases.length === 0 && <p class="sw-p">{t("raga.noPhrases")}</p>}
+        <div class="rp-phrases">
+          {v.phrases.map((p) => (
+            <div class="rp-phrase">
+              <button type="button" class="rp-play" data-play={p.line} aria-label={t("raga.play")} title={t("raga.play")}><span aria-hidden="true"></span></button>
+              <div class:list={["rp-line", "sn-script-" + script]} data-line={p.line} data-subs={p.subs?.join(",")} set:html={draw(p.line, p.subs ?? false)} />
+              <p class="rp-pnote">{p.note} {!v.featured ? null : <ConfidenceNote level={p.confidence} />}</p>
+            </div>
+          ))}
+        </div>
+        {v.character.filter((c) => c.text).length > 0 && (
+          <div class="sw-inset rp-char">
+            <p class="t-eyebrow sw-eyebrow rose">{t("raga.gamaka")}</p>
+            {v.character.filter((c) => c.text).map((c) => (
+              <p class="sw-prose">{c.text}{c.who && <span class="rp-who"> {c.who}</span>} {c.confidence && <ConfidenceNote level={c.confidence} />}</p>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section class="sw-section" aria-labelledby="rp-sc">
+        <h2 id="rp-sc" class="sw-h3">{t("raga.scale")}</h2>
+        {[[t("raga.aro"), v.arohana], [t("raga.ava"), v.avarohana]].map(([label, line]) => (
+          <div class="rp-scale">
+            <span class="sw-p">{label}</span>
+            <div class:list={["rp-sline", "sn-script-" + script]} data-line={line} data-subs="1" set:html={draw(line, true)} />
+          </div>
+        ))}
+        {v.scaleNote && <p class="sw-p">{v.scaleNote}</p>}
+        <p class="sw-note">{t("raga.key")}</p>
+      </section>
+
+      <section class="sw-section" aria-labelledby="rp-ro">
+        <h2 id="rp-ro" class="sw-h3">{t("raga.roles")}</h2>
+        <div class="rp-roles">
+          {v.roles.map((ro) => (
+            <div class="rp-role">
+              <span class="sw-h4">{ROLE_LABEL[ro.key]}</span>
+              {ro.value ? <span class="rp-rv">{ro.value.split(" ").map((s) => inline(s, script, tamil)).join("  ")}</span> : <span class="sw-p">{t("raga.notShown")}</span>}
+              {ro.note && <span class="rp-rnote"><ConfidenceNote level={ro.confidence === "high" ? "medium" : ro.confidence} text={ro.note} sources={ro.sources} /></span>}
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section class="sw-section" aria-labelledby="rp-va">
+        <h2 id="rp-va" class="sw-h3">{t("raga.variants")}</h2>
+        {v.variant ? (
+          <>
+            <p class="sw-p">{v.variant.intro}</p>
+            <div class="sw-schools" data-schools>
+              {v.variant.options.map((o, i) => (
+                <button type="button" class="sw-school" aria-pressed={i === 0 ? "true" : "false"}>
+                  <span class="sw-school-head">{i === 0 ? t("raga.common") : t("raga.some")}<span class="sw-school-mark">{t("raga.shown")}</span></span>
+                  <span class:list={["rp-vline", "sn-script-" + script]} data-line={o.line} set:html={draw(o.line)} />
+                  <span class="sw-school-attr">{o.attr}</span>
+                </button>
+              ))}
+            </div>
+          </>
+        ) : <p class="sw-p">{t("raga.noVariants")}</p>}
+        {v.disagreements.length > 0 && (
+          <details class="rp-dis">
+            <summary class="sw-p">{t("raga.disagreements")} ({v.disagreements.length})</summary>
+            <ul>{v.disagreements.map((d) => <li class="sw-p">{d}</li>)}</ul>
+          </details>
+        )}
+      </section>
+
+      <section class="sw-section" aria-labelledby="rp-co">
+        <h2 id="rp-co" class="sw-h3">{t("raga.comps")}</h2>
+        {v.compositions.length === 0 ? <p class="sw-p">{t("raga.noComps")}</p> : (
+          <div class="rp-comps">
+            {v.compositions.map((c) => (
+              <div class="sw-dotrow">
+                <span class="rp-ctitle">{c.title}</span><Badge>{c.form}</Badge>
+                <span class="leader" aria-hidden="true"></span>
+                <span class="sw-p">{c.composer}</span><span class="sw-mono">{c.tala}</span>
+              </div>
+            ))}
+          </div>
+        )}
+        {v.compositionsNote && <p class="sw-note">{v.compositionsNote}</p>}
+        <div class="rp-rec"><span class="sw-mono">{t("raga.recording")}</span><span class="sw-note">{t("raga.recordingP")}</span></div>
+      </section>
+
+      {v.tradition && (
+        <section class="rp-trad">
+          <div class="rp-head"><h2 class="sw-h4">{t("raga.tradition")}</h2><span class="sw-mono">{t("raga.traditional")}</span></div>
+          <p class="sw-p">{v.featured ? v.tradition : t("raga.traditionPrefix", { text: v.tradition })}</p>
+        </section>
+      )}
+    </div>
+
+    <aside class="sw-aside">
+      <div class="sw-card rp-parent">
+        <p class="t-eyebrow sw-eyebrow">{t("raga.parent")}</p>
+        <a href={L(`/carnatic/ragas/melakarta/${r.parent.number}`)} class="rp-plink"><span class="sw-mono">{r.parent.number}</span><span>{parent?.name ?? r.parent.name}</span></a>
+        <div class="sw-chips">{v.tags.map((g) => <Badge>{g}</Badge>)}</div>
+      </div>
+      {related.length > 0 && (
+        <div class="rp-rel">
+          <p class="t-eyebrow sw-eyebrow">{t("raga.related")}</p>
+          <div class="sw-chips">{related.map((x) => <a class="sw-chip" href={L(`/carnatic/ragas/${x.id}`)}>{x.name}</a>)}</div>
+        </div>
+      )}
+      <div class="rp-src">
+        <p class="t-eyebrow sw-eyebrow">{t("raga.sources")}</p>
+        {v.confidenceNote ? <ConfidenceNote level={v.confidence === "high" ? "medium" : v.confidence} text={v.confidenceNote} /> : <p class="sw-note">{t("raga.high")}</p>}
+        <p class="sw-note">{t("raga.sourceNote")}</p>
+        <details>
+          <summary class="rp-view">{t("raga.viewSources")}</summary>
+          <ul class="rp-srclist">{v.sources.map((s) => <li>{/^https?:/.test(s) ? <a href={s} rel="noopener nofollow">{s.replace(/^https?:\/\/(www\.)?/, "").slice(0, 70)}</a> : s}</li>)}</ul>
+        </details>
+      </div>
+    </aside>
+  </div>
+</SwaraLayout>
+
+<script>
+  import { phraseHtml } from "../../../lib/carnatic/render";
+  import { playLine } from "../../../lib/carnatic/client/phrase";
+  import { settings, setSettings, startDrone, theDrone, stopDrone, onDrone } from "../../../lib/carnatic/client/state";
+  import { pitchHz } from "../../../lib/carnatic/notation";
+
+  const bar = document.querySelector<HTMLElement>("[data-raga]");
+  if (bar) {
+    const scale = bar.dataset.scale!;
+    const tamil = (bar.dataset.tamil || "grantha") as any;
+    const always = bar.dataset.subs === "always";
+    /* The swara script switches in place: every line on the page redraws. */
+    bar.querySelectorAll<HTMLButtonElement>("[data-script-btn]").forEach((b) => b.addEventListener("click", () => {
+      const script = b.dataset.scriptBtn as any;
+      bar.querySelectorAll("[data-script-btn]").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+      document.querySelectorAll<HTMLElement>("[data-line]").forEach((el) => {
+        el.className = el.className.replace(/sn-script-\w+/, `sn-script-${script}`);
+        const subs = el.dataset.subs === "1" ? true : el.dataset.subs ? el.dataset.subs.split(",") : false;
+        el.innerHTML = phraseHtml(el.dataset.line!, { script, tamil, subs: always || subs });
+      });
+    }));
+    const droneBtn = bar.querySelector<HTMLButtonElement>("[data-raga-drone]")!;
+    const paint = () => { const on = theDrone().playing; droneBtn.setAttribute("aria-pressed", String(on)); droneBtn.textContent = on ? droneBtn.dataset.on! : droneBtn.dataset.off!; };
+    droneBtn.addEventListener("click", () => { theDrone().playing ? stopDrone() : startDrone(droneBtn.dataset.ragaDrone as any); paint(); });
+    onDrone(paint);
+    document.querySelectorAll<HTMLButtonElement>("[data-play]").forEach((b) => b.addEventListener("click", () => {
+      if (!theDrone().playing) { startDrone(droneBtn.dataset.ragaDrone as any); paint(); }
+      playLine(b.dataset.play!, { saHz: pitchHz(settings().sa || "C3"), tuning: settings().playbackTuning, scale, at: undefined });
+    }));
+    document.querySelectorAll<HTMLElement>("[data-schools]").forEach((box) => box.querySelectorAll<HTMLButtonElement>(".sw-school").forEach((c) => c.addEventListener("click", () => {
+      box.querySelectorAll(".sw-school").forEach((x) => x.setAttribute("aria-pressed", String(x === c)));
+    })));
+    void setSettings;
+  }
+</script>
+
+<style>
+  .rp-names { margin: 0; display: flex; gap: 6px 12px; flex-wrap: wrap; align-items: baseline; font-family: var(--font-display); font-size: 17px; color: var(--ink-soft); }
+  .rp-dot { color: var(--line-strong); padding: 0 4px; }
+  .rp-names .sw-mono { font-size: 12px; }
+  .rp-drone { appearance: none; border: 0; border-radius: var(--radius-sm); background: var(--accent); color: var(--on-accent); font: 600 var(--text-sm) / 1 var(--font-body); padding: 12px 18px; min-height: 40px; cursor: pointer; }
+  .rp-drone[aria-pressed="true"] { background: var(--accent-wash); color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+  .rp-head { display: flex; gap: 8px 14px; align-items: baseline; flex-wrap: wrap; }
+  .rp-phrases { display: grid; gap: 8px; }
+  .rp-phrase { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 4px 16px; align-items: center; padding: 12px 14px; background: var(--surface-card); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow-1); }
+  .rp-play { width: 44px; height: 44px; border-radius: 99px; border: 1px solid var(--accent); background: var(--accent-wash); color: var(--accent); cursor: pointer; display: grid; place-items: center; padding: 0; }
+  .rp-play span { width: 0; height: 0; border-style: solid; border-width: 7px 0 7px 12px; border-color: transparent transparent transparent currentColor; margin-left: 3px; }
+  .rp-play:hover { background: var(--surface-veil); }
+  .rp-line :global(.sn-row) { gap: 2px 14px; }
+  .rp-pnote { grid-column: 2; margin: 0; font: var(--text-xs) / 1.5 var(--font-body); color: var(--ink-faint); }
+  .rp-char { display: grid; gap: 8px; }
+  .rp-who { font-family: var(--font-body); font-size: var(--text-xs); color: var(--ink-faint); }
+  .rp-scale { display: flex; gap: 8px 16px; align-items: center; flex-wrap: wrap; padding: 8px 0; border-bottom: 1px solid var(--line); }
+  .rp-scale > .sw-p { width: 104px; flex: none; }
+  .rp-sline :global(.sn) { --sn-size: 18px; grid-template-rows: 0 8px auto 8px 12px; }
+  .rp-sline :global(.sn-g) { visibility: hidden; }
+  .rp-sline :global(.sn-anya)::after { content: "anya"; font: 9px / 12px var(--font-mono); color: var(--rose); }
+  .rp-roles { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr)); gap: 10px; }
+  .rp-role { display: grid; gap: 6px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-card); align-content: start; }
+  .rp-rv { font: 18px / 1.3 var(--font-notation); color: var(--ink); }
+  .rp-rnote { font-size: 11px; }
+  .rp-vline :global(.sn) { --sn-size: 15px; grid-template-rows: 0 5px auto 5px; }
+  .rp-vline :global(.sn-g) { display: none; }
+  .rp-dis summary { cursor: pointer; }
+  .rp-dis ul { margin: 8px 0 0; padding-left: 18px; display: grid; gap: 6px; }
+  .rp-comps { border-top: 1px solid var(--line); }
+  .rp-ctitle { font: italic 19px / 1.3 var(--font-display); color: var(--ink); }
+  .rp-rec { display: flex; gap: 10px; align-items: center; padding: 12px 14px; border: 1px dashed var(--line-strong); border-radius: 8px; }
+  .rp-trad { display: grid; gap: 8px; padding: 16px 18px; border: 1px solid var(--line); border-radius: 10px; }
+  .rp-parent { display: grid; gap: 10px; }
+  .rp-plink { display: flex; gap: 10px; align-items: baseline; text-decoration: none; }
+  .rp-plink .sw-mono { font-size: 22px; }
+  .rp-plink span:last-child { font: 22px / 1.2 var(--font-display); color: var(--accent); }
+  .rp-rel, .rp-src { display: grid; gap: 8px; padding-top: 14px; border-top: 1px solid var(--line); }
+  .rp-rel { border-top: 0; padding-top: 0; }
+  .rp-view { font: var(--text-sm) / 1.4 var(--font-body); color: var(--accent); cursor: pointer; text-decoration: underline; }
+  .rp-srclist { margin: 8px 0 0; padding-left: 16px; display: grid; gap: 4px; font: var(--text-xs) / 1.4 var(--font-body); color: var(--ink-soft); overflow-wrap: anywhere; }
+</style>

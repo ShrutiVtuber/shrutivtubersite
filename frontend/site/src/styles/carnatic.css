@@ -7,6 +7,7 @@
  */
 
 /* ── the page ─────────────────────────────────────────────────────────────── */
+.sw [hidden], .sw-minibar[hidden] { display: none !important; }
 .sw { padding-bottom: var(--space-8); }
 .sw[lang="ta"], .sw[lang="te"], .sw[lang="kn"] { line-height: var(--leading-indic); }
 .sw[lang="ta"] .t-eyebrow, .sw[lang="te"] .t-eyebrow, .sw[lang="kn"] .t-eyebrow,
