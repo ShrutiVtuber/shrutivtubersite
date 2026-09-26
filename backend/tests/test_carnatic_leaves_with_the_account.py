@@ -180,3 +180,116 @@ async def _three_reports():
 @needs_db
 def test_three_reporters_hide_a_post_until_she_reviews_it() -> None:
     _run(_three_reports())
+
+
+async def _a_reported_sheet():
+    from datetime import datetime, timezone
+    from fastapi import HTTPException
+    from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+    from shruti.api.routes import carnatic as routes
+    from shruti.models.accounts import User
+    from shruti.models.carnatic import CarnaticPost, CarnaticReport, CarnaticSong
+    from sqlmodel import func, select
+
+    routes.REPORTED_BY_USER._seen.clear()
+    engine = create_async_engine(URL)
+    async with AsyncSession(engine, expire_on_commit=False) as s:
+        tag = uuid.uuid4().hex[:8]
+        people = [User(email=f"s{i}-{tag}@example.com", display_name=f"S{i}") for i in range(5)]
+        s.add_all(people); await s.flush()
+        # An anonymised sheet: its author chose to keep it when they left.
+        sheet = CarnaticSong(user_id=None, slug=f"kept-{tag}", title="Kept", raga="mohanam", tala="adi",
+                             body={"title": "Kept"}, published=True, published_at=datetime.now(timezone.utc),
+                             author_deleted_at=datetime.now(timezone.utc))
+        s.add(sheet); await s.flush()
+        post = CarnaticPost(user_id=people[0].id, song_id=sheet.id, title="Linked", player="youtube",
+                            url="https://youtu.be/k")
+        s.add(post); await s.commit()
+
+        for who in (people[1], people[1], people[2]):
+            await routes.report_sheet(sheet.slug, routes.ReportIn(reason="wrong"), who, s)
+        await s.refresh(sheet)
+        assert not sheet.hidden, "two reporters must not hide a sheet"
+        await routes.report_sheet(sheet.slug, routes.ReportIn(reason=""), people[3], s)
+        await s.refresh(sheet)
+        assert sheet.hidden and sheet.hidden_by == "reports"
+
+        # Hidden: not found for anyone, and no longer linked from Listen.
+        with pytest.raises(HTTPException) as e:
+            await routes.sheet(sheet.slug, people[4], s)
+        assert e.value.status_code == 404
+        assert (await routes.listen_post(post.id, None, s))["sheetSlug"] is None
+
+        mod = await routes.admin_moderation("op", s)
+        first = mod["sheets"][0]
+        assert first["id"] == sheet.id and first["hiddenBy"] == "reports" and first["reports"] == 3
+        assert first["anonymised"] and not any(k in first for k in ("reporters", "userIds", "by"))
+
+        # Restored: shown again, and only new reports count.
+        await routes.admin_hide_sheet(sheet.id, routes.HideIn(hidden=False), "op", s)
+        await s.refresh(sheet)
+        assert not sheet.hidden and sheet.reviewed_at is not None
+        assert (await routes.sheet(sheet.slug, people[4], s))["author"] is None
+        await routes.report_sheet(sheet.slug, routes.ReportIn(reason=""), people[4], s)
+        await s.refresh(sheet)
+        assert not sheet.hidden
+
+        # Removed for good, although its author chose to keep it.
+        await routes.admin_remove_sheet(sheet.id, "op", s)
+        assert await s.get(CarnaticSong, sheet.id) is None
+        assert (await s.execute(select(func.count()).select_from(CarnaticReport)
+                                .where(CarnaticReport.song_id == sheet.id))).scalar_one() == 0
+        await s.refresh(post)
+        assert post.song_id is None
+    await engine.dispose()
+
+
+@needs_db
+def test_a_sheet_is_hidden_by_three_reporters_and_she_can_remove_it() -> None:
+    _run(_a_reported_sheet())
+
+
+async def _banned(monkeypatch):
+    from datetime import datetime, timezone
+    from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+    from shruti.api.routes import admin
+    from shruti.core import mail
+    from shruti.models.accounts import User
+    from shruti.models.carnatic import CarnaticComment, CarnaticPost, CarnaticSong
+
+    class Sent:
+        sent, error = True, None
+
+    async def send(**_kw):
+        return Sent()
+
+    monkeypatch.setattr(mail, "send", send)
+    engine = create_async_engine(URL)
+    async with AsyncSession(engine, expire_on_commit=False) as s:
+        tag = uuid.uuid4().hex[:8]
+        u = User(email=f"banned-{tag}@example.com", display_name="Banned")
+        s.add(u); await s.flush()
+        sheet = CarnaticSong(user_id=u.id, slug=f"ban-sheet-{tag}", title="Sheet", raga="mohanam", tala="adi",
+                             body={"title": "Sheet"}, published=True, published_at=datetime.now(timezone.utc))
+        draft = CarnaticSong(user_id=u.id, slug=f"ban-draft-{tag}", title="Draft", raga="mohanam", tala="adi",
+                             body={"title": "Draft"})
+        s.add_all([sheet, draft]); await s.flush()
+        post = CarnaticPost(user_id=u.id, song_id=sheet.id, title="Theirs", player="youtube", url="https://youtu.be/b")
+        s.add(post); await s.flush()
+        s.add(CarnaticComment(post_id=post.id, user_id=u.id, body="hello"))
+        await s.commit()
+
+        await admin.ban_user(u.id, admin.BanIn(reason="test"), s, "op")
+
+        # Songs and sheets: removed, not kept credited to nobody.
+        assert await s.get(CarnaticSong, sheet.id) is None and await s.get(CarnaticSong, draft.id) is None
+        # Everything else keeps the rule for any deleted account: kept without a name.
+        kept = await s.get(CarnaticPost, post.id)
+        await s.refresh(kept)
+        assert kept is not None and kept.user_id is None and kept.song_id is None
+    await engine.dispose()
+
+
+@needs_db
+def test_a_ban_removes_their_songs_and_keeps_the_rest_without_a_name(monkeypatch) -> None:
+    _run(_banned(monkeypatch))

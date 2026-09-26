@@ -340,9 +340,14 @@ async def create_song(body: SongIn, user: User = Depends(require_user),
 @router.get("/sheets/{slug}")
 async def sheet(slug: str, viewer: User | None = Depends(current_user),
                 session: AsyncSession = Depends(get_session)) -> dict:
-    """A published song, for anyone; an unpublished one only for its author (the preview)."""
+    """
+    A published song, for anyone; an unpublished one only for its author (the
+    preview). A sheet hidden by moderation is not found, except by its author,
+    who is told it is hidden.
+    """
     row = (await session.execute(select(CarnaticSong).where(CarnaticSong.slug == slug))).scalar_one_or_none()
-    if row is None or (not row.published and (viewer is None or viewer.id != row.user_id)):
+    theirs = row is not None and viewer is not None and row.user_id is not None and viewer.id == row.user_id
+    if row is None or ((not row.published or row.hidden) and not theirs):
         raise HTTPException(404, "No such sheet.")
     author = await _person(session, row.user_id)
     ragas = rules.data("ragas.json") or {}
@@ -350,7 +355,7 @@ async def sheet(slug: str, viewer: User | None = Depends(current_user),
     # An anonymised song is credited to nobody: no name, not "somebody".
     return {**_song_full(row), "author": _public_name(author) if author else None,
             "mine": bool(viewer and row.user_id is not None and viewer.id == row.user_id),
-            "outOfRaga": rules.out_of_raga(row.body, raga)}
+            "hidden": row.hidden, "outOfRaga": rules.out_of_raga(row.body, raga)}
 
 
 @router.get("/songs/{song_id}")
@@ -433,7 +438,7 @@ async def _post_view(p: CarnaticPost, viewer: User | None, session: AsyncSession
     return {"id": p.id, "title": p.title, "author": _public_name(author), "mine": bool(viewer and p.user_id is not None and viewer.id == p.user_id),
             "instrument": p.instrument, "raga": p.raga, "tala": p.tala,
             "player": {"kind": p.player, "url": p.url},
-            "sheetSlug": sheet.slug if sheet is not None and sheet.published else None,
+            "sheetSlug": sheet.slug if sheet is not None and sheet.published and not sheet.hidden else None,
             "likes": likes, "liked": liked, "comments": comments, "createdAt": _iso(p.created_at)}
 
 
@@ -567,8 +572,9 @@ class ReportIn(BaseModel):
 HIDE_AFTER = 3
 
 
-async def _report(user: User, reason: str, session: AsyncSession, thing: CarnaticPost | CarnaticComment, *,
-                  post_id: int | None = None, comment_id: int | None = None):
+async def _report(user: User, reason: str, session: AsyncSession,
+                  thing: CarnaticPost | CarnaticComment | CarnaticSong, *,
+                  post_id: int | None = None, comment_id: int | None = None, song_id: int | None = None):
     """
     One report per person per thing; a second is accepted and changes nothing.
     The HIDE_AFTER-th report from a different account hides the thing until
@@ -576,14 +582,16 @@ async def _report(user: User, reason: str, session: AsyncSession, thing: Carnati
     restored post is not hidden again by the reports she already weighed.
     Nothing here tells anyone who reported.
     """
-    col = CarnaticReport.post_id if post_id is not None else CarnaticReport.comment_id
-    ref = post_id if post_id is not None else comment_id
+    col, ref = ((CarnaticReport.post_id, post_id) if post_id is not None
+                else (CarnaticReport.comment_id, comment_id) if comment_id is not None
+                else (CarnaticReport.song_id, song_id))
     existing = (await session.execute(select(CarnaticReport).where(
         CarnaticReport.user_id == user.id, col == ref))).scalar_one_or_none()
     if existing is None:
         if REPORTED_BY_USER.full(str(user.id)):
             return JSONResponse(status_code=429, content=SLOW_DOWN)
-        session.add(CarnaticReport(user_id=user.id, post_id=post_id, comment_id=comment_id, reason=reason.strip()))
+        session.add(CarnaticReport(user_id=user.id, post_id=post_id, comment_id=comment_id, song_id=song_id,
+                                   reason=reason.strip()))
         await session.flush()
         since = select(func.count()).select_from(CarnaticReport).where(col == ref)
         if thing.reviewed_at is not None:
@@ -594,6 +602,16 @@ async def _report(user: User, reason: str, session: AsyncSession, thing: Carnati
         await session.commit()
         REPORTED_BY_USER.add(str(user.id))
     return {"reported": True}
+
+
+@router.post("/sheets/{slug}/report")
+async def report_sheet(slug: str, body: ReportIn, user: User = Depends(require_user),
+                       session: AsyncSession = Depends(get_session)):
+    """A published sheet, reported like a Listen post (the same three-reporter rule)."""
+    row = (await session.execute(select(CarnaticSong).where(CarnaticSong.slug == slug))).scalar_one_or_none()
+    if row is None or not row.published or row.hidden:
+        raise HTTPException(404, "No such sheet.")
+    return await _report(user, body.reason, session, row, song_id=row.id)
 
 
 @router.post("/listen/comments/{comment_id}/report")
@@ -819,9 +837,18 @@ async def admin_moderation(_: str = Depends(require_admin), session: AsyncSessio
     reports = (await session.execute(select(CarnaticReport))).scalars().all()
     by_post: dict[int, list[str]] = {}
     by_comment: dict[int, list[str]] = {}
+    by_song: dict[int, list[str]] = {}
     for r in reports:
-        target = by_post.setdefault(r.post_id, []) if r.post_id is not None else by_comment.setdefault(r.comment_id, [])
+        target = (by_post.setdefault(r.post_id, []) if r.post_id is not None
+                  else by_comment.setdefault(r.comment_id, []) if r.comment_id is not None
+                  else by_song.setdefault(r.song_id, []))
         target.append(r.reason)
+    sheets = (await session.execute(select(CarnaticSong).where(CarnaticSong.published.is_(True))
+                                    .order_by(CarnaticSong.id.desc()).limit(100))).scalars().all()
+    seen_sheets = {x.id for x in sheets}
+    sheets = [*(await session.execute(select(CarnaticSong).where(CarnaticSong.id.in_(
+        [i for i in by_song if i not in seen_sheets] or [-1])))).scalars().all(), *sheets]
+    sheets.sort(key=lambda x: (x.hidden_by != "reports", -len(by_song.get(x.id, [])), -x.id))
     posts = (await session.execute(select(CarnaticPost).order_by(CarnaticPost.id.desc()).limit(100))).scalars().all()
     comments_ = (await session.execute(select(CarnaticComment).order_by(CarnaticComment.id.desc()).limit(100))).scalars().all()
     # Reported things first, however old: a report older than the 100 newest
@@ -845,8 +872,13 @@ async def admin_moderation(_: str = Depends(require_admin), session: AsyncSessio
                       "createdAt": _iso(c.created_at), "reviewedAt": _iso(c.reviewed_at),
                       "reports": len(by_comment.get(c.id, [])), "reasons": [x for x in by_comment.get(c.id, []) if x]}
                      for c in comments_],
-        "reported": len(by_post) + len(by_comment),
-        "awaitingReview": sum(p.hidden_by == "reports" for p in posts) + sum(c.hidden_by == "reports" for c in comments_),
+        "sheets": [{"id": x.id, "slug": x.slug, "title": x.title, "raga": x.raga, "hidden": x.hidden,
+                    "hiddenBy": x.hidden_by, "anonymised": x.user_id is None, "createdAt": _iso(x.created_at),
+                    "reviewedAt": _iso(x.reviewed_at), "reports": len(by_song.get(x.id, [])),
+                    "reasons": [r for r in by_song.get(x.id, []) if r]} for x in sheets],
+        "reported": len(by_post) + len(by_comment) + len(by_song),
+        "awaitingReview": sum(p.hidden_by == "reports" for p in posts) + sum(c.hidden_by == "reports" for c in comments_)
+                          + sum(x.hidden_by == "reports" for x in sheets),
     }
 
 
@@ -854,7 +886,7 @@ class HideIn(BaseModel):
     hidden: bool
 
 
-def _review(thing: CarnaticPost | CarnaticComment, hidden: bool) -> None:
+def _review(thing: CarnaticPost | CarnaticComment | CarnaticSong, hidden: bool) -> None:
     """
     Her decision. Hiding is hers; showing it again (restoring) marks it
     reviewed, so the reports she has already weighed cannot hide it again.
@@ -905,5 +937,32 @@ async def admin_remove_comment(comment_id: int, _: str = Depends(require_admin),
     if c is None:
         raise HTTPException(404, "No such comment.")
     await session.delete(c)
+    await session.commit()
+    return Response(status_code=204)
+
+
+@router.post("/admin/sheets/{song_id}/hide")
+async def admin_hide_sheet(song_id: int, body: HideIn, _: str = Depends(require_admin),
+                           session: AsyncSession = Depends(get_session)) -> dict:
+    x = await session.get(CarnaticSong, song_id)
+    if x is None:
+        raise HTTPException(404, "No such sheet.")
+    _review(x, body.hidden)
+    await session.commit()
+    return {"id": x.id, "hidden": x.hidden}
+
+
+@router.delete("/admin/sheets/{song_id}", status_code=204)
+async def admin_remove_sheet(song_id: int, _: str = Depends(require_admin),
+                             session: AsyncSession = Depends(get_session)) -> Response:
+    """
+    Taken down for good: the song and its sheet, whoever wrote it and whatever
+    they chose when deleting their account. Its reports go with it; a Listen
+    post that linked it keeps its link to nothing.
+    """
+    x = await session.get(CarnaticSong, song_id)
+    if x is None:
+        raise HTTPException(404, "No such sheet.")
+    await session.delete(x)
     await session.commit()
     return Response(status_code=204)

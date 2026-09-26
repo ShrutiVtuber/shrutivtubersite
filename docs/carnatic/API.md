@@ -375,7 +375,15 @@ All song routes need auth except reading a published sheet.
 - `POST /api/carnatic/songs/{id}/unpublish`
 - `GET /api/carnatic/sheets/{slug}` (no auth) → the published song and its
   author's display name, or `"author": null` for a sheet kept after its
-  author deleted their account (show no credit).
+  author deleted their account (show no credit). A sheet hidden by
+  moderation is 404 for everyone except its author, who gets it with
+  `"hidden": true` (say it is hidden while Shruti reviews reports).
+- `POST /api/carnatic/sheets/{slug}/report` (auth) with `{"reason": "…"}`
+  (optional, up to 300 characters) → `{"reported": true}`. Published sheets
+  are moderated exactly like Listen posts (§6): once per person, three
+  different reporters hide it until Shruti reviews it, reporters never shown.
+  Offer Report on sheets that are not the person's own. Shruti may restore a
+  sheet or remove it for good, whatever its author chose when leaving.
 
 A song may have any number of parts, for everybody.
 
@@ -460,7 +468,10 @@ never shown to anyone**, her included; only the count and any reasons given.
 Offer Report on posts and comments that are not the person's own.
 
 `author` is `"somebody"` on a post or comment kept after its author deleted
-their account.
+their account. A post's `sheetSlug` is `null` while its sheet is hidden.
+
+Published song sheets follow the same rules (§5,
+`POST /api/carnatic/sheets/{slug}/report`).
 
 **Limits**, per account: 10 shares an hour, 30 comments in 10 minutes, 30
 reports an hour. Past them: **429** `{"code": "SLOW_DOWN", "detail": "…"}`;
@@ -522,6 +533,10 @@ follows the owner's rule of 26 Sep 2026:
 
   Ask with those two choices, then call again with `songs`. A person with no
   songs is deleted at once, as before.
+
+An account **banned** by Shruti is deleted the same way, except that its
+songs and sheets are always deleted (the owner's rule of 26 Sep 2026); the
+choice is only for somebody deleting their own account.
 
 The account export (`GET /api/account/export`) is unchanged and includes all
 of it.

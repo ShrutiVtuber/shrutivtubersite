@@ -85,6 +85,10 @@ class CarnaticSong(TimestampMixin, table=True):
     published: bool = Field(default=False, index=True)
     published_at: Optional[datetime] = Field(default=None, sa_type=UTC_TS)
     author_deleted_at: Optional[datetime] = Field(default=None, sa_type=UTC_TS)   # kept, credited to nobody
+    # A published sheet is moderated like a Listen post (q5o1l8m4n410).
+    hidden: bool = Field(default=False, index=True)
+    hidden_by: str = ""         # "" | her | reports
+    reviewed_at: Optional[datetime] = Field(default=None, sa_type=UTC_TS)
 
 
 class CarnaticPost(TimestampMixin, table=True):
@@ -139,7 +143,8 @@ class CarnaticComment(TimestampMixin, table=True):
 
 class CarnaticReport(TimestampMixin, table=True):
     """
-    A member flagging a Listen post or comment for the operator to look at.
+    A member flagging a Listen post, a comment or a published song sheet for
+    the operator to look at.
 
     One report per person per thing (a second press changes nothing). Three
     reports from different accounts hide the thing until she reviews it
@@ -152,12 +157,14 @@ class CarnaticReport(TimestampMixin, table=True):
     __table_args__ = (
         UniqueConstraint("user_id", "post_id", name="uq_carnatic_report_post"),
         UniqueConstraint("user_id", "comment_id", name="uq_carnatic_report_comment"),
+        UniqueConstraint("user_id", "song_id", name="uq_carnatic_report_song"),
     )
 
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: Optional[int] = Field(default=None, index=True, foreign_key="site_user.id", ondelete="SET NULL")
     post_id: Optional[int] = Field(default=None, index=True, foreign_key="carnatic_post.id", ondelete="CASCADE")
     comment_id: Optional[int] = Field(default=None, index=True, foreign_key="carnatic_comment.id", ondelete="CASCADE")
+    song_id: Optional[int] = Field(default=None, index=True, foreign_key="carnatic_song.id", ondelete="CASCADE")
     reason: str = ""
 
 

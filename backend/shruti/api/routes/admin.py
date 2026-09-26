@@ -1270,7 +1270,8 @@ async def ban_user(
             "deletion itself was lawful. Anything you had made public — a "
             "guide, a reading, a comment, a group others joined, a shared "
             "build — stays up without your name, as you agreed when you "
-            "published it.\n\n"
+            "published it. Your Swara Studio songs and song sheets have been "
+            "deleted.\n\n"
             "If you believe this is a mistake, reply to this message.\n\n"
             + json.dumps(payload, ensure_ascii=False, indent=2)
         ),
@@ -1284,7 +1285,10 @@ async def ban_user(
             "giving them a copy is not something to do quietly.",
         )
 
-    await erase(user, session)
+    # A ban takes their Swara Studio songs and sheets down (the owner's rule
+    # of 26 Sep 2026); only somebody deleting their own account may choose
+    # to keep them up, credited to nobody.
+    await erase(user, session, songs="delete")
 
     session.add(
         BannedEmail(email_hash=fingerprint(email), reason=body.reason.strip(),

@@ -72,6 +72,10 @@ const footLine = say("foot", "Reviewers and consultants see the same queue. Conf
       <table class="sw-table">
         <tbody>{(mod.body?.posts ?? []).map((p: any) => <tr><td>{p.title}<small>{p.url}</small>{p.reports > 0 && <small class="aq-rep">{reportsLabel(p.reports, p.reasons)}</small>}</td><td class:list={["aq-state", p.hiddenBy === "reports" && "aq-wait"]}>{stateOf(p)}</td><td class="aq-act"><button type="button" data-hide-post={p.id} data-hidden={String(p.hidden)}>{p.hidden ? say("restore", "Restore") : say("hide", "Hide")}</button> <button type="button" class="aq-link" data-remove-post={p.id}>{say("remove", "Remove")}</button></td></tr>)}</tbody>
       </table>
+      <h2 class="sw-h3">{say("mod.sheets", "Song sheets")}</h2>
+      <table class="sw-table">
+        <tbody>{(mod.body?.sheets ?? []).map((x: any) => <tr><td><a href={`/carnatic/sheets/${x.slug}`}>{x.title}</a><small>{x.raga}{x.anonymised ? ` · ${say("anonymised", "credited to nobody")}` : ""}</small>{x.reports > 0 && <small class="aq-rep">{reportsLabel(x.reports, x.reasons)}</small>}</td><td class:list={["aq-state", x.hiddenBy === "reports" && "aq-wait"]}>{stateOf(x)}</td><td class="aq-act"><button type="button" data-hide-sheet={x.id} data-hidden={String(x.hidden)}>{x.hidden ? say("restore", "Restore") : say("hide", "Hide")}</button> <button type="button" class="aq-link" data-remove-sheet={x.id}>{say("remove", "Remove")}</button></td></tr>)}</tbody>
+      </table>
       <h2 class="sw-h3">{say("mod.comments", "Comments")}</h2>
       <table class="sw-table">
         <tbody>{(mod.body?.comments ?? []).map((c: any) => <tr><td>{c.body}{c.reports > 0 && <small class="aq-rep">{reportsLabel(c.reports, c.reasons)}</small>}</td><td class:list={["aq-state", c.hiddenBy === "reports" && "aq-wait"]}>{stateOf(c)}</td><td class="aq-act"><button type="button" data-hide-comment={c.id} data-hidden={String(c.hidden)}>{c.hidden ? say("restore", "Restore") : say("hide", "Hide")}</button> <button type="button" class="aq-link" data-remove-comment={c.id}>{say("remove", "Remove")}</button></td></tr>)}</tbody>
@@ -95,15 +99,15 @@ const footLine = say("foot", "Reviewers and consultants see the same queue. Conf
     const r = await post("/api/carnatic/admin/reviews", { key: row.dataset.key, status, text });
     if (r.ok) location.reload();
   }));
-  document.querySelectorAll<HTMLButtonElement>("[data-hide-post],[data-hide-comment]").forEach((b) => b.addEventListener("click", async () => {
-    const kind = b.dataset.hidePost ? "posts" : "comments";
-    const id = b.dataset.hidePost ?? b.dataset.hideComment;
+  document.querySelectorAll<HTMLButtonElement>("[data-hide-post],[data-hide-comment],[data-hide-sheet]").forEach((b) => b.addEventListener("click", async () => {
+    const kind = b.dataset.hidePost ? "posts" : b.dataset.hideSheet ? "sheets" : "comments";
+    const id = b.dataset.hidePost ?? b.dataset.hideSheet ?? b.dataset.hideComment;
     const r = await post(`/api/carnatic/admin/${kind}/${id}/hide`, { hidden: b.dataset.hidden !== "true" });
     if (r.ok) location.reload();
   }));
-  document.querySelectorAll<HTMLButtonElement>("[data-remove-post],[data-remove-comment]").forEach((b) => b.addEventListener("click", async () => {
-    const kind = b.dataset.removePost ? "posts" : "comments";
-    const id = b.dataset.removePost ?? b.dataset.removeComment;
+  document.querySelectorAll<HTMLButtonElement>("[data-remove-post],[data-remove-comment],[data-remove-sheet]").forEach((b) => b.addEventListener("click", async () => {
+    const kind = b.dataset.removePost ? "posts" : b.dataset.removeSheet ? "sheets" : "comments";
+    const id = b.dataset.removePost ?? b.dataset.removeSheet ?? b.dataset.removeComment;
     if (!confirm("Remove it for good? This cannot be undone.")) return;
     const r = await fetch(`/api/carnatic/admin/${kind}/${id}`, { method: "DELETE", headers: { "x-csrf-token": csrf() } });
     if (r.ok) location.reload();

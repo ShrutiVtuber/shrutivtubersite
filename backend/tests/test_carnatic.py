@@ -367,7 +367,8 @@ def test_three_reporters_hide_and_nobody_learns_who_they_were() -> None:
     assert "existing is None" in src and '"reports"' in src and "reviewed_at" in src
     mod = inspect.getsource(routes.admin_moderation)
     returned = mod[mod.index("return {"):]
-    assert "user_id" not in returned, "the moderation queue must never name a reporter"
+    assert "r.user_id" not in mod and "reporter" not in returned.lower(), "the moderation queue must never name a reporter"
+    assert "target.append(r.reason)" in mod, "only a report's reason is collected, never who made it"
     assert "reviewed_at = _now()" in inspect.getsource(routes._review)
     models = (BACKEND / "models" / "carnatic.py").read_text()
     assert 'UniqueConstraint("user_id", "post_id"' in models and 'UniqueConstraint("user_id", "comment_id"' in models
@@ -445,3 +446,22 @@ def test_a_two_kalai_varnam_line_is_the_angas_scaled() -> None:
     assert rec["repeats"] == b.repeats_for(64, 32)
     uneven = dict(it, sections=[{"section": "pallavi", "lines": [line, {"segments": [row[:4] * 3, row[:6], row[:6]]}]}])
     assert b.build_varnam(uneven, _ADI, _RAGAS) is None and "different lengths" in b.WARNINGS[-1]
+
+
+def test_a_sheet_is_moderated_like_a_listen_post() -> None:
+    src = inspect.getsource(routes.report_sheet)
+    assert "_report(" in src and "song_id=row.id" in src and "row.hidden" in src
+    sheet = inspect.getsource(routes.sheet)
+    assert "row.hidden" in sheet and "not theirs" in sheet, "a hidden sheet is found only by its author"
+    assert "not sheet.hidden" in inspect.getsource(routes._post_view)
+    remove = inspect.getsource(routes.admin_remove_sheet)
+    assert "session.delete(x)" in remove and "user_id" not in remove.split('"""')[2], (
+        "Remove takes a sheet down whatever its author chose")
+    models = (BACKEND / "models" / "carnatic.py").read_text()
+    assert 'UniqueConstraint("user_id", "song_id"' in models
+
+
+def test_a_ban_takes_their_songs_down() -> None:
+    """The owner's rule: a ban deletes songs and sheets; only self-deletion may keep them."""
+    from shruti.api.routes import admin
+    assert 'erase(user, session, songs="delete")' in inspect.getsource(admin.ban_user)
