@@ -18,6 +18,7 @@ import type { APIRoute } from "astro";
  * is invisibly wrong for as long as nobody opens it. */
 
 import { site, SITE_API, SITE_URL } from "../lib/api";
+import { paths as journalPaths, read as readJournal } from "../lib/journal/parse";
 
 
 /* One origin for the whole site, read at runtime. See lib/env.ts. */
@@ -161,6 +162,37 @@ export const GET: APIRoute = async () => {
   )) ?? [];
   for (const issue of archive) {
     add(`/newsletter/archive/${issue.slug}`, "0.5", "yearly", issue.sentAt ?? undefined);
+  }
+
+  /* The journal: every page the agent has written, not only its front page.
+     Until 26 September 2026 the sitemap listed /journal/ and nothing under
+     it, so every entry had to be found by following links. The dates come
+     from the journal's own index — the list the feed is built from — and a
+     page the index does not date is listed without one rather than with a
+     guessed date.
+     ⚠ With a trailing slash, as /journal/ itself: the journal answers the
+     slashless form with a redirect, and a sitemap of redirects spends a
+     crawl on every hop. */
+  if (reachable("/journal/")) {
+    const dated = new Map<string, string>();
+    try {
+      for (const e of (await readJournal([]))?.entries ?? []) {
+        if (e.href && e.date) dated.set(e.href.replace(/\/?$/, "/"), e.date);
+      }
+    } catch {
+      /* The index could not be read; the pages are still listed, undated. */
+    }
+    let found: string[] = [];
+    try {
+      found = await journalPaths();
+    } catch {
+      found = [];
+    }
+    for (const raw of found) {
+      const path = raw.replace(/\/?$/, "/");
+      if (path === "/journal/") continue;          // already a static entry
+      add(path, "0.6", "monthly", dated.get(path));
+    }
   }
 
   const xml =
