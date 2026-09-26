@@ -64,7 +64,9 @@ const NAV: [string, string][] = [
   ["/support", "Support the work"],
   ["/contact", "Contact"],
 ];
-const BAR = ["/today", "/guides", "/tools", "/horoscopes", "/journal", "/schedule"];
+/* Play, not Guides: /play is the games wing's front door and Guides is one of
+   its rooms. The bar names the door; the menu's Play group lists the rooms. */
+const BAR = ["/today", "/play", "/tools", "/horoscopes", "/journal", "/schedule"];
 /* A group whose first page is its own overview gets a heading that links to
    it: the Play group's heading opens /play, and /play is also its first item,
    "Overview", so the door is there for somebody who does not click headings. */
@@ -81,6 +83,10 @@ const itemLabel = (href: string) => OVERVIEWS[href] ?? label(href);
 /* /play, /builds, /groups and /ledger belong to the guides section: hidden with it. */
 const visibleNav = (href: string) => visible(["/play", "/builds", "/groups", "/ledger"].includes(href) ? "/guides" : href);
 const current = (href: string) => (href === "/" ? here === "/" : here.startsWith(href));
+/* In the bar, Play stands for the whole games wing: it is the current place
+   on a guide, a build, a group or a ledger as much as on /play itself. */
+const WING = ["/play", "/guides", "/builds", "/groups", "/ledger"];
+const currentInBar = (href: string) => (href === "/play" ? WING.some((w) => here.startsWith(w)) : current(href));
 ---
 
 <header class="site-header" data-scrolled="false">
@@ -99,7 +105,7 @@ const current = (href: string) => (href === "/" ? here === "/" : here.startsWith
       <nav class="site-nav" aria-label={say("text.31", "Primary")}>
         {
           BAR.filter(visibleNav).map((href) => (
-            <a href={href} aria-current={current(href) ? "page" : undefined}>
+            <a href={href} aria-current={currentInBar(href) ? "page" : undefined}>
               {label(href)}
             </a>
           ))
