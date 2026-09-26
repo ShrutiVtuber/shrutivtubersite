@@ -22,6 +22,7 @@ import { copy } from "../../lib/copy";
 import { renderMarkdown } from "../../lib/markdown";
 import { SIGN_GLYPH, signIndex } from "../../lib/wheel";
 import { asPeriod, label as periodLabel } from "../../lib/periods";
+import PublishConsent from "../../components/feedback/PublishConsent.astro";
 
 const say = await copy("practice/[id]");
 const id = Astro.params.id ?? "";
@@ -248,6 +249,7 @@ const REASONS = [
       )}
     </section>
   </main>
+  {me && <PublishConsent />}
 </BaseLayout>
 
 <style>
@@ -382,6 +384,8 @@ const REASONS = [
 </style>
 
 <script>
+  import { publishing } from "../../lib/publish-consent";
+
   /* ⚠ Progressive, not required. Without this every sign is already on the
      page and the tabs are anchors that jump to them; this only makes them
      behave as tabs, showing one at a time. */
@@ -425,12 +429,15 @@ const REASONS = [
   const token = () =>
     document.cookie.split("; ").find((c) => c.startsWith("shruti_csrf="))?.split("=")[1] ?? "";
 
+  // Every post goes through `publishing`: a comment is public, and the first
+  // one asks what happens to it if the account goes. Nothing else here ever
+  // answers 428, so votes and withdrawals pass straight through.
   const post = (path: string, body?: unknown) =>
-    fetch(path, {
+    publishing(() => fetch(path, {
       method: "POST",
       headers: { "content-type": "application/json", "x-csrf-token": token() },
       body: body === undefined ? undefined : JSON.stringify(body),
-    });
+    }));
 
   const vote = document.querySelector<HTMLButtonElement>("[data-vote]");
   vote?.addEventListener("click", async () => {

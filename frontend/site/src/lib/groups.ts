@@ -6,18 +6,22 @@
  */
 const csrf = () => document.cookie.split("; ").find((c) => c.startsWith("shruti_csrf="))?.split("=")[1] ?? "";
 
+/* Through `publishing`: starting a group and giving to one are public (a
+   giver's name is shown to anyone with the code), and the first time asks
+   what happens to that if the account goes. Nothing else answers 428. */
 async function api(method: string, path: string, body?: unknown): Promise<{ ok: boolean; status: number; body: any }> {
-  const r = await fetch(path, {
+  const r = await publishing(() => fetch(path, {
     method,
     headers: { "content-type": "application/json", "x-csrf-token": csrf() },
     body: body === undefined ? undefined : JSON.stringify(body),
-  });
+  }));
   let out: any = null;
   try { out = await r.json(); } catch { /* no body */ }
   return { ok: r.ok, status: r.status, body: out };
 }
 
 import { plate } from "./plate";
+import { publishing } from "./publish-consent";
 const esc = (v: string) => String(v).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
 
 /** The chosen theme: a tile radio on the new pages, a select on older ones. */

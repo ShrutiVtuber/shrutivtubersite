@@ -16,7 +16,7 @@ import CsrfField from "../components/forms/CsrfField.astro";
 import Button from "../components/forms/Button.astro";
 import Plate from "../components/guides/Plate.astro";
 import { PRESETS } from "../lib/plate";
-import { CONSENTS } from "../lib/consents";
+import { CONSENTS, PUBLISH_CONSENT } from "../lib/consents";
 import PasskeyList, { type PasskeyRow } from "../components/auth/PasskeyList.astro";
 import { account, asReader } from "../lib/account";
 import { verifyCsrf } from "../lib/csrf";
@@ -346,9 +346,13 @@ const themeWord = (t: string) => t === "grimoire" ? say("tokens.theme.grimoire",
 
     <section class="card">
       <h2>{say("consents.1", "Consents")}</h2>
-      <p class="quiet">{say("consents.2", "Three decisions, revisitable. Withdrawing is exactly as easy as giving — one control, here, with no email and no waiting.")}</p>
+      <p class="quiet">{say("consents.2", "Every decision, revisitable. Withdrawing is exactly as easy as giving — one control, here, with no email and no waiting.")}</p>
       {
-        CONSENTS.map((c) => {
+        /* The publishing agreement sits with the others so it can be read,
+           given or withdrawn here — the app sends people here to give it.
+           Withdrawn, nothing already public changes; the next thing made
+           public asks again. */
+        [...CONSENTS, PUBLISH_CONSENT].map((c) => {
           const now = state[c.kind];
           const granted = !!now?.granted;
           return (
@@ -483,12 +487,12 @@ const themeWord = (t: string) => t === "grimoire" ? say("tokens.theme.grimoire",
       <div class="rights">
         <div class="right">
           <h3>{say("export.1", "Export")}</h3>
-          <p class="quiet">{say("export.2", "Everything held about you, as a file, now — profile, nativity, the full consent history with dates, and your newsletter state. No email round-trip and no thirty days.")}</p>
+          <p class="quiet">{say("export.2", "Everything held about you, as a file, now — profile, nativity, consent history, guides, runs, builds, groups, readings, comments, charts, classes and the rest. No email round-trip and no thirty days.")}</p>
           <div><Button variant="secondary" href="/account/export">{say("text.11", "Download JSON")}</Button></div>
         </div>
         <div class="right">
           <h3>{say("delete.1", "Delete")}</h3>
-          <p class="quiet">{say("delete.2", "Immediate, irreversible, and it reaches the newsletter list too — not just the account.")}</p>
+          <p class="quiet">{say("delete.2", "Immediate, irreversible, and it reaches the newsletter list too — not just the account. What you made public stays up, without your name.")}</p>
           <div><Button variant="secondary" data-open-delete>{say("text.12", "Delete my account")}</Button></div>
         </div>
       </div>
@@ -504,6 +508,9 @@ const themeWord = (t: string) => t === "grimoire" ? say("tokens.theme.grimoire",
             <li>{say("what-goes.3", "Your name and preferences")}</li>
             <li>{say("what-goes.4", "Your saved nativity")}</li>
             <li>{say("what-goes.5", "Your newsletter subscription")}</li>
+            <li>{say("what-goes.6", "Your saved charts, and every comparison made with them")}</li>
+            <li>{say("what-goes.7", "Your drafts, runs, and any build you had not shared")}</li>
+            <li>{say("what-goes.8", "Your passkeys, devices, votes, reports and blocks")}</li>
           </ul>
         </div>
         <div>
@@ -512,6 +519,7 @@ const themeWord = (t: string) => t === "grimoire" ? say("tokens.theme.grimoire",
             <li>
               <Copy text={say("kept.consent", "A record that consent was given and withdrawn, with dates and **no birth data** — that record is the proof the law asks for, and it no longer names you.")} />
             </li>
+            <li>{say("kept.public", "What you made public — a published guide, an accepted change, a reading, a comment, a group others joined, a shared build — stays up with your name taken off it. Other people are following it; you agreed to this before you published.")}</li>
             <li>{say("what-is-kept-and-why.3", "Invoices, for as long as tax law requires. There are none yet.")}</li>
           </ul>
         </div>

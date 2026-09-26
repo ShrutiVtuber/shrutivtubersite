@@ -59,7 +59,8 @@ class Guide(TimestampMixin, table=True):
     game_id: int = Field(index=True, foreign_key="guide_game.id")
     slug: str = Field(index=True)
     title: str
-    created_by: int = Field(index=True, foreign_key="site_user.id")
+    created_by: Optional[int] = Field(default=None, index=True, foreign_key="site_user.id")   # null: the author deleted their account; the work stays
+    author_deleted_at: Optional[datetime] = Field(default=None, sa_type=UTC_TS)   # the author deleted their account; this is kept, anonymised
 
     # ⚠ The version that is served. Null means never published — a guide that
     # exists only as a draft. Not a foreign key, deliberately: the version
@@ -106,7 +107,8 @@ class GuideVersion(TimestampMixin, table=True):
     # her when she reads — and the rule that nothing an agent does publishes
     # is only checkable if the origin is kept.
     source: str = Field(default="desk")
-    created_by: int = Field(index=True, foreign_key="site_user.id")
+    created_by: Optional[int] = Field(default=None, index=True, foreign_key="site_user.id")   # null: the author deleted their account; the work stays
+    author_deleted_at: Optional[datetime] = Field(default=None, sa_type=UTC_TS)   # the author deleted their account; this is kept, anonymised
     submitted_at: Optional[datetime] = Field(default=None, sa_type=UTC_TS)
     published_at: Optional[datetime] = Field(default=None, sa_type=UTC_TS)
     # ⚠ A contribution: somebody else's version of this guide, written against
@@ -210,7 +212,8 @@ class Group(TimestampMixin, table=True):
     goal: str = ""
     target: int = 0
     tiers: int = 5
-    created_by: int = Field(index=True, foreign_key="site_user.id")
+    created_by: Optional[int] = Field(default=None, index=True, foreign_key="site_user.id")   # null: the author deleted their account; the work stays
+    author_deleted_at: Optional[datetime] = Field(default=None, sa_type=UTC_TS)   # the author deleted their account; this is kept, anonymised
     closed: bool = False
 
 
@@ -230,7 +233,8 @@ class GroupContribution(TimestampMixin, table=True):
 
     id: Optional[int] = Field(default=None, primary_key=True)
     group_id: int = Field(index=True, foreign_key="guide_group.id")
-    user_id: int = Field(index=True, foreign_key="site_user.id")
+    user_id: Optional[int] = Field(default=None, index=True, foreign_key="site_user.id")   # null: the giver deleted their account; the amount still counts
+    author_deleted_at: Optional[datetime] = Field(default=None, sa_type=UTC_TS)   # the author deleted their account; this is kept, anonymised
     amount: int = 0
 
 
@@ -278,7 +282,8 @@ class Build(TimestampMixin, table=True):
     __tablename__ = "build"
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    user_id: int = Field(index=True, foreign_key="site_user.id")
+    user_id: Optional[int] = Field(default=None, index=True, foreign_key="site_user.id")   # null: a shared build whose owner deleted their account
+    author_deleted_at: Optional[datetime] = Field(default=None, sa_type=UTC_TS)   # the author deleted their account; this is kept, anonymised
     template_id: Optional[int] = Field(default=None, index=True, foreign_key="build_template.id")
     game_id: Optional[int] = Field(default=None, index=True, foreign_key="guide_game.id")     # set when there is no template
     run_id: Optional[int] = Field(default=None, foreign_key="guide_run.id")

@@ -237,6 +237,41 @@ is not loaded — a working state. The file is also served whole at
 decision, not a side effect of a deploy — see `research/LICENSE-DATA.md` in
 the guides repository.
 
+## Deleting an account keeps public work — 26 September 2026
+
+Migration `k9i6f2g7h854` and the new `erase()`. Before it, deleting an account
+failed for anybody with a passkey, a saved chart, a class or a push
+subscription — the final `DELETE` hit a foreign key and rolled everything back.
+
+What the deploy needs, in order:
+
+1. **The migration runs with the usual `alembic upgrade head`.** It makes the
+   author columns of public work nullable (SET NULL), gives the private tables
+   ON DELETE CASCADE, adds `author_deleted_at` to the seven tables whose rows
+   survive anonymised, and widens `ck_practice_comment_has_an_author`. It
+   round-trips; a downgrade after a deletion keeps the anonymised rows and
+   leaves those columns nullable rather than failing.
+2. **The privacy page's words are in `seed_legal.py`, and the seeder does not
+   overwrite a section that already has text.** Either paste the new `rights`
+   section into the admin, or run `python scripts/seed_legal.py --force` — which
+   rewrites every legal section from the file, so only if nothing was edited by
+   hand since.
+3. **The apps.** Posting a reading or a comment (Astrolabe) and starting or
+   giving to a group (Squirrel Guides) now answer 428 until the person agrees
+   to what happens to public work. An app older than the builds carrying
+   `publish_agreement.dart` shows the site's sentence — "…once, on your account
+   page at shrutivtuber.com" — and the agreement given there works for the app
+   too. Ship both app builds with the next batch; nothing else waits on them.
+
+To check the deletion itself against a real Postgres (the normal suite reads
+source and cannot):
+
+    scripts/test-erase.sh
+
+It starts its own database on its own network, migrates it from nothing,
+deletes somebody with one of everything, and removes itself. It never touches
+the dev stack.
+
 ## Stripe went live — 2026-08-26
 
 Live keys installed on production; both membership tiers rebuilt in live mode

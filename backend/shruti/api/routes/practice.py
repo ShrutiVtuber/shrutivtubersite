@@ -27,6 +27,7 @@ from sqlmodel import select
 
 from shruti.api.deps import require_admin
 from shruti.core.db import get_session
+from shruti.core.publishing import require_publish_agreement
 from shruti.models.accounts import User
 from shruti.models.practice import (
     PracticeBlock, PracticeBridge, PracticeComment, PracticeReading,
@@ -73,9 +74,17 @@ async def _reader(request: Request, session: AsyncSession) -> User:
 
 
 def _name(user: User | None) -> str:
+    """
+    The name shown beside somebody's public work.
+
+    ⚠ No user is an author who deleted their account: the work stays and the
+    name goes. And no display name is "somebody" too — never the front half
+    of an email address, which is how an address ends up on a public page
+    without anybody having decided to put it there.
+    """
     if user is None:
         return "somebody"
-    return (user.display_name or "").strip() or user.email.split("@")[0]
+    return (user.display_name or "").strip() or "somebody"
 
 
 async def _hidden_from(session: AsyncSession, viewer: User | None) -> set[int]:
@@ -129,7 +138,7 @@ async def _work_json(
             )
         ).scalars().first() is not None
 
-    author = await session.get(User, work.user_id)
+    author = await session.get(User, work.user_id) if work.user_id else None
     by_sign = sorted(readings, key=lambda r: SIGNS.index(r.sign)
                      if r.sign in SIGNS else 99)
 
@@ -552,6 +561,7 @@ async def submit(
     # silence, not an erasure, and blocking the draft endpoint too would take
     # their unfinished writing with it.
     await _refuse_if_suspended(session, user)
+    await require_publish_agreement(session, user)
     work = await session.get(PracticeWork, work_id)
     if work is None or work.user_id != user.id:
         raise HTTPException(404, "no such work")
@@ -905,6 +915,7 @@ async def comment(
 ) -> dict:
     user = await _reader(request, session)
     await _refuse_if_suspended(session, user)
+    await require_publish_agreement(session, user)
     work = await session.get(PracticeWork, work_id)
     if work is None or work.submitted_at is None or work.hidden:
         raise HTTPException(404, "no such work")
@@ -925,7 +936,10 @@ async def comment(
     # ⚠ Their own comment must not wake their own phone. Somebody saying
     # something on their own work is not news to them, and being notified about
     # yourself is the fastest way to turn notifications off.
-    if work.user_id != user.id:
+    # ⚠ And a work whose author deleted their account has nobody to tell:
+    # `tell` reads to_user=None as EVERY device that wants replies, so a
+    # comment on an anonymised reading would wake the whole room.
+    if work.user_id is not None and work.user_id != user.id:
         try:
             from shruti.core.notify import tell
 
@@ -1202,7 +1216,7 @@ async def to_read(
         body["votes"] = vote_count
         body["comments"] = remark_count
         # What she would say out loud before reading it.
-        author = await session.get(User, work.user_id)
+        author = await session.get(User, work.user_id) if work.user_id else None
         body["byline"] = _name(author)
         out.append(body)
     return out
@@ -1253,7 +1267,7 @@ async def reports(
             work = await session.get(PracticeWork, subject_id)
             if work is None:
                 continue
-            author = await session.get(User, work.user_id)
+            author = await session.get(User, work.user_id) if work.user_id else None
             entry["hidden"] = work.hidden
             entry["hidden_by"] = work.hidden_by
             entry["author"] = _name(author)
@@ -1369,7 +1383,7 @@ async def strikes(session: AsyncSession = Depends(get_session)) -> list[dict]:
         .order_by(PracticeStrike.created_at.desc()))).scalars().all()
     out = []
     for row in rows:
-        who = await session.get(User, row.user_id)
+        who = await session.get(User, row.user_id) if row.user_id else None
         out.append({
             "id": row.id,
             "user_id": row.user_id,

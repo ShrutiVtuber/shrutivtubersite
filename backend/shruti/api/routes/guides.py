@@ -44,6 +44,7 @@ from shruti.api.routes.practice import (
     REPORTS_TO_HIDE, REPORT_REASONS as REASONS, _hidden_from, _name, _reader, _refuse_if_suspended,
 )
 from shruti.core.db import get_session
+from shruti.core.publishing import require_publish_agreement
 from shruti.models.accounts import User
 from shruti.models.guides import Game, Guide, GuideReport, GuideVersion, GuideVote
 
@@ -246,8 +247,8 @@ async def my_version(
     game = await session.get(Game, guide.game_id)
     contribution = None
     if version.contributed_by is not None:
-        author = await session.get(User, guide.created_by)
-        who = await session.get(User, version.contributed_by)
+        author = await session.get(User, guide.created_by) if guide.created_by else None
+        who = await session.get(User, version.contributed_by) if version.contributed_by else None
         contribution = {"by": _name(who), "byId": version.contributed_by, "author": _name(author),
                         "mine": version.contributed_by == user.id, "owner": guide.created_by == user.id,
                         "against": version.against_id, "accepted": version.accepted_at is not None}
@@ -382,6 +383,9 @@ async def submit(
     """Put a draft in her queue. Only a clean one; the problems are the answer otherwise."""
     user = await _reader(request, session)
     await _refuse_if_suspended(session, user)
+    # A guide and a proposed change both go public from here, and both stay
+    # up if the account goes — so they are agreed to first.
+    await require_publish_agreement(session, user)
     version = await session.get(GuideVersion, version_id)
     guide = await session.get(Guide, version.guide_id) if version else None
     if version is None or guide is None or not _may_open(user, guide, version):
@@ -501,7 +505,7 @@ async def contributions(request: Request, session: AsyncSession = Depends(get_se
         guide = await session.get(Guide, v.guide_id)
         game = await session.get(Game, guide.game_id) if guide else None
         who = await session.get(User, v.contributed_by) if v.contributed_by else None
-        author = await session.get(User, guide.created_by) if guide else None
+        author = await session.get(User, guide.created_by) if guide and guide.created_by else None
         against = await session.get(GuideVersion, v.against_id) if v.against_id else None
         return {"id": v.id, "state": v.state, "note": v.note, "accepted": v.accepted_at is not None,
                 "by": _name(who), "byId": v.contributed_by, "author": _name(author),
@@ -736,7 +740,7 @@ async def publish(version_id: int, session: AsyncSession = Depends(get_session))
         g.hidden, g.hidden_by = False, ""
     await session.commit()
     game = await session.get(Game, g.game_id)
-    author = await session.get(User, g.created_by)
+    author = await session.get(User, g.created_by) if g.created_by else None
     await _tell_discord({
         "id": g.id, "slug": g.slug, "title": g.title,
         "game": game.name if game else "", "gameSlug": game.slug if game else "",
@@ -969,7 +973,7 @@ async def one(
     v = await session.get(GuideVersion, g.published_version_id) if g.published_version_id else None
     if v is None:
         v = await _open_draft(session, g.id)          # the author, before publishing
-    author = await session.get(User, g.created_by)
+    author = await session.get(User, g.created_by) if g.created_by else None
     votes = (await _votes_for(session, [g.id])).get(g.id, 0)
     voted = g.id in await _voted_by(session, viewer, [g.id])
     out = _card(g, game_row, author, v, votes, voted, viewer)

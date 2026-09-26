@@ -1267,7 +1267,10 @@ async def ban_user(
             "records. It has now been deleted, apart from a dated record that "
             "consent was given and withdrawn, which carries no birth data and "
             "no longer carries your address — that record is what shows the "
-            "deletion itself was lawful.\n\n"
+            "deletion itself was lawful. Anything you had made public — a "
+            "guide, a reading, a comment, a group others joined, a shared "
+            "build — stays up without your name, as you agreed when you "
+            "published it.\n\n"
             "If you believe this is a mistake, reply to this message.\n\n"
             + json.dumps(payload, ensure_ascii=False, indent=2)
         ),

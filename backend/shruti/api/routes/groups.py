@@ -22,6 +22,7 @@ from sqlmodel import select
 
 from shruti.api.deps import get_session
 from shruti.api.routes.practice import _name, _reader, _refuse_if_suspended
+from shruti.core.publishing import require_publish_agreement
 from shruti.models import OverlayToken, User
 from shruti.models.guides import Group, GroupContribution, GroupMember
 
@@ -50,7 +51,7 @@ async def _view(session: AsyncSession, g: Group, viewer: User | None) -> dict:
     )).all()
     names = {}
     for uid, _ in rows[:3]:
-        u = await session.get(User, uid)
+        u = await session.get(User, uid) if uid else None
         names[uid] = _name(u)
     shown = [{"who": names[uid], "amount": int(n)} for uid, n in rows[:3]]
     others = rows[3:]
@@ -102,6 +103,7 @@ class GroupIn(BaseModel):
 async def create(body: GroupIn, request: Request, session: AsyncSession = Depends(get_session)) -> dict:
     user = await _reader(request, session)
     await _refuse_if_suspended(session, user)
+    await require_publish_agreement(session, user)
     name = body.name.strip()[:80]
     if not name:
         raise HTTPException(422, "a group needs a name")
@@ -172,6 +174,8 @@ async def contribute(code: str, body: ContributeIn, request: Request, session: A
     """One number. Nobody is ranked, and nobody is reminded."""
     user = await _reader(request, session)
     await _refuse_if_suspended(session, user)
+    # A contribution shows its giver's name to anyone with the code.
+    await require_publish_agreement(session, user)
     g = await _group(session, code)
     if g.closed:
         raise HTTPException(409, "this group is closed")

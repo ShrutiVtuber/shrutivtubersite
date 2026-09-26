@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 """
-The three consents, and their exact wording.
+The three consents, the one acknowledgement before publishing, and their
+exact wording.
 
 **Three decisions, never one.** Someone must be able to say yes to one and no
 to another, so these are three separate records with three different lawful
@@ -20,7 +21,7 @@ from dataclasses import dataclass
 
 # Bump when any wording below changes. Records keep the version they were
 # given under.
-CONSENT_VERSION = "2026-08-24.1"
+CONSENT_VERSION = "2026-09-26.1"
 
 
 @dataclass(frozen=True)
@@ -85,5 +86,33 @@ NEWSLETTER = ConsentSpec(
     ),
 )
 
+# ⚠ Asked the first time somebody makes anything public — never at signup,
+# which is why it is not in ALL: signup, the account settings list and the
+# app's consent screen all render ALL, and none of them is the moment this
+# decision belongs to. It is filed as a ConsentRecord like the others, with
+# its wording verbatim, and it is checked by WORDING rather than by version,
+# so a change to one of the three above does not ask everybody again.
+PUBLISH = ConsentSpec(
+    kind="publish",
+    label="What happens to what I publish",
+    wording=(
+        "I understand that what I make public on shrutivtuber.com — a guide, "
+        "a change to somebody's guide, a reading, a comment, a group, a "
+        "contribution to a group, a shared build — is read and relied on by "
+        "other people. If I delete my account, my account and everything "
+        "private go, and what I made public stays up with my name taken off "
+        "it. Copies already posted to Discord cannot be called back."
+    ),
+    lawful_basis="contract",
+    required=False,
+    explanation=(
+        "People follow a guide for weeks and answer each other's readings. "
+        "Deleting an account removes you, not the thing they are in the "
+        "middle of using. You are asked once, before the first thing you make "
+        "public, and it stays readable on your account page."
+    ),
+)
+
 ALL = (ACCOUNT, NATIVITY, NEWSLETTER)
-BY_KIND = {c.kind: c for c in ALL}
+ON_PUBLISH = (PUBLISH,)
+BY_KIND = {c.kind: c for c in (*ALL, *ON_PUBLISH)}

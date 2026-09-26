@@ -1,0 +1,55 @@
+---
+/* Before anything goes public: what happens to it if the account goes.
+ *
+ * Rendered once on every page that can publish, and opened by
+ * `lib/publish-consent.ts` only when the backend answers a publish with 428 —
+ * so somebody who has agreed never sees it again, and somebody who has not
+ * cannot get past it by using a client without the dialog.
+ *
+ * ⚠ The WORDING is not editable here and is not passed through `say()`. It is
+ * stored verbatim with the record, so it comes from `lib/consents.ts`, which
+ * a test holds against the backend's copy word for word. The heading, the
+ * lead and the buttons are ordinary copy.
+ */
+import ConsentCheckbox from "../forms/ConsentCheckbox.astro";
+import Button from "../forms/Button.astro";
+import { copy } from "../../lib/copy";
+import { PUBLISH_CONSENT } from "../../lib/consents";
+
+const say = await copy("component:PublishConsent");
+---
+<dialog class="publish-consent" data-publish-consent aria-labelledby="publish-consent-title">
+  <p class="eyebrow">{say("eyebrow", "Before this goes public")}</p>
+  <h2 id="publish-consent-title">{say("title", "What happens to what you publish")}</h2>
+  <p class="lead">{say("lead", "Once, before the first thing you make public. You will not be asked again unless these words change.")}</p>
+  <ConsentCheckbox
+    name="publish"
+    label={PUBLISH_CONSENT.label}
+    basis={PUBLISH_CONSENT.basis}
+    required
+    explanation={PUBLISH_CONSENT.explanation}
+    wording={PUBLISH_CONSENT.wording}
+  />
+  <p class="failed" data-publish-consent-failed hidden>{say("failed", "That did not save. Nothing was published; try again.")}</p>
+  <div class="actions">
+    <Button data-publish-consent-agree disabled>{say("agree", "Agree and publish")}</Button>
+    <Button variant="ghost" data-publish-consent-cancel>{say("cancel", "Not now")}</Button>
+  </div>
+</dialog>
+
+<style>
+  .publish-consent {
+    border: var(--border-w) solid var(--line-strong); border-radius: var(--radius-lg);
+    background: var(--surface-card); color: var(--ink); box-shadow: var(--shadow-3);
+    padding: var(--space-5); max-width: 640px; width: calc(100% - var(--space-5));
+  }
+  .publish-consent::backdrop { background: color-mix(in srgb, var(--surface-inset) 70%, transparent); }
+  .eyebrow {
+    margin: 0 0 6px; font: 600 var(--text-micro) var(--font-body);
+    letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-faint);
+  }
+  h2 { font: 600 var(--text-h3) var(--font-display); margin: 0 0 var(--space-3); }
+  .lead { margin: 0 0 var(--space-4); font: 400 var(--text-sm) / 1.6 var(--font-body); color: var(--ink-soft); max-width: 56ch; }
+  .failed { margin: var(--space-3) 0 0; font: 400 var(--text-sm) var(--font-body); color: var(--ink); }
+  .actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: var(--space-4); }
+</style>

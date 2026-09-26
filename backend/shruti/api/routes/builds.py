@@ -27,6 +27,7 @@ from shruti.api.deps import get_session, require_admin
 from shruti.api.routes.accounts import _site_url
 from shruti.api.routes.gamedata import data as gamedata
 from shruti.api.routes.practice import _reader, _refuse_if_suspended
+from shruti.core.publishing import require_publish_agreement
 from shruti.models import OverlayToken
 from shruti.models.guides import Build, BuildTemplate, Game, GuideRun
 
@@ -343,7 +344,9 @@ async def copy_shared_build(code: str, request: Request, session: AsyncSession =
 @router.post("/{build_id}/share")
 async def share_build(build_id: int, request: Request, session: AsyncSession = Depends(get_session)) -> dict:
     """Give this build a code. Asking twice gives the same code back; the code is the build's, not a new thing each time."""
-    b, _ = await _mine(session, request, build_id)
+    b, user = await _mine(session, request, build_id)
+    if not b.share_code:
+        await require_publish_agreement(session, user)
     if not b.share_code:
         for _attempt in range(8):
             code = _share_code()

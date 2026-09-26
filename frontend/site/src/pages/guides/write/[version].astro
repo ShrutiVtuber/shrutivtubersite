@@ -26,6 +26,7 @@ import Plate from "../../../components/guides/Plate.astro";
 import BaseLayout from "../../../layouts/BaseLayout.astro";
 import { account, asReader } from "../../../lib/account";
 import { copy } from "../../../lib/copy";
+import PublishConsent from "../../../components/feedback/PublishConsent.astro";
 
 const say = await copy("guides/write/[version]");
 const id = Astro.params.version ?? "";
@@ -248,6 +249,7 @@ const WORDS = {
       </aside>
     </div>
   </main>
+  {me && <PublishConsent />}
 </BaseLayout>
 
 <style is:global>
@@ -383,6 +385,7 @@ const WORDS = {
 
 <script>
   import { gateWords, optionLabel, phasesOf, stepsOf, fill } from "../../../lib/guides";
+  import { publishing } from "../../../lib/publish-consent";
 
   /* The editor. Vanilla, no framework: one document, path-bound inputs,
      one thing selected at a time, structural redraws only. */
@@ -843,7 +846,8 @@ const WORDS = {
     root.querySelector("[data-submit]")?.addEventListener("click", async () => {
       if (!(await save())) return;
       if (problems.length) { tell(W.status.submitFailed, "bad"); return; }
-      const r = await fetch(`/api/guides/by-id/${versionId}/submit`, { method: "POST", headers: { "x-csrf-token": token() } });
+      // Going public: the first time, this asks what happens to it if the account goes.
+      const r = await publishing(() => fetch(`/api/guides/by-id/${versionId}/submit`, { method: "POST", headers: { "x-csrf-token": token() } }));
       const a = await r.json().catch(() => ({}));
       if (r.ok) { tell(W.status.submitted); location.href = "/guides/write"; }
       else { problems = a.problems ?? problems; tell(a.detail || W.status.submitFailed, "bad"); draw(); }

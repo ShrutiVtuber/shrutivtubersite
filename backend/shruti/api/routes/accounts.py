@@ -8,6 +8,7 @@ hostage grace period, and reaches the newsletter list as well as the account.
 """
 from __future__ import annotations
 
+import copy
 import logging
 from datetime import datetime, timezone
 
@@ -17,7 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import update
 from sqlmodel import delete, select
 
-from shruti.core.consents import BY_KIND, CONSENT_VERSION
+from shruti.core.consents import BY_KIND, CONSENT_VERSION, PUBLISH
 from shruti.core.bans import is_banned
 from shruti.core.db import get_session
 from shruti.core.mail import send as send_mail
@@ -161,21 +162,25 @@ async def consent_wording() -> dict:
     website mirrors it in TypeScript with a test holding the two together; the
     app asks instead, which is one fewer copy to drift.
     """
-    from shruti.core.consents import ALL, CONSENT_VERSION
+    from shruti.core.consents import ALL, CONSENT_VERSION, PUBLISH
+
+    def spec(c) -> dict:
+        return {
+            "kind": c.kind,
+            "label": c.label,
+            "wording": c.wording,
+            "basis": c.lawful_basis,
+            "required": c.required,
+            "explanation": c.explanation,
+        }
 
     return {
         "version": CONSENT_VERSION,
-        "consents": [
-            {
-                "kind": c.kind,
-                "label": c.label,
-                "wording": c.wording,
-                "basis": c.lawful_basis,
-                "required": c.required,
-                "explanation": c.explanation,
-            }
-            for c in ALL
-        ],
+        "consents": [spec(c) for c in ALL],
+        # ⚠ Apart from `consents` on purpose: an app renders that list at
+        # signup, and this one belongs to the first publish, when a publish
+        # endpoint answers 428. The app shows these words and files them.
+        "publish": spec(PUBLISH),
     }
 
 
@@ -496,7 +501,12 @@ async def me(
         "nativity": _nativity_payload(nativity),
         "consents": [
             {
-                "kind": k, "granted": c.granted, "version": c.version,
+                # ⚠ The publishing agreement counts only for the words in
+                # force (core.publishing): an old yes to other words reads as
+                # not given, which is what the publish endpoints will say too.
+                "kind": k,
+                "granted": c.granted and (k != PUBLISH.kind or c.wording == PUBLISH.wording),
+                "version": c.version,
                 "givenAt": c.created_at.isoformat() if c.created_at else None,
                 "lawfulBasis": c.lawful_basis, "source": c.source,
             }
@@ -654,6 +664,12 @@ async def save_nativity(
 class ConsentChangeIn(BaseModel):
     kind: str
     granted: bool
+    # Where the decision was made, filed with the record. Only the names in
+    # CONSENT_SOURCES: anything else a client sends is filed as the settings page.
+    source: str = "account-settings"
+
+
+CONSENT_SOURCES = ("account-settings", "publish-dialog", "app")
 
 
 @router.post("/consents")
@@ -678,7 +694,8 @@ async def change_consent(
     session.add(ConsentRecord(
         user_id=user.id, email=user.email, kind=spec.kind, granted=body.granted,
         version=CONSENT_VERSION, wording=spec.wording,
-        lawful_basis=spec.lawful_basis, source="account-settings",
+        lawful_basis=spec.lawful_basis,
+        source=body.source if body.source in CONSENT_SOURCES else "account-settings",
     ))
 
     deleted_nativity = False
@@ -768,6 +785,10 @@ async def export_for(user: User, session: AsyncSession) -> dict:
             }
             for c in consents
         ],
+        # Everything else held about them, table by table: what they wrote,
+        # made, joined, kept and bought. GDPR's right of access is "all of
+        # it", and one definition shared with the ban keeps it that way.
+        **(await _everything_else(user, session)),
         "newsletter": None if subscriber is None else {
             "confirmedAt": subscriber.confirmed_at.isoformat() if subscriber.confirmed_at else None,
             "unsubscribedAt": subscriber.unsubscribed_at.isoformat() if subscriber.unsubscribed_at else None,
@@ -780,6 +801,86 @@ async def export_for(user: User, session: AsyncSession) -> dict:
     }
 
 
+# Never in a download: the export is also EMAILED when an account is closed
+# (admin.ban), and a token in an email is a key to somebody's chart, overlay
+# or share in an inbox nobody here controls.
+_NEVER_EXPORTED = ("password_hash", "public_key", "endpoint", "p256dh", "auth", "fcm_token")
+
+
+def _plain(row) -> dict:
+    """One row as the person may read it: every column, minus keys and secrets."""
+    out = {}
+    for key, value in row.model_dump().items():
+        if key in _NEVER_EXPORTED or key.endswith("token") or key.endswith("_hash"):
+            continue
+        out[key] = value.isoformat() if hasattr(value, "isoformat") else value
+    return out
+
+
+async def _everything_else(user: User, session: AsyncSession) -> dict:
+    """
+    Every table with a row about this person, as rows.
+
+    ⚠ `test_an_account_can_be_deleted` holds this against the list of foreign
+    keys to `site_user`: a table added later that points at people and is
+    missing here fails there, rather than quietly leaving the download short.
+    """
+    from shruti.models import (
+        Enrolment, Entitlement, Hosting, LessonProgress, OverlayToken, PushSubscription, Supporter,
+    )
+    from shruti.models.accounts import CollabGroup, Comparison, Passkey, SavedChart, StandingTest
+    from shruti.models.devices import AppDevice
+    from shruti.models.guides import (
+        Build, Group, GroupContribution, GroupMember, Guide, GuideReport, GuideRun, GuideVersion,
+        GuideVote,
+    )
+    from shruti.models.practice import (
+        PracticeBlock, PracticeComment, PracticeReading, PracticeReport, PracticeStrike,
+        PracticeVote, PracticeWork,
+    )
+
+    uid = user.id
+
+    async def rows(model, *where) -> list[dict]:
+        found = (await session.execute(select(model).where(*where))).scalars().all()
+        return [_plain(r) for r in found]
+
+    works = (await session.execute(select(PracticeWork).where(PracticeWork.user_id == uid))).scalars().all()
+    work_ids = [w.id for w in works]
+    return {
+        "guides": await rows(Guide, Guide.created_by == uid),
+        "guideVersions": await rows(GuideVersion, (GuideVersion.created_by == uid)
+                                    | (GuideVersion.contributed_by == uid)),
+        "guideRuns": await rows(GuideRun, GuideRun.user_id == uid),
+        "guideVotes": await rows(GuideVote, GuideVote.user_id == uid),
+        "guideReports": await rows(GuideReport, GuideReport.user_id == uid),
+        "groupsStarted": await rows(Group, Group.created_by == uid),
+        "groupMemberships": await rows(GroupMember, GroupMember.user_id == uid),
+        "groupContributions": await rows(GroupContribution, GroupContribution.user_id == uid),
+        "builds": await rows(Build, Build.user_id == uid),
+        "overlays": await rows(OverlayToken, OverlayToken.user_id == uid),
+        "practiceWorks": [_plain(w) for w in works],
+        "practiceReadings": await rows(PracticeReading, PracticeReading.work_id.in_(work_ids)) if work_ids else [],
+        "practiceComments": await rows(PracticeComment, PracticeComment.user_id == uid),
+        "practiceVotes": await rows(PracticeVote, PracticeVote.user_id == uid),
+        "practiceReports": await rows(PracticeReport, PracticeReport.user_id == uid),
+        "practiceStrikes": await rows(PracticeStrike, PracticeStrike.user_id == uid),
+        "practiceBlocks": await rows(PracticeBlock, PracticeBlock.user_id == uid),
+        "savedCharts": await rows(SavedChart, SavedChart.user_id == uid),
+        "comparisons": await rows(Comparison, Comparison.user_id == uid),
+        "standingTests": await rows(StandingTest, StandingTest.user_id == uid),
+        "collabGroups": await rows(CollabGroup, CollabGroup.user_id == uid),
+        "passkeys": await rows(Passkey, Passkey.user_id == uid),
+        "pushSubscriptions": await rows(PushSubscription, PushSubscription.user_id == uid),
+        "appDevices": await rows(AppDevice, AppDevice.user_id == uid),
+        "entitlements": await rows(Entitlement, Entitlement.user_id == uid),
+        "enrolments": await rows(Enrolment, Enrolment.user_id == uid),
+        "lessonProgress": await rows(LessonProgress, LessonProgress.user_id == uid),
+        "supporter": await rows(Supporter, Supporter.user_id == uid),
+        "hosting": await rows(Hosting, Hosting.user_id == uid),
+    }
+
+
 @router.delete("/", status_code=200)
 async def delete_account(
     response: Response, user: User = Depends(require_user),
@@ -789,7 +890,12 @@ async def delete_account(
     Immediate, irreversible, no grace period — and it reaches the list.
 
     WHAT GOES: the account, the email address, the preferences, the nativity,
-    and the newsletter subscription.
+    saved charts and their comparisons, drafts, runs, unshared builds, passkeys,
+    devices, votes, reports, blocks, and the newsletter subscription.
+
+    WHAT STAYS, WITHOUT THEIR NAME: what they made public, because other
+    people are following it (see `erase`). They agreed to that before they
+    published anything (`core.publishing`).
 
     WHAT IS KEPT, and why: a record that consent was given and withdrawn, with
     dates and NO birth data. That record is the proof the law asks for, and
@@ -810,19 +916,44 @@ async def erase(user: User, session: AsyncSession) -> dict:
     A banned account is a deleted account — the same deletion, reaching the
     same places, keeping the same anonymised consent trail. Writing it twice
     would mean one of them forgetting the newsletter.
+
+    Three kinds of thing, in this order:
+
+    1. **What is nobody's but theirs** is deleted: the nativity, saved charts
+       and the comparisons made with them, passkeys, devices, push
+       subscriptions, class progress, drafts, runs, unshared builds, votes,
+       reports, blocks, the newsletter subscription.
+    2. **What they made public is kept, with their name taken off**
+       (`_anonymise_public`): other people are following a published guide,
+       answering a reading, filling a group, copying a shared build. They
+       agreed to this before they published (`core.publishing`).
+    3. **The consent trail** stays, stripped of the address that identified
+       it — the proof that the deletion itself was lawful.
+
+    ⚠ Every table pointing at `site_user` has to be answered for here or by
+    its own ON DELETE (migration k9i6f2g7h854). One that is not makes the
+    final DELETE fail, the transaction roll back, and the person believe they
+    are gone when nothing has gone — which is how this function behaved until
+    that migration. `test_an_account_can_be_deleted` names every table.
     """
     email = user.email
     uid = user.id
+    names = _public_names(user)
 
-    await _erase_guides(session, uid)
+    kept = await _anonymise_public(session, uid, names)
+    await _erase_private(session, uid)
     await session.execute(delete(Nativity).where(Nativity.user_id == uid))
 
-    # Deletion must reach the newsletter list too, not only the account.
-    await session.execute(delete(Subscriber).where(Subscriber.email == email))
+    # Deletion must reach the newsletter list too, not only the account —
+    # by the address, and by the account in case the address was changed.
+    await session.execute(
+        delete(Subscriber).where((Subscriber.email == email) | (Subscriber.user_id == uid)))
 
     # The consent trail survives, stripped of the address that identifies it.
     records = (
-        await session.execute(select(ConsentRecord).where(ConsentRecord.email == email))
+        await session.execute(
+            select(ConsentRecord).where(
+                (ConsentRecord.email == email) | (ConsentRecord.user_id == uid)))
     ).scalars().all()
     for r in records:
         r.email = f"deleted-account-{uid}"
@@ -833,74 +964,256 @@ async def erase(user: User, session: AsyncSession) -> dict:
 
     return {
         "ok": True,
-        "deleted": ["account", "email address", "preferences", "nativity", "newsletter subscription"],
-        "kept": ["a consent given/withdrawn record with dates and no birth data"],
+        "deleted": [
+            "account", "email address", "preferences", "nativity", "saved charts and comparisons",
+            "passkeys and devices", "newsletter subscription", "drafts", "runs",
+            "builds you had not shared", "votes and reports", "class progress",
+        ],
+        "kept": [
+            "a consent given/withdrawn record with dates and no birth data",
+            *(f"{what}: {n}, still public, with your name taken off" for what, n in kept.items() if n),
+        ],
     }
 
 
-# ── mail ────────────────────────────────────────────────────────────────────
+def _public_names(user: User) -> set[str]:
+    """
+    Every name this person could have been credited under in a guide's own
+    JSON (`guide.authors` is a list of strings, written from the display name
+    — and, before 26 September 2026, from the front of the email address when
+    there was no display name).
 
-async def _erase_guides(session: AsyncSession, uid: int) -> None:
+    ⚠ A name changed since a guide was written is not found here. The credit
+    was a string copied at the time, and there is no record of what it was.
     """
-    Everything Squirrel Guides holds about a person goes with the account:
-    runs and their overlays, groups they made and joined, what they gave to
-    a goal, the vote, the report, hosting. What they WROTE is not theirs
-    alone to take from the people following it: a published guide stays in
-    the catalogue, taken down and kept by the operator; a draft is deleted;
-    a suggested change loses its name and keeps its words.
+    names = {(user.display_name or "").strip(), (user.email or "").split("@")[0].strip()}
+    return {n for n in names if n and n != "somebody"}
+
+
+def _without_notes(value):
+    """A copy with every `note` and `notes` removed — what a person wrote to themselves."""
+    if isinstance(value, dict):
+        return {k: _without_notes(v) for k, v in value.items() if k not in ("note", "notes")}
+    if isinstance(value, list):
+        return [_without_notes(v) for v in value]
+    return value
+
+
+async def _anonymise_public(session: AsyncSession, uid: int, names: set[str]) -> dict:
     """
-    from shruti.core.operator import operator_email
-    from shruti.models import Hosting, OverlayToken, Supporter
+    What this person made public stays, and stops being theirs.
+
+    PUBLIC, and kept with the author column set to NULL (which reads as
+    "somebody" wherever a name is shown):
+
+    - a guide with a published version, unless they had withdrawn it — its
+      published and superseded versions; their unpublished drafts of it go
+    - a change they proposed that was accepted into somebody's guide
+    - a reading they submitted to the practice room, unless withdrawn, and
+      every comment they left on anyone's reading
+    - a group somebody else had joined, and every amount they gave to a group
+    - a build they had shared by code, with every note taken out of it
+
+    Their name is also taken out of `guide.authors` in the JSON of every guide
+    they are credited on — their own, and every fork of it down the line,
+    whoever made the fork.
+
+    Everything else they wrote — drafts, proposals nobody accepted, withdrawn
+    work, a group nobody else joined, an unshared build — is private and goes
+    in `_erase_private`, after this.
+    """
+    from shruti.models import OverlayToken
     from shruti.models.guides import (
-        Group, GroupContribution, GroupMember, Guide, GuideReport, GuideRun, GuideVersion, GuideVote,
+        Build, Group, GroupContribution, GroupMember, Guide, GuideReport, GuideRun,
+        GuideVersion, GuideVote,
     )
+    from shruti.models.practice import PracticeComment, PracticeWork
+    from shrutisguides.builds import public_goals
+
+    kept = {"guides": 0, "accepted changes": 0, "readings": 0, "comments": 0,
+            "groups": 0, "shared builds": 0}
+    # Every row anonymised here says when: a null author with no date is a
+    # bug, a null author with one is a person who left.
+    gone = datetime.now(timezone.utc)
+    public_versions = ("published", "superseded")
+
+    # ── guides ─────────────────────────────────────────────────────────────
+    theirs = (await session.execute(select(Guide).where(Guide.created_by == uid))).scalars().all()
+    credited: list[int] = []
+    for g in theirs:
+        withdrawn = g.hidden and g.hidden_by == "author"
+        if g.published_version_id and not withdrawn:
+            g.created_by, g.author_deleted_at = None, gone
+            credited.append(g.id)
+            kept["guides"] += 1
+            # Their unpublished drafts of the guide are private; what was
+            # published, and what it replaced, is what people read.
+            await session.execute(
+                delete(GuideVersion).where(
+                    GuideVersion.guide_id == g.id, GuideVersion.created_by == uid,
+                    GuideVersion.contributed_by.is_(None),
+                    GuideVersion.state.not_in(public_versions)))
+            continue
+        # Never public, or withdrawn by them: the guide goes, and with it
+        # every run of it — nobody else can have been following a guide that
+        # was never out, and a withdrawn one was already gone for them.
+        runs_of = [r for (r,) in (await session.execute(
+            select(GuideRun.id).where(GuideRun.guide_id == g.id))).all()]
+        if runs_of:
+            await session.execute(delete(OverlayToken).where(OverlayToken.run_id.in_(runs_of)))
+            await session.execute(update(Build).where(Build.run_id.in_(runs_of)).values(run_id=None))
+            await session.execute(delete(GuideRun).where(GuideRun.id.in_(runs_of)))
+        await session.execute(update(Guide).where(Guide.published_version_id.in_(
+            select(GuideVersion.id).where(GuideVersion.guide_id == g.id))).values(published_version_id=None))
+        await session.execute(delete(GuideVote).where(GuideVote.guide_id == g.id))
+        await session.execute(delete(GuideReport).where(GuideReport.guide_id == g.id))
+        await session.execute(delete(GuideVersion).where(GuideVersion.guide_id == g.id))
+        await session.delete(g)
+    await session.flush()
+
+    # A change they proposed to somebody else's guide: kept once accepted
+    # (it is part of what people read), deleted while it was only a proposal.
+    accepted = (await session.execute(
+        update(GuideVersion)
+        .where(GuideVersion.contributed_by == uid, GuideVersion.state.in_(public_versions))
+        .values(contributed_by=None, created_by=None, author_deleted_at=gone))).rowcount or 0
+    kept["accepted changes"] = accepted
+    await session.execute(delete(GuideVersion).where(GuideVersion.created_by == uid,
+                                                     GuideVersion.state.not_in(public_versions)))
+    await session.execute(update(GuideVersion).where(GuideVersion.created_by == uid)
+                          .values(created_by=None, author_deleted_at=gone))
+    await session.execute(update(GuideVersion).where(GuideVersion.contributed_by == uid)
+                          .values(contributed_by=None, author_deleted_at=gone))
+
+    # Their name, out of the credits of every guide descended from theirs.
+    if names and credited:
+        lineage, frontier = set(credited), list(credited)
+        while frontier:
+            children = [c for (c,) in (await session.execute(
+                select(Guide.id).where(Guide.forked_from_id.in_(frontier)))).all()]
+            frontier = [c for c in children if c not in lineage]
+            lineage.update(frontier)
+        versions = (await session.execute(
+            select(GuideVersion).where(GuideVersion.guide_id.in_(lineage)))).scalars().all()
+        for v in versions:
+            meta = (v.body or {}).get("guide") or {}
+            authors = meta.get("authors")
+            if isinstance(authors, list) and any(a in names for a in authors):
+                body = copy.deepcopy(v.body)
+                body["guide"]["authors"] = [("somebody" if a in names else a) for a in authors]
+                v.body = body
+
+    # ── groups ─────────────────────────────────────────────────────────────
+    groups = (await session.execute(select(Group).where(Group.created_by == uid))).scalars().all()
+    for grp in groups:
+        others = (await session.execute(
+            select(GroupMember.id).where(GroupMember.group_id == grp.id, GroupMember.user_id != uid)
+        )).first()
+        if others is not None:
+            grp.created_by, grp.author_deleted_at = None, gone
+            kept["groups"] += 1
+            continue
+        await session.execute(delete(OverlayToken).where(OverlayToken.group_id == grp.id))
+        await session.execute(delete(GroupContribution).where(GroupContribution.group_id == grp.id))
+        await session.execute(delete(GroupMember).where(GroupMember.group_id == grp.id))
+        await session.delete(grp)
+    await session.flush()
+    # What they gave still counts toward the goal other people are filling.
+    await session.execute(update(GroupContribution).where(GroupContribution.user_id == uid)
+                          .values(user_id=None, author_deleted_at=gone))
+
+    # ── the practice room ──────────────────────────────────────────────────
+    kept["readings"] = (await session.execute(
+        update(PracticeWork)
+        .where(PracticeWork.user_id == uid, PracticeWork.submitted_at.is_not(None),
+               ~((PracticeWork.hidden.is_(True)) & (PracticeWork.hidden_by == "author")))
+        .values(user_id=None, author_deleted_at=gone))).rowcount or 0
+    await session.execute(delete(PracticeComment).where(
+        PracticeComment.user_id == uid, PracticeComment.hidden.is_(True),
+        PracticeComment.hidden_by == "author"))
+    kept["comments"] = (await session.execute(
+        update(PracticeComment).where(PracticeComment.user_id == uid)
+        .values(user_id=None, author_deleted_at=gone))).rowcount or 0
+
+    # ── shared builds ──────────────────────────────────────────────────────
+    shared = (await session.execute(
+        select(Build).where(Build.user_id == uid, Build.share_code.is_not(None)))).scalars().all()
+    for b in shared:
+        await session.execute(delete(OverlayToken).where(OverlayToken.build_id == b.id))
+        b.user_id, b.author_deleted_at = None, gone
+        b.run_id = None
+        b.goals = public_goals(b.goals)
+        b.plan = _without_notes(b.plan or {})
+        kept["shared builds"] += 1
+
+    await session.flush()
+    return kept
+
+
+async def _erase_private(session: AsyncSession, uid: int) -> None:
+    """
+    Everything that was only ever theirs. Runs after `_anonymise_public`, so
+    whatever still points at them here is, by elimination, private.
+    """
+    from shruti.models import (
+        Enrolment, Entitlement, Hosting, LessonProgress, OverlayToken, PushSubscription, Supporter,
+    )
+    from shruti.models.accounts import Comparison, Passkey, SavedChart
+    from shruti.models.guides import (
+        Build, Group, GroupMember, Guide, GuideReport, GuideRun, GuideVersion, GuideVote,
+    )
+    from shruti.models.practice import PracticeBlock, PracticeWork
+
+    # Runs, and every overlay they minted.
     runs = [r for (r,) in (await session.execute(select(GuideRun.id).where(GuideRun.user_id == uid))).all()]
+    await session.execute(delete(OverlayToken).where(OverlayToken.user_id == uid))
     if runs:
         await session.execute(delete(OverlayToken).where(OverlayToken.run_id.in_(runs)))
+        await session.execute(update(Build).where(Build.run_id.in_(runs)).values(run_id=None))
         await session.execute(delete(GuideRun).where(GuideRun.id.in_(runs)))
-    await session.execute(delete(OverlayToken).where(OverlayToken.user_id == uid))
-    mine = [g for (g,) in (await session.execute(select(Group.id).where(Group.created_by == uid))).all()]
-    if mine:
-        await session.execute(delete(OverlayToken).where(OverlayToken.group_id.in_(mine)))
-        await session.execute(delete(GroupContribution).where(GroupContribution.group_id.in_(mine)))
-        await session.execute(delete(GroupMember).where(GroupMember.group_id.in_(mine)))
-        await session.execute(delete(Group).where(Group.id.in_(mine)))
-    await session.execute(delete(GroupContribution).where(GroupContribution.user_id == uid))
+
+    # Builds nobody else was given.
+    unshared = [b for (b,) in (await session.execute(select(Build.id).where(Build.user_id == uid))).all()]
+    if unshared:
+        await session.execute(delete(OverlayToken).where(OverlayToken.build_id.in_(unshared)))
+        await session.execute(delete(Build).where(Build.id.in_(unshared)))
+
     await session.execute(delete(GroupMember).where(GroupMember.user_id == uid))
     await session.execute(delete(GuideVote).where(GuideVote.user_id == uid))
     await session.execute(delete(GuideReport).where(GuideReport.user_id == uid))
-    await session.execute(update(GuideVersion).where(GuideVersion.contributed_by == uid).values(contributed_by=None))
-    keeper = None
-    her = await operator_email(session)
-    if her:
-        keeper = (await session.execute(select(User).where(User.email == her))).scalar_one_or_none()
-    if keeper is not None and keeper.id == uid:
-        keeper = None
-    guides = (await session.execute(select(Guide).where(Guide.created_by == uid))).scalars().all()
-    for g in guides:
-        if g.published_version_id and keeper is not None:
-            g.created_by = keeper.id
-            g.hidden = True
-            g.hidden_by = "author"
-        else:
-            await session.execute(delete(GuideVersion).where(GuideVersion.guide_id == g.id))
-            await session.execute(delete(GuideVote).where(GuideVote.guide_id == g.id))
-            await session.execute(delete(GuideReport).where(GuideReport.guide_id == g.id))
-            runs_of = [r for (r,) in (await session.execute(select(GuideRun.id).where(GuideRun.guide_id == g.id))).all()]
-            if runs_of:
-                await session.execute(delete(OverlayToken).where(OverlayToken.run_id.in_(runs_of)))
-                await session.execute(delete(GuideRun).where(GuideRun.id.in_(runs_of)))
-            await session.delete(g)
-    await session.flush()
-    if keeper is not None:
-        await session.execute(update(GuideVersion).where(GuideVersion.created_by == uid).values(created_by=keeper.id))
-    else:
-        left = [g for (g,) in (await session.execute(select(GuideVersion.guide_id).where(GuideVersion.created_by == uid))).all()]
-        if left:
-            await session.execute(delete(GuideVersion).where(GuideVersion.created_by == uid))
+
+    # Practice drafts and withdrawn work. Readings, votes and comments on
+    # them go by their own ON DELETE CASCADE.
+    await session.execute(delete(PracticeWork).where(PracticeWork.user_id == uid))
+    await session.execute(delete(PracticeBlock).where(
+        (PracticeBlock.user_id == uid) | (PracticeBlock.blocked_id == uid)))
+
+    # Charts are birth data — never kept, published or not. Their own
+    # comparisons first; the comparisons OTHER people made with these charts
+    # and the standing tests on them go by ON DELETE CASCADE with the chart.
+    await session.execute(delete(Comparison).where(Comparison.user_id == uid))
+    await session.execute(delete(SavedChart).where(SavedChart.user_id == uid))
+
+    for table in (Passkey, PushSubscription, Entitlement, Enrolment, LessonProgress):
+        await session.execute(delete(table).where(table.user_id == uid))
+
+    # Billing keeps its own records for as long as tax law asks; the link to
+    # the account is what goes.
     await session.execute(update(Hosting).where(Hosting.user_id == uid).values(user_id=None))
     await session.execute(update(Supporter).where(Supporter.user_id == uid).values(user_id=None))
+
+    # ⚠ Anything left pointing at them now is a bug in `_anonymise_public`,
+    # not something to delete quietly: say so in the log and let the
+    # foreign keys decide.
+    for model, column in ((Guide, Guide.created_by), (GuideVersion, GuideVersion.created_by),
+                          (Group, Group.created_by)):
+        left = (await session.execute(select(model.id).where(column == uid))).first()
+        if left is not None:
+            log.error("erase: %s %s still points at the account being deleted", model.__name__, left[0])
     await session.flush()
+
+
+# ── mail ────────────────────────────────────────────────────────────────────
 
 
 async def _send_verification(email: str) -> None:

@@ -33,7 +33,8 @@ class PracticeWork(TimestampMixin, table=True):
     __tablename__ = "practice_work"
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    user_id: int = Field(index=True, foreign_key="site_user.id")
+    user_id: Optional[int] = Field(default=None, index=True, foreign_key="site_user.id")   # null: the author deleted their account; the work stays
+    author_deleted_at: Optional[datetime] = Field(default=None, sa_type=UTC_TS)   # the author deleted their account; this is kept, anonymised
 
     # Which sky it was written for. Same vocabulary as her own readings, so a
     # practice piece and a published one are about the same period.
@@ -111,6 +112,7 @@ class PracticeComment(TimestampMixin, table=True):
     # Exactly one of the two is set, and the database says so.
     user_id: Optional[int] = Field(
         default=None, index=True, foreign_key="site_user.id")
+    author_deleted_at: Optional[datetime] = Field(default=None, sa_type=UTC_TS)   # the author deleted their account; this is kept, anonymised
 
     # ⚠ **Which reading this is about, or the whole work.** Empty means the
     # set: "this week reads well as a series", which is a real thing to say

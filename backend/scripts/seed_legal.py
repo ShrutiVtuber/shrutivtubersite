@@ -241,11 +241,16 @@ leaves your consent intact.
 These are controls in your account, not an address to write to:
 
 - **A copy of your data** — a JSON file, downloaded from your account page
-  immediately. It contains your profile, your saved nativity, your full consent
-  history with dates, and your newsletter state.
+  immediately. It contains everything held about you: your profile, your saved
+  nativity, your full consent history with dates, your newsletter state, and
+  every guide, run, build, group, reading, comment, chart, comparison, class and
+  device on your account. Keys that would open something (passwords, share
+  links, push addresses) are left out of the file.
 - **Deletion** — immediate and irreversible, from your account page. It removes
-  the account, the email address, the preferences, the nativity and the
-  newsletter subscription. There is no grace period and no retention attempt.
+  the account, the email address, the preferences, the nativity, saved charts
+  and every comparison made with them, drafts, runs, unshared builds, passkeys,
+  devices, votes, reports, blocks and the newsletter subscription. There is no
+  grace period and no retention attempt.
 - **Withdrawing a consent** — one control, as easy as giving it was.
 - **Correction** — edit your profile and nativity directly.
 
@@ -253,6 +258,15 @@ These are controls in your account, not an address to write to:
 withdrawn, with dates and **no birth data**, stripped of the email address that
 identified it. That record is the evidence that the processing was lawful and
 that the deletion happened; deleting it would remove the proof of both.
+
+**What you made public stays, without your name.** A published guide, a change
+accepted into somebody's guide, a reading in the practice room, a comment, a
+group other people joined, an amount given to a group, a build shared by code:
+other people are following these, so deleting your account takes your name off
+them rather than taking them away. Your name is removed from the guide's own
+credits too, including in forks other people made of it. You are told this, and
+agree to it, before the first thing you make public. Copies already posted to
+the Discord server cannot be recalled by the site.
 
 You also have the right to complain to a supervisory authority.
 """),

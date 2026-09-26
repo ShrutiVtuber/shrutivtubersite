@@ -5,10 +5,10 @@
  * displays one sentence and files another is worse than no record at all.
  * A test asserts they agree.
  */
-export const CONSENT_VERSION = "2026-08-24.1";
+export const CONSENT_VERSION = "2026-09-26.1";
 
 export interface ConsentSpec {
-  kind: "account" | "nativity" | "newsletter";
+  kind: "account" | "nativity" | "newsletter" | "publish";
   label: string;
   wording: string;
   basis: "contract" | "consent" | "explicit-consent";
@@ -61,3 +61,27 @@ export const CONSENTS: ConsentSpec[] = [
       "and that is said here rather than buried in the privacy policy.",
   },
 ];
+
+/* Asked the first time somebody makes anything public, never at signup —
+ * which is why it is not in CONSENTS, the list signup and the account
+ * settings render. `PublishConsent.astro` shows it; the backend refuses a
+ * publish with 428 until it has been agreed to.
+ */
+export const PUBLISH_CONSENT: ConsentSpec = {
+  kind: "publish",
+  label: "What happens to what I publish",
+  wording:
+    "I understand that what I make public on shrutivtuber.com — a guide, " +
+    "a change to somebody's guide, a reading, a comment, a group, a " +
+    "contribution to a group, a shared build — is read and relied on by " +
+    "other people. If I delete my account, my account and everything " +
+    "private go, and what I made public stays up with my name taken off " +
+    "it. Copies already posted to Discord cannot be called back.",
+  basis: "contract",
+  required: false,
+  explanation:
+    "People follow a guide for weeks and answer each other's readings. " +
+    "Deleting an account removes you, not the thing they are in the " +
+    "middle of using. You are asked once, before the first thing you make " +
+    "public, and it stays readable on your account page.",
+};
