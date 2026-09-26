@@ -1,0 +1,83 @@
+---
+/* Support (Web Compose Account, "support") — the web only: the app shows no
+ * prices, no supporter mentions and no links to buy.
+ *
+ * Swara Studio is kept going by the site's own supporters, the Swaras: a
+ * Swaras supporter gets every gated tool, the school included (the owner's
+ * rule), so supporting the school IS becoming a Swara, through the site's
+ * existing checkout at /support. The prices shown are the site's real tiers,
+ * read from the billing API; nothing here invents a price.
+ *
+ * ⚠ The open fund and gifting a supporter year are drawn in the design and
+ * are not products yet: both need decisions (what a "year" costs, who
+ * decides a fund request). Until then their cards say what exists today.
+ */
+import SwaraLayout from "../../layouts/SwaraLayout.astro";
+import Hero from "../../components/carnatic/Hero.astro";
+import Chip from "../../components/carnatic/Chip.astro";
+import Button from "../../components/forms/Button.astro";
+import { langOf, words } from "../../lib/carnatic/i18n";
+import { site } from "../../lib/api";
+import { visitor } from "../../lib/carnatic/prefs";
+import { copy } from "../../lib/copy";
+
+const lang = langOf(Astro);
+const tr = await words(lang);
+const say = await copy("carnatic/support");
+const { me } = await visitor(Astro);
+const billing = await site<{ configured?: boolean; tiers?: any[] }>("/api/billing/tiers");
+const tiers = (billing?.tiers ?? []).filter((x) => x.amount);
+const price = (x: any) => `€${(x.amount / 100).toFixed(x.amount % 100 ? 2 : 0)}${x.interval === "month" ? " a month" : x.interval === "year" ? " a year" : ""}`;
+const first = tiers.find((x) => x.featured) ?? tiers[0];
+---
+<SwaraLayout title={say("meta.title", "Support Swara Studio")}
+             description={say("meta.description", "Swara Studio is free to use and kept going by supporters. Become a Swara: every tool stays free for everyone, and supporters can add more parts to each song in the composer.")}>
+  <Hero eyebrow={tr("nav.support")} title={say("title", "Free to use, kept going by supporters")} lede={say("lede", "Become a Swara, give once, or ask about a year from the fund.")} />
+  {me.supporter && <p class="sw-p su-thanks">{tr("landing.thanks")}</p>}
+  <div class="su">
+    <section class="sw-card su-card su-main" data-tiers>
+      <p class="t-eyebrow sw-eyebrow su-accent">{say("payH", "Become a Swara")}</p>
+      <h2 class="su-h">{say("payTitle", "A supporter")}</h2>
+      <div class="sw-chips">
+        {tiers.map((x) => <Chip data-tier={x.tier} data-label={price(x)} active={x === first}>{x.name} · {price(x)}</Chip>)}
+        <Chip data-tier="one-off" data-label={say("once", "any amount, once")} active={!first}>{say("other", "Other · once")}</Chip>
+      </div>
+      <p class="sw-p">{say("payP", "Swaras are the people who support Shruti's work. A Swaras supporter can add more parts to each song in the composer and has every gated tool on the site. Every tool here stays free for everyone.")}</p>
+      <Button href="/support" data-go>{first ? `${say("supportWith", "Support with")} ${price(first)}` : say("giveOnce", "Give once")}</Button>
+      {billing?.configured === false && <p class="sw-note">{say("notOpen", "Payments are not open yet on this site.")}</p>}
+    </section>
+    <section class="sw-card su-card">
+      <p class="t-eyebrow sw-eyebrow">{say("fundH", "The open fund")}</p>
+      <h2 class="su-h">{say("fundTitle", "For people who can't pay")}</h2>
+      <p class="sw-p">{say("fundP", "Nothing in the school is behind a payment: the path, the tools, the ragas and the composer's first two parts are free. If you would like the supporter parts and can't pay, write and ask; no proof, no questions beyond a short note.")}</p>
+      <Button href="/contact" variant="secondary">{say("ask", "Ask for a year")}</Button>
+    </section>
+    <section class="sw-card su-card">
+      <p class="t-eyebrow sw-eyebrow">{say("giftH", "Gifts")}</p>
+      <h2 class="su-h">{say("giftTitle", "Give a year to a student")}</h2>
+      <p class="sw-p">{say("giftP", "Gifting a supporter year is coming. Until then, a one-off gift on the support page keeps the school going for everyone.")}</p>
+      <Button href="/support" variant="secondary">{say("giveOnce", "Give once")}</Button>
+    </section>
+  </div>
+  <p class="sw-note su-foot">{say("foot", "Web only. The app shows no prices and no supporter mentions. Payments use the shrutivtuber.com account and its existing processor.")}</p>
+</SwaraLayout>
+
+<script>
+  const box = document.querySelector<HTMLElement>("[data-tiers]");
+  box?.querySelectorAll<HTMLElement>("[data-tier]").forEach((c) => c.addEventListener("click", () => {
+    box.querySelectorAll("[data-tier]").forEach((x) => x.setAttribute("aria-pressed", String(x === c)));
+    const go = box.querySelector<HTMLAnchorElement>("[data-go] span") ?? box.querySelector<HTMLAnchorElement>("[data-go]");
+    if (go) go.textContent = c.dataset.tier === "one-off" ? "Give once" : `Support with ${c.dataset.label}`;
+  }));
+</script>
+
+<style>
+  .su { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; padding-top: 24px; align-items: stretch; }
+  .su-card { display: grid; gap: 14px; align-content: start; padding: 20px; }
+  .su-main { border-color: var(--accent); }
+  .su-accent { color: var(--accent); }
+  .su-h { margin: 0; font: 24px / 1.2 var(--font-display); color: var(--ink); }
+  .su-thanks { padding-top: 16px; }
+  .su-foot { padding-top: 16px; }
+  @media (max-width: 899px) { .su { grid-template-columns: minmax(0, 1fr); } }
+</style>

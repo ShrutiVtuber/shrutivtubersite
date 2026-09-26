@@ -1,0 +1,342 @@
+---
+/* The composer (Web Compose Account, "composer"). A song is sections of lines;
+ * a line is one avartanam of the chosen tala, each count holding one, two or
+ * four notes, a syllable of sahitya, and a mridangam stroke if the song has
+ * that part. A note outside the raga stays where it was typed, with a dotted
+ * underline, so the composer decides.
+ *
+ * Nothing is a wall: signed out, the song is kept in this browser. Signed in,
+ * it is saved to the account and can be published as a sheet. Songs have up
+ * to two parts; Swaras supporters have no limit (the owner's rule). The web
+ * explains the limit; the app never mentions it.
+ */
+import SwaraLayout from "../../layouts/SwaraLayout.astro";
+import Hero from "../../components/carnatic/Hero.astro";
+import { hrefIn, langOf, words } from "../../lib/carnatic/i18n";
+import { ragas, talas } from "../../lib/carnatic/data";
+import { visitor, swaraScript } from "../../lib/carnatic/prefs";
+import { asReader } from "../../lib/account";
+import { copy } from "../../lib/copy";
+
+const lang = langOf(Astro);
+const tr = await words(lang);
+const say = await copy("carnatic/compose");
+const L = (p: string) => hrefIn(lang, p);
+const { me, settings } = await visitor(Astro);
+const [r, tl] = await Promise.all([ragas(), talas()]);
+const ragaOptions = [...(r?.janyas ?? []), ...(r?.performed ?? [])].sort((a, b) => a.name.localeCompare(b.name))
+  .map((x) => ({ id: x.id, name: x.name, scale: `${x.arohana} ${x.avarohana}`.replace(/!\w/g, "") }));
+const talaOptions = (tl?.practical ?? []).map((x: any) => ({ id: x.id, name: x.name, counts: x.counts, angas: x.angas }));
+let mine: any[] = [];
+let song: any = null;
+if (me.signedIn) {
+  const list = await asReader(Astro, "/api/carnatic/songs");
+  mine = list.ok ? list.body.items : [];
+  const want = Astro.url.searchParams.get("song");
+  const id = want ? Number(want) : mine[0]?.id;
+  if (id) {
+    const one = await asReader(Astro, `/api/carnatic/songs/${id}`);
+    if (one.ok) song = one.body;
+  }
+}
+const boot = { ragas: ragaOptions, talas: talaOptions, song, mine, script: swaraScript(settings, lang), tamil: settings.tamilStyle,
+               limit: me.limits?.partsPerSong ?? 2, signedIn: me.signedIn, instrument: settings.instrument };
+const playLine = say("playLine", "drone Sa = {sa} · tala clicks on · {tuning}").replace("{sa}", settings.sa).replace("{tuning}", settings.playbackTuning === "equal" ? say("et", "equal temperament") : say("ji", "just intonation"));
+---
+<SwaraLayout title={say("meta.title", "Compose · Swara Studio")} noindex={me.signedIn}
+             description={say("meta.description", "Write a Carnatic song in swara notation on the tala grid: pallavi, anupallavi and charanam, sahitya under the notes, gamaka signs, mridangam strokes, and playback over the drone. Publish it as a printable sheet.")}>
+  <Hero eyebrow={tr("nav.compose")} title={song?.title ?? say("untitled", "Your song")} lede={say("lede", "Your song · pick a raga and a tala, then write a line at a time.")} />
+  <div class="cp" data-composer>
+    <div class="cp-bar">
+      <label>{say("raga", "Raga")}<select data-raga>{ragaOptions.map((o) => <option value={o.id}>{o.name}</option>)}</select></label>
+      <label>{say("tala", "Tala")}<select data-tala>{talaOptions.map((o: any) => <option value={o.id}>{o.name}</option>)}</select></label>
+      <label>{say("script", "Sahitya script")}<select data-script><option value="lat">{say("script.lat", "Latin")}</option><option value="ta">{say("script.ta", "Tamil")}</option><option value="te">{say("script.te", "Telugu")}</option><option value="kn">{say("script.kn", "Kannada")}</option></select></label>
+      <label class="cp-title">{say("titleL", "Title")}<input data-title maxlength="120" /></label>
+      <span class="spacer"></span>
+      <span class="sw-mono" data-saved>{me.signedIn ? "" : say("local", "kept in this browser")}</span>
+      <a class="cp-preview" data-preview href={song ? L(`/carnatic/sheets/${song.slug}`) : "#"} aria-disabled={song ? undefined : "true"}>{say("preview", "Preview sheet")}</a>
+    </div>
+    {me.signedIn && mine.length > 1 && (
+      <p class="sw-note">{say("yours", "Your songs")}: {mine.map((m, i) => <>{i > 0 && " · "}<a href={L(`/carnatic/compose?song=${m.id}`)}>{m.title}</a></>)} · <a href={L("/carnatic/compose?song=new")}>{say("new", "New song")}</a></p>
+    )}
+    <div class="cp-body">
+      <div class="cp-sections" data-sections></div>
+      <aside class="cp-side">
+        <div class="sw-card cp-parts">
+          <p class="t-eyebrow sw-eyebrow">{say("parts", "Parts")}</p>
+          <div data-parts></div>
+          <div class="cp-add" data-add-part>
+            <button type="button" data-add="strokes">+ {say("addStrokes", "Mridangam strokes")}</button>
+            <button type="button" data-add="melody">+ {say("addMelody", "Second melody")}</button>
+          </div>
+          <p class="sw-note" data-limit-note hidden>{say("limit", "Free songs have up to 2 parts. Swaras supporters can add more.")} <a href={L("/carnatic/support")}>{say("supportLink", "Support Swara Studio")}</a></p>
+        </div>
+        <div class="sw-card cp-play">
+          <p class="t-eyebrow sw-eyebrow">{say("playback", "Playback")}</p>
+          <button type="button" class="cp-go" data-go>{say("playFrom", "Play from pallavi")}</button>
+          <label class="cp-tempo"><span class="sw-p">{say("tempo", "Tempo")}</span><input type="range" min="40" max="90" value="64" data-tempo /><span class="sw-mono" data-tempo-v>64</span></label>
+          <p class="sw-mono">{playLine}</p>
+        </div>
+        <div class="sw-card cp-help">
+          <p class="t-eyebrow sw-eyebrow">{say("howH", "Writing notes")}</p>
+          <p class="sw-note">{say("how", "Click a count to edit it. Notes: S R G M P D N, with a variant if you want one (R1, G3); ' for tara (S'), . for mandra (.P); , and ; hold. Gamaka signs before a note: ~ kampita, / and \\ jaru, w nokku, x odukkal, y orikkai, : sphurita. Strokes: tha dhi thom nam ki ta mi chapu dheem tham dhom gumki.")}</p>
+          {!me.signedIn && <p class="sw-note">{say("signIn", "Sign in to keep songs on every device and to publish a sheet.")} <a href="/signin?next=/carnatic/compose">{tr("gen.signIn")}</a></p>}
+        </div>
+      </aside>
+    </div>
+    <div class="cp-flag" data-flag hidden></div>
+  </div>
+  <script type="application/json" id="cp-boot" set:html={JSON.stringify(boot)} />
+</SwaraLayout>
+
+<script>
+  import { avartanamHtml } from "../../lib/carnatic/render";
+  import { csrf, settings, startDrone, theDrone } from "../../lib/carnatic/client/state";
+  import { TalaClock } from "../../lib/carnatic/client/tala";
+  import { playNote, blip, ctx } from "../../lib/carnatic/client/audio";
+  import { pitchHz, ratio, semitones, tokenize, variantsOf, inline } from "../../lib/carnatic/notation";
+
+  const B = JSON.parse(document.getElementById("cp-boot")!.textContent!);
+  const root = document.querySelector<HTMLElement>("[data-composer]")!;
+  const $ = <T extends HTMLElement>(s: string) => root.querySelector<T>(s)!;
+  const KEY = "swara.song.draft";
+  const GAMAKA: Record<string, string> = { "~": "kampita", "/": "jaru-up", "\\": "jaru-down", w: "nokku", x: "odukkal", y: "orikkai", ":": "sphurita" };
+  const SIGN = Object.fromEntries(Object.entries(GAMAKA).map(([k, v]) => [v, k]));
+  const STROKES = new Set(["tha", "dhi", "thom", "nam", "ki", "ta", "mi", "chapu", "arai-chapu", "dheem", "tham", "dhom", "gumki", "-"]);
+
+  const tala = (id: string) => B.talas.find((x: any) => x.id === id) ?? B.talas[0];
+  const blankLine = (n: number, per: number, parts: any[]) => ({ counts: Array.from({ length: n }, () => ({ notes: Array(per).fill(","), sahitya: "", parts: Object.fromEntries(parts.filter((p: any) => p.kind === "strokes").map((p: any) => [p.id, []])) })) });
+  const fresh = () => {
+    const parts = [{ id: "melody", kind: "melody", instrument: B.instrument === "mridangam" ? "voice" : B.instrument }];
+    const n = tala("adi").counts.length;
+    return { format: 1, title: "Untitled", raga: "mohanam", tala: "adi", sahityaScript: "lat", parts,
+      sections: [["pallavi", "Pallavi"], ["anupallavi", "Anupallavi"], ["charanam", "Charanam"]].map(([id, name]) => ({ id, name, repeat: 1, notesPerCount: 2, lines: [blankLine(n, 2, parts)] })) };
+  };
+  let meta: any = B.song ? { id: B.song.id, slug: B.song.slug, updatedAt: B.song.updatedAt } : null;
+  let song: any = B.song?.song ?? (() => { try { return JSON.parse(localStorage.getItem(KEY) || "null"); } catch { return null; } })() ?? fresh();
+
+  const ragaScale = () => B.ragas.find((x: any) => x.id === song.raga)?.scale ?? "";
+  const outside = () => {
+    const vars = variantsOf(ragaScale());
+    const letters = new Set(Object.keys(vars).concat(["S", "P"]));
+    for (const tk of tokenize(ragaScale())) if (tk.kind === "note" && tk.swara) letters.add(tk.swara);
+    const out = new Set<string>();
+    for (const s of song.sections) for (const l of s.lines) for (const c of l.counts) for (const n of c.notes) {
+      const tk = tokenize(n.replace(/^[a-z-]+:/, ""))[0];
+      if (!tk || tk.kind !== "note" || !tk.swara) continue;
+      const name = tk.swara + (tk.variant ?? "");
+      if (tk.variant ? (vars[tk.swara] !== tk.variant && !"SP".includes(tk.swara)) : !letters.has(tk.swara)) out.add(tk.variant ? name : tk.swara);
+    }
+    return out;
+  };
+
+  /* Typed shorthand → the stored token: "~G" → "kampita:G", "S'" and ".P" as they are. */
+  const toToken = (s: string) => {
+    s = s.trim();
+    if (!s) return ",";
+    const g = GAMAKA[s[0]];
+    if (g && s.length > 1) return `${g}:${s.slice(1)}`;
+    return s;
+  };
+  const toTyped = (tok: string) => { const m = /^([a-z-]+):(.*)$/.exec(tok); return m ? (SIGN[m[1]] ?? "") + m[2] : tok; };
+
+  function render() {
+    $<HTMLSelectElement>("[data-raga]").value = song.raga;
+    $<HTMLSelectElement>("[data-tala]").value = song.tala;
+    $<HTMLSelectElement>("[data-script]").value = song.sahityaScript ?? "lat";
+    $<HTMLInputElement>("[data-title]").value = song.title;
+    const tl = tala(song.tala);
+    const out = outside();
+    const strokeParts = song.parts.filter((p: any) => p.kind === "strokes");
+    $("[data-sections]").innerHTML = song.sections.map((s: any, si: number) => `
+      <section class="sw-card cp-sec" data-sec="${si}">
+        <div class="cp-sec-head"><h2>${s.name}</h2><span class="sw-mono">${s.repeat > 1 ? `repeat ×${s.repeat}` : ""}</span>
+          <span class="spacer"></span>
+          <button type="button" data-repeat="${si}">Repeat</button><span aria-hidden="true">·</span><button type="button" data-addline="${si}">Add line</button>
+        </div>
+        ${s.lines.map((l: any, li: number) => `<div class="cp-line sn-script-${B.script}" data-line="${si}:${li}" lang="${song.sahityaScript === "lat" ? "" : song.sahityaScript}">${avartanamHtml({
+          counts: l.counts.map((c: any) => c.notes), angas: tl.angas, speed: s.notesPerCount >= 4 ? 3 : s.notesPerCount,
+          sahitya: l.counts.map((c: any) => c.sahitya),
+          strokes: strokeParts.length ? l.counts.map((c: any) => strokeParts.flatMap((p: any) => c.parts?.[p.id] ?? [])) : undefined,
+        }, { script: B.script, tamil: B.tamil, outside: out }, li)}</div>`).join("")}
+      </section>`).join("");
+    $("[data-parts]").innerHTML = song.parts.map((p: any) => `<div class="cp-part"><span>${p.kind === "strokes" ? "Mridangam strokes" : `Melody · ${p.instrument}`}</span>
+      <button type="button" class="cp-ms" data-mute="${p.id}" aria-pressed="${p.muted ? "true" : "false"}" title="Mute">M</button>
+      ${p.id === "melody" ? "" : `<button type="button" class="cp-ms" data-remove="${p.id}" title="Remove this part">×</button>`}</div>`).join("");
+    const atLimit = B.limit !== null && song.parts.length >= B.limit;
+    $("[data-add-part]").hidden = atLimit;
+    $("[data-limit-note]").hidden = !atLimit;
+    const flag = $("[data-flag]");
+    flag.hidden = out.size === 0;
+    const name = B.ragas.find((x: any) => x.id === song.raga)?.name ?? song.raga;
+    flag.innerHTML = out.size ? `<span class="sw-mono">${[...out].map((o) => inline(o, "lat")).join(", ")} flagged</span> <span class="sw-p">${[...out].length === 1 ? "That note is" : "Those notes are"} not in ${name}. ${[...out].length === 1 ? "It stays" : "They stay"} where you typed ${[...out].length === 1 ? "it" : "them"}, with a dotted underline, so you can decide whether you meant it.</span>` : "";
+  }
+
+  /* Editing a count. */
+  root.addEventListener("click", (e) => {
+    const el = e.target as HTMLElement;
+    const cell = el.closest<HTMLElement>(".sl-count");
+    if (cell && !el.closest(".cp-edit")) return edit(cell);
+    if (el.dataset.repeat) { const s = song.sections[Number(el.dataset.repeat)]; s.repeat = s.repeat >= 4 ? 1 : s.repeat + 1; changed(); }
+    if (el.dataset.addline) { const s = song.sections[Number(el.dataset.addline)]; s.lines.push(blankLine(tala(song.tala).counts.length, s.notesPerCount, song.parts)); changed(); }
+    if (el.dataset.add) {
+      const id = `p${Date.now().toString(36)}`;
+      song.parts.push(el.dataset.add === "strokes" ? { id, kind: "strokes", instrument: "mridangam" } : { id, kind: "melody", instrument: "violin" });
+      changed();
+    }
+    if (el.dataset.remove) { song.parts = song.parts.filter((p: any) => p.id !== el.dataset.remove); changed(); }
+    if (el.dataset.mute) { const p = song.parts.find((x: any) => x.id === el.dataset.mute); p.muted = !p.muted; render(); }
+  });
+  function edit(cell: HTMLElement) {
+    const [si, li] = cell.closest<HTMLElement>("[data-line]")!.dataset.line!.split(":").map(Number);
+    const ci = Number(cell.dataset.count);
+    const c = song.sections[si].lines[li].counts[ci];
+    const strokeParts = song.parts.filter((p: any) => p.kind === "strokes");
+    const form = document.createElement("form");
+    form.className = "cp-edit";
+    form.innerHTML = `<label>Notes<input name="n" value="${c.notes.map(toTyped).join(" ")}" autocomplete="off" /></label>
+      <label>Sahitya<input name="s" value="${(c.sahitya ?? "").replace(/"/g, "&quot;")}" maxlength="40" /></label>
+      ${strokeParts.length ? `<label>Stroke<input name="k" value="${strokeParts.flatMap((p: any) => c.parts?.[p.id] ?? []).join(" ")}" /></label>` : ""}
+      <button type="submit">Done</button>`;
+    cell.replaceChildren(form);
+    form.querySelector<HTMLInputElement>("input")!.focus();
+    const done = () => {
+      const per = song.sections[si].notesPerCount;
+      const typed = String(new FormData(form).get("n") || "").split(/\s+/).filter(Boolean).map(toToken).slice(0, per);
+      while (typed.length < per) typed.push(",");
+      c.notes = typed;
+      c.sahitya = String(new FormData(form).get("s") || "");
+      const k = String(new FormData(form).get("k") || "").split(/\s+/).filter((x) => STROKES.has(x));
+      c.parts = c.parts ?? {};
+      for (const p of strokeParts) c.parts[p.id] = k.slice(0, 2);
+      changed();
+    };
+    form.addEventListener("submit", (e) => { e.preventDefault(); done(); });
+    form.addEventListener("focusout", (e) => { if (!form.contains(e.relatedTarget as Node)) done(); });
+  }
+
+  $<HTMLSelectElement>("[data-raga]").addEventListener("change", (e) => { song.raga = (e.target as HTMLSelectElement).value; changed(); });
+  $<HTMLSelectElement>("[data-script]").addEventListener("change", (e) => { song.sahityaScript = (e.target as HTMLSelectElement).value; changed(); });
+  $<HTMLInputElement>("[data-title]").addEventListener("change", (e) => { song.title = (e.target as HTMLInputElement).value.trim() || "Untitled"; document.querySelector("#sw-title")!.textContent = song.title; changed(); });
+  $<HTMLSelectElement>("[data-tala]").addEventListener("change", (e) => {
+    const id = (e.target as HTMLSelectElement).value;
+    const n = tala(id).counts.length;
+    song.tala = id;
+    for (const s of song.sections) for (const l of s.lines) {
+      while (l.counts.length < n) l.counts.push(blankLine(1, s.notesPerCount, song.parts).counts[0]);
+      l.counts.length = n;
+    }
+    changed();
+  });
+
+  /* Saving: to the account when signed in (with conflict answers), else here. */
+  let timer = 0;
+  const saved = $("[data-saved]");
+  function changed() {
+    render();
+    try { localStorage.setItem(KEY, JSON.stringify(song)); } catch { /* storage blocked */ }
+    if (!B.signedIn) return;
+    saved.textContent = "saving…";
+    window.clearTimeout(timer);
+    timer = window.setTimeout(save, 1200);
+  }
+  async function save() {
+    const body = JSON.stringify({ song: { ...song, parts: song.parts.map(({ muted, ...p }: any) => p) }, baseUpdatedAt: meta?.updatedAt ?? null });
+    const r = await fetch(meta ? `/api/carnatic/songs/${meta.id}` : "/api/carnatic/songs", {
+      method: meta ? "PUT" : "POST", headers: { "content-type": "application/json", "x-csrf-token": csrf() }, body });
+    const b = await r.json().catch(() => null);
+    if (r.ok && b) {
+      meta = { id: b.id, slug: b.slug, updatedAt: b.updatedAt };
+      saved.textContent = "saved · just now";
+      const pv = $<HTMLAnchorElement>("[data-preview]"); pv.href = `/carnatic/sheets/${b.slug}`; pv.removeAttribute("aria-disabled");
+      history.replaceState(null, "", `/carnatic/compose?song=${b.id}`);
+    } else if (r.status === 409 && b?.song) {
+      saved.textContent = "changed on another device; showing that version";
+      song = b.song; meta = { id: b.id, slug: b.slug, updatedAt: b.updatedAt }; render();
+    } else {
+      saved.textContent = b?.detail ?? "not saved; kept in this browser";
+    }
+  }
+
+  /* Playback: every part over the tala, from the pallavi, in just intonation. */
+  let clock: TalaClock | null = null;
+  const go = $<HTMLButtonElement>("[data-go]");
+  go.addEventListener("click", () => {
+    if (clock?.playing) { clock.stop(); go.textContent = "Play from pallavi"; return; }
+    if (!theDrone().playing) startDrone();
+    const tl = tala(song.tala);
+    const sa = pitchHz(settings().sa || "C3");
+    const vars = variantsOf(ragaScale());
+    const order: { s: any; l: any; si: number; li: number }[] = [];
+    song.sections.forEach((s: any, si: number) => { for (let r = 0; r < (s.repeat || 1); r++) s.lines.forEach((l: any, li: number) => order.push({ s, l, si, li })); });
+    let g = 0;
+    clock = new TalaClock(tl.counts, Number($<HTMLInputElement>("[data-tempo]").value));
+    const melodyMuted = song.parts.find((p: any) => p.id === "melody")?.muted;
+    const strokesMuted = song.parts.filter((p: any) => p.kind === "strokes").every((p: any) => p.muted);
+    clock.onSchedule = (_i, _c, at, cs) => {
+      const k = g++;
+      const n = tl.counts.length;
+      const row = order[Math.floor(k / n)];
+      if (!row) { window.setTimeout(() => { clock?.stop(); go.textContent = "Play from pallavi"; }, (at - ctx().currentTime) * 1000); return; }
+      const c = row.l.counts[k % n];
+      const unit = cs / c.notes.length;
+      c.notes.forEach((tok: string, j: number) => {
+        const tk = tokenize(tok.replace(/^[a-z-]+:/, ""))[0];
+        if (melodyMuted || !tk || tk.kind !== "note" || !tk.swara) return;
+        let dur = unit;
+        for (let x = j + 1; x < c.notes.length && c.notes[x] === ","; x++) dur += unit;
+        const hz = sa * ratio(semitones(tk.swara, tk.variant ?? vars[tk.swara]) + 12 * (tk.octave ?? 0), settings().playbackTuning);
+        playNote({ hz, at: at + j * unit, dur: dur * 0.92, gamaka: /^([a-z-]+):/.exec(tok)?.[1] ?? null });
+      });
+      if (!strokesMuted) for (const p of song.parts.filter((x: any) => x.kind === "strokes" && !x.muted)) {
+        (c.parts?.[p.id] ?? []).forEach((s: string, j: number) => blip(["tha", "thom", "gumki", "tham", "dhom"].includes(s) ? 110 : 420, at + j * unit, 0.09, 0.12));
+      }
+      window.setTimeout(() => {
+        root.querySelectorAll(".sl-count.is-now").forEach((x) => x.classList.remove("is-now"));
+        root.querySelector(`[data-line="${row.si}:${row.li}"] [data-count="${k % n}"]`)?.classList.add("is-now");
+      }, Math.max(0, (at - ctx().currentTime) * 1000));
+    };
+    clock.sound = true;
+    clock.start();
+    go.textContent = "Stop";
+  });
+  $<HTMLInputElement>("[data-tempo]").addEventListener("input", (e) => { $("[data-tempo-v]").textContent = (e.target as HTMLInputElement).value; if (clock) clock.bpm = Number((e.target as HTMLInputElement).value); });
+  render();
+</script>
+
+<style>
+  .cp { display: grid; gap: 16px; padding-top: 20px; }
+  .cp-bar { display: flex; gap: 12px 16px; align-items: end; flex-wrap: wrap; padding-bottom: 16px; border-bottom: 1px solid var(--line); }
+  .cp-bar label { display: grid; gap: 6px; font: var(--text-sm) / 1 var(--font-body); color: var(--ink-soft); }
+  .cp-bar select, .cp-bar input { font: 15px / 1.3 var(--font-body); padding: 10px 12px; border: 1px solid var(--line-strong); border-radius: 4px; background: var(--surface-card); color: var(--ink); min-width: 120px; }
+  .cp-bar .spacer { flex: 1; }
+  .cp-preview { font: 600 var(--text-sm) / 1 var(--font-body); color: var(--accent); border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent); border-radius: var(--radius-sm); padding: 13px 18px; text-decoration: none; }
+  .cp-preview[aria-disabled] { opacity: .5; pointer-events: none; }
+  .cp-body { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 330px); gap: 24px; align-items: start; }
+  .cp-sections { display: grid; gap: 14px; }
+  .cp-sections :global(.cp-sec) { display: grid; gap: 14px; }
+  .cp-sections :global(.cp-sec-head) { display: flex; gap: 8px; align-items: baseline; }
+  .cp-sections :global(.cp-sec-head h2) { margin: 0; font: 22px / 1.2 var(--font-display); color: var(--ink); }
+  .cp-sections :global(.cp-sec-head .spacer) { flex: 1; }
+  .cp-sections :global(.cp-sec-head button) { appearance: none; background: none; border: 0; color: var(--accent); font: var(--text-sm) / 1 var(--font-body); cursor: pointer; padding: 4px; }
+  .cp-sections :global(.cp-line) { --sl-cell: 48px; padding-bottom: 10px; border-bottom: 1px solid var(--line); }
+  .cp-sections :global(.sl-count) { cursor: text; }
+  .cp-sections :global(.sl-count:hover) { background: var(--surface-veil); }
+  .cp-sections :global(.cp-edit) { display: grid; gap: 4px; padding: 6px; background: var(--surface-card); border: 1px solid var(--accent); border-radius: 4px; position: relative; z-index: 2; min-width: 140px; }
+  .cp-sections :global(.cp-edit label) { display: grid; font: 10px / 1.2 var(--font-mono); color: var(--ink-faint); }
+  .cp-sections :global(.cp-edit input) { font: 14px / 1.2 var(--font-mono); padding: 4px; border: 1px solid var(--line-strong); border-radius: 3px; background: var(--surface-page); color: var(--ink); }
+  .cp-sections :global(.cp-edit button) { font: 600 11px / 1 var(--font-body); padding: 5px; }
+  .cp-side { display: grid; gap: 12px; }
+  .cp-parts :global(.cp-part) { display: flex; gap: 8px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--line); font: 15px / 1.3 var(--font-body); color: var(--ink); }
+  .cp-parts :global(.cp-part span) { flex: 1; }
+  .cp-parts :global(.cp-ms) { width: 26px; height: 26px; border: 1px solid var(--line-strong); border-radius: 3px; background: var(--surface-card); font: 10px / 1 var(--font-mono); color: var(--ink-soft); cursor: pointer; }
+  .cp-parts :global(.cp-ms[aria-pressed="true"]) { background: var(--accent-wash); color: var(--accent); }
+  .cp-add { display: flex; gap: 8px; flex-wrap: wrap; padding-top: 10px; }
+  .cp-add button { appearance: none; background: none; border: 1px dashed var(--line-strong); border-radius: 4px; padding: 8px 10px; font: var(--text-xs) / 1 var(--font-body); color: var(--accent); cursor: pointer; }
+  .cp-play { display: grid; gap: 10px; }
+  .cp-go { appearance: none; border: 0; border-radius: var(--radius-sm); background: var(--accent); color: var(--on-accent); font: 600 var(--text-sm) / 1 var(--font-body); padding: 13px; cursor: pointer; }
+  .cp-tempo { display: flex; gap: 10px; align-items: center; }
+  .cp-tempo input { flex: 1; accent-color: var(--accent); }
+  .cp-flag { display: flex; gap: 12px; align-items: baseline; padding: 12px 14px; border: 1px solid var(--line); border-radius: 8px; }
+  @media (max-width: 899px) { .cp-body { grid-template-columns: minmax(0, 1fr); } .cp-sections :global(.cp-line) { overflow-x: auto; } .cp-sections :global(.sl) { min-width: 520px; } }
+</style>

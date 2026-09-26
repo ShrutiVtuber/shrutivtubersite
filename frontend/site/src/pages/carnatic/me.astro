@@ -1,0 +1,132 @@
+---
+/* Your practice (Web Compose Account, "dashboard"): where you left off on the
+ * path, the month's practice log, your songs and your posts in Listen.
+ * ⚠ No guilt: the log counts time and never days missed; there is no streak
+ * and nothing to lose. Signed out, the page says what signing in keeps. */
+import SwaraLayout from "../../layouts/SwaraLayout.astro";
+import Hero from "../../components/carnatic/Hero.astro";
+import Button from "../../components/forms/Button.astro";
+import { hrefIn, langOf, words } from "../../lib/carnatic/i18n";
+import { visitor } from "../../lib/carnatic/prefs";
+import { asReader } from "../../lib/account";
+import { lessons } from "../../lib/carnatic/data";
+import { lessonList } from "../../lib/carnatic/lessons";
+import { copy } from "../../lib/copy";
+
+const lang = langOf(Astro);
+const tr = await words(lang);
+const say = await copy("carnatic/me");
+const L = (p: string) => hrefIn(lang, p);
+const { me } = await visitor(Astro);
+const month = new Date().toISOString().slice(0, 7);
+const [songs, progress, log, posts, data] = me.signedIn ? await Promise.all([
+  asReader(Astro, "/api/carnatic/songs"), asReader(Astro, "/api/carnatic/me/progress"),
+  asReader(Astro, `/api/carnatic/me/practice?month=${month}`), asReader(Astro, "/api/carnatic/listen"), lessons(),
+]) : [null, null, null, null, await lessons()];
+const list = lessonList(data, (id) => tr(`set.${id}` as any));
+const done: Record<string, number[]> = Object.fromEntries(Object.entries((progress?.body?.items ?? {}) as Record<string, any>).map(([k, v]) => [k, v.speeds]));
+const next = list.find((l) => (done[l.id] ?? []).length < 3) ?? list[0];
+const started = list.filter((l) => (done[l.id] ?? []).length > 0).length;
+const finished = list.filter((l) => (done[l.id] ?? []).length >= 3).length;
+const days: Record<string, number> = log?.body?.days ?? {};
+const daysIn = new Date(Number(month.slice(0, 4)), Number(month.slice(5)), 0).getDate();
+const maxS = Math.max(600, ...Object.values(days));
+const total = log?.body?.totalSeconds ?? 0;
+const hours = Math.floor(total / 3600);
+const hm = (hours ? hours + " h " : "") + Math.round((total % 3600) / 60) + " min";
+const bars = Array.from({ length: daysIn }, (_, i) => {
+  const v = days[`${month}-${String(i + 1).padStart(2, "0")}`] ?? 0;
+  return v ? Math.max(8, (v / maxS) * 100) : 2;
+});
+const songRows = ((songs?.body?.items ?? []) as any[]).slice(0, 6).map((x) => ({
+  href: L(`/carnatic/compose?song=${x.id}`), title: x.title, meta: `${x.raga} · ${String(x.tala).split("_").join(" ")}`,
+  state: x.published ? "published" : "draft",
+}));
+/* Sentences with {placeholders} are filled here: braces inside the template's
+   own expressions confuse the Astro parser. */
+const startedLine = say("started", "{a} of {n} started · {b} finished at every speed").replace("{a}", String(started)).replace("{n}", String(list.length)).replace("{b}", String(finished));
+const sessionsLine = say("sessions", "{s} sessions, {t} this month.").replace("{s}", String(log?.body?.sessions ?? 0)).replace("{t}", hm);
+const composeNew = L("/carnatic/compose?song=new");
+const myPosts = (posts?.body?.items ?? []).filter((p: any) => p.mine);
+const monthName = new Date().toLocaleDateString("en-GB", { month: "long" });
+const name = me.displayName || "";
+const nextSpeed = next ? Math.min(3, (done[next.id]?.length ?? 0) + 1) : 1;
+const heading = name ? say("hello", "Hello, {name}").replace("{name}", name) : say("title", "Your practice");
+---
+<SwaraLayout title={say("meta.title", "Your practice · Swara Studio")} noindex description={say("meta.description", "Where you left off, your practice time and your songs.")}>
+  <Hero eyebrow={say("eyebrow", "Your practice")} title={heading} lede={say("lede", "Where you left off, and what you have made.")} />
+  {!me.signedIn ? (
+    <div class="sw-empty me-out">
+      <span class="marks" aria-hidden="true">| ||</span>
+      <h2>{say("outH", "Everything works without an account")}</h2>
+      <p>{say("outP", "The path, the tools and the composer keep your work in this browser. Sign in with your shrutivtuber.com account to keep your progress, practice time and songs on every device, and to publish a sheet.")}</p>
+      <Button href="/signin?next=/carnatic/me" variant="secondary">{tr("gen.signIn")}</Button>
+    </div>
+  ) : (
+  <div class="me">
+    <section class="sw-card me-card">
+      <p class="t-eyebrow sw-eyebrow">{say("pathH", "Beginner path")}</p>
+      <p class="me-now">{next?.name} · speed {nextSpeed}</p>
+      <div class="me-ticks" aria-hidden="true">{list.map((l) => <i class:list={[(done[l.id] ?? []).length >= 3 && "done", (done[l.id] ?? []).length > 0 && (done[l.id] ?? []).length < 3 && "part"]} />)}</div>
+      <p class="sw-p">{startedLine}</p>
+      <Button href={L(`/carnatic/path?item=${next?.id ?? ""}`)}>{say("continue", "Continue")}</Button>
+    </section>
+    <section class="sw-card me-card">
+      <p class="t-eyebrow sw-eyebrow">{say("logH", "Practice log")} · {monthName}</p>
+      <div class="me-bars" aria-hidden="true">
+        {bars.map((h) => <i style={`height:${h}%`} class:list={[h === 2 && "off"]} />)}
+      </div>
+      <p class="sw-p me-sum">{sessionsLine}</p>
+      <p class="sw-note">{say("noGuilt", "Days off are part of practice. The log counts time; it never counts days missed.")}</p>
+    </section>
+    <section class="sw-card me-card">
+      <p class="t-eyebrow sw-eyebrow">{say("songsH", "Your songs")}</p>
+      {songRows.length === 0 && (
+        <p class="sw-p">{say("noSongs", "No songs yet.")} <a href={composeNew}>{say("compose", "Start one in the composer")}</a></p>
+      )}
+      {songRows.length > 0 && (
+        <ul class="me-songs">
+          {songRows.map((s) => (
+            <li><a href={s.href}><span class="me-st">{s.title}</span><span class="sw-mono">{s.meta}</span><span class="spacer"></span><span class="sw-p">{s.state}</span></a></li>
+          ))}
+        </ul>
+      )}
+    </section>
+    <section class="sw-card me-card">
+      <p class="t-eyebrow sw-eyebrow">{say("postsH", "Your posts in Listen")}</p>
+      {myPosts.length === 0 ? (
+        <div class="sw-empty"><span class="marks" aria-hidden="true">| |</span><h3>{say("noPostsH", "Nothing shared yet")}</h3><p>{say("noPostsP", "When a song is ready, publish its sheet and share a performance link here.")}</p></div>
+      ) : <ul class="me-songs">{myPosts.map((p: any) => <li><a href={L("/carnatic/listen")}><span class="me-st">{p.title}</span><span class="sw-mono">{p.likes} likes · {p.comments} comments</span></a></li>)}</ul>}
+    </section>
+  </div>
+  )}
+</SwaraLayout>
+
+<script>
+  /* Good morning / afternoon / evening in the visitor's own hours. */
+  const h1 = document.querySelector("#sw-title") as HTMLElement | null;
+  if (h1 && h1.textContent?.startsWith("Hello, ")) {
+    const hr = new Date().getHours();
+    h1.textContent = `${hr < 12 ? "Good morning" : hr < 18 ? "Good afternoon" : "Good evening"}, ${h1.textContent.slice(7)}`;
+  }
+</script>
+
+<style>
+  .me { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; padding-top: 24px; align-items: start; }
+  .me-card { display: grid; gap: 12px; }
+  .me-now { margin: 0; font: 24px / 1.2 var(--font-display); color: var(--ink); }
+  .me-ticks { display: flex; gap: 3px; flex-wrap: wrap; }
+  .me-ticks i { width: 3px; height: 10px; border-radius: 1px; background: var(--line); }
+  .me-ticks i.part { background: color-mix(in srgb, var(--accent) 50%, var(--line)); }
+  .me-ticks i.done { background: var(--accent); }
+  .me-bars { display: flex; gap: 3px; align-items: flex-end; height: 84px; }
+  .me-bars i { flex: 1; background: var(--accent); border-radius: 1px 1px 0 0; }
+  .me-bars i.off { background: var(--line); }
+  .me-sum { color: var(--ink); }
+  .me-songs { list-style: none; margin: 0; padding: 0; }
+  .me-songs a { display: flex; gap: 10px; align-items: baseline; padding: 12px 0; border-bottom: 1px solid var(--line); text-decoration: none; }
+  .me-songs .spacer { flex: 1; }
+  .me-st { font: 19px / 1.2 var(--font-display); color: var(--ink); }
+  .me-out { margin-top: 24px; }
+  @media (max-width: 899px) { .me { grid-template-columns: minmax(0, 1fr); } }
+</style>

@@ -323,15 +323,16 @@ async def create_song(body: SongIn, user: User = Depends(require_user),
 
 
 @router.get("/sheets/{slug}")
-async def sheet(slug: str, session: AsyncSession = Depends(get_session)) -> dict:
-    """A published song, for anyone. Unpublished is not found, for anyone."""
+async def sheet(slug: str, viewer: User | None = Depends(current_user),
+                session: AsyncSession = Depends(get_session)) -> dict:
+    """A published song, for anyone; an unpublished one only for its author (the preview)."""
     row = (await session.execute(select(CarnaticSong).where(CarnaticSong.slug == slug))).scalar_one_or_none()
-    if row is None or not row.published:
+    if row is None or (not row.published and (viewer is None or viewer.id != row.user_id)):
         raise HTTPException(404, "No such sheet.")
     author = await session.get(User, row.user_id)
     ragas = rules.data("ragas.json") or {}
     raga = next((r for r in ragas.get("janyas", []) + ragas.get("performed", []) if r["id"] == row.raga), None)
-    return {**_song_full(row), "author": _public_name(author), "authorId": row.user_id,
+    return {**_song_full(row), "author": _public_name(author), "mine": bool(viewer and viewer.id == row.user_id),
             "outOfRaga": rules.out_of_raga(row.body, raga)}
 
 

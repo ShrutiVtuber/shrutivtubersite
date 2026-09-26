@@ -1,0 +1,172 @@
+---
+/* Listen, the concert hall (Web Compose Account, "listen"): compositions and
+ * performances by members. ⚠ Nothing third-party loads before a click: each
+ * card is the art-absent sky with "Load YouTube player"; the player is built
+ * only when that is pressed. Bandcamp links open on Bandcamp (its player
+ * needs ids a link does not carry). Signed out, the room is readable; sharing,
+ * liking and commenting ask for an account. */
+import SwaraLayout from "../../layouts/SwaraLayout.astro";
+import Hero from "../../components/carnatic/Hero.astro";
+import Chip from "../../components/carnatic/Chip.astro";
+import Badge from "../../components/navigation/Badge.astro";
+import { hrefIn, langOf, words } from "../../lib/carnatic/i18n";
+import { ragas } from "../../lib/carnatic/data";
+import { visitor } from "../../lib/carnatic/prefs";
+import { asReader } from "../../lib/account";
+import { copy } from "../../lib/copy";
+
+const lang = langOf(Astro);
+const tr = await words(lang);
+const say = await copy("carnatic/listen");
+const L = (p: string) => hrefIn(lang, p);
+const { me } = await visitor(Astro);
+const f = { raga: Astro.url.searchParams.get("raga") ?? "", tala: Astro.url.searchParams.get("tala") ?? "", instrument: Astro.url.searchParams.get("instrument") ?? "" };
+const qs = new URLSearchParams(Object.entries(f).filter(([, v]) => v)).toString();
+const [got, all] = await Promise.all([asReader(Astro, `/api/carnatic/listen${qs ? `?${qs}` : ""}`), ragas()]);
+const items: any[] = got.ok ? got.body.items : [];
+const mySheets = me.signedIn ? ((await asReader(Astro, "/api/carnatic/songs")).body?.items ?? []).filter((s: any) => s.published) : [];
+const ragaName = (id: string) => [...(all?.janyas ?? []), ...(all?.performed ?? [])].find((x) => x.id === id)?.name ?? id;
+const HOST: Record<string, string> = { youtube: "youtube.com", soundcloud: "soundcloud.com", vimeo: "vimeo.com", bandcamp: "bandcamp.com" };
+const LABEL: Record<string, string> = { youtube: "YouTube", soundcloud: "SoundCloud", vimeo: "Vimeo", bandcamp: "Bandcamp" };
+const counts = (key: "raga" | "tala" | "instrument") => [...new Set(items.map((i) => i[key]).filter(Boolean))].slice(0, 3);
+const chips: [string, string, string][] = [["", "", tr("gen.all")], ...counts("raga").map((r) => ["raga", r, ragaName(r)] as [string, string, string]),
+  ...counts("tala").map((x) => ["tala", x, x] as [string, string, string]), ...counts("instrument").map((x) => ["instrument", x, x] as [string, string, string])];
+const INSTRUMENTS = ["venu", "voice", "veena", "violin", "mridangam"];
+---
+<SwaraLayout title={say("meta.title", "Listen · the concert hall · Swara Studio")}
+             description={say("meta.description", "Carnatic compositions and performances by Swara Studio's members, with links to the sheets they play from. Players load only when you press them.")}>
+  <Hero eyebrow={tr("nav.listen")} title={say("title", "Concert hall")} lede={say("lede", "Compositions and performances by members. Players load only when you ask.")} />
+  <div class="sw-toolbar">
+    <div class="sw-chips">
+      {chips.map(([k, v, label]) => <Chip href={L(`/carnatic/listen${k ? `?${k}=${encodeURIComponent(v)}` : ""}`)} active={k ? f[k as "raga"] === v : !qs}>{label}</Chip>)}
+    </div>
+    <span class="spacer"></span>
+    {me.signedIn ? <button type="button" class="ls-share" data-share-open>{say("share", "Share your own")}</button>
+                 : <a class="ls-share" href="/signin?next=/carnatic/listen">{say("shareSignIn", "Sign in to share your own")}</a>}
+  </div>
+
+  {me.signedIn && (
+    <form class="sw-card ls-form" data-share hidden>
+      <label>{say("f.title", "Title")}<input name="title" required maxlength="120" /></label>
+      <label>{say("f.url", "Link (YouTube, SoundCloud, Vimeo or Bandcamp)")}<input name="url" type="url" required placeholder={say("f.urlHint", "https://")} /></label>
+      <label>{say("f.instrument", "Instrument")}<select name="instrument">{INSTRUMENTS.map((i) => <option>{i}</option>)}</select></label>
+      <label>{say("f.raga", "Raga")}<select name="raga"><option value="">—</option>{[...(all?.janyas ?? []), ...(all?.performed ?? [])].sort((a, b) => a.name.localeCompare(b.name)).map((r) => <option value={r.id}>{r.name}</option>)}</select></label>
+      <label>{say("f.tala", "Tala")}<input name="tala" maxlength="40" placeholder={say("f.talaHint", "Adi")} /></label>
+      {mySheets.length > 0 && <label>{say("f.sheet", "Your sheet")}<select name="sheetSlug"><option value="">—</option>{mySheets.map((s: any) => <option value={s.slug}>{s.title}</option>)}</select></label>}
+      <div class="ls-form-row"><button type="submit" class="ls-share">{say("f.post", "Share")}</button><span class="sw-note" data-share-msg>{say("f.note", "Your post goes with your account if you delete it.")}</span></div>
+    </form>
+  )}
+
+  {items.length === 0 ? (
+    <div class="sw-empty ls-empty"><span class="marks" aria-hidden="true">| |</span><h2>{say("emptyH", "Nothing shared yet")}</h2><p>{say("emptyP", "When members share a performance or a song, it appears here, with its player one press away.")}</p></div>
+  ) : (
+    <div class="ls-grid" data-listen>
+      {items.map((it) => (
+        <article class="ls-card" data-post={it.id}>
+          <div class="sky ls-player" data-player={it.player.kind} data-url={it.player.url}>
+            <button type="button" class="sky-veil ls-load" data-load>
+              <b>{it.player.kind === "bandcamp" ? say("openBandcamp", "Open on Bandcamp") : `${say("load", "Load")} ${LABEL[it.player.kind]} ${say("player", "player")}`}</b>
+              <small>{say("nothingLoads", "Nothing loads from {host} until you press this.").replace("{host}", HOST[it.player.kind])}</small>
+            </button>
+            <div class="sky-horizon"></div>
+          </div>
+          <div class="ls-body">
+            <h2 class="ls-title">{it.title}</h2>
+            <p class="sw-p">{it.author}{it.instrument ? ` · ${it.instrument}` : ""}</p>
+            <div class="sw-chips">{it.raga && <Badge>{ragaName(it.raga)}</Badge>}{it.tala && <Badge>{it.tala}</Badge>}</div>
+            <div class="ls-meta">
+              <button type="button" class="ls-like" data-like={it.id} aria-pressed={it.liked ? "true" : "false"} disabled={!me.signedIn}><span data-likes>{it.likes}</span> likes</button>
+              <details data-comments={it.id}><summary>{it.comments} comments</summary><div class="ls-comments" data-comment-list></div>
+                {me.signedIn && <form data-comment-form><input name="body" maxlength="1000" required placeholder={say("commentHint", "Say something kind about the music")} /><button type="submit">{say("post", "Post")}</button></form>}
+              </details>
+              <span class="spacer"></span>
+              {it.sheetSlug && <a href={L(`/carnatic/sheets/${it.sheetSlug}`)}>{say("learn", "Learn to play it")}</a>}
+            </div>
+          </div>
+        </article>
+      ))}
+    </div>
+  )}
+</SwaraLayout>
+
+<script>
+  import { csrf } from "../../lib/carnatic/client/state";
+  /* Build the third-party player only on press. */
+  const embed = (kind: string, url: string): string | null => {
+    try {
+      const u = new URL(url);
+      if (kind === "youtube") {
+        const id = u.hostname === "youtu.be" ? u.pathname.slice(1) : u.searchParams.get("v") ?? u.pathname.split("/").pop();
+        return id ? `https://www.youtube-nocookie.com/embed/${encodeURIComponent(id)}?autoplay=1` : null;
+      }
+      if (kind === "vimeo") { const id = u.pathname.split("/").filter(Boolean).pop(); return id ? `https://player.vimeo.com/video/${encodeURIComponent(id)}?autoplay=1` : null; }
+      if (kind === "soundcloud") return `https://w.soundcloud.com/player/?url=${encodeURIComponent(url)}&auto_play=true`;
+    } catch { /* not a URL */ }
+    return null;
+  };
+  document.querySelectorAll<HTMLElement>("[data-player]").forEach((box) => box.querySelector("[data-load]")?.addEventListener("click", () => {
+    const src = embed(box.dataset.player!, box.dataset.url!);
+    if (!src) { window.open(box.dataset.url, "_blank", "noopener"); return; }
+    const f = document.createElement("iframe");
+    f.src = src; f.allow = "autoplay; encrypted-media; fullscreen"; f.loading = "lazy"; f.title = "Player"; f.className = "ls-frame";
+    box.replaceChildren(f);
+  }));
+  document.querySelectorAll<HTMLButtonElement>("[data-like]").forEach((b) => b.addEventListener("click", async () => {
+    const on = b.getAttribute("aria-pressed") !== "true";
+    const r = await fetch(`/api/carnatic/listen/${b.dataset.like}/like`, { method: on ? "PUT" : "DELETE", headers: { "x-csrf-token": csrf() } });
+    if (!r.ok) return;
+    b.setAttribute("aria-pressed", String(on));
+    const n = b.querySelector("[data-likes]")!; n.textContent = String(Number(n.textContent) + (on ? 1 : -1));
+  }));
+  document.querySelectorAll<HTMLDetailsElement>("[data-comments]").forEach((d) => {
+    const list = d.querySelector<HTMLElement>("[data-comment-list]")!;
+    const load = async () => {
+      const r = await fetch(`/api/carnatic/listen/${d.dataset.comments}/comments`);
+      const b = r.ok ? await r.json() : { items: [] };
+      list.replaceChildren(...b.items.map((c: any) => { const p = document.createElement("p"); p.className = "sw-p"; p.textContent = `${c.author}: ${c.body}`; return p; }));
+    };
+    d.addEventListener("toggle", () => { if (d.open) load(); });
+    d.querySelector<HTMLFormElement>("[data-comment-form]")?.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const form = e.currentTarget as HTMLFormElement;
+      const r = await fetch(`/api/carnatic/listen/${d.dataset.comments}/comments`, { method: "POST", headers: { "content-type": "application/json", "x-csrf-token": csrf() }, body: JSON.stringify({ body: new FormData(form).get("body") }) });
+      if (r.ok) { form.reset(); load(); }
+    });
+  });
+  const form = document.querySelector<HTMLFormElement>("[data-share]");
+  document.querySelector("[data-share-open]")?.addEventListener("click", () => { if (form) form.hidden = !form.hidden; });
+  form?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const data = Object.fromEntries(new FormData(form).entries());
+    if (!data.sheetSlug) delete data.sheetSlug;
+    const r = await fetch("/api/carnatic/listen", { method: "POST", headers: { "content-type": "application/json", "x-csrf-token": csrf() }, body: JSON.stringify(data) });
+    const b = await r.json().catch(() => null);
+    if (r.ok) location.reload(); else form.querySelector("[data-share-msg]")!.textContent = b?.detail ?? "That did not share. Try again.";
+  });
+</script>
+
+<style>
+  .ls-share { appearance: none; border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent); border-radius: var(--radius-sm); background: transparent; color: var(--accent); font: 600 var(--text-sm) / 1 var(--font-body); padding: 10px 14px; cursor: pointer; text-decoration: none; }
+  .ls-form { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 16px; }
+  .ls-form label { display: grid; gap: 6px; font: var(--text-sm) / 1.2 var(--font-body); color: var(--ink-soft); }
+  .ls-form input, .ls-form select { font: 15px / 1.3 var(--font-body); padding: 9px 10px; border: 1px solid var(--line-strong); border-radius: 4px; background: var(--surface-card); color: var(--ink); }
+  .ls-form-row { grid-column: 1 / -1; display: flex; gap: 12px; align-items: center; }
+  .ls-empty { margin-top: 24px; }
+  .ls-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; padding-top: 16px; }
+  .ls-card { background: var(--surface-card); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; box-shadow: var(--shadow-1); display: grid; }
+  .ls-player { aspect-ratio: 16 / 9; display: grid; place-items: center; }
+  .ls-load { position: relative; display: grid; gap: 4px; padding: 12px 16px; border: 0; cursor: pointer; font: inherit; color: var(--ink); text-align: center; }
+  .ls-load b { font: 600 var(--text-sm) / 1.3 var(--font-body); }
+  .ls-load small { font: 11px / 1.4 var(--font-body); color: var(--ink-soft); }
+  .ls-player :global(.ls-frame) { width: 100%; height: 100%; border: 0; grid-area: 1 / 1; }
+  .ls-body { display: grid; gap: 8px; padding: 14px; }
+  .ls-title { margin: 0; font: 20px / 1.2 var(--font-display); color: var(--ink); }
+  .ls-meta { display: flex; gap: 12px; align-items: baseline; flex-wrap: wrap; padding-top: 8px; border-top: 1px solid var(--line); font: var(--text-sm) / 1.3 var(--font-body); color: var(--ink-soft); }
+  .ls-meta .spacer { flex: 1; }
+  .ls-like { appearance: none; background: none; border: 0; color: var(--ink-soft); font: inherit; cursor: pointer; padding: 0; }
+  .ls-like[aria-pressed="true"] { color: var(--accent); }
+  .ls-meta details summary { cursor: pointer; }
+  .ls-comments { display: grid; gap: 4px; padding: 6px 0; }
+  @media (max-width: 1023px) { .ls-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (max-width: 599px) { .ls-grid, .ls-form { grid-template-columns: minmax(0, 1fr); } }
+</style>
