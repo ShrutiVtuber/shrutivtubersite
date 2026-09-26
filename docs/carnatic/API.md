@@ -540,3 +540,354 @@ choice is only for somebody deleting their own account.
 
 The account export (`GET /api/account/export`) is unchanged and includes all
 of it.
+
+---
+
+# Part II: the full school (v2)
+
+Everything below is the v2 contract: the course, exercises, Test yourself,
+ear training, the Listening room and community feedback. Same conventions
+as Part I (base `/api`, JSON, `{"detail": …}` errors, ISO times, bearer
+token or cookie). **Nothing is gated**: every read works signed out; an
+account only keeps things across devices and is needed to post.
+
+## 10. The course (content, for reading and offline)
+
+The course text lives in the private course repository and is imported
+into the site's database, where Sophia edits it in the Swara Studio admin.
+The site and the app read the **published** version only. A lesson is
+published when its `status` is `published`; until then it is absent from
+every public answer (the operator sees drafts on the website only).
+
+### 10a. Knowing when to download
+
+`GET /api/carnatic/course/version` →
+`{"digest": "…16 hex…", "lessons": 12, "exercises": 40, "updatedAt": "…"}`,
+`ETag: "<digest>"`, 304 on `If-None-Match`. The digest changes whenever
+any published lesson, exercise, glossary entry, drill definition or the unit
+list changes.
+
+### 10b. The whole course in one download (offline)
+
+`GET /api/carnatic/course/bundle` (ETag as above) →
+
+```json
+{ "format": 1, "digest": "…", "updatedAt": "…",
+  "units":     [Unit, …],          // all 21, always
+  "lessons":   [Lesson, …],        // published lessons, full text
+  "exercises": [Exercise, …],      // exercises of published lessons, plus checkpoints
+  "glossary":  [Term, …],
+  "drills":    {"families": […], "levels": […], "ragaFlags": {…}},
+  "tala_keeping": [TalaTask, …] }  // K.01-K.16
+```
+
+Or piecewise, same shapes:
+
+- `GET /api/carnatic/course/units` → `{"items": [Unit]}`
+- `GET /api/carnatic/course/lessons/{idOrSlug}` → `Lesson` (404 if unknown or not published)
+- `GET /api/carnatic/course/exercises?unit=9` or `?lesson=U09.L03` → `{"items": [Exercise]}`;
+  `GET /api/carnatic/course/exercises/{id}` → `Exercise`
+- `GET /api/carnatic/course/glossary` → `{"items": [Term]}`
+- `GET /api/carnatic/course/drills` → the drill definitions (§13)
+
+**Unit**
+
+```json
+{ "n": 9, "title": "The melakarta system", "level": "intermediate",
+  "levelLabel": "Intermediate", "intro": "2-3 sentences",
+  "lessons": [ { "id": "U09.L01", "slug": "…", "order": 1, "title": "…",
+                 "minutes": 15, "level": "intermediate",
+                 "available": true,             // a published lesson exists
+                 "hasListening": true, "hasPractice": false } ],
+  "checkpoint": "CP.U09" }                      // or null
+```
+
+Units come from the syllabus, so all 21 units and all 173 lessons are
+listed from day one; `available: false` lessons (not yet written or not
+published) are shown as "coming", never as a link. Level labels:
+units 1-7 Foundations, 8-15 Intermediate, 16-21 Advanced (unit 18 is
+"any time" in the syllabus); they are labels only and unlock nothing.
+
+**Lesson**
+
+```json
+{ "id": "U01.L01", "slug": "sa-your-home-note", "lang": "en",
+  "revision": 3, "unit": 1, "order": 1,
+  "title": "…", "summary": "…", "level": "beginner", "minutes": 15,
+  "goals": ["…"], "prerequisites": ["U00.L00"], "tools": ["drone", "sargam"],
+  "ragas": ["mohanam"], "talas": ["adi"],
+  "recordings": [ {"id": "form-tanpura-02", "why": "…",
+                   "available": true} ],        // false until Sophia approves it
+  "sources": [ {"key": "ins-sa", "n": 1, "cite": "…", "url": null,
+                "confidence": "high"} ],        // n: footnote number, in order of first use
+  "exercises": ["U01.L01.Q1", "U01.L01.P1"],
+  "body": "markdown exactly as FORMAT.md §3 (editor notes removed)",
+  "words": 1834,
+  "translation": null }       // or {"lang": "ta", "status": "published", "outOfDate": false}
+```
+
+`body` is the lesson markdown with `<!-- -->` editor notes already stripped.
+Render it by FORMAT.md §3 (the same rules the website uses): YAML is
+already split out; `{{kind k=v}}` lines and ```` ```sargam ```` fences are
+embeds; `> [!listen]`, `> [!schools]`, `> [!sources]` quote blocks are the
+three boxes; `[^key]` are footnote markers numbered by `sources[].n`.
+
+Tolerated extensions (until format 2 lands): a tap task embedded with
+`{{quiz id=U04.L02.T1}}` (render it as a tap task: look the id up in the
+exercises); `{{tap id=…}}` means the same. Unknown tags render as a quiet
+grey box naming the tag, never as an error and never hiding text.
+
+Translations: lessons are English only at launch. When a published
+translation exists for the requested `?lang=ta|te|kn`, it is returned with
+`"translation": {…}`; otherwise the English is returned and the client
+shows the quiet "not yet translated" line.
+
+**Exercise**: the exercise as FORMAT.md §4 defines it, converted to JSON,
+with the writers' extensions kept as they are (`also`, `also_recordings`,
+`recordings_also`, `recording_choices`, `pool`, `comparison` on listening
+exercises; `speed: [1,2,3]`, `nadai: [4,3,5]` or `nadai_sequence`,
+`plays`, `eduppu`, `line`, `targets: entry`, `tempo_range` on taps;
+`line` and `raga`/`tala` on fill and sargam items; `checkpoint: true`,
+`includes`/`drills`, `skills` on checkpoints). Clients should treat
+unknown fields as absent. Answers are included (the app checks offline).
+
+**Term** (glossary): `{ "term": "vakra", "slug": "vakra", "definition":
+"one line", "lesson": "U07.L05", "aliases": ["vakra raga"] }`.
+
+## 11. Lesson progress (synced)
+
+Kept on the device when signed out; synced when signed in.
+
+- `GET /api/carnatic/me/lessons` → `{"items": {"U01.L01": {"openedAt": "…",
+  "completedAt": "…" | null, "position": {"heading": "choosing-your-sa",
+  "fraction": 0.42}, "updatedAt": "…"}}}`
+- `PUT /api/carnatic/me/lessons/{id}` with any of `openedAt`, `completedAt`
+  (`null` un-marks), `position`, and `updatedAt` (the device's time of the
+  change). Merge rule: `openedAt` keeps the earliest; `completedAt` and
+  `position` follow the most recent `updatedAt`. Returns the merged row.
+
+Completion is manual ("Mark as complete"). Nothing is marked for the
+learner, nothing is locked, and there is no streak.
+
+## 12. Attempts, personal bests and review cards (synced)
+
+### 12a. Attempts
+
+`POST /api/carnatic/me/attempts` with `{"attempts": [Attempt, …]}` (up to
+200; the client's `id` makes it idempotent) → `{"stored": 3, "bests": [Best…]}`
+(the bests this batch improved).
+
+```json
+{ "id": "client uuid", "itemId": "U01.L01.Q1" | "CP.U09" | "K.02" | "SW.04" | "mixed",
+  "kind": "quiz" | "checkpoint" | "tap" | "drill" | "review" | "guess",
+  "startedAt": "…", "seconds": 184,
+  "result": { … } }
+```
+
+`result` by kind:
+- quiz, review: `{"items": [{"key": "U01.L01.Q1#3", "right": true}], "right": 5, "of": 6}`
+- checkpoint: as quiz plus `"skills": {"melakarta": {"right": 4, "of": 5}}`
+- tap: `{"tempo": 60, "perfect": 12, "onTime": 3, "early": 1, "late": 0, "missed": 0, "of": 16}`
+- drill: `{"level": "SW.04", "items": [{"card": "SW.04:G2-G3", "right": true, "ms": 2100}]}`
+
+`GET /api/carnatic/me/attempts?item=CP.U09&kind=checkpoint&limit=50` →
+`{"items": [Attempt]}` newest first (for the charts).
+
+### 12b. Personal bests
+
+`GET /api/carnatic/me/bests` → `{"items": [{"itemId": "CP.U09", "skill":
+"melakarta", "best": {"right": 5, "of": 5, "word": "comfortable"},
+"achievedAt": "…"}]}`. The server keeps one row per item and skill:
+checkpoint skills by share right (**new** under 50 %, **getting there**
+50-79 %, **comfortable** 80 % and over; these three words are the only
+scale shown), taps by perfect + on time out of targets at the highest
+tempo, drills by the highest level with 16 of the last 20 right. Results
+are never shown to anyone else.
+
+### 12c. Review cards (spaced repetition, EAR_TRAINING.md §6)
+
+- `GET /api/carnatic/me/cards` → `{"items": [Card], "due": 12}`
+- `PUT /api/carnatic/me/cards` with `{"cards": [Card, …]}` → the merged
+  cards. Merge: per `key`, the card with the latest `lastSeen` wins.
+
+```json
+{ "key": "SW.04:G2-G3" | "U01.L01.Q1#3" | "gen:mela_scale_from_number:chakra-4",
+  "box": 0..6, "lastSeen": "…", "nextDue": "…", "recent": [true, false, true] }
+```
+
+Boxes 0-6 = this session, 1, 3, 7, 16, 35, 75 days. Right: up one box (two
+if under the item's fluent time); wrong: box 1, and again later in the same
+session. The dashboard says "12 cards ready to review", never how long it
+has been.
+
+## 13. Ear training and tala keeping (definitions)
+
+`GET /api/carnatic/course/drills` →
+
+```json
+{ "families": [ {"id": "SW", "title": "Swaras against the drone", "answerBy": "swara buttons"} … ],
+  "levels": [ {"id": "SW.04", "family": "SW", "title": "The pairs that matter",
+               "unlockedBy": "U02.L05", "answer": "choice",
+               "audio": {"kind": "synth"}, "ladder": ["3 options", "5 options", "all"],
+               "fluentMs": 3000, "note": null} … ],
+  "ragaFlags": { "todi": {"synthOk": false}, "mohanam": {"synthOk": true} … },
+  "confusable": [ {"set": "C1", "ragas": ["mohanam", "shivaranjani"], "mode": "synth",
+                   "unlockedBy": "U12.L03"} … ] }
+```
+
+`unlockedBy` is advice: a level whose lesson isn't complete is shown
+dashed with the lesson named, and can be opened anyway. MS levels carry
+`"note": "a scale, not a raga"`. Ragas with `synthOk: false` (Todi,
+Sahana, Begada, Anandabhairavi, Varali, Saveri, Kanada, Atana, and the
+pairs EAR_TRAINING.md §3 names) are drilled only from recordings; Sophia
+changes the flags in the admin.
+
+Tala keeping: `tala_keeping` in the bundle holds K.01-K.16 as tap tasks
+(`{"id": "K.02", "title": "…", "tala": "adi", "tempoRange": [50, 80],
+"targets": "claps", "fade": ["all", "claps", "samam", "none"],
+"unlockedBy": "U04.L02"}`). Timing: perfect ±30 ms, on time ±80 ms,
+shrinking to 40 % of the gap at dense targets.
+
+## 14. The Listening room
+
+### 14a. Recordings
+
+Only recordings Sophia has **approved** are ever returned.
+
+- `GET /api/carnatic/listening/recordings?raga=mohanam` or `?form=varnam`
+  → `{"items": [Recording]}`
+- `GET /api/carnatic/listening/recordings/{id}` → `Recording` (404 if not
+  approved; a retired recording returns `"status": "retired"` and no `url`)
+
+```json
+{ "id": "mohanam-02", "status": "approved" | "retired",
+  "provider": "youtube", "url": "https://…", "title": "…", "channel": "…",
+  "artists": ["…"], "instrument": "voice", "composition": "…", "composer": "…",
+  "form": "kriti", "raga": "mohanam", "tala": "adi",
+  "listenFor": "…", "clips": [{"id": "a", "start": "1:10", "end": "1:40", "label": "…"}],
+  "sections": [{"t": "2:14", "label": "anupallavi"}],     // Sophia's marks (answer keys: see below)
+  "beatMap": {"clip": "a", "samam": [12.40, 20.41, …]} | null,
+  "analyses": 14 }
+```
+
+Guess mode: clients must not show `title`, `channel`, `raga` or
+`composition` until the learner has committed a guess (§14b). `sections`
+are only returned to clients for recordings the learner has guessed or
+that are not used in guess mode; auto-checking of analyses happens on the
+server (§15).
+
+### 14b. Guess the raga
+
+`POST /api/carnatic/listening/guesses` with `{"recording": "mohanam-02",
+"guess": "mohanam", "confidence": "hunch" | "fairly" | "sure",
+"phrases": "optional text"}` → `{"right": true, "close": false, "raga":
+"mohanam", "ragaName": "Mohanam", "composition": "…", "artists": […],
+"listenFor": "…", "lessons": ["U12.L03"]}`. Signed out, the guess is
+checked and nothing is stored. Stored guesses: `GET
+/api/carnatic/me/guesses`. Analyses of a recording stay hidden from a
+learner until they have guessed it (`GET …/analyses` answers `{"locked":
+true}` until then, for recordings in guess mode).
+
+### 14c. Suggesting a recording
+
+`POST /api/carnatic/listening/suggestions` (auth, not suspended) with
+`{"url", "raga", "composition", "why"}` → 201 `{"id", "title", "channel",
+"status": "pending"}` (the site fetches the provider's oEmbed and shows
+back what it found). 422 if the link isn't YouTube, SoundCloud, Vimeo or
+Bandcamp; 429 `{"code": "TOO_MANY_PENDING"}` over 5 pending.
+`GET /api/carnatic/me/suggestions` → `{"items": [{…, "status": "pending"
+| "approved" | "rejected" | "held", "reason": "…"}]}`.
+
+## 15. Community: practice pieces and listening analyses
+
+Both are **works** in the site's practice model, in two rooms:
+`carnatic-practice` (subject `exercise:U10.L04.P1`) and
+`carnatic-analysis` (subject `recording:mohanam-02`). The same votes,
+comments, reports, strikes and blocks serve the horoscope practice room,
+so a suspension or a block applies everywhere.
+
+### 15a. Reading
+
+- `GET /api/carnatic/community/works?room=carnatic-practice&subject=exercise:U10.L04.P1&sort=new|discussed&before=<id>`
+  → `{"items": [WorkSummary], "next": id | null}`. Hidden works and works
+  by people the viewer blocked are absent.
+- `GET /api/carnatic/community/works/{id}` → `Work`; 404 `{"code":
+  "NOT_AVAILABLE"}` for a hidden work unless it is the viewer's own, which
+  comes back with `"hidden": true, "hiddenBy": "reports"` ("Hidden while
+  Shruti reviews reports").
+
+```json
+{ "id": 41, "room": "carnatic-analysis", "subject": "recording:mohanam-02",
+  "title": "…", "author": "Priya" | "somebody", "authorId": 7 | null, "mine": false,
+  "submittedAt": "…", "votes": 3, "voted": false, "comments": 5,
+  "parts": [ {"key": "sargam", "body": "G3 D2 P G3 R2", "data": {"raga": "mohanam", "tala": "adi", "speed": 2}},
+             {"key": "text", "body": "…"},
+             {"key": "link", "body": "https://youtu.be/…"},
+             {"key": "note:1", "body": "…", "data": {"t": "2:14", "category": "phrase", "notation": "G3 D2 P G3 R2"}},
+             {"key": "summary", "body": "…"},
+             {"key": "guess", "data": {"raga": "mohanam", "confidence": "sure", "at": "…"}} ],
+  "rubric": {"questions": [{"id": "idiom", "ask": "…", "scale": ["not yet", "partly", "yes"]}],
+             "totals": {"idiom": {"not yet": 0, "partly": 2, "yes": 5}}, "mine": {"idiom": "yes"}},
+  "private": {"sectionsFound": 5, "sectionsMarked": 6} | null,   // author only
+  "hidden": false }
+```
+
+Deleted accounts show as `"author": "somebody"`, `"authorId": null`
+(works and comments are kept, anonymised; Sophia's rule).
+
+### 15b. Writing
+
+- `POST /api/carnatic/community/works` with `{"room", "subject", "title",
+  "parts": [...]}` → 201 draft. `PUT …/works/{id}` replaces a draft's
+  parts. `POST …/works/{id}/submit` makes it public (it runs the
+  exercise's `prechecks` and returns them as `"hints"`: they never block).
+  First submission needs the site's publish agreement: 428
+  `{"code": "PUBLISH_AGREEMENT_NEEDED"}` until the person agrees (the same
+  agreement as the rest of the site's public writing).
+- `POST …/works/{id}/withdraw` hides one's own work.
+- `DELETE …/works/{id}` deletes one's own draft.
+- Word ranges come from the exercise definition (`submission.text.words`).
+
+### 15c. Feedback
+
+- `PUT /api/carnatic/community/works/{id}/vote` and `DELETE …/vote`
+  ("This helped me"; one per person, never on one's own work).
+- `PUT /api/carnatic/community/works/{id}/rubric` with `{"answers": {"idiom":
+  "yes", "tip": "free text"}}` (one set per person; shown only as totals).
+- `GET /api/carnatic/community/works/{id}/comments` →
+  `{"items": [{"id", "author", "authorId", "mine", "part": "note:1" | null,
+  "partLabel": "the 2:14 phrase", "body", "createdAt"}]}`;
+  `POST` with `{"body", "part"}`; `DELETE /api/carnatic/community/comments/{id}` (own).
+
+### 15d. Reports, blocks, suspension
+
+- `POST /api/carnatic/community/works/{id}/report` and
+  `POST /api/carnatic/community/comments/{id}/report` with `{"reason":
+  "abuse" | "hate" | "sexual" | "spam" | "self-harm" |
+  "not-about-this-exercise" | "other", "detail"}` → `{"reported": true}`.
+  One per person per thing; three distinct reporters hide it until Sophia
+  reviews it; reporters are never shown.
+- `GET /api/carnatic/community/blocks`, `POST` with `{"userId"}`,
+  `DELETE /api/carnatic/community/blocks/{userId}`: blocks work both ways
+  and nobody is told.
+- `GET /api/carnatic/me/community` → `{"suspended": null | {"until": "…" |
+  null, "reason": "…"}}`. A suspension pauses posting only (403 with the
+  sentence on any write); reading, lessons and drills stay available.
+  Lengths and appeals follow the site's practice-room strikes (Sophia sets
+  the length when she upholds a report; 0 is indefinite; replying to the
+  notice reaches her).
+
+## 16. Drills data offline, and what needs a connection
+
+Works offline from the bundle: lessons, exercises, quizzes, checkpoints,
+ear-training drills with synthesised audio, tala keeping and the review
+queue. Needs a connection: recordings (and RR/GM/TL/FM drills that play
+them), the Listening room, community, sync. Queue attempts, cards and
+lesson progress offline and send them when back online.
+
+## 17. The Swara Studio admin (web only)
+
+`/carnatic/studio` on the website, for the operator: lessons tree and
+editor (form, text, live preview, checks, editor notes, revision history),
+exercises, recordings queue and annotation, balance, moderation, glossary,
+review. Its API lives under `/api/carnatic/studio/*` and is not for the app.
