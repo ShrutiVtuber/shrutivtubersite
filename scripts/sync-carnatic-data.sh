@@ -36,6 +36,9 @@ trap 'rm -rf "$tmp"' EXIT
 
 summary="$(python3 "$here/carnatic/build_data.py" "$RESEARCH" "$tmp")" || {
   echo "the build reported problems; read them above and fix the research before publishing" >&2; exit 1; }
+# Anything the build left out on purpose (a varnam that does not check out)
+# is said here, loudly, rather than discovered as a missing lesson.
+python3 -c 'import json,sys; [print("carnatic data: warning:", w, file=sys.stderr) for w in json.loads(sys.argv[1]).get("warnings", [])]' "$summary"
 
 python3 - "$tmp" "$summary" "$RESEARCH" <<'PY'
 import json, sys, datetime, os, subprocess

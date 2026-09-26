@@ -66,7 +66,7 @@ const url = new URL(`/carnatic/sheets/${sheet.slug}`, SITE_URL);
     ))}
     <footer class="sh-foot">
       <span>{url.host}{url.pathname}</span><span>{say("foot.brand", "Swara Studio · Carnatic music school")}</span>
-      <p>{say("legend", "gamaka signs after SSP (1904):")} {legend.map(([g, sign], i) => <>{i > 0 && " · "}{sign} {NAMES[g]}</>)}</p>
+      <p>{say("legend", "gamaka signs after Subbarama Dikshitar's Sangita Sampradaya Pradarsini (1904):")} {legend.map(([g, sign], i) => <>{i > 0 && " · "}{sign} {NAMES[g]}</>)}</p>
       {out.size > 0 && <p>Dotted underline: a note outside {raga?.name}, as the composer wrote it.</p>}
     </footer>
   </article>

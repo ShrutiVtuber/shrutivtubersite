@@ -28,7 +28,7 @@ const l = list[idx];
 const next = list[idx + 1];
 const script = swaraScript(settings, lang);
 const firstLine = l.item.sections[0]?.lines[0];
-const firstAv = firstLine ? avartanamHtml({ counts: toCounts(firstLine.segments, 1).slice(0, l.item.angas.reduce((a: number, b: number) => a + b, 0)), angas: l.item.angas }, { script, tamil: settings.tamilStyle }) : "";
+const firstAv = firstLine ? avartanamHtml({ counts: toCounts(firstLine.segments, 1).slice(0, l.item.angas.reduce((a: number, b: number) => a + b, 0)), angas: l.item.angas }, { script, tamil: settings.tamilStyle, subs: l.set === "varnams" || settings.subscripts === "always" }) : "";
 const lede = l.set === "sarali_varisai" && l.n === 1 ? say("lede.sarali1", "The seven swaras, up and down, at three speeds.") : (l.title ? `${l.title}.` : "");
 const journal = await schoolJournal(1);
 const talaName = (l.item.practicalTala ?? l.item.tala).replace(/_/g, " ").replace("rupaka chaturasra", "rupaka, 6-count").replace(/^\w/, (c: string) => c.toUpperCase());

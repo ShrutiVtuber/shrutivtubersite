@@ -40,7 +40,7 @@ const STEPS: [string, string, string][] = [
   [tr("set.sthayi"), `${sets("tara_sthayi_varisai") ?? 5} + ${sets("mandra_sthayi_varisai") ?? 5}`, "/carnatic/path#tara_sthayi_varisai"],
   [tr("set.alankaram"), String(sets("alankaram") ?? 7), "/carnatic/path#alankaram"],
   [tr("set.geethams"), tr("set.geethamsNote"), "/carnatic/path#geethams"],
-  [tr("set.varnams"), "", "/carnatic/path#varnams"],
+  [tr("set.varnams"), sets("varnams") ? String(sets("varnams")) : "", "/carnatic/path#varnams"],
 ];
 
 const TOOLS = [

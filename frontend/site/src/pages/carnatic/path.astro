@@ -7,6 +7,7 @@
  * bars are speeds 1, 2 and 3. Progress is kept in this browser, and in the
  * account when signed in; nothing is lost by not having one.
  */
+import { SET_ORDER, SONG_SETS } from "../../lib/carnatic/lessons";
 import SwaraLayout from "../../layouts/SwaraLayout.astro";
 import Hero from "../../components/carnatic/Hero.astro";
 import Absent from "../../components/carnatic/Absent.astro";
@@ -30,22 +31,26 @@ const countsFor = (tala: string, practical: string | null) => {
   if (p) return p.counts;
   return tl?.suladi?.find((x: any) => x.id === tala)?.counts ?? [];
 };
-const SET_ORDER = ["sarali_varisai", "janta_varisai", "dhatu_varisai", "tara_sthayi_varisai", "mandra_sthayi_varisai", "alankaram", "geethams"];
 const sets = SET_ORDER.map((id) => data?.sets?.find((s: any) => s.id === id)).filter(Boolean);
 const optional = settings.eighthAlankaram;
 const exercises = sets.flatMap((s: any) => s.items.filter((i: any) => optional || !i.optional).map((i: any) => ({
   id: i.id, set: s.id, title: i.title,
-  name: `${tr(`set.${s.id}` as any)} ${s.id === "geethams" ? "" : String(s.items.indexOf(i) + 1)}`.trim(),
+  name: SONG_SETS.has(s.id) ? (i.title ?? i.id).split(" (")[0] : `${tr(`set.${s.id}` as any)} ${String(s.items.indexOf(i) + 1)}`,
   counts: countsFor(i.tala, i.practicalTala), angas: i.angas,
   notes: i.sections.flatMap((sec: any) => sec.lines.flatMap((l: any) => l.segments.flat())),
   repeats: i.repeats,
+  /* A varnam may write a variant (Begada's anya N2); show it where it is written. */
+  subs: s.id === "varnams",
   raga: i.raga,
-  scale: i.raga === "Malahari" ? `${i.raga_scale?.arohana ?? ""} ${i.raga_scale?.avarohana ?? ""}` : `${data.defaultRaga.arohana} ${data.defaultRaga.avarohana}`,
+  /* Each song carries its raga's scale (Malahari, a varnam's raga); the
+     exercises are in the default raga, Mayamalavagowla. */
+  scale: i.raga_scale ? `${i.raga_scale.arohana ?? ""} ${i.raga_scale.avarohana ?? ""}` : `${data.defaultRaga.arohana} ${data.defaultRaga.avarohana}`,
   talaName: tl?.practical?.find((x: any) => x.id === i.practicalTala)?.name ?? i.tala.replace(/_/g, " ").replace("jati", "jati"),
 })));
+const hasVarnams = sets.some((s: any) => s.id === "varnams");
 const asked = Astro.url.searchParams.get("item");
 const current = exercises.find((e) => e.id === asked) ?? exercises[0];
-const first = current ? avartanamHtml({ counts: toCounts([current.notes.slice(0, current.counts.length)], 1), angas: current.angas }, { script, tamil: settings.tamilStyle }) : "";
+const first = current ? avartanamHtml({ counts: toCounts([current.notes.slice(0, current.counts.length)], 1), angas: current.angas }, { script, tamil: settings.tamilStyle, subs: current.subs }) : "";
 const venu = settings.instrument === "venu" ? (inst?.venu?.fingerings ?? []).filter((f: any) => f.holes && ["primary", "cross-fingering"].includes(f.kind)).map((f: any) => ({ swara: f.swara, sthayi: f.sthayi, holes: f.holes, kind: f.kind })) : [];
 ---
 <SwaraLayout title={say("meta.title", "The beginner path · Swara Studio")}
@@ -72,10 +77,14 @@ const venu = settings.instrument === "venu" ? (inst?.venu?.fingerings ?? []).fil
           </section>
         );
       })}
-      <section class="pa-set" id="varnams">
-        <div class="pa-set-head"><h2 class="pa-set-h">{tr("set.varnams")} · {tr("gen.coming")}</h2><span class="sw-mono">{tr("gen.exercises", { n: 0 })}</span></div>
-        <ul class="pa-varnams">{(data.varnamsComing ?? []).map((v: any) => <li class="sw-p">{v.title} · <a href={L(`/carnatic/ragas/${v.raga}`)}>{v.raga[0].toUpperCase() + v.raga.slice(1)}</a></li>)}</ul>
-      </section>
+      {/* Varnams not yet in the data: the whole set while none has arrived, and
+          under it the ones still to come once some have. */}
+      {(data.varnamsComing ?? []).length > 0 && (
+        <section class="pa-set" id={hasVarnams ? "varnams-coming" : "varnams"}>
+          <div class="pa-set-head"><h2 class="pa-set-h">{tr("set.varnams")} · {tr("gen.coming")}</h2><span class="sw-mono">{tr("gen.exercises", { n: 0 })}</span></div>
+          <ul class="pa-varnams">{(data.varnamsComing ?? []).map((v: any) => <li class="sw-p">{v.title} · <a href={L(`/carnatic/ragas/${v.raga}`)}>{v.raga[0].toUpperCase() + v.raga.slice(1)}</a></li>)}</ul>
+        </section>
+      )}
       <p class="sw-note">{say("key", "Each block is one exercise; its three bars are speeds 1, 2 and 3.")} {say("count", "52 exercises and geethams at launch, with the 8th alankaram's two versions off by default.")}</p>
       <p class="sw-note">{data.attribution?.assessment ? say("attribution", "The sequence is traditionally attributed to Purandara Dasa (16th century); that is tradition, not documented authorship.") : ""}</p>
     </div>
@@ -163,7 +172,7 @@ const venu = settings.instrument === "venu" ? (inst?.venu?.fingerings ?? []).fil
       }).join("")}</span>`).join("");
     };
     const draw = (av: string[][], speed: number, now = -1) => {
-      line.innerHTML = avartanamHtml({ counts: av, angas: ex.angas, speed }, opts);
+      line.innerHTML = avartanamHtml({ counts: av, angas: ex.angas, speed }, { ...opts, subs: ex.subs });
       line.querySelectorAll<HTMLElement>("[data-count]").forEach((c) => c.classList.toggle("is-now", Number(c.dataset.count) === now));
       drawVenu(av);
     };

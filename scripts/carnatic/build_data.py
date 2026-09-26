@@ -571,6 +571,50 @@ def build_talas(root: Path) -> dict:
 TOKEN = re.compile(r"^(\.?[SRGMPDN]|[SRGMPDN]'?|,)$")
 RAGA_SWARAS = {"Mayamalavagowla": set("SRGMPDN"), "Malahari": set("SRGMPD")}
 
+# Varnams (research/lessons, branch `varnams`): notation may name a variant
+# (N2 for Begada's anya nishadam), carry a gamaka sign before a note, and
+# hold for two units with ";". Every note must be in the raga: its arohana,
+# its avarohana or its anya swaras.
+VARNAM_TOKEN = re.compile(r"^(?P<g>[~/\\wxy:]?)(?P<low>\.?)(?P<s>[SRGMPDN])(?P<v>[123]?)(?P<high>'?)$|^[,;]$")
+VARNAMS_EXPECTED = [
+    {"title": "Ninnukori", "raga": "mohanam", "tala": "Adi"},
+    {"title": "Evvari bodhana", "raga": "abhogi"},
+    {"title": "Inta chalamu", "raga": "begada", "tala": "Adi"},
+    {"title": "Jalajakshi", "raga": "hamsadhwani"},
+]
+WARNINGS: list[str] = []
+
+
+def _key(text: str) -> str:
+    return re.sub(r"[^a-z]", "", (text or "").lower())
+
+
+def raga_scale(ragas: dict | None, name: str) -> dict | None:
+    """A raga's arohana, avarohana and allowed swaras (with anya), by id or name."""
+    if not ragas:
+        return None
+    k = _key(name)
+    for r in ragas.get("janyas", []) + ragas.get("performed", []):
+        if k in {_key(r["id"]), _key(r["name"]), *(_key(a) for a in r.get("aliases", []))}:
+            clean = lambda t: re.sub(r"![av]", "", t)
+            aro, ava = clean(r["arohana"]), clean(r["avarohana"])
+            allowed = set(re.findall(r"[SRGMPDN][123]?", f"{aro} {ava}"))
+            allowed |= {a["swara"] for a in r.get("anya", [])}
+            return {"id": r["id"], "arohana": aro, "avarohana": ava, "allowed": allowed}
+    return None
+
+
+def check_varnam_token(t: str, allowed: set[str]) -> bool:
+    m = VARNAM_TOKEN.match(t)
+    if not m:
+        return False
+    if t in (",", ";"):
+        return True
+    s, v = m.group("s"), m.group("v")
+    if v:
+        return f"{s}{v}" in allowed
+    return s == "S" or s == "P" or any(a.startswith(s) for a in allowed)
+
 
 def anga_sizes(root: Path) -> dict:
     doc = load(root, "tala/talas.json")
@@ -594,14 +638,34 @@ def repeats_for(total: int, aksharas: int) -> dict:
     return out
 
 
-def build_lessons(root: Path) -> dict:
+def build_lessons(root: Path, ragas: dict | None = None) -> dict:
     doc = load(root, "lessons/abhyasa_gana.json")
     sizes = anga_sizes(root)
-    sets, path = [], []
-    for s in doc["sets"]:
+    sets, path, varnam_ids = [], [], []
+    source_sets = list(doc["sets"])
+    # Varnams may arrive as a set of their own in abhyasa_gana.json or in a
+    # file beside it (lessons/varnams.json: {"sets": [...]}, {"items": [...]}
+    # or {"varnams": [...]}). Either way they become the set "varnams".
+    extra = root / "lessons" / "varnams.json"
+    if extra.is_file() and not any(x["id"] == "varnams" for x in source_sets):
+        vd = json.loads(extra.read_text(encoding="utf-8"))
+        if isinstance(vd, dict) and vd.get("sets"):
+            source_sets += [dict(x, id="varnams") if len(vd["sets"]) == 1 else x for x in vd["sets"]]
+        else:
+            items = (vd.get("items") or vd.get("varnams") or []) if isinstance(vd, dict) else vd
+            source_sets.append({"id": "varnams", "name": (vd.get("name") if isinstance(vd, dict) else None) or "Varnams",
+                                "confidence": vd.get("confidence") if isinstance(vd, dict) else None, "items": items})
+    for s in source_sets:
+        is_varnam = s["id"] == "varnams"
         items = s.get("exercises") or s.get("items") or []
         out_items = []
         for it in items:
+            if is_varnam:
+                rec = build_varnam(it, sizes, ragas)
+                if rec is not None:
+                    out_items.append(rec)
+                    varnam_ids.append(rec["id"])
+                continue
             tala = it["tala"]
             if tala not in sizes:
                 raise BuildError(f"{it['id']}: unknown tala {tala}")
@@ -644,12 +708,19 @@ def build_lessons(root: Path) -> dict:
             out_items.append(rec)
             if not optional:
                 path.append(it["id"])
-        sets.append(drop_history({"id": s["id"], "name": s["name"], "countNote": s.get("count_note"),
+        if is_varnam and not out_items:
+            continue
+        sets.append(drop_history({"id": s["id"], "name": s.get("name") or s["id"], "countNote": s.get("count_note"),
                                   "definition": s.get("definition"), "technique": s.get("technique"),
                                   "confidence": s.get("confidence"), "items": out_items,
                                   "refs": s.get("exercise_refs")}))
     if len(path) != 50:
         raise BuildError(f"the default path should have 50 items, it has {len(path)}")
+    # The varnams follow the fifty; the ones not yet in the data stay "coming".
+    path += varnam_ids
+    have = {_key(it.get("title", "").split("(")[0]) for x in sets if x["id"] == "varnams" for it in x["items"]}
+    have |= {_key(i) for i in varnam_ids}
+    coming = [v for v in VARNAMS_EXPECTED if not ({_key(v["title"])} & have)]
     meta = doc["meta"]
     return drop_history({
         "format": FORMAT,
@@ -659,13 +730,68 @@ def build_lessons(root: Path) -> dict:
         "speedNote": meta.get("speed_note"),
         "path": path,
         "sets": sets,
-        "varnamsComing": [
-            {"title": "Ninnukori", "raga": "mohanam", "tala": "Adi"},
-            {"title": "Evvari bodhana", "raga": "abhogi"},
-            {"title": "Inta chalamu", "raga": "begada", "tala": "Adi"},
-            {"title": "Jalajakshi", "raga": "hamsadhwani"},
-        ],
+        "varnamsComing": coming,
     })
+
+
+def build_varnam(it: dict, sizes: dict, ragas: dict | None) -> dict | None:
+    """
+    One varnam, checked like every other lesson. A varnam that does not check
+    out is left out with a warning (printed by the sync) and stays "coming":
+    one transcription slip must not stop the rest of the school's data.
+    """
+    ident = it.get("id") or _key(it.get("title", "")) or "?"
+    def skip(why: str) -> None:
+        WARNINGS.append(f"varnam {ident}: {why}; left out, shown as coming")
+    tala = it.get("tala", "")
+    if tala not in sizes:
+        skip(f"unknown tala {tala!r}")
+        return None
+    scale = raga_scale(ragas, it.get("raga_id") or it.get("raga", ""))
+    if scale is None:
+        skip(f"unknown raga {it.get('raga')!r}")
+        return None
+    secs = it.get("sections") or ([{"section": None, "lines": it["lines"]}] if "lines" in it else [])
+    if not secs:
+        skip("no notation")
+        return None
+    total = 0
+    for sec in secs:
+        for n, line in enumerate(sec.get("lines", []), 1):
+            toks = [t for seg in line["segments"] for t in seg]
+            bad = [t for t in toks if not check_varnam_token(t, scale["allowed"])]
+            if bad:
+                skip(f"{sec.get('section')} line {n}: not in {scale['id']}: {bad[:3]}")
+                return None
+            units = sum(2 if t == ";" else 1 for t in toks)
+            per = sum(sizes[tala])
+            if units % per or [sum(2 if t == ";" else 1 for t in seg) for seg in line["segments"]] != sizes[tala] * (units // per):
+                skip(f"{sec.get('section')} line {n}: segments do not match the tala")
+                return None
+            total += units
+    rec = {
+        "id": ident,
+        "title": it.get("title"),
+        "tala": tala,
+        "practicalTala": TALA_OF_LESSON.get(tala),
+        "angas": sizes[tala],
+        "raga": it.get("raga") or scale["id"],
+        "ragaId": scale["id"],
+        "raga_scale": it.get("raga_scale") or {"arohana": scale["arohana"], "avarohana": scale["avarohana"]},
+        "units": total,
+        "repeats": repeats_for(total, sum(sizes[tala])),
+        "sections": [{"section": sec.get("section"),
+                      # One token per unit, as in every other lesson: a ";" hold becomes ", ,".
+                      "lines": [{"segments": [[u for t in seg for u in ([",", ","] if t == ";" else [t])]
+                                              for seg in l["segments"]],
+                                 "sahitya": l.get("sahitya_source") or l.get("sahitya")}
+                                for l in sec.get("lines", [])]} for sec in secs],
+        "optional": False,
+    }
+    for key in ("type", "composer", "language", "tala_note", "confidence", "source_url", "speeds"):
+        if it.get(key):
+            rec[key] = it[key]
+    return rec
 
 
 # ── instruments ─────────────────────────────────────────────────────────────
@@ -732,6 +858,70 @@ def build_gamakas(root: Path) -> dict:
     return {"format": FORMAT, **doc}
 
 
+# ── abbreviations ───────────────────────────────────────────────────────────
+#
+# The research writes for researchers ("PPN: 'There is endless debate...'").
+# Readers get names: a person is named in full every time; a work, a journal
+# or a school is spelled out at its first mention in a note and keeps its
+# short form after that. Only reader-facing text is touched: never an id, an
+# address or a line of notation. (CAC is left as written: the research does
+# not say which organisation it means.)
+ALWAYS = {
+    "PPN": "P. P. Narayanaswami",
+    "12-TET": "12-tone equal temperament",
+}
+FIRST = {
+    "SSP": "Sangita Sampradaya Pradarsini",
+    "CDP": "Chaturdandi Prakashika",
+    "JMA": "Journal of the Music Academy",
+    "RTP": "ragam-tanam-pallavi",
+    "GNB": "G. N. Balasubramaniam",
+    "SAWF": "South Asian Women's Forum",
+}
+NOT_PROSE_KEYS = {"id", "ids", "url", "source_url", "sargam", "line", "segments", "arohana", "avarohana",
+                  "sign", "iso", "raga", "ragaId", "tala", "practicalTala", "swara", "swaras", "path", "slug"}
+
+
+def _word(short: str) -> str:
+    return rf"(?<![\w-]){re.escape(short)}(?![\w-])"
+
+
+def expand(text: str) -> str:
+    if text.startswith(("http://", "https://")):
+        return text
+    for short, full in ALWAYS.items():
+        text = re.sub(_word(short), full, text)
+    for short, full in FIRST.items():
+        if f"{full} ({short})" in text:
+            continue
+        explained = False
+
+        def one(m: re.Match) -> str:
+            nonlocal explained
+            if explained:
+                return short
+            before, after = text[:m.start()], text[m.end():]
+            # In a possessive or inside brackets, the name alone reads; the
+            # short form is explained at the next plain mention.
+            if after.startswith("'s") or before.count("(") > before.count(")"):
+                return full
+            explained = True
+            return f"{full} ({short})"
+
+        text = re.sub(_word(short), one, text)
+    return text
+
+
+def expand_all(node, key: str | None = None):
+    if isinstance(node, str):
+        return node if key in NOT_PROSE_KEYS else expand(node)
+    if isinstance(node, list):
+        return node if key in NOT_PROSE_KEYS else [expand_all(x, key) for x in node]
+    if isinstance(node, dict):
+        return {k: expand_all(v, k) for k, v in node.items()}
+    return node
+
+
 # ── main ────────────────────────────────────────────────────────────────────
 
 def build(root: Path, out: Path) -> dict:
@@ -742,7 +932,7 @@ def build(root: Path, out: Path) -> dict:
     files = {
         "ragas.json": ragas,
         "talas.json": build_talas(root),
-        "lessons.json": build_lessons(root),
+        "lessons.json": build_lessons(root, ragas),
         "instruments.json": build_instruments(root, gaps),
         "featured.json": build_featured(root, ragas),
         "gamakas.json": build_gamakas(root),
@@ -750,11 +940,12 @@ def build(root: Path, out: Path) -> dict:
     out.mkdir(parents=True, exist_ok=True)
     listed = []
     for name, data in files.items():
+        data = expand_all(data)
         raw = json.dumps(data, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
         (out / name).write_bytes(raw)
         listed.append({"name": name, "digest": hashlib.sha256(raw).hexdigest()[:16], "bytes": len(raw)})
     digest = hashlib.sha256("".join(f["digest"] for f in listed).encode()).hexdigest()[:16]
-    return {"format": FORMAT, "digest": digest, "files": listed,
+    return {"format": FORMAT, "digest": digest, "files": listed, "warnings": WARNINGS,
             "counts": {"melakartas": len(ragas["melakartas"]), "janyas": len(ragas["janyas"]),
                        "performed": len(ragas["performed"])}}
 

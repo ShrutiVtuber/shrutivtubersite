@@ -42,7 +42,7 @@ const path = (id: string) => {
 };
 ---
 <SwaraLayout title={say("meta.title", "Gamaka library · Swara Studio")}
-             description={say("meta.description", "Kampita, jaru, nokku, odukkal, orikkai, sphurita, pratyahata, ravai and khandippu: each as a pitch curve you can hear, with its textbook name, its sign after the SSP (1904) and how it is made on the venu, veena and violin.")}
+             description={say("meta.description", "Kampita, jaru, nokku, odukkal, orikkai, sphurita, pratyahata, ravai and khandippu: each as a pitch curve you can hear, with its textbook name, its sign after the Sangita Sampradaya Pradarsini (1904) and how it is made on the venu, veena and violin.")}
              crumbs={[[tr("crumb.learn"), L("/carnatic/lessons")], [say("crumb", "Gamaka library")]]}>
   <Hero eyebrow={say("eyebrow", "Gamakas")} title={say("title", "Gamaka library")} lede={say("lede", "Each gamaka as a pitch curve, with audio and how it is made on your instrument.")} />
   {!data ? <div class="sw-section"><Absent /></div> : (
@@ -53,7 +53,7 @@ const path = (id: string) => {
             <header class="gm-head">
               <h2 class="gm-name">{g.name}</h2>
               <span class="sw-mono">{g.term}{g.list ? ` · ${g.list}` : ""}</span>
-              <span class="gm-sign" title={`Sign after the SSP, written ${g.signPlacement === "before" ? "before" : "above"} the note`}>{g.sign}</span>
+              <span class="gm-sign" title={say("signTitle", "Sign after the Sangita Sampradaya Pradarsini (1904), written {where} the note").replace("{where}", g.signPlacement === "before" ? say("before", "before") : say("above", "above"))}>{g.sign}</span>
             </header>
             <svg class="gm-curve" viewBox={`0 0 ${W} 84`} preserveAspectRatio="none" role="img" aria-label={`${g.name}: pitch over time`}>
               <line x1="0" x2={W} y1="20" y2="20" class="lane" /><line x1="0" x2={W} y1="60" y2="60" class="lane" />

@@ -2,9 +2,11 @@
  * address (sarali-varisai-1, alankaram-3, geetham-sri-gananatha). */
 export const SET_SLUG: Record<string, string> = {
   sarali_varisai: "sarali-varisai", janta_varisai: "janta-varisai", dhatu_varisai: "dhatu-varisai",
-  tara_sthayi_varisai: "tara-sthayi", mandra_sthayi_varisai: "mandra-sthayi", alankaram: "alankaram", geethams: "geetham",
+  tara_sthayi_varisai: "tara-sthayi", mandra_sthayi_varisai: "mandra-sthayi", alankaram: "alankaram", geethams: "geetham", varnams: "varnam",
 };
-export const SET_ORDER = ["sarali_varisai", "janta_varisai", "dhatu_varisai", "tara_sthayi_varisai", "mandra_sthayi_varisai", "alankaram", "geethams"];
+export const SET_ORDER = ["sarali_varisai", "janta_varisai", "dhatu_varisai", "tara_sthayi_varisai", "mandra_sthayi_varisai", "alankaram", "geethams", "varnams"];
+/* Sets whose items are songs with titles, not numbered exercises. */
+export const SONG_SETS = new Set(["geethams", "varnams"]);
 
 export interface LessonRef { id: string; slug: string; set: string; n: number; name: string; title: string | null; item: any; index: number }
 
@@ -14,11 +16,11 @@ export function lessonList(data: any, setName: (id: string) => string, withOptio
     const set = data?.sets?.find((s: any) => s.id === id);
     if (!set) continue;
     set.items.filter((i: any) => withOptional || !i.optional).forEach((i: any, k: number) => {
-      const slug = id === "geethams" ? `geetham-${i.id.replace(/_/g, "-")}` : `${SET_SLUG[id]}-${i.id.split("_").pop()?.replace(/^0/, "")}`;
+      const slug = SONG_SETS.has(id) ? `${SET_SLUG[id]}-${i.id.replace(/_/g, "-")}` : `${SET_SLUG[id]}-${i.id.split("_").pop()?.replace(/^0/, "")}`;
       out.push({
         id: i.id, slug, set: id, n: k + 1, item: i, index: out.length,
-        name: id === "geethams" ? (i.title ?? i.id).split(" (")[0] : `${setName(id)} ${k + 1}`,
-        title: id === "geethams" ? i.title : i.title ?? null,
+        name: SONG_SETS.has(id) ? (i.title ?? i.id).split(" (")[0] : `${setName(id)} ${k + 1}`,
+        title: i.title ?? null,
       });
     });
   }
@@ -35,4 +37,5 @@ export const SET_PROSE: Record<string, string> = {
   mandra_sthayi_varisai: "Mandra sthayi varisai goes down into the lower octave, where the voice and the flute both need a steady, unhurried breath.",
   alankaram: "Each alankaram is a pattern set in one of the seven suladi talas, so the hand learns a new tala with each one. Learn the tala in the trainer first, then keep it while you sing.",
   geethams: "The Malahari geethams are the first songs: simple melodies with words, in the rupaka and triputa talas. They are traditionally attributed to Purandara Dasa.",
+  varnams: "A varnam is the étude of Carnatic music: a composition that teaches a raga's characteristic phrases and its gamakas, sung in two speeds. The first half is sung once slowly and once at double speed; learn it phrase by phrase with the drone before joining the pieces.",
 };
