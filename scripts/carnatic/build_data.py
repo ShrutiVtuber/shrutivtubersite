@@ -756,6 +756,11 @@ def build_varnam(it: dict, sizes: dict, ragas: dict | None) -> dict | None:
         skip("no notation")
         return None
     total = 0
+    # A varnam line may be one avartanam of a slower grid (2-kalai Adi printed
+    # 16 + 8 + 8, research/lessons/varnams.json "kalai": 2): its segments are
+    # the angas scaled, not the angas repeated. Every scaled line of a varnam
+    # has the same length.
+    scale_units = None
     for sec in secs:
         for n, line in enumerate(sec.get("lines", []), 1):
             toks = [t for seg in line["segments"] for t in seg]
@@ -765,9 +770,17 @@ def build_varnam(it: dict, sizes: dict, ragas: dict | None) -> dict | None:
                 return None
             units = sum(2 if t == ";" else 1 for t in toks)
             per = sum(sizes[tala])
-            if units % per or [sum(2 if t == ";" else 1 for t in seg) for seg in line["segments"]] != sizes[tala] * (units // per):
+            segs = [sum(2 if t == ";" else 1 for t in seg) for seg in line["segments"]]
+            repeated = not units % per and segs == sizes[tala] * (units // per)
+            scaled = not units % per and segs == [a * (units // per) for a in sizes[tala]]
+            if not (repeated or scaled):
                 skip(f"{sec.get('section')} line {n}: segments do not match the tala")
                 return None
+            if scaled and not repeated:
+                if scale_units not in (None, units // per):
+                    skip(f"{sec.get('section')} line {n}: lines of different lengths")
+                    return None
+                scale_units = units // per
             total += units
     rec = {
         "id": ident,
@@ -779,7 +792,7 @@ def build_varnam(it: dict, sizes: dict, ragas: dict | None) -> dict | None:
         "ragaId": scale["id"],
         "raga_scale": it.get("raga_scale") or {"arohana": scale["arohana"], "avarohana": scale["avarohana"]},
         "units": total,
-        "repeats": repeats_for(total, sum(sizes[tala])),
+        "repeats": repeats_for(total, sum(sizes[tala]) * (scale_units or 1)),
         "sections": [{"section": sec.get("section"),
                       # One token per unit, as in every other lesson: a ";" hold becomes ", ,".
                       "lines": [{"segments": [[u for t in seg for u in ([",", ","] if t == ";" else [t])]
@@ -791,6 +804,16 @@ def build_varnam(it: dict, sizes: dict, ragas: dict | None) -> dict | None:
     for key in ("type", "composer", "language", "tala_note", "confidence", "source_url", "speeds"):
         if it.get(key):
             rec[key] = it[key]
+    if scale_units:
+        # The grid the line fills. With kalai 2 the practical tala is 2-kalai
+        # Adi (16 counts), so each count holds scale_units * angas-total /
+        # counts units at the first speed.
+        kalai = it.get("kalai") or 1
+        rec["kalai"] = kalai
+        if tala in ("adi", "chaturasra_jati_triputa") and kalai == 2:
+            rec["practicalTala"] = "adi_2_kalai"
+        counts = sum(sizes[tala]) * kalai
+        rec["unitsPerCount"] = scale_units * sum(sizes[tala]) // counts
     return rec
 
 

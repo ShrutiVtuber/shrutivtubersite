@@ -10,6 +10,8 @@ import { ratio, semitones, tokenize, variantsOf } from "../notation";
 export interface Exercise {
   id: string; title: string; counts: ClockCount[]; angas: number[];
   notes: string[]; repeats: Record<string, number>; scale: string;
+  /** Notes in one count at speed 1: 1, or 2 for a varnam in 2-kalai Adi. */
+  unitsPerCount?: number;
 }
 
 export interface Run { speed: number; perCount: number; notes: string[] }
@@ -21,7 +23,7 @@ export function runsFor(ex: Exercise, speeds: number[]): Run[] {
     const times = ex.repeats[String(s)] ?? 1;
     const notes: string[] = [];
     for (let i = 0; i < times; i++) notes.push(...ex.notes);
-    return { speed: s, perCount: PER[s], notes };
+    return { speed: s, perCount: PER[s] * (ex.unitsPerCount ?? 1), notes };
   });
 }
 

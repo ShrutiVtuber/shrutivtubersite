@@ -36,7 +36,10 @@ const optional = settings.eighthAlankaram;
 const exercises = sets.flatMap((s: any) => s.items.filter((i: any) => optional || !i.optional).map((i: any) => ({
   id: i.id, set: s.id, title: i.title,
   name: SONG_SETS.has(s.id) ? (i.title ?? i.id).split(" (")[0] : `${tr(`set.${s.id}` as any)} ${String(s.items.indexOf(i) + 1)}`,
-  counts: countsFor(i.tala, i.practicalTala), angas: i.angas,
+  /* A varnam in 2-kalai Adi fills 16 counts (the angas doubled), two
+     notes to a count at speed 1. */
+  counts: countsFor(i.tala, i.practicalTala), angas: i.angas.map((a: number) => a * (i.kalai ?? 1)),
+  unitsPerCount: i.unitsPerCount ?? 1,
   notes: i.sections.flatMap((sec: any) => sec.lines.flatMap((l: any) => l.segments.flat())),
   repeats: i.repeats,
   /* A varnam may write a variant (Begada's anya N2); show it where it is written. */
@@ -50,7 +53,7 @@ const exercises = sets.flatMap((s: any) => s.items.filter((i: any) => optional |
 const hasVarnams = sets.some((s: any) => s.id === "varnams");
 const asked = Astro.url.searchParams.get("item");
 const current = exercises.find((e) => e.id === asked) ?? exercises[0];
-const first = current ? avartanamHtml({ counts: toCounts([current.notes.slice(0, current.counts.length)], 1), angas: current.angas }, { script, tamil: settings.tamilStyle, subs: current.subs }) : "";
+const first = current ? avartanamHtml({ counts: toCounts([current.notes.slice(0, current.counts.length * current.unitsPerCount)], current.unitsPerCount), angas: current.angas }, { script, tamil: settings.tamilStyle, subs: current.subs }) : "";
 const venu = settings.instrument === "venu" ? (inst?.venu?.fingerings ?? []).filter((f: any) => f.holes && ["primary", "cross-fingering"].includes(f.kind)).map((f: any) => ({ swara: f.swara, sthayi: f.sthayi, holes: f.holes, kind: f.kind })) : [];
 ---
 <SwaraLayout title={say("meta.title", "The beginner path · Swara Studio")}
@@ -181,7 +184,8 @@ const venu = settings.instrument === "venu" ? (inst?.venu?.fingerings ?? []).fil
       badge.hidden = !(rep > 1);
       badge.textContent = rep > 1 ? `×${rep}` : "";
     };
-    draw(Array.from({ length: ex.counts.length }, (_, i) => [ex.notes[i] ?? ","]), 1);
+    const u = ex.unitsPerCount ?? 1;
+    draw(Array.from({ length: ex.counts.length }, (_, i) => { const n = ex.notes.slice(i * u, (i + 1) * u); return n.length ? n : [","]; }), 1);
     showBadge();
 
     /* The instrument's range (DECISIONS tala §7): marked, never hidden. */
