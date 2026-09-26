@@ -53,7 +53,7 @@ const INSTRUMENTS = ["venu", "voice", "veena", "violin", "mridangam"];
       <label>{say("f.raga", "Raga")}<select name="raga"><option value="">—</option>{[...(all?.janyas ?? []), ...(all?.performed ?? [])].sort((a, b) => a.name.localeCompare(b.name)).map((r) => <option value={r.id}>{r.name}</option>)}</select></label>
       <label>{say("f.tala", "Tala")}<input name="tala" maxlength="40" placeholder={say("f.talaHint", "Adi")} /></label>
       {mySheets.length > 0 && <label>{say("f.sheet", "Your sheet")}<select name="sheetSlug"><option value="">—</option>{mySheets.map((s: any) => <option value={s.slug}>{s.title}</option>)}</select></label>}
-      <div class="ls-form-row"><button type="submit" class="ls-share">{say("f.post", "Share")}</button><span class="sw-note" data-share-msg>{say("f.note", "Your post goes with your account if you delete it.")}</span></div>
+      <div class="ls-form-row"><button type="submit" class="ls-share">{say("f.post", "Share")}</button><span class="sw-note" data-share-msg>{say("f.note", "If you delete your account, your post stays up, credited to nobody.")}</span></div>
     </form>
   )}
 

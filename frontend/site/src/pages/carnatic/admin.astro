@@ -21,6 +21,10 @@ const filter = Astro.url.searchParams.get("lang") ?? "";
 const visible = items.filter((i) => (show === "all" || !i.review) && (!filter || i.lang === filter || (filter === "facts" && i.key.startsWith("fact:"))));
 const hiddenCount = (mod.body?.posts ?? []).filter((p: any) => p.hidden).length + (mod.body?.comments ?? []).filter((c: any) => c.hidden).length;
 const reportedCount = mod.body?.reported ?? 0;
+const awaiting = mod.body?.awaitingReview ?? 0;
+/* Three reports from different accounts hide a thing until she looks. */
+const stateOf = (x: any) => x.hiddenBy === "reports" ? say("state.waiting", "Hidden by reports, waiting for you")
+  : x.hidden ? say("state.hidden", "Hidden by you") : x.reviewedAt ? say("state.restored", "Restored") : say("state.shown", "Shown");
 const reportsLabel = (n: number, reasons: string[]) => n ? say("reports", "{n} reported").replace("{n}", String(n)) + (reasons.length ? ": " + reasons.join(" / ") : "") : "";
 const footLine = say("foot", "Reviewers and consultants see the same queue. Confirming clears the public \"unverified\" or confidence note; correcting replaces the text with yours and clears it. Showing {n} of {total}.").replace("{n}", String(Math.min(visible.length, 400))).replace("{total}", String(visible.length));
 ---
@@ -30,7 +34,7 @@ const footLine = say("foot", "Reviewers and consultants see the same queue. Conf
     <div class="sw-chips">
       <Chip href="/carnatic/admin" active={tab === "queue"}>{say("tab.queue", "Review queue")} · {queue.body?.open ?? 0}</Chip>
       <Chip href="/admin/classes">{say("tab.lessons", "Lessons")}</Chip>
-      <Chip href="/carnatic/admin?tab=moderation" active={tab === "moderation"}>{say("tab.moderation", "Moderation")} · {reportedCount ? say("tab.reported", "{n} reported").replace("{n}", String(reportedCount)) : hiddenCount}</Chip>
+      <Chip href="/carnatic/admin?tab=moderation" active={tab === "moderation"}>{say("tab.moderation", "Moderation")} · {awaiting ? say("tab.waiting", "{n} waiting").replace("{n}", String(awaiting)) : reportedCount ? say("tab.reported", "{n} reported").replace("{n}", String(reportedCount)) : hiddenCount}</Chip>
     </div>
     <span class="spacer"></span>
     {tab === "queue" && (
@@ -66,11 +70,11 @@ const footLine = say("foot", "Reviewers and consultants see the same queue. Conf
     <div class="aq-mod">
       <h2 class="sw-h3">{say("mod.posts", "Listen posts")}</h2>
       <table class="sw-table">
-        <tbody>{(mod.body?.posts ?? []).map((p: any) => <tr><td>{p.title}<small>{p.url}</small>{p.reports > 0 && <small class="aq-rep">{reportsLabel(p.reports, p.reasons)}</small>}</td><td>{p.hidden ? "hidden" : "shown"}</td><td><button type="button" data-hide-post={p.id} data-hidden={String(p.hidden)}>{p.hidden ? "Show" : "Hide"}</button></td></tr>)}</tbody>
+        <tbody>{(mod.body?.posts ?? []).map((p: any) => <tr><td>{p.title}<small>{p.url}</small>{p.reports > 0 && <small class="aq-rep">{reportsLabel(p.reports, p.reasons)}</small>}</td><td class:list={["aq-state", p.hiddenBy === "reports" && "aq-wait"]}>{stateOf(p)}</td><td class="aq-act"><button type="button" data-hide-post={p.id} data-hidden={String(p.hidden)}>{p.hidden ? say("restore", "Restore") : say("hide", "Hide")}</button> <button type="button" class="aq-link" data-remove-post={p.id}>{say("remove", "Remove")}</button></td></tr>)}</tbody>
       </table>
       <h2 class="sw-h3">{say("mod.comments", "Comments")}</h2>
       <table class="sw-table">
-        <tbody>{(mod.body?.comments ?? []).map((c: any) => <tr><td>{c.body}{c.reports > 0 && <small class="aq-rep">{reportsLabel(c.reports, c.reasons)}</small>}</td><td>{c.hidden ? "hidden" : "shown"}</td><td><button type="button" data-hide-comment={c.id} data-hidden={String(c.hidden)}>{c.hidden ? "Show" : "Hide"}</button></td></tr>)}</tbody>
+        <tbody>{(mod.body?.comments ?? []).map((c: any) => <tr><td>{c.body}{c.reports > 0 && <small class="aq-rep">{reportsLabel(c.reports, c.reasons)}</small>}</td><td class:list={["aq-state", c.hiddenBy === "reports" && "aq-wait"]}>{stateOf(c)}</td><td class="aq-act"><button type="button" data-hide-comment={c.id} data-hidden={String(c.hidden)}>{c.hidden ? say("restore", "Restore") : say("hide", "Hide")}</button> <button type="button" class="aq-link" data-remove-comment={c.id}>{say("remove", "Remove")}</button></td></tr>)}</tbody>
       </table>
     </div>
   )}
@@ -97,6 +101,13 @@ const footLine = say("foot", "Reviewers and consultants see the same queue. Conf
     const r = await post(`/api/carnatic/admin/${kind}/${id}/hide`, { hidden: b.dataset.hidden !== "true" });
     if (r.ok) location.reload();
   }));
+  document.querySelectorAll<HTMLButtonElement>("[data-remove-post],[data-remove-comment]").forEach((b) => b.addEventListener("click", async () => {
+    const kind = b.dataset.removePost ? "posts" : "comments";
+    const id = b.dataset.removePost ?? b.dataset.removeComment;
+    if (!confirm("Remove it for good? This cannot be undone.")) return;
+    const r = await fetch(`/api/carnatic/admin/${kind}/${id}`, { method: "DELETE", headers: { "x-csrf-token": csrf() } });
+    if (r.ok) location.reload();
+  }));
 </script>
 
 <style>
@@ -108,4 +119,6 @@ const footLine = say("foot", "Reviewers and consultants see the same queue. Conf
   .aq-act .aq-link { border-color: transparent; }
   .aq-foot { padding-top: 16px; }
   .aq-rep { color: var(--ink) !important; }
+  .aq-state { font: 12px / 1.4 var(--font-mono); color: var(--ink-soft); }
+  .aq-wait { color: var(--ink); font-weight: 600; }
 </style>

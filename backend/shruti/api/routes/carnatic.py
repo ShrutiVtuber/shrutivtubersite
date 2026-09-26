@@ -64,6 +64,11 @@ def _iso(value: datetime | None) -> str | None:
     return value.isoformat()
 
 
+async def _person(session: AsyncSession, uid: int | None) -> User | None:
+    """The account behind a row, or None when it was deleted (the row is kept without a name)."""
+    return await session.get(User, uid) if uid is not None else None
+
+
 def _public_name(user: User | None) -> str:
     """Never the front half of an email address."""
     name = (getattr(user, "display_name", "") or "").strip()
@@ -72,9 +77,10 @@ def _public_name(user: User | None) -> str:
 
 async def is_supporter(user: User | None, session: AsyncSession) -> bool:
     """
-    A Swaras supporter: a live subscription at any tier. The owner's rule is
-    that a Swaras supporter gets every gated tool, Swara Studio included. The
-    operator is never limited on her own site.
+    A Swaras supporter: a live subscription at any tier, or the operator.
+    Nothing in the school is gated (the owner's rule of 26 Sep 2026: every
+    tool is free, like the site's others); a supporter is thanked, never
+    unlocked.
     """
     if user is None:
         return False
@@ -146,13 +152,14 @@ async def me(user: User | None = Depends(current_user), session: AsyncSession = 
     """Never 401: a signed-out visitor is an ordinary visitor."""
     supporter = await is_supporter(user, session)
     if user is None:
-        return {"signedIn": False, "limits": {"partsPerSong": rules.part_limit(False)}, "settings": None}
+        return {"signedIn": False, "limits": {"partsPerSong": None}, "settings": None}
     profile = await session.get(CarnaticProfile, user.id)
     return {
         "signedIn": True,
         "displayName": _public_name(user) if user.display_name else "",
         "supporter": supporter,
-        "limits": {"partsPerSong": rules.part_limit(supporter)},
+        # Kept for older clients: null means no limit, and it is always null.
+        "limits": {"partsPerSong": None},
         "settings": rules.with_defaults(profile.settings if profile else None),
         "settingsUpdatedAt": _iso(profile.updated_at) if profile else None,
     }
@@ -291,27 +298,12 @@ def _song_full(s: CarnaticSong) -> dict:
     return {**_song_summary(s), "song": s.body}
 
 
-class PartLimit(Exception):
-    def __init__(self, limit: int):
-        self.limit = limit
-
-    def response(self) -> JSONResponse:
-        return JSONResponse(status_code=413, content={
-            "code": "PART_LIMIT", "limit": self.limit,
-            "detail": f"Songs have up to {self.limit} parts. Swaras supporters can add more."})
-
-
-async def _check_body(body: dict, user: User, session: AsyncSession, before: dict | None = None) -> dict:
+def _check_body(body: dict) -> dict:
+    """A song as format 1 describes it. Any number of parts, for everybody."""
     try:
         rules.check_song(body)
     except rules.Invalid as e:
         raise HTTPException(422, str(e))
-    limit = rules.part_limit(await is_supporter(user, session))
-    parts = rules.parts_in(body)
-    # A song kept from a supporter year keeps its parts; it cannot grow past
-    # the limit, and saving it without adding one is always accepted.
-    if limit is not None and parts > limit and parts > rules.parts_in(before or {}):
-        raise PartLimit(limit)
     return body
 
 
@@ -336,10 +328,7 @@ async def create_song(body: SongIn, user: User = Depends(require_user),
                                .where(CarnaticSong.user_id == user.id))).scalar_one()
     if n >= rules.SONGS_PER_PERSON:
         raise HTTPException(422, f"An account keeps up to {rules.SONGS_PER_PERSON} songs.")
-    try:
-        song = await _check_body(body.song, user, session)
-    except PartLimit as e:
-        return e.response()
+    song = _check_body(body.song)
     row = CarnaticSong(user_id=user.id, slug=rules.song_slug(song["title"]), title=song["title"].strip(),
                        raga=str(song.get("raga", ""))[:60], tala=song["tala"], body=song)
     session.add(row)
@@ -355,10 +344,12 @@ async def sheet(slug: str, viewer: User | None = Depends(current_user),
     row = (await session.execute(select(CarnaticSong).where(CarnaticSong.slug == slug))).scalar_one_or_none()
     if row is None or (not row.published and (viewer is None or viewer.id != row.user_id)):
         raise HTTPException(404, "No such sheet.")
-    author = await session.get(User, row.user_id)
+    author = await _person(session, row.user_id)
     ragas = rules.data("ragas.json") or {}
     raga = next((r for r in ragas.get("janyas", []) + ragas.get("performed", []) if r["id"] == row.raga), None)
-    return {**_song_full(row), "author": _public_name(author), "mine": bool(viewer and viewer.id == row.user_id),
+    # An anonymised song is credited to nobody: no name, not "somebody".
+    return {**_song_full(row), "author": _public_name(author) if author else None,
+            "mine": bool(viewer and row.user_id is not None and viewer.id == row.user_id),
             "outOfRaga": rules.out_of_raga(row.body, raga)}
 
 
@@ -376,10 +367,7 @@ async def put_song(song_id: int, body: SongIn, user: User = Depends(require_user
         return JSONResponse(status_code=409, content={
             "code": "CONFLICT", "detail": "This song was changed on another device.", **_song_full(row),
             "updatedAt": _iso(row.updated_at)})
-    try:
-        song = await _check_body(body.song, user, session, before=row.body)
-    except PartLimit as e:
-        return e.response()
+    song = _check_body(body.song)
     row.body, row.title, row.raga, row.tala = song, song["title"].strip(), str(song.get("raga", ""))[:60], song["tala"]
     row.updated_at = _now()
     await session.commit()
@@ -432,16 +420,17 @@ class CommentIn(BaseModel):
 
 
 async def _post_view(p: CarnaticPost, viewer: User | None, session: AsyncSession) -> dict:
-    author = await session.get(User, p.user_id)
+    author = await _person(session, p.user_id)
     likes = (await session.execute(select(func.count()).select_from(CarnaticLike)
                                    .where(CarnaticLike.post_id == p.id))).scalar_one()
     comments = (await session.execute(select(func.count()).select_from(CarnaticComment)
                                       .where(CarnaticComment.post_id == p.id, CarnaticComment.hidden.is_(False)))).scalar_one()
     liked = False
     if viewer is not None:
-        liked = (await session.get(CarnaticLike, (p.id, viewer.id))) is not None
+        liked = (await session.execute(select(CarnaticLike.id).where(
+            CarnaticLike.post_id == p.id, CarnaticLike.user_id == viewer.id))).first() is not None
     sheet = await session.get(CarnaticSong, p.song_id) if p.song_id else None
-    return {"id": p.id, "title": p.title, "author": _public_name(author), "mine": bool(viewer and viewer.id == p.user_id),
+    return {"id": p.id, "title": p.title, "author": _public_name(author), "mine": bool(viewer and p.user_id is not None and viewer.id == p.user_id),
             "instrument": p.instrument, "raga": p.raga, "tala": p.tala,
             "player": {"kind": p.player, "url": p.url},
             "sheetSlug": sheet.slug if sheet is not None and sheet.published else None,
@@ -526,7 +515,8 @@ async def _visible_post(post_id: int, session: AsyncSession) -> CarnaticPost:
 @router.put("/listen/{post_id}/like")
 async def like(post_id: int, user: User = Depends(require_user), session: AsyncSession = Depends(get_session)) -> dict:
     await _visible_post(post_id, session)
-    if await session.get(CarnaticLike, (post_id, user.id)) is None:
+    if (await session.execute(select(CarnaticLike.id).where(
+            CarnaticLike.post_id == post_id, CarnaticLike.user_id == user.id))).first() is None:
         session.add(CarnaticLike(post_id=post_id, user_id=user.id, created_at=_now()))
         await session.commit()
     return {"liked": True}
@@ -547,8 +537,9 @@ async def comments(post_id: int, viewer: User | None = Depends(current_user),
         CarnaticComment.post_id == post_id, CarnaticComment.hidden.is_(False)).order_by(CarnaticComment.id))).scalars().all()
     out = []
     for c in rows:
-        author = await session.get(User, c.user_id)
-        out.append({"id": c.id, "author": _public_name(author), "mine": bool(viewer and viewer.id == c.user_id),
+        author = await _person(session, c.user_id)
+        out.append({"id": c.id, "author": _public_name(author),
+                    "mine": bool(viewer and c.user_id is not None and viewer.id == c.user_id),
                     "body": c.body, "createdAt": _iso(c.created_at)})
     return {"items": out}
 
@@ -571,9 +562,20 @@ class ReportIn(BaseModel):
     reason: str = Field(default="", max_length=300)
 
 
-async def _report(user: User, reason: str, session: AsyncSession, *, post_id: int | None = None,
-                  comment_id: int | None = None):
-    """One report per person per thing; a second is accepted and changes nothing."""
+#: Reports from this many different accounts hide a post or comment until
+#: she reviews it (the owner's rule of 26 Sep 2026).
+HIDE_AFTER = 3
+
+
+async def _report(user: User, reason: str, session: AsyncSession, thing: CarnaticPost | CarnaticComment, *,
+                  post_id: int | None = None, comment_id: int | None = None):
+    """
+    One report per person per thing; a second is accepted and changes nothing.
+    The HIDE_AFTER-th report from a different account hides the thing until
+    she reviews it. Only reports made since she last restored it count, so a
+    restored post is not hidden again by the reports she already weighed.
+    Nothing here tells anyone who reported.
+    """
     col = CarnaticReport.post_id if post_id is not None else CarnaticReport.comment_id
     ref = post_id if post_id is not None else comment_id
     existing = (await session.execute(select(CarnaticReport).where(
@@ -582,6 +584,13 @@ async def _report(user: User, reason: str, session: AsyncSession, *, post_id: in
         if REPORTED_BY_USER.full(str(user.id)):
             return JSONResponse(status_code=429, content=SLOW_DOWN)
         session.add(CarnaticReport(user_id=user.id, post_id=post_id, comment_id=comment_id, reason=reason.strip()))
+        await session.flush()
+        since = select(func.count()).select_from(CarnaticReport).where(col == ref)
+        if thing.reviewed_at is not None:
+            since = since.where(CarnaticReport.created_at > thing.reviewed_at)
+        # One row per account (uq_carnatic_report_*), so rows are reporters.
+        if not thing.hidden and (await session.execute(since)).scalar_one() >= HIDE_AFTER:
+            thing.hidden, thing.hidden_by = True, "reports"
         await session.commit()
         REPORTED_BY_USER.add(str(user.id))
     return {"reported": True}
@@ -593,14 +602,14 @@ async def report_comment(comment_id: int, body: ReportIn, user: User = Depends(r
     c = await session.get(CarnaticComment, comment_id)
     if c is None or c.hidden:
         raise HTTPException(404, "No such comment.")
-    return await _report(user, body.reason, session, comment_id=comment_id)
+    return await _report(user, body.reason, session, c, comment_id=comment_id)
 
 
 @router.post("/listen/{post_id}/report")
 async def report_post(post_id: int, body: ReportIn, user: User = Depends(require_user),
                       session: AsyncSession = Depends(get_session)):
-    await _visible_post(post_id, session)
-    return await _report(user, body.reason, session, post_id=post_id)
+    p = await _visible_post(post_id, session)
+    return await _report(user, body.reason, session, p, post_id=post_id)
 
 
 # ── signing in on the app ───────────────────────────────────────────────────
@@ -823,21 +832,36 @@ async def admin_moderation(_: str = Depends(require_admin), session: AsyncSessio
     seen_comments = {c.id for c in comments_}
     comments_ = [*(await session.execute(select(CarnaticComment).where(CarnaticComment.id.in_(
         [i for i in by_comment if i not in seen_comments] or [-1])))).scalars().all(), *comments_]
-    posts.sort(key=lambda p: (-len(by_post.get(p.id, [])), -p.id))
-    comments_.sort(key=lambda c: (-len(by_comment.get(c.id, [])), -c.id))
+    # Waiting for her first (hidden by reports), then the most reported.
+    posts.sort(key=lambda p: (p.hidden_by != "reports", -len(by_post.get(p.id, [])), -p.id))
+    comments_.sort(key=lambda c: (c.hidden_by != "reports", -len(by_comment.get(c.id, [])), -c.id))
+    # Reasons are shown, reporters never are: not even to her.
     return {
-        "posts": [{"id": p.id, "title": p.title, "url": p.url, "hidden": p.hidden, "createdAt": _iso(p.created_at),
+        "posts": [{"id": p.id, "title": p.title, "url": p.url, "hidden": p.hidden, "hiddenBy": p.hidden_by,
+                   "createdAt": _iso(p.created_at), "reviewedAt": _iso(p.reviewed_at),
                    "reports": len(by_post.get(p.id, [])), "reasons": [x for x in by_post.get(p.id, []) if x]}
                   for p in posts],
-        "comments": [{"id": c.id, "postId": c.post_id, "body": c.body, "hidden": c.hidden, "createdAt": _iso(c.created_at),
+        "comments": [{"id": c.id, "postId": c.post_id, "body": c.body, "hidden": c.hidden, "hiddenBy": c.hidden_by,
+                      "createdAt": _iso(c.created_at), "reviewedAt": _iso(c.reviewed_at),
                       "reports": len(by_comment.get(c.id, [])), "reasons": [x for x in by_comment.get(c.id, []) if x]}
                      for c in comments_],
         "reported": len(by_post) + len(by_comment),
+        "awaitingReview": sum(p.hidden_by == "reports" for p in posts) + sum(c.hidden_by == "reports" for c in comments_),
     }
 
 
 class HideIn(BaseModel):
     hidden: bool
+
+
+def _review(thing: CarnaticPost | CarnaticComment, hidden: bool) -> None:
+    """
+    Her decision. Hiding is hers; showing it again (restoring) marks it
+    reviewed, so the reports she has already weighed cannot hide it again.
+    """
+    thing.hidden, thing.hidden_by = hidden, "her" if hidden else ""
+    if not hidden:
+        thing.reviewed_at = _now()
 
 
 @router.post("/admin/posts/{post_id}/hide")
@@ -846,7 +870,7 @@ async def admin_hide_post(post_id: int, body: HideIn, _: str = Depends(require_a
     p = await session.get(CarnaticPost, post_id)
     if p is None:
         raise HTTPException(404, "No such post.")
-    p.hidden, p.hidden_by = body.hidden, "her" if body.hidden else ""
+    _review(p, body.hidden)
     await session.commit()
     return {"id": p.id, "hidden": p.hidden}
 
@@ -857,6 +881,29 @@ async def admin_hide_comment(comment_id: int, body: HideIn, _: str = Depends(req
     c = await session.get(CarnaticComment, comment_id)
     if c is None:
         raise HTTPException(404, "No such comment.")
-    c.hidden = body.hidden
+    _review(c, body.hidden)
     await session.commit()
     return {"id": c.id, "hidden": c.hidden}
+
+
+@router.delete("/admin/posts/{post_id}", status_code=204)
+async def admin_remove_post(post_id: int, _: str = Depends(require_admin),
+                            session: AsyncSession = Depends(get_session)) -> Response:
+    """Removed for good: its likes, comments and reports go with it."""
+    p = await session.get(CarnaticPost, post_id)
+    if p is None:
+        raise HTTPException(404, "No such post.")
+    await session.delete(p)
+    await session.commit()
+    return Response(status_code=204)
+
+
+@router.delete("/admin/comments/{comment_id}", status_code=204)
+async def admin_remove_comment(comment_id: int, _: str = Depends(require_admin),
+                               session: AsyncSession = Depends(get_session)) -> Response:
+    c = await session.get(CarnaticComment, comment_id)
+    if c is None:
+        raise HTTPException(404, "No such comment.")
+    await session.delete(c)
+    await session.commit()
+    return Response(status_code=204)

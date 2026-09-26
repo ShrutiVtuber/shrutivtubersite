@@ -114,7 +114,11 @@ if (Astro.request.method === "POST") {
     }
 
     if (action === "delete") {
-      const r = await asReader(Astro, "/api/account/", { method: "DELETE" });
+      /* Swara Studio songs are the person's choice (anonymise or delete);
+         the dialog asks only somebody who has songs. */
+      const songs = String(form.get("songs") ?? "");
+      const q = songs === "anonymise" || songs === "delete" ? `?songs=${songs}` : "";
+      const r = await asReader(Astro, `/api/account/${q}`, { method: "DELETE" });
       if (r.ok) {
         Astro.cookies.delete("shruti_reader", { path: "/" });
         return Astro.redirect("/account/deleted");
@@ -133,6 +137,10 @@ const state = Object.fromEntries(me.consents.map((c) => [c.kind, c]));
    somebody looks for the things the site is holding for them, and a chart is
    one of those. */
 const chartCall = await asReader(Astro, "/api/charts/mine");
+/* Swara Studio songs: the deletion dialog asks what happens to them. */
+const songsCall = await asReader(Astro, "/api/carnatic/songs");
+const schoolSongs: { published: boolean }[] = songsCall.ok ? (songsCall.body?.items ?? []) : [];
+const schoolSheets = schoolSongs.filter((x) => x.published).length;
 const charts: any[] = Array.isArray(chartCall.body) ? chartCall.body : [];
 
 /* Fetched here rather than in the browser so the list is already on the page:
@@ -525,6 +533,7 @@ const themeWord = (t: string) => t === "grimoire" ? say("tokens.theme.grimoire",
               <Copy text={say("kept.consent", "A record that consent was given and withdrawn, with dates and **no birth data** — that record is the proof the law asks for, and it no longer names you.")} />
             </li>
             <li>{say("kept.public", "What you made public — a published guide, an accepted change, a reading, a comment, a group others joined, a shared build — stays up with your name taken off it. Other people are following it; you agreed to this before you published.")}</li>
+            <li>{say("kept.school", "In Swara Studio, your Listen posts, comments and likes, your reports and your practice time stay, credited to nobody.")}</li>
             <li>{say("what-is-kept-and-why.3", "Invoices, for as long as tax law requires. There are none yet.")}</li>
           </ul>
         </div>
@@ -534,6 +543,15 @@ const themeWord = (t: string) => t === "grimoire" ? say("tokens.theme.grimoire",
         <form method="POST">
           <CsrfField />
           <input type="hidden" name="action" value="delete" />
+          {schoolSongs.length > 0 && (
+            <fieldset class="school-songs">
+              <legend>{say("songs.legend", "Your Swara Studio songs")} ({schoolSongs.length}{schoolSheets ? `, ${schoolSheets} ${say("songs.published", "published")}` : ""})</legend>
+              <label><input type="radio" name="songs" value="anonymise" required checked />
+                {say("songs.anonymise", "Keep my published sheets up, credited to nobody. Songs I never published are deleted.")}</label>
+              <label><input type="radio" name="songs" value="delete" required />
+                {say("songs.delete", "Delete all my songs and sheets with my account.")}</label>
+            </fieldset>
+          )}
           <Button type="submit">{say("text.20", "Delete it")}</Button>
         </form>
         <Button variant="ghost" data-close-delete>{say("text.13", "Keep my account")}</Button>
@@ -601,6 +619,11 @@ const themeWord = (t: string) => t === "grimoire" ? say("tokens.theme.grimoire",
   .lists ul { margin: 0; padding-left: 1.2em; font: 400 var(--text-sm) / 1.7 var(--font-body); color: var(--ink-soft); }
   .modal-note { font: 500 var(--text-sm) var(--font-body); color: var(--live); margin: var(--space-4) 0 0; }
   .modal-actions { display: flex; gap: 10px; align-items: center; margin-top: var(--space-4); }
+  .modal-actions { align-items: flex-end; flex-wrap: wrap; }
+  .modal-actions form { display: grid; gap: var(--space-3); justify-items: start; }
+  .school-songs { border: 0; margin: 0; padding: 0; display: grid; gap: 8px; max-width: 52ch; }
+  .school-songs legend { font: 600 var(--text-sm) / 1.4 var(--font-body); color: var(--ink); margin-bottom: 4px; }
+  .school-songs label { display: flex; gap: 8px; align-items: baseline; font: var(--text-sm) / 1.45 var(--font-body); color: var(--ink-soft); }
 
   .acc-blocked { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
   .acc-blocked li {

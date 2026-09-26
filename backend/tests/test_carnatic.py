@@ -77,7 +77,7 @@ def test_the_data_is_read_and_never_written() -> None:
 
 def test_a_signed_out_visitor_is_answered_not_refused() -> None:
     out = asyncio.run(routes.me(user=None, session=None))
-    assert out == {"signedIn": False, "limits": {"partsPerSong": 2}, "settings": None}
+    assert out == {"signedIn": False, "limits": {"partsPerSong": None}, "settings": None}
 
 
 def test_reading_needs_no_account() -> None:
@@ -87,14 +87,21 @@ def test_reading_needs_no_account() -> None:
         assert not any("require_user" in str(p.default) for p in params.values()), fn.__name__
 
 
-def test_the_part_limit_is_two_and_supporters_have_none() -> None:
-    assert rules.part_limit(False) == 2 and rules.part_limit(True) is None
+def test_nothing_in_the_school_is_paygated() -> None:
+    """The owner's rule (26 Sep 2026): every tool is free; supporters are thanked, never unlocked."""
+    for path in (BACKEND / "api" / "routes" / "carnatic.py", BACKEND / "core" / "carnatic.py"):
+        code = re.sub(r'""".*?"""', "", path.read_text(), flags=re.S)
+        for gate in ("part_limit", "FREE_PARTS", "PartLimit", "413"):
+            assert gate not in code, f"{path.name} still gates something: {gate}"
+    assert "is_supporter" not in inspect.getsource(routes._check_body)
+    out = asyncio.run(routes.me(user=None, session=None))
+    assert out["limits"]["partsPerSong"] is None
 
 
 def test_a_supporter_is_a_live_subscription_at_any_tier() -> None:
     code = inspect.getsource(routes.is_supporter)
     assert '{"active", "trialing"}' in code and "tier" not in code.split('"""')[2], (
-        "every Swaras tier unlocks every gated tool (owner's rule), so the tier must not be checked")
+        "any Swaras tier is thanked the same, so the tier must not be checked")
 
 
 # ── settings ────────────────────────────────────────────────────────────────
@@ -161,11 +168,6 @@ def test_a_note_outside_the_raga_is_kept_and_named(published) -> None:
     assert rules.out_of_raga(s, mohanam) == ["M1", "N2"]
 
 
-def test_parts_beyond_the_limit_are_refused_but_a_kept_song_can_be_saved() -> None:
-    code = inspect.getsource(routes._check_body)
-    assert "parts > rules.parts_in(before" in code, "a song kept from a supporter year must stay editable"
-
-
 def test_a_slug_never_collides_and_is_readable() -> None:
     a, b = rules.song_slug("Kaalai isai"), rules.song_slug("Kaalai isai")
     assert a != b and a.startswith("kaalai-isai-") and rules.song_slug("காலை").startswith("song-")
@@ -227,17 +229,34 @@ def test_literal_routes_come_before_the_ones_that_would_swallow_them() -> None:
     assert source.index('"/sheets/{slug}"') < source.index('"/songs/{song_id}"') or "/songs/sheets" not in source
 
 
-def test_every_table_goes_with_the_account_from_the_first_migration() -> None:
+def test_what_is_theirs_goes_and_what_others_see_is_kept_without_a_name() -> None:
+    """The owner's rule of 26 Sep 2026; the deletion itself is run in test_carnatic_leaves_with_the_account."""
+    import importlib.util as iu
     versions = ROOT / "backend" / "alembic" / "versions"
     if not versions.is_dir():
         versions = ROOT / "alembic" / "versions"
-    text = "".join(next(versions.glob(f"{rev}_*.py")).read_text() for rev in ("n2l8i5j1k187", "o3m9j6k2l298"))
+    path = next(versions.glob("p4n0k7l3m309_*.py"))
+    spec = iu.spec_from_file_location("p4n0", path); m = iu.module_from_spec(spec); spec.loader.exec_module(m)
+    kept = {t: ondelete for t, _c, _to, ondelete, _null in m.KEPT_WITHOUT_A_NAME}
+    assert kept == {t: "SET NULL" for t in ("carnatic_post", "carnatic_comment", "carnatic_like",
+                                            "carnatic_report", "carnatic_practice_day", "carnatic_song")}
+    first = next(versions.glob("n2l8i5j1k187_*.py")).read_text()
+    for table in ("carnatic_profile", "carnatic_progress", "carnatic_device_link"):
+        assert f'("{table}", "user_id")' in first, f"{table} is theirs alone and must cascade"
     models = (BACKEND / "models" / "carnatic.py").read_text()
-    tables = [t for t in re.findall(r'__tablename__ = "(carnatic_\w+)"', models) if t != "carnatic_review"]
-    assert len(tables) == 9
-    for table in tables:
-        assert f'("{table}", "user_id")' in text, f"{table} must be in NOBODYS_BUT_THEIRS"
-    assert text.count("ondelete=\"CASCADE\"") >= 3
+    for table in kept:
+        block = models[models.index(f'__tablename__ = "{table}"'):]
+        line = next(l for l in block.splitlines() if "user_id" in l and "site_user.id" in l)
+        assert 'ondelete="SET NULL"' in line and "Optional[int]" in line, table
+
+
+def test_deleting_an_account_asks_about_songs_first() -> None:
+    from shruti.api.routes import accounts
+    src = inspect.getsource(accounts.delete_account)
+    assert "SONGS_CHOICE_NEEDED" in src and '"anonymise", "delete"' in src
+    leave = inspect.getsource(accounts._carnatic_leave)
+    assert "CarnaticSong.published.is_(False)" in leave, "anonymising must still delete unreachable drafts"
+    assert "_carnatic_leave(session, uid, songs)" in inspect.getsource(accounts.erase)
 
 
 def test_the_school_keeps_no_streak() -> None:
@@ -342,10 +361,14 @@ def test_sharing_commenting_and_reporting_are_rate_limited() -> None:
         assert "SLOW_DOWN" in inspect.getsource(fn), fn.__name__
 
 
-def test_a_report_is_once_per_person_and_hides_nothing() -> None:
+def test_three_reporters_hide_and_nobody_learns_who_they_were() -> None:
+    assert routes.HIDE_AFTER == 3
     src = inspect.getsource(routes._report)
-    assert "existing is None" in src
-    assert "hidden" not in src, "a report must not hide anything by itself; hiding is the operator's"
+    assert "existing is None" in src and '"reports"' in src and "reviewed_at" in src
+    mod = inspect.getsource(routes.admin_moderation)
+    returned = mod[mod.index("return {"):]
+    assert "user_id" not in returned, "the moderation queue must never name a reporter"
+    assert "reviewed_at = _now()" in inspect.getsource(routes._review)
     models = (BACKEND / "models" / "carnatic.py").read_text()
     assert 'UniqueConstraint("user_id", "post_id"' in models and 'UniqueConstraint("user_id", "comment_id"' in models
 
@@ -405,3 +428,20 @@ def test_abbreviations_are_spelled_out_for_readers() -> None:
     assert b.expand("https://example.org/PPN") == "https://example.org/PPN"
     out = b.expand_all({"note": "PPN", "sargam": "S R G", "source_url": "PPN"})
     assert out == {"note": "P. P. Narayanaswami", "sargam": "S R G", "source_url": "PPN"}
+
+
+def test_a_two_kalai_varnam_line_is_the_angas_scaled() -> None:
+    """Varnams are printed one 2-kalai Adi avartanam a line: 16 + 8 + 8 units."""
+    b = _build_data()
+    b.WARNINGS.clear()
+    row = ["P", "N2", "D", "P", "M", "G", "R", "S"]
+    line = {"segments": [row * 2, row, row]}
+    it = {"id": "inta_chalamu", "title": "Inta chalamu", "raga": "Begada", "tala": "chaturasra_jati_triputa",
+          "kalai": 2, "sections": [{"section": "pallavi", "lines": [line, line]}]}
+    rec = b.build_varnam(it, _ADI, _RAGAS)
+    assert rec is not None, b.WARNINGS
+    assert (rec["kalai"], rec["practicalTala"], rec["unitsPerCount"]) == (2, "adi_2_kalai", 2)
+    # Two lines of 32 units on a 32-unit avartanam end on samam every time.
+    assert rec["repeats"] == b.repeats_for(64, 32)
+    uneven = dict(it, sections=[{"section": "pallavi", "lines": [line, {"segments": [row[:4] * 3, row[:6], row[:6]]}]}])
+    assert b.build_varnam(uneven, _ADI, _RAGAS) is None and "different lengths" in b.WARNINGS[-1]

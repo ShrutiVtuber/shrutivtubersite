@@ -139,17 +139,6 @@ def with_defaults(settings: dict | None) -> dict:
     return {**DEFAULTS, **(settings or {})}
 
 
-# ── the part limit ──────────────────────────────────────────────────────────
-
-#: Two parts a song for everybody; Swaras supporters have no limit (the
-#: owner's rule: a Swaras supporter gets every gated tool, this included).
-FREE_PARTS = 2
-
-
-def part_limit(supporter: bool) -> int | None:
-    return None if supporter else FREE_PARTS
-
-
 # ── songs ───────────────────────────────────────────────────────────────────
 
 #: Counts per avartanam of every tala the composer offers.

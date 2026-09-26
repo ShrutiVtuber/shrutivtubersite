@@ -35,7 +35,7 @@ const NAMES: Record<string, string> = { kampita: "kampita", "jaru-up": "jaru", "
 const url = new URL(`/carnatic/sheets/${sheet.slug}`, SITE_URL);
 ---
 <SwaraLayout title={`${song.title} · ${raga?.name ?? song.raga} · Swara Studio`} noindex={!sheet.published}
-             description={`${song.title}: a song in ${raga?.name ?? song.raga}, ${tala?.name ?? song.tala} tala, by ${sheet.author}. Swara notation with sahitya, printable.`}>
+             description={`${song.title}: a song in ${raga?.name ?? song.raga}, ${tala?.name ?? song.tala} tala${sheet.author ? `, by ${sheet.author}` : ""}. Swara notation with sahitya, printable.`}>
   <div class="sh-bar sw-noprint" data-sheet data-id={sheet.id} data-song={JSON.stringify(song)} data-scale={raga ? `${raga.arohana} ${raga.avarohana}` : ""}>
     <button type="button" class="sh-btn-p" data-play>{tr("gen.play")}</button>
     <button type="button" class="sh-btn-s" onclick="window.print()">{say("print", "Print")}</button>
@@ -44,15 +44,15 @@ const url = new URL(`/carnatic/sheets/${sheet.slug}`, SITE_URL);
       <>
         <a class="sh-link" href={L(`/carnatic/compose?song=${sheet.id}`)}>Edit</a>
         <button type="button" class="sh-link" data-publish={sheet.published ? "unpublish" : "publish"}>{sheet.published ? "Unpublish" : "Publish"}</button>
-        <span class="sw-note">{sheet.published ? "Only the author sees Edit and Unpublish." : "A published sheet is public at this address, and goes with your account if you delete it."}</span>
+        <span class="sw-note">{sheet.published ? say("authorOnly", "Only the author sees Edit and Unpublish.") : say("publicNote", "A published sheet is public at this address. If you delete your account, you choose whether it stays up, credited to nobody, or goes.")}</span>
       </>
-    ) : <span class="sw-note">Only the author sees Edit and Unpublish.</span>}
+    ) : <span class="sw-note">{say("authorOnly", "Only the author sees Edit and Unpublish.")}</span>}
   </div>
   <article class="sh-paper">
     <header class="sh-head">
       <h1>{song.title}</h1>
       {song.titleScript && <p class="sh-script" lang={song.sahityaScript}>{song.titleScript}</p>}
-      <p class="sh-meta">{(raga?.name ?? song.raga).toUpperCase()} · {(tala?.name ?? song.tala).toUpperCase()} · COMPOSED BY {sheet.author.toUpperCase()}</p>
+      <p class="sh-meta">{(raga?.name ?? song.raga).toUpperCase()} · {(tala?.name ?? song.tala).toUpperCase()} {sheet.author ? ` · ${say("composedBy", "Composed by")} ${sheet.author}`.toUpperCase() : ""}</p>
       {raga && <p class="sh-scale">arohana {phraseText(raga.arohana.replace(/!\w/g, ""), { script, subs: true })} · avarohana {phraseText(raga.avarohana, { script, subs: true })}</p>}
     </header>
     {song.sections.map((s: any) => (

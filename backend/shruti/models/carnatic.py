@@ -10,14 +10,15 @@ built from the private research repository by
 made — settings, progress, practice time, songs, posts — and which of the
 data's script names and flagged facts a reviewer has checked.
 
-⚠ **Everything that is a person's goes with their account.** Every foreign
-key to `site_user` here is ON DELETE CASCADE from the first migration
-(n2l8i5j1k187, `NOBODYS_BUT_THEIRS`), and every table is in the account
-export (`accounts._everything_else`). A published song sheet or a Listen post
-is removed with the account rather than kept anonymised: they are a person's
-own performances and compositions, nobody else's work builds on them, and the
-composer says so where it publishes. (The site's publishing agreement, which
-keeps guides and readings up without a name, is not asked for here.)
+⚠ **When an account is deleted** (the owner's rule of 26 Sep 2026;
+`accounts.erase` → `_carnatic_leave`): what was only theirs goes (settings,
+progress, app sign-in codes: ON DELETE CASCADE, n2l8i5j1k187). What others
+see or count is **kept without a name** (user_id NULL and, where it is shown,
+`author_deleted_at`): Listen posts, comments, likes, reports and the practice
+log (migration p4n0k7l3m309, `KEPT_WITHOUT_A_NAME`). Their **songs** are
+their choice when they delete: anonymised (published sheets stay up,
+credited to nobody; unpublished drafts go) or deleted. Every table is in the
+account export (`accounts._everything_else`).
 
 ⚠ **No streaks.** The practice log counts seconds per day. There is no column
 from which "you missed N days" could be computed cheaply, and none should be
@@ -63,7 +64,7 @@ class CarnaticPracticeDay(TimestampMixin, table=True):
     __table_args__ = (UniqueConstraint("user_id", "day", name="uq_carnatic_practice_day"),)
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    user_id: int = Field(index=True, foreign_key="site_user.id", ondelete="CASCADE")
+    user_id: Optional[int] = Field(default=None, index=True, foreign_key="site_user.id", ondelete="SET NULL")
     day: str                    # YYYY-MM-DD in the person's own zone, as their device said
     seconds: int = 0
     sessions: int = 0
@@ -75,7 +76,7 @@ class CarnaticSong(TimestampMixin, table=True):
     __tablename__ = "carnatic_song"
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    user_id: int = Field(index=True, foreign_key="site_user.id", ondelete="CASCADE")
+    user_id: Optional[int] = Field(default=None, index=True, foreign_key="site_user.id", ondelete="SET NULL")
     slug: str = Field(index=True, unique=True)
     title: str = ""
     raga: str = ""
@@ -83,6 +84,7 @@ class CarnaticSong(TimestampMixin, table=True):
     body: dict = Field(default_factory=dict, sa_column=Column(JSONB, nullable=False))
     published: bool = Field(default=False, index=True)
     published_at: Optional[datetime] = Field(default=None, sa_type=UTC_TS)
+    author_deleted_at: Optional[datetime] = Field(default=None, sa_type=UTC_TS)   # kept, credited to nobody
 
 
 class CarnaticPost(TimestampMixin, table=True):
@@ -91,7 +93,7 @@ class CarnaticPost(TimestampMixin, table=True):
     __tablename__ = "carnatic_post"
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    user_id: int = Field(index=True, foreign_key="site_user.id", ondelete="CASCADE")
+    user_id: Optional[int] = Field(default=None, index=True, foreign_key="site_user.id", ondelete="SET NULL")
     song_id: Optional[int] = Field(default=None, foreign_key="carnatic_song.id", ondelete="SET NULL")
     title: str
     instrument: str = ""
@@ -100,16 +102,23 @@ class CarnaticPost(TimestampMixin, table=True):
     player: str                 # youtube | soundcloud | vimeo | bandcamp
     url: str
     hidden: bool = Field(default=False, index=True)
-    hidden_by: str = ""         # "" | her | author
+    hidden_by: str = ""         # "" | her | author | reports (hidden by 3 reporters, until she reviews it)
+    reviewed_at: Optional[datetime] = Field(default=None, sa_type=UTC_TS)        # she restored it; reports before this are spent
+    author_deleted_at: Optional[datetime] = Field(default=None, sa_type=UTC_TS)  # kept, credited to nobody
 
 
 class CarnaticLike(SQLModel, table=True):
-    """One person liking one post. A like is a row; there is no count to forge."""
+    """
+    One person liking one post. A like is a row; there is no count to forge.
+    A deleted account's like stays counted, with no one behind it.
+    """
 
     __tablename__ = "carnatic_like"
+    __table_args__ = (UniqueConstraint("post_id", "user_id", name="uq_carnatic_like"),)
 
-    post_id: int = Field(primary_key=True, foreign_key="carnatic_post.id", ondelete="CASCADE")
-    user_id: int = Field(primary_key=True, foreign_key="site_user.id", ondelete="CASCADE")
+    id: Optional[int] = Field(default=None, primary_key=True)
+    post_id: int = Field(index=True, foreign_key="carnatic_post.id", ondelete="CASCADE")
+    user_id: Optional[int] = Field(default=None, index=True, foreign_key="site_user.id", ondelete="SET NULL")
     created_at: Optional[datetime] = Field(default=None, sa_type=UTC_TS)
 
 
@@ -120,19 +129,23 @@ class CarnaticComment(TimestampMixin, table=True):
 
     id: Optional[int] = Field(default=None, primary_key=True)
     post_id: int = Field(index=True, foreign_key="carnatic_post.id", ondelete="CASCADE")
-    user_id: int = Field(index=True, foreign_key="site_user.id", ondelete="CASCADE")
+    user_id: Optional[int] = Field(default=None, index=True, foreign_key="site_user.id", ondelete="SET NULL")
     body: str
     hidden: bool = False
+    hidden_by: str = ""         # "" | her | reports
+    reviewed_at: Optional[datetime] = Field(default=None, sa_type=UTC_TS)
+    author_deleted_at: Optional[datetime] = Field(default=None, sa_type=UTC_TS)
 
 
 class CarnaticReport(TimestampMixin, table=True):
     """
     A member flagging a Listen post or comment for the operator to look at.
 
-    One report per person per thing (a second press changes nothing), and a
-    report hides nothing by itself: the review queue's Moderation tab lists
-    reported items first, and hiding is her decision. It is the reporter's
-    row, so it goes with the reporter's account.
+    One report per person per thing (a second press changes nothing). Three
+    reports from different accounts hide the thing until she reviews it
+    (`routes.carnatic.HIDE_AFTER`); she restores it or removes it from the
+    Moderation tab. Who reported is never shown to anyone. A deleted
+    reporter's report stays counted, with no one behind it.
     """
 
     __tablename__ = "carnatic_report"
@@ -142,7 +155,7 @@ class CarnaticReport(TimestampMixin, table=True):
     )
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    user_id: int = Field(index=True, foreign_key="site_user.id", ondelete="CASCADE")
+    user_id: Optional[int] = Field(default=None, index=True, foreign_key="site_user.id", ondelete="SET NULL")
     post_id: Optional[int] = Field(default=None, index=True, foreign_key="carnatic_post.id", ondelete="CASCADE")
     comment_id: Optional[int] = Field(default=None, index=True, foreign_key="carnatic_comment.id", ondelete="CASCADE")
     reason: str = ""

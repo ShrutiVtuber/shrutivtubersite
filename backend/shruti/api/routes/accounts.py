@@ -12,7 +12,8 @@ import copy
 import logging
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import update
@@ -914,7 +915,8 @@ async def _everything_else(user: User, session: AsyncSession) -> dict:
 async def delete_account(
     response: Response, user: User = Depends(require_user),
     session: AsyncSession = Depends(get_session),
-) -> dict:
+    songs: str | None = Query(default=None, description="Swara Studio songs: anonymise | delete"),
+):
     """
     Immediate, irreversible, no grace period — and it reaches the list.
 
@@ -932,13 +934,31 @@ async def delete_account(
     lawful. It is anonymised to the point where it is no longer personal data
     about a living person we can identify — the email is replaced by the
     account id.
+
+    SWARA STUDIO SONGS are the person's choice (the owner's rule of 26 Sep
+    2026): `?songs=anonymise` keeps their published sheets up, credited to
+    nobody, or `?songs=delete` deletes them. Somebody who has songs and has
+    not chosen is answered 409 SONGS_CHOICE_NEEDED with how many, and
+    nothing is deleted: the website's dialog and the app ask, then call again.
     """
-    result = await erase(user, session)
+    from shruti.models.carnatic import CarnaticSong
+
+    if songs not in (None, "anonymise", "delete"):
+        raise HTTPException(422, "songs must be anonymise or delete")
+    if songs is None:
+        mine = (await session.execute(select(CarnaticSong.published).where(CarnaticSong.user_id == user.id))).all()
+        if mine:
+            return JSONResponse(status_code=409, content={
+                "code": "SONGS_CHOICE_NEEDED",
+                "detail": "You have songs in Swara Studio. Keep your published sheets up, credited to nobody, "
+                          "or delete them with your account?",
+                "songs": len(mine), "published": sum(1 for (p,) in mine if p)})
+    result = await erase(user, session, songs=songs or "anonymise")
     response.delete_cookie(SESSION_COOKIE, path="/")
     return result
 
 
-async def erase(user: User, session: AsyncSession) -> dict:
+async def erase(user: User, session: AsyncSession, songs: str = "anonymise") -> dict:
     """
     The deletion itself, shared with the admin's ban.
 
@@ -970,6 +990,7 @@ async def erase(user: User, session: AsyncSession) -> dict:
     names = _public_names(user)
 
     kept = await _anonymise_public(session, uid, names)
+    kept.update(await _carnatic_leave(session, uid, songs))
     await _erase_private(session, uid)
     await session.execute(delete(Nativity).where(Nativity.user_id == uid))
 
@@ -997,13 +1018,56 @@ async def erase(user: User, session: AsyncSession) -> dict:
             "account", "email address", "preferences", "nativity", "saved charts and comparisons",
             "passkeys and devices", "newsletter subscription", "drafts", "runs",
             "builds you had not shared", "votes and reports", "class progress", "ledgers",
-            "Swara Studio settings, progress, practice log, songs, sheets and Listen posts",
+            "Swara Studio settings, progress and app sign-ins",
+            *(["Swara Studio songs and sheets"] if songs == "delete" else ["Swara Studio unpublished songs"]),
         ],
         "kept": [
             "a consent given/withdrawn record with dates and no birth data",
             *(f"{what}: {n}, still public, with your name taken off" for what, n in kept.items() if n),
         ],
     }
+
+
+async def _carnatic_leave(session: AsyncSession, uid: int, songs: str) -> dict:
+    """
+    Swara Studio, when an account is deleted (the owner's rule of 26 Sep 2026).
+
+    KEPT WITHOUT A NAME (user_id NULL; `author_deleted_at` where a name is
+    shown): Listen posts, comments, likes, reports, and the practice log.
+    Other people are listening, replying and counting on them.
+
+    SONGS, as the person chose: `anonymise` keeps each published sheet up,
+    credited to nobody, and deletes the unpublished drafts nobody could reach
+    again; `delete` deletes every song (a Listen post that linked a sheet
+    keeps its link to nothing, ON DELETE SET NULL).
+
+    Settings, progress and app sign-in codes are theirs alone and go by
+    their own ON DELETE CASCADE.
+    """
+    from shruti.models.carnatic import (
+        CarnaticComment, CarnaticLike, CarnaticPost, CarnaticPracticeDay, CarnaticReport, CarnaticSong,
+    )
+
+    gone = datetime.now(timezone.utc)
+    kept = {"Swara Studio sheets": 0, "Listen posts": 0, "Listen comments": 0}
+    if songs == "delete":
+        await session.execute(delete(CarnaticSong).where(CarnaticSong.user_id == uid))
+    else:
+        await session.execute(delete(CarnaticSong).where(CarnaticSong.user_id == uid,
+                                                         CarnaticSong.published.is_(False)))
+        kept["Swara Studio sheets"] = (await session.execute(
+            update(CarnaticSong).where(CarnaticSong.user_id == uid)
+            .values(user_id=None, author_deleted_at=gone))).rowcount or 0
+    kept["Listen posts"] = (await session.execute(
+        update(CarnaticPost).where(CarnaticPost.user_id == uid)
+        .values(user_id=None, author_deleted_at=gone))).rowcount or 0
+    kept["Listen comments"] = (await session.execute(
+        update(CarnaticComment).where(CarnaticComment.user_id == uid)
+        .values(user_id=None, author_deleted_at=gone))).rowcount or 0
+    for table in (CarnaticLike, CarnaticReport, CarnaticPracticeDay):
+        await session.execute(update(table).where(table.user_id == uid).values(user_id=None))
+    await session.flush()
+    return kept
 
 
 def _public_names(user: User) -> set[str]:
