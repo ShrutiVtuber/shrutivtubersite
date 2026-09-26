@@ -1,0 +1,366 @@
+---
+/* /play — the Play hub: every room of the games wing on one page, and the
+ * first step into each (design handoff of 26 September 2026; README.md there
+ * is the spec).
+ *
+ * An almanac's contents page with a first step beside each entry. The rooms
+ * are one list in a fixed, editorial order — what each asks of you: nothing,
+ * then an account, then a machine of your own — never by popularity. Each
+ * carries its own On stream line; the way to the stream is one shared path
+ * further down.
+ *
+ * Every state is decided here, on the server, and the page ships no script:
+ *   · a room whose section is hidden from this visitor is absent (the whole
+ *     page sits in the guides section, so hiding the wing 404s /play in the
+ *     middleware before this renders; Layouts lives at /guides/overlays and
+ *     goes with it — her decision, 26 Sep 2026);
+ *   · signed in, a room the reader has something in adds one quiet link back
+ *     to the most recently touched item: a name, never a count or a date;
+ *   · a game whose data is not loaded says so in words.
+ *
+ * No price, no hosting, no counts, no badges, and no --live.
+ */
+import BaseLayout from "../layouts/BaseLayout.astro";
+import Button from "../components/forms/Button.astro";
+import FitsTogether from "../components/play/FitsTogether.astro";
+import StreamerPath from "../components/play/StreamerPath.astro";
+import { site } from "../lib/api";
+import { copy } from "../lib/copy";
+import { GAME_ORDER, GAME_THEMES, LEDGER_GAME, PLANNER_GAMES, leftOff, wingData, type LeftOff } from "../lib/play";
+
+const say = await copy("play");
+const hidden = (href: string) => Astro.locals.pathHidden?.(href) ?? false;
+const signedIn = Astro.locals.signedIn ?? false;
+
+const live = {
+  guides: !hidden("/guides"),
+  ledger: !hidden("/ledger"),
+  builds: !hidden("/builds"),
+  groups: !hidden("/groups"),
+  layouts: !hidden("/guides/overlays"),
+  self: !hidden("/tracker"),
+};
+
+const [wing, left, discord] = await Promise.all([
+  wingData(),
+  signedIn ? leftOff(Astro, live) : Promise.resolve({} as Record<string, LeftOff>),
+  site<{ invite?: string | null }>("/api/community/discord"),
+]);
+
+/* ── the rooms ───────────────────────────────────────────────────────────── */
+
+const packOf = (id: string) => wing.packs.find((p) => p.id === id && p.planner) ?? null;
+const plannerName = (g: { id: string; name: string }) => packOf(g.id)?.name || g.name;
+const ledgerName = wing.ledgerName || LEDGER_GAME.name;
+const guideNames = wing.guideGames.map((g) => g.name);
+const anyGame = say("room.any_game", "Any game");
+
+/* The phone app is not in a store yet. When it is, this one string becomes the
+   store's address and the room gets its button; until then it says so. */
+const STORE = say("room.phone.store", "", "Phone app store link (empty until the app is listed)").trim();
+
+interface Room {
+  id: string; name: string; path: string; what: string; needs: string; games: string;
+  stream?: string; step: string; href?: string; soon?: string; left?: LeftOff;
+}
+const ROOMS: (Room | false)[] = [
+  live.guides && {
+    id: "guides", name: say("room.guides.name", "Guides"), path: "/guides", href: "/guides",
+    what: say("room.guides.what", "A game guide as a path: phases, steps, routines and a codex. You keep your place on it from the website, the phone and the stream. Anyone can write one."),
+    needs: say("room.guides.needs", "No account to read. An account to track a run or write a guide."),
+    games: guideNames.length
+      ? say("room.guides.games", "{games}, and any game a guide is written for").replace("{games}", guideNames.join(" · "))
+      : say("room.guides.games_none", "Any game a guide is written for"),
+    stream: say("room.guides.stream", "The Now card, the path, the routine and the sigil."),
+    step: say("room.guides.step", "Read a guide"),
+  },
+  live.ledger && {
+    id: "ledger", name: say("room.ledger.name", "Ledger"), path: "/ledger", href: "/ledger/plan",
+    what: say("room.ledger.what", "Plan a Big Ambitions business before spending a dollar, see what holds it back, and keep every week it makes beside its plan."),
+    needs: say("room.ledger.needs", "No account to plan. An account to keep a ledger."),
+    games: ledgerName,
+    stream: say("room.ledger.stream", "The plate, the business card, the strip, the limit line, the week counter, and the plan as you change it."),
+    step: say("room.ledger.step", "Plan a business"),
+  },
+  live.builds && {
+    id: "builds", name: say("room.builds.name", "Builds and planners"), path: "/builds", href: "/builds/plan",
+    what: say("room.builds.what", "A build is a set of goals for one character: met, partly met or not yet. The planners make one from the game's own data (class, skills, gear, boards and trees) and add up the numbers."),
+    needs: say("room.builds.needs", "An account"),
+    games: PLANNER_GAMES.map(plannerName).join(" · "),
+    stream: say("room.builds.stream", "The build plate and the plan sheet."),
+    step: say("room.builds.step", "Plan a build"),
+  },
+  live.groups && {
+    id: "groups", name: say("room.groups.name", "Groups"), path: "/groups", href: "/groups#join",
+    what: say("room.groups.what", "A shared goal and nothing else. Join with a six-letter code, give a number, and watch the tiers fill. Nobody is ranked."),
+    needs: say("room.groups.needs", "An account"),
+    games: anyGame,
+    stream: say("room.groups.stream", "The goal."),
+    step: say("room.groups.step", "Join a group with its code"),
+  },
+  live.layouts && {
+    id: "layouts", name: say("room.layouts.name", "Layouts"), path: "/guides/overlays", href: "/guides/overlays",
+    what: say("room.layouts.what", "Overlay layouts to start from: where the elements sit on stream. A theme (Grimoire, Almanac, Plain or Ledger) is what they wear."),
+    needs: say("room.layouts.needs", "No account to look. An account to use one."),
+    games: anyGame,
+    stream: say("room.layouts.stream", "Every overlay above starts from one."),
+    step: say("room.layouts.step", "Pick a layout"),
+  },
+  {
+    id: "phone", name: say("room.phone.name", "The phone app"), path: "",
+    what: say("room.phone.what", "Squirrel Guides on the phone: tick a step or a goal mid-game, and the stream follows within two seconds."),
+    needs: say("room.phone.needs", "An account"),
+    games: anyGame,
+    stream: say("room.phone.stream", "Moves whatever is on stream."),
+    step: say("room.phone.step", "Get the app"),
+    href: STORE || undefined,
+    soon: say("room.phone.soon", "Not in the app stores yet. It will be, and this is where it will say so."),
+  },
+  live.self && {
+    id: "self", name: say("room.self.name", "Run it yourself"), path: "/tracker", href: "/tracker",
+    what: say("room.self.what", "The whole tracking server is AGPL. Run it on your own machine and point the site and the phone at it."),
+    needs: say("room.self.needs", "A computer that runs Docker"),
+    games: anyGame,
+    step: say("room.self.step", "Run it yourself"),
+  },
+];
+const rooms: Room[] = ROOMS.filter((r): r is Room => !!r).map((r) => ({ ...r, left: left[r.id] }));
+
+/* ── by game ─────────────────────────────────────────────────────────────── */
+
+type Row =
+  | { kind: "link"; label: string; href: string }
+  | { kind: "text"; label: string; value: string }
+  | { kind: "missing"; label: string };
+interface Game { slug: string; name: string; rows: Row[]; notes: string[]; nothing: boolean }
+
+const THEME_WORD: Record<string, string> = {
+  grimoire: say("theme.grimoire", "Grimoire"),
+  ledger: say("theme.ledger", "Ledger"),
+};
+const L = {
+  guide: say("index.guide", "Guide"),
+  planner: say("index.planner", "Build planner"),
+  buildTheme: say("index.build_theme", "Build theme"),
+  ledger: say("index.ledger", "The Ledger"),
+  ledgerTheme: say("index.ledger_theme", "Ledger theme"),
+};
+const NOT_LOADED = say("index.not_loaded", "data not loaded yet");
+const PLANNER_NOTE = say("index.planner_note", "The planner opens when the game's data is loaded. Builds you already made are kept.");
+const LEDGER_NOTE = say("index.ledger_note", "The planner opens when the game's data is loaded. Ledgers you already keep are kept.");
+
+const games = new Map<string, Game>();
+const game = (slug: string, name: string) => {
+  if (!games.has(slug)) games.set(slug, { slug, name, rows: [], notes: [], nothing: false });
+  return games.get(slug)!;
+};
+/* Guides first in each game's rows, as the rooms are ordered. */
+const guided = new Set(live.guides ? wing.guideGames.map((g) => g.slug) : []);
+if (live.guides) for (const g of wing.guideGames) game(g.slug, g.name).rows.push({ kind: "link", label: L.guide, href: `/guides/${g.slug}` });
+if (live.ledger) {
+  const g = game(LEDGER_GAME.id, ledgerName);
+  g.rows.push(wing.ledgerLoaded ? { kind: "link", label: L.ledger, href: "/ledger" } : { kind: "missing", label: L.ledger });
+  if (!wing.ledgerLoaded) g.notes.push(LEDGER_NOTE);
+}
+if (live.builds) {
+  for (const p of PLANNER_GAMES) {
+    const loaded = !!packOf(p.id);
+    const g = game(p.id, plannerName(p));
+    g.rows.push(loaded ? { kind: "link", label: L.planner, href: `/builds/plan?game=${p.id}` } : { kind: "missing", label: L.planner });
+    if (!loaded) g.notes.push(PLANNER_NOTE);
+  }
+}
+/* A theme is named under the room it belongs to, and only while that room is here. */
+for (const [slug, t] of Object.entries(GAME_THEMES)) {
+  const g = games.get(slug);
+  if (!g || !live[t.room]) continue;
+  g.rows.push({ kind: "text", label: t.room === "ledger" ? L.ledgerTheme : L.buildTheme, value: THEME_WORD[t.theme] });
+}
+/* "No guide for this game yet" only while Guides is on the page to write one in. */
+for (const g of games.values()) g.nothing = live.guides && !guided.has(g.slug);
+const rank = (slug: string) => { const i = GAME_ORDER.indexOf(slug); return i === -1 ? GAME_ORDER.length : i; };
+const index = [...games.values()]
+  .filter((g) => g.rows.length > 0)
+  .sort((a, b) => rank(a.slug) - rank(b.slug) || a.name.localeCompare(b.name));
+const anyLine = live.groups && live.layouts
+  ? say("index.any", "Groups, layouts, the phone app and running it yourself work with any game.")
+  : say("index.any_short", "The phone app and running it yourself work with any game.");
+
+const invite = typeof discord?.invite === "string" && discord.invite.trim() ? discord.invite.trim() : "";
+---
+
+<BaseLayout
+  title={say("meta.title", "Play — Squirrel Guides")}
+  description={say("meta.description", "Guides, build planners and a ledger for the games Shruti plays: what each room is, what it needs, and the first step into it.")}
+>
+  <div class="page gd-full ph">
+    <header class="ph-head" aria-labelledby="ph-title">
+      <span class="gd-eyebrow">{say("head.eyebrow", "The games wing")}</span>
+      <h1 id="ph-title" class="ph-title">{say("head.title", "Guides, planners and a ledger for the games I play.")}</h1>
+      <p class="ph-lede">{say("head.lede", "Squirrel Guides keeps your place in a game: on the website, on your phone and on stream. Every room reads with no account; an account is free, has no limits, and is only what keeping things needs.")}</p>
+    </header>
+
+    <section class="ph-sec" aria-labelledby="ph-rooms">
+      <div class="ph-sec-head ph-sec-head-split">
+        <div class="ph-sec-title">
+          <span class="gd-eyebrow">{say("rooms.eyebrow", "Contents")}</span>
+          <h2 id="ph-rooms">{say("rooms.title", "The rooms")}</h2>
+        </div>
+        <p class="ph-order">{say("rooms.order", "In the order of what they ask of you: nothing, then an account, then a machine of your own.")}</p>
+      </div>
+      <ol class="ph-rooms">
+        {rooms.map((r) => (
+          <li class="ph-room" data-room={r.id}>
+            <div class="ph-room-name">
+              <h3>{r.name}</h3>
+              {r.path && <p class="gd-mono ph-path">{r.path}</p>}
+            </div>
+            <div class="ph-room-body">
+              <p class="ph-what">{r.what}</p>
+              <dl class="ph-facts">
+                <dt>{say("row.needs", "Needs")}</dt><dd>{r.needs}</dd>
+                <dt>{say("row.games", "Games")}</dt><dd>{r.games}</dd>
+                {r.stream && <><dt>{say("row.stream", "On stream")}</dt><dd>{r.stream}</dd></>}
+              </dl>
+            </div>
+            <div class="ph-room-step">
+              {r.href
+                ? <Button variant="secondary" size="md" href={r.href}>{r.step}</Button>
+                : <p class="ph-soon">{r.soon}</p>}
+              {r.left && (
+                <div class="ph-left">
+                  <span class="ph-left-label">{say("row.left", "Where you left off")}</span>
+                  <a href={r.left.href}>{r.left.name}</a>
+                </div>
+              )}
+            </div>
+          </li>
+        ))}
+      </ol>
+    </section>
+
+    {index.length > 0 && (
+      <section class="ph-sec" aria-labelledby="ph-games">
+        <div class="ph-sec-head">
+          <div class="ph-sec-title">
+            <span class="gd-eyebrow">{say("index.eyebrow", "Index")}</span>
+            <h2 id="ph-games">{say("index.title", "By game")}</h2>
+          </div>
+        </div>
+        <div class="ph-games">
+          {index.map((g) => (
+            <div class="ph-game">
+              <h3>{g.name}</h3>
+              <ul class="gd-index ph-index">
+                {g.rows.map((row) => (
+                  <li>
+                    <span class="ph-label">{row.label}</span>
+                    <span class="gd-lead" aria-hidden="true"></span>
+                    {row.kind === "link" && <a class="ph-val gd-mono" href={row.href}>{row.href}</a>}
+                    {row.kind === "text" && <span class="ph-val gd-soft">{row.value}</span>}
+                    {row.kind === "missing" && <span class="ph-val ph-missing">{NOT_LOADED}</span>}
+                  </li>
+                ))}
+              </ul>
+              {g.notes.map((n) => <p class="ph-note">{n}</p>)}
+              {g.nothing && <p class="ph-nothing">{say("index.nothing", "No guide for this game yet. A game arrives with its first one.")}</p>}
+            </div>
+          ))}
+        </div>
+        <p class="ph-any">{anyLine}</p>
+        <p class="ph-affiliation">{say("index.affiliation", "Squirrel Guides is not affiliated with or endorsed by the makers of these games. Game names are used only to say what a page is for.")}</p>
+      </section>
+    )}
+
+    <section class="ph-sec" aria-labelledby="ph-fits">
+      <div class="ph-sec-head">
+        <div class="ph-sec-title">
+          <span class="gd-eyebrow">{say("fits.eyebrow", "How it fits together")}</span>
+          <h2 id="ph-fits">{say("fits.title", "One account, three places")}</h2>
+        </div>
+      </div>
+      <FitsTogether />
+    </section>
+
+    <section class="ph-sec" aria-labelledby="ph-stream">
+      <div class="ph-sec-head">
+        <div class="ph-sec-title">
+          <span class="gd-eyebrow">{say("stream.eyebrow", "For streamers")}</span>
+          <h2 id="ph-stream">{say("stream.title", "From nothing to an overlay on stream")}</h2>
+        </div>
+        <p class="ph-sec-lede">{say("stream.lede", "Every room above can reach the stream. Each one says what it shows on its On stream line; the way there is the same for all of them.")}</p>
+      </div>
+      <StreamerPath />
+    </section>
+
+    <section class="ph-sec ph-ask" aria-labelledby="ph-ask">
+      <h2 id="ph-ask" class="gd-eyebrow">{say("ask.title", "Where to ask")}</h2>
+      <ul class="ph-ask-list">
+        {invite && (
+          <li><a href={invite} rel="noopener" target="_blank">{say("ask.discord", "Join the Discord")}</a><span class="ph-sep" aria-hidden="true">·</span><span class="gd-soft">{say("ask.discord_line", "Where things get talked about between streams.")}</span></li>
+        )}
+        <li><a href="/contact">{say("ask.contact", "Contact")}</a><span class="ph-sep" aria-hidden="true">·</span><span class="gd-soft">{say("ask.contact_line", "Fan works, questions, edge cases, hellos.")}</span></li>
+      </ul>
+    </section>
+  </div>
+</BaseLayout>
+
+<style>
+  .ph { container-type: inline-size; font-family: var(--font-body); font-variant-numeric: tabular-nums; color: var(--ink); }
+  .ph a:not(.sh-btn) { color: var(--accent); text-decoration: none; }
+  .ph a:not(.sh-btn):hover { color: var(--accent-hover); text-decoration: underline; text-underline-offset: 3px; }
+
+  /* Head: 56px above (the main's 32 plus 24), 40 below; no sky panel. */
+  .ph-head { display: grid; gap: 16px; padding: 24px 0 40px; border-bottom: 1px solid var(--line); }
+  .ph-title { margin: 0; max-width: 18ch; font-family: var(--font-display); font-weight: 500; font-size: clamp(34px, 4.4cqi, 50px); line-height: 1.08; letter-spacing: -0.01em; text-wrap: balance; }
+  .ph-lede { margin: 0; max-width: 60ch; font-family: var(--font-display); font-size: 19px; line-height: 1.6; color: var(--ink-soft); text-wrap: pretty; }
+
+  /* Sections, each closed by a 1px rule. */
+  .ph-sec { padding: 48px 0; border-bottom: 1px solid var(--line); min-width: 0; }
+  .ph-sec-head { display: grid; gap: 8px; margin-bottom: 28px; }
+  .ph-sec-head-split { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 8px 24px; margin-bottom: 24px; }
+  .ph-sec-title { display: grid; gap: 10px; }
+  .ph-sec h2 { margin: 0; font-family: var(--font-display); font-size: 28px; font-weight: 600; line-height: 1.2; color: var(--ink); }
+  .ph-order { margin: 0; max-width: 44ch; font-size: 14px; color: var(--ink-faint); }
+  .ph-sec-lede { margin: 0; max-width: 62ch; font-size: 16px; line-height: 1.55; color: var(--ink-soft); text-wrap: pretty; }
+
+  /* The rooms: name 200 · body 340 (×3 grow) · step 200, wrapping to one column. */
+  .ph-rooms { margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--line); }
+  .ph-room { display: flex; flex-wrap: wrap; gap: 12px 32px; padding: 24px 0; border-bottom: 1px solid var(--line); }
+  .ph-room:last-child { border-bottom: 0; padding-bottom: 0; }
+  .ph-room-name { flex: 1 1 200px; min-width: 0; }
+  .ph-room-name h3 { margin: 0 0 4px; font-family: var(--font-display); font-size: 22px; font-weight: 600; line-height: 1.2; }
+  .ph-path { margin: 0; color: var(--ink-faint); overflow-wrap: anywhere; }
+  .ph-room-body { flex: 3 1 340px; min-width: 0; display: grid; gap: 12px; align-content: start; }
+  .ph-what { margin: 0; max-width: 62ch; font-size: 16px; line-height: 1.55; text-wrap: pretty; }
+  .ph-facts { margin: 0; display: grid; grid-template-columns: minmax(5em, auto) minmax(0, 1fr); gap: 4px 16px; font-size: 14px; line-height: 1.5; }
+  .ph-facts dt { color: var(--ink-faint); }
+  .ph-facts dd { margin: 0; color: var(--ink-soft); }
+  .ph-room-step { flex: 1 1 200px; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 14px; }
+  .ph-room-step :global(.sh-btn) { white-space: normal; text-align: left; line-height: 1.25; }
+  .ph-soon { margin: 0; font-size: 14px; line-height: 1.5; color: var(--ink-soft); max-width: 32ch; }
+  .ph-left { display: grid; gap: 4px; font-size: 14px; min-width: 0; overflow-wrap: anywhere; }
+  .ph-left-label { font-size: 12px; color: var(--ink-faint); }
+
+  /* By game: the almanac index, two columns at 1280 and one on the phone. */
+  .ph-games { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 440px), 1fr)); gap: 0 48px; }
+  .ph-game { padding: 20px 0 24px; border-top: 1px solid var(--line); min-width: 0; }
+  .ph-game h3 { margin: 0 0 8px; font-family: var(--font-display); font-size: 20px; font-weight: 600; line-height: 1.2; }
+  .ph-index > li { flex-wrap: wrap; font-size: 15px; padding: 8px 0; }
+  .ph-index > li:last-child { border-bottom: 0; }
+  .ph-label { color: var(--ink); }
+  .ph-val { margin-left: auto; min-width: 0; text-align: right; overflow-wrap: anywhere; }
+  .ph-val.gd-mono { font-size: 13px; }
+  .ph-missing { color: var(--ink-faint); font-style: italic; }
+  .ph-note { margin: 12px 0 0; max-width: 52ch; font-size: 14px; line-height: 1.5; color: var(--ink-soft); }
+  .ph-nothing { margin: 12px 0 0; font-family: var(--font-display); font-size: 16px; font-style: italic; color: var(--ink-faint); }
+  .ph-any { margin: 16px 0 0; font-size: 14px; color: var(--ink-soft); }
+  .ph-affiliation { margin: 8px 0 0; max-width: 80ch; font-size: 12px; line-height: 1.5; color: var(--ink-faint); }
+
+  /* Where to ask: two lines, and the page's last section has no closing rule. */
+  .ph-ask { padding: 40px 0 0; border-bottom: 0; display: grid; gap: 16px; }
+  .ph-ask h2.gd-eyebrow { font: 600 12px/1 var(--font-body); letter-spacing: .14em; text-transform: uppercase; color: var(--ink-faint); }
+  .ph-ask-list { margin: 0; padding: 0; list-style: none; display: grid; gap: 10px; font-size: 16px; }
+  .ph-ask-list li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; }
+  .ph-sep { color: var(--ink-faint); }
+</style>

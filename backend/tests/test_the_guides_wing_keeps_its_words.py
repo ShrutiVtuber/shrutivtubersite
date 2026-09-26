@@ -23,6 +23,8 @@ WING = [
     *sorted((SRC / "pages" / "builds").rglob("*.astro")),
     *sorted((SRC / "pages" / "groups").rglob("*.astro")),
     SRC / "pages" / "tracker.astro",
+    SRC / "pages" / "play.astro",
+    *sorted((SRC / "components" / "play").rglob("*.astro")),
     *sorted((SRC / "components" / "guides").rglob("*.astro")),
     SRC / "components" / "chrome" / "GuidesNav.astro",
     SRC / "styles" / "guides-section.css",

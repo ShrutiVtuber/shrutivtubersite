@@ -185,6 +185,10 @@ html.menu-open, html.menu-open body { overflow: hidden; }
 .site-menu-eyebrow { font: 600 var(--text-xs)/1 var(--font-body); letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-faint); padding: 10px 2px 8px; }
 .site-menu a { display: block; padding: 10px 2px; min-height: 44px; box-sizing: border-box; font: 500 var(--text-body)/1.2 var(--font-body); color: var(--ink); text-decoration: none; border-bottom: var(--border-w) solid var(--line); }
 .site-menu-group a:last-child { border-bottom: 0; }
+/* A group heading that opens the group's overview (the Play hub): still an
+   eyebrow, with the link's hover. */
+.site-menu a.site-menu-heading { display: block; min-height: 0; padding: 10px 2px 8px; font: 600 var(--text-xs)/1 var(--font-body); letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-faint); border-bottom: 0; }
+.site-menu a.site-menu-heading:hover { color: var(--accent); }
 .site-menu a:hover { color: var(--accent); }
 .site-menu a[aria-current="page"] { color: var(--accent); }
 .site-menu-rule { display: none; }

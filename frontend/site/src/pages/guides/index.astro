@@ -157,6 +157,13 @@ const WING = [
         <section id="how" class="gd-section" aria-labelledby="wing">
           <div class="gd-section-title gd-section-line"><span class="gd-eyebrow">{say("wing", "Also in this wing")}</span><h2 id="wing" class="gd-h3">{say("wing.title", "Four more rooms, one vocabulary")}</h2></div>
           <ul class="gd-wing">
+            {/* The whole wing on one page (the Play hub). First, and hidden with the wing. */}
+            {!(Astro.locals.pathHidden?.("/play") ?? false) && (
+              <li>
+                <Sigil n={7} done={0} size={44} ring={false} showCount={false} aria={say("wing.all_aria", "Every room of the wing")} />
+                <div class="gd-wing-text"><a href="/play">{say("wing.all", "All of it, on one page")}</a><span class="gd-mono gd-soft"><span aria-hidden="true">→</span> {say("wing.all_path", "/play")}</span></div>
+              </li>
+            )}
             {WING.map((r) => (
               <li>
                 <Sigil n={r.n} done={r.done} size={44} ring={false} showCount={false} aria={r.name} />

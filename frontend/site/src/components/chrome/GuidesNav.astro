@@ -1,21 +1,30 @@
 ---
 /* Squirrel Guides' own chrome: the lockup strip under the site header on every
  * page of the section (README §4.1). The mark is the 28px ring sigil with four
- * empty arcs and the north lit; the name is type, not a logo; then the six
- * places as tabs. On the phone it is two rows and never hides its name. */
+ * empty arcs and the north lit; the name is type, not a logo; then the places
+ * as tabs. On the phone it is two rows and never hides its name.
+ *
+ * Since the Play hub (26 Sep 2026): the lockup opens /play, and Play is the
+ * first tab — the same word as the site menu's group, so the same word opens
+ * the same door. A tab whose room is hidden from this visitor is not drawn,
+ * and neither is a link to a hidden /play (the strip also sits on /tracker,
+ * which stays outside the gate). */
 import { copy } from "../../lib/copy";
 import { sigil } from "../../lib/guides-sigil";
 
 const say = await copy("component:GuidesNav");
 const here = Astro.url.pathname;
-const ITEMS: [string, string][] = [
+const hidden = (href: string) => Astro.locals.pathHidden?.(href) ?? false;
+const ITEMS: [string, string][] = ([
+  ["/play", say("play", "Play")],
   ["/guides", say("guides", "Guides")],
   ["/builds", say("builds", "Builds")],
   ["/groups", say("groups", "Groups")],
   ["/guides/overlays", say("layouts", "Layouts")],
   ["/ledger", say("ledger", "Ledger")],
   ["/guides/write", say("desk", "Create a guide")],
-];
+] as [string, string][]).filter(([href]) => !hidden(href));
+const hubLive = !hidden("/play");
 const current = (href: string) => {
   if (href === "/guides") return here === "/guides" || (here.startsWith("/guides/") && !here.startsWith("/guides/overlays") && !here.startsWith("/guides/write"));
   return here === href || here.startsWith(href + "/");
@@ -24,14 +33,23 @@ const current = (href: string) => {
 
 <div class="gd-strip">
   <div class="page gd-strip-row">
-    <a class="gd-lockup" href="/guides" aria-label={say("lockup.aria", "Squirrel Guides — the front door")}>
-      <Fragment set:html={sigil({ n: 4, done: 0, now: -1, size: 28, ring: true, showCount: false, animate: false, aria: say("mark.aria", "Squirrel Guides mark") })} />
-      <span class="gd-lockup-name">{say("eyebrow", "Squirrel Guides")}</span>
-    </a>
-    <span class="gd-strip-divider" aria-hidden="true"></span>
-    <nav class="gd-strip-nav" aria-label={say("nav.aria", "Squirrel Guides")}>
-      {ITEMS.map(([href, name]) => <a class="gd-tab" href={href} aria-current={current(href) ? "page" : undefined}>{name}</a>)}
-    </nav>
+    {hubLive ? (
+      <a class="gd-lockup" href="/play" aria-label={say("lockup.aria", "Squirrel Guides — the front door")}>
+        <Fragment set:html={sigil({ n: 4, done: 0, now: -1, size: 28, ring: true, showCount: false, animate: false, aria: say("mark.aria", "Squirrel Guides mark") })} />
+        <span class="gd-lockup-name">{say("eyebrow", "Squirrel Guides")}</span>
+      </a>
+    ) : (
+      <span class="gd-lockup">
+        <Fragment set:html={sigil({ n: 4, done: 0, now: -1, size: 28, ring: true, showCount: false, animate: false, aria: say("mark.aria", "Squirrel Guides mark") })} />
+        <span class="gd-lockup-name">{say("eyebrow", "Squirrel Guides")}</span>
+      </span>
+    )}
+    {ITEMS.length > 0 && <span class="gd-strip-divider" aria-hidden="true"></span>}
+    {ITEMS.length > 0 && (
+      <nav class="gd-strip-nav" aria-label={say("nav.aria", "Squirrel Guides")}>
+        {ITEMS.map(([href, name]) => <a class="gd-tab" href={href} aria-current={current(href) ? "page" : undefined}>{name}</a>)}
+      </nav>
+    )}
   </div>
 </div>
 

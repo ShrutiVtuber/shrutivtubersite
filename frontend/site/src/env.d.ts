@@ -10,6 +10,8 @@ declare namespace App {
     previewingSection?: string;
     /** Which sections visitors may reach; the nav drops the rest. */
     sectionsLive?: Record<string, boolean>;
+    /** Whether an address sits in a section hidden from this visitor. */
+    pathHidden?: (path: string) => boolean;
     signedIn?: boolean;
   }
 }

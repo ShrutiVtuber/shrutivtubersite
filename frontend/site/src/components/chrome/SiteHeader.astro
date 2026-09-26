@@ -45,6 +45,9 @@ const NAV: [string, string][] = [
   ["/", "Home"],
   ["/today", "Today"],
   ["/guides", "Guides"],
+  /* The Play hub. Named from the menu as its group's "Overview" (the label
+     below is overridden there by an editable string). */
+  ["/play", "Play"],
   ["/tools", "Instruments"],
   ["/horoscopes", "Horoscopes"],
   ["/journal", "Journal"],
@@ -62,16 +65,21 @@ const NAV: [string, string][] = [
   ["/contact", "Contact"],
 ];
 const BAR = ["/today", "/guides", "/tools", "/horoscopes", "/journal", "/schedule"];
+/* A group whose first page is its own overview gets a heading that links to
+   it: the Play group's heading opens /play, and /play is also its first item,
+   "Overview", so the door is there for somebody who does not click headings. */
 const GROUPS: [string, string[]][] = [
   [say("group.watch", "Watch"), ["/schedule", "/videos"]],
-  [say("group.play", "Play"), ["/guides", "/builds", "/groups", "/ledger"]],
+  [say("group.play", "Play"), ["/play", "/guides", "/builds", "/groups", "/ledger"]],
   [say("group.practice", "Practice"), ["/tools", "/horoscopes", "/classes"]],
   [say("group.read", "Read"), ["/today", "/journal", "/newsletter"]],
   [say("group.her", "Shruti"), ["/about", "/work", "/shop", "/support", "/contact"]],
 ];
+const OVERVIEWS: Record<string, string> = { "/play": say("group.play.overview", "Overview") };
 const label = (href: string) => NAV.find(([h]) => h === href)?.[1] ?? href;
-/* /builds, /groups and /ledger belong to the guides section: hidden with it. */
-const visibleNav = (href: string) => visible(href === "/builds" || href === "/groups" || href === "/ledger" ? "/guides" : href);
+const itemLabel = (href: string) => OVERVIEWS[href] ?? label(href);
+/* /play, /builds, /groups and /ledger belong to the guides section: hidden with it. */
+const visibleNav = (href: string) => visible(["/play", "/builds", "/groups", "/ledger"].includes(href) ? "/guides" : href);
 const current = (href: string) => (href === "/" ? here === "/" : here.startsWith(href));
 ---
 
@@ -123,11 +131,14 @@ const current = (href: string) => (href === "/" ? here === "/" : here.startsWith
       {
         GROUPS.map(([name, hrefs]) => {
           const shown = hrefs.filter(visibleNav);
+          const overview = OVERVIEWS[shown[0]] ? shown[0] : null;
           return shown.length ? (
             <div class="site-menu-group">
-              <span class="site-menu-eyebrow">{name}</span>
+              {overview
+                ? <a class="site-menu-eyebrow site-menu-heading" href={overview}>{name}</a>
+                : <span class="site-menu-eyebrow">{name}</span>}
               {shown.map((href) => (
-                <a href={href} aria-current={current(href) ? "page" : undefined}>{label(href)}</a>
+                <a href={href} aria-current={current(href) ? "page" : undefined}>{itemLabel(href)}</a>
               ))}
             </div>
           ) : null;

@@ -210,12 +210,12 @@ const homeLd = isHome
         white. Inlined on purpose — it cannot wait for a module to load. */}
     <script is:inline src="/first-paint.js"></script>
   </head>
-  <body data-wing={/^\/(guides|builds|groups|tracker|ledger)(\/|$)/.test(Astro.url.pathname) ? "guides" : undefined}>
+  <body data-wing={/^\/(guides|builds|groups|tracker|ledger|play)(\/|$)/.test(Astro.url.pathname) ? "guides" : undefined}>
     <a href="#main" class="skip-link">{say("text.2", "Skip to content")}</a>
     {/* Only when the operator is past the gate — see the component. */}
     {Astro.locals.bypassingHolding && <HoldingNotice />}
     <SiteHeader live={badge} signedIn={Astro.locals.signedIn ?? false} />
-    {/^\/(guides|builds|groups|tracker|ledger)(\/|$)/.test(Astro.url.pathname) && <GuidesNav />}
+    {/^\/(guides|builds|groups|tracker|ledger|play)(\/|$)/.test(Astro.url.pathname) && <GuidesNav />}
     {bare ? <slot /> : <main id="main" class="site-main"><slot /></main>}
     <SiteFooter socials={socials} />
     <CookieNotice />

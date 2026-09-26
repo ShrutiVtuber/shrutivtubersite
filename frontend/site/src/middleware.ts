@@ -95,6 +95,8 @@ const SECTION_PATHS: Record<string, string> = {
   "/groups": "guides",
   "/builds": "guides",
   "/ledger": "guides",
+  /* The Play hub is the wing's front door, and goes when the wing goes. */
+  "/play": "guides",
 };
 
 function sectionOf(path: string): string | null {
@@ -179,6 +181,14 @@ export const onRequest = defineMiddleware(async (context, next) => {
        They read what the gate decided rather than asking again — two sources
        for one answer is how a nav ends up pointing at a 404. */
     context.locals.sectionsLive = state.sections;
+    /* The same answer per address, for chrome that links into a section by
+       path (the Squirrel Guides strip, the Play hub's rooms). Hidden unless
+       she is the one previewing that section — read at call time, because
+       previewingSection is decided below. */
+    context.locals.pathHidden = (p: string) => {
+      const name = sectionOf(p);
+      return !!name && state.sections[name] === false && context.locals.previewingSection !== name;
+    };
     // Signed in, for the header's one link. Asked only when a reader cookie is
     // present — a stranger costs nothing — and asked rather than assumed, so a
     // stale cookie never shows "Account" to somebody who is not.

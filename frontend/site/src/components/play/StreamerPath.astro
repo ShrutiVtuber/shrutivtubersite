@@ -1,0 +1,54 @@
+---
+/* The streamer path (Play hub, README "Page structure"): the one way from
+ * nothing to an overlay on stream, the same for every room. Five steps in a
+ * grid of minmax(min(100%, 180px), 1fr) — five across at 1280, stacked at
+ * 390 — each under a 1px --line-strong rule with a mono number, a 15/600
+ * title and a 14px body; then three notes as a definition list. */
+import { copy } from "../../lib/copy";
+
+const say = await copy("component:PlayStreamerPath");
+const STEPS = [
+  { n: "01", title: say("step1.title", "Sign in"), body: say("step1.body", "The account that keeps your runs also mints your overlays.") },
+  { n: "02", title: say("step2.title", "Pick a room"), body: say("step2.body", "A guide, a build, a group or a ledger.") },
+  { n: "03", title: say("step3.title", "Open On stream"), body: say("step3.body", "Choose what shows and the theme it wears.") },
+  { n: "04", title: say("step4.title", "Mint the address"), body: say("step4.body", "It is secret and shown once. Copy it before you close the page.") },
+  { n: "05", title: say("step5.title", "Paste into OBS"), body: say("step5.body", "As a browser source at {size}.") },
+];
+const SIZE = say("step5.size", "1920 × 1080");
+/* "{size}" is set in mono: split the sentence around it rather than build it. */
+const parts = (body: string) => body.split("{size}");
+const NOTES = [
+  { term: say("note.themes", "Themes"), text: say("note.themes_body", "Grimoire · Almanac · Plain · Ledger") },
+  { term: say("note.address", "The address"), text: say("note.address_body", "Shown once. If it leaks, mint a new one and the old one stops working.") },
+  { term: say("note.phone", "The phone"), text: say("note.phone_body", "Tick a step on the phone and the stream follows within two seconds.") },
+];
+---
+<div class="sp">
+  <ol class="sp-steps">
+    {STEPS.map((s) => (
+      <li>
+        <span class="sp-n">{s.n}</span>
+        <p class="sp-title">{s.title}</p>
+        <p class="sp-body">
+          {parts(s.body).map((piece, i) => (i === 0 ? piece : <><span class="sp-mono">{SIZE}</span>{piece}</>))}
+        </p>
+      </li>
+    ))}
+  </ol>
+  <dl class="sp-notes">
+    {NOTES.map((n) => (<><dt>{n.term}</dt><dd>{n.text}</dd></>))}
+  </dl>
+</div>
+
+<style>
+  .sp { display: grid; gap: 28px; }
+  .sp-steps { margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr)); gap: 20px 24px; }
+  .sp-steps li { min-width: 0; border-top: 1px solid var(--line-strong); padding-top: 12px; }
+  .sp-n { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 13px; color: var(--ink-faint); }
+  .sp-title { margin: 6px 0 4px; font-size: 15px; font-weight: 600; color: var(--ink); }
+  .sp-body { margin: 0; font-size: 14px; line-height: 1.5; color: var(--ink-soft); text-wrap: pretty; }
+  .sp-mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 13px; white-space: nowrap; }
+  .sp-notes { margin: 0; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px 20px; max-width: 720px; font-size: 14px; line-height: 1.5; }
+  .sp-notes dt { color: var(--ink-faint); }
+  .sp-notes dd { margin: 0; color: var(--ink-soft); }
+</style>

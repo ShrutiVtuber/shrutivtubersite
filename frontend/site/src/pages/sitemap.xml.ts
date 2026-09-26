@@ -45,6 +45,9 @@ const STATIC: [path: string, priority: string, changefreq: string][] = [
      likely to earn a link from somebody else's site. */
   ["/collab", "0.7", "monthly"],
   ["/horoscopes", "0.8", "weekly"],
+  /* The games wing's front door: every room on one page. Hidden with the
+     guides section, whose gate it sits behind. */
+  ["/play", "0.8", "weekly"],
   ["/guides", "0.8", "weekly"],
   /* The Ledger's public doors: the planner, the building finder and the
      calculators. A kept business is private and never listed. */
@@ -113,9 +116,12 @@ export const GET: APIRoute = async () => {
     );
 
   const hidden = await hiddenSections();
-  /* The Ledger belongs to the guides section and is hidden with it
-     (middleware SECTION_PATHS), though its address does not start /guides. */
-  const sectionPath = (path: string) => (path === "/ledger" || path.startsWith("/ledger/") ? "/guides" : path);
+  /* The Ledger and the Play hub belong to the guides section and are hidden
+     with it (middleware SECTION_PATHS), though their addresses do not start
+     /guides. */
+  const IN_GUIDES = ["/ledger", "/play"];
+  const sectionPath = (path: string) =>
+    (IN_GUIDES.some((p) => path === p || path.startsWith(p + "/")) ? "/guides" : path);
   const reachable = (path: string) =>
     ![...hidden].some((prefix) => [path, sectionPath(path)].some((p) => p === prefix || p.startsWith(prefix + "/")));
 

@@ -74,14 +74,15 @@ test("the engine's sentences are all in What limits it's words", () => {
 test("the Ledger is the sixth tab of the lockup strip, before Create a guide", () => {
   const nav = read("components/chrome/GuidesNav.astro");
   const hrefs = [...nav.matchAll(/\["(\/[^"]*)",\s*say\(/g)].map((m) => m[1]);
-  assert.deepEqual(hrefs, ["/guides", "/builds", "/groups", "/guides/overlays", "/ledger", "/guides/write"]);
+  /* Play (the hub, 26 Sep 2026) is the first tab, ahead of the rooms. */
+  assert.deepEqual(hrefs, ["/play", "/guides", "/builds", "/groups", "/guides/overlays", "/ledger", "/guides/write"]);
 });
 
 test("the Ledger is in the Play menu, the wing's pages and the sitemap", () => {
   const header = read("components/chrome/SiteHeader.astro");
   assert.match(header, /\["\/ledger",\s*"Ledger"\]/, "NAV has the Ledger as a tuple");
   assert.match(header, /group\.play[^\]]*"\/ledger"/, "the Play group lists /ledger");
-  assert.match(read("layouts/BaseLayout.astro"), /\(guides\|builds\|groups\|tracker\|ledger\)/);
+  assert.match(read("layouts/BaseLayout.astro"), /\(guides\|builds\|groups\|tracker\|ledger\|play\)/);
   const sitemap = read("pages/sitemap.xml.ts");
   for (const p of ["/ledger", "/ledger/plan"]) assert.ok(sitemap.includes(`["${p}",`), `${p} is in the sitemap`);
   assert.ok(read("pages/guides/index.astro").includes('href: "/ledger"'), "Also in this wing lists the Ledger");

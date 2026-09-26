@@ -1,0 +1,85 @@
+---
+/* How it fits together (Play hub, README "Page structure"): one account card
+ * branching, by hairlines, to the three places it reaches; then two index
+ * rows — the four state dots and the four themes.
+ *
+ * Measurements: the card 260–340px, --surface-card, 1px --line, radius 10,
+ * shadow-1; a 32px connector; the branch list with a left rule in
+ * --line-strong and 20px ticks. Below 640px of its own width the card stacks
+ * above the branches and the connector turns downward, so nothing is ever
+ * wider than the column. The dots are the section's own StateDot. */
+import StateDot from "../guides/StateDot.astro";
+import { copy } from "../../lib/copy";
+
+const say = await copy("component:PlayFits");
+const PLACES = [
+  { name: say("place.web", "The website"), line: say("place.web_line", "Where you read, plan and write.") },
+  { name: say("place.phone", "The phone"), line: say("place.phone_line", "Where you tick a step or a goal mid-game, without leaving it.") },
+  { name: say("place.stream", "The stream"), line: say("place.stream_line", "Where an overlay shows it, within two seconds of the phone.") },
+];
+const STATES = [
+  { state: "locked", word: say("state.locked", "locked") },
+  { state: "open", word: say("state.open", "open") },
+  { state: "now", word: say("state.now", "now") },
+  { state: "done", word: say("state.done", "done") },
+];
+---
+<div class="pf">
+  <div class="pf-tree">
+    <div class="pf-card">
+      <span class="gd-eyebrow">{say("card.eyebrow", "Your account")}</span>
+      <p class="pf-card-title">{say("card.title", "One, for every room")}</p>
+      <p class="pf-card-body">{say("card.body", "Free, with no limits. It holds your runs, builds, groups, ledgers and overlay addresses.")}</p>
+    </div>
+    <span class="pf-connector" aria-hidden="true"></span>
+    <ul class="pf-branches" aria-label={say("places.aria", "The three places your account reaches")}>
+      {PLACES.map((p) => (
+        <li>
+          <span class="pf-tick" aria-hidden="true"></span>
+          <div class="pf-place"><p class="pf-place-name">{p.name}</p><p class="pf-place-line">{p.line}</p></div>
+        </li>
+      ))}
+    </ul>
+  </div>
+  <dl class="pf-rows">
+    <div>
+      <dt>{say("states.title", "One vocabulary of states")}</dt>
+      <dd class="pf-states">
+        {STATES.map((s) => <span class="pf-state"><StateDot state={s.state} />{s.word}</span>)}
+      </dd>
+    </div>
+    <div>
+      <dt>{say("themes.title", "One set of themes")}</dt>
+      <dd>{say("themes.body", "Grimoire · Almanac · Plain · Ledger, worn by every overlay, with the same motion settings.")}</dd>
+    </div>
+  </dl>
+</div>
+
+<style>
+  .pf { container-type: inline-size; display: grid; gap: 32px; }
+  .pf-tree { display: flex; align-items: center; }
+  .pf-card { flex: 1 1 260px; min-width: 0; max-width: 340px; box-sizing: border-box; display: grid; gap: 8px; padding: 20px; background: var(--surface-card); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow-1); }
+  .pf-card-title { margin: 0; font-family: var(--font-display); font-size: 20px; font-weight: 600; line-height: 1.2; color: var(--ink); }
+  .pf-card-body { margin: 0; font-size: 14px; line-height: 1.5; color: var(--ink-soft); text-wrap: pretty; }
+  .pf-connector { flex: 0 0 32px; height: 0; border-top: 1px solid var(--line-strong); }
+  .pf-branches { flex: 2 1 320px; min-width: 0; margin: 0; padding: 4px 0; list-style: none; display: grid; gap: 12px; border-left: 1px solid var(--line-strong); }
+  .pf-branches li { display: flex; align-items: flex-start; }
+  .pf-tick { flex: 0 0 20px; margin-top: 12px; border-top: 1px solid var(--line-strong); }
+  .pf-place { min-width: 0; padding: 2px 0 0 4px; }
+  .pf-place-name { margin: 0; font-size: 15px; font-weight: 600; color: var(--ink); }
+  .pf-place-line { margin: 2px 0 0; font-size: 14px; line-height: 1.5; color: var(--ink-soft); text-wrap: pretty; }
+  .pf-rows { margin: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 20px 48px; }
+  .pf-rows > div { border-top: 1px solid var(--line); padding-top: 14px; min-width: 0; }
+  .pf-rows dt { margin: 0 0 10px; font-size: 14px; font-weight: 600; color: var(--ink); }
+  .pf-rows dd { margin: 0; font-size: 14px; line-height: 1.5; color: var(--ink-soft); }
+  .pf-states { display: flex; flex-wrap: wrap; gap: 8px 20px; }
+  .pf-state { display: inline-flex; align-items: center; gap: 8px; }
+
+  /* The phone: the card above, a 24px drop, the branches under it. */
+  @container (max-width: 639px) {
+    .pf-tree { flex-direction: column; align-items: stretch; }
+    .pf-card { flex: none; max-width: none; }
+    .pf-connector { flex: 0 0 24px; height: 24px; width: 0; margin-left: 24px; border-top: 0; border-left: 1px solid var(--line-strong); }
+    .pf-branches { flex: none; margin-left: 24px; }
+  }
+</style>
