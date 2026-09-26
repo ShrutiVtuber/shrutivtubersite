@@ -839,6 +839,10 @@ async def _everything_else(user: User, session: AsyncSession) -> dict:
         CarnaticComment, CarnaticDeviceLink, CarnaticLike, CarnaticPost, CarnaticPracticeDay,
         CarnaticProfile, CarnaticProgress, CarnaticReport, CarnaticSong,
     )
+    from shruti.models.carnatic_course import (
+        CarnaticAttempt, CarnaticBest, CarnaticCard, CarnaticGuess, CarnaticLessonState,
+        CarnaticRecording, PracticeRubric,
+    )
     from shruti.models.ledger import Ledger, LedgerBusiness, LedgerWeek
     from shruti.models.practice import (
         PracticeBlock, PracticeComment, PracticeReading, PracticeReport, PracticeStrike,
@@ -851,6 +855,7 @@ async def _everything_else(user: User, session: AsyncSession) -> dict:
         found = (await session.execute(select(model).where(*where))).scalars().all()
         return [_plain(r) for r in found]
 
+    from shruti.models.carnatic_course import PracticePart
     works = (await session.execute(select(PracticeWork).where(PracticeWork.user_id == uid))).scalars().all()
     work_ids = [w.id for w in works]
 
@@ -879,6 +884,8 @@ async def _everything_else(user: User, session: AsyncSession) -> dict:
         "overlays": await rows(OverlayToken, OverlayToken.user_id == uid),
         "practiceWorks": [_plain(w) for w in works],
         "practiceReadings": await rows(PracticeReading, PracticeReading.work_id.in_(work_ids)) if work_ids else [],
+        # Swara Studio's practice pieces and analyses keep their parts here.
+        "practiceParts": await rows(PracticePart, PracticePart.work_id.in_(work_ids)) if work_ids else [],
         "practiceComments": await rows(PracticeComment, PracticeComment.user_id == uid),
         "practiceVotes": await rows(PracticeVote, PracticeVote.user_id == uid),
         "practiceReports": await rows(PracticeReport, PracticeReport.user_id == uid),
@@ -906,6 +913,14 @@ async def _everything_else(user: User, session: AsyncSession) -> dict:
             "likes": await rows(CarnaticLike, CarnaticLike.user_id == uid),
             "comments": await rows(CarnaticComment, CarnaticComment.user_id == uid),
             "reports": await rows(CarnaticReport, CarnaticReport.user_id == uid),
+            # v2: the course and practice (models/carnatic_course.py)
+            "lessons": await rows(CarnaticLessonState, CarnaticLessonState.user_id == uid),
+            "attempts": await rows(CarnaticAttempt, CarnaticAttempt.user_id == uid),
+            "bests": await rows(CarnaticBest, CarnaticBest.user_id == uid),
+            "reviewCards": await rows(CarnaticCard, CarnaticCard.user_id == uid),
+            "ragaGuesses": await rows(CarnaticGuess, CarnaticGuess.user_id == uid),
+            "rubricAnswers": await rows(PracticeRubric, PracticeRubric.user_id == uid),
+            "recordingSuggestions": await rows(CarnaticRecording, CarnaticRecording.suggested_by == uid),
             "appSignIns": await rows(CarnaticDeviceLink, CarnaticDeviceLink.user_id == uid),
         },
     }

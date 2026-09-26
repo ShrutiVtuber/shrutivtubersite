@@ -36,6 +36,15 @@ class PracticeWork(TimestampMixin, table=True):
     user_id: Optional[int] = Field(default=None, index=True, foreign_key="site_user.id")   # null: the author deleted their account; the work stays
     author_deleted_at: Optional[datetime] = Field(default=None, sa_type=UTC_TS)   # the author deleted their account; this is kept, anonymised
 
+    # Which room it belongs to (LISTENING.md §4d option 2): the horoscope
+    # practice room, or Swara Studio's practice pieces and listening analyses.
+    # ⚠ Every horoscope query filters on room == "horoscope", so a Carnatic
+    # piece never turns up among readings, and the other way round.
+    room: str = Field(default="horoscope", index=True)
+    # What it is about in a Carnatic room: "exercise:U10.L04.P1" or
+    # "recording:mohanam-02". Empty in the horoscope room.
+    subject: str = Field(default="", index=True)
+
     # Which sky it was written for. Same vocabulary as her own readings, so a
     # practice piece and a published one are about the same period.
     period: str = Field(default="weekly", index=True)

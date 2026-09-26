@@ -50,6 +50,11 @@ PERIODS = ["daily", "weekly", "monthly", "yearly"]
 # because whoever changes it should have to see this sentence.
 REPORTS_TO_HIDE = 3
 
+# The room this router serves (LISTENING.md §4d option 2). Swara Studio's
+# practice pieces and listening analyses share the model and its votes,
+# comments, reports, strikes and blocks, but never appear in these lists.
+HOROSCOPE = "horoscope"
+
 # The short list a report picks from. Free text is also taken, but the reason
 # is what makes a queue of a hundred readable at a glance.
 REPORT_REASONS = [
@@ -210,6 +215,7 @@ async def save_draft(
     work = (
         await session.execute(
             select(PracticeWork).where(
+                PracticeWork.room == HOROSCOPE,
                 PracticeWork.user_id == user.id,
                 PracticeWork.period == body.period,
                 PracticeWork.covers == body.covers,
@@ -270,6 +276,7 @@ async def read_draft(
     work = (
         await session.execute(
             select(PracticeWork).where(
+                PracticeWork.room == HOROSCOPE,
                 PracticeWork.user_id == user.id,
                 PracticeWork.period == period,
                 PracticeWork.covers == covers,
@@ -704,7 +711,7 @@ async def mine(
     works = (
         await session.execute(
             select(PracticeWork)
-            .where(PracticeWork.user_id == user.id)
+            .where(PracticeWork.user_id == user.id, PracticeWork.room == HOROSCOPE)
             .order_by(PracticeWork.submitted_at.is_(None).desc(),
                       PracticeWork.updated_at.desc())
         )
@@ -734,6 +741,7 @@ async def feed(
     viewer = await current_user(request, session)
     q = (
         select(PracticeWork)
+        .where(PracticeWork.room == HOROSCOPE)
         .where(PracticeWork.submitted_at.is_not(None))
         .where(PracticeWork.hidden.is_(False))
     )
@@ -771,7 +779,7 @@ async def one(
 
     viewer = await current_user(request, session)
     work = await session.get(PracticeWork, work_id)
-    if work is None:
+    if work is None or work.room != HOROSCOPE:
         raise HTTPException(404, "no such work")
     # A draft is nobody's business but its author's.
     mine = viewer is not None and viewer.id == work.user_id
@@ -1199,6 +1207,7 @@ async def to_read(
         )
         .join(votes, votes.c.work_id == PracticeWork.id, isouter=True)
         .join(remarks, remarks.c.work_id == PracticeWork.id, isouter=True)
+        .where(PracticeWork.room == HOROSCOPE)
         .where(PracticeWork.submitted_at.is_not(None))
         .where(PracticeWork.hidden.is_(False))
         .where(PracticeWork.period == period)
@@ -1265,7 +1274,8 @@ async def reports(
     for (kind, subject_id), entry in subjects.items():
         if kind == "work":
             work = await session.get(PracticeWork, subject_id)
-            if work is None:
+            # Swara Studio's rooms are moderated in its own admin.
+            if work is None or work.room != HOROSCOPE:
                 continue
             author = await session.get(User, work.user_id) if work.user_id else None
             entry["hidden"] = work.hidden
@@ -1283,6 +1293,9 @@ async def reports(
         else:
             row = await session.get(PracticeComment, subject_id)
             if row is None:
+                continue
+            parent = await session.get(PracticeWork, row.work_id)
+            if parent is not None and parent.room != HOROSCOPE:
                 continue
             author = (await session.get(User, row.user_id)
                       if row.user_id else None)

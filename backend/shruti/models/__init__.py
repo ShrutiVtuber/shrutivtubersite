@@ -1459,3 +1459,4 @@ from shruti.models.practice import (  # noqa: E402,F401
 from shruti.models.guides import *  # noqa: E402,F403
 from shruti.models.ledger import Ledger, LedgerBusiness, LedgerWeek  # noqa: E402,F401
 from shruti.models.carnatic import *  # noqa: E402,F403
+from shruti.models.carnatic_course import *  # noqa: E402,F403

@@ -168,4 +168,9 @@ app.include_router(media.router)
 app.include_router(packs.router)
 app.include_router(videos.router)
 app.include_router(carnatic.router)
+# Swara Studio v2: the course, practice and Listening room; community rooms; the admin.
+from shruti.api.routes import carnatic_community, carnatic_course, carnatic_studio  # noqa: E402
+app.include_router(carnatic_course.router)
+app.include_router(carnatic_community.router)
+app.include_router(carnatic_studio.router)
 app.include_router(admin.router)

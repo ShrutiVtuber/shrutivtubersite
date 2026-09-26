@@ -77,6 +77,9 @@ def _cascading_since() -> set[tuple[str, str]]:
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
         found |= set(module.NOBODYS_BUT_THEIRS)
+        # Later revisions may also keep a person's public rows without a name
+        # (SET NULL), listed as k9i6f2g7h854 lists its own.
+        found |= {(t, c) for t, c, *_rest in getattr(module, "KEPT_WITHOUT_A_NAME", [])}
     return found
 
 

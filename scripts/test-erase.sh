@@ -45,4 +45,5 @@ RUN=(docker run --rm --network "$NET"
 
 "${RUN[@]}" alembic upgrade head
 "${RUN[@]}" python -m pytest tests/test_an_account_can_be_deleted.py tests/test_a_ledger_is_one_company_in_one_game.py \
-  tests/test_the_ledger_on_stream.py tests/test_carnatic_leaves_with_the_account.py -rs "$@"
+  tests/test_the_ledger_on_stream.py tests/test_carnatic_leaves_with_the_account.py \
+  tests/test_carnatic_school.py -rs "$@"
