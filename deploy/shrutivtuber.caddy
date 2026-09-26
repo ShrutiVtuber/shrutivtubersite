@@ -45,13 +45,16 @@ shrutivtuber.com {
         # 'unsafe-inline' covers the no-flash theme script and design-system
         # inline styles. img-src allows data: for inlined marks. YouTube/Twitch
         # embeds need frame-src; drop those entries if embeds are removed.
+        # SoundCloud, Vimeo and Bandcamp are Swara Studio's Listen room, whose
+        # players load only when pressed (internal Caddy narrows them to
+        # /carnatic).
         #
         # `frame-src 'self'` is for /admin/preview, which embeds the real page
         # so she can edit the words with the page in front of her. Note the two
         # directives are opposites and easy to confuse: `frame-ancestors` is
         # who may embed US, `frame-src` is what WE may embed. Fixing only the
         # first left the preview blocked with a message naming the second.
-        Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self'; frame-src 'self' https://www.youtube-nocookie.com https://player.twitch.tv; base-uri 'self'; form-action 'self' https://checkout.stripe.com https://billing.stripe.com; frame-ancestors 'self'"
+        Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self'; frame-src 'self' https://www.youtube-nocookie.com https://player.twitch.tv https://w.soundcloud.com https://player.vimeo.com https://bandcamp.com; base-uri 'self'; form-action 'self' https://checkout.stripe.com https://billing.stripe.com; frame-ancestors 'self'"
         -Server
     }
 

@@ -198,7 +198,7 @@ Try /api/health
 	# Both halves, stated here so local and production say the same thing.
 	# Local previously set NEITHER, which is why the preview worked on a laptop
 	# and was blocked on the site — twice, for two different directives.
-	@framable not path /admin /admin/* /embed /embed/*
+	@framable not path /admin /admin/* /embed /embed/* /carnatic /carnatic/*
 	header @framable Content-Security-Policy "frame-src 'self' https://www.youtube-nocookie.com https://player.twitch.tv; frame-ancestors 'self'"
 
 	# The embed widget is the ONE path other sites may frame, and that is what
@@ -213,6 +213,17 @@ Try /api/health
 	# again.
 	@embed path /embed /embed/*
 	header @embed Content-Security-Policy "frame-src 'self'; frame-ancestors *"
+
+	# Swara Studio (/carnatic) listens to the microphone for the tuner and the
+	# voice finder — only after a press, and never sent anywhere — so the
+	# school may ask for it; the rest of the site still denies it. Its Listen
+	# room embeds members' performances, loaded only when pressed, from the
+	# four players it accepts.
+	@school path /carnatic /carnatic/*
+	@notschool not path /carnatic /carnatic/*
+	header @school Permissions-Policy "camera=(), microphone=(self), geolocation=(self), usb=()"
+	header @notschool Permissions-Policy "camera=(), microphone=(), geolocation=(self), usb=()"
+	header @school Content-Security-Policy "frame-src 'self' https://www.youtube-nocookie.com https://player.twitch.tv https://w.soundcloud.com https://player.vimeo.com https://bandcamp.com; frame-ancestors 'self'"
 
 	header {
 		X-Content-Type-Options "nosniff"
@@ -237,7 +248,8 @@ Try /api/health
 		# logged "Unrecognized feature: interest-cohort" in the console. A
 		# header that errors is worse than no header: it trains whoever is
 		# looking to ignore console noise on this site.
-		Permissions-Policy "camera=(), microphone=(), geolocation=(self), usb=()"
+		# Permissions-Policy is set below, per path: Swara Studio's tuner and
+		# voice finder need the microphone, and nothing else on the site does.
 		# HSTS is set by the HOST Caddy, which is the one that terminates TLS.
 		# Setting it here as well would send it over the plain-HTTP hop, where
 		# it means nothing and only invites confusion about who owns it.
