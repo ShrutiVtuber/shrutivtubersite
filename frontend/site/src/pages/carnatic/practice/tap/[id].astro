@@ -1,0 +1,39 @@
+---
+/* A tala-keeping task (SELF_TEST.md §3; artboard P4): K.01-K.16, the tap
+ * game with fading audio, five counts and a personal best. K.16 taps along
+ * with a real recording and lives in the Listening room.
+ */
+import SwaraLayout from "../../../../layouts/SwaraLayout.astro";
+import PracticeTabs from "../../../../components/carnatic/PracticeTabs.astro";
+import { hrefIn, langOf } from "../../../../lib/carnatic/i18n";
+import { copy } from "../../../../lib/copy";
+import { notFound } from "../../../../lib/carnatic/notfound";
+import { drills, units } from "../../../../lib/carnatic/course";
+
+const lang = langOf(Astro);
+const say = await copy("carnatic/practice/tap/[id]");
+const L = (p: string) => hrefIn(lang, p);
+const [dr, all] = await Promise.all([drills(), units()]);
+const k = (dr?.talaKeeping ?? []).find((x: any) => x.id === Astro.params.id) as any;
+if (!k) return notFound(Astro);
+if (k.id === "K.16") return Astro.redirect(L("/carnatic/listen?tap=1"), 302);
+const lesson = all.flatMap((u) => u.lessons).find((l) => l.id === k.unlockedBy);
+---
+<SwaraLayout title={`${k.id} ${k.title} · Swara Studio`} description={say("desc", "Keep the tala with your taps: perfect within 30 ms, on time within 80 ms. Results are for you only.")}
+             crumbs={[[say("crumb", "Test yourself"), L("/carnatic/practice")], [k.id]]}>
+  <PracticeTabs />
+  <div class="st-wrap">
+    <p class="lr-eyebrow-top">{say("eyebrow", "Tala keeping")} · {k.id}</p>
+    <h1 class="lr-title">{k.title}</h1>
+    {lesson && <p class="cu-first">{say("from", "Taught in")} <a href={L(`/carnatic/learn/${lesson.slug}`)}>{lesson.title}</a></p>}
+    <div class="ex-card tt-host" data-tap style="margin-top: 20px"></div>
+  </div>
+  <script type="application/json" id="tap-spec" set:html={JSON.stringify(k)} />
+</SwaraLayout>
+
+<script>
+  import { TapTask, tapData } from "../../../../lib/carnatic/client/taptask";
+  const spec = JSON.parse(document.getElementById("tap-spec")!.textContent!);
+  const host = document.querySelector<HTMLElement>("[data-tap]")!;
+  void tapData(spec).then((d) => new TapTask(host, spec, d));
+</script>

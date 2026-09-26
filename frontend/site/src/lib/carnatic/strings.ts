@@ -13,6 +13,8 @@ export const STRINGS = {
   "brand.name": ["Swara Studio"],
   "brand.desc": ["Carnatic music school", "கர்நாடக இசைப் பள்ளி", "కర్ణాటక సంగీత పాఠశాల", "ಕರ್ನಾಟಕ ಸಂಗೀತ ಶಾಲೆ"],
   "nav.learn": ["Learn", "கற்க", "నేర్చుకో", "ಕಲಿಯಿರಿ"],
+  "nav.ragas": ["Ragas", "ராகங்கள்", "రాగాలు", "ರಾಗಗಳು"],
+  "nav.me": ["Me", "நான்", "నేను", "ನಾನು"],
   "nav.practice": ["Practice", "பயிற்சி", "అభ్యాసం", "ಅಭ್ಯಾಸ"],
   "nav.compose": ["Compose", "இசையமைக்க", "రచన", "ರಚನೆ"],
   "nav.listen": ["Listen", "கேட்க", "వినండి", "ಕೇಳಿ"],

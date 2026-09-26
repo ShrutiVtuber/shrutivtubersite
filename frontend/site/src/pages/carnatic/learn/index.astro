@@ -1,0 +1,200 @@
+---
+/* The course home (README_v2 §3, artboards C1-C2): every unit by level, with
+ * the learner's own progress (lessons opened, lessons they marked complete),
+ * "Continue", the beginner path beside the units, and a search and filters
+ * that work without leaving the page. Levels are labels, not locks.
+ */
+import SwaraLayout from "../../../layouts/SwaraLayout.astro";
+import Hero from "../../../components/carnatic/Hero.astro";
+import { hrefIn, langOf } from "../../../lib/carnatic/i18n";
+import { visitor } from "../../../lib/carnatic/prefs";
+import { copy } from "../../../lib/copy";
+import { duration, isOperator, myLessons, units } from "../../../lib/carnatic/course";
+
+const lang = langOf(Astro);
+const say = await copy("carnatic/learn");
+const L = (p: string) => hrefIn(lang, p);
+const { me } = await visitor(Astro);
+const preview = Astro.url.searchParams.get("preview") === "true" && (await isOperator(Astro));
+const all = await units(Astro, preview);
+const mine = me.signedIn ? await myLessons(Astro) : {};
+const lessonCount = all.reduce((n, u) => n + u.lessons.length, 0);
+const LEVELS: [string, string][] = [
+  ["foundations", say("level.foundations", "Foundations")],
+  ["intermediate", say("level.intermediate", "Intermediate")],
+  ["advanced", say("level.advanced", "Advanced")],
+];
+const levelOf = (u: (typeof all)[number]) => (u.level === "any" || u.level === "any time" ? "advanced" : u.level);
+const groups = LEVELS.map(([id, label]) => ({ id, label, units: all.filter((u) => levelOf(u) === id) })).filter((g) => g.units.length);
+const range = (us: typeof all) => us.length ? `${say("unitWord", "Unit")} ${us[0].n}–${us[us.length - 1].n}` : "";
+const unitMinutes = (u: (typeof all)[number]) => u.lessons.reduce((n, x) => n + (x.minutes || 0), 0);
+const flat = all.flatMap((u) => u.lessons.map((x) => ({ id: x.id, slug: x.slug, title: x.title, unit: u.n, order: x.order, minutes: x.minutes, available: x.available || preview })));
+const searchIndex = flat.filter((x) => x.available).map((x) => ({ id: x.id, t: x.title, u: x.unit, o: x.order, h: L(`/carnatic/learn/${x.slug}`) }));
+const available = flat.some((x) => x.available);
+---
+<SwaraLayout title={`${say("title", "The course")} · Swara Studio`}
+             description={say("desc", "From Sa to ragam tanam pallavi: {u} units and {l} lessons of Carnatic theory, for any voice or instrument.").replace("{u}", String(all.length)).replace("{l}", String(lessonCount))}>
+  <Hero eyebrow={say("eyebrow", "The course")} title={say("h1", "From Sa to ragam tanam pallavi")}
+        lede={say("lede", "{u} units and {l} lessons of Carnatic theory, for any voice or instrument. Levels are labels, not locks: open anything.").replace("{u}", String(all.length)).replace("{l}", String(lessonCount))} />
+
+  <div class="ch-top">
+    <a class="ch-continue" data-continue href={flat.find((x) => x.available) ? L(`/carnatic/learn/${flat.find((x) => x.available)!.slug}`) : L("/carnatic/learn")}>
+      <span class="t-eyebrow ch-blue" data-continue-eyebrow>{say("start", "Start here")}</span>
+      <b data-continue-title>{flat.find((x) => x.available)?.title ?? say("soon", "The first lessons are on their way")}</b>
+      <small data-continue-meta>{flat.find((x) => x.available) ? say("unitLesson", "Unit {u} · Lesson {n} · {min} min").replace("{u}", "1").replace("{n}", "1").replace("{min}", String(flat.find((x) => x.available)!.minutes)) : ""}</small>
+    </a>
+    <div class="ch-path">
+      <span class="t-eyebrow ch-rose">{say("pathH", "The beginner path")}</span>
+      <a href={L("/carnatic/lessons")}><b>{say("pathT", "50 exercises and 4 varnams")}</b></a>
+      <small>{say("pathP", "The traditional practice order. It runs alongside these units:")}</small>
+      <div class="ch-pills">{[4, 5, 6, 13].map((n) => <a class="ch-pill" href={L(`/carnatic/learn/unit/${n}`)}>{say("unitWord", "Unit")} {n}</a>)}</div>
+    </div>
+  </div>
+  <p class="ch-kept">
+    {me.signedIn ? say("keptAccount", "Your progress is kept in your account, on every device you sign in on.")
+      : <>{say("keptDevice", "Your progress is kept on this device.")}{" "}<a href={`/signin?next=${encodeURIComponent(L("/carnatic/learn"))}`}>{say("keptSignIn", "Sign in to keep it across devices.")}</a></>}
+  </p>
+
+  <div class="ch-tools">
+    <label class="ch-search">
+      <span aria-hidden="true">⌕</span>
+      <input type="search" data-search placeholder={say("search", "Search lessons, ragas, talas")} aria-label={say("search", "Search lessons, ragas, talas")} />
+    </label>
+    <div class="lr-seg ch-levels" role="group" aria-label={say("levels", "Level")}>
+      <button type="button" data-level="" aria-pressed="true">{say("all", "All")}</button>
+      {LEVELS.map(([id, label]) => <button type="button" data-level={id} aria-pressed="false">{label}</button>)}
+    </div>
+    <button type="button" class="ch-chip" data-has="listening" aria-pressed="false">{say("hasListening", "Has listening")}</button>
+    <button type="button" class="ch-chip" data-has="practice" aria-pressed="false">{say("hasPractice", "Has practice piece")}</button>
+  </div>
+
+  <div class="ch-results" data-results hidden>
+    <p class="ch-kept" data-results-line></p>
+    <ul data-results-list></ul>
+  </div>
+
+  {!available && (
+    <p class="ch-empty">{say("noneYet", "The lessons are being checked before they go up. The units below show what's coming.")}</p>
+  )}
+
+  <div data-units>
+    {groups.map((g) => (
+      <section class="ch-level" data-level-group={g.id} aria-labelledby={`lv-${g.id}`}>
+        <h2 id={`lv-${g.id}`}>{g.label} <span>{range(g.units)}</span></h2>
+        <div class="ch-grid">
+          {g.units.map((u) => {
+            const ids = u.lessons.map((x) => x.id);
+            const opened = ids.filter((id) => mine[id]?.openedAt).length;
+            const done = ids.filter((id) => mine[id]?.completedAt).length;
+            return (
+              <a class="ch-unit" href={L(`/carnatic/learn/unit/${u.n}`)} data-unit={u.n} data-lessons={ids.join(" ")}
+                 data-listening={u.lessons.some((x) => x.hasListening) ? "1" : ""} data-practice={u.lessons.some((x) => x.hasPractice) ? "1" : ""}>
+                <span class="ch-n">{u.n}</span>
+                <span class="ch-unit-t">
+                  <b>{u.title}</b>
+                  <small>{say("nLessons", "{n} lessons").replace("{n}", String(u.lessons.length))} · {say("about", "about {d}").replace("{d}", duration(unitMinutes(u)))}{u.lessons.some((x) => x.hasListening) ? ` · ${say("hasListeningShort", "has listening")}` : ""}</small>
+                  <span class="ch-prog">
+                    <span class="ch-segs" aria-hidden="true">{ids.map((id) => <i class:list={[mine[id]?.completedAt ? "done" : mine[id]?.openedAt ? "open" : ""]} data-seg={id}></i>)}</span>
+                    <small data-prog-line>{opened ? say("progress", "{o} opened · {c} completed").replace("{o}", String(opened)).replace("{c}", String(done)) : say("notOpened", "not opened yet")}</small>
+                  </span>
+                </span>
+              </a>
+            );
+          })}
+        </div>
+      </section>
+    ))}
+  </div>
+  <p class="ch-foot"><a href={L("/carnatic/learn/glossary")}>{say("glossary", "Glossary")} ›</a></p>
+
+  <script type="application/json" id="course-index" set:html={JSON.stringify({ lessons: searchIndex, flat: flat.map((x) => ({ id: x.id, slug: x.slug, title: x.title, unit: x.unit, order: x.order, minutes: x.minutes, available: x.available })), words: {
+    progress: say("progress", "{o} opened · {c} completed"), notOpened: say("notOpened", "not opened yet"),
+    continue: say("continue", "Continue"), unitLesson: say("unitLesson", "Unit {u} · Lesson {n} · {min} min"),
+    minLeft: say("minLeft", "Unit {u} · Lesson {n} · {min} min left"), results: say("results", "{n} lessons match"), none: say("noResults", "No lesson matches. Try a raga or tala name, or fewer words."),
+  } })} />
+</SwaraLayout>
+
+<script>
+  import { allLessons, syncLessons } from "../../../lib/carnatic/client/learner";
+  import { boot } from "../../../lib/carnatic/client/state";
+
+  const data = JSON.parse(document.getElementById("course-index")?.textContent ?? "{}");
+  const W = data.words;
+  const paint = (st: Record<string, any>) => {
+    document.querySelectorAll<HTMLElement>("[data-unit]").forEach((card) => {
+      const ids = (card.dataset.lessons ?? "").split(" ").filter(Boolean);
+      const opened = ids.filter((id) => st[id]?.openedAt).length;
+      const done = ids.filter((id) => st[id]?.completedAt).length;
+      card.querySelectorAll<HTMLElement>("[data-seg]").forEach((i) => {
+        const s = st[i.dataset.seg!];
+        i.className = s?.completedAt ? "done" : s?.openedAt ? "open" : "";
+      });
+      const line = card.querySelector<HTMLElement>("[data-prog-line]");
+      if (line) line.textContent = opened ? W.progress.replace("{o}", opened).replace("{c}", done) : W.notOpened;
+    });
+    // Continue: the most recently touched lesson not yet completed; else the next after the last completed.
+    const touched = Object.entries(st).filter(([, s]: any) => s.openedAt && !s.completedAt)
+      .sort((a: any, b: any) => String(b[1].updatedAt ?? b[1].openedAt).localeCompare(String(a[1].updatedAt ?? a[1].openedAt)));
+    const lesson = data.flat.find((x: any) => x.id === touched[0]?.[0] && x.available);
+    if (lesson) {
+      const s = st[lesson.id];
+      const left = Math.max(1, Math.round(lesson.minutes * (1 - (s.position?.fraction ?? 0))));
+      const a = document.querySelector<HTMLAnchorElement>("[data-continue]")!;
+      a.href = a.href.replace(/\/carnatic\/learn\/[^?]*/, `/carnatic/learn/${lesson.slug}`);
+      document.querySelector("[data-continue-eyebrow]")!.textContent = W.continue;
+      document.querySelector("[data-continue-title]")!.textContent = lesson.title;
+      document.querySelector("[data-continue-meta]")!.textContent = W.minLeft.replace("{u}", lesson.unit).replace("{n}", lesson.order).replace("{min}", left);
+    }
+  };
+  paint(allLessons());
+  if (boot().signedIn) void syncLessons().then(paint);
+
+  // search and filters
+  let level = "";
+  const has = new Set<string>();
+  const input = document.querySelector<HTMLInputElement>("[data-search]")!;
+  const results = document.querySelector<HTMLElement>("[data-results]")!;
+  const norm = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/(th|sh|dh|bh)/g, (m) => m[0]).replace(/(.)\1/g, "$1");
+  const apply = () => {
+    document.querySelectorAll<HTMLElement>("[data-level-group]").forEach((g) => {
+      g.hidden = !!level && g.dataset.levelGroup !== level;
+      let any = false;
+      g.querySelectorAll<HTMLElement>("[data-unit]").forEach((u) => {
+        const ok = (!has.has("listening") || u.dataset.listening === "1") && (!has.has("practice") || u.dataset.practice === "1");
+        u.hidden = !ok;
+        any = any || ok;
+      });
+      if (!any) g.hidden = true;
+    });
+    const q = norm(input.value.trim());
+    if (!q) { results.hidden = true; return; }
+    const words = q.split(/\s+/);
+    const hits = data.lessons.filter((x: any) => words.every((w: string) => norm(x.t).includes(w)));
+    results.hidden = false;
+    results.querySelector("[data-results-line]")!.textContent = hits.length ? W.results.replace("{n}", hits.length) : W.none;
+    const list = results.querySelector<HTMLElement>("[data-results-list]")!;
+    list.innerHTML = "";
+    for (const h of hits.slice(0, 30)) {
+      const li = document.createElement("li");
+      const a = document.createElement("a");
+      a.href = h.h;
+      a.innerHTML = `<span class="ch-rid"></span><b></b>`;
+      a.querySelector(".ch-rid")!.textContent = `${h.u}.${String(h.o).padStart(2, "0")}`;
+      a.querySelector("b")!.textContent = h.t;
+      li.append(a);
+      list.append(li);
+    }
+  };
+  input.addEventListener("input", apply);
+  document.querySelectorAll<HTMLElement>("[data-level]").forEach((b) => b.addEventListener("click", () => {
+    level = b.dataset.level ?? "";
+    document.querySelectorAll<HTMLElement>("[data-level]").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+    apply();
+  }));
+  document.querySelectorAll<HTMLElement>("[data-has]").forEach((b) => b.addEventListener("click", () => {
+    const k = b.dataset.has!;
+    if (has.has(k)) has.delete(k); else has.add(k);
+    b.setAttribute("aria-pressed", String(has.has(k)));
+    apply();
+  }));
+</script>

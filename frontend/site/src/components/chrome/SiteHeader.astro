@@ -52,10 +52,12 @@ const NAV: [string, string][] = [
   /* Swara Studio, the Carnatic music school (26 Sep 2026). Its six places
      are the menu's own group; the bar carries the school's front door. */
   ["/carnatic", "Carnatic music school"],
-  ["/carnatic/lessons", "Learn"],
-  ["/carnatic/practice/tuner", "Practice"],
-  ["/carnatic/compose", "Compose"],
+  ["/carnatic/learn", "Learn"],
+  ["/carnatic/ragas", "Ragas"],
+  ["/carnatic/practice", "Practice"],
   ["/carnatic/listen", "Listen"],
+  ["/carnatic/compose", "Compose"],
+  ["/carnatic/me", "Me"],
   ["/carnatic/support", "Support the school"],
   ["/horoscopes", "Horoscopes"],
   ["/journal", "Journal"],
@@ -85,7 +87,7 @@ const GROUPS: [string, string[]][] = [
   [say("group.watch", "Watch"), ["/schedule", "/videos"]],
   [say("group.play", "Play"), ["/play", "/guides", "/builds", "/groups", "/ledger"]],
   [say("group.practice", "Practice"), ["/tools", "/horoscopes", "/classes"]],
-  [say("group.carnatic", "Carnatic music school"), ["/carnatic", "/carnatic/lessons", "/carnatic/practice/tuner", "/carnatic/compose", "/carnatic/listen", "/carnatic/support"]],
+  [say("group.carnatic", "Carnatic music school"), ["/carnatic", "/carnatic/learn", "/carnatic/ragas", "/carnatic/practice", "/carnatic/listen", "/carnatic/compose", "/carnatic/me", "/carnatic/support"]],
   [say("group.read", "Read"), ["/today", "/journal", "/newsletter"]],
   [say("group.her", "Shruti"), ["/about", "/work", "/shop", "/support", "/contact"]],
 ];

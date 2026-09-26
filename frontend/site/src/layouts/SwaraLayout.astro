@@ -8,6 +8,7 @@
  * sits straight under the strip, as drawn.
  */
 import "../styles/carnatic.css";
+import "../styles/carnatic-course.css";
 import BaseLayout from "./BaseLayout.astro";
 import { LANGS, langOf, words } from "../lib/carnatic/i18n";
 import { visitor } from "../lib/carnatic/prefs";
@@ -43,7 +44,7 @@ const boot = {
   lang,
   signedIn: me.signedIn,
   supporter: Boolean(me.supporter),
-  partsPerSong: me.limits?.partsPerSong ?? 2,
+  partsPerSong: me.limits?.partsPerSong ?? null,
   settings,
   settingsUpdatedAt: me.settingsUpdatedAt ?? null,
 };

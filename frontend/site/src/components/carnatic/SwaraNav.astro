@@ -1,7 +1,7 @@
 ---
 /* Swara Studio's own strip under the site header, on every /carnatic page
  * (handoff README §2): the lockup (name in EB Garamond, the descriptor as an
- * eyebrow beneath it, translated; the name is not), the school's six places,
+ * eyebrow beneath it, translated; the name is not), the school's six places (v2: Learn, Ragas, Practice, Listen, Compose, Me),
  * and the language switcher.
  *
  * At phone width the six places fold into the site's one Menu (its
@@ -19,12 +19,12 @@ const tr = await words(lang);
 const here = Astro.url.pathname;
 
 const ITEMS: [string, string, string[]][] = [
-  ["/carnatic/lessons", tr("nav.learn"), ["/carnatic/lessons", "/carnatic/ragas", "/carnatic/talas", "/carnatic/instruments", "/carnatic/gamakas", "/carnatic/path"]],
-  ["/carnatic/practice/tuner", tr("nav.practice"), ["/carnatic/practice"]],
-  ["/carnatic/compose", tr("nav.compose"), ["/carnatic/compose", "/carnatic/sheets"]],
+  ["/carnatic/learn", tr("nav.learn"), ["/carnatic/learn", "/carnatic/lessons", "/carnatic/path"]],
+  ["/carnatic/ragas", tr("nav.ragas"), ["/carnatic/ragas", "/carnatic/talas", "/carnatic/instruments", "/carnatic/gamakas"]],
+  ["/carnatic/practice", tr("nav.practice"), ["/carnatic/practice"]],
   ["/carnatic/listen", tr("nav.listen"), ["/carnatic/listen"]],
-  ["/journal/", tr("nav.journal"), []],
-  ["/carnatic/support", tr("nav.support"), ["/carnatic/support"]],
+  ["/carnatic/compose", tr("nav.compose"), ["/carnatic/compose", "/carnatic/sheets"]],
+  ["/carnatic/me", tr("nav.me"), ["/carnatic/me", "/carnatic/settings"]],
 ];
 const current = (prefixes: string[]) => prefixes.some((p) => here === p || here.startsWith(p + "/"));
 

@@ -1,0 +1,108 @@
+---
+/* A unit (README_v2 §3, artboards C4-C5): its lessons in order with the
+ * learner's own state, "You might read … first" from the lessons'
+ * prerequisites in other units, the recordings it leans on, and the unit
+ * checkpoint at the foot.
+ */
+import SwaraLayout from "../../../../layouts/SwaraLayout.astro";
+import { hrefIn, langOf } from "../../../../lib/carnatic/i18n";
+import { visitor } from "../../../../lib/carnatic/prefs";
+import { notFound } from "../../../../lib/carnatic/notfound";
+import { copy } from "../../../../lib/copy";
+import { duration, isOperator, myLessons, recordingLabel, recordings, units } from "../../../../lib/carnatic/course";
+
+const lang = langOf(Astro);
+const say = await copy("carnatic/learn/unit/[n]");
+const L = (p: string) => hrefIn(lang, p);
+const { me } = await visitor(Astro);
+const preview = Astro.url.searchParams.get("preview") === "true" && (await isOperator(Astro));
+const n = Number(Astro.params.n);
+const all = await units(Astro, preview);
+const u = all.find((x) => x.n === n);
+if (!u) return notFound(Astro);
+const mine = me.signedIn ? await myLessons(Astro) : {};
+const minutes = u.lessons.reduce((a, x) => a + (x.minutes || 0), 0);
+const before = [...new Set(u.lessons.flatMap((x) => x.after).map((id) => Number(id.slice(1, 3))).filter((m) => m && m !== n))].sort((a, b) => a - b);
+const recs = await recordings();
+const byId = new Map(recs.map((r) => [r.id, r]));
+const leanOn = ((u as any).recordings ?? []).map((r: any) => ({ ...r, rec: byId.get(r.id) })).filter((r: any) => r.rec && r.rec.status === "approved").slice(0, 4);
+const LEVEL: Record<string, string> = { foundations: say("level.foundations", "Foundations"), intermediate: say("level.intermediate", "Intermediate"), advanced: say("level.advanced", "Advanced") };
+const eyebrow = say("eyebrow", "Unit {n} · {level} · {count} lessons · about {d}").replace("{n}", String(n))
+  .replace("{level}", LEVEL[u.level] ?? u.levelLabel).replace("{count}", String(u.lessons.length)).replace("{d}", duration(minutes));
+const prev = all.find((x) => x.n === n - 1);
+const next = all.find((x) => x.n === n + 1);
+---
+<SwaraLayout title={`${say("unitWord", "Unit")} ${n}: ${u.title} · Swara Studio`} description={(u.intro || `${u.title}. ${u.lessons.map((x) => x.title).join(", ")}.`).slice(0, 300)}
+             crumbs={[[say("crumbLearn", "Learn"), L("/carnatic/learn")], [`${say("unitWord", "Unit")} ${n}`]]}>
+  <header class="cu-head">
+    <p class="lr-eyebrow-top">{eyebrow}</p>
+    <h1 class="lr-title">{u.title}</h1>
+    {u.intro && <p class="cu-lede">{u.intro}</p>}
+    {before.length > 0 && (
+      <p class="cu-first">{say("readFirst1", "You might read")} {before.map((m, i) => <>{i > 0 && " · "}<a href={L(`/carnatic/learn/unit/${m}`)}>{say("unitWord", "Unit")} {m}</a></>)} {say("readFirst2", "first.")}</p>
+    )}
+  </header>
+  <div class="cu-cols">
+    <ol class="cu-list" data-unit-list data-done={say("completed", "Completed ✓")} data-opened={say("opened", "Opened")}>
+      {u.lessons.map((x) => {
+        const s = mine[x.id];
+        const label = `${n}.${String(x.order).padStart(2, "0")}`;
+        return (
+          <li>
+            {x.available || preview ? (
+              <a href={L(`/carnatic/learn/${x.slug}`) + (preview && !x.available ? "?preview=true" : "")} data-lesson={x.id}>
+                <span class="cu-id">{label}</span>
+                <span class="cu-t"><b>{x.title}</b><small>{x.minutes} min</small></span>
+                <span class:list={["cu-state", s?.completedAt && "done"]} data-state>{s?.completedAt ? say("completed", "Completed ✓") : s?.openedAt ? say("opened", "Opened") : ""}</span>
+              </a>
+            ) : (
+              <div class="cu-planned">
+                <span class="cu-id">{label}</span>
+                <span class="cu-t"><b>{x.title}</b><small>{x.minutes} min</small></span>
+                <span class="cu-state">{say("planned", "Being checked")}</span>
+              </div>
+            )}
+          </li>
+        );
+      })}
+      {u.checkpoint && (
+        <li class="cu-check">
+          <a href={L(`/carnatic/practice/test?checkpoint=${u.n}`)}>
+            <span class="cu-id" aria-hidden="true">✓</span>
+            <span class="cu-t"><b>{say("checkpoint", "Unit {n} checkpoint").replace("{n}", String(n))}</b><small>{say("checkpointP", "10–15 minutes · a profile in words for each skill, not a score")}</small></span>
+            <span class="cu-state">{say("start", "Start")} ›</span>
+          </a>
+        </li>
+      )}
+    </ol>
+    <aside class="cu-side">
+      {leanOn.length > 0 && <h2 class="t-eyebrow">{say("leansOn", "Recordings this unit leans on")}</h2>}
+      {leanOn.map((r: any) => (
+        <div class="cu-rec">
+          <b>{[r.rec.raga && r.rec.raga[0].toUpperCase() + r.rec.raga.slice(1), recordingLabel(r.rec), r.rec.instrument].filter(Boolean).join(" · ")}</b>
+          {r.why && <span>{r.why}</span>}
+          <a href={L(`/carnatic/listen/recording/${r.id}`)}>{say("listeningRoom", "Listening room")} ›</a>
+        </div>
+      ))}
+      <div class="lr-nav cu-units">
+        {prev && <a href={L(`/carnatic/learn/unit/${prev.n}`)}><span class="t-eyebrow">{say("unitWord", "Unit")} {prev.n}</span><small>{prev.title}</small></a>}
+        {next && <a href={L(`/carnatic/learn/unit/${next.n}`)}><span class="t-eyebrow">{say("unitWord", "Unit")} {next.n}</span><small>{next.title}</small></a>}
+      </div>
+    </aside>
+  </div>
+</SwaraLayout>
+
+<script>
+  import { allLessons, syncLessons } from "../../../../lib/carnatic/client/learner";
+  import { boot } from "../../../../lib/carnatic/client/state";
+  const list = document.querySelector<HTMLElement>("[data-unit-list]");
+  const paint = (st: Record<string, any>) => document.querySelectorAll<HTMLElement>("[data-lesson]").forEach((a) => {
+    const s = st[a.dataset.lesson!];
+    const el = a.querySelector<HTMLElement>("[data-state]");
+    if (!el || !s) return;
+    el.textContent = s.completedAt ? list?.dataset.done ?? "" : s.openedAt ? list?.dataset.opened ?? "" : "";
+    el.classList.toggle("done", !!s.completedAt);
+  });
+  paint(allLessons());
+  if (boot().signedIn) void syncLessons().then(paint);
+</script>

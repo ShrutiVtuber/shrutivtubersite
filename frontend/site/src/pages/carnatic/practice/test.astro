@@ -1,0 +1,35 @@
+---
+/* One Test yourself set (SELF_TEST.md §2, §4; artboards P2-P3): a lesson or
+ * unit quiz, mixed, topic or card review, or a unit checkpoint. The set is
+ * assembled in the browser from the learner's own progress, which may live
+ * only on this device.
+ */
+import SwaraLayout from "../../../layouts/SwaraLayout.astro";
+import PracticeTabs from "../../../components/carnatic/PracticeTabs.astro";
+import { hrefIn, langOf } from "../../../lib/carnatic/i18n";
+import { visitor, swaraScript } from "../../../lib/carnatic/prefs";
+import { copy } from "../../../lib/copy";
+import { drills, units } from "../../../lib/carnatic/course";
+
+const lang = langOf(Astro);
+const say = await copy("carnatic/practice/test");
+const { settings } = await visitor(Astro);
+const [all, dr] = await Promise.all([units(), drills()]);
+const page = {
+  units: all.map((u) => ({ n: u.n, title: u.title, lessons: u.lessons.filter((l) => l.available).map((l) => ({ id: l.id, slug: l.slug, title: l.title, available: l.available, order: l.order })) })),
+  topics: dr?.topics ?? {}, script: swaraScript(settings, lang), tamil: settings.tamilStyle, lang,
+};
+---
+<SwaraLayout title={`${say("title", "Test yourself")} · Swara Studio`} noindex
+             description={say("desc", "A quiz, a review or a checkpoint. Results are for you only.")}>
+  <PracticeTabs />
+  <div class="st-wrap" data-test><noscript><p class="ch-empty">{say("noscript", "Test yourself needs JavaScript: the questions are put together from your own progress in this browser.")}</p></noscript></div>
+  <script type="application/json" id="test-data" set:html={JSON.stringify(page)} />
+</SwaraLayout>
+
+<script>
+  import { runTest } from "../../../lib/carnatic/client/selftest";
+  const data = JSON.parse(document.getElementById("test-data")!.textContent!);
+  const href = (p: string) => (data.lang === "en" ? p : `${p}${p.includes("?") ? "&" : "?"}lang=${data.lang}`);
+  void runTest(document.querySelector<HTMLElement>("[data-test]")!, new URLSearchParams(location.search), { ...data, href });
+</script>

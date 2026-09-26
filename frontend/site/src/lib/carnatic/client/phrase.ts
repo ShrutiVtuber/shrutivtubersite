@@ -17,7 +17,7 @@ function hzOf(t: Token, o: PlayOptions, vars: Record<string, number>): number | 
 
 /** Schedules the line and returns when it ends (AudioContext time). */
 export function playLine(line: string | Token[], o: PlayOptions): number {
-  const toks = (typeof line === "string" ? tokenize(line) : line).filter((t) => !(t.kind === "text" && t.raw === "·"));
+  const toks = (typeof line === "string" ? tokenize(line) : line).filter((t) => !(t.kind === "text" && (t.raw === "·" || t.raw === "|" || t.raw === "||")));
   const vars = o.scale ? variantsOf(o.scale) : {};
   const unit = o.unit ?? 0.42;
   let at = o.at ?? ctx().currentTime + 0.08;

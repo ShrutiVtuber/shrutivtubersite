@@ -1,0 +1,177 @@
+---
+/* The lesson reader (README_v2 §4, artboards L1-L4). The centre of v2.
+ *
+ * The body is rendered on the server by lib/carnatic/lesson.ts, the same
+ * function the Studio's live preview runs, and hydrated in the browser by
+ * client/lesson.ts. Visitors see published lessons only; the operator can
+ * add ?preview=true to read a draft, and the page says so.
+ */
+import SwaraLayout from "../../../layouts/SwaraLayout.astro";
+import { hrefIn, langOf, LANG_NAME } from "../../../lib/carnatic/i18n";
+import { visitor, swaraScript } from "../../../lib/carnatic/prefs";
+import { notFound } from "../../../lib/carnatic/notfound";
+import { copy } from "../../../lib/copy";
+import { drills, exercises, glossary, isOperator, lesson, lessonContext, units } from "../../../lib/carnatic/course";
+import { confidenceLine, renderLesson } from "../../../lib/carnatic/lesson";
+
+const lang = langOf(Astro);
+const say = await copy("carnatic/learn/[slug]");
+const L = (p: string) => hrefIn(lang, p);
+const { settings } = await visitor(Astro);
+const wantPreview = Astro.url.searchParams.get("preview") === "true";
+const preview = wantPreview && (await isOperator(Astro));
+const l = await lesson(Astro.params.slug!, Astro, preview, lang);
+if (!l) return notFound(Astro);
+if (Astro.params.slug !== l.slug && !preview) return Astro.redirect(L(`/carnatic/learn/${l.slug}`), 301);
+
+const [allUnits, exs, gloss, dr] = await Promise.all([units(Astro, preview), exercises({ lesson: l.id }, Astro, preview), glossary(), drills()]);
+const script = swaraScript(settings, lang);
+const ctx = await lessonContext(l, { script, tamil: settings.tamilStyle, href: L, saLabel: settings.sa }, { exercises: exs, glossary: gloss, drills: dr, units: allUnits });
+const r = renderLesson(l.body, ctx);
+
+const unit = allUnits.find((u) => u.n === l.unit);
+const inUnit = unit?.lessons ?? [];
+const pos = inUnit.findIndex((x) => x.id === l.id);
+const flat = allUnits.flatMap((u) => u.lessons.map((x) => ({ ...x, unit: u.n })));
+const fi = flat.findIndex((x) => x.id === l.id);
+const next = flat.slice(fi + 1).find((x) => x.available || preview) ?? null;
+const unitHref = L(`/carnatic/learn/unit/${l.unit}`);
+const LEVEL: Record<string, string> = { foundations: "Foundations", beginner: "Beginner", intermediate: "Intermediate", advanced: "Advanced" };
+const eyebrow = say("eyebrow", "Unit {u} · Lesson {n} · {level} · {min} min")
+  .replace("{u}", String(l.unit)).replace("{n}", String(l.order)).replace("{level}", LEVEL[l.level] ?? l.level).replace("{min}", String(l.minutes));
+const recs = l.recordings.map((x) => ({ ...x, info: ctx.recordings?.[x.id] }));
+const quizId = exs.find((e) => e.kind === "quiz" && e.lesson === l.id)?.id ?? exs[0]?.id ?? null;
+const lessonHref = (id?: string) => {
+  const t = id ? ctx.lessonTitles?.[id] : undefined;
+  return t ? L(`/carnatic/learn/${t.slug}`) : undefined;
+};
+const pageData = {
+  id: l.id, slug: l.slug, title: l.title, minutes: l.minutes, words: l.words, unitHref,
+  sources: l.sources,
+  glossary: gloss.filter((g) => r.glossaryUsed.includes(g.slug)).map((g) => ({ ...g, lessonTitle: g.lesson ? ctx.lessonTitles?.[g.lesson]?.title : undefined, lessonHref: lessonHref(g.lesson) })),
+  exercises: Object.fromEntries(exs.map((e) => [e.id, e])),
+  recordings: Object.fromEntries(Object.values(ctx.recordings ?? {}).filter((x) => x.available).map((x) => [x.id, { provider: x.provider, url: x.url, label: x.label }])),
+  lessonTitles: Object.fromEntries(Object.entries(ctx.lessonTitles ?? {}).map(([k, v]) => [k, { title: v.title, href: L(`/carnatic/learn/${v.slug}`) }])),
+  script, tamil: settings.tamilStyle,
+};
+const untranslated = lang !== "en" && l.translation && l.translation.status === "none";
+const outOfDate = lang !== "en" && l.translation?.outOfDate;
+---
+<SwaraLayout title={`${l.title} · Swara Studio`} description={l.summary.slice(0, 300)} noindex={preview && l.status !== "published"}>
+  <div class="lr-progress-track" aria-hidden="true"></div>
+  <div class="lr-progress" data-progress aria-hidden="true"></div>
+  <div class="lr-wrap" id="top">
+    <aside class="lr-rail" aria-label={say("railLabel", "This lesson")}>
+      <div class="lr-rail-unit">
+        <span class="t-eyebrow">{say("unitN", "Unit {n}").replace("{n}", String(l.unit))}</span>
+        <b>{unit?.title}</b>
+      </div>
+      <h2 class="t-eyebrow">{say("onThisPage", "On this page")}</h2>
+      <nav class="lr-toc" data-toc>
+        {r.toc.filter((t) => t.level === 2).map((t) => <a href={`#${t.id}`}>{t.text}</a>)}
+      </nav>
+      <div class="lr-rail-foot">
+        <span class="mono" data-left>{l.minutes} min left · {l.words.toLocaleString("en")} words</span>
+        <span>{say("remembered", "Your place is remembered on this device.")}</span>
+      </div>
+    </aside>
+
+    <article class="lr-main" data-lesson-root>
+      <nav class="lr-crumbs" aria-label={say("crumbs", "Breadcrumb")}>
+        <a href={L("/carnatic/learn")}>{say("crumbLearn", "Learn")}</a><span aria-hidden="true">/</span>
+        <a href={unitHref}>{say("unitN", "Unit {n}").replace("{n}", String(l.unit))}</a><span aria-hidden="true">/</span>
+        <span aria-current="page">{say("lessonN", "Lesson {n}").replace("{n}", String(l.order))}</span>
+      </nav>
+      {preview && l.status !== "published" && (
+        <p class="lr-preview-line">{say("preview", "Preview: this lesson is {status} and only you can see it.").replace("{status}", l.status)} <a href={`/carnatic/studio/lessons/${l.id}`}>{say("openStudio", "Open in the Studio")}</a></p>
+      )}
+      {untranslated && (
+        <p class="lr-preview-line">{say("untranslated", "This lesson isn't in {lang} yet. You're reading the English.").replace("{lang}", LANG_NAME[lang])}</p>
+      )}
+      {outOfDate && (
+        <p class="lr-preview-line">{say("outOfDate", "The English has changed since this translation was made. The English is the reference.")}</p>
+      )}
+      <p class="lr-eyebrow-top">{eyebrow}</p>
+      <h1 class="lr-title">{l.title}</h1>
+      {l.summary && <p class="lr-lede">{l.summary}</p>}
+      {l.goals.length > 0 && (
+        <div class="lr-goals">
+          <span class="t-eyebrow">{say("goals", "By the end of this lesson you can")}</span>
+          <ul>{l.goals.map((g) => <li>{g}</li>)}</ul>
+        </div>
+      )}
+      <div class="lr-lines">
+        <p data-resume hidden></p>
+      </div>
+      <hr class="lr-rule" />
+
+      <div class="lr-prose" data-lesson-body set:html={r.html} />
+
+      {recs.length > 0 && (
+        <section class="lr-recs" aria-labelledby="recs-h">
+          <h2 id="recs-h">{say("recs", "Recommended recordings")}</h2>
+          <ul>
+            {recs.map((x) => (
+              <li>
+                <b>{x.info?.label ?? x.id}</b>
+                <span>{x.why}</span>
+                {x.info?.available
+                  ? <a href={L(`/carnatic/listen/recording/${x.id}`)}>{say("listeningRoom", "Listening room")} ›</a>
+                  : <span class="lr-meta">{say("recSoon", "Being checked")}</span>}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      <div class="lr-end">
+        <div class="lr-end-actions">
+          {quizId && <a class="lr-btn" href={L(`/carnatic/practice/test?lesson=${l.id}`)}>{say("testLesson", "Test yourself on this lesson")}</a>}
+          <button type="button" class="lr-btn lr-btn-s" data-complete aria-pressed="false">{say("complete", "Mark as complete")}</button>
+        </div>
+        <small>{say("youDecide", "You decide when a lesson is complete. Nothing is marked for you.")}</small>
+      </div>
+
+      <div class="lr-nav">
+        {next ? (
+          <a href={L(`/carnatic/learn/${next.slug}`)}>
+            <span class="t-eyebrow">{next.unit === l.unit ? say("nextLesson", "Next lesson") : say("nextUnit", "Next: unit {n}").replace("{n}", String(next.unit))}</span>
+            <b>{next.title}</b>
+            <small>{say("lessonMin", "Lesson {n} · {min} min").replace("{n}", String(next.order)).replace("{min}", String(next.minutes))}</small>
+          </a>
+        ) : <div><span class="t-eyebrow">{say("end", "End of the course")}</span><small>{say("endP", "This is the last lesson written so far.")}</small></div>}
+        <a class="lr-unit-card" href={unitHref}>
+          <span class="t-eyebrow">{say("unitN", "Unit {n}").replace("{n}", String(l.unit))}</span>
+          <b>{unit?.title ?? ""}</b>
+          <small>{pos >= 0 ? say("ofUnit", "Lesson {n} of {m}").replace("{n}", String(pos + 1)).replace("{m}", String(inUnit.length)) : ""}</small>
+        </a>
+      </div>
+
+      {l.sources.length > 0 && (
+        <section class="lr-sources" aria-labelledby="sources-h">
+          <h2 class="t-eyebrow" id="sources-h">{say("sources", "Sources")}</h2>
+          <ol>
+            {[...l.sources].sort((a, b) => a.n - b.n).map((s) => (
+              <li id={`source-${s.n}`}>
+                <b>{s.n}</b>
+                <span>{s.cite}{confidenceLine(s.confidence) && <small>{confidenceLine(s.confidence)}</small>}</span>
+              </li>
+            ))}
+          </ol>
+        </section>
+      )}
+    </article>
+
+    <aside class="lr-side" aria-live="polite">
+      <div class="lr-fnp" data-fn-panel hidden></div>
+    </aside>
+  </div>
+  <script type="application/json" id="lesson-data" set:html={JSON.stringify(pageData)} />
+</SwaraLayout>
+
+<script>
+  import { hydrateLesson } from "../../../lib/carnatic/client/lesson";
+  const root = document.querySelector<HTMLElement>("[data-lesson-root]");
+  const data = JSON.parse(document.getElementById("lesson-data")?.textContent ?? "null");
+  if (root && data) hydrateLesson(root, data);
+</script>

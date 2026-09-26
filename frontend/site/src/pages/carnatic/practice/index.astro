@@ -1,4 +1,164 @@
 ---
-/* Practice opens on the tuner and drone; the trainer and quizzes are a tap away. */
-return Astro.redirect(`/carnatic/practice/tuner${Astro.url.search}`, 302);
+/* Practice opens on Test yourself (SELF_TEST.md §1-§4, artboard P1): what's
+ * ready to review, mixed and topic review, the little quizzes of lessons
+ * the learner has opened, the tala-keeping tasks K.01-K.16 and the unit
+ * checkpoints. Everything works signed out; nothing is locked, though a
+ * task not yet reached says which unit opens it.
+ */
+import SwaraLayout from "../../../layouts/SwaraLayout.astro";
+import PracticeTabs from "../../../components/carnatic/PracticeTabs.astro";
+import { hrefIn, langOf } from "../../../lib/carnatic/i18n";
+import { copy } from "../../../lib/copy";
+import { drills, exercises, units } from "../../../lib/carnatic/course";
+
+const lang = langOf(Astro);
+const say = await copy("carnatic/practice/index");
+const L = (p: string) => hrefIn(lang, p);
+const [all, exs, dr] = await Promise.all([units(), exercises({}), drills()]);
+const quizzes = exs.filter((e) => e.kind === "quiz" && !e.checkpoint && !e.id.startsWith("CP."));
+const itemsIn = (e: (typeof quizzes)[number]) => (e.items ?? []).reduce((n: number, it: any) => n + (it.type === "generated" ? Math.min(8, Number(it.settings?.count ?? 1) || 1) : 1), 0);
+const perUnit = new Map<number, number>();
+for (const e of quizzes) perUnit.set(Number(e.unit ?? String(e.lesson ?? "").slice(1, 3)), (perUnit.get(Number(e.unit ?? String(e.lesson ?? "").slice(1, 3))) ?? 0) + itemsIn(e));
+const topics = Object.entries(dr?.topics ?? {}).map(([t, us]) => ({ t, units: us, n: us.reduce((a, u) => a + (perUnit.get(u) ?? 0), 0) }));
+const lessonTitle = new Map(all.flatMap((u) => u.lessons.map((l) => [l.id, l] as const)));
+const lessonQuizzes = [...new Map(quizzes.filter((e) => e.lesson && lessonTitle.get(e.lesson as string)?.available).map((e) => [e.lesson as string, e])).values()]
+  .map((e) => ({ id: e.lesson as string, title: lessonTitle.get(e.lesson as string)!.title, n: quizzes.filter((x) => x.lesson === e.lesson).reduce((a, x) => a + itemsIn(x), 0), unit: Number(String(e.lesson).slice(1, 3)) }));
+const K = (dr?.talaKeeping ?? []) as { id: string; title: string; unlockedBy: string; tempo?: number }[];
+const cps = all.filter((u) => u.checkpoint);
+const TOPIC: Record<string, string> = { pitch: "Pitch", notation: "Notation", tala: "Tala", raga: "Raga", melakarta: "Melakarta", gamaka: "Gamaka", forms: "Forms", laya: "Laya", manodharma: "Manodharma", history: "History" };
 ---
+<SwaraLayout title={`${say("title", "Test yourself")} · Swara Studio`} description={say("desc", "Quizzes, mixed and topic review, tala-keeping tasks and unit checkpoints. No scores, no streaks; results are for you only.")}>
+  <PracticeTabs />
+  <h1 class="sr-only">{say("title", "Test yourself")}</h1>
+  <div class="ty-top">
+    <div class="ty-review" data-review>
+      <span class="t-eyebrow ch-blue">{say("reviewH", "Ready to review")}</span>
+      <h2 data-review-n>{say("reviewNone", "Nothing to review yet")}</h2>
+      <p>{say("reviewP", "Quiz items and drill items share one review queue.")}</p>
+      <a class="lr-btn" href={L("/carnatic/practice/test?review=1")} data-review-start hidden>{say("start", "Start")}</a>
+      <a class="lr-link" href={L("/carnatic/practice/ear?review=1")} data-review-ear hidden></a>
+    </div>
+    <div class="ty-mixed">
+      <span class="t-eyebrow ch-rose">{say("mixedH", "Mixed review")}</span>
+      <h2>{say("mixedT", "A little of everything you've opened")}</h2>
+      <div class="lr-seg" role="group" aria-label={say("mixedSize", "How many items")}>
+        {[10, 20, 40].map((n) => <a class="lr-seg-a" href={L(`/carnatic/practice/test?mixed=${n}`)} data-default={n === 20 ? "1" : undefined}>{n}</a>)}
+      </div>
+      <p>{say("mixedP", "Items come from lessons you've read. Retake any time.")}</p>
+    </div>
+  </div>
+
+  <h2 class="ty-sec">{say("topicH", "Topic review")}</h2>
+  <div class="ty-chips">
+    {topics.map((t) => (
+      <a class="ty-chip" href={L(`/carnatic/practice/test?topic=${t.t}`)} data-topic-units={t.units.join(" ")}>
+        {TOPIC[t.t] ?? t.t} <small data-topic-n data-n={t.n} data-after={t.units[0]}>{say("items", "{n} items").replace("{n}", String(t.n))}</small>
+      </a>
+    ))}
+  </div>
+
+  <h2 class="ty-sec">{say("quizH", "Little quizzes")}</h2>
+  <p class="ty-quiz-note" data-quiz-empty>{say("quizEmpty", "A lesson's quiz appears here once you've opened the lesson. The first ones:")}</p>
+  <ul class="ty-quiz" data-quizzes>
+    {lessonQuizzes.map((q) => (
+      <li data-quiz={q.id} data-unit={q.unit} hidden>
+        <a href={L(`/carnatic/practice/test?lesson=${q.id}`)}><span class="mono">{q.id.replace("U", "U").replace(".L", ".L")}</span><b>{q.title}</b><small data-quiz-meta data-n={q.n}>{say("nItems", "{n} items").replace("{n}", String(q.n))}</small></a>
+      </li>
+    ))}
+    {all.filter((u) => perUnit.get(u.n)).map((u) => (
+      <li data-unit-quiz={u.n} data-lessons={u.lessons.map((l) => l.id).join(" ")} hidden>
+        <a href={L(`/carnatic/practice/test?unit=${u.n}`)}><span class="mono">U{String(u.n).padStart(2, "0")}</span><b>{say("unitQuiz", "Unit {n} quiz").replace("{n}", String(u.n))}</b><small data-quiz-meta data-n={Math.min(20, perUnit.get(u.n) ?? 0)}>{Math.min(20, perUnit.get(u.n) ?? 0)} items</small></a>
+      </li>
+    ))}
+  </ul>
+
+  <h2 class="ty-sec">{say("talaH", "Tala keeping")}</h2>
+  <div class="ty-k">
+    {K.map((k) => (
+      <a href={L(`/carnatic/practice/tap/${k.id}`)} data-k={k.id} data-unlocked-by={k.unlockedBy}>
+        <span class="mono">{k.id}</span>
+        <span><b>{k.title}</b><small data-k-meta>{say("notTried", "not tried yet")}</small></span>
+      </a>
+    ))}
+  </div>
+
+  <h2 class="ty-sec">{say("cpH", "Unit checkpoints")}</h2>
+  <div class="ty-cp">
+    {cps.map((u) => (
+      <a href={L(`/carnatic/practice/test?checkpoint=${u.n}`)} data-cp={u.checkpoint}>
+        <b>{say("unitWord", "Unit")} {u.n}</b><small data-cp-meta>{say("notTaken", "not taken")}</small>
+      </a>
+    ))}
+  </div>
+  <script type="application/json" id="ty-words" set:html={JSON.stringify({
+    due: say("due", "{n} cards ready to review"), due1: say("due1", "1 card ready to review"), none: say("reviewNone", "Nothing to review yet"),
+    ear: say("earDue", "{n} of them are ear-training cards: review them in Ear training ›"),
+    notTaken: say("notTaken", "not taken"), taken: say("taken", "taken · see profile"), once: say("once", "taken once"), twice: say("twice", "taken twice"), times: say("times", "taken {n} times"),
+    items: say("nItems", "{n} items"), best: say("best", "best {p} of {t}"), opens: say("opens", "opens with unit {n} · try it anyway"), notTried: say("notTried", "not tried yet"),
+    after: say("after", "after unit {n}"),
+  })} />
+</SwaraLayout>
+
+<script>
+  import { allLessons, attempts, dueCards, syncCards, syncLessons } from "../../../lib/carnatic/client/learner";
+  import { boot } from "../../../lib/carnatic/client/state";
+  const W = JSON.parse(document.getElementById("ty-words")!.textContent!);
+  const paint = () => {
+    const lessons = allLessons();
+    const due = dueCards();
+    const quiz = due.filter((c) => c.key.includes("#") || c.key.startsWith("gen:")).length;
+    const ear = due.length - quiz;
+    document.querySelector("[data-review-n]")!.textContent = due.length ? (due.length === 1 ? W.due1 : W.due.replace("{n}", due.length)) : W.none;
+    document.querySelector<HTMLElement>("[data-review-start]")!.hidden = !quiz;
+    const earA = document.querySelector<HTMLElement>("[data-review-ear]")!;
+    earA.hidden = !ear;
+    earA.textContent = W.ear.replace("{n}", ear);
+    const times = (id: string, kind?: string) => attempts({ itemId: id, kind }).length;
+    const takenWord = (n: number) => (n === 0 ? W.notTaken.replace("not taken", "not taken") : n === 1 ? W.once : n === 2 ? W.twice : W.times.replace("{n}", n));
+    let shown = 0;
+    document.querySelectorAll<HTMLElement>("[data-quiz]").forEach((li) => {
+      const id = li.dataset.quiz!;
+      li.hidden = !lessons[id]?.openedAt;
+      if (!li.hidden) shown++;
+      const n = attempts({ kind: "quiz" }).filter((a) => a.itemId.startsWith(id)).length;
+      const m = li.querySelector<HTMLElement>("[data-quiz-meta]")!;
+      m.textContent = `${W.items.replace("{n}", m.dataset.n)} · ${takenWord(n)}`;
+    });
+    document.querySelectorAll<HTMLElement>("[data-unit-quiz]").forEach((li) => {
+      const ids = (li.dataset.lessons ?? "").split(" ");
+      li.hidden = !ids.some((id) => lessons[id]?.completedAt);
+      if (!li.hidden) shown++;
+      const n = times(`U${String(li.dataset.unitQuiz).padStart(2, "0")}`);
+      const m = li.querySelector<HTMLElement>("[data-quiz-meta]")!;
+      m.textContent = `${W.items.replace("{n}", m.dataset.n)} · ${takenWord(n)}`;
+    });
+    const empty = document.querySelector<HTMLElement>("[data-quiz-empty]")!;
+    empty.hidden = shown > 0;
+    if (!shown) document.querySelectorAll<HTMLElement>("[data-quiz]").forEach((li, i) => { li.hidden = i >= 4; });
+    // topics: open after two lessons of the strand are complete
+    document.querySelectorAll<HTMLElement>("[data-topic-units]").forEach((a) => {
+      const units = (a.dataset.topicUnits ?? "").split(" ").map(Number);
+      const done = Object.entries(lessons).filter(([id, s]) => s.completedAt && units.includes(Number(id.slice(1, 3)))).length;
+      const small = a.querySelector<HTMLElement>("[data-topic-n]")!;
+      small.textContent = done >= 2 ? W.items.replace("{n}", small.dataset.n) : W.after.replace("{n}", small.dataset.after);
+    });
+    document.querySelectorAll<HTMLElement>("[data-k]").forEach((a) => {
+      const tries = attempts({ itemId: a.dataset.k, kind: "tap" });
+      const meta = a.querySelector<HTMLElement>("[data-k-meta]")!;
+      if (tries.length) {
+        const best = tries.map((t) => t.result).sort((x: any, y: any) => (y.perfect + y.on_time) - (x.perfect + x.on_time))[0] as any;
+        meta.textContent = `${W.best.replace("{p}", best.perfect + best.on_time).replace("{t}", best.of ?? "?")}${best.tempo ? ` · ${best.tempo} bpm` : ""}`;
+      } else {
+        const by = a.dataset.unlockedBy ?? "";
+        meta.textContent = by && !lessons[by]?.openedAt ? W.opens.replace("{n}", Number(by.slice(1, 3))) : W.notTried;
+      }
+    });
+    document.querySelectorAll<HTMLAnchorElement>("[data-cp]").forEach((a) => {
+      const n = attempts({ itemId: a.dataset.cp, kind: "checkpoint" }).length;
+      a.classList.toggle("taken", n > 0);
+      a.querySelector("[data-cp-meta]")!.textContent = n ? W.taken : W.notTaken;
+    });
+  };
+  paint();
+  if (boot().signedIn) void Promise.all([syncLessons(), syncCards()]).then(paint);
+</script>

@@ -85,6 +85,8 @@ details.sw-conf-wrap > summary::-webkit-details-marker { display: none; }
 .sn-hint { color: var(--ink-faint); }
 .sn-outside .sn-l { border-bottom: 1px dotted var(--ink-soft); }
 .sn-sep { align-self: center; color: var(--ink-faint); font-family: var(--font-body); padding: 0 2px; }
+.sn-bar { align-self: stretch; width: 1px; background: var(--ink-soft); margin: 4px 6px; }
+.sn-bar-end { width: 4px; border-left: 1px solid var(--ink-soft); border-right: 1px solid var(--ink-soft); background: none; }
 .sn-tag { display: block; font: 9px / 12px var(--font-mono); color: var(--rose); text-align: center; }
 
 .sn-script-ta { --sn-size: var(--notation-size-ta); }

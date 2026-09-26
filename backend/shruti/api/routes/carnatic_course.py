@@ -126,25 +126,37 @@ async def units_json(session: AsyncSession, preview: bool) -> list[dict]:
             unit = int(eid[4:6]) if eid.startswith("CP.U") else 0
             if unit:
                 checkpoints[unit] = eid
+    approved = await _approved_ids(session)
     out = []
     for u in units:
         items = []
+        recs: list[dict] = []
+        quizzes = False
         for s in u.lessons or []:
             row = lessons.get(s["id"])
             f = row.front if row else {}
             tools = set(f.get("tools") or s.get("tools") or [])
             k = kinds.get(s["id"], set())
+            quizzes = quizzes or "quiz" in k
+            front_recs = f.get("recordings") or []
+            for r in front_recs:
+                rid = r.get("id") if isinstance(r, dict) else r
+                if rid and all(x["id"] != rid for x in recs):
+                    recs.append({"id": rid, "why": (r.get("why") if isinstance(r, dict) else "") or "",
+                                 "lesson": s["id"], "available": rid in approved})
             items.append({
                 "id": s["id"], "slug": (row.slug if row else s.get("slug")), "order": int(s["id"][-2:]),
                 "title": f.get("title") or s.get("title"), "minutes": f.get("minutes") or s.get("minutes") or 0,
                 "level": f.get("level") or s.get("level") or "", "available": row is not None,
                 "status": row.status if row else "planned",
-                "hasListening": "listening" in k or bool(tools & {"recording", "listen"}),
+                "hasListening": "listening" in k or bool(front_recs) or bool(tools & {"recording", "listen"}),
                 "hasPractice": "practice" in k,
                 "after": s.get("after") or [],
             })
         out.append({"n": u.n, "title": u.title, "level": u.level, "levelLabel": LEVEL_LABEL.get(u.level, u.level),
-                    "intro": u.intro, "lessons": items, "checkpoint": checkpoints.get(u.n)})
+                    "intro": u.intro, "lessons": items, "recordings": recs,
+                    # A unit without its own CP.Unn set gets one assembled from its lesson quizzes.
+                    "checkpoint": checkpoints.get(u.n) or (f"CP.U{u.n:02d}" if quizzes else None)})
     return out
 
 
@@ -171,7 +183,9 @@ async def _flags(session: AsyncSession) -> dict[str, bool]:
 async def _glossary(session: AsyncSession) -> list[dict]:
     rows = (await session.execute(select(CarnaticGlossary).order_by(CarnaticGlossary.term))).scalars().all()
     return [{"term": g.term, "slug": g.slug, "definition": g.definition, "lesson": g.lesson,
-             "aliases": g.aliases or []} for g in rows]
+             "aliases": g.aliases or [],
+             # glossary.yaml may give a scholarly spelling (`translit`/`iast`); shown beside the term.
+             "translit": str((g.file_data or {}).get("translit") or (g.file_data or {}).get("iast") or "")} for g in rows]
 
 
 _version_cache: dict[str, tuple[float, dict]] = {}

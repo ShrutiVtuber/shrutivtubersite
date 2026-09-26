@@ -53,7 +53,10 @@ export function noteHtml(t: Token, o: DrawOptions, extraClass = ""): string {
 /** A phrase or a scale: a row of notes. `·` in the data is a quiet separator. */
 export function phraseHtml(line: string, o: DrawOptions): string {
   const cells = tokenize(line).map((t) =>
-    t.kind === "text" && t.raw === "·" ? `<span class="sn-sep" aria-hidden="true">·</span>` : noteHtml(t, o));
+    t.kind === "text" && t.raw === "·" ? `<span class="sn-sep" aria-hidden="true">·</span>`
+      // Bars in a lesson's notation: a thin rule between angas, a double one at the end.
+      : t.kind === "text" && (t.raw === "|" || t.raw === "||") ? `<span class="sn-bar${t.raw === "||" ? " sn-bar-end" : ""}" aria-hidden="true"></span>`
+      : noteHtml(t, o));
   return `<span class="sn-row">${cells.join("")}</span>`;
 }
 

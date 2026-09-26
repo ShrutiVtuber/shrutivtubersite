@@ -1,0 +1,56 @@
+---
+/* The glossary (README_v2 §3, artboard C6): every term the course uses, a
+ * one-line definition, and the lesson that teaches it. In lessons the same
+ * definitions open from a dotted underline. Terms come from the course's
+ * glossary.yaml and are edited in the Studio.
+ */
+import SwaraLayout from "../../../layouts/SwaraLayout.astro";
+import { hrefIn, langOf } from "../../../lib/carnatic/i18n";
+import { copy } from "../../../lib/copy";
+import { glossary, units } from "../../../lib/carnatic/course";
+
+const lang = langOf(Astro);
+const say = await copy("carnatic/learn/glossary");
+const L = (p: string) => hrefIn(lang, p);
+const [terms, all] = await Promise.all([glossary(), units()]);
+const lessons = new Map(all.flatMap((u) => u.lessons.map((x) => [x.id, { ...x, unit: u.n }] as const)));
+const sorted = [...terms].sort((a, b) => a.term.localeCompare(b.term, "en", { sensitivity: "base" }));
+const first = (t: string) => t.normalize("NFD").replace(/[̀-ͯ]/g, "")[0]?.toUpperCase() ?? "";
+const letters = new Set(sorted.map((t) => first(t.term)));
+const AZ = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
+const firstOf = new Map<string, string>();
+for (const t of sorted) if (!firstOf.has(first(t.term))) firstOf.set(first(t.term), t.slug);
+const taught = (id?: string) => {
+  const l = id ? lessons.get(id) : undefined;
+  if (!l) return id ? { text: `${say("unitWord", "Unit")} ${Number(id.slice(1, 3))}`, href: L(`/carnatic/learn/unit/${Number(id.slice(1, 3))}`) } : null;
+  return l.available ? { text: `${say("unitWord", "Unit")} ${l.unit} · ${l.title}`, href: L(`/carnatic/learn/${l.slug}`) }
+    : { text: `${say("unitWord", "Unit")} ${l.unit}`, href: L(`/carnatic/learn/unit/${l.unit}`) };
+};
+---
+<SwaraLayout title={`${say("title", "Glossary")} · Swara Studio`} description={say("desc", "Every term the Swara Studio course uses, with a one-line definition and the lesson that teaches it.")}
+             crumbs={[[say("crumbLearn", "Learn"), L("/carnatic/learn")], [say("title", "Glossary")]]}>
+  <p class="lr-eyebrow-top">{say("eyebrow", "Learn · {n} terms").replace("{n}", String(sorted.length))}</p>
+  <h1 class="lr-title">{say("title", "Glossary")}</h1>
+  <p class="cu-first" style="max-width: 62ch">{say("lede", "Every term the course uses, with a one-line definition and the lesson that teaches it. In lessons, terms with a dotted underline open the same definition.")}</p>
+  {sorted.length === 0 ? (
+    <p class="ch-empty">{say("empty", "The glossary is being written alongside the lessons. Terms will appear here as they're checked.")}</p>
+  ) : (
+    <>
+      <nav class="gl-letters" aria-label={say("letters", "Jump to a letter")}>
+        {AZ.map((c) => letters.has(c) ? <a href={`#${firstOf.get(c)}`}>{c}</a> : <span>{c}</span>)}
+      </nav>
+      <div class="gl-grid">
+        {sorted.map((t) => {
+          const where = taught(t.lesson);
+          return (
+            <article class="gl-term" id={t.slug}>
+              <h2>{t.term}{(t as any).translit && <small>{(t as any).translit}</small>}</h2>
+              <p>{t.definition}</p>
+              {where && <a href={where.href}>{where.text} ›</a>}
+            </article>
+          );
+        })}
+      </div>
+    </>
+  )}
+</SwaraLayout>

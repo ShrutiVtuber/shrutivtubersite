@@ -1,0 +1,20 @@
+---
+/* Practice's own tabs (README_v2 §5-§6, artboard P1): Test yourself, Ear
+ * training, Skill map, Tuner, Tala trainer. */
+import { hrefIn, langOf } from "../../lib/carnatic/i18n";
+import { copy } from "../../lib/copy";
+
+const lang = langOf(Astro);
+const say = await copy("carnatic/practice");
+const here = Astro.url.pathname;
+const TABS: [string, string, (p: string) => boolean][] = [
+  ["/carnatic/practice", say("tab.test", "Test yourself"), (p) => p === "/carnatic/practice" || p.startsWith("/carnatic/practice/test")],
+  ["/carnatic/practice/ear", say("tab.ear", "Ear training"), (p) => p.startsWith("/carnatic/practice/ear")],
+  ["/carnatic/practice/skills", say("tab.skills", "Skill map"), (p) => p.startsWith("/carnatic/practice/skills")],
+  ["/carnatic/practice/tuner", say("tab.tuner", "Tuner"), (p) => p.startsWith("/carnatic/practice/tuner")],
+  ["/carnatic/practice/tala", say("tab.tala", "Tala trainer"), (p) => p.startsWith("/carnatic/practice/tala")],
+];
+---
+<nav class="pt-tabs" aria-label={say("tabs", "Practice")}>
+  {TABS.map(([href, label, on]) => <a href={hrefIn(lang, href)} aria-current={on(here.replace(/\/$/, "")) ? "page" : undefined}>{label}</a>)}
+</nav>
