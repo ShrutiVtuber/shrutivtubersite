@@ -9,7 +9,7 @@ same API, exactly as the Astrolabe and Squirrel Guides apps are.
   `http://localhost:8200`. Every path below starts with `/api`.
 - **Bodies:** JSON. Errors are `{"detail": "<a sentence meant for a person>"}`;
   show `detail` as it is. Where a client must branch, the status code says so
-  (401, 403, 404, 409, 413, 428, 429), and a few answers add `"code"`.
+  (401, 403, 404, 409, 428, 429), and a few answers add `"code"`.
 - **Times:** ISO 8601 with an offset (`2026-09-26T12:05:00+00:00`).
 - **No account is ever required** to read data, use the drone, tuner, tala
   trainer, raga explorer, lessons or player. An account keeps progress,
@@ -112,18 +112,22 @@ consents). For the school, use:
 {
   "signedIn": true,
   "displayName": "Priya",
-  "limits": { "partsPerSong": 2 },
+  "supporter": false,
+  "limits": { "partsPerSong": null },
   "settings": { … see §3 … },
   "settingsUpdatedAt": "2026-09-26T12:00:00+00:00"
 }
 ```
 
-Signed out: `{"signedIn": false, "limits": {"partsPerSong": 2}, "settings": null}`.
+Signed out: `{"signedIn": false, "limits": {"partsPerSong": null}, "settings": null}`.
 
-`limits.partsPerSong` is `null` when unlimited. **The app shows no prices, no
-supporter perks and no purchase links** (App Store and Play rules, and the
-design's hard rule 6): when a song is at its limit the app simply does not
-offer another part. The web explains the limit; the app does not.
+**Nothing in Swara Studio is gated** (the owner's rule of 26 Sep 2026):
+every tool and every feature is free for everyone, as the site's other tools
+are. `limits.partsPerSong` is always `null` (no limit) and is kept only for
+clients that read it. `supporter` says whether the person is a Swaras
+supporter so the website can thank them; it unlocks nothing. **The app shows
+no prices, no supporter mentions and no purchase links** (App Store and Play
+rules, and the design's hard rule 6).
 
 ## 2. The school's data (offline download)
 
@@ -269,13 +273,18 @@ or varnam's named sections; `section: null` for an exercise) of `lines[]` of
 optional `sahitya`, and `repeats: {"1": 1, "2": 1, "3": 2}`, the number of
 times the item is sung at each speed so it ends on samam (the "×2" badge).
 `path[]` is the order: the 50 default items, then the varnams that have
-arrived. `optional: true` items (the 8th alankaram) are off by default.
+arrived (54 with all four). `optional: true` items (the 8th alankaram) are off by default.
 
 **Varnams** arrive as the set `"id": "varnams"` when the research has their
 notation. Each item is a lesson item as above plus `ragaId` (the raga's id in
 `ragas.json`), `raga_scale` (its arohana and avarohana) and, where the
 research gives them, `composer`, `language`, `type`, `tala_note`,
-`confidence` and `source_url`. `varnamsComing[]` lists the ones not yet in
+`confidence` and `source_url`. Varnams are printed one **2-kalai Adi**
+avartanam a line (16 + 8 + 8 units: the angas scaled, not repeated); such a
+varnam carries `"kalai": 2`, `"practicalTala": "adi_2_kalai"` (16 counts in
+`talas.json`) and `"unitsPerCount": 2`: two notes to a count at speed 1, four
+at speed 2, eight at speed 3. Its `repeats` are computed on that 32-unit
+avartanam. An item without `unitsPerCount` has one note a count at speed 1. `varnamsComing[]` lists the ones not yet in
 the data (`{title, raga, tala?}`, `raga` being an id): show them as "coming";
 the list empties as they arrive. A varnam whose notation does not check out
 (a note outside its raga, a line that does not fit the tala) is left out of
@@ -360,17 +369,15 @@ All song routes need auth except reading a published sheet.
 - `PUT /api/carnatic/songs/{id}` with the body and `"baseUpdatedAt"`; 409 as for settings
 - `DELETE /api/carnatic/songs/{id}` → 204
 - `POST /api/carnatic/songs/{id}/publish` → the sheet is public at
-  `/carnatic/sheets/{slug}`. A published sheet is the person's own and goes
-  with their account if they delete it (§9); say so where they publish.
+  `/carnatic/sheets/{slug}`. When the person deletes their account they
+  choose whether their published sheets stay up, credited to nobody, or go
+  (§9); say so where they publish.
 - `POST /api/carnatic/songs/{id}/unpublish`
 - `GET /api/carnatic/sheets/{slug}` (no auth) → the published song and its
-  author's display name.
+  author's display name, or `"author": null` for a sheet kept after its
+  author deleted their account (show no credit).
 
-**413** `{"code": "PART_LIMIT", "limit": 2}` when a song carries more parts
-than the account allows. Free accounts have 2 parts per song (the melody
-counts as one); Swaras supporters have no limit. Songs saved by a supporter
-keep their parts if the support ends; they become read-only for parts
-beyond the limit (a PUT that does not add parts is accepted).
+A song may have any number of parts, for everybody.
 
 Song body (format 1):
 
@@ -443,11 +450,17 @@ site account (a cookie on the web, a bearer token in the app).
   `{"reason": "…"}` (optional, up to 300 characters) → `{"reported": true}`.
 
 **Moderation, the same for both clients.** A report flags the post or
-comment for Shruti; it hides nothing by itself. Each person reports a thing
-once (reporting again answers `{"reported": true}` and changes nothing). The
-review queue lists reported things first; hiding is her decision, and a
-hidden post or comment disappears for everyone (404 on its own address). Offer
-Report on posts and comments that are not the person's own.
+comment for Shruti. Each person reports a thing once (reporting again
+answers `{"reported": true}` and changes nothing). When **three different
+accounts** have reported it, it is **hidden automatically until she reviews
+it**; she then restores it or removes it for good. A restored post is only
+hidden again by three new reports. A hidden post or comment disappears for
+everyone (404 on its own address; gone from the list). **Who reported is
+never shown to anyone**, her included; only the count and any reasons given.
+Offer Report on posts and comments that are not the person's own.
+
+`author` is `"somebody"` on a post or comment kept after its author deleted
+their account.
 
 **Limits**, per account: 10 shares an hour, 30 comments in 10 minutes, 30
 reports an hour. Past them: **429** `{"code": "SLOW_DOWN", "detail": "…"}`;
@@ -482,12 +495,33 @@ while the school is not yet published.
 
 ## 8. Data the app never shows
 
-Prices, the support page, the open fund and gifts are **web only**
-(`/carnatic/support`). The app does not link to them.
+Prices and the support page are **web only** (`/carnatic/support`, which
+invites people to become a Swaras supporter through the site's own
+`/support`). The app does not link to them. There is no fund and nothing to
+gift: nothing is sold or unlocked.
 
 ## 9. Deleting an account
 
 Deleting a site account (website Account page, or `DELETE /api/account/`)
-deletes the person's settings, progress, practice log, device links, songs,
-sheets, Listen posts, likes, comments and reports with it. The account export
-(`GET /api/account/export`) includes all of them.
+follows the owner's rule of 26 Sep 2026:
+
+- **Deleted:** Swara Studio settings, progress and app sign-in codes.
+- **Kept without a name:** Listen posts, comments, likes and reports, and
+  the practice log. Posts and comments then show `"author": "somebody"`.
+- **Songs, as the person chooses:** `DELETE /api/account/?songs=anonymise`
+  keeps each published sheet up, credited to nobody (`"author": null`), and
+  deletes the songs never published; `?songs=delete` deletes every song and
+  sheet. A person who has songs and sends neither is answered, and nothing
+  is deleted:
+
+```json
+409 { "code": "SONGS_CHOICE_NEEDED",
+      "detail": "You have songs in Swara Studio. Keep your published sheets up, credited to nobody, or delete them with your account?",
+      "songs": 3, "published": 1 }
+```
+
+  Ask with those two choices, then call again with `songs`. A person with no
+  songs is deleted at once, as before.
+
+The account export (`GET /api/account/export`) is unchanged and includes all
+of it.
