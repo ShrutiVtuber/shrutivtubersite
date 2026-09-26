@@ -165,9 +165,13 @@ async function isOperator(token: string | undefined): Promise<boolean> {
  * sees. No CSRF cookie is minted for it (nothing here is a form) and no
  * reader session is asked about (it reads none). */
 const SECTION_MACHINES = new Set(["/ledger/reckon.json"]);
+/* Swara Studio's journal for the app (docs/carnatic/API.md §7): the list and
+   one article, read-only JSON, under the same rules as the Ledger's engine. */
+const SCHOOL_MACHINES = /^\/carnatic\/journal(\/[a-z0-9][a-z0-9-]*)?\.json$/;
+const isSectionMachine = (path: string) => SECTION_MACHINES.has(path) || SCHOOL_MACHINES.test(path);
 
 export const onRequest = defineMiddleware(async (context, next) => {
-  if (SECTION_MACHINES.has(context.url.pathname)) {
+  if (isSectionMachine(context.url.pathname)) {
     const section = sectionOf(context.url.pathname);
     if (section && (await siteState()).sections[section] === false
         && !(await isOperator(context.cookies.get(ADMIN_COOKIE)?.value))) {

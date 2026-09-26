@@ -45,24 +45,12 @@ export function athens(iso: string): string {
   return `${day} ${time} Athens`;
 }
 
-const TOPICS = /\b(carnatic|raga|ragam|tala|talam|swara|sruti|shruti box|tanpura|drone|gamaka|varisai|alankaram|geetham|varnam|kriti|venu|veena|mridangam|konnakol|melakarta|mohanam|bhairavi|begada|just intonation)\b/i;
 
 export async function schoolJournal(limit = 3): Promise<{ href: string; title: string; meta: string }[]> {
-  /* The dev server cannot load the journal's HTML parser (a CommonJS module
-     the production build bundles); the journal's own pages have the same
-     limit there. In dev the section shows its empty state. */
-  if (import.meta.env.DEV) return [];
-  try {
-    /* Imported when asked for: the journal reader brings an HTML parser that
-       only the journal's own pages otherwise load. */
-    const { read: readJournal } = await import("../journal/parse");
-    const page = await readJournal(["blog"]);
-    const entries = (page?.entries ?? []).filter((e) => TOPICS.test(`${e.title} ${e.dek}`));
-    return entries.slice(0, limit).map((e) => ({
-      href: e.href, title: e.title,
-      meta: e.date ? new Date(e.date).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "",
-    }));
-  } catch {
-    return [];
-  }
+  /* The same list the app reads (lib/carnatic/journal.ts). */
+  const { schoolArticles } = await import("./journal");
+  return (await schoolArticles()).slice(0, limit).map((e) => ({
+    href: e.href, title: e.title,
+    meta: e.date ? new Date(e.date).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "",
+  }));
 }
