@@ -90,7 +90,16 @@ rentOrBuy(data, buildingId, years)
 rankBuildings(data, plan, ctx, filters)                 // memoised by plan + filters
 ```
 
-The formulas come from the research (`01-businesses-and-products.md` §1 and §5, `03-real-estate-investments.md` §2, `04-employees-operations-demand.md` §4–5). **Not** from the prototype's stand-in. The sample check comes from the brief: Acorn Gifts at 12 2nd Avenue, one register, open 09–21, Normal, satisfaction 80, demand 80, gives **1,459** customers a week, **47** hours held, and a week of **$73,171**.
+Additions, as built (types in `lib/ledger/types.ts`):
+
+- `Plan.products?: string[]`: the products stocked; absent = the type's primary products.
+- `Plan.displays?: {productId: {fixtureId: n}}`: which displays hold which product. When it is absent the engine shares the display fixtures out, and each goes to the product with the least display so far.
+- `Plan.staff?: {roleId: {hours?, wage?}}`: the hours a week for staff beyond the registers (cleaning, guards), and the wage an hour when the person knows it. The default wage is base × the difficulty's salary multiplier, marked approximate. The role that staffs the registers works every staffed register-hour.
+- `Ctx.custom?` (a Custom difficulty's values) and `Ctx.importIndex?` (default 0.9).
+- `heldBy` can also be `"fixtures"`: a store-wide required fixture, such as the baskets or a changing room. `limit.reason` names the unknown state (no-type · no-building · closed · no-customers). `limit.say` and `rentOrBuy().say` are `{key, template, params}` for `say()` + `fill()`. Figures carry `lines: {key, label, op: + − × ÷ =, value, unit, honesty}`, and a null value means not counted.
+- Goods are bought at the cheapest wholesalers' index (0.90). An imported-only good uses `Ctx.importIndex`. Deliveries are $400 for each wholesale contract. Prices are compared to the cent.
+
+The formulas come from the research (`01-businesses-and-products.md` §1 and §5, `03-real-estate-investments.md` §2, `04-employees-operations-demand.md` §4–5). **Not** from the prototype's stand-in. The sample check comes from the brief: Acorn Gifts at 12 2nd Avenue, one register, open 09–21, Normal, satisfaction 80, demand 80, gives **1,459** customers a week, **47** hours held, and a week of **$73,171**. The brief's wages ($20 cashier, $14 cleaner 42 h) are not the pack's, so the test plan states them in `staff`.
 
 ## Contract 3 — the API (`backend/shruti/api/routes/ledger.py`)
 
