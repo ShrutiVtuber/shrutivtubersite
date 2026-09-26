@@ -1,0 +1,21 @@
+---
+/* A room's mark (lib/play.ts PLAY_MARKS), set in a 1px ring the size of the
+ * wing's small sigil, so a row of rooms reads like the wing's other lists.
+ * Decoration beside a name: aria-hidden, currentColor, never filled. */
+import { PLAY_MARKS } from "../../lib/play";
+interface Props { mark: string; ring?: boolean; size?: 16 | 24 }
+const { mark, ring = true, size = 24 } = Astro.props;
+const d = PLAY_MARKS[mark] ?? "";
+---
+{d && (
+  <span class="pm" data-ring={ring || undefined} aria-hidden="true">
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
+         stroke-linecap="round" stroke-linejoin="round"><path d={d} /></svg>
+  </span>
+)}
+
+<style>
+  .pm { display: inline-grid; place-items: center; flex: none; color: var(--ink); line-height: 0; }
+  .pm[data-ring] { width: 44px; height: 44px; box-sizing: border-box; border: 1px solid var(--line-strong); border-radius: 50%; background: var(--surface-page); }
+  .pm svg { display: block; }
+</style>

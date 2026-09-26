@@ -11,6 +11,7 @@
 import { site } from "./api";
 import { asReader } from "./account";
 import { loadPack } from "./ledger/data";
+import { MARKS } from "./marks";
 
 /* The games a build planner is written for. Mirrors RECIPES in
  * backend/shrutisguides/gamedata/recipes.py (checked by
@@ -108,3 +109,29 @@ export async function leftOff(astro: any, rooms: { guides: boolean; ledger: bool
   if (group?.code && group.name) out.groups = { name: String(group.name), href: `/groups/${group.code}` };
   return out;
 }
+
+/* ── the rooms' marks ─────────────────────────────────────────────────────────
+ * One drawing per room, in the rules every mark on the site keeps: 24 × 24,
+ * stroke 1.5, currentColor, round caps and joins, no fill, geometric. Reused
+ * where a set already has the thing — the planners' marks (lib/marks.ts) and
+ * the Ledger's kind marks (design_handoff_ledger/assets/marks, as path data) —
+ * and drawn here only where neither set does: a group, a phone, a server.
+ * A mark is decoration beside a name; it never carries state. */
+export const PLAY_MARKS: Record<string, string> = {
+  /* A guide is a path: the planners' progression, a climb in steps. */
+  guides: MARKS["kind-progression"],
+  /* The Ledger's own kind mark for a business: the shopfront. */
+  ledger: "M4 10v10h16V10M3 10l2-5h14l2 5zM10 20v-5h4v5",
+  /* A build is laid out on boards: the planners' board. */
+  builds: MARKS["kind-board"],
+  /* Drawn here: three members joined to one goal. */
+  groups: "M15 13a3 3 0 1 1-6 0 3 3 0 0 1 6 0zM7 5a2 2 0 1 1-4 0 2 2 0 0 1 4 0zM21 5a2 2 0 1 1-4 0 2 2 0 0 1 4 0zM14 20.5a2 2 0 1 1-4 0 2 2 0 0 1 4 0zM6.3 6.5l3.6 4.3M17.7 6.5l-3.6 4.3M12 16v2.5",
+  /* The Ledger's kind mark for a campaign: a screen on its stand — the stream's canvas. */
+  layouts: "M3 4h18v10H3zM12 14v7M8 21h8",
+  /* Drawn here: a phone. */
+  phone: "M7 3h10v18H7zM11 18h2",
+  /* Drawn here: a server of your own, two units. */
+  self: "M4 4h16v7H4zM4 13h16v7H4zM7.5 7.5h1M7.5 16.5h1",
+  /* The website, where you read: the planners' open manual. */
+  web: MARKS["kind-manual"],
+};
