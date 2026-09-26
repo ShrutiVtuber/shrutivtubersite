@@ -1,0 +1,113 @@
+---
+/* One catalogue (handoff README §2): self-paced lessons and live classes
+ * together, filtered by format. Live classes show Athens time with the
+ * visitor's own beside it. Progress bars read this browser's progress, and
+ * the account's when signed in. */
+import SwaraLayout from "../../../layouts/SwaraLayout.astro";
+import Hero from "../../../components/carnatic/Hero.astro";
+import Absent from "../../../components/carnatic/Absent.astro";
+import Chip from "../../../components/carnatic/Chip.astro";
+import Badge from "../../../components/navigation/Badge.astro";
+import { hrefIn, langOf, words } from "../../../lib/carnatic/i18n";
+import { lessons } from "../../../lib/carnatic/data";
+import { schoolClasses } from "../../../lib/carnatic/catalogue";
+import { lessonList } from "../../../lib/carnatic/lessons";
+import { visitor } from "../../../lib/carnatic/prefs";
+import { copy } from "../../../lib/copy";
+
+const lang = langOf(Astro);
+const t = await words(lang);
+const say = await copy("carnatic.lessons");
+const L = (p: string) => hrefIn(lang, p);
+const { me } = await visitor(Astro);
+const data = await lessons();
+const list = lessonList(data, (id) => t(`set.${id}` as any));
+const classes = (await schoolClasses(t, data)).rows.filter((r) => r.kind !== "self");
+const setLabel = (id: string) => t(`set.${id}` as any);
+---
+<SwaraLayout title={say("meta.title", "Lessons and classes · Swara Studio")}
+             description={say("meta.description", "Self-paced Carnatic lessons in the traditional order, from sarali varisai to the Malahari geethams, and live classes and workshops in one catalogue.")}
+             crumbs={[[t("crumb.learn"), L("/carnatic/lessons")], [say("crumb", "Lessons and classes")]]}>
+  <Hero eyebrow={say("eyebrow", "Lessons")} title={say("title", "Lessons and classes")} lede={say("lede", "Self-paced lessons and live classes in one catalogue.")} />
+  {!data ? <div class="sw-section"><Absent /></div> : (
+  <div class="lc" data-catalogue data-signed-in={me.signedIn ? "1" : ""}>
+    <div class="sw-toolbar">
+      <div class="sw-chips">
+        <Chip active data-f="all">{t("gen.all")}</Chip><Chip data-f="self">Self-paced</Chip><Chip data-f="live">Live classes</Chip><Chip data-f="workshop">Workshops</Chip>
+      </div>
+      <span class="spacer"></span>
+      <a class="sw-p" href={L("/carnatic/path")}>{say("toPath", "Open the path and player")}</a>
+    </div>
+    <ul class="lc-list">
+      {list.map((l, i) => (
+        <>
+          <li data-kind="self" id={i === 0 || list[i - 1].set !== l.set ? l.set : undefined}>
+            <a class="lc-row" href={L(`/carnatic/lessons/${l.slug}`)}>
+              <span class="sw-mono lc-n">{String(i + 1).padStart(2, "0")}</span>
+              <span class="lc-main"><span class="lc-h">{l.name}</span><span class="sw-p">{say("beginnerPath", "Beginner path")} · {setLabel(l.set)}{l.item.raga !== "Mayamalavagowla" ? ` · ${l.item.raga}` : ""}</span></span>
+              <Badge>Self-paced</Badge>
+              <span class="lc-bar" aria-hidden="true"><i data-progress={l.id}></i></span>
+              <span class="sw-mono lc-state" data-state={l.id}></span>
+            </a>
+          </li>
+          {i === 2 && classes.map((c) => (
+            <li data-kind={c.kind}>
+              <a class="lc-row" href={c.href}>
+                <span class="sw-mono lc-n">–</span>
+                <span class="lc-main"><span class="lc-h">{c.title}</span><span class="sw-p" data-utc={c.startsAt ?? undefined}>{c.kindLabel} · {c.meta}</span></span>
+                <Badge tone="accent">{c.kindLabel}</Badge>
+                <span class="lc-bar" aria-hidden="true"><i></i></span>
+                <span class="sw-mono lc-state">{c.kind === "live" ? "book" : ""}</span>
+              </a>
+            </li>
+          ))}
+        </>
+      ))}
+    </ul>
+    {classes.length === 0 && <p class="sw-note">{say("noClasses", "Live classes and workshops appear here when they are announced.")}</p>}
+  </div>
+  )}
+</SwaraLayout>
+
+<script>
+  import { boot } from "../../../lib/carnatic/client/state";
+  const root = document.querySelector<HTMLElement>("[data-catalogue]");
+  if (root) {
+    const chips = root.querySelectorAll<HTMLElement>("[data-f]");
+    chips.forEach((c) => c.addEventListener("click", () => {
+      chips.forEach((x) => x.setAttribute("aria-pressed", String(x === c)));
+      root.querySelectorAll<HTMLElement>("li[data-kind]").forEach((li) => { li.hidden = c.dataset.f !== "all" && li.dataset.kind !== c.dataset.f; });
+    }));
+    /* The visitor's own time beside Athens time. */
+    root.querySelectorAll<HTMLElement>("[data-utc]").forEach((el) => {
+      const d = new Date(el.dataset.utc!);
+      el.textContent += ` · ${d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} your time`;
+    });
+    let progress: Record<string, number[]> = {};
+    try { progress = JSON.parse(localStorage.getItem("swara.progress") || "{}"); } catch { /* blocked */ }
+    const paint = () => root.querySelectorAll<HTMLElement>("[data-progress]").forEach((bar) => {
+      const done = progress[bar.dataset.progress!] ?? [];
+      bar.style.width = `${(done.length / 3) * 100}%`;
+      const st = root.querySelector<HTMLElement>(`[data-state="${bar.dataset.progress}"]`);
+      if (st) st.textContent = done.length >= 3 ? "done" : done.length ? `speed ${Math.max(...done)}` : "";
+    });
+    paint();
+    if (boot().signedIn) fetch("/api/carnatic/me/progress").then((r) => r.ok ? r.json() : null).then((b) => {
+      if (!b) return;
+      for (const [id, v] of Object.entries<any>(b.items)) progress[id] = [...new Set([...(progress[id] ?? []), ...v.speeds])];
+      paint();
+    });
+  }
+</script>
+
+<style>
+  .lc-list { list-style: none; margin: 0; padding: 0; }
+  .lc-row { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto 120px 70px; gap: 12px 16px; align-items: center; padding: 14px 4px; border-bottom: 1px solid var(--line); text-decoration: none; }
+  .lc-row:hover .lc-h { color: var(--accent); }
+  .lc-main { display: grid; gap: 2px; }
+  .lc-h { font: 600 16px / 1.3 var(--font-body); color: var(--ink); }
+  .lc-bar { height: 3px; background: var(--line); border-radius: 2px; overflow: hidden; }
+  .lc-bar i { display: block; height: 100%; width: 0; background: var(--accent); }
+  .lc-state { text-align: right; }
+  @media (max-width: 599px) { .lc-row { grid-template-columns: 32px minmax(0, 1fr) auto; } .lc-bar, .lc-state { display: none; } }
+</style>
