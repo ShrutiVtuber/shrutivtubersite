@@ -1,0 +1,57 @@
+---
+/* The refusal / before-it-saves / saved note (handoff README, "Refusal /
+ * before-it-saves / saved note"): a grid of minmax(0,160px) minmax(0,1fr),
+ * the path at the left in mono 12 ink-faint, the sentence at 15px at the
+ * right. Eyebrows: NOT SAVED · BEFORE IT SAVES · SAVED (SAVED in --rose) ·
+ * IT CANNOT OPEN YET. No icon. In a console for `before` and `missing`.
+ *
+ * `rows` are drawn by the server; a script redraws them into
+ * `[data-note-rows]` with `drawNoteRows()` (lib/ledger/notes.ts). The
+ * default slot holds whatever follows the rows (a comparison, buttons). */
+import Console from "../guides/Console.astro";
+import { copy } from "../../lib/copy";
+import type { NoteRow } from "../../lib/ledger/notes";
+
+interface Props {
+  kind: "refusal" | "before" | "saved" | "missing";
+  rows?: NoteRow[];
+  /** The mono note at the head's right: "Acorn Gifts is open in the game". */
+  note?: string;
+  eyebrow?: string;
+  hidden?: boolean;
+  id?: string;
+  [key: string]: unknown;
+}
+const { kind, rows = [], note = "", eyebrow, hidden = false, id, ...rest } = Astro.props;
+const say = await copy("component:SaveNote");
+const EYEBROW = {
+  refusal: say("eyebrow.refusal", "Not saved"),
+  before: say("eyebrow.before", "Before it saves"),
+  saved: say("eyebrow.saved", "Saved"),
+  missing: say("eyebrow.missing", "It cannot open yet"),
+};
+const framed = kind === "before" || kind === "missing";
+---
+{framed ? (
+  <Console as="section" class="lg-note" data-kind={kind} hidden={hidden} id={id} {...rest}>
+    <div class="gd-console-head">
+      <span class="gd-eyebrow">{eyebrow ?? EYEBROW[kind]}</span>
+      <span class="gd-note" data-note-head>{note}</span>
+    </div>
+    <div class="lg-note-rows" data-note-rows>
+      {rows.map((r) => (<><span class="lg-note-path">{r.path}</span><span class="lg-note-text">{r.text}</span></>))}
+    </div>
+    <slot />
+  </Console>
+) : (
+  <section class="lg-note" data-kind={kind} hidden={hidden} id={id} role={kind === "refusal" ? "alert" : "status"} {...rest}>
+    <div class="lg-note-head">
+      <span class="gd-eyebrow">{eyebrow ?? EYEBROW[kind]}</span>
+      <span class="gd-note" data-note-head>{note}</span>
+    </div>
+    <div class="lg-note-rows" data-note-rows>
+      {rows.map((r) => (<><span class="lg-note-path">{r.path}</span><span class="lg-note-text">{r.text}</span></>))}
+    </div>
+    <slot />
+  </section>
+)}

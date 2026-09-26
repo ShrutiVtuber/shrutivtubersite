@@ -115,6 +115,36 @@ The formulas come from the research (`01-businesses-and-products.md` §1 and §5
 
 A route answers only for the reader's own ledger, and anyone else's is 404. Plans are JSON, checked for shape and size (64 KB at most), not recomputed. A null line means not written, never zero. All routes are free and ungated.
 
+## Contract 4 — the Ledger on stream (`backend/shruti/api/routes/ledger_stream.py`)
+
+Design: `shrutisgametracker/design/design_handoff_ledger_overlays/` (README §1–§8 and A1–A6). Seven overlay kinds, all drawn by `/overlay/ledger?t=` and inside a layout (`/overlay/guide-layout`): `ledger-plate`, `ledger-card`, `ledger-strip`, `ledger-limit`, `ledger-counter`, `ledger-plan-panel` and `ledger-plan-card`. The design's `streamingPlanId` is **not** used. The planner may stream a plan that was never kept, so the ledger stores the live plan itself.
+
+| Method | Path | What |
+|---|---|---|
+| GET · POST | `/api/ledger/ledgers/{id}/overlays` | this ledger's overlays by kind, theme and motion, never their address · mint `{kind, theme?, motion?, label?, shows?: "" \| "top"}` → `{id, token, path, kind, theme, motion, shows, createdAt, lastSeen}` (the token once) |
+| DELETE | `/api/ledger/ledgers/{id}/overlays/{tokenId}` | revoke (a delete) |
+| PUT | `/api/ledger/ledgers/{id}/on-screen` | `{businessId \| null}`: only an open business of this ledger (404 otherwise; 422 if it was never opened) |
+| PUT · DELETE | `/api/ledger/ledgers/{id}/live` | the *Plan on stream* switch: `{plan, name?, change?: {label, delta}}` overwrites the one live plan · off: cleared at once |
+
+Minting uses the same fair use as every overlay and never charges. The theme defaults to the game's own (`GAME_THEMES`: Big Ambitions → `ledger`). A ledger's overlays are `overlay_token.ledger_id` (ON DELETE CASCADE), so they go with the ledger, and the ledger goes with the account. `GET /ledgers/{id}` now also carries `onScreenBusinessId` and `live` (a bool, never the plan).
+
+**The frame** (`/api/overlay/guide?t=`, polled every second; the unchanged answer reads one row):
+
+```jsonc
+{ "kind", "theme", "motion", "version", "shows",
+  "element": {
+    "company": "Acorn Holdings", "game": {"version": "1.0", "build": "3682"},
+    "ctx": {"difficulty", "courses", "custom"},                  // so the browser reckons with the engine
+    // the five business kinds:
+    "businesses": [{"id", "name", "neighbourhood", "week": 6, "total": 72880}],   // open only, ledger order
+    "week": {"n": 6, "total": 101580} | null,                   // the latest week any open business wrote
+    "onScreen": id | null, "onScreenPlan": {engine keys only} | null,
+    // the two plan kinds, instead of all of the above but company:
+    "live": {"plan": {engine keys only}, "name", "change": {"label", "delta"} | null, "updatedAt"} | null } }
+```
+
+A week's total is money in minus the lines written. It is never cash, a note, an unopened plan, another ledger, or where a week came from. Plans are cut to the engine's keys (`PLAN_KEYS`). The words and the change sentences (A2) are in `frontend/site/src/lib/ledger/stream.ts`. The planner builds `{label, delta}` with `changeLabel()` and its own reckoning.
+
 ## Next — the plan on stream (after the backend lands; design in `design/requests/ledger-overlays-addendum-plan-on-stream.md`)
 
 Shruti plans on an iPad while chat watches an overlay. The planner's **Plan on stream** switch sends the working plan to the server as a live draft, a moment after each change. An overlay of kind `ledger-plan` polls for it, like every other overlay (about 2 s), and reckons it **with the same engine** in the browser source, so the two never disagree.

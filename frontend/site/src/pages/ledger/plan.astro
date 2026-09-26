@@ -1,0 +1,565 @@
+---
+/* Plan a business (handoff README §2): the Ledger's planner. Works signed
+ * out; keeping a plan needs an account.
+ *
+ * The server draws the shell — the sub-bar, the stats bar with every figure
+ * at —, the rail, What limits it, and the eight sections with all their fixed
+ * words — and the script (lib/ledger/planner.ts) fetches the game's data
+ * once, reckons the plan with the engine on every change, and fills the
+ * lists. With no data loaded the page says so and plans nothing.
+ *
+ *   ?section=type|building|…|review   the section in view
+ *   ?sample=1                         the brief's sample gift shop
+ *   ?business=ID                      a kept business: Review shows Before it saves
+ *   ?ledger=ID                        the ledger a new plan is for (its difficulty and courses)
+ *   ?draft=1                          the plan in progress before signing in
+ *
+ * ⚠ Every word the script draws is in WORDS below, as say() strings, and
+ * reaches it through data-words. test/ledger-planner-words.test.mjs checks
+ * that every key the script asks for is here.
+ */
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import Console from "../../components/guides/Console.astro";
+import Empty from "../../components/guides/Empty.astro";
+import Button from "../../components/forms/Button.astro";
+import LedgerBar from "../../components/ledger/LedgerBar.astro";
+import LedgerFoot from "../../components/ledger/LedgerFoot.astro";
+import LedgerStats from "../../components/ledger/LedgerStats.astro";
+import WhatLimitsIt from "../../components/ledger/WhatLimitsIt.astro";
+import WeekGrid from "../../components/ledger/WeekGrid.astro";
+import HoursPainter from "../../components/ledger/HoursPainter.astro";
+import SaveNote from "../../components/ledger/SaveNote.astro";
+import { account, asReader } from "../../lib/account";
+import { copy } from "../../lib/copy";
+import { loadPack } from "../../lib/ledger/data";
+
+const say = await copy("ledger/plan");
+const me = await account(Astro);
+const pack = await loadPack();
+const loaded = !!pack;
+const params = Astro.url.searchParams;
+
+type LedgerRow = { id: number; name: string; difficulty: string; custom?: Record<string, unknown> | null; courses: string[] };
+const ledgersRead = me ? await asReader(Astro, "/api/ledger/ledgers") : null;
+const ledgers: LedgerRow[] = ledgersRead?.ok && Array.isArray(ledgersRead.body)
+  ? ledgersRead.body.map((l: any) => ({ id: l.id, name: l.name, difficulty: l.difficulty, custom: l.custom ?? null, courses: l.courses ?? [] }))
+  : [];
+
+/* ?business= opens a kept plan. Anyone else's is a 404 from the API, which
+   reads here as "no such business": the planner then starts empty. */
+const businessId = Number(params.get("business") || 0) || 0;
+const businessRead = me && businessId ? await asReader(Astro, `/api/ledger/businesses/${businessId}`) : null;
+const business = businessRead?.ok && businessRead.body?.id
+  ? { id: businessRead.body.id, name: businessRead.body.name, ledgerId: businessRead.body.ledgerId, opened: !!businessRead.body.opened,
+      plan: businessRead.body.plan ?? {}, keptPlan: businessRead.body.keptPlan ?? null }
+  : null;
+const asked = Number(params.get("ledger") || 0) || 0;
+const ledgerId = business?.ledgerId ?? (ledgers.some((l) => l.id === asked) ? asked : ledgers[0]?.id ?? null);
+const ledger = ledgers.find((l) => l.id === ledgerId) ?? null;
+
+const SECTIONS = ["type", "building", "products", "fixtures", "hours", "campaigns", "assumptions", "review"] as const;
+const wanted = String(params.get("section") || "");
+const section = (SECTIONS as readonly string[]).includes(wanted) ? wanted : "type";
+
+const NAMES: Record<string, string> = {
+  type: say("section.type", "Type"),
+  building: say("section.building", "Building"),
+  products: say("section.products", "Products"),
+  fixtures: say("section.fixtures", "Fixtures"),
+  hours: say("section.hours", "Hours and staff"),
+  campaigns: say("section.campaigns", "Campaigns"),
+  assumptions: say("section.assumptions", "Assumptions"),
+  review: say("section.review", "Review"),
+};
+
+const WORDS = {
+  ...Object.fromEntries(Object.entries(NAMES).map(([k, v]) => [`section.${k}`, v])),
+  and: say("and", "and"),
+  or: say("or", "or"),
+  chosen: say("chosen", "Chosen"),
+  yours: say("yours", "yours"),
+  loss: say("loss", "loss"),
+  "unit.days": say("unit.days", "days"),
+  "stats.note": say("stats.note", "{difficulty} · satisfaction {s} %"),
+  "title.none": say("title.none", "A business, not kept"),
+  "title.type": say("title.type", "A {type}, not kept"),
+  "meta.noType": say("meta.noType", "no type yet"),
+  "meta.noBuilding": say("meta.noBuilding", "no building yet"),
+  "meta.unsaved": say("meta.unsaved", "nothing is saved until you keep it"),
+  "meta.opened": say("meta.opened", "in {ledger} · opened"),
+  "meta.kept": say("meta.kept", "in {ledger} · kept"),
+  "rail.none": say("rail.none", "none"),
+  "rail.hours": say("rail.hours", "{n} h"),
+  "rail.campaigns": say("rail.campaigns", "{n} of {of}"),
+  "rail.yours": say("rail.yours", "{n} yours"),
+  "rail.change": say("rail.change", "{n} change"),
+  "rail.changes": say("rail.changes", "{n} changes"),
+  "nav.prev": say("nav.prev", "← {name}"),
+  "nav.next": say("nav.next", "{name} →"),
+  "nav.start": say("nav.start", "Start of the plan"),
+  "nav.end": say("nav.end", "End of the plan"),
+  "use.shop": say("use.shop", "a shop unit"),
+  "use.office": say("use.office", "an office"),
+  "use.warehouse": say("use.warehouse", "a warehouse"),
+  "use.home": say("use.home", "a home"),
+  "use.cinema": say("use.cinema", "a cinema building"),
+  "use.theatre": say("use.theatre", "a theatre building"),
+  "use.special": say("use.special", "a special building"),
+  "type.note": say("type.note", "{n} types · {open} you can open"),
+  "type.noCourse": say("type.noCourse", "no course"),
+  "type.needs": say("type.needs", "needs {course}"),
+  "type.finished": say("type.finished", "{course} · finished"),
+  "type.line": say("type.line", "Sells {products}. Opens in {useA}."),
+  "type.lineNoProducts": say("type.lineNoProducts", "Opens in {useA}."),
+  "type.from": say("type.from", "from {x}"),
+  "finder.hood": say("finder.hood", "neighbourhood"),
+  "finder.capacity": say("finder.capacity", "capacity"),
+  "finder.all": say("finder.all", "All"),
+  "finder.any": say("finder.any", "any"),
+  "finder.anyHood": say("finder.anyHood", "any neighbourhood"),
+  "finder.rankFor": say("finder.rankFor", "{type}, as planned"),
+  "finder.rankNone": say("finder.rankNone", "Choose a type to rank for it"),
+  "finder.count": say("finder.count", "{n} of {of}"),
+  "finder.emptyBody": say("finder.emptyBody", "No building in {hood} has a capacity of {cap} an hour. The nearest match is one filter away."),
+  "finder.capacityOf": say("finder.capacityOf", "capacity {n}"),
+  "finder.traffic": say("finder.traffic", "traffic {n}"),
+  "finder.rentDay": say("finder.rentDay", "{x} a day"),
+  "finder.plannedWeek": say("finder.plannedWeek", "planned week"),
+  "finder.rentWeek": say("finder.rentWeek", "rent a week"),
+  "finder.cannotTrade": say("finder.cannotTrade", "cannot trade here"),
+  "finder.read": say("finder.read", "Read"),
+  "finder.more": say("finder.more", "See all {n} in Places"),
+  "products.noteHood": say("products.noteHood", "primary first · {hood} prices"),
+  "products.noteNoHood": say("products.noteNoHood", "primary first · prices wait for a building"),
+  "products.primary": say("products.primary", "primary"),
+  "products.impact": say("products.impact", "sells {x}"),
+  "products.unlisted": say("products.unlisted", "not usual here"),
+  "products.market": say("products.market", "Market {p}."),
+  "products.atEdge": say("products.atEdge", "The Ledger uses {p}, the edge where every customer buys."),
+  "products.noBuilding": say("products.noBuilding", "Choose a building: a price is read against its neighbourhood."),
+  "products.noFigures": say("products.noFigures", "Nothing is reckoned until the plan can open."),
+  "products.figs": say("products.figs", "{units} a week · {money}"),
+  "products.priceAria": say("products.priceAria", "{name} price"),
+  "products.useEdge": say("products.useEdge", "Use the edge, {p}"),
+  "products.staircase": say("products.staircase", "Staircase"),
+  "products.unstock": say("products.unstock", "Stop stocking"),
+  "products.alsoSells": say("products.alsoSells", "also sells"),
+  "tread.all": say("tread.all", "Every customer buys at this price."),
+  "tread.above": say("tread.above", "Above the {lost}-class edge: {still} class still buy."),
+  "tread.only": say("tread.only", "Only {cls}-class customers buy at this price."),
+  "tread.none": say("tread.none", "Above every edge: nobody buys."),
+  "class.working": say("class.working", "working"),
+  "class.middle": say("class.middle", "middle"),
+  "class.upper": say("class.upper", "upper"),
+  "stair.noBuilding": say("stair.noBuilding", "Choose a building: the staircase is read against its neighbourhood."),
+  "mark.market": say("mark.market", "market {p}"),
+  "mark.allBuy": say("mark.allBuy", "every customer buys · {p}"),
+  "mark.best": say("mark.best", "best {p}"),
+  "mark.merged": say("mark.merged", "best · every customer buys · {p}"),
+  "mark.competitor": say("mark.competitor", "competitor {p}"),
+  axis: say("axis", "price → money a week ↑"),
+  backorder: say("backorder", "Backordered: there is nothing to sell this week, at any price. The staircase returns when the stock does."),
+  aria: say("stair.aria", "Money a week for {product} against its shelf price"),
+  "fixtures.note": say("fixtures.note", "the type's required fixtures, and what shows its products"),
+  "fixtures.noteCapacity": say("fixtures.noteCapacity", "the building serves {n} an hour at most"),
+  "fixture.serves": say("fixture.serves", "serves {n} customers an hour"),
+  "fixture.holds": say("fixture.holds", "holds {list}"),
+  "fixture.holdsUnits": say("fixture.holdsUnits", "{n} {product}"),
+  "fixture.standsOn": say("fixture.standsOn", "stands on {x}"),
+  "fixture.store": say("fixture.store", "from {store}"),
+  "fixture.required": say("fixture.required", "required"),
+  "fixture.requiredOr": say("fixture.requiredOr", "required · or {other}"),
+  "fixture.neededBy": say("fixture.neededBy", "needed by the {by}"),
+  "fixture.fewer": say("fixture.fewer", "One fewer {name}"),
+  "fixture.more": say("fixture.more", "One more {name}"),
+  "fixture.lineTotal": say("fixture.lineTotal", "{n} × {each} · {total}"),
+  "hours.note": say("hours.note", "{open} open hours · {reg} register-hours"),
+  "staff.station": say("staff.station", "Works every staffed register-hour: {h} h this week."),
+  "staff.hours": say("staff.hours", "{h} h a week."),
+  "staff.none": say("staff.none", "No hours planned: the week counts no wage for this role."),
+  "staff.hoursUnit": say("staff.hoursUnit", "h a week"),
+  "staff.hoursAria": say("staff.hoursAria", "{name}: hours a week"),
+  "staff.wageAria": say("staff.wageAria", "{name}: wage an hour"),
+  "campaigns.note": say("campaigns.note", "advertising works {x} in {hood}"),
+  "campaigns.noteNone": say("campaigns.noteNone", "choose a building to see what each brings"),
+  "campaigns.line": say("campaigns.line", "{agency} · reach {reach}"),
+  "campaigns.cost": say("campaigns.cost", "{x} a day"),
+  "campaigns.adds": say("campaigns.adds", "+{n} customers a week"),
+  "assume.percent": say("assume.percent", "{n} %"),
+  "assume.demandValue": say("assume.demandValue", "{n} for every product · the Ledger's figure"),
+  "assume.compHelp": say("assume.compHelp", "For {product}. Leave it empty if nobody nearby sells it; it is marked on the staircase."),
+  "assume.compNone": say("assume.compNone", "Choose a type first: a competitor's price is for one of its products."),
+  "review.business": say("review.business", "Business"),
+  "review.type": say("review.type", "Type"),
+  "review.building": say("review.building", "Building"),
+  "review.layout": say("review.layout", "Layout"),
+  "review.perHour": say("review.perHour", "{n} an hour"),
+  "review.products": say("review.products", "Products"),
+  "review.fixtures": say("review.fixtures", "Fixtures"),
+  "review.times": say("review.times", "{name} × {n}"),
+  "review.hours": say("review.hours", "Hours and more"),
+  "review.openHours": say("review.openHours", "Open hours"),
+  "review.registerHours": say("review.registerHours", "Register-hours"),
+  "review.campaigns": say("review.campaigns", "Campaigns"),
+  "review.satisfaction": say("review.satisfaction", "Satisfaction"),
+  "review.h": say("review.h", "{n} h"),
+  "review.week": say("review.week", "The week"),
+  "review.moneyIn": say("review.moneyIn", "Money in"),
+  "review.moneyOut": say("review.moneyOut", "Money out"),
+  "review.theWeek": say("review.theWeek", "The week"),
+  "review.setup": say("review.setup", "Setup"),
+  "review.payback": say("review.payback", "Payback"),
+  "review.signedOut": say("review.signedOut", "Nothing is saved yet. Keep it in a ledger to open it in the game and write down its weeks."),
+  "review.unchanged": say("review.unchanged", "Nothing has changed since this plan was kept. Change anything and this page says what it changes before it saves."),
+  "before.opened": say("before.opened", "{name} is open in the game"),
+  "before.kept": say("before.kept", "{name} is kept in {ledger}"),
+  "compare.row": say("compare.row", "Row"),
+  "compare.before": say("compare.before", "Before"),
+  "compare.after": say("compare.after", "After"),
+  "compare.change": say("compare.change", "Change"),
+  "saved.kept": say("saved.kept", "Kept in {ledger} as {name}. Change anything and Review says what it changes before it saves."),
+  "refuse.namePath": say("refuse.namePath", "business · name"),
+  "refuse.name": say("refuse.name", "A business needs a name before it is kept. The name it has in the game will do."),
+  "refuse.ledgerPath": say("refuse.ledgerPath", "business · ledger"),
+  "refuse.ledger": say("refuse.ledger", "Choose the ledger it belongs to."),
+  "refuse.keepPath": say("refuse.keepPath", "business · keep"),
+  "refuse.savePath": say("refuse.savePath", "business · plan"),
+  "refuse.failed": say("refuse.failed", "That did not go through. Nothing was saved; try again."),
+  // Before it saves (lib/ledger/notes.ts)
+  "change.text": say("change.text", "{a} → {b}."),
+  "change.buy": say("change.buy", "{a} → {b}. Buy the difference in the game before it opens tomorrow."),
+  "change.none": say("change.none", "none"),
+  "change.edge": say("change.edge", "the edge"),
+  "change.on": say("change.on", "on"),
+  "change.off": say("change.off", "off"),
+  "path.type": say("path.type", "type"),
+  "path.building": say("path.building", "building"),
+  "path.fixture": say("path.fixture", "fixtures · {name}"),
+  "path.price": say("path.price", "products · {name}"),
+  "path.products": say("path.products", "products · stocked"),
+  "path.open": say("path.open", "hours · open"),
+  "path.registers": say("path.registers", "hours · registers"),
+  "path.campaign": say("path.campaign", "campaigns · {name}"),
+  "path.satisfaction": say("path.satisfaction", "assumptions · satisfaction"),
+  "path.staff": say("path.staff", "staff · {name}"),
+  "path.competitor": say("path.competitor", "assumptions · {name}"),
+  "value.hours": say("value.hours", "{n} h"),
+  "value.percent": say("value.percent", "{n} %"),
+  "value.wage": say("value.wage", "${n} an hour"),
+  saved: say("saved", "Saved. {changes}."),
+  "saved.join": say("saved.join", "; "),
+  "row.week": say("row.week", "The week"),
+  "row.customers": say("row.customers", "Customers a week"),
+  "row.setup": say("row.setup", "Setup"),
+  "row.payback": say("row.payback", "Payback"),
+  // It cannot open yet (lib/ledger/limit.ts)
+  "missing.path.fixtures": say("missing.path.fixtures", "fixtures · {short}"),
+  "missing.path.type": say("missing.path.type", "type · course"),
+  "missing.path.products": say("missing.path.products", "products"),
+  "missing.fixtures": say("missing.fixtures", "{typeA} needs {names} to open. Add one under Fixtures."),
+  "missing.needs": say("missing.needs", "Each {neededBy} stands on {names}. Add one under Fixtures."),
+  "missing.course": say("missing.course", "{typeA} needs the {course} course finished first. A ledger's courses decide which types it can open."),
+  "missing.products": say("missing.products", "{typeA} needs one of {names} in stock. Choose it under Products."),
+  "missing.or": say("missing.or", "or"),
+};
+
+const STATE = {
+  signedIn: !!me,
+  ledgers,
+  ledgerId,
+  business,
+  sample: params.get("sample") === "1",
+  draft: params.get("draft") === "1",
+  section,
+};
+const signInHref = `/signin?next=${encodeURIComponent("/ledger/plan?draft=1&section=review")}`;
+const planHref = business ? `/ledger/plan?business=${business.id}` : "/ledger/plan";
+---
+
+<BaseLayout title={say("meta.title", "Plan a business — the Ledger")}
+            description={say("meta.description", "Plan a Big Ambitions business before you spend a dollar of the game's money, and see what the game will do with it.")}
+            noindex={!!business}>
+  <div class="page gd-full lg-root lg-plan" data-planner data-loaded={loaded ? "pending" : "no"}
+       data-words={JSON.stringify(WORDS)} data-state={JSON.stringify(STATE)}>
+    <LedgerBar current="plan" signedIn={!!me} ledger={ledger} business={business && ledger ? { id: business.id, name: business.name } : null} planHref={planHref} />
+
+    {loaded && <LedgerStats note={say("stats.noteStart", "Normal · satisfaction 80 %")} />}
+
+    <header class="lg-head">
+      <span class="gd-eyebrow">{say("head.eyebrow", "Plan a business")}</span>
+      <h1 data-plan-title>{business ? business.name : say("title.none", "A business, not kept")}</h1>
+      <span class="lg-head-meta" data-plan-meta>{say("meta.start", "no type yet · no building yet · nothing is saved until you keep it")}</span>
+    </header>
+
+    {!loaded && (
+      <Empty n={3} eyebrow={say("notloaded.eyebrow", "Not loaded yet")}
+             title={say("notloaded.title", "The game's data is not loaded yet.")}
+             body={say("notloaded.body", "The Ledger reckons from the game's own figures, gathered for one version of the game. Until they arrive there is nothing honest to plan from.")}
+             action={say("notloaded.action", "Back to the Ledger")} href="/ledger"
+             ringAria={say("notloaded.aria", "The game's data is not loaded")} />
+    )}
+
+    {loaded && (
+      <div class="lg-work">
+        <nav class="lg-rail" aria-label={say("rail.aria", "The plan's sections")}>
+          {SECTIONS.map((id) => (
+            <button type="button" class="lg-rail-row" data-go={id} aria-current={id === section ? "step" : "false"}>
+              <span class="lg-rail-mark" data-rail-mark data-state={id === section ? "now" : "open"} aria-hidden="true"></span>
+              <span class="lg-rail-name">{NAMES[id]}</span>
+              <span class="lg-rail-count" data-rail-count></span>
+            </button>
+          ))}
+        </nav>
+
+        <div class="lg-main" data-main>
+          <WhatLimitsIt loaded={loaded} />
+          <SaveNote kind="missing" hidden data-missing />
+
+          {/* ── Type ── */}
+          <Console as="section" class="lg-section" data-section="type" hidden={section !== "type"} aria-labelledby="lg-s-type">
+            <div class="gd-console-head"><span class="gd-eyebrow" id="lg-s-type">{NAMES.type}</span><span class="gd-note" data-type-note></span></div>
+            <div class="lg-rows" data-types></div>
+          </Console>
+
+          {/* ── Building ── */}
+          <Console as="section" class="lg-section" data-section="building" hidden={section !== "building"} aria-labelledby="lg-s-building">
+            <div class="gd-console-head"><span class="gd-eyebrow" id="lg-s-building">{say("building.eyebrow", "Building · find one")}</span><span class="gd-note" data-finder-count></span></div>
+            <div class="lg-filters">
+              <div class="lg-chips" data-hoods></div>
+              <div class="lg-chips" data-caps></div>
+              <div class="lg-chips">
+                <span class="lg-chip-label">{say("finder.rank", "rank for")}</span>
+                <button type="button" class="lg-chip" data-rank aria-pressed="true">{say("finder.rankNone", "Choose a type to rank for it")}</button>
+              </div>
+            </div>
+            <div data-finder-empty hidden>
+              <Empty n={3} compact eyebrow={say("finder.emptyEyebrow", "No buildings")} title={say("finder.emptyTitle", "Widen one filter.")}
+                     body={say("finder.emptyBody", "No building in {hood} has a capacity of {cap} an hour. The nearest match is one filter away.")}
+                     ringAria={say("finder.emptyAria", "No building matches")}>
+                <button slot="action" type="button" class="lg-btn" data-variant="secondary" data-size="sm" data-clear-filters>{say("finder.clear", "Clear the filters")}</button>
+              </Empty>
+            </div>
+            <div class="lg-rows" data-finder-rows></div>
+            <div class="lg-actions lg-spread">
+              <a class="lg-link" href="/ledger/places" data-finder-more>{say("finder.moreStart", "See every building in Places")}</a>
+              <button type="button" class="lg-link" data-no-building>{say("finder.none", "Plan without a building")}</button>
+            </div>
+          </Console>
+
+          {/* ── Products ── */}
+          <Console as="section" class="lg-section" data-section="products" hidden={section !== "products"} aria-labelledby="lg-s-products">
+            <div class="gd-console-head"><span class="gd-eyebrow" id="lg-s-products">{NAMES.products}</span><span class="gd-note" data-products-note></span></div>
+            <p class="lg-rule-note" data-products-none>{say("products.none", "Choose a type first: its products and their prices come with it.")}</p>
+            <div class="lg-rows" data-products></div>
+            <div class="lg-chips" data-products-more></div>
+            <div class="lg-stair-block" data-stair-block>
+              <div class="lg-stair-head">
+                <h2 class="lg-sub">{say("stair.title", "The price staircase")} · <span data-stair-name></span></h2>
+                <span class="lg-chips">
+                  <button type="button" class="lg-chip" data-event="monopoly" aria-pressed="false">{say("event.monopoly", "Monopoly")}</button>
+                  <button type="button" class="lg-chip" data-event="hype" aria-pressed="false">{say("event.hype", "Hype")}</button>
+                  <button type="button" class="lg-chip" data-event="shortage" aria-pressed="false">{say("event.shortage", "Shortage")}</button>
+                  <button type="button" class="lg-chip" data-event="backorder" aria-pressed="false">{say("event.backorder", "Backorder")}</button>
+                </span>
+              </div>
+              <div data-stair></div>
+              <div class="lg-almanac lg-best-table">
+                <div class="lg-group-head"><span class="gd-eyebrow">{say("best.title", "Best prices · ready for the game")}</span><span class="lg-count" data-best-count></span></div>
+                <div class="lg-al lg-best lg-best-heads"><span>{say("best.product", "Product")}</span><span class="lg-lead" aria-hidden="true"></span><span class="lg-val">{say("best.price", "Best price")}</span><span class="lg-val lg-best-week">{say("best.week", "Its week")}</span></div>
+                <div data-best></div>
+              </div>
+            </div>
+          </Console>
+
+          {/* ── Fixtures ── */}
+          <Console as="section" class="lg-section" data-section="fixtures" hidden={section !== "fixtures"} aria-labelledby="lg-s-fixtures">
+            <div class="gd-console-head"><span class="gd-eyebrow" id="lg-s-fixtures">{NAMES.fixtures}</span><span class="gd-note" data-fixtures-note></span></div>
+            <p class="lg-rule-note" data-fixtures-none>{say("fixtures.none", "Choose a type first: it says which fixtures it needs to open.")}</p>
+            <div class="lg-rows" data-fixtures></div>
+            <div class="lg-almanac">
+              <div class="lg-al"><span>{say("setup.fixtures", "Fixtures")}</span><span class="lg-lead" aria-hidden="true"></span><span class="lg-val" data-setup-fixtures>—</span></div>
+              <div class="lg-al"><span>{say("setup.deposit", "Rent deposit")}</span><span class="lg-lead" aria-hidden="true"></span><span class="lg-val" data-setup-deposit>—</span></div>
+              <div class="lg-total"><span>{say("setup.total", "Setup")}</span><span class="lg-val" data-setup-total>—</span></div>
+            </div>
+          </Console>
+
+          {/* ── Hours and staff ── */}
+          <Console as="section" class="lg-section lg-hours" data-section="hours" hidden={section !== "hours"} aria-labelledby="lg-s-hours">
+            <div class="gd-console-head"><span class="gd-eyebrow" id="lg-s-hours">{NAMES.hours}</span><span class="gd-note" data-hours-note></span></div>
+            <HoursPainter />
+            <div class="lg-actions">
+              <button type="button" class="lg-link" data-open-usual>{say("hours.usual", "Open 09–21 every day")}</button>
+              <button type="button" class="lg-link" data-close-all>{say("hours.closeAll", "Close every hour")}</button>
+            </div>
+            <WeekGrid />
+            <div class="lg-staff">
+              <h2 class="lg-sub">{say("staff.title", "Staff")}</h2>
+              <p class="lg-row-line">{say("staff.help", "The registers' staff work every staffed register-hour you paint. Give other roles their hours a week. A wage left empty is the game's starting wage for the difficulty, marked approximate.")}</p>
+              <div class="lg-rows" data-staff></div>
+            </div>
+          </Console>
+
+          {/* ── Campaigns ── */}
+          <Console as="section" class="lg-section" data-section="campaigns" hidden={section !== "campaigns"} aria-labelledby="lg-s-campaigns">
+            <div class="gd-console-head"><span class="gd-eyebrow" id="lg-s-campaigns">{NAMES.campaigns}</span><span class="gd-note" data-campaigns-note></span></div>
+            <div class="lg-rows" data-campaigns></div>
+          </Console>
+
+          {/* ── Assumptions ── */}
+          <Console as="section" class="lg-section" data-section="assumptions" hidden={section !== "assumptions"} aria-labelledby="lg-s-assumptions">
+            <div class="gd-console-head"><span class="gd-eyebrow" id="lg-s-assumptions">{NAMES.assumptions}</span><span class="gd-note">{say("assume.note", "3 in force")}</span></div>
+            <div class="lg-assume">
+              <div class="lg-assume-row">
+                <div class="lg-assume-text">
+                  <span class="lg-assume-name">{say("assume.satisfaction", "Satisfaction")}</span>
+                  <span class="lg-row-line">{say("assume.satisfactionHelp", "How the game adds it up is not known. Copy today's figure from the business's overview in the game; ×0.5 at 0 %, ×1.5 at 100 %.")}</span>
+                </div>
+                <div class="lg-actions">
+                  <span class="lg-stepper">
+                    <button type="button" class="lg-step" data-sat-dec aria-label={say("assume.lower", "Lower satisfaction")}>−</button>
+                    <span class="lg-step-value lg-sat" data-sat-value>{say("assume.default", "80 %")}</span>
+                    <button type="button" class="lg-step" data-sat-inc aria-label={say("assume.raise", "Raise satisfaction")}>+</button>
+                  </span>
+                  <span class="lg-actions" data-sat-typed hidden>
+                    <span class="lg-yours">{say("yours", "yours")}</span>
+                    <button type="button" class="lg-link" data-sat-reset>{say("assume.reset", "Use the Ledger's 80 %")}</button>
+                  </span>
+                </div>
+              </div>
+              <div class="lg-assume-row">
+                <div class="lg-assume-text">
+                  <span class="lg-assume-name">{say("assume.demand", "Demand")}</span>
+                  <span class="lg-row-line">{say("assume.demandHelp", "How much each product is wanted, out of 100. The Ledger reckons with 80 for every product; the game's market screen shows today's figure.")}</span>
+                </div>
+                <span class="lg-fixed lg-num" data-demand>—</span>
+              </div>
+              <div class="lg-assume-row">
+                <div class="lg-assume-text">
+                  <span class="lg-assume-name">{say("assume.competitor", "A competitor's lowest price")}</span>
+                  <span class="lg-row-line" data-comp-help></span>
+                </div>
+                <label class="lg-money"><span>$</span><input class="lg-input" data-wide type="text" inputmode="decimal" autocomplete="off" placeholder="—"
+                  data-competitor aria-label={say("assume.competitorAria", "A competitor's lowest price")} /></label>
+              </div>
+            </div>
+          </Console>
+
+          {/* ── Review ── */}
+          <Console as="section" class="lg-section" data-section="review" hidden={section !== "review"} aria-labelledby="lg-s-review">
+            <div class="gd-console-head"><span class="gd-eyebrow" id="lg-s-review">{NAMES.review}</span><span class="gd-note">{say("review.note", "the plan's lines")}</span></div>
+            <div class="lg-review-grid" data-review-lines></div>
+          </Console>
+          <div class="lg-review-after" data-section="review" hidden={section !== "review"}>
+            <SaveNote kind="before" hidden data-before>
+              <div data-compare></div>
+              <div class="lg-actions">
+                <button type="button" class="lg-btn" data-save>{say("before.save", "Save these changes")}</button>
+                <button type="button" class="lg-btn" data-variant="ghost" data-put-back>{say("before.putBack", "Put the kept plan back")}</button>
+              </div>
+            </SaveNote>
+            <SaveNote kind="saved" hidden data-saved />
+            <SaveNote kind="refusal" hidden data-refusal />
+            <p class="lg-rule-note" data-review-note hidden></p>
+
+            <div class="lg-actions" data-keep-out hidden={!!me}>
+              <Button variant="primary" href={signInHref}>{say("keep.out", "Keep it in a ledger")}</Button>
+              <span class="lg-row-line">{say("keep.outNote", "Keeping needs an account, as a build does. It is free and it has no limits.")}</span>
+            </div>
+
+            {me && !business && ledgers.length > 0 && (
+              <Console as="div" class="lg-keep" data-keep-in>
+                <div class="gd-console-head"><span class="gd-eyebrow">{say("keep.eyebrow", "Keep it in a ledger")}</span><span class="gd-note">{say("keep.note", "one company in one saved game")}</span></div>
+                <label class="lg-field">
+                  <span class="lg-field-label">{say("keep.name", "Name")}</span>
+                  <input class="lg-text" type="text" maxlength="120" autocomplete="off" data-keep-name
+                         placeholder={say("keep.namePlaceholder", "The name it has in the game")} />
+                </label>
+                <label class="lg-field">
+                  <span class="lg-field-label">{say("keep.ledger", "Ledger")}</span>
+                  <select class="lg-text" data-keep-ledger>
+                    {ledgers.map((l) => <option value={l.id} selected={l.id === ledgerId}>{l.name}</option>)}
+                  </select>
+                </label>
+                <div class="lg-actions">
+                  <button type="button" class="lg-btn" data-keep>{say("keep.in", "Keep it in this ledger")}</button>
+                  <span class="lg-row-line">{say("keep.inNote", "It is kept as planned. Changing it later shows what changes before it saves.")}</span>
+                </div>
+              </Console>
+            )}
+            {me && !business && ledgers.length === 0 && (
+              <p class="lg-rule-note" data-keep-none>
+                {say("keep.none", "Keeping a plan needs a ledger first: one company in one saved game.")}
+                {" "}<a href="/ledger#new">{say("keep.start", "Start a ledger")}</a>
+              </p>
+            )}
+          </div>
+
+          <div class="lg-actions lg-spread">
+            <button type="button" class="lg-btn" data-variant="ghost" data-prev>{say("nav.start", "Start of the plan")}</button>
+            <button type="button" class="lg-btn" data-variant="secondary" data-next>{say("nav.nextStart", "Building →")}</button>
+          </div>
+        </div>
+      </div>
+    )}
+
+    <LedgerFoot game={pack?.game ?? null} />
+  </div>
+</BaseLayout>
+
+<style is:global>
+  .lg-head { display: grid; gap: 4px; }
+  .lg-head h1 { margin: 0; font-family: var(--font-display); font-size: 36px; font-weight: 600; line-height: 1.2; letter-spacing: -0.01em; text-wrap: balance; }
+  @media (max-width: 600px) { .lg-head h1 { font-size: 28px; } }
+  .lg-head-meta { font-family: var(--font-mono); font-size: 12px; color: var(--ink-soft); }
+
+  /* the desk: a 264px rail, then the main column (flex 1 1 480px), 24/32 apart */
+  .lg-work { display: flex; flex-wrap: wrap; gap: 24px 32px; align-items: flex-start; }
+  .lg-rail { flex: 0 0 264px; position: sticky; top: 84px; display: flex; flex-direction: column; box-sizing: border-box;
+    border: 1px solid var(--line); border-radius: 4px; background: var(--surface-card); padding: 6px; }
+  .lg-rail-row { appearance: none; border: 0; background: transparent; display: grid; grid-template-columns: 15px 1fr auto; gap: 10px; align-items: center;
+    text-align: left; padding: 9px 10px; border-radius: 4px; cursor: pointer; color: var(--ink); font: 500 14px/1.2 var(--font-body); min-height: 40px; }
+  .lg-rail-row:hover { background: var(--surface-veil); }
+  .lg-rail-row[aria-current="step"] { background: var(--accent-wash); }
+  .lg-rail-mark { justify-self: center; box-sizing: border-box; width: 9px; height: 9px; border-radius: 50%; border: 1.5px solid var(--ink); }
+  .lg-rail-mark[data-state="now"] { border: 0; background: var(--accent); }
+  .lg-rail-mark[data-state="done"] { width: 10px; height: 2px; border: 0; border-radius: 1px; background: var(--rose); }
+  .lg-rail-count { font-family: var(--font-mono); font-size: 11px; color: var(--ink-faint); font-variant-numeric: tabular-nums; }
+  .lg-main { flex: 1 1 480px; min-width: 0; display: flex; flex-direction: column; gap: 24px; }
+  /* at 390 the rail is a row of 32px chips */
+  @media (max-width: 899px) {
+    .lg-rail { flex: 1 1 100%; position: static; flex-direction: row; gap: 6px; overflow-x: auto; scrollbar-width: none; border: 0; background: none; padding: 0 0 4px; }
+    .lg-rail::-webkit-scrollbar { display: none; }
+    .lg-rail-row { flex: none; display: flex; gap: 8px; height: 32px; min-height: 32px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface-card); font-size: 13px; white-space: nowrap; }
+    .lg-rail-count { display: none; }
+    .lg-hours { padding: 16px 12px; }
+  }
+
+  .lg-section { gap: 12px; }
+  .lg-filters { display: grid; gap: 10px; }
+  .lg-spread { justify-content: space-between; }
+  .lg-stair-block { display: grid; gap: 8px; margin-top: 8px; }
+  .lg-stair-head { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; align-items: baseline; }
+  .lg-best-table { margin-top: 8px; }
+  .lg-best .lg-best-week { min-width: 96px; text-align: right; }
+  .lg-best-heads { font: 600 11px/1.2 var(--font-body); letter-spacing: .14em; text-transform: uppercase; color: var(--ink-faint); }
+  .lg-best-heads .lg-val { font: inherit; }
+  .lg-best-heads .lg-lead { visibility: hidden; }
+  .lg-staff { display: grid; gap: 8px; margin-top: 8px; }
+  .lg-assume { display: flex; flex-direction: column; gap: 20px; }
+  .lg-assume-row { display: flex; flex-wrap: wrap; gap: 8px 24px; align-items: center; }
+  .lg-assume-text { flex: 1 1 260px; display: flex; flex-direction: column; gap: 2px; }
+  .lg-assume-name { font-size: 14px; font-weight: 600; }
+  .lg-sat { min-width: 56px; }
+  .lg-fixed { font-size: 14px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 4px; background: var(--surface-card); }
+  .lg-review-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px 32px; }
+  .lg-review-after { display: flex; flex-direction: column; gap: 16px; }
+  .lg-keep { max-width: 640px; }
+  .lg-field { display: grid; gap: 6px; }
+  .lg-field-label { font-size: 14px; font-weight: 600; }
+</style>
+
+<script>
+  import { mountPlanner } from "../../lib/ledger/planner";
+  const root = document.querySelector<HTMLElement>("[data-planner]");
+  if (root && root.dataset.loaded !== "no") mountPlanner(root);
+</script>

@@ -1,0 +1,76 @@
+---
+/* What limits it (handoff README §3, SPEC §3.3): the Ledger's signature.
+ * A console, eyebrow WHAT LIMITS IT, a mono note at the right
+ * (`held · 47 h` / `free` / `not known yet`), one sentence in EB Garamond
+ * 20/1.4 at 62ch, and for a held limit one secondary sm button with a 13px
+ * note. Never red, never an icon; the sentence is aria-live.
+ *
+ * The server draws the not-known (or not-loaded) state; a script mounts it:
+ *
+ *   import { mountLimit } from "../../lib/ledger/limit";
+ *   const view = mountLimit(el, (limit) => apply(limit.fix));
+ *   view.update(reckoning.limit);   // or view.update(null): not loaded
+ *
+ * Every sentence the engine can return is a say() string here, handed to
+ * the script in `data-words` under the engine's own key. */
+import Console from "../guides/Console.astro";
+import { copy } from "../../lib/copy";
+
+interface Props {
+  /** Whether the game's data is loaded; false draws the not-loaded sentence. */
+  loaded: boolean;
+  id?: string;
+  class?: string;
+}
+const { loaded, id, class: klass } = Astro.props;
+const say = await copy("component:WhatLimitsIt");
+
+const WORDS = {
+  "limit.noType": say("limit.noType", "Nothing to limit yet. Choose a business type and a building, and the Ledger works out what holds it back."),
+  "limit.unknown": say("limit.unknown", "Nothing to limit yet. Choose a building and the Ledger works out what holds this business back."),
+  "limit.notAShop": say("limit.notAShop", "This building is not a shop. {typeA} needs a shop unit; the finder lists them."),
+  "limit.notItsUse": say("limit.notItsUse", "This building is not {useNoun}. {typeA} needs {useA}; the finder lists them."),
+  "limit.noCustomers": say("limit.noCustomers", "{typeA} serves no customers, so nothing holds its customers back."),
+  "limit.cannotOpen": say("limit.cannotOpen", "Nothing to limit until it can open. It needs {need} first."),
+  "limit.closed": say("limit.closed", "Nothing to limit while it never opens. Paint the hours it opens under Hours and staff."),
+  "limit.free": say("limit.free", "Nothing binds. Every customer who would come is served, every open hour."),
+  "limit.held.building": say("limit.held.building", "Held at {cap} customers an hour by the building, for {hours} hours of the week. How many more would come is not known: the game stops counting at the building's capacity. A building with a larger capacity is the change that lifts it."),
+  "limit.held.registers": say("limit.held.registers", "Held at {cap} customers an hour by {count} {station}, for {hours} hours of the week. {would} would come. A {ordinal} {stationOne} ({cost}{withNeeds}) and {staffA} ({weeklyCost} a week) are worth {worth} a week."),
+  "limit.held.staff": say("limit.held.staff", "Held at {cap} customers an hour by {count} staffed {station}, for {hours} hours of the week. {would} would come. Staffing the {ordinal} {stationOne} every open hour ({weeklyCost} a week) is worth {worth} a week."),
+  "limit.held.displays": say("limit.held.displays", "Held at {cap} customers an hour for {product} by its displays, for {hours} hours of the week. {would} would come. {fixtureA} ({cost}) is worth {worth} a week."),
+  "limit.held.displays.none": say("limit.held.displays.none", "Held for {product} by its displays, for {hours} hours of the week. Nothing in the game's catalogue displays it."),
+  "limit.held.fixtures": say("limit.held.fixtures", "Held at {cap} customers an hour by the {fixture}, for {hours} hours of the week. {would} would come. Another ({cost}) is worth {worth} a week."),
+  "limit.notLoaded": say("limit.notLoaded", "Nothing to limit yet: the game's data is not loaded, so there is nothing honest to reckon with."),
+  "note.held": say("note.held", "held · {hours} h"),
+  "note.free": say("note.free", "free"),
+  "note.unknown": say("note.unknown", "not known yet"),
+  "note.cannotOpen": say("note.cannotOpen", "cannot open yet"),
+  "note.notAShop": say("note.notAShop", "not this building"),
+  "fix.register": say("fix.register", "Add a {ordinal} {stationOne}"),
+  "fix.staff": say("fix.staff", "Staff the {ordinal} {stationOne}"),
+  "fix.display": say("fix.display", "Add {fixture}"),
+  "fix.fixture": say("fix.fixture", "Add another {fixture}"),
+  "fix.building": say("fix.building", "Find a larger building"),
+  "fix.note": say("fix.note", "You can undo it, and Review shows before against after."),
+  "fix.note.building": say("fix.note.building", "The Building section ranks every building for this plan."),
+  "head.registers": say("head.registers", "Registers"),
+  "head.staff": say("head.staff", "Staff"),
+  "head.displays": say("head.displays", "Displays"),
+  "head.fixtures": say("head.fixtures", "Fixtures"),
+  "head.building": say("head.building", "The building"),
+  "head.free": say("head.free", "Nothing"),
+  "head.unknown": say("head.unknown", "—"),
+};
+---
+<Console as="section" class={["lg-limit", klass].filter(Boolean).join(" ")} id={id}
+         data-limit data-state="unknown" data-words={JSON.stringify(WORDS)}>
+  <div class="gd-console-head">
+    <span class="gd-eyebrow">{say("eyebrow", "What limits it")}</span>
+    <span class="gd-note" data-limit-note>{WORDS["note.unknown"]}</span>
+  </div>
+  <p class="lg-limit-text" data-limit-text aria-live="polite">{loaded ? WORDS["limit.noType"] : WORDS["limit.notLoaded"]}</p>
+  <div class="lg-limit-fix" data-limit-fix hidden>
+    <button type="button" class="lg-btn" data-variant="secondary" data-size="sm" data-limit-apply></button>
+    <span class="lg-limit-fix-note" data-limit-fix-note></span>
+  </div>
+</Console>

@@ -1,0 +1,105 @@
+---
+/* The Ledger on stream — one browser source for each of its seven elements
+ * (design_handoff_ledger_overlays README §3, A1): the plate, the business
+ * card, the company strip, the limit line, the week counter, and the plan on
+ * stream as a panel or a card. The token names the ledger and the kind.
+ *
+ * `?t=` is the whole authentication and is never rendered into the page.
+ * Nothing chosen is the theme's empty frame, with no text; a revoked token
+ * draws nothing at all, at the next poll.
+ *
+ * ⚠ Polled every second, not every two like the guides: the business on
+ * screen is changed from a phone mid-stream, and the design wants it on air
+ * within a second (README §8, "push or poll ≤ 1 s"). The server's unchanged
+ * answer reads one row and computes nothing, as nineteen polls in twenty are.
+ *
+ * ⚠ Words: an overlay renders beside the encoder and never waits on the copy
+ * fetch (scripts/seed-copy.mjs skips overlays), so its words are the design's,
+ * kept in one place: WORDS in lib/ledger/stream.ts.
+ */
+import "../../styles/global.css";
+import "../../styles/overlay.css";
+import "../../styles/overlay-guides.css";
+import { SITE_API } from "../../lib/api";
+import { themeCss } from "../../lib/overlay-theme";
+
+export const prerender = false;
+
+const themeStyle = await themeCss();
+
+const KINDS = ["ledger-plate", "ledger-card", "ledger-strip", "ledger-limit", "ledger-counter", "ledger-plan-panel", "ledger-plan-card"];
+const token = Astro.url.searchParams.get("t") ?? "";
+let data: any = null;
+if (token) {
+  try {
+    const r = await fetch(`${SITE_API}/api/overlay/guide?t=${encodeURIComponent(token)}`);
+    if (r.ok) data = await r.json();
+  } catch {
+    /* Held, not blanked. */
+  }
+}
+const kind = KINDS.includes(data?.kind) ? data.kind : "";
+const theme = data?.theme ?? "ledger";
+const motion = data?.motion ?? "reduced";
+const initial = JSON.stringify({ version: data?.version ?? "", element: data?.element ?? null, kind, shows: data?.shows ?? "" });
+---
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>ledger · on stream</title>
+    <meta name="robots" content="noindex, nofollow" />
+    <style set:html={themeStyle}></style>
+  </head>
+  <body>
+    <div class="gov" data-theme={theme} data-motion={motion} data-token={token} data-initial={initial} data-kind={kind}>
+      <div data-slot data-shows={data?.shows ?? ""}></div>
+      <span class="glg-note" data-note hidden></span>
+    </div>
+  </body>
+</html>
+
+<script>
+  import { drawElement } from "../../lib/overlay-elements";
+  const root = document.querySelector<HTMLElement>(".gov")!;
+  const token = root.dataset.token || "";
+  let last: any = JSON.parse(root.dataset.initial || "{}");
+  const kind: string = last.kind || "";
+  const still = root.dataset.motion === "still", reduced = root.dataset.motion === "reduced";
+  const slot = root.querySelector<HTMLElement>("[data-slot]")!;
+  const note = root.querySelector<HTMLElement>("[data-note]")!;
+  /* The mono line sits bottom-left of the canvas, beside the plate; above an
+     element that is itself at the bottom-left, so it never covers it. */
+  const placeNote = () => {
+    note.classList.toggle("by-plate", kind === "ledger-plate");
+    note.style.bottom = "";
+    const el = slot.firstElementChild as HTMLElement | null;
+    if (!el || kind === "ledger-plate") return;
+    const box = el.getBoundingClientRect(), canvas = root.getBoundingClientRect();
+    const scale = canvas.width / 1920 || 1;
+    const top = (box.top - canvas.top) / scale, left = (box.left - canvas.left) / scale;
+    if (top > 540 && left < 600) note.style.bottom = `${Math.round(1080 - top + 16)}px`;
+  };
+  const paint = async (prev: any, next: any) => {
+    if (!kind) return;
+    await drawElement(slot, kind, prev, next, { still, reduced, line: note });
+    placeNote();
+  };
+  paint(null, last.element ?? null);
+  const tick = async () => {
+    if (!token || !kind) return;
+    try {
+      const r = await fetch(`/api/overlay/guide?t=${encodeURIComponent(token)}&v=${encodeURIComponent(last.version ?? "")}`, { cache: "no-store" });
+      /* Revoked: OBS stops showing it at once. Anything else that is not an answer holds the last frame. */
+      if (r.status === 404) { slot.innerHTML = ""; note.hidden = true; last = { version: "", element: null }; return; }
+      if (!r.ok) return;
+      const next = await r.json();
+      if (next.unchanged) return;
+      if (next.version !== last.version) {
+        await paint(last.element ?? null, next.element ?? null);
+        last = { ...last, version: next.version, element: next.element ?? null };
+      }
+    } catch { /* offline: the last frame stands */ }
+  };
+  window.setInterval(tick, 1000);
+</script>

@@ -8,6 +8,8 @@
  * like nothing at all. A person must never read "approximate" as "partly".
  */
 import type { Sheet, StatRow, Step, Line } from "./planner";
+import type { BreakdownLine, Honesty, LineUnit } from "./ledger/types.ts";
+import { MARK as FIG_MARK, escape as esc, lineValue, withMark as figWithMark } from "./ledger/format.ts";
 
 const MARK: Record<string, string> = { approximate: "≈", "not-counted": "†" };
 
@@ -117,5 +119,83 @@ export function drawBreakdown(row: StatRow): string {
       ${missing}${waiting}
       <p class="sb-foot"><span>${escape(row.name)}</span><span class="sb-lead" aria-hidden="true"></span><span class="sb-val">${withMark(row)}</span></p>
       <p class="gd-hint">Every line names something you can go and change.</p>
+    </div>`;
+}
+
+/* ── the Ledger's figures ─────────────────────────────────────────────────
+ *
+ * The Ledger's numbers are not a sheet from the server but Figures from its
+ * own engine (lib/ledger/engine.ts): a value, how far to trust it, and the
+ * lines that add up to it. The bar and the popover are the same drawing as
+ * above — the same `.sb-stat` buttons, the same `.sb-pop` — fed from those.
+ * Additions carry +, subtractions −, multipliers ×; a not-counted line is
+ * struck through in ink-faint and marked †. The ≈/† key sits at the foot of
+ * every breakdown, beside "Every line names something you can go and change."
+ */
+
+/** One headline figure: an id, its name (eyebrow), its text, and how far to trust it. */
+export type FigureStat = {
+  id: string;
+  name: string;
+  text: string;
+  honesty?: Honesty;
+  /** The word beside a negative headline ("loss"); a loss is never a colour. */
+  loss?: string;
+  /** Shown on the desk only: at 390 the bar keeps three figures. */
+  desk?: boolean;
+  /** No figure yet: the button reads — in ink-faint. */
+  empty?: boolean;
+};
+
+export function drawFigureHeadline(stats: FigureStat[], open = ""): string {
+  return stats.map((s) => `
+    <button type="button" class="sb-stat" data-stat="${esc(s.id)}" data-empty="${s.empty ? "yes" : "no"}"
+            ${s.desk ? `data-desk="yes"` : ""} aria-expanded="${open === s.id ? "true" : "false"}">
+      <span class="sb-name">${esc(s.name)}</span>
+      <span class="sb-figure">${figWithMark(s.text, s.honesty)}${s.loss ? ` <span class="sb-loss">${esc(s.loss)}</span>` : ""}</span>
+    </button>`).join("");
+}
+
+/** A group in a breakdown: an eyebrow with a subtotal, over its almanac lines. */
+export type FigureGroup = { label: string; sub?: string; lines: BreakdownLine[] };
+
+export type FigureWords = {
+  /** "Every line names something you can go and change." */
+  foot: string;
+  /** "≈ approximate: rests on the satisfaction you set · † not counted" */
+  key: string;
+  units?: Partial<Record<LineUnit, string>>;
+};
+
+const figureLine = (l: BreakdownLine, units?: Partial<Record<LineUnit, string>>) => `
+  <div class="sb-fline" data-op="${esc(l.op)}" data-state="${esc(l.honesty)}">
+    <span>${esc(l.label)}</span><span class="sb-lead" aria-hidden="true"></span>
+    <span class="sb-val">${esc(lineValue(l, units))}${l.value != null && FIG_MARK[l.honesty] ? `<sup>${FIG_MARK[l.honesty]}</sup>` : ""}</span>
+  </div>`;
+
+/** The breakdown of one Ledger figure: its title and value, its groups, a total, the foot and the key. */
+export function drawFigureBreakdown(o: {
+  title: string;
+  value: string;
+  honesty?: Honesty;
+  groups: FigureGroup[];
+  total?: { label: string; value: string; honesty?: Honesty };
+  words: FigureWords;
+}): string {
+  const groups = o.groups.filter((g) => g.lines.length).map((g) => `
+    <div class="sb-fgroup">
+      <p class="sb-fgroup-head"><span class="gd-eyebrow">${esc(g.label)}</span>${g.sub ? `<span class="sb-fsub">${esc(g.sub)}</span>` : ""}</p>
+      ${g.lines.map((l) => figureLine(l, o.words.units)).join("")}
+    </div>`).join("");
+  return `
+    <div class="sb-pop" data-pop data-kind="figure" role="dialog" aria-label="${esc(o.title)}">
+      <div class="sb-fhead">
+        <span class="sb-ftitle">${esc(o.title)}</span>
+        <span class="sb-fvalue">${figWithMark(o.value, o.honesty)}</span>
+      </div>
+      ${groups}
+      ${o.total ? `<p class="sb-ftotal"><span>${esc(o.total.label)}</span><span class="sb-val">${figWithMark(o.total.value, o.total.honesty)}</span></p>` : ""}
+      <p class="sb-ffoot">${esc(o.words.foot)}</p>
+      <p class="sb-fkey">${esc(o.words.key)}</p>
     </div>`;
 }

@@ -2,6 +2,7 @@
 @import "./guides.css";
 @import "./forms.css";
 @import "./guides-section.css";
+@import "./ledger.css";
 
 @tailwind base;
 @tailwind components;

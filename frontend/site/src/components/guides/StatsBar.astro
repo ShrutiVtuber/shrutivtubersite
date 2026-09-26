@@ -16,19 +16,33 @@ import { copy } from "../../lib/copy";
 interface Props {
   headline?: string[];
   class?: string;
+  /* The Ledger's bar (components/ledger/LedgerStats.astro) is this bar fed
+     from its own engine's Figures: it is shown from the first render (every
+     figure reads — until there is one), carries a mono note at the right of
+     the row, and keeps its ≈/† key in each breakdown's foot instead. */
+  shown?: boolean;
+  note?: string;
+  showKey?: boolean;
+  [key: string]: unknown;
 }
-const { headline = ["life", "armour", "resistance-fire", "critical-chance", "damage", "skill-points"], class: klass = "" } = Astro.props;
+const { headline = ["life", "armour", "resistance-fire", "critical-chance", "damage", "skill-points"], class: klass = "",
+        shown = false, note, showKey = true, ...rest } = Astro.props;
 const say = await copy("component:stats");
 ---
 
-<div class:list={["sb", klass]} data-stats data-headline={JSON.stringify(headline)} hidden>
-  <div class="sb-row" data-sb-headline></div>
+<div class:list={["sb", klass]} data-stats data-headline={JSON.stringify(headline)} hidden={!shown} {...rest}>
+  <div class="sb-line-row">
+    <div class="sb-row" data-sb-headline><slot /></div>
+    {note !== undefined && <span class="sb-note gd-mono" data-sb-note>{note}</span>}
+  </div>
   <div class="sb-assume gd-mono" data-sb-assume hidden></div>
   <div class="sb-open" data-sb-groups hidden></div>
-  <p class="sb-key gd-hint">
-    <span><sup class="gd-mono">≈</sup> {say("key.approximate", "approximate — something known is missing")}</span>
-    <span><sup class="gd-mono">†</sup> {say("key.uncounted", "not counted — the line is in the breakdown, out of the total")}</span>
-  </p>
+  {showKey && (
+    <p class="sb-key gd-hint">
+      <span><sup class="gd-mono">≈</sup> {say("key.approximate", "approximate — something known is missing")}</span>
+      <span><sup class="gd-mono">†</sup> {say("key.uncounted", "not counted — the line is in the breakdown, out of the total")}</span>
+    </p>
+  )}
 </div>
 
 <style is:global>
@@ -36,6 +50,9 @@ const say = await copy("component:stats");
     padding: 10px clamp(16px, 4vw, 40px); margin: 0 calc(-1 * clamp(16px, 4vw, 40px));
     background: var(--surface-page); border-bottom: 1px solid var(--line-strong); }
   .sb[hidden] { display: none; }
+  .sb-line-row { display: flex; align-items: center; gap: 12px; min-width: 0; }
+  .sb-line-row > .sb-row { flex: 1 1 auto; min-width: 0; }
+  .sb-note { flex: none; font-size: 12px; color: var(--ink-faint); white-space: nowrap; }
   .sb-row { display: flex; gap: 10px; overflow-x: auto; scrollbar-width: none; }
   .sb-row::-webkit-scrollbar { display: none; }
   .sb-stat { flex: none; display: grid; gap: 2px; text-align: left; padding: 6px 12px; cursor: pointer;

@@ -1,7 +1,7 @@
 ---
 /* Squirrel Guides' own chrome: the lockup strip under the site header on every
  * page of the section (README §4.1). The mark is the 28px ring sigil with four
- * empty arcs and the north lit; the name is type, not a logo; then the five
+ * empty arcs and the north lit; the name is type, not a logo; then the six
  * places as tabs. On the phone it is two rows and never hides its name. */
 import { copy } from "../../lib/copy";
 import { sigil } from "../../lib/guides-sigil";
@@ -13,6 +13,7 @@ const ITEMS: [string, string][] = [
   ["/builds", say("builds", "Builds")],
   ["/groups", say("groups", "Groups")],
   ["/guides/overlays", say("layouts", "Layouts")],
+  ["/ledger", say("ledger", "Ledger")],
   ["/guides/write", say("desk", "Create a guide")],
 ];
 const current = (href: string) => {

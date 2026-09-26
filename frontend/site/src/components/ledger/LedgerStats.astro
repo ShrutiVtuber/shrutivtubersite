@@ -1,0 +1,66 @@
+---
+/* The Ledger's stats bar (handoff README, "Plan a business" → Stats bar):
+ * the site's StatsBar, sticky at the top, on --surface-card with the one
+ * shadow, fed from the engine's Figures instead of a server sheet.
+ *
+ *   desk: The week · Setup · Payback · Customers a week · What limits it
+ *   390:  The week · Payback · What limits it   (the others are data-desk)
+ *
+ * A mono note at the right (`Normal · satisfaction 80 %`). Each figure is a
+ * button; opening one draws its breakdown under it. The server draws every
+ * figure as — ; `mountLedgerStats(el)` (lib/ledger/stats.ts) redraws them
+ * from a Reckoning on every change. */
+import StatsBar from "../guides/StatsBar.astro";
+import { copy } from "../../lib/copy";
+
+interface Props { note?: string }
+const { note = "" } = Astro.props;
+const say = await copy("component:LedgerStats");
+
+const WORDS = {
+  "stat.week": say("stat.week", "The week"),
+  "stat.setup": say("stat.setup", "Setup"),
+  "stat.payback": say("stat.payback", "Payback"),
+  "stat.customers": say("stat.customers", "Customers a week"),
+  "stat.limit": say("stat.limit", "What limits it"),
+  loss: say("loss", "loss"),
+  foot: say("foot", "Every line names something you can go and change."),
+  key: say("key", "≈ approximate: rests on the satisfaction you set · † not counted"),
+  "group.moneyIn": say("group.moneyIn", "Money in"),
+  "group.moneyOut": say("group.moneyOut", "Money out"),
+  "group.fixtures": say("group.fixtures", "Fixtures"),
+  "group.building": say("group.building", "Building"),
+  "group.reckoned": say("group.reckoned", "Reckoned"),
+  "group.byDay": say("group.byDay", "Served, by day"),
+  "group.against": say("group.against", "Against"),
+  "group.held": say("group.held", "Hours held, by ceiling"),
+  "group.fix": say("group.fix", "The change that lifts it"),
+  "held.registers": say("held.registers", "Registers · {cap} an hour"),
+  "held.displays": say("held.displays", "Displays"),
+  "held.fixtures": say("held.fixtures", "Store-wide fixtures"),
+  "held.building": say("held.building", "The building · {cap} an hour"),
+  "fix.cost": say("fix.cost", "It costs"),
+  "fix.weekly": say("fix.weekly", "A week, in wages"),
+  "fix.worth": say("fix.worth", "Worth a week"),
+  "unit.days": say("unit.days", "days"),
+  "unit.hours": say("unit.hours", "h"),
+  "unit.years": say("unit.years", "game years"),
+  nothing: say("nothing", "Nothing is reckoned yet: a type, a building and open hours come first."),
+};
+const names = [
+  ["week", WORDS["stat.week"], false],
+  ["setup", WORDS["stat.setup"], true],
+  ["payback", WORDS["stat.payback"], false],
+  ["customers", WORDS["stat.customers"], true],
+  ["limit", WORDS["stat.limit"], false],
+] as const;
+---
+<StatsBar class="sb-ledger" shown note={note} showKey={false} headline={names.map(([id]) => id)}
+          data-ledger-stats data-words={JSON.stringify(WORDS)}>
+  {names.map(([id, name, desk]) => (
+    <button type="button" class="sb-stat" data-stat={id} data-empty="yes" data-desk={desk ? "yes" : undefined} aria-expanded="false">
+      <span class="sb-name">{name}</span>
+      <span class="sb-figure">—</span>
+    </button>
+  ))}
+</StatsBar>

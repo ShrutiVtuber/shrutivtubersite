@@ -28,11 +28,12 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import func
+from sqlalchemy import false, func
 from sqlmodel import select
 
 from shruti.api.deps import get_session
 from shruti.api.deps import require_admin
+from shruti.api.routes import ledger_stream
 from shruti.api.routes.practice import _reader
 from shruti.models import OverlayToken
 from shruti.models.guides import Game, Guide, GuideRun, GuideVersion
@@ -42,9 +43,44 @@ log = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/overlay", tags=["overlay"])
 runs_router = APIRouter(prefix="/api/runs", tags=["runs"])
 
-GUIDE_KINDS, THEMES, MOTIONS = progress.GUIDE_KINDS, progress.THEMES, progress.MOTIONS
-# The site's one extra kind: a group's goal, bound to a group rather than a run.
-SITE_KINDS = GUIDE_KINDS + ("guide-goal", "build", "sheet")
+GUIDE_KINDS, MOTIONS = progress.GUIDE_KINDS, progress.MOTIONS
+# The fourth theme is the site's: Big Ambitions' Ledger (design_handoff_ledger_overlays
+# README §1). The tracker has no ledger, so the vendored format keeps three.
+THEMES = progress.THEMES + ("ledger",)
+# The site's extra kinds: a group's goal, a build, and the Ledger's seven,
+# each bound to its own thing rather than a run.
+SITE_KINDS = GUIDE_KINDS + ("guide-goal", "build", "sheet") + ledger_stream.ALL_KINDS
+LEDGER_KINDS = ledger_stream.ALL_KINDS
+
+
+def clean_layout(layout) -> list[dict]:
+    """
+    `progress.clean_layout`, plus the Ledger's elements, in the order given.
+    The vendored format drops kinds it does not know, and a self-hosted
+    tracker has no ledger to draw; the site does.
+    """
+    out: list[dict] = []
+    if not isinstance(layout, list):
+        return out
+    for e in layout:
+        if isinstance(e, dict) and e.get("kind") in LEDGER_KINDS:
+            out.append(ledger_stream.clean_element(e))
+        else:
+            out.extend(progress.clean_layout([e]))
+    return out[:12]
+
+
+def layout_elements(layout: list[dict], stored: dict, doc: dict) -> list[dict]:
+    """`progress.layout_elements`, with each Ledger element left for the host to fill."""
+    theirs = iter(progress.layout_elements([e for e in layout if e["kind"] not in LEDGER_KINDS], stored, doc))
+    return [{**e, "element": {}} if e["kind"] in LEDGER_KINDS else next(theirs) for e in layout]
+
+
+def refuse_a_collision(layout: list[dict]) -> None:
+    """README §2.5: the layout editor refuses a company strip and a path strip on one edge."""
+    said = ledger_stream.strip_collision(layout)
+    if said:
+        raise HTTPException(422, said)
 
 
 def _stored(row: GuideRun) -> dict:
@@ -78,6 +114,13 @@ async def guide(t: str, v: str = "", session: AsyncSession = Depends(get_session
             "motion": token.motion, "run": None, "element": None, "version": ""}
     if token.kind == "guide-goal":
         return await _goal_frame(session, token, base)
+    if token.kind in LEDGER_KINDS:
+        # ⚠ Polled every second, not two: the business on screen changes
+        # from a phone mid-stream and the design wants it on air within a
+        # second. The unchanged answer reads one row (the ledger's) and
+        # computes nothing, so the cost is a primary-key read per second
+        # per source — less than the run's own check above.
+        return await ledger_stream.token_frame(session, token, base, v)
     if token.kind == "sheet":
         # ⚠ The plan on stream answers "what are you playing?" and nothing
         # that reads like a spreadsheet — see gamedata.planner.stream_sheet.
@@ -107,7 +150,7 @@ async def guide(t: str, v: str = "", session: AsyncSession = Depends(get_session
     run = await session.get(GuideRun, token.run_id) if token.run_id else None
     if run is None:
         return base
-    layout = progress.clean_layout(token.layout) if token.kind == "guide-layout" else []
+    layout = clean_layout(token.layout) if token.kind == "guide-layout" else []
     version = run.updated_at.isoformat() if run.updated_at else ""
     if token.kind == "guide-layout":
         version += await _instrument_stamp(session, layout)
@@ -126,8 +169,8 @@ async def guide(t: str, v: str = "", session: AsyncSession = Depends(get_session
     game = await session.get(Game, g.game_id)
     base["run"] = {"name": run.name, "guide": g.title, "game": game.name if game else ""}
     if token.kind == "guide-layout":
-        base["elements"] = progress.layout_elements(layout, _stored(run), doc)
-        await _fill_goals(session, base["elements"])
+        base["elements"] = layout_elements(layout, _stored(run), doc)
+        await _fill_goals(session, base["elements"], run.user_id)
     else:
         base["element"] = progress.element(token.kind, _stored(run), doc, token.routine_id)
     return base
@@ -220,6 +263,8 @@ async def _instrument_stamp(session: AsyncSession, elements: list[dict]) -> str:
             stamp += ":b" + ",".join(f"{i}@{u.isoformat() if u else ''}" for i, u in rows)
     if kinds & {"sky", "hours", "countdown"}:
         stamp += f":t{int(datetime.now(timezone.utc).timestamp() // 300)}"
+    if kinds & set(LEDGER_KINDS):
+        stamp += await ledger_stream.layout_stamp(session, elements)
     return stamp
 
 
@@ -248,7 +293,7 @@ def _counter_element(c, prog: dict) -> dict:
     return {"name": c.name, "text": text, "target_text": target_text, "current": cur, "target": target, "unit": c.unit}
 
 
-async def _fill_goals(session: AsyncSession, elements: list[dict]) -> None:
+async def _fill_goals(session: AsyncSession, elements: list[dict], owner_id: int | None = None) -> None:
     """
     The host's elements of a layout: a goal names a group by its code, a
     counter names one of her counters by id. The site draws both; a tracker
@@ -292,6 +337,10 @@ async def _fill_goals(session: AsyncSession, elements: list[dict]) -> None:
             elif kind == "build" and e.get("build_id"):
                 from shruti.api.routes.builds import build_frame
                 e["element"] = (await build_frame(session, int(e["build_id"]))) or {}
+            elif kind in LEDGER_KINDS:
+                # A ledger is drawn only for the person who keeps it: a layout
+                # naming somebody else's ledger draws it empty.
+                e["element"] = await ledger_stream.fill_element(session, e, owner_id)
             elif kind == "wheel":
                 query = "".join(ch for ch in str(e.get("shows") or "") if ch.isalnum() or ch in "=&-_")[:80]
                 e["element"] = {"src": f"/overlay/wheel?size={int(e.get('w', 432))}&bg=" + (f"&{query}" if query else "")}
@@ -301,7 +350,7 @@ async def _fill_goals(session: AsyncSession, elements: list[dict]) -> None:
             e["element"] = {}
 
 
-PRIVATE_FIELDS = ("routine_id", "group", "counter_id", "text", "url")
+PRIVATE_FIELDS = ("routine_id", "group", "counter_id", "text", "url", "ledger_id")
 
 # ── the themes' tokens, editable by her ──────────────────────────────────────
 #
@@ -309,7 +358,20 @@ PRIVATE_FIELDS = ("routine_id", "group", "counter_id", "text", "url")
 # not change layout, legibility or the four state colours — so the editable
 # set is exactly these, and nothing beginning with st-.
 EDITABLE = ("panel", "panel-dim", "border", "ink", "soft", "faint", "eyebrow", "rule",
-            "radius", "display-weight", "stroke", "left-rule", "ring")
+            "radius", "display-weight", "stroke", "left-rule", "ring",
+            # The Ledger's hooks (README §8), which the other themes leave off:
+            # the margin line, the row ruling, the double rule under a total,
+            # the strong ruling under a head, the on-screen wash, and the
+            # sigil's cap and track.
+            "margin", "rule-row", "total-rule", "strong", "wash", "sigil-cap", "sigil-track")
+# The hooks are --ov-*; the rest are the guides' --gt-* tokens.
+OV_TOKENS = ("margin", "rule-row", "total-rule", "strong", "wash", "sigil-cap", "sigil-track")
+CAPS = ("butt", "round", "square")
+
+
+def css_var(token: str) -> str:
+    return f"--{'ov' if token in OV_TOKENS else 'gt'}-{token}"
+
 THEMES_KEY = "overlay.themes"
 _COLOUR = re.compile(r"^(#[0-9a-fA-F]{3,8}|rgba?\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}\s*(,\s*(0|1|0?\.\d+))?\s*\)|transparent)$")
 _LENGTH = re.compile(r"^\d{1,3}px$")
@@ -319,6 +381,10 @@ _NUMBER = re.compile(r"^\d{1,3}$")
 def css_value(token: str, value: str) -> str:
     """The value if it is a colour, a length or a number as the token wants; empty otherwise."""
     v = str(value or "").strip()
+    if token == "sigil-cap":
+        return v if v in CAPS else ""
+    if token == "margin" and v == "none":
+        return v
     if token in ("radius", "left-rule"):
         return v if _LENGTH.match(v) else ""
     if token in ("stroke", "display-weight"):
@@ -346,7 +412,7 @@ def theme_css(themes: dict[str, dict[str, str]]) -> str:
     rules = []
     for name, block in themes.items():
         if name in THEMES and block:
-            rules.append(f'.gov[data-theme="{name}"]{{' + "".join(f"--gt-{t}:{v};" for t, v in block.items() if t in EDITABLE) + "}")
+            rules.append(f'.gov[data-theme="{name}"]{{' + "".join(f"{css_var(t)}:{v};" for t, v in block.items() if t in EDITABLE) + "}")
     return "\n".join(rules)
 
 
@@ -361,9 +427,10 @@ async def _themes(session: AsyncSession) -> dict[str, dict[str, str]]:
 
 @router.get("/themes")
 async def themes(session: AsyncSession = Depends(get_session)) -> dict:
-    """Her adjustments to the three themes, and the stylesheet they make. Public: every overlay wears them."""
+    """Her adjustments to the four themes, and the stylesheet they make. Public: every overlay wears them."""
     overrides = await _themes(session)
-    return {"themes": overrides, "editable": list(EDITABLE), "css": theme_css(overrides)}
+    return {"themes": overrides, "editable": list(EDITABLE), "vars": {t: css_var(t) for t in EDITABLE},
+            "css": theme_css(overrides)}
 
 
 class ThemesIn(BaseModel):
@@ -380,30 +447,46 @@ async def set_themes(body: ThemesIn, session: AsyncSession = Depends(get_session
     return {"ok": True, "themes": cleaned, "css": theme_css(cleaned)}
 
 
+# Layouts the site starts everybody with, before any of hers: data, not a
+# token, because a layout drawn from nobody's run has nothing to hide and no
+# run to belong to. README §6: "Big Ambitions · Ledger", the plate on the
+# right and a group's goal at the bottom left, in the Ledger theme.
+STARTER_LAYOUTS = [
+    {"id": "big-ambitions-ledger", "label": "Big Ambitions · Ledger", "theme": "ledger", "motion": "reduced",
+     "note": "Ledger theme", "game": "big-ambitions",
+     "description": "The ledger plate on the right, a group's goal at the bottom left. Move anything once it is yours.",
+     "layout": [{"kind": "ledger-plate", "x": 1112, "y": 48, "w": 760},
+                {"kind": "guide-goal", "x": 72, "y": 800, "w": 860}]},
+]
+
+
 @router.get("/gallery")
 async def gallery(session: AsyncSession = Depends(get_session)) -> list[dict]:
     """
-    Her shared layouts, for anybody to start from: the kinds and their
-    places, the theme and the motion. Never her tokens, and never the
-    fields that name her routines, groups or counters — a person fills
-    those with their own.
+    The site's starting layouts, then her shared layouts, for anybody to
+    start from: the kinds and their places, the theme and the motion. Never
+    her tokens, and never the fields that name her routines, groups, counters
+    or ledgers — a person fills those with their own.
     """
     from shruti.core.operator import operator_email
     from shruti.models.accounts import User
+    out: list[dict] = [{**starter, "starter": True,
+                        "layout": [{k: v for k, v in e.items() if k not in PRIVATE_FIELDS}
+                                   for e in clean_layout(starter["layout"])]}
+                       for starter in STARTER_LAYOUTS]
     email = await operator_email(session)
     her = (await session.execute(select(User).where(User.email == email))).scalar_one_or_none() if email else None
     if her is None:
-        return []
+        return out
     runs = [r.id for r in (await session.execute(select(GuideRun).where(GuideRun.user_id == her.id))).scalars().all()]
     if not runs:
-        return []
+        return out
     rows = (await session.execute(
         select(OverlayToken).where(OverlayToken.kind == "guide-layout", OverlayToken.shared.is_(True), OverlayToken.run_id.in_(runs))
         .order_by(OverlayToken.id)
     )).scalars().all()
-    out = []
     for o in rows:
-        layout = [{k: v for k, v in e.items() if k not in PRIVATE_FIELDS} for e in progress.clean_layout(o.layout)]
+        layout = [{k: v for k, v in e.items() if k not in PRIVATE_FIELDS} for e in clean_layout(o.layout)]
         out.append({"id": o.id, "label": o.label, "theme": o.theme, "motion": o.motion, "layout": layout})
     return out
 
@@ -441,7 +524,7 @@ async def allowance(session: AsyncSession, user) -> dict:
     tokens = (await session.execute(
         select(OverlayToken).where(
             OverlayToken.kind.in_(SITE_KINDS),
-            (OverlayToken.run_id.in_(runs) if runs else False) | (OverlayToken.user_id == user.id),
+            (OverlayToken.run_id.in_(runs) if runs else false()) | (OverlayToken.user_id == user.id),
         )
     )).scalars().all()
     hours = sum((await hours_this_month(session, [t.id for t in tokens])).values()) if tokens else 0.0
@@ -485,12 +568,13 @@ async def my_tokens(request: Request, session: AsyncSession = Depends(get_sessio
     """
     from shruti.api.routes.practice import _reader
     from shruti.models.guides import Group
+    from shruti.models.ledger import Ledger
     user = await _reader(request, session)
     runs = {r.id: r for r in (await session.execute(select(GuideRun).where(GuideRun.user_id == user.id))).scalars().all()}
     rows = (await session.execute(
         select(OverlayToken).where(
             OverlayToken.kind.in_(SITE_KINDS),
-            (OverlayToken.run_id.in_(list(runs)) if runs else False) | (OverlayToken.user_id == user.id),
+            (OverlayToken.run_id.in_(list(runs)) if runs else false()) | (OverlayToken.user_id == user.id),
         ).order_by(OverlayToken.id)
     )).scalars().all()
     now = datetime.now(timezone.utc)
@@ -500,6 +584,9 @@ async def my_tokens(request: Request, session: AsyncSession = Depends(get_sessio
         if o.kind == "guide-goal":
             group = await session.get(Group, o.group_id) if o.group_id else None
             showing, href = (group.name if group else ""), (f"/groups/{group.code}" if group else "")
+        elif o.kind in LEDGER_KINDS:
+            book = await session.get(Ledger, o.ledger_id) if o.ledger_id else None
+            showing, href = (book.name if book else ""), (f"/ledger/{book.id}" if book else "")
         else:
             run = runs.get(o.run_id)
             showing, href = (run.name if run else ""), ""
@@ -577,6 +664,8 @@ async def mint_token(run_id: int, body: TokenIn, request: Request, session: Asyn
     run = await _mine(session, request, run_id)
     if body.kind not in GUIDE_KINDS:
         raise HTTPException(422, "kind is guide-now, guide-sigil, guide-path, guide-routine or guide-layout")
+    layout = clean_layout(body.layout)
+    refuse_a_collision(layout)
     from shruti.api.routes.practice import _reader
     await refuse_if_out_of_allowance(session, await _reader(request, session))
     token = secrets.token_urlsafe(24)
@@ -584,7 +673,7 @@ async def mint_token(run_id: int, body: TokenIn, request: Request, session: Asyn
                        routine_id=body.routine_id.strip()[:80],
                        theme=body.theme if body.theme in THEMES else "almanac",
                        motion=body.motion if body.motion in MOTIONS else "reduced",
-                       layout=progress.clean_layout(body.layout))
+                       layout=layout)
     session.add(row)
     await session.commit()
     await session.refresh(row)
@@ -608,7 +697,9 @@ async def set_layout(run_id: int, token_id: int, body: LayoutIn, request: Reques
     row = await session.get(OverlayToken, token_id)
     if row is None or row.run_id != run.id:
         raise HTTPException(404, "no such overlay")
-    row.layout = progress.clean_layout(body.layout)
+    layout = clean_layout(body.layout)
+    refuse_a_collision(layout)
+    row.layout = layout
     if body.theme in THEMES:
         row.theme = body.theme
     if body.motion in MOTIONS:
@@ -660,7 +751,7 @@ async def admin_preview(token_id: int, session: AsyncSession = Depends(get_sessi
     if token is None or token.kind not in GUIDE_KINDS:
         raise HTTPException(404, "no such overlay")
     base = {"id": token.id, "kind": token.kind, "theme": token.theme, "motion": token.motion, "label": token.label,
-            "layout": progress.clean_layout(token.layout), "run": None, "elements": [], "version": ""}
+            "layout": clean_layout(token.layout), "run": None, "elements": [], "version": ""}
     run = await session.get(GuideRun, token.run_id) if token.run_id else None
     if run is None:
         return base
@@ -669,6 +760,9 @@ async def admin_preview(token_id: int, session: AsyncSession = Depends(get_sessi
     if g is None or v is None:
         return base
     base["run"] = {"id": run.id, "name": run.name, "guide": g.title}
-    base["elements"] = progress.layout_elements(base["layout"], _stored(run), v.body)
+    base["elements"] = layout_elements(base["layout"], _stored(run), v.body)
+    for e in base["elements"]:
+        if e["kind"] in LEDGER_KINDS:
+            e["element"] = await ledger_stream.fill_element(session, e, run.user_id)
     base["version"] = run.updated_at.isoformat() if run.updated_at else ""
     return base

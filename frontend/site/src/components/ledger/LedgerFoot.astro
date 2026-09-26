@@ -1,0 +1,20 @@
+---
+/* The two lines every Ledger page carries (handoff README, Global rules):
+ * the data line, read from the loaded pack's `game` block, and the line
+ * saying the game's names are the game's. With no pack loaded the data line
+ * says so instead of inventing a version. */
+import { copy } from "../../lib/copy";
+import { dataLine } from "../../lib/ledger/format";
+import type { LedgerData } from "../../lib/ledger/types";
+
+interface Props { game: LedgerData["game"] | null }
+const { game } = Astro.props;
+const say = await copy("component:LedgerFoot");
+const line = game
+  ? dataLine(game, { build: say("build", "build {build}"), gathered: say("gathered", "gathered {date}") })
+  : say("not_loaded", "Big Ambitions · the game's data is not loaded yet");
+---
+<footer class="lg-foot">
+  <p class="lg-foot-data">{line}</p>
+  <p class="lg-foot-affiliation">{say("affiliation", "Not affiliated with or endorsed by Hovgaard Games; names are theirs, used to say what you are planning.")}</p>
+</footer>

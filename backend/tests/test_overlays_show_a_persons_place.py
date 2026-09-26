@@ -34,7 +34,7 @@ def test_the_state_colours_are_defined_once_outside_every_theme() -> None:
     css = without_comments(CSS)
     assert css.count("--st-done:") == 1 and css.count("--st-now:") == 1
     blocks = re.findall(r'\.gov\[data-theme="[a-z]+"\]\s*\{([^}]*)\}', css)
-    assert len(blocks) == 3, "three themes: almanac, grimoire, plain"
+    assert len(blocks) == 4, "four themes: almanac, grimoire, plain, and the Ledger's"
     for block in blocks:
         assert "--st-" not in block, "a theme redefined a state colour"
     assert "#E0A4BC" in css and "#8FBEE8" in css        # rose done, blue current — everywhere
@@ -102,7 +102,7 @@ def test_a_source_that_shows_this_version_is_told_so_and_nothing_is_computed() -
     body = code_of(og.guide)
     unchanged = body.index('base["unchanged"] = True')
     assert body.index("await _doc(session") > unchanged, "the document is loaded before the cheap answer"
-    assert body.index("progress.layout_elements(") > unchanged
+    assert body.index("layout_elements(") > unchanged
     assert 'if v and v.replace(" ", "+") == version:' in body
     tracker = (ROOT / "backend" / "shrutisguides" / "tracker" / "app.py").read_text(encoding="utf-8")
     assert 'base["unchanged"] = True' in tracker, "the tracker keeps the same contract"
@@ -136,5 +136,6 @@ def test_a_layout_is_several_elements_in_one_source_placed_on_the_canvas() -> No
     # A picture is loaded from https only: a browser source must never load a file or a script.
     assert progress.clean_layout([{"kind": "image", "url": "file:///etc/passwd"}])[0]["url"] == ""
     assert progress.clean_layout([{"kind": "image", "url": "https://example.org/a.png"}])[0]["url"] == "https://example.org/a.png"
-    assert "progress.layout_elements(" in code_of(og.guide)
+    # The site's layout_elements is the format's, with the Ledger's elements left to the host.
+    assert "layout_elements(" in code_of(og.guide) and "progress.layout_elements(" in code_of(og.layout_elements)
     assert 'left:${e.x}px;top:${e.y}px;width:${e.w}px' in LAYOUT

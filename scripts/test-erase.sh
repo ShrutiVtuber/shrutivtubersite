@@ -10,7 +10,8 @@
 # It starts its own Postgres on its own network, migrates it from nothing
 # (which also proves the migrations run from an empty database), runs
 # `test_an_account_can_be_deleted.py` and the Ledger's own (kept, exported,
-# erased with the account), and removes both afterwards. It never touches the
+# erased with the account; and on stream, showing only what was written for
+# chat), and removes both afterwards. It never touches the
 # dev stack's database.
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -43,4 +44,5 @@ RUN=(docker run --rm --network "$NET"
   shruti-backend-test)
 
 "${RUN[@]}" alembic upgrade head
-"${RUN[@]}" python -m pytest tests/test_an_account_can_be_deleted.py tests/test_a_ledger_is_one_company_in_one_game.py -rs "$@"
+"${RUN[@]}" python -m pytest tests/test_an_account_can_be_deleted.py tests/test_a_ledger_is_one_company_in_one_game.py \
+  tests/test_the_ledger_on_stream.py -rs "$@"

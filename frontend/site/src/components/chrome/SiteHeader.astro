@@ -52,6 +52,7 @@ const NAV: [string, string][] = [
   ["/videos", "Videos"],
   ["/builds", "Builds"],
   ["/groups", "Groups"],
+  ["/ledger", "Ledger"],
   ["/classes", "Classes"],
   ["/newsletter", "The monthly letter"],
   ["/about", "About"],
@@ -63,14 +64,14 @@ const NAV: [string, string][] = [
 const BAR = ["/today", "/guides", "/tools", "/horoscopes", "/journal", "/schedule"];
 const GROUPS: [string, string[]][] = [
   [say("group.watch", "Watch"), ["/schedule", "/videos"]],
-  [say("group.play", "Play"), ["/guides", "/builds", "/groups"]],
+  [say("group.play", "Play"), ["/guides", "/builds", "/groups", "/ledger"]],
   [say("group.practice", "Practice"), ["/tools", "/horoscopes", "/classes"]],
   [say("group.read", "Read"), ["/today", "/journal", "/newsletter"]],
   [say("group.her", "Shruti"), ["/about", "/work", "/shop", "/support", "/contact"]],
 ];
 const label = (href: string) => NAV.find(([h]) => h === href)?.[1] ?? href;
-/* /builds and /groups belong to the guides section: hidden with it. */
-const visibleNav = (href: string) => visible(href === "/builds" || href === "/groups" ? "/guides" : href);
+/* /builds, /groups and /ledger belong to the guides section: hidden with it. */
+const visibleNav = (href: string) => visible(href === "/builds" || href === "/groups" || href === "/ledger" ? "/guides" : href);
 const current = (href: string) => (href === "/" ? here === "/" : here.startsWith(href));
 ---
 

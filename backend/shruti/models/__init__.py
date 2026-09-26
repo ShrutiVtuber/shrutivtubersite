@@ -571,6 +571,9 @@ class OverlayToken(TimestampMixin, table=True):
     shared: bool = Field(default=False)
     # kind build: a build tracker rather than a run.
     build_id: Optional[int] = Field(default=None, foreign_key="build.id")
+    # kind ledger-*: a ledger (the Ledger on stream). ON DELETE CASCADE, so the
+    # overlay goes with its ledger, and the ledger goes with its account.
+    ledger_id: Optional[int] = Field(default=None, foreign_key="ledger.id", ondelete="CASCADE", index=True)
 
     last_seen: Optional[datetime] = Field(default=None, sa_type=UTC_TS)
 

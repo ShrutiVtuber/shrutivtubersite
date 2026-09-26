@@ -195,6 +195,9 @@ def _ledger_view(g: Ledger) -> dict:
     return {"id": g.id, "name": g.name, "game": g.game, "version": g.version,
             "difficulty": g.difficulty, "custom": g.custom, "inGameDay": g.in_game_day,
             "courses": g.courses or [], "position": g.position,
+            # On stream (routes in ledger_stream.py): which business the
+            # overlays are about, and whether a plan is live. Never the plan.
+            "onScreenBusinessId": g.on_screen_business_id, "live": g.live_plan is not None,
             "createdAt": _iso(g.created_at), "updatedAt": _iso(g.updated_at)}
 
 

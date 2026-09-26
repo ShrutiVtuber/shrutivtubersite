@@ -584,7 +584,7 @@ async def build_tokens(build_id: int, request: Request, session: AsyncSession = 
 @router.post("/{build_id}/overlays", status_code=201)
 async def mint_build_token(build_id: int, body: BuildTokenIn, request: Request, session: AsyncSession = Depends(get_session)) -> dict:
     """The build as a browser source; the token is returned once."""
-    from shrutisguides.progress import MOTIONS, THEMES
+    from shruti.api.routes.overlay_guides import MOTIONS, THEMES
     from shruti.api.routes.overlay_guides import refuse_if_out_of_allowance
     b, user = await _mine(session, request, build_id)
     await _refuse_if_suspended(session, user)

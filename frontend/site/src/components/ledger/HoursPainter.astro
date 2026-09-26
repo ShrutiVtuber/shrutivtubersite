@@ -1,0 +1,36 @@
+---
+/* The hours painter (SPEC §3.2): the brush chips (Closed · Open · 1
+ * register · Open · 2 registers, each with a 12px swatch) and the 7 × 24
+ * grid a person paints the week's opening hours and staffed registers on.
+ * One tab stop; arrows move, Space or Enter paints, 0 / 1 / 2 pick the brush.
+ *
+ *   import { mountPainter } from "../../lib/ledger/grid";
+ *   const painter = mountPainter(el, (d, h, v) => { plan.hours[d][h] = v; reckonAll(); });
+ *   painter.update(plan.hours);
+ */
+import { copy } from "../../lib/copy";
+
+interface Props { id?: string }
+const { id = "lg-painter" } = Astro.props;
+const say = await copy("component:HoursPainter");
+const WORDS = {
+  "day.0": say("day.0", "Mon"), "day.1": say("day.1", "Tue"), "day.2": say("day.2", "Wed"), "day.3": say("day.3", "Thu"),
+  "day.4": say("day.4", "Fri"), "day.5": say("day.5", "Sat"), "day.6": say("day.6", "Sun"),
+  "dayLong.0": say("dayLong.0", "Monday"), "dayLong.1": say("dayLong.1", "Tuesday"), "dayLong.2": say("dayLong.2", "Wednesday"),
+  "dayLong.3": say("dayLong.3", "Thursday"), "dayLong.4": say("dayLong.4", "Friday"), "dayLong.5": say("dayLong.5", "Saturday"),
+  "dayLong.6": say("dayLong.6", "Sunday"),
+  "cell.closed": say("cell.closed", "{at}, closed"),
+  "cell.one": say("cell.one", "{at}, 1 register"),
+  "cell.many": say("cell.many", "{at}, {n} registers"),
+};
+---
+<div class="lg-painter-wrap" data-hours-painter data-words={JSON.stringify(WORDS)}>
+  <div class="lg-chips">
+    <span class="lg-chip-label">{say("paint", "paint")}</span>
+    <button type="button" class="lg-chip" data-brush="0" aria-pressed="false"><span class="lg-swatch" data-kind="paint-0" aria-hidden="true"></span>{say("brush.closed", "Closed")}</button>
+    <button type="button" class="lg-chip" data-brush="1" aria-pressed="true"><span class="lg-swatch" data-kind="paint-1" aria-hidden="true"></span>{say("brush.one", "Open · 1 register")}</button>
+    <button type="button" class="lg-chip" data-brush="2" aria-pressed="false"><span class="lg-swatch" data-kind="paint-2" aria-hidden="true"></span>{say("brush.two", "Open · 2 registers")}</button>
+  </div>
+  <div class="lg-grid lg-painter" id={id} tabindex="0" role="grid" data-painter
+       aria-label={say("aria", "Opening hours and staffed registers. Arrow keys move, space paints, 0, 1 and 2 choose the brush.")}></div>
+</div>

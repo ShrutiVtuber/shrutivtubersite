@@ -1,4 +1,4 @@
-/* Squirrel Guides on stream: six elements, three skins, one layout.
+/* Squirrel Guides on stream: six elements, four skins, one layout.
  *
  * Built on the shared overlay ground (overlay.css): transparent, 1920x1080,
  * every length a pixel. A THEME re-points the palette, the display face and
@@ -15,6 +15,24 @@
   --st-now: #8FBEE8;
   --st-open: var(--gt-ink);
   --st-locked: var(--gt-faint);
+}
+
+/* The Ledger's hooks (design_handoff_ledger_overlays README §8), which every
+   theme but Ledger leaves off: the margin line (--ov-margin; `none` turns it
+   off), the row ruling (--ov-rule-row), the 5px double rule under a total
+   (--ov-total-rule), and the sigil's cap and track. The Ledger elements also
+   read each theme's own ruling, strong ruling and on-screen wash (--ov-rule,
+   --ov-strong, --ov-wash), and the left padding that makes room for a margin. */
+.gov {
+  --ov-margin: none;
+  --ov-margin-x: 40px;
+  --ov-rule-row: transparent;
+  --ov-total-rule: transparent;
+  --ov-sigil-cap: butt;
+  --ov-sigil-track: var(--gt-faint);
+  --ov-sigil-track-opacity: .35;
+  --ov-pad: 44px;
+  --ov-pad-wide: 56px;
 }
 
 /* Almanac — her house theme: the dusk palette unchanged, radius 16, a rose
@@ -34,6 +52,9 @@
   --gt-stroke: 12;
   --gt-left-rule: 0;
   --gt-ring: transparent;
+  --ov-rule: #2E3752;
+  --ov-strong: #485272;
+  --ov-wash: rgba(143, 190, 232, .08);
 }
 
 /* Grimoire — Diablo-feeling: ember, ash, a gold rule; built from its own
@@ -53,6 +74,9 @@
   --gt-stroke: 12;
   --gt-left-rule: 4px;
   --gt-ring: rgba(201, 162, 39, .45);
+  --ov-rule: rgba(237, 227, 214, .14);
+  --ov-strong: rgba(237, 227, 214, .32);
+  --ov-wash: rgba(237, 227, 214, .07);
 }
 
 /* Plain — the information and none of her atmosphere; the fallback when a
@@ -72,6 +96,40 @@
   --gt-stroke: 10;
   --gt-left-rule: 0;
   --gt-ring: transparent;
+  --ov-rule: rgba(255, 255, 255, .14);
+  --ov-strong: rgba(255, 255, 255, .32);
+  --ov-wash: rgba(255, 255, 255, .07);
+}
+
+/* Ledger — Big Ambitions (README §1): an account book read from across a
+   room. Ruled rows, a rose double margin line, a double rule under a total,
+   radius 2, and the ruling as the panel's border. Figures in JetBrains Mono. */
+.gov[data-theme="ledger"] {
+  --gt-panel: rgba(20, 26, 38, .95);
+  --gt-panel-dim: rgba(20, 26, 38, .72);
+  --gt-border: #34425F;
+  --gt-ink: #F1EDE4;
+  --gt-soft: #C3C0B6;
+  --gt-faint: #9C998F;
+  --gt-eyebrow: #9C998F;
+  --gt-rule: transparent;
+  --gt-radius: 2px;
+  --gt-display: var(--font-display);
+  --gt-display-weight: 600;
+  --gt-stroke: 12;
+  --gt-left-rule: 0px;       /* with a unit: max(1px, 0) is not valid CSS, and the border would fall back to 3px */
+  --gt-ring: #34425F;
+  --ov-rule: #34425F;
+  --ov-strong: #4A5C82;
+  --ov-wash: rgba(143, 190, 232, .08);
+  --ov-margin: #C7849F;
+  --ov-rule-row: #34425F;
+  --ov-total-rule: #F1EDE4;
+  --ov-sigil-cap: butt;
+  --ov-sigil-track: #34425F;
+  --ov-sigil-track-opacity: 1;
+  --ov-pad: 76px;
+  --ov-pad-wide: 104px;
 }
 
 .gov { position: relative; width: 1920px; height: 1080px; font-family: var(--font-body); -webkit-font-smoothing: antialiased; color: var(--gt-ink); }
@@ -86,7 +144,17 @@
   border-radius: var(--gt-radius);
   box-shadow: 0 12px 34px rgba(6, 9, 18, .5);
 }
-.gov[data-theme="almanac"] .gov-plate { border-left-color: var(--gt-border); }
+.gov[data-theme="almanac"] .gov-plate, .gov[data-theme="ledger"] .gov-plate { border-left-color: var(--gt-border); }
+/* The margin line: a double line of 1.5px strokes, 5px apart, --ov-margin-x in.
+   Drawn as the panel's own background, so it needs no element and never sits
+   over text; with --ov-margin: none the gradient is invalid and draws nothing. */
+.gov-plate {
+  background-image: linear-gradient(to right,
+    transparent var(--ov-margin-x), var(--ov-margin) var(--ov-margin-x),
+    var(--ov-margin) calc(var(--ov-margin-x) + 1.5px), transparent calc(var(--ov-margin-x) + 1.5px),
+    transparent calc(var(--ov-margin-x) + 3.5px), var(--ov-margin) calc(var(--ov-margin-x) + 3.5px),
+    var(--ov-margin) calc(var(--ov-margin-x) + 5px), transparent calc(var(--ov-margin-x) + 5px));
+}
 .gov[data-theme="plain"] .gov-plate { border-left-color: transparent; }
 
 .gov-eyebrow { font: 600 24px var(--font-body); letter-spacing: .14em; text-transform: uppercase; color: var(--gt-eyebrow); }
@@ -282,3 +350,158 @@
 .gov-sheet-slot-name { font-family: var(--font-body); font-size: 21px; color: var(--gt-faint); }
 .gov-sheet-target { font-family: var(--font-mono); font-size: 21px; line-height: 1.3; color: var(--gt-ink);
   overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+
+/* ── the Ledger theme on the existing elements (README §2.1) ───────────────
+   A total gets the double rule; everything else gets ruled rows and the
+   margin line. Spacing lives here, under the theme; the colours are the hooks,
+   so her adjustments reach them. */
+.gov-sigil .fill, .gov-build .ring .fill, .gov-sigil .track, .gov-build .ring .track { stroke-linecap: var(--ov-sigil-cap); }
+.gov[data-theme="ledger"] .gov-now { padding-left: var(--ov-pad); }
+.gov[data-theme="ledger"] .gov-now .title { padding-bottom: 16px; border-bottom: 1px solid var(--ov-rule-row); }
+.gov[data-theme="ledger"] .gov-now .line { color: var(--gt-soft); }
+.gov[data-theme="ledger"] .gov-path { padding-left: var(--ov-pad); }
+.gov[data-theme="ledger"] .gov-path .it { position: relative; }
+.gov[data-theme="ledger"] .gov-path .it + .it::before { content: ""; position: absolute; left: -30px; width: 30px; top: 50%; border-top: 1px solid var(--ov-rule-row); }
+.gov[data-theme="ledger"] .gov-routine { padding-left: var(--ov-pad); gap: 0; }
+.gov[data-theme="ledger"] .gov-routine .head { padding-bottom: 12px; border-bottom: 2px solid var(--ov-strong); }
+.gov[data-theme="ledger"] .gov-routine .item { min-height: 64px; border-bottom: 1px solid var(--ov-rule-row); }
+.gov[data-theme="ledger"] .gov-goal { padding-left: var(--ov-pad); }
+.gov[data-theme="ledger"] .gov-goal .count { align-self: flex-start; padding-bottom: 4px; border-bottom: 5px double var(--ov-total-rule); }
+.gov[data-theme="ledger"] .gov-goal .tier { background: var(--ov-rule-row); opacity: 1; border-radius: 0; }
+.gov[data-theme="ledger"] .gov-counter { padding-left: var(--ov-pad); }
+.gov[data-theme="ledger"] .gov-counter .number { align-self: flex-start; padding-bottom: 6px; border-bottom: 5px double var(--ov-total-rule); }
+.gov[data-theme="ledger"] .gov-build, .gov[data-theme="ledger"] .gov-sheet { --ov-margin-x: 64px; padding-left: var(--ov-pad-wide); border-radius: var(--gt-radius); }
+.gov[data-theme="ledger"] .gov-build .goal { padding-bottom: 10px; border-bottom: 1px solid var(--ov-rule-row); }
+.gov[data-theme="ledger"] .gov-build .grid-block, .gov[data-theme="ledger"] .gov-build .next-block { border-top: 2px solid var(--ov-strong); }
+.gov[data-theme="ledger"] .gov-build .complete-block { border-top: 5px double var(--ov-total-rule); }
+.gov[data-theme="ledger"] .gov-sheet-count { justify-self: start; padding-bottom: 6px; border-bottom: 5px double var(--ov-total-rule); }
+.gov[data-theme="ledger"] .gov-sheet-sub { padding-bottom: 8px; border-bottom: 2px solid var(--ov-strong); }
+.gov[data-theme="ledger"] .gov-sheet-slot { padding-bottom: 8px; border-bottom: 1px solid var(--ov-rule-row); }
+.gov[data-theme="ledger"] .gov-empty { padding-left: var(--ov-pad); }
+/* The goal's Done moment when a tier fills: the 3px ignite border, 0 → 1 over 400 ms. */
+.gov-goal.ignite::before { content: ""; position: absolute; inset: -2px; border: 3px solid var(--st-done); border-radius: calc(var(--gt-radius) + 2px); pointer-events: none; animation: gov-ignite 400ms cubic-bezier(.2,.7,.3,1) forwards; }
+
+/* ── the Ledger elements (README §3, A1) ──────────────────────────────────
+   Every string ≥ 24px at 1080. Figures in mono, tabular. A loss is the sign
+   and the word LOSS, never a colour. */
+.glg { color: var(--gt-ink); overflow: hidden; }
+.glg .gov-eyebrow { color: var(--gt-faint); line-height: 1.3; }
+.glg .dash { color: var(--gt-faint); }
+.glg-loss { margin-left: 10px; font: 600 24px/1 var(--font-body); letter-spacing: .1em; text-transform: uppercase; color: var(--gt-soft); }
+.glg-limit { font: var(--gt-display-weight) 34px/1.3 var(--gt-display); display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }
+.glg-label { font: 600 28px/1.3 var(--font-body); color: var(--gt-soft); }
+.glg-data { font-size: 24px; line-height: 1.3; color: var(--gt-faint); }
+.glg-double { flex: none; border-top: 5px double var(--gt-ink); margin-top: -1px; }
+
+/* The plate · 760 × 984, inset 48 from the top, right and bottom. */
+.glg-plate { right: 48px; top: 48px; width: 760px; height: 984px; padding: 48px 56px 44px var(--ov-pad-wide); --ov-margin-x: 64px; display: flex; flex-direction: column; }
+.glg-plate .glg-company { flex: none; margin-top: 12px; font-family: var(--gt-display); font-weight: var(--gt-display-weight); line-height: 1.1; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+.glg-weekblock { flex: none; margin-top: 20px; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+.glg-weeklabel { align-self: flex-start; font-size: 28px; line-height: 1.3; color: var(--gt-soft); }
+.glg-total { display: flex; align-items: baseline; line-height: 1.05; white-space: nowrap; }
+.glg-bigfig { font-size: 64px; font-weight: 500; color: var(--gt-ink); }
+.glg-weekblock .glg-loss, .glg-strip .glg-total .glg-loss, .glg-counter .glg-loss, .glg-plan-panel .glg-weekrow .glg-loss { font-size: 28px; letter-spacing: .12em; color: var(--gt-ink); margin-left: 12px; }
+.glg-rows { flex: 0 1 auto; min-height: 0; overflow: hidden; margin-top: 20px; border-top: 2px solid var(--ov-strong); }
+.glg-row { display: flex; justify-content: space-between; align-items: center; gap: 24px; box-sizing: border-box; border-bottom: 1px solid var(--ov-rule); margin: 0 -16px; padding: 0 16px; }
+.glg-row.on { background: var(--ov-wash); }
+.glg-who { display: flex; flex-direction: column; min-width: 0; line-height: 1.2; }
+.glg-name { font-size: 32px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.glg-hood { font-size: 24px; color: var(--gt-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-height: 1.2em; }
+.glg-rowfig { white-space: nowrap; }
+.glg-fig { font-size: 36px; color: var(--gt-ink); }
+.glg-more { height: 56px; display: flex; align-items: center; font-size: 28px; color: var(--gt-soft); border-bottom: 1px solid var(--ov-rule); }
+.glg-foot { flex: none; margin-top: auto; padding-top: 20px; display: flex; flex-direction: column; gap: 6px; }
+.glg-foot .glg-data { margin-top: 8px; }
+.glg-plate .glg-foot { min-height: 0; }
+
+/* The business card · 900 wide at 72,72: the Now card's footprint. */
+.glg-card, .glg-plan-card { left: 72px; top: 72px; width: 900px; min-height: 300px; padding: 36px 44px 32px var(--ov-pad); display: flex; flex-direction: column; }
+.glg-plan-card { padding-top: 34px; padding-bottom: 30px; }
+.glg-head { margin-top: 10px; display: flex; justify-content: space-between; align-items: baseline; gap: 24px; padding-bottom: 16px; border-bottom: 1px solid var(--ov-rule-row); }
+.glg-head .glg-title { font: var(--gt-display-weight) 54px/1.1 var(--gt-display); min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.glg-plan-card .glg-head { margin-top: 8px; padding-bottom: 14px; }
+.glg-plan-card .glg-head .glg-title { font-size: 48px; }
+.glg-headfig { white-space: nowrap; }
+.glg-fig54 { font-size: 54px; font-weight: 500; color: var(--gt-ink); }
+.glg-headfig .glg-loss { font-size: 26px; }
+.glg-card .glg-line { margin-top: 12px; font-size: 30px; line-height: 1.4; color: var(--gt-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.glg-card .glg-limit, .glg-plan-card .glg-limit { margin-top: 14px; font-size: 30px; }
+.glg-card .glg-data { margin-top: 16px; }
+
+/* The company strip · full width, 104 tall, bottom 72 (or top 72). */
+.glg-strip { left: 72px; right: 72px; bottom: 72px; height: 104px; padding: 0 36px 0 var(--ov-pad); display: flex; align-items: center; gap: 32px; }
+.glg-strip.top { top: 72px; bottom: auto; }
+.glg-strip .glg-company { flex: 0 1 auto; min-width: 0; font: var(--gt-display-weight) 36px/1.2 var(--gt-display); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.glg-strip .glg-week { font-size: 28px; color: var(--gt-soft); white-space: nowrap; }
+.glg-strip .glg-total { padding-bottom: 4px; border-bottom: 5px double var(--ov-total-rule); }
+.glg-fig44 { font-size: 44px; font-weight: 500; color: var(--gt-ink); }
+.glg-spacer { flex: 1; }
+.glg-divider { width: 1px; align-self: stretch; margin: 22px 0; background: var(--ov-strong); }
+.glg-on { display: flex; align-items: baseline; gap: 14px; white-space: nowrap; min-width: 0; }
+.glg-onword { font-size: 28px; color: var(--gt-soft); }
+.glg-on .glg-name { font-size: 32px; }
+.glg-fig36 { font-size: 36px; color: var(--gt-ink); }
+.glg-on .glg-loss { margin-left: 0; }
+
+/* The limit line · 1100 wide at bottom-left 72. Only what limits it; no money. */
+.glg-limit-line { left: 72px; bottom: 72px; width: 1100px; min-height: 150px; padding: 28px 40px 30px var(--ov-pad); display: flex; flex-direction: column; }
+.glg-limit-line .glg-label { padding-bottom: 10px; border-bottom: 1px solid var(--ov-rule-row); }
+.glg-limit-line .glg-limit { margin-top: 12px; font-size: 36px; }
+
+/* The week counter · the counter as built, with the week in its label. */
+.glg-counter { left: 72px; top: 72px; min-width: 420px; min-height: 160px; padding: 24px 40px 26px var(--ov-pad); display: flex; flex-direction: column; align-items: flex-start; }
+.glg-counter .glg-label { font-size: 24px; font-weight: 600; }
+.glg-count { display: flex; align-items: baseline; padding-bottom: 6px; border-bottom: 5px double var(--ov-total-rule); }
+.glg-fig72 { font-size: 72px; font-weight: 500; line-height: 1.1; color: var(--gt-ink); }
+
+/* The plan on stream, as a panel · the plate's footprint (A1). */
+.glg-plan-panel { right: 48px; top: 48px; width: 760px; height: 984px; padding: 44px 56px 40px var(--ov-pad-wide); --ov-margin-x: 64px; display: flex; flex-direction: column; }
+.glg-plan-panel .glg-title { flex: none; margin-top: 10px; font: var(--gt-display-weight) 56px/1.1 var(--gt-display); display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+.glg-plan-panel.long .glg-title { font-size: 48px; }
+.glg-where { flex: none; margin-top: 8px; font-size: 28px; line-height: 1.3; color: var(--gt-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.glg-plan-card .glg-where { margin-top: 10px; }
+.glg-weekrow { flex: none; margin-top: 18px; padding-top: 14px; border-top: 2px solid var(--ov-strong); display: flex; justify-content: space-between; align-items: baseline; gap: 16px; }
+.glg-weekword { font-size: 28px; line-height: 1.3; color: var(--gt-soft); }
+.glg-change { flex: none; margin-top: 14px; display: flex; align-items: baseline; padding: 10px 14px; border: 1px solid var(--ov-strong); border-radius: var(--gt-radius); transition: opacity 240ms cubic-bezier(.2,.7,.3,1); }
+.glg-change.fading { opacity: 0; }
+.glg-changetext { font-size: 28px; line-height: 1.3; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.glg-caret { margin-left: 8px; font-size: 24px; color: var(--gt-faint); }
+.glg-lines { flex: none; margin-top: 14px; }
+.glg-lineitem { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; height: 52px; box-sizing: border-box; padding-top: 6px; border-bottom: 1px solid var(--ov-rule); font-size: 30px; }
+.glg-lineitem .gov-mono { font-size: 34px; color: var(--gt-ink); }
+.glg-lineitem .gov-mono.dash { color: var(--gt-faint); }
+.glg-grid-block { flex: 0 1 auto; min-height: 0; overflow: hidden; margin-top: 16px; display: flex; flex-direction: column; gap: 3px; }
+.glg-gridlabel { font-size: 24px; line-height: 1.3; color: var(--gt-soft); margin-bottom: 6px; }
+.glg-grid { display: flex; flex-direction: column; gap: 2px; }
+.glg-gridrow { display: flex; gap: 2px; height: 18px; }
+.glg-cell { flex: 1 1 0; box-shadow: inset 0 0 0 1px var(--ov-rule); }
+.glg-cell.open { box-shadow: none; background: color-mix(in srgb, var(--gt-ink) var(--lvl, 10%), transparent); }
+.glg-cell.open.held { box-shadow: inset 0 4px 0 var(--gt-ink); }
+.glg-ticks { display: flex; justify-content: space-between; font-size: 24px; color: var(--gt-faint); margin-top: 4px; }
+.glg-plan-panel .glg-double { margin-top: 16px; }
+.glg-plan-panel .glg-foot { padding-top: 16px; }
+.glg-plan-panel .glg-foot .glg-data { margin-top: 6px; }
+
+/* Nothing chosen, or the switch off: the theme's empty panel, .72, the
+   ornament at half strength, no text, no dot, no motion (README §4). */
+.glg-empty { background-color: var(--gt-panel-dim); border-color: color-mix(in srgb, var(--gt-border) 50%, transparent);
+  background-image: linear-gradient(to right,
+    transparent var(--ov-margin-x), color-mix(in srgb, var(--ov-margin) 50%, transparent) var(--ov-margin-x),
+    color-mix(in srgb, var(--ov-margin) 50%, transparent) calc(var(--ov-margin-x) + 1.5px), transparent calc(var(--ov-margin-x) + 1.5px),
+    transparent calc(var(--ov-margin-x) + 3.5px), color-mix(in srgb, var(--ov-margin) 50%, transparent) calc(var(--ov-margin-x) + 3.5px),
+    color-mix(in srgb, var(--ov-margin) 50%, transparent) calc(var(--ov-margin-x) + 5px), transparent calc(var(--ov-margin-x) + 5px));
+  box-shadow: none; }
+.glg-card.glg-empty, .glg-plan-card.glg-empty { height: 300px; }
+.glg-limit-line.glg-empty { height: 150px; }
+.glg-counter.glg-empty { width: 420px; height: 160px; }
+.gov[data-theme="grimoire"] .glg-empty { border-left-color: rgba(201, 162, 39, .5); }
+
+/* The mono line: what happened, for two seconds, bottom-left of the canvas
+   (beside the plate at right 856). Mono 26 on the theme's panel. */
+.glg-note { position: absolute; left: 72px; bottom: 72px; font: 500 26px var(--font-mono); color: var(--gt-ink); background: var(--gt-panel); padding: 8px 16px; border-radius: var(--gt-radius); white-space: nowrap; }
+.glg-note.by-plate { left: auto; right: 856px; bottom: 48px; }
+
+/* Inside a layout the slot places the element; the plate keeps its height. */
+.gov-placed .glg-strip { height: 104px; }
+.gov-placed .glg-plate, .gov-placed .glg-plan-panel { height: 984px; }
+.gov-placed .glg-counter { width: auto; }

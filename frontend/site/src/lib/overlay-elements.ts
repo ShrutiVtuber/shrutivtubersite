@@ -3,6 +3,9 @@
  * collapse 260–340, unfold 300–400. Under the overlay's own reduced setting
  * it is an instant swap and one line.
  */
+import { drawLedger, LEDGER_KINDS } from "./ledger-elements";
+import type { Words } from "./ledger/stream";
+
 const esc = (s: unknown) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
 const wait = (ms: number) => new Promise((r) => window.setTimeout(r, ms));
 
@@ -17,7 +20,9 @@ export function sigilSvg(parts: any[], stroke = 12, size = 200): string {
   let out = "";
   parts.forEach((p, i) => {
     const a0 = i * span + gap / 2, a1 = (i + 1) * span - gap / 2;
-    out += `<path d="${arcD(r, a0, a1)}" fill="none" stroke="var(--gt-faint)" stroke-opacity=".35" stroke-width="${w}"/>`;
+    /* The track and the cap are theme hooks (--ov-sigil-track, --ov-sigil-cap):
+       Ledger draws a ruled pen, butt-capped on a ruling-coloured track. */
+    out += `<path class="track" d="${arcD(r, a0, a1)}" fill="none" style="stroke:var(--ov-sigil-track, var(--gt-faint));stroke-opacity:var(--ov-sigil-track-opacity, .35)" stroke-width="${w}"/>`;
     const pct = Math.max(0, Math.min(1, p.pct || 0));
     if (p.partly !== undefined) {
       /* Two fills: blue on to met + partly (motion, not absence), rose to met on top. */
@@ -31,9 +36,10 @@ export function sigilSvg(parts: any[], stroke = 12, size = 200): string {
   return `<svg viewBox="0 0 100 100" width="${size}" height="${size}" aria-hidden="true">${out}</svg>`;
 }
 
-interface Opts { still: boolean; reduced: boolean; line?: HTMLElement | null }
+interface Opts { still: boolean; reduced: boolean; line?: HTMLElement | null; words?: Words }
 
 export async function drawElement(slot: HTMLElement, kind: string, prev: any, next: any, o: Opts): Promise<void> {
+  if (LEDGER_KINDS.includes(kind)) return drawLedger(slot, kind, prev, next, o);
   if (kind === "guide-now") {
     let card = slot.querySelector<HTMLElement>(".gov-now");
     if (!card) { slot.innerHTML = `<div class="gov-plate gov-now"><div class="swap" data-swap><span class="gov-eyebrow" data-phase></span><span class="title" data-title></span><span class="line" data-line></span><span class="horizon"></span></div></div>`; card = slot.querySelector<HTMLElement>(".gov-now")!; }
@@ -78,6 +84,14 @@ export async function drawElement(slot: HTMLElement, kind: string, prev: any, ne
     const others = Number(g.others || 0);
     const line = crew.join(" · ") + (others > 0 ? `${crew.length ? " · " : ""}and ${others} ${others === 1 ? "other" : "others"}` : "");
     slot.innerHTML = `<div class="gov-plate gov-goal"><span class="gov-eyebrow">${esc(g.name)}</span><span class="title">${esc(g.goal)}</span><span class="gov-mono count">${esc(g.count)}${g.tiers ? ` · tier ${esc(g.tier)} of ${esc(g.tiers)}` : ""}</span><div class="tiers">${(g.parts ?? []).map((p: any) => `<span class="tier ${esc(p.state)}"><span class="fill" style="width:${(Math.max(0, Math.min(1, p.pct || 0)) * 100).toFixed(1)}%"></span></span>`).join("")}</div><span class="crew">${esc(line)}</span></div>`;
+    /* A tier filled (Ledger README §4, the same timings in every theme): the
+       bar is full on frame one; Full adds the 3px ignite border, 0 → 1 over
+       400 ms; Reduced says so in the mono line for two seconds; Still, nothing. */
+    const filled = (x: any) => (x?.parts ?? []).filter((p: any) => p.state === "done").length;
+    if (prev && filled(g) > filled(prev) && !o.still) {
+      if (o.reduced) { if (o.line) { o.line.textContent = `${g.goal ?? ""} · tier ${filled(g)} of ${(g.parts ?? []).length}`; o.line.hidden = false; window.setTimeout(() => { o.line!.hidden = true; }, 2000); } }
+      else { const card = slot.querySelector<HTMLElement>(".gov-goal")!; card.classList.add("ignite"); window.setTimeout(() => card.classList.remove("ignite"), 1200); }
+    }
     return;
   }
   if (kind === "sheet") {

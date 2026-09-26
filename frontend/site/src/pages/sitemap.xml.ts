@@ -45,6 +45,10 @@ const STATIC: [path: string, priority: string, changefreq: string][] = [
   ["/collab", "0.7", "monthly"],
   ["/horoscopes", "0.8", "weekly"],
   ["/guides", "0.8", "weekly"],
+  /* The Ledger's public doors. Its places and calculators join when they are
+     built; a kept business is private and never listed. */
+  ["/ledger", "0.6", "monthly"],
+  ["/ledger/plan", "0.7", "monthly"],
   ["/horoscopes/archive", "0.6", "weekly"],
   ["/fan-works", "0.5", "monthly"],
   ["/press", "0.4", "yearly"],
@@ -106,8 +110,11 @@ export const GET: APIRoute = async () => {
     );
 
   const hidden = await hiddenSections();
+  /* The Ledger belongs to the guides section and is hidden with it
+     (middleware SECTION_PATHS), though its address does not start /guides. */
+  const sectionPath = (path: string) => (path === "/ledger" || path.startsWith("/ledger/") ? "/guides" : path);
   const reachable = (path: string) =>
-    ![...hidden].some((prefix) => path === prefix || path.startsWith(prefix + "/"));
+    ![...hidden].some((prefix) => [path, sectionPath(path)].some((p) => p === prefix || p.startsWith(prefix + "/")));
 
   for (const [path, priority, changefreq] of STATIC) {
     if (reachable(path)) add(path, priority, changefreq);

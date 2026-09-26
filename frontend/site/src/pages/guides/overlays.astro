@@ -17,7 +17,7 @@ import { copy } from "../../lib/copy";
 
 const say = await copy("guides/overlays");
 interface Placed { kind: string; x: number; y: number; w: number; shows?: string }
-interface Shared { id: number; label: string; theme: string; motion: string; layout: Placed[] }
+interface Shared { id: number | string; label: string; theme: string; motion: string; layout: Placed[]; starter?: boolean; note?: string; description?: string }
 interface Run { id: number; name: string; guide?: { slug: string; game: { slug: string } } }
 const me = await account(Astro);
 const [shared, runsRead] = await Promise.all([
@@ -33,8 +33,21 @@ const KIND: Record<string, string> = {
   "ticker": say("kind.ticker", "Ticker"), "sky": say("kind.sky", "Sky"), "hours": say("kind.hours", "Planetary hours"),
   "countdown": say("kind.countdown", "Countdown"), "alerts": say("kind.alerts", "Alerts"), "wheel": say("kind.wheel", "Transit wheel"),
   "build": say("kind.build", "Build"),
+  "ledger-plate": say("kind.ledger_plate", "Ledger plate"), "ledger-card": say("kind.ledger_card", "Business card"),
+  "ledger-strip": say("kind.ledger_strip", "Company strip"), "ledger-limit": say("kind.ledger_limit", "Limit line"),
+  "ledger-counter": say("kind.ledger_counter", "Week counter"), "ledger-plan-panel": say("kind.ledger_plan_panel", "Plan on stream"),
+  "ledger-plan-card": say("kind.ledger_plan_card", "Plan on stream, card"),
 };
-const THEME: Record<string, string> = { almanac: say("theme.almanac", "Almanac"), grimoire: say("theme.grimoire", "Grimoire"), plain: say("theme.plain", "Plain") };
+const THEME: Record<string, string> = { almanac: say("theme.almanac", "Almanac"), grimoire: say("theme.grimoire", "Grimoire"), plain: say("theme.plain", "Plain"), ledger: say("theme.ledger", "Ledger") };
+/* The site's starting layouts come from the server with its own words; these are hers to change. */
+const STARTER: Record<string, { label: string; note: string; description: string; line: string }> = {
+  "big-ambitions-ledger": {
+    label: say("starter.ledger.title", "Big Ambitions · Ledger"),
+    note: say("starter.ledger.note", "Ledger theme"),
+    description: say("starter.ledger.body", "The ledger plate on the right, a group's goal at the bottom left. Move anything once it is yours."),
+    line: say("starter.ledger.line", "plate · goal · 1920 × 1080"),
+  },
+};
 const MOTION: Record<string, string> = { full: say("motion.full", "full motion"), reduced: say("motion.reduced", "reduced motion"), still: say("motion.still", "still") };
 const meta = (l: Shared) => `${THEME[l.theme] ?? l.theme} · ${MOTION[l.motion] ?? l.motion} · ${say("card.elements", "{n} elements").replace("{n}", String(l.layout.length))}`;
 const kinds = (l: Shared) => l.layout.map((e) => KIND[e.kind] ?? e.kind).join(" · ");
@@ -65,9 +78,10 @@ const WORDS = {
             <article class="card" data-layout={JSON.stringify({ theme: l.theme, motion: l.motion, layout: l.layout })}>
               <div class="plate"><Plate theme={l.theme} elements={l.layout} width={520} fluid labels={KIND} aria={say("card.plate_aria", "{theme} layout, {n} elements").replace("{theme}", THEME[l.theme] ?? l.theme).replace("{n}", String(l.layout.length))} /></div>
               <div class="body">
-                <h2>{l.label || say("card.untitled", "A layout")}</h2>
-                <span class="gd-mono gd-soft">{meta(l)}</span>
-                <span class="gd-note">{kinds(l)}</span>
+                <h2>{STARTER[String(l.id)]?.label ?? (l.label || say("card.untitled", "A layout"))}</h2>
+                <span class="gd-mono gd-soft">{STARTER[String(l.id)]?.note ?? meta(l)}</span>
+                {STARTER[String(l.id)] ? <p class="gd-note starter">{STARTER[String(l.id)].description}</p> : null}
+                <span class="gd-note">{STARTER[String(l.id)]?.line ?? kinds(l)}</span>
               </div>
               <div class="foot">
                 {me ? (
@@ -109,6 +123,7 @@ const WORDS = {
   .pick { flex: 1 1 160px; }
   .pick :global(.sh-field) { max-width: none; }
   .small { font-size: 14px; }
+  .starter { margin: 0; font-size: 14px; }
   .minted { flex-basis: 100%; }
   .foot-note { max-width: 66ch; text-wrap: pretty; }
 </style>

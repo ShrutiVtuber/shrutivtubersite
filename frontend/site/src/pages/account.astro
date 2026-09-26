@@ -180,8 +180,13 @@ const guideTokens: { id: number; kind: string; label: string; showing: string; h
 const kindWord = (k: string) =>
   k === "guide-now" ? say("tokens.kind.now", "now card") : k === "guide-sigil" ? say("tokens.kind.sigil", "sigil")
   : k === "guide-path" ? say("tokens.kind.path", "path strip") : k === "guide-routine" ? say("tokens.kind.routine", "routine")
-  : k === "guide-goal" ? say("tokens.kind.goal", "goal") : say("tokens.kind.layout", "layout");
-const themeWord = (t: string) => t === "grimoire" ? say("tokens.theme.grimoire", "Grimoire") : t === "plain" ? say("tokens.theme.plain", "Plain") : say("tokens.theme.almanac", "Almanac");
+  : k === "guide-goal" ? say("tokens.kind.goal", "goal")
+  : k === "ledger-plate" ? say("tokens.kind.ledger_plate", "ledger plate") : k === "ledger-card" ? say("tokens.kind.ledger_card", "business card")
+  : k === "ledger-strip" ? say("tokens.kind.ledger_strip", "company strip") : k === "ledger-limit" ? say("tokens.kind.ledger_limit", "limit line")
+  : k === "ledger-counter" ? say("tokens.kind.ledger_counter", "week counter")
+  : k === "ledger-plan-panel" || k === "ledger-plan-card" ? say("tokens.kind.ledger_plan", "plan on stream")
+  : say("tokens.kind.layout", "layout");
+const themeWord = (t: string) => t === "grimoire" ? say("tokens.theme.grimoire", "Grimoire") : t === "plain" ? say("tokens.theme.plain", "Plain") : t === "ledger" ? say("tokens.theme.ledger", "Ledger") : say("tokens.theme.almanac", "Almanac");
 ---
 
 <BaseLayout title={say("text.1", "Your account — Shruti")} description={say("text.2", "Profile, consents and your data.")} noindex>

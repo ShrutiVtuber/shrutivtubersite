@@ -2,7 +2,7 @@
 /* A layout: several elements in one browser source, each at its own place
  * on the 1920 × 1080 canvas (board W7's canvas, as OBS sees it).
  *
- * The same elements as the single-element sources, drawn by the same rules
+ * The same elements as the single-element sources (the Ledger's too), drawn by the same rules
  * and the same theme sheet; positions come from the layout and a theme may
  * never move them. The Done moment plays on the now card inside the layout
  * exactly as it does alone.
@@ -96,5 +96,9 @@ const initial = JSON.stringify({ version: data?.version ?? "", elements });
       }
     } catch { /* offline: the last frame stands */ }
   };
-  window.setInterval(tick, 2000);
+  /* A layout holding a Ledger element polls every second, as /overlay/ledger
+     does: the business on screen changes from a phone mid-stream. The
+     unchanged answer is the same one row's read either way. */
+  const ledger = (last.elements ?? []).some((e: any) => String(e.kind || "").startsWith("ledger-"));
+  window.setInterval(tick, ledger ? 1000 : 2000);
 </script>

@@ -23,7 +23,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import Column, UniqueConstraint
+from sqlalchemy import Column, ForeignKey, Integer, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import Field
 
@@ -49,6 +49,20 @@ class Ledger(TimestampMixin, table=True):
     in_game_day: Optional[int] = Field(default=None)
     courses: list = Field(default_factory=list, sa_column=Column(JSONB, nullable=False))
     position: int = 0
+    # ── on stream (the Ledger on stream; docs/LEDGER.md) ──
+    # The business the stream is about: an OPEN business of this ledger, or
+    # nothing. SET NULL when that business is deleted. `use_alter`, because a
+    # business also points at its ledger.
+    on_screen_business_id: Optional[int] = Field(default=None, sa_column=Column(
+        Integer, ForeignKey("ledger_business.id", ondelete="SET NULL", use_alter=True,
+                            name="fk_ledger_on_screen_business"), nullable=True))
+    # The plan on stream, which may never have been kept: {"plan": {...},
+    # "name": "..."}. Null when the planner's switch is off. One per ledger.
+    live_plan: Optional[dict] = Field(default=None, sa_column=Column(JSONB, nullable=True))
+    # When the live plan (or the switch) last changed: the overlay's clock.
+    live_updated_at: Optional[datetime] = Field(default=None, sa_type=UTC_TS)
+    # The planner's own diff of the last tap: {"label": "A second register", "delta": 12845}.
+    live_change: Optional[dict] = Field(default=None, sa_column=Column(JSONB, nullable=True))
 
 
 class LedgerBusiness(TimestampMixin, table=True):

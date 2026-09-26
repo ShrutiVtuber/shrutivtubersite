@@ -1,0 +1,45 @@
+---
+/* The week grid (SPEC §3.1): customers served each hour of the week, with
+ * its heading, its legend (held at the ceiling · served in full · closed)
+ * and its caption. The server draws the frame; a script fills it:
+ *
+ *   import { mountWeekGrid } from "../../lib/ledger/grid";
+ *   const grid = mountWeekGrid(el);
+ *   grid.update(reckoning, plan.hours);     // null: every hour closed
+ *
+ * `heading` false leaves the heading out (a page that titles it itself). */
+import { copy } from "../../lib/copy";
+
+interface Props { heading?: boolean; id?: string }
+const { heading = true, id } = Astro.props;
+const say = await copy("component:WeekGrid");
+const WORDS = {
+  "day.0": say("day.0", "Mon"), "day.1": say("day.1", "Tue"), "day.2": say("day.2", "Wed"), "day.3": say("day.3", "Thu"),
+  "day.4": say("day.4", "Fri"), "day.5": say("day.5", "Sat"), "day.6": say("day.6", "Sun"),
+  "dayLong.0": say("dayLong.0", "Monday"), "dayLong.1": say("dayLong.1", "Tuesday"), "dayLong.2": say("dayLong.2", "Wednesday"),
+  "dayLong.3": say("dayLong.3", "Thursday"), "dayLong.4": say("dayLong.4", "Friday"), "dayLong.5": say("dayLong.5", "Saturday"),
+  "dayLong.6": say("dayLong.6", "Sunday"),
+  "cell.closed": say("cell.closed", "{at} · closed"),
+  "cell.open": say("cell.open", "{at} · {served} served, {would} would come"),
+  "cell.held": say("cell.held", "{at} · {served} served, {would} would come · held by the {by}"),
+  "by.registers": say("by.registers", "registers"),
+  "by.displays": say("by.displays", "displays"),
+  "by.fixtures": say("by.fixtures", "store-wide fixtures"),
+  "by.building": say("by.building", "building"),
+  caption: say("caption", "{n} customers a week, served. A line along the top of a cell means the hour is held at its ceiling: {h} hours this week. Those are the hours money is lost."),
+  "caption.none": say("caption.none", "Nothing planned yet: with no building there is no traffic to count."),
+  "caption.cannotOpen": say("caption.cannotOpen", "Nothing is served until it can open."),
+};
+---
+<div class="lg-weekgrid" data-week-grid data-words={JSON.stringify(WORDS)} id={id}>
+  <div class="lg-weekgrid-head">
+    {heading && <h3 class="lg-sub">{say("heading", "Customers each hour")}</h3>}
+    <span class="lg-legend">
+      <span class="lg-legend-item"><span class="lg-swatch" data-kind="held" aria-hidden="true"></span>{say("legend.held", "held at the ceiling")}</span>
+      <span class="lg-legend-item"><span class="lg-swatch" data-kind="served" aria-hidden="true"></span>{say("legend.served", "served in full")}</span>
+      <span class="lg-legend-item"><span class="lg-swatch" data-kind="closed" aria-hidden="true"></span>{say("legend.closed", "closed")}</span>
+    </span>
+  </div>
+  <div class="lg-grid" role="table" aria-label={say("aria", "Customers served each hour of the week")} data-grid-body></div>
+  <p class="lg-grid-caption" data-grid-caption>{WORDS["caption.none"]}</p>
+</div>

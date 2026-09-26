@@ -1,0 +1,29 @@
+---
+/* /ledger/calculators — ⚠ a holding page, so the Ledger's own tabs lead somewhere
+ * honest. The real page is a later build (handoff README §8). It says
+ * what will be here and sends a person to the planner; it shows nothing it
+ * does not have. Not in the sitemap, and kept out of search until it is built. */
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import Head from "../../components/guides/Head.astro";
+import Empty from "../../components/guides/Empty.astro";
+import LedgerBar from "../../components/ledger/LedgerBar.astro";
+import LedgerFoot from "../../components/ledger/LedgerFoot.astro";
+import { account } from "../../lib/account";
+import { copy } from "../../lib/copy";
+import { loadGame } from "../../lib/ledger/data";
+
+const say = await copy("ledger/calculators");
+const me = await account(Astro);
+const game = await loadGame();
+---
+<BaseLayout title={say("meta.title", "Calculators — the Ledger")} noindex>
+  <div class="page gd-full lg-root">
+    <LedgerBar current="calculators" signedIn={!!me} />
+    <Head as="h1" eyebrow={say("eyebrow", "Ledger")} title={say("title", "Calculators")} />
+    <Empty n={3} eyebrow={say("empty.eyebrow", "Not built yet")} title={say("empty.title", "The calculators are not built yet.")}
+           body={say("empty.body", "The price staircase, which campaigns reach a target, and rent or buy. They are the next part of the Ledger to be built; the planner already draws the staircase for each product.")}
+           action={say("empty.action", "Plan a business")} href="/ledger/plan"
+           ringAria={say("empty.aria", "Not built yet")} />
+    <LedgerFoot game={game} />
+  </div>
+</BaseLayout>

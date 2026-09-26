@@ -55,7 +55,9 @@ const origin = Astro.url.origin;
 
 const variants = doc.game.variants ?? [];
 // The theme this game brings: what a new overlay wears unless the person picks another.
-const gameTheme = ["almanac", "grimoire", "plain"].includes(String((doc.game as any).theme ?? "")) ? String((doc.game as any).theme) : "almanac";
+// Big Ambitions wears the Ledger theme (Ledger overlays README §8), whatever its guides say.
+const GAME_THEMES: Record<string, string> = { "big-ambitions": "ledger" };
+const gameTheme = GAME_THEMES[game] ?? (["almanac", "grimoire", "plain", "ledger"].includes(String((doc.game as any).theme ?? "")) ? String((doc.game as any).theme) : "almanac");
 const skipGroups = [...new Set(phasesOf(doc).map((p) => p.skip_group).filter(Boolean))] as string[];
 const groupNames = (g: string) => phasesOf(doc).filter((p) => p.skip_group === g).map((p) => p.name).join(", ");
 
@@ -250,8 +252,8 @@ const WORDS = {
             <fieldset class="tk-themes">
               <legend>{say("ov.theme", "Theme")}</legend>
               <ThemeTiles name="theme" value={gameTheme} preset="now"
-                themes={[{ value: "almanac", label: say("ov.almanac", "Almanac") }, { value: "grimoire", label: say("ov.grimoire", "Grimoire") }, { value: "plain", label: say("ov.plain", "Plain") }]}
-                note={say("ov.theme_note", "A theme is a skin. The four state colours are the same in all three.")} />
+                themes={[{ value: "almanac", label: say("ov.almanac", "Almanac") }, { value: "grimoire", label: say("ov.grimoire", "Grimoire") }, { value: "plain", label: say("ov.plain", "Plain") }, { value: "ledger", label: say("ov.ledger", "Ledger") }]}
+                note={say("ov.theme_note", "A theme is a skin. The four state colours are the same in all four.")} />
             </fieldset>
             <SelectField label={say("ov.motion", "Motion")} name="motion" value="full"
               options={[{ value: "full", label: say("ov.full", "Full — the Done moment, 600 ms") }, { value: "reduced", label: say("ov.reduced", "Reduced — an instant swap") }, { value: "still", label: say("ov.still", "Still") }]} />

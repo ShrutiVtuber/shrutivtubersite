@@ -56,7 +56,7 @@ const tiersIndex = Array.from({ length: g.tiers }, (_, i) => {
   return { idx, state, right };
 });
 const othersLine = (g.others.count === 1 ? say("crew.one_other", "and one other") : say("crew.others", "and {n} others").replace("{n}", few(g.others.count)));
-const themeWord = (t: string) => (t === "grimoire" ? say("theme.grimoire", "Grimoire") : t === "plain" ? say("theme.plain", "Plain") : say("theme.almanac", "Almanac"));
+const themeWord = (t: string) => (t === "grimoire" ? say("theme.grimoire", "Grimoire") : t === "plain" ? say("theme.plain", "Plain") : t === "ledger" ? say("theme.ledger", "Ledger") : say("theme.almanac", "Almanac"));
 const motionWord = (m?: string) => (m === "full" ? say("motion.full_word", "full") : m === "still" ? say("motion.still_word", "still") : say("motion.reduced_word", "reduced"));
 const seenWord = (t: Token) => {
   if (!t.lastSeen) return say("token.idle", "idle");
@@ -71,7 +71,7 @@ const WORDS = {
   copied: say("words.copied", "Copied."),
   goalOverlay: say("words.goal_overlay", "Goal overlay"),
   revoke: say("words.revoke", "Revoke"),
-  themes: { almanac: themeWord("almanac"), grimoire: themeWord("grimoire"), plain: themeWord("plain") },
+  themes: { almanac: themeWord("almanac"), grimoire: themeWord("grimoire"), plain: themeWord("plain"), ledger: themeWord("ledger") },
   motions: { full: motionWord("full"), reduced: motionWord("reduced"), still: motionWord("still") },
   drawing: say("token.drawing", "drawing, seen just now"), idle: say("token.idle", "idle"),
 };
@@ -159,7 +159,7 @@ const WORDS = {
         <fieldset class="themes">
           <legend>{say("overlay.theme", "Theme")}</legend>
           <ThemeTiles name="theme" value="almanac" preset="goal"
-            themes={[{ value: "almanac", label: themeWord("almanac") }, { value: "grimoire", label: themeWord("grimoire") }, { value: "plain", label: themeWord("plain") }]}
+            themes={[{ value: "almanac", label: themeWord("almanac") }, { value: "grimoire", label: themeWord("grimoire") }, { value: "plain", label: themeWord("plain") }, { value: "ledger", label: themeWord("ledger") }]}
             note={say("overlay.theme_note", "A theme is a skin. The four state colours are the same in all three.")} />
         </fieldset>
         <SelectField label={say("overlay.motion", "Motion")} name="motion" data-motion value="reduced"

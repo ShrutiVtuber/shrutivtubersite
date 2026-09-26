@@ -36,18 +36,24 @@ export interface PlateOptions {
 
 interface Theme {
   ground: string; panel: string; inkSoft: string; rule: string; bottom: string; radius: number; ring: boolean;
+  /** The margin line's colour, where the theme rules its panels (Ledger). */
+  margin?: string;
 }
 
 export const THEMES: Record<string, Theme> = {
   grimoire: { ground: "#14100E", panel: "rgba(36,27,22,.92)", inkSoft: "#C4B4A2", rule: "4px solid #C9A227", bottom: "none", radius: 2, ring: true },
   almanac: { ground: "#121829", panel: "rgba(26,33,56,.92)", inkSoft: "#B3B9D2", rule: "none", bottom: "1px solid #8A6880", radius: 16, ring: false },
   plain: { ground: "#000000", panel: "rgba(21,22,26,.88)", inkSoft: "#C8CCD4", rule: "none", bottom: "none", radius: 0, ring: false },
+  /* Big Ambitions: ruled panels with a rose double margin line (Ledger overlays README §1). */
+  ledger: { ground: "#10151F", panel: "rgba(20,26,38,.95)", inkSoft: "#C3C0B6", rule: "none", bottom: "1px solid #34425F", radius: 2, ring: true, margin: "#C7849F" },
 };
 
 /** The usual height of each element kind on the canvas, as the site's overlays draw them. */
 export const HEIGHTS: Record<string, number> = {
   "guide-sigil": 224, "guide-path": 96, "guide-now": 200, "guide-routine": 260, "guide-goal": 260, "guide-layout": 1080,
   counter: 140, text: 80, image: 160, ticker: 64, sky: 300, hours: 150, countdown: 130, alerts: 120, wheel: 432, build: 420,
+  "ledger-plate": 984, "ledger-card": 300, "ledger-strip": 104, "ledger-limit": 150, "ledger-counter": 160,
+  "ledger-plan-panel": 984, "ledger-plan-card": 300,
 };
 
 /** The board's presets, for tiles that depict no particular layout. */
@@ -80,7 +86,9 @@ export function plate(o: PlateOptions): string {
       continue;
     }
     const sky = isSky(e.kind);
-    const bg = sky ? "linear-gradient(180deg,var(--dusk-sky-zenith) 0%,var(--dusk-sky-mid) 58%,var(--dusk-sky-horizon) 100%)" : T.panel;
+    const margin = !sky && T.margin && width >= 200
+      ? `linear-gradient(to right,transparent 6%,${T.margin} 6%,${T.margin} 7%,transparent 7%),` : "";
+    const bg = sky ? "linear-gradient(180deg,var(--dusk-sky-zenith) 0%,var(--dusk-sky-mid) 58%,var(--dusk-sky-horizon) 100%)" : `${margin}${T.panel}`;
     const left = sky ? "none" : T.rule;
     const bottom = sky ? "1px solid var(--dusk-horizon-line)" : T.bottom;
     const radius = sky ? "0" : width < 160 ? "2px" : `${(T.radius * (width / 1920) * 4).toFixed(2)}px`;

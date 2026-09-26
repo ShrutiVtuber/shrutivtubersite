@@ -225,7 +225,7 @@ async def goal_tokens(code: str, request: Request, session: AsyncSession = Depen
 @router.post("/{code}/overlays", status_code=201)
 async def mint_goal_token(code: str, body: GoalTokenIn, request: Request, session: AsyncSession = Depends(get_session)) -> dict:
     """A member mints a goal overlay for the group; the token is returned once."""
-    from shrutisguides.progress import MOTIONS, THEMES
+    from shruti.api.routes.overlay_guides import MOTIONS, THEMES
     user = await _reader(request, session)
     await _refuse_if_suspended(session, user)
     g = await _group(session, code)

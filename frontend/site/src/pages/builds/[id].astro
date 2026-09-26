@@ -60,7 +60,7 @@ const itemStates = (c: Cat) => c.items.map((it) => (it.state === "met" ? "d" : i
 const dotState = (s: string) => (s === "met" ? "met" : s === "partial" ? "partly" : "notyet");
 const KIND: Record<string, string> = { slot: say("kind.slot", "slot"), counter: say("kind.counter", "counter"), check: say("kind.check", "check") };
 const STATE: Record<string, string> = { met: say("state.met", "met"), partial: say("state.partial", "partly"), open: say("state.open", "not yet") };
-const themeWord = (t: string) => (t === "grimoire" ? say("theme.grimoire", "Grimoire") : t === "plain" ? say("theme.plain", "Plain") : say("theme.almanac", "Almanac"));
+const themeWord = (t: string) => (t === "grimoire" ? say("theme.grimoire", "Grimoire") : t === "plain" ? say("theme.plain", "Plain") : t === "ledger" ? say("theme.ledger", "Ledger") : say("theme.almanac", "Almanac"));
 const motionWord = (m?: string) => (m === "still" ? say("motion.still_word", "none") : say("motion.ignite_word", "ignite"));
 const seenWord = (t: Token) => {
   if (!t.lastSeen) return say("token.idle", "idle");
@@ -76,7 +76,7 @@ const WORDS = {
   catMet: say("cat.count", "{met}/{total} met"), next: say("next.eyebrow", "Next"), allMet: say("next.all_met", "Every goal is met."),
   target: say("slot.target", "Target"), targetHint: say("slot.target_hint", "Your words. The template only hints: {hint}"), partly: say("slot.partial", "Partly"), onChar: say("slot.met", "On the character"),
   less: say("counter.less", "One fewer"), more: say("counter.more", "One more"), want: say("counter.want", "Target"), done: say("check.done", "done"),
-  themes: { almanac: themeWord("almanac"), grimoire: themeWord("grimoire"), plain: themeWord("plain") },
+  themes: { almanac: themeWord("almanac"), grimoire: themeWord("grimoire"), plain: themeWord("plain"), ledger: themeWord("ledger") },
   motions: { full: motionWord("full"), still: motionWord("still") }, idle: say("token.idle", "idle"),
   ringAria: say("head.sigil_aria", "One arc per category"),
 };
@@ -208,7 +208,7 @@ const WORDS = {
         <fieldset class="themes">
           <legend>{say("overlay.theme", "Theme")}</legend>
           <ThemeTiles name="theme" value="almanac" preset="grid"
-            themes={[{ value: "almanac", label: themeWord("almanac") }, { value: "grimoire", label: themeWord("grimoire") }, { value: "plain", label: themeWord("plain") }]}
+            themes={[{ value: "almanac", label: themeWord("almanac") }, { value: "grimoire", label: themeWord("grimoire") }, { value: "plain", label: themeWord("plain") }, { value: "ledger", label: themeWord("ledger") }]}
             note={say("overlay.theme_note", "A theme is a skin. The four state colours are the same in all three.")} />
         </fieldset>
         <SelectField label={say("overlay.motion", "Motion")} name="motion" data-motion value="full"

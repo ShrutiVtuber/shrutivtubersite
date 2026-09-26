@@ -1,0 +1,51 @@
+---
+/* The Ledger's own row under the lockup strip (handoff README, "Ledger
+ * sub-bar"): a mono breadcrumb, then the Ledger's places as tabs. The
+ * current one has an --accent-wash ground and --accent text.
+ *
+ *   signed in:  Ledgers · {ledger} · {business} · Plan · Places · Calculators
+ *   signed out: Ledger · Plan · Places · Calculators
+ *
+ * Props: `current` names the tab this page is; `ledger` and `business` are
+ * the ones in view (signed in), each `{ id, name }`; `planHref` overrides
+ * where Plan goes (the planner opened on a kept business). */
+import { copy } from "../../lib/copy";
+
+type Place = "start" | "ledger" | "business" | "plan" | "places" | "calculators";
+interface Props {
+  current: Place;
+  signedIn: boolean;
+  ledger?: { id: number | string; name: string } | null;
+  business?: { id: number | string; name: string } | null;
+  planHref?: string;
+}
+const { current, signedIn, ledger = null, business = null, planHref = "/ledger/plan" } = Astro.props;
+const say = await copy("component:LedgerBar");
+
+const crumb = !signedIn ? say("crumb.out", "signed out") : ledger ? ledger.name : say("crumb.none", "no ledger yet");
+const tabs: [Place, string, string][] = signedIn
+  ? [
+      ["start", "/ledger", say("tab.ledgers", "Ledgers")],
+      ...(ledger ? [["ledger", `/ledger/${ledger.id}`, ledger.name] as [Place, string, string]] : []),
+      ...(ledger && business ? [["business", `/ledger/${ledger.id}/${business.id}`, business.name] as [Place, string, string]] : []),
+      ["plan", planHref, say("tab.plan", "Plan")],
+      ["places", "/ledger/places", say("tab.places", "Places")],
+      ["calculators", "/ledger/calculators", say("tab.calculators", "Calculators")],
+    ]
+  : [
+      ["start", "/ledger", say("tab.ledger", "Ledger")],
+      ["plan", planHref, say("tab.plan", "Plan")],
+      ["places", "/ledger/places", say("tab.places", "Places")],
+      ["calculators", "/ledger/calculators", say("tab.calculators", "Calculators")],
+    ];
+---
+<div class="lg-bar">
+  <div class="lg-bar-row">
+    <span class="lg-crumb">{say("crumb.game", "Big Ambitions")} · {say("crumb.ledger", "Ledger")} · <span class="lg-crumb-here">{crumb}</span></span>
+    <nav class="lg-bar-tabs" aria-label={say("nav.aria", "The Ledger")}>
+      {tabs.map(([id, href, name]) => (
+        <a class="lg-bar-tab" href={href} aria-current={id === current ? "page" : undefined}>{name}</a>
+      ))}
+    </nav>
+  </div>
+</div>

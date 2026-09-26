@@ -1,0 +1,53 @@
+---
+/* /ledger — the Ledger's front door.
+ *
+ * ⚠ A holding page. The list of a person's ledgers, "Start a ledger" and the
+ * signed-in view (handoff README §1) are the next build. Until then this says
+ * what the Ledger is, opens the planner, and says plainly that keeping a
+ * ledger is not here yet — it never shows a list it does not have. */
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import Head from "../../components/guides/Head.astro";
+import Console from "../../components/guides/Console.astro";
+import Button from "../../components/forms/Button.astro";
+import LedgerBar from "../../components/ledger/LedgerBar.astro";
+import LedgerFoot from "../../components/ledger/LedgerFoot.astro";
+import { account } from "../../lib/account";
+import { copy } from "../../lib/copy";
+import { loadGame } from "../../lib/ledger/data";
+
+const say = await copy("ledger");
+const me = await account(Astro);
+const game = await loadGame();
+---
+<BaseLayout title={say("meta.title", "The Ledger — plan and keep a Big Ambitions business")}
+            description={say("meta.description", "Plan a Big Ambitions business before you spend a dollar of the game's money, and see what the game will do with it.")}>
+  <div class="page gd-full lg-root">
+    <LedgerBar current="start" signedIn={!!me} />
+    <Head as="h1" eyebrow={say("eyebrow", "Ledger")} title={say("title", "The Ledger")}
+          lede={say("lede", "Plan a business before you spend a dollar of the game's money, and see what the game will do with it. Keep a ledger, and every week the business makes stays written beside its plan, long after the game forgets.")} max="66ch" />
+    <div class="lg-doors">
+      <Console eyebrow={say("door.plan.eyebrow", "Plan a business")}>
+        <h2 class="gd-h3">{say("door.plan.title", "Type, building, products, staff.")}</h2>
+        <p class="gd-soft">{say("door.plan.body", "Every choice moves the week's total. Nothing is saved until you keep it.")}</p>
+        <div><Button variant="primary" href="/ledger/plan">{say("door.plan.action", "Plan a business")}</Button></div>
+      </Console>
+      <Console eyebrow={say("door.sample.eyebrow", "Or start from an example")}>
+        <h2 class="gd-h3">{say("door.sample.title", "A gift shop in Hell's Kitchen.")}</h2>
+        <p class="gd-soft">{say("door.sample.body", "One register, open nine to nine: the usual first shop, planned already, so you can see what every figure means.")}</p>
+        <div><Button variant="secondary" href="/ledger/plan?sample=1&section=fixtures">{say("door.sample.action", "Open the example")}</Button></div>
+      </Console>
+    </div>
+    <p class="lg-rule-note">
+      {me
+        ? say("note.in", "Your ledgers will be listed here, one for each saved game. That part of the Ledger is not built yet; planning works now.")
+        : say("note.out", "Planning works signed out. Keeping a ledger needs an account, as a build does. It is free and it has no limits.")}
+      {!me && <>{" "}<a href="/signin?next=%2Fledger">{say("note.signin", "Sign in")}</a></>}
+    </p>
+    <LedgerFoot game={game} />
+  </div>
+</BaseLayout>
+
+<style>
+  .lg-doors { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 24px; }
+  .lg-doors .gd-soft { margin: 0; font-size: 15px; }
+</style>
