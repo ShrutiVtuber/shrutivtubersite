@@ -1,53 +1,182 @@
 ---
-/* /ledger — the Ledger's front door.
+/* /ledger — the Ledger's front door (handoff README §1; screens 01–05).
  *
- * ⚠ A holding page. The list of a person's ledgers, "Start a ledger" and the
- * signed-in view (handoff README §1) are the next build. Until then this says
- * what the Ledger is, opens the planner, and says plainly that keeping a
- * ledger is not here yet — it never shows a list it does not have. */
+ * Signed out: the eyebrow, the h1, the lede, two door consoles (Plan a
+ * business · Find a building) and the note ending in Sign in.
+ * Signed in: Your ledgers — each with its latest week's total over "week N"
+ * (the company's latest week: the highest any business wrote) — or the
+ * no-ledger empty state; then Start a ledger (#new): a name (required; the
+ * refusal note if it is empty, and nothing is created), the difficulty as
+ * chips (Custom says its values are asked once the ledger starts), the
+ * in-game day, and the courses finished. Starting it opens the new ledger.
+ *
+ * The script is lib/ledger/start.ts; every word it draws is in WORDS.
+ */
+import "../../styles/ledger-book.css";
 import BaseLayout from "../../layouts/BaseLayout.astro";
-import Head from "../../components/guides/Head.astro";
 import Console from "../../components/guides/Console.astro";
+import Empty from "../../components/guides/Empty.astro";
 import Button from "../../components/forms/Button.astro";
 import LedgerBar from "../../components/ledger/LedgerBar.astro";
 import LedgerFoot from "../../components/ledger/LedgerFoot.astro";
-import { account } from "../../lib/account";
+import SaveNote from "../../components/ledger/SaveNote.astro";
+import { account, asReader } from "../../lib/account";
 import { copy } from "../../lib/copy";
-import { loadGame } from "../../lib/ledger/data";
+import { loadPack } from "../../lib/ledger/data";
+import { companyWeek, type WeekRow } from "../../lib/ledger/book";
+import { fill, money } from "../../lib/ledger/format";
 
 const say = await copy("ledger");
 const me = await account(Astro);
-const game = await loadGame();
+const pack = await loadPack();
+
+type Row = { id: number; name: string; version: string; difficulty: string; inGameDay: number | null; businesses: number };
+const listRead = me ? await asReader(Astro, "/api/ledger/ledgers") : null;
+const ledgers: Row[] = listRead?.ok && Array.isArray(listRead.body) ? listRead.body : [];
+/* The latest week of each: read from each ledger, as the ledger page reckons it. A person keeps a handful. */
+const full = await Promise.all(ledgers.map((l) => asReader(Astro, `/api/ledger/ledgers/${l.id}`)));
+const latest = new Map<number, { n: number; total: number | null } | null>();
+full.forEach((r, i) => latest.set(ledgers[i].id, r.ok && Array.isArray(r.body?.businesses)
+  ? companyWeek(r.body.businesses as { weeks: WeekRow[] }[]) : null));
+
+const COUNTS = say("count.words", "none one two three four five six seven eight nine ten eleven twelve").split(/\s+/);
+const businessesWord = (n: number) => (n === 1 ? say("list.oneBusiness", "one business")
+  : fill(say("list.businesses", "{n} businesses"), { n: COUNTS[n] ?? String(n) }));
+const difficultyName = (id: string) => (id === "custom" ? say("difficulty.custom", "Custom")
+  : pack?.difficulties.find((d) => d.id === id)?.name ?? id);
+const metaOf = (l: Row) => [pack?.game.name ?? say("game", "Big Ambitions"), l.version || pack?.game.version,
+  pack?.game.build ? fill(say("list.build", "build {build}"), { build: pack.game.build }) : "",
+  difficultyName(l.difficulty), businessesWord(l.businesses)].filter(Boolean).join(" · ");
+const loss = say("loss", "loss");
+
+const DIFFICULTIES = [...(pack?.difficulties ?? [{ id: "easy", name: "Easy" }, { id: "normal", name: "Normal" }, { id: "hard", name: "Hard" }])
+  .map((d) => ({ id: d.id, name: d.name })), { id: "custom", name: say("difficulty.custom", "Custom") }];
+const COURSES = (pack?.courses ?? []).map((c) => ({ id: c.id, name: c.name }));
+const buildings = pack?.buildings.length ?? 0;
+
+const WORDS = {
+  "refuse.namePath": say("refuse.namePath", "ledger · name"),
+  "refuse.name": say("refuse.name", "A ledger needs a name before it starts. The company's name in the game will do."),
+  "refuse.dayPath": say("refuse.dayPath", "ledger · in-game day"),
+  "refuse.day": say("refuse.day", "The in-game day is a whole number, as the game counts them. Leave it blank if you would rather not say."),
+  "refuse.failedPath": say("refuse.failedPath", "ledger"),
+  "refuse.failed": say("refuse.failed", "That did not start. Nothing was created; try again."),
+};
 ---
 <BaseLayout title={say("meta.title", "The Ledger — plan and keep a Big Ambitions business")}
-            description={say("meta.description", "Plan a Big Ambitions business before you spend a dollar of the game's money, and see what the game will do with it.")}>
-  <div class="page gd-full lg-root">
+            description={say("meta.description", "Plan a Big Ambitions business before you spend a dollar of the game's money, and see what the game will do with it.")}
+            noindex={!!me}>
+  <div class="page gd-full lg-root lb-start-page" data-start data-words={JSON.stringify(WORDS)}>
     <LedgerBar current="start" signedIn={!!me} />
-    <Head as="h1" eyebrow={say("eyebrow", "Ledger")} title={say("title", "The Ledger")}
-          lede={say("lede", "Plan a business before you spend a dollar of the game's money, and see what the game will do with it. Keep a ledger, and every week the business makes stays written beside its plan, long after the game forgets.")} max="66ch" />
-    <div class="lg-doors">
-      <Console eyebrow={say("door.plan.eyebrow", "Plan a business")}>
-        <h2 class="gd-h3">{say("door.plan.title", "Type, building, products, staff.")}</h2>
-        <p class="gd-soft">{say("door.plan.body", "Every choice moves the week's total. Nothing is saved until you keep it.")}</p>
-        <div><Button variant="primary" href="/ledger/plan">{say("door.plan.action", "Plan a business")}</Button></div>
-      </Console>
-      <Console eyebrow={say("door.sample.eyebrow", "Or start from an example")}>
-        <h2 class="gd-h3">{say("door.sample.title", "A gift shop in Hell's Kitchen.")}</h2>
-        <p class="gd-soft">{say("door.sample.body", "One register, open nine to nine: the usual first shop, planned already, so you can see what every figure means.")}</p>
-        <div><Button variant="secondary" href="/ledger/plan?sample=1&section=fixtures">{say("door.sample.action", "Open the example")}</Button></div>
-      </Console>
-    </div>
-    <p class="lg-rule-note">
+
+    <header class="lb-head-text">
+      <span class="gd-eyebrow">{me ? say("in.eyebrow", "Ledger") : say("out.eyebrow", "Squirrel Guides · Big Ambitions")}</span>
+      <h1 class="lb-title">{me ? say("in.title", "Your ledgers") : say("title", "The Ledger")}</h1>
       {me
-        ? say("note.in", "Your ledgers will be listed here, one for each saved game. That part of the Ledger is not built yet; planning works now.")
-        : say("note.out", "Planning works signed out. Keeping a ledger needs an account, as a build does. It is free and it has no limits.")}
-      {!me && <>{" "}<a href="/signin?next=%2Fledger">{say("note.signin", "Sign in")}</a></>}
-    </p>
-    <LedgerFoot game={game} />
+        ? <span class="lb-meta">{say("in.sub", "one ledger for each saved game")}</span>
+        : <p class="lb-lede">{say("lede", "Plan a business before you spend a dollar of the game's money, and see what the game will do with it. Keep a ledger, and every week the business makes stays written beside its plan, long after the game forgets.")}</p>}
+    </header>
+
+    {!me && (
+      <>
+        <div class="lb-doors">
+          <Console eyebrow={say("door.plan.eyebrow", "Plan a business")}>
+            <h2>{say("door.plan.title", "Type, building, products, staff.")}</h2>
+            <p>{say("door.plan.body", "Every choice moves the week's total. Nothing is saved until you keep it.")}</p>
+            <div><Button variant="primary" href="/ledger/plan">{say("door.plan.action", "Plan a business")}</Button></div>
+          </Console>
+          <Console eyebrow={say("door.find.eyebrow", "Find a building")}>
+            <h2>{buildings ? fill(say("door.find.title", "All {n}, ranked for your plan."), { n: buildings.toLocaleString("en-US") }) : say("door.find.titleNone", "Every building, ranked for your plan.")}</h2>
+            <p>{say("door.find.body", "Filter by neighbourhood, use, capacity and rent, and see what each would make.")}</p>
+            <div><Button variant="secondary" href="/ledger/places">{say("door.find.action", "Find a building")}</Button></div>
+          </Console>
+        </div>
+        <p class="lg-rule-note">
+          {say("note.out", "Planning works signed out. Keeping a ledger needs an account, as a build does. It is free and it has no limits.")}
+          {" "}<a href="/signin?next=%2Fledger">{say("note.signin", "Sign in")}</a>
+        </p>
+      </>
+    )}
+
+    {me && (
+      <>
+        {ledgers.length > 0 ? (
+          <ul class="lb-list">
+            {ledgers.map((l) => {
+              const wk = latest.get(l.id);
+              const t = wk?.total ?? null;
+              return (
+                <li class="lb-list-row">
+                  <span class="lb-list-main">
+                    <a class="lb-list-name" href={`/ledger/${l.id}`}>{l.name}</a>
+                    <span class="lb-meta">{metaOf(l)}</span>
+                  </span>
+                  <span class="lb-list-fig">
+                    <span class="lb-fig">{money(t)}{t != null && Math.round(t) < 0 && <span class="lg-loss">{loss}</span>}</span>
+                    <span class="lb-under">{wk ? fill(say("list.week", "week {n}"), { n: String(wk.n) }) : say("list.noWeek", "no week yet")}</span>
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        ) : (
+          <Empty n={3} eyebrow={say("none.eyebrow", "No ledger yet")} title={say("none.title", "Start one for the game you are playing.")}
+                 body={say("none.body", "A ledger is one company in one saved game. It needs the company's name and the difficulty; courses can come later.")}
+                 action={say("none.action", "Start a ledger")} href="#new" ringAria={say("none.aria", "No ledger yet")} />
+        )}
+
+        <Console as="section" id="new" class="lb-start" aria-labelledby="lb-new-eyebrow" data-new>
+          <div class="gd-console-head">
+            <span class="gd-eyebrow" id="lb-new-eyebrow">{say("new.eyebrow", "Start a ledger")}</span>
+            <span class="gd-note">{say("new.note", "one company in one saved game")}</span>
+          </div>
+          <div class="lb-form">
+            <label class="lb-form-field">
+              <span class="lb-form-label">{say("new.name", "Name")}</span>
+              <span class="lb-form-help">{say("new.nameHelp", "The company's name in the game is the usual one.")}</span>
+              <input class="lg-text" type="text" maxlength="80" autocomplete="off" data-new-name
+                     placeholder={say("new.namePlaceholder", "Acorn Holdings")} />
+            </label>
+            <div class="lb-form-field" role="group" aria-labelledby="lb-new-difficulty">
+              <span class="lb-form-label" id="lb-new-difficulty">{say("new.difficulty", "Difficulty")}</span>
+              <div class="lg-chips">
+                {DIFFICULTIES.map((d) => (
+                  <button type="button" class="lg-chip" data-difficulty={d.id} aria-pressed={String(d.id === "normal")}>{d.name}</button>
+                ))}
+              </div>
+              <span class="lb-form-help" data-custom-note hidden>{say("new.custom", "Custom asks for its own values once the ledger starts: starting money, tax rate, the cost of goods and wages, and how many customers a promotion brings.")}</span>
+            </div>
+            <label class="lb-form-field">
+              <span class="lb-form-label">{say("new.day", "In-game day · optional")}</span>
+              <input class="lg-input lb-day" type="text" inputmode="numeric" autocomplete="off" placeholder="—" data-new-day />
+            </label>
+            {COURSES.length > 0 && (
+              <div class="lb-form-field" role="group" aria-labelledby="lb-new-courses">
+                <span class="lb-form-label" id="lb-new-courses">{say("new.courses", "Courses finished · optional")}</span>
+                <span class="lb-form-help">{say("new.coursesHelp", "They decide which business types the plan can open. Add more as you finish them.")}</span>
+                <div class="lg-chips">
+                  {COURSES.map((c) => <button type="button" class="lg-chip" data-course={c.id} aria-pressed="false">{c.name}</button>)}
+                </div>
+              </div>
+            )}
+          </div>
+          <SaveNote kind="refusal" hidden data-new-refusal />
+          <div><button type="button" class="lg-btn" data-new-start>{say("new.start", "Start the ledger")}</button></div>
+        </Console>
+      </>
+    )}
+
+    <LedgerFoot game={pack?.game ?? null} />
   </div>
 </BaseLayout>
 
 <style>
-  .lg-doors { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 24px; }
-  .lg-doors .gd-soft { margin: 0; font-size: 15px; }
+  .lb-title { margin: 0; font-family: var(--font-display); font-size: 36px; font-weight: 600; line-height: 1.2; letter-spacing: -0.01em; }
+  .lb-start-page > header { max-width: 66ch; }
 </style>
+
+<script>
+  import { mountStart } from "../../lib/ledger/start";
+  const root = document.querySelector<HTMLElement>("[data-start]");
+  if (root) mountStart(root);
+</script>

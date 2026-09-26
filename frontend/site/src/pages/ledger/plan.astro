@@ -13,6 +13,11 @@
  *   ?business=ID                      a kept business: Review shows Before it saves
  *   ?ledger=ID                        the ledger a new plan is for (its difficulty and courses)
  *   ?draft=1                          the plan in progress before signing in
+ *   ?building=ID                      a new plan on this building (Places' "Plan a business here"), over the plan in hand
+ *   ?campaigns=a,b                    …with these campaigns on (Calculators' "Use this mix in the plan")
+ *
+ * The Plan on stream switch (StreamSwitch.astro, lib/ledger/stream-switch.ts)
+ * streams through ?ledger=ID or the business's own ledger, never a default one.
  *
  * ⚠ Every word the script draws is in WORDS below, as say() strings, and
  * reaches it through data-words. test/ledger-planner-words.test.mjs checks
@@ -29,6 +34,8 @@ import WhatLimitsIt from "../../components/ledger/WhatLimitsIt.astro";
 import WeekGrid from "../../components/ledger/WeekGrid.astro";
 import HoursPainter from "../../components/ledger/HoursPainter.astro";
 import SaveNote from "../../components/ledger/SaveNote.astro";
+import StreamSwitch from "../../components/ledger/StreamSwitch.astro";
+import "../../styles/ledger-stream-switch.css";
 import { account, asReader } from "../../lib/account";
 import { copy } from "../../lib/copy";
 import { loadPack } from "../../lib/ledger/data";
@@ -271,7 +278,12 @@ const STATE = {
   sample: params.get("sample") === "1",
   draft: params.get("draft") === "1",
   section,
+  building: params.get("building") || null,
+  campaigns: (params.get("campaigns") || "").split(",").map((c) => c.trim()).filter(Boolean),
 };
+/* The ledger the plan streams through: the business's, or the one asked for. */
+const streamLedger = ledgers.find((l) => l.id === (business?.ledgerId ?? asked)) ?? null;
+const streamSignIn = `/signin?next=${encodeURIComponent(`/ledger/plan?draft=1&section=${section}`)}`;
 const signInHref = `/signin?next=${encodeURIComponent("/ledger/plan?draft=1&section=review")}`;
 const planHref = business ? `/ledger/plan?business=${business.id}` : "/ledger/plan";
 ---
@@ -284,6 +296,8 @@ const planHref = business ? `/ledger/plan?business=${business.id}` : "/ledger/pl
     <LedgerBar current="plan" signedIn={!!me} ledger={ledger} business={business && ledger ? { id: business.id, name: business.name } : null} planHref={planHref} />
 
     {loaded && <LedgerStats note={say("stats.noteStart", "Normal · satisfaction 80 %")} />}
+    {loaded && <StreamSwitch signedIn={!!me} ledger={streamLedger ? { id: streamLedger.id, name: streamLedger.name } : null}
+                             ledgers={ledgers.map((l) => ({ id: l.id, name: l.name }))} signInHref={streamSignIn} />}
 
     <header class="lg-head">
       <span class="gd-eyebrow">{say("head.eyebrow", "Plan a business")}</span>
@@ -514,7 +528,7 @@ const planHref = business ? `/ledger/plan?business=${business.id}` : "/ledger/pl
 
   /* the desk: a 264px rail, then the main column (flex 1 1 480px), 24/32 apart */
   .lg-work { display: flex; flex-wrap: wrap; gap: 24px 32px; align-items: flex-start; }
-  .lg-rail { flex: 0 0 264px; position: sticky; top: 84px; display: flex; flex-direction: column; box-sizing: border-box;
+  .lg-rail { flex: 0 0 264px; position: sticky; top: calc(var(--site-header-h, 57px) + 84px); display: flex; flex-direction: column; box-sizing: border-box;
     border: 1px solid var(--line); border-radius: 4px; background: var(--surface-card); padding: 6px; }
   .lg-rail-row { appearance: none; border: 0; background: transparent; display: grid; grid-template-columns: 15px 1fr auto; gap: 10px; align-items: center;
     text-align: left; padding: 9px 10px; border-radius: 4px; cursor: pointer; color: var(--ink); font: 500 14px/1.2 var(--font-body); min-height: 40px; }
@@ -560,6 +574,10 @@ const planHref = business ? `/ledger/plan?business=${business.id}` : "/ledger/pl
 
 <script>
   import { mountPlanner } from "../../lib/ledger/planner";
+  import { mountStreamSwitch } from "../../lib/ledger/stream-switch";
   const root = document.querySelector<HTMLElement>("[data-planner]");
+  const box = document.querySelector<HTMLElement>("[data-stream-switch]");
+  // the switch listens before the planner's first ledger:plan
+  if (root && box && root.dataset.loaded !== "no") mountStreamSwitch(box, root);
   if (root && root.dataset.loaded !== "no") mountPlanner(root);
 </script>

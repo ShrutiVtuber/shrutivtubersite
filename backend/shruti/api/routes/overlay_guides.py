@@ -147,6 +147,8 @@ async def guide(t: str, v: str = "", session: AsyncSession = Depends(get_session
             if v and v.replace(" ", "+") == base["version"]:
                 return {"kind": token.kind, "theme": base["theme"], "motion": base["motion"], "version": base["version"], "unchanged": True}
         return base
+    if token.kind == "guide-layout" and not token.run_id and token.ledger_id:
+        return await _ledger_layout_frame(session, token, base, v)
     run = await session.get(GuideRun, token.run_id) if token.run_id else None
     if run is None:
         return base
@@ -173,6 +175,28 @@ async def guide(t: str, v: str = "", session: AsyncSession = Depends(get_session
         await _fill_goals(session, base["elements"], run.user_id)
     else:
         base["element"] = progress.element(token.kind, _stored(run), doc, token.routine_id)
+    return base
+
+
+async def _ledger_layout_frame(session: AsyncSession, token: OverlayToken, base: dict, v: str) -> dict:
+    """
+    A layout minted from a ledger (ledger_stream.mint_ledger_layout): no run.
+    Its Ledger elements draw that ledger, and only while the person who
+    minted it keeps it; a goal draws its group; a run's elements stay empty.
+    The unchanged answer reads the ledger's row and computes nothing.
+    """
+    from shruti.models.ledger import Ledger
+    g = await session.get(Ledger, token.ledger_id)
+    if g is None or g.user_id != token.user_id:
+        return base
+    layout = clean_layout(token.layout)
+    base["version"] = "L" + await _instrument_stamp(session, layout)
+    if v and v.replace(" ", "+") == base["version"]:
+        base["unchanged"] = True
+        return base
+    base["run"] = {"name": g.name, "guide": "", "game": ""}
+    base["elements"] = [{**e, "element": {}} for e in layout]
+    await _fill_goals(session, base["elements"], g.user_id)
     return base
 
 
@@ -584,7 +608,7 @@ async def my_tokens(request: Request, session: AsyncSession = Depends(get_sessio
         if o.kind == "guide-goal":
             group = await session.get(Group, o.group_id) if o.group_id else None
             showing, href = (group.name if group else ""), (f"/groups/{group.code}" if group else "")
-        elif o.kind in LEDGER_KINDS:
+        elif o.kind in LEDGER_KINDS or (o.ledger_id and not o.run_id):
             book = await session.get(Ledger, o.ledger_id) if o.ledger_id else None
             showing, href = (book.name if book else ""), (f"/ledger/{book.id}" if book else "")
         else:

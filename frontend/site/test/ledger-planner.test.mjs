@@ -95,7 +95,7 @@ test("the Ledger's pages carry the sub-bar, the foot and one h1", () => {
     const h1 = (src.match(/<h1[\s>]/g) || []).length + (src.match(/<Head\b/g) || []).length;
     assert.equal(h1, 1, `${p} has exactly one h1`);
   }
-  assert.match(read("pages/ledger/places.astro"), /noindex/, "a holding page is kept out of search");
+  // Places and Calculators are built and public now: test/ledger-places.test.mjs checks they are in the sitemap.
 });
 
 test("no Ledger style is red or green", () => {

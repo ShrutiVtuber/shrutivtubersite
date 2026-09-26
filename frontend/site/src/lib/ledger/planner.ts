@@ -40,6 +40,9 @@ export type PlannerState = {
   draft: boolean;
   section: SectionId;
   signInHref: string;
+  /** ?building= and ?campaigns=: a building and a campaign mix laid over the plan in hand (Places, Calculators). */
+  building?: string | null;
+  campaigns?: string[];
 };
 
 const DRAFT_KEY = "ledger.plan.draft";
@@ -116,12 +119,25 @@ export function mountPlanner(root: HTMLElement): void {
       kept = wholePlan(business.keptPlan ?? business.plan);
     } else if (state.sample) {
       plan = samplePlan();
-    } else if (state.draft) {
+    } else if (state.draft || state.building || state.campaigns?.length) {
       let stored: Partial<Plan> | null = null;
       try { stored = JSON.parse(sessionStorage.getItem(DRAFT_KEY) || "null"); } catch { stored = null; }
       plan = wholePlan(stored);
     } else {
       plan = emptyPlan();
+    }
+    if (!business) {
+      if (state.building && data.buildings.some((b) => b.id === state.building)) plan.buildingId = state.building;
+      const mix = (state.campaigns ?? []).filter((id) => data.campaigns.some((c) => c.id === id));
+      if (mix.length) plan.campaigns = Object.fromEntries(mix.map((id) => [id, true]));
+      if (state.building || state.campaigns?.length) {
+        // laid over once: a reload keeps the plan as it now is, not the link's building again
+        const url = new URL(window.location.href);
+        url.searchParams.delete("building");
+        url.searchParams.delete("campaigns");
+        url.searchParams.set("draft", "1");
+        history.replaceState(null, "", url);
+      }
     }
     let ledgerId: number | null = business?.ledgerId ?? state.ledgerId ?? state.ledgers[0]?.id ?? null;
     const ledger = () => state.ledgers.find((l) => l.id === ledgerId) ?? null;

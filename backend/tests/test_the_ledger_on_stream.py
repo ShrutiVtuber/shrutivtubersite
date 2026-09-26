@@ -36,6 +36,7 @@ ROUTES = {
     ("GET", "/api/ledger/ledgers/{ledger_id}/overlays"),
     ("POST", "/api/ledger/ledgers/{ledger_id}/overlays"),
     ("DELETE", "/api/ledger/ledgers/{ledger_id}/overlays/{token_id}"),
+    ("POST", "/api/ledger/ledgers/{ledger_id}/layouts"),
     ("PUT", "/api/ledger/ledgers/{ledger_id}/on-screen"),
     ("PUT", "/api/ledger/ledgers/{ledger_id}/live"),
     ("DELETE", "/api/ledger/ledgers/{ledger_id}/live"),
@@ -84,6 +85,23 @@ def test_minting_follows_every_overlays_fair_use_and_never_charges() -> None:
         assert word not in code, f"minting reaches for {word}"
     assert "OverlayToken.ledger_id" in code_of(overlay_guides.my_tokens) or "LEDGER_KINDS" in code_of(overlay_guides.my_tokens)
     assert set(ledger_stream.ALL_KINDS) <= set(overlay_guides.SITE_KINDS), "the allowance does not count ledger overlays"
+
+
+def test_a_ledgers_layout_is_minted_like_every_overlay_and_draws_only_that_ledger() -> None:
+    code = code_of(ledger_stream.mint_ledger_layout)
+    for call in ("_my_ledger(", "refuse_if_out_of_allowance(", "_refuse_if_suspended(", "refuse_a_collision(",
+                 "secrets.token_urlsafe", '"ledger_id": g.id', "ledger_id=g.id"):
+        assert call in code, f"a ledger's layout is minted without {call}"
+    for word in ("stripe", "Checkout", "Hosting(", "charge", "price"):
+        assert word not in code, f"minting a layout reaches for {word}"
+    host = code_of(overlay_guides.guide)
+    assert "_ledger_layout_frame(" in host, "a layout with no run never draws its ledger"
+    frame = code_of(overlay_guides._ledger_layout_frame)
+    assert "g.user_id != token.user_id" in frame, "a layout draws a ledger its minter no longer keeps"
+    assert frame.index('base["unchanged"] = True') < frame.index("_fill_goals("), "the unchanged answer computes the frame"
+    assert "o.ledger_id and not o.run_id" in code_of(overlay_guides.my_tokens), "the account page cannot name a ledger's layout"
+    gallery = _site("pages", "guides", "overlays.astro")
+    assert "/layouts`" in gallery and "data-ledger" in gallery, "the gallery's Ledger card still mints a run's layout"
 
 
 def test_the_overlay_reads_a_ledger_through_its_token_and_polls_it_cheaply() -> None:
@@ -320,6 +338,36 @@ async def _stream_a_ledger(monkeypatch):
         off = await overlay_guides.guide(plan_token["token"], live["version"], s)
         assert off["element"]["live"] is None, "the plan stayed on stream after the switch went off"
         assert (await s.get(Ledger, book["id"])).live_plan is None
+
+        # The gallery's layout: bound to this ledger with no run, drawing only it.
+        laid = await ledger_stream.mint_ledger_layout(book["id"], ledger_stream.LedgerLayoutIn.model_validate(
+            {"layout": [{"kind": "ledger-plate", "x": 1112, "y": 48, "w": 760, "ledger_id": theirs["id"]},
+                        {"kind": "guide-goal", "x": 72, "y": 800, "w": 860}],
+             "theme": "ledger", "motion": "reduced", "label": "Big Ambitions · Ledger"}), None, s)
+        assert laid["kind"] == "guide-layout" and laid["path"].startswith("/overlay/guide-layout?t=")
+        drawn = await overlay_guides.guide(laid["token"], "", s)
+        assert [e["kind"] for e in drawn["elements"]] == ["ledger-plate", "guide-goal"]
+        plate_el = drawn["elements"][0]["element"]
+        assert plate_el["company"] == "Acorn Holdings", "the layout drew the ledger it was sent, not its own"
+        assert drawn["elements"][1]["element"] == {}
+        said = json.dumps(drawn)
+        for secret in (SECRET_NOTE, SECRET_PLAN, "987654", "Fy's Holdings"):
+            assert secret not in said, f"the layout carries {secret!r}"
+        assert (await overlay_guides.guide(laid["token"], drawn["version"], s)).get("unchanged") is True
+        assert "guide-layout" in [t["kind"] for t in await ledger_stream.ledger_tokens(book["id"], None, s)]
+        try:
+            await ledger_stream.mint_ledger_layout(theirs["id"], ledger_stream.LedgerLayoutIn.model_validate(
+                {"layout": [{"kind": "ledger-plate"}]}), None, s)
+            raise AssertionError("a layout was minted on somebody else's ledger")
+        except HTTPException as refused:
+            assert refused.status_code == 404
+        try:
+            await ledger_stream.mint_ledger_layout(book["id"], ledger_stream.LedgerLayoutIn.model_validate(
+                {"layout": [{"kind": "guide-goal"}]}), None, s)
+            raise AssertionError("a ledger's layout was minted with nothing of the ledger in it")
+        except HTTPException as refused:
+            assert refused.status_code == 422
+        await ledger_stream.revoke_ledger_token(book["id"], laid["id"], None, s)
 
         # Revoked is gone.
         await ledger_stream.revoke_ledger_token(book["id"], plan_token["id"], None, s)

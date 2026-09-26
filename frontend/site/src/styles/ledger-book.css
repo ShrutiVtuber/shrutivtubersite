@@ -1,0 +1,207 @@
+/* The Ledger's book: /ledger (your ledgers, start a ledger), /ledger/{id} (a
+   company, the entry grid) and /ledger/{id}/{business} (the weeks chart, the
+   week page, write a week), with This ledger on stream and the one-tap switch.
+   Handoff design_handoff_ledger README §1, §4, §5 and SPEC §3.4–3.6;
+   design_handoff_ledger_overlays README §6.
+
+   Imported from those pages' frontmatter, so it reaches markup their scripts
+   draw. It builds on ledger.css (chips, buttons, notes, almanac rows, totals)
+   and adds no token and no hue: a loss is the sign and the word, the plan's
+   column is the inset ground closed by the rose margin line, a total closes
+   with the double rule. */
+
+.lb-sr { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.lb-hint { margin: 0; font-size: 13px; color: var(--ink-soft); max-width: 72ch; text-wrap: pretty; }
+.lb-rose { color: var(--rose); }
+.lb-mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+/* ── heads ──────────────────────────────────────────────────────────────── */
+.lb-head { display: flex; flex-wrap: wrap; gap: 16px 32px; align-items: flex-end; justify-content: space-between; }
+.lb-head-text { display: grid; gap: 4px; min-width: 0; }
+.lb-head h1 { margin: 0; font-family: var(--font-display); font-size: 36px; font-weight: 600; line-height: 1.2; letter-spacing: -0.01em; text-wrap: balance; overflow-wrap: anywhere; }
+@media (max-width: 600px) { .lb-head h1 { font-size: 30px; } }
+.lb-meta { font-family: var(--font-mono); font-size: 12px; color: var(--ink-soft); overflow-wrap: anywhere; }
+.lb-head-figure { display: grid; justify-items: end; gap: 2px; }
+.lb-head-figure .lb-big { font-family: var(--font-mono); font-size: 28px; font-variant-numeric: tabular-nums; line-height: 1.2; white-space: nowrap; }
+.lb-head-figure .lg-loss { font-size: 14px; letter-spacing: .12em; text-transform: uppercase; font-weight: 600; }
+.lb-h2 { margin: 0; font-family: var(--font-display); font-size: 28px; font-weight: 600; line-height: 1.2; }
+.lb-section { display: grid; gap: 12px; min-width: 0; }
+.lb-section-head { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; align-items: baseline; }
+
+/* ── your ledgers (a list under a 1.5px ink rule) ──────────────────────── */
+.lb-list { margin: 0; padding: 0; list-style: none; border-top: 1.5px solid var(--ink); }
+.lb-list-row { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px 24px; padding: 14px 4px; border-bottom: 1px solid var(--line); }
+.lb-list-main { display: grid; gap: 2px; min-width: 0; }
+.lb-list-name { font-size: 17px; font-weight: 500; color: var(--accent); text-decoration: underline; text-underline-offset: .18em; overflow-wrap: anywhere; }
+.lb-list-name:hover { color: var(--accent-hover); }
+.lb-list-fig { display: grid; justify-items: end; gap: 1px; margin-left: auto; }
+.lb-list-fig .lb-fig { font-family: var(--font-mono); font-size: 16px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.lb-list-fig .lb-under { font-family: var(--font-mono); font-size: 12px; color: var(--ink-faint); }
+
+/* ── start a ledger ─────────────────────────────────────────────────────── */
+.lb-start { max-width: none; }
+.lb-form { display: grid; gap: 20px; max-width: 640px; }
+.lb-form-field { display: grid; gap: 6px; }
+.lb-form-label { font-size: 14px; font-weight: 600; }
+.lb-form-help { font-size: 13px; color: var(--ink-soft); }
+.lb-form .lg-text { max-width: 460px; }
+.lb-day { width: 96px; text-align: left; }
+.lb-doors { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 24px; }
+.lb-doors .gd-console { align-content: start; }
+.lb-doors h2 { margin: 0; font-family: var(--font-display); font-size: 22px; font-weight: 600; line-height: 1.2; }
+.lb-doors p { margin: 0; font-size: 14px; color: var(--ink-soft); }
+.lb-lede { margin: 0; font-family: var(--font-display); font-size: 20px; line-height: 1.45; max-width: 66ch; text-wrap: pretty; }
+
+/* ── a company: business rows ───────────────────────────────────────────── */
+.lb-rows { border-top: 1.5px solid var(--ink); }
+.lb-row { display: flex; flex-wrap: wrap; gap: 6px 24px; padding: 16px 4px; border-bottom: 1px solid var(--line); align-items: baseline; }
+.lb-row-who { flex: 1 1 200px; display: grid; gap: 2px; min-width: 0; }
+.lb-row-name { font-size: 16px; font-weight: 500; color: var(--accent); text-decoration: underline; text-underline-offset: .18em; overflow-wrap: anywhere; }
+.lb-row-name:hover { color: var(--accent-hover); }
+.lb-row-kind { font-family: var(--font-mono); font-size: 12px; color: var(--ink-soft); overflow-wrap: anywhere; }
+.lb-row-limit { flex: 2 1 320px; font-size: 14px; color: var(--ink-soft); text-wrap: pretty; min-width: 0; }
+.lb-row-fig { flex: 0 0 170px; display: grid; justify-items: end; gap: 1px; margin-left: auto; }
+.lb-row-fig .lb-fig { font-family: var(--font-mono); font-size: 16px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.lb-row-fig .lb-plan { font-family: var(--font-mono); font-size: 12px; color: var(--ink-faint); white-space: nowrap; }
+.lb-row .lg-loss, .lb-total .lg-loss, .lb-list-fig .lg-loss, .lb-book .lg-loss { letter-spacing: .1em; text-transform: uppercase; font-weight: 600; font-size: 11px; }
+.lb-total { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 12px 4px 0; border-top: 3px double var(--ink); font-weight: 600; }
+.lb-total .lb-fig { font-family: var(--font-mono); font-size: 16px; font-weight: 400; font-variant-numeric: tabular-nums; }
+.lb-rows + .lb-total { margin-top: -1px; }
+@media (max-width: 599px) { .lb-row-fig { flex-basis: auto; } }
+
+/* ── the entry grid (SPEC §3.6) ─────────────────────────────────────────── */
+.lb-entry-scroll { overflow-x: auto; margin: 0 -4px; padding: 0 4px 4px; }
+.lb-entry { min-width: 840px; display: grid; gap: 4px; font-variant-numeric: tabular-nums; }
+.lb-entry-row { display: grid; grid-template-columns: minmax(130px, 1.3fr) repeat(6, minmax(84px, 1fr)) minmax(96px, 1fr); gap: 4px; align-items: center; }
+.lb-entry-head span { font: 600 12px/1.2 var(--font-body); letter-spacing: .14em; text-transform: uppercase; color: var(--ink-faint); padding: 0 4px 6px; text-align: right; }
+.lb-entry-head span:first-child { text-align: left; }
+.lb-entry-name { font-size: 14px; font-weight: 500; padding: 0 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lb-entry .lg-input { width: 100%; min-width: 0; }
+.lb-entry-week { text-align: right; font-family: var(--font-mono); font-size: 14px; padding: 0 4px; white-space: nowrap; }
+.lb-entry-week[data-empty="yes"] { color: var(--ink-faint); }
+.lb-entry-week .lg-loss { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; font-weight: 600; }
+.lb-entry .lg-input[aria-invalid="true"] { outline: 1px dashed var(--ink); outline-offset: -3px; }
+
+/* ── the quiet consoles ─────────────────────────────────────────────────── */
+.lb-quiet { gap: 14px; }
+.lb-quiet .lb-form { gap: 14px; }
+.lb-inline { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; }
+.lb-inline .lg-text { flex: 1 1 240px; max-width: 420px; }
+.lb-confirm { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; font-size: 14px; }
+.lb-custom { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px 16px; }
+.lb-custom .lg-input { width: 100%; }
+
+/* ── the weeks chart (SPEC §3.5) ────────────────────────────────────────── */
+.lb-legend { display: flex; gap: 16px; flex-wrap: wrap; font-family: var(--font-mono); font-size: 11px; color: var(--ink-soft); }
+.lb-legend span { display: inline-flex; gap: 6px; align-items: center; }
+.lb-legend-line { width: 18px; border-top: 1.5px solid var(--ink); }
+.lb-legend-line[data-kind="plan"] { border-top: 1.5px dashed var(--ink-faint); }
+.lb-chart { padding: 8px 0 22px; }
+.lb-plot { position: relative; height: 170px; margin-left: 64px; }
+.lb-plot svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.lb-plan-line { fill: none; stroke: var(--ink-faint); stroke-width: 1.5; stroke-dasharray: 5 4; vector-effect: non-scaling-stroke; }
+.lb-week-line { fill: none; stroke: var(--ink); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+.lb-tick { position: absolute; left: 0; right: 0; border-top: 1px dotted var(--line); }
+.lb-tick[data-zero="yes"] { border-top: 1px solid var(--ink-soft); }
+.lb-tick-label { position: absolute; right: calc(100% + 8px); top: -7px; font-family: var(--font-mono); font-size: 11px; color: var(--ink-faint); white-space: nowrap; }
+.lb-dot { position: absolute; width: 7px; height: 7px; margin: -3.5px 0 0 -3.5px; border-radius: 50%; background: var(--surface-page); border: 1.5px solid var(--ink); box-sizing: border-box; }
+.lb-xlabel { position: absolute; top: calc(100% + 6px); transform: translateX(-50%); font-family: var(--font-mono); font-size: 11px; color: var(--ink-faint); white-space: nowrap; }
+@media (max-width: 599px) { .lb-plot { margin-left: 56px; } .lb-xlabel:not(:first-of-type):not(:last-of-type) { display: none; } }
+
+/* ── the book (SPEC §3.4; §1.7 at 390) ──────────────────────────────────── */
+.lb-book-desk { overflow-x: auto; border: 1px solid var(--line); border-radius: 4px; background: var(--surface-card); }
+.lb-book-table { font-size: 14px; font-variant-numeric: tabular-nums; }
+.lb-book-row { display: grid; border-bottom: 1px solid var(--line); }
+.lb-book-row > span { padding: 8px 16px; }
+.lb-book-head { border-bottom-color: var(--line-strong); }
+.lb-book-head > span { font: 600 12px/1.2 var(--font-body); letter-spacing: .14em; text-transform: uppercase; color: var(--ink-faint); padding: 12px 16px; }
+.lb-book-num { text-align: right; font-family: var(--font-mono); font-size: 13px; white-space: nowrap; }
+.lb-book-head .lb-book-num, .lb-book-head .lb-book-plan { text-align: right; }
+.lb-book-plan { background: var(--surface-inset); border-right: 1px solid var(--rose); text-align: right; font-family: var(--font-mono); font-size: 13px; color: var(--ink-soft); white-space: nowrap; }
+.lb-book-total { border-top: 3px double var(--ink); border-bottom: 0; }
+.lb-book-total > span { padding: 10px 16px 4px; font-weight: 600; }
+.lb-book-total .lb-book-num, .lb-book-total .lb-book-plan { font-size: 14px; }
+.lb-book-against { border-bottom: 0; }
+.lb-book-against > span { padding: 4px 16px 12px; font-size: 13px; }
+.lb-book-against > span:first-child { color: var(--ink-soft); font-family: var(--font-body); }
+.lb-book-phone { display: none; }
+.lb-book-chips { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; }
+.lb-book-one { border: 1px solid var(--line); border-radius: 4px; background: var(--surface-card); padding: 16px; display: grid; }
+.lb-book-line { padding: 2px 0; border-bottom: 1px solid var(--line); }
+.lb-book-beneath { text-align: right; font-family: var(--font-mono); font-size: 12px; color: var(--ink-faint); padding-bottom: 4px; }
+.lb-book-vs { display: flex; justify-content: space-between; gap: 12px; padding-top: 6px; font-family: var(--font-mono); font-size: 12px; color: var(--ink-faint); }
+@media (max-width: 899px) {
+  .lb-book-desk { display: none; }
+  .lb-book-phone { display: grid; gap: 8px; }
+}
+
+/* ── write a week ───────────────────────────────────────────────────────── */
+.lb-write-fields { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 16px; }
+.lb-write-fields label { display: grid; gap: 6px; }
+.lb-write-fields .lg-input { width: 100%; }
+.lb-draft { font-family: var(--font-mono); font-size: 13px; color: var(--ink-soft); }
+
+/* ── this ledger on stream (README §6) ──────────────────────────────────── */
+.lb-stream { gap: 20px; }
+.lb-field { border: 0; margin: 0; padding: 0; display: grid; gap: 10px; min-width: 0; }
+.lb-label { padding: 0; font-size: 14px; font-weight: 600; color: var(--ink); }
+.lb-themes { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; max-width: 720px; }
+.lb-theme { position: relative; display: grid; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--surface-card); cursor: pointer; }
+.lb-theme:hover { border-color: var(--line-strong); }
+.lb-theme:has(input:checked) { border: 2px solid var(--accent); margin: -1px; }
+.lb-theme:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+.lb-theme-preview { height: 76px; display: flex; align-items: center; padding: 0 12px; }
+.lb-theme-panel { flex: 1; display: grid; gap: 1px; padding: 6px 10px; min-width: 0; }
+.lb-theme-co { font-family: var(--font-display); font-size: 14px; font-weight: 600; color: #F1EDE4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lb-theme-fig { font-family: var(--font-mono); font-size: 13px; font-variant-numeric: tabular-nums; }
+.lb-theme-text { display: grid; gap: 2px; padding: 10px 12px 12px; }
+.lb-theme-name { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; font-size: 14px; font-weight: 600; }
+.lb-chosen { display: none; font: 600 11px/1 var(--font-body); letter-spacing: .14em; text-transform: uppercase; color: var(--rose); }
+.lb-theme:has(input:checked) .lb-chosen { display: inline; }
+.lb-theme-note { font-size: 12px; color: var(--ink-soft); }
+.lb-on-chip .lb-on-dot { width: 8px; height: 8px; border-radius: 50%; background: transparent; flex: none; }
+.lb-on-chip[aria-pressed="true"], .lb-on-chip[aria-checked="true"] { border-color: var(--accent); background: var(--accent-wash); color: var(--accent); }
+.lb-on-chip[aria-pressed="true"] .lb-on-dot, .lb-on-chip[aria-checked="true"] .lb-on-dot { background: var(--accent); }
+.lb-motions { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); gap: 8px; }
+.lb-motion { display: grid; gap: 2px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 4px; background: var(--surface-card); cursor: pointer; }
+.lb-motion:hover { border-color: var(--line-strong); }
+.lb-motion:has(input:checked) { border-color: var(--accent); background: var(--accent-wash); }
+.lb-motion:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+.lb-motion-name { font-size: 15px; font-weight: 600; }
+.lb-motion-rule { font-size: 13px; color: var(--ink-soft); }
+.lb-summary { font-size: 13px; color: var(--ink-soft); }
+.lb-once { display: grid; gap: 10px; padding: 16px; border: 1px solid var(--line-strong); border-radius: 4px; background: var(--surface-card); }
+.lb-once-row { display: flex; gap: 8px; align-items: stretch; flex-wrap: wrap; }
+.lb-once-url { flex: 1 1 260px; min-width: 0; min-height: 44px; box-sizing: border-box; padding: 0 12px; font-family: var(--font-mono); font-size: 14px; color: var(--ink);
+  background: var(--surface-inset); border: 1px solid var(--line); border-radius: 4px; }
+.lb-once-url:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.lb-once-text { margin: 0; font-size: 14px; }
+.lb-minted { display: grid; gap: 4px; }
+.lb-tokens { margin: 0; padding: 0; list-style: none; }
+.lb-tokens:empty { display: none; }
+.lb-token { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px 16px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.lb-token-text { display: grid; gap: 2px; min-width: 0; }
+.lb-token-kind { font-size: 15px; font-weight: 500; }
+.lb-token-meta { font-family: var(--font-mono); font-size: 12px; color: var(--ink-soft); }
+.lb-token-act { display: flex; align-items: center; gap: 12px; margin-left: auto; }
+.lb-token-confirm { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; font-size: 14px; }
+.lb-minted .lb-hint { margin-top: 8px; }
+
+/* ── the one-tap switch: sticky under the site header (itself sticky) while anything is minted ────── */
+.lb-switch { position: sticky; top: var(--site-header-h, 57px); z-index: 20; margin: 0 calc(-1 * clamp(16px, 4vw, 40px)); padding: 8px clamp(16px, 4vw, 40px) 10px;
+  background: var(--surface-card); border-bottom: 1px solid var(--line-strong); box-shadow: var(--shadow-1); display: grid; gap: 8px; }
+.lb-switch-row { display: flex; align-items: baseline; gap: 8px 12px; flex-wrap: wrap; }
+.lb-switch-label { font-size: 13px; color: var(--ink-soft); }
+.lb-switch-name { font-size: 17px; font-weight: 600; }
+.lb-switch-note { margin-left: auto; font-family: var(--font-mono); font-size: 12px; color: var(--ink-faint); }
+.lb-switch-chips { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: thin; }
+.lb-switch .lg-chip { height: 44px; padding: 0 16px; font-size: 14px; }
+
+/* Nothing here may push the page sideways at 390: a console is a grid whose
+   items would otherwise grow to their content, and a fieldset's min-content. */
+.lb-company .gd-console > *, .lb-business .gd-console > *, .lb-start-page .gd-console > *, .lb-switch > * { min-width: 0; }
+.lb-field { min-inline-size: 0; }
+.lb-field > * { min-width: 0; }
+.lb-themes { width: 100%; }
+/* At 390 a console's eyebrow and its mono note take a line each rather than squeezing each other. */
+@media (max-width: 599px) { .lb-company .gd-console-head, .lb-business .gd-console-head, .lb-start-page .gd-console-head { flex-wrap: wrap; } }

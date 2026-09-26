@@ -3,7 +3,9 @@
  * anybody to start from — each a miniature of the plate in its theme, the
  * kinds and their places on the 1920 × 1080 canvas, the motion. Never her
  * tokens; never the fields that name her routines, groups or counters.
- * "Use this layout" mints one for a run of yours, and shows the URL once. */
+ * "Use this layout" mints one for a run of yours, and shows the URL once.
+ * The Ledger's starting layout asks for a ledger instead: its plate draws
+ * that ledger, bound to it with no run (POST /api/ledger/ledgers/{id}/layouts). */
 import BaseLayout from "../../layouts/BaseLayout.astro";
 import Head from "../../components/guides/Head.astro";
 import Empty from "../../components/guides/Empty.astro";
@@ -17,13 +19,18 @@ import { copy } from "../../lib/copy";
 
 const say = await copy("guides/overlays");
 interface Placed { kind: string; x: number; y: number; w: number; shows?: string }
-interface Shared { id: number | string; label: string; theme: string; motion: string; layout: Placed[]; starter?: boolean; note?: string; description?: string }
+interface Shared { id: number | string; label: string; theme: string; motion: string; layout: Placed[]; starter?: boolean; note?: string; description?: string; game?: string }
+interface Book { id: number; name: string }
 interface Run { id: number; name: string; guide?: { slug: string; game: { slug: string } } }
 const me = await account(Astro);
-const [shared, runsRead] = await Promise.all([
+const [shared, runsRead, booksRead] = await Promise.all([
   site<Shared[]>("/api/overlay/gallery"),
   me ? asReader(Astro, "/api/runs") : Promise.resolve({ ok: false, status: 0, body: null }),
+  me ? asReader(Astro, "/api/ledger/ledgers") : Promise.resolve({ ok: false, status: 0, body: null }),
 ]);
+const books: Book[] = booksRead.ok && Array.isArray(booksRead.body) ? booksRead.body.map((b: any) => ({ id: b.id, name: b.name })) : [];
+/* A layout holding a Ledger element draws a ledger, not a run's place. */
+const isLedger = (l: Shared) => l.layout.some((e) => e.kind.startsWith("ledger-"));
 const layouts: Shared[] = Array.isArray(shared) ? shared : [];
 const runs: Run[] = runsRead.ok && Array.isArray(runsRead.body) ? runsRead.body : [];
 const KIND: Record<string, string> = {
@@ -57,6 +64,7 @@ const WORDS = {
   minted: say("words.minted", "Made. Paste this into OBS as a browser source, 1920 × 1080 — it is shown once."),
   failed: say("words.failed", "That did not go through. Try again."),
   pick: say("words.pick", "Pick a run first."),
+  pickLedger: say("words.pick_ledger", "Pick a ledger first."),
   copied: say("words.copied", "Copied."),
 };
 ---
@@ -84,7 +92,16 @@ const WORDS = {
                 <span class="gd-note">{STARTER[String(l.id)]?.line ?? kinds(l)}</span>
               </div>
               <div class="foot">
-                {me ? (
+                {me && isLedger(l) ? (
+                  books.length === 0 ? (
+                    <p class="gd-lede small">{say("card.noledger", "Start a ledger first — this layout draws one.")} <a href="/ledger#new">{say("card.ledger_start", "Start a ledger")}</a></p>
+                  ) : (
+                    <>
+                      <div class="pick"><SelectField label={say("card.ledger", "Which ledger")} name={`ledger-${l.id}`} data-ledger options={books.map((b) => ({ value: String(b.id), label: b.name }))} /></div>
+                      <Button type="button" data-use>{say("card.use", "Use this layout")}</Button>
+                    </>
+                  )
+                ) : me ? (
                   runs.length === 0 ? (
                     <p class="gd-lede small">{say("card.norun", "Start a run first — a layout draws a run's place.")} <a href="/guides">{say("card.guides", "The guides")}</a></p>
                   ) : (
@@ -94,7 +111,7 @@ const WORDS = {
                     </>
                   )
                 ) : (
-                  <p class="gd-lede small">{say("card.signin", "Sign in with a run to use it. It mints an overlay and shows the URL once.")} <a href="/signin?next=%2Fguides%2Foverlays">{say("card.signin_link", "Sign in")}</a></p>
+                  <p class="gd-lede small">{isLedger(l) ? say("card.signin_ledger", "Sign in with a ledger to use it. It mints an overlay and shows the URL once.") : say("card.signin", "Sign in with a run to use it. It mints an overlay and shows the URL once.")} <a href="/signin?next=%2Fguides%2Foverlays">{say("card.signin_link", "Sign in")}</a></p>
                 )}
                 <div class="gd-once minted" data-minted hidden>
                   <span class="gd-eyebrow">{say("card.once", "Shown once")}</span>
@@ -139,17 +156,23 @@ const WORDS = {
       btn.addEventListener("click", async () => {
         const card = btn.closest<HTMLElement>("[data-layout]"); if (!card) return;
         const chosen = JSON.parse(card.dataset.layout || "{}");
+        const label = card.querySelector("h2")?.textContent ?? "";
+        /* The Ledger's layout is bound to a ledger; every other one to a run. */
+        const ledger = card.querySelector<HTMLSelectElement>("[data-ledger]");
         const run = card.querySelector<HTMLSelectElement>("[data-run]")?.value;
-        if (!run) { tell(words.pick); return; }
+        if (ledger ? !ledger.value : !run) { tell(ledger ? words.pickLedger : words.pick); return; }
         btn.disabled = true;
-        const r = await fetch(`/api/runs/${run}/overlays`, { method: "POST", headers: { "content-type": "application/json", "x-csrf-token": csrf() },
-          body: JSON.stringify({ kind: "guide-layout", theme: chosen.theme, motion: chosen.motion, label: card.querySelector("h2")?.textContent ?? "", layout: chosen.layout }) });
+        const r = ledger
+          ? await fetch(`/api/ledger/ledgers/${ledger.value}/layouts`, { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json", "x-csrf-token": csrf() },
+              body: JSON.stringify({ theme: chosen.theme, motion: chosen.motion, label, layout: chosen.layout }) })
+          : await fetch(`/api/runs/${run}/overlays`, { method: "POST", headers: { "content-type": "application/json", "x-csrf-token": csrf() },
+              body: JSON.stringify({ kind: "guide-layout", theme: chosen.theme, motion: chosen.motion, label, layout: chosen.layout }) });
         btn.disabled = false;
         if (!r.ok) { tell(words.failed); return; }
         const made = await r.json();
         const box = card.querySelector<HTMLElement>("[data-minted]");
         const url = card.querySelector<HTMLInputElement>("[data-url]");
-        if (url) url.value = `${location.origin}/overlay/guide-layout?t=${encodeURIComponent(made.token)}`;
+        if (url) url.value = `${location.origin}${made.path ?? `/overlay/guide-layout?t=${encodeURIComponent(made.token)}`}`;
         if (box) box.hidden = false;
         tell(words.minted);
       });

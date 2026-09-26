@@ -1,0 +1,270 @@
+---
+/* A ledger: one company in one saved game (handoff README §4, screens 18,
+ * 19, 22; design_handoff_ledger_overlays README §6).
+ *
+ *   head       the name, the mono meta line, and the company's latest week
+ *              over its total in mono 28 (a loss is the sign and the word)
+ *   rows       each business: name, kind · neighbourhood, the first sentence
+ *              of What limits it (reckoned from the KEPT plan with the
+ *              planner's engine, here on the server), the week, "plan {x}";
+ *              the total over the double rule
+ *   #entry     write the next week for every business at once (SPEC §3.6)
+ *   #stream    This ledger on stream, and the one-tap switch bar at the top
+ *   settings   rename, the in-game day, a Custom difficulty's values, delete
+ *
+ * Private: signed out goes to sign in; anybody else's ledger is a 404.
+ * The script is lib/ledger/company.ts; every word it draws is in WORDS.
+ */
+import "../../styles/ledger-book.css";
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import Console from "../../components/guides/Console.astro";
+import Empty from "../../components/guides/Empty.astro";
+import LedgerBar from "../../components/ledger/LedgerBar.astro";
+import LedgerFoot from "../../components/ledger/LedgerFoot.astro";
+import SaveNote from "../../components/ledger/SaveNote.astro";
+import OnStream from "../../components/ledger/OnStream.astro";
+import SwitchBar from "../../components/ledger/SwitchBar.astro";
+import { account, asReader } from "../../lib/account";
+import { copy } from "../../lib/copy";
+import { loadPack } from "../../lib/ledger/data";
+import { LIMIT_SENTENCES, LIMIT_WORDS } from "../../lib/ledger/limit";
+import { ctxOf, keptView } from "../../lib/ledger/kept";
+import { companyWeek, nextWeekNumber, weekTotal, type WeekRow } from "../../lib/ledger/book";
+import { fill, money } from "../../lib/ledger/format";
+import type { StreamToken } from "../../lib/ledger/onstream";
+
+const id = Astro.params.id ?? "";
+if (!/^\d{1,12}$/.test(id)) return Astro.rewrite("/404");
+const me = await account(Astro);
+if (!me) return Astro.redirect(`/signin?next=${encodeURIComponent(`/ledger/${id}`)}`);
+const [read, tokensRead, pack, say, sayLimit] = await Promise.all([
+  asReader(Astro, `/api/ledger/ledgers/${id}`),
+  asReader(Astro, `/api/ledger/ledgers/${id}/overlays`),
+  loadPack(),
+  copy("ledger/[id]"),
+  copy("component:WhatLimitsIt"),
+]);
+if (!read.ok || !read.body?.id) return Astro.rewrite("/404");
+
+type Business = { id: number; name: string; plan: unknown; keptPlan: unknown; opened: boolean; weeks: WeekRow[] };
+const book = read.body as { id: number; name: string; version: string; difficulty: string; custom: Record<string, number> | null;
+  inGameDay: number | null; courses: string[]; onScreenBusinessId: number | null; businesses: Business[] };
+const tokens: StreamToken[] = tokensRead.ok && Array.isArray(tokensRead.body) ? tokensRead.body : [];
+const ctx = ctxOf(book);
+
+/* What limits it, in her words for the component (the same keys WhatLimitsIt says). */
+const limitWords: Record<string, string> = {};
+for (const [k, v] of Object.entries({ ...LIMIT_SENTENCES, ...LIMIT_WORDS })) limitWords[k] = sayLimit(k, v);
+
+const businesses = book.businesses.map((b) => ({ ...b, view: keptView(pack, b, ctx, limitWords) }));
+const week = companyWeek(book.businesses);
+const nextN = nextWeekNumber(book.businesses);
+const open = book.businesses.filter((b) => b.opened).map((b) => ({ id: b.id, name: b.name }));
+
+const COUNTS = say("count.words", "none one two three four five six seven eight nine ten eleven twelve").split(/\s+/);
+const nBusinesses = book.businesses.length === 1 ? say("meta.oneBusiness", "one business")
+  : fill(say("meta.businesses", "{n} businesses"), { n: COUNTS[book.businesses.length] ?? String(book.businesses.length) });
+const difficultyName = book.difficulty === "custom" ? say("difficulty.custom", "Custom")
+  : pack?.difficulties.find((d) => d.id === book.difficulty)?.name ?? book.difficulty;
+const meta = [pack?.game.name ?? say("meta.game", "Big Ambitions"), book.version || pack?.game.version,
+  pack?.game.build ? fill(say("meta.build", "build {build}"), { build: pack.game.build }) : "",
+  difficultyName, nBusinesses,
+  book.inGameDay != null ? fill(say("meta.day", "day {n}"), { n: String(book.inGameDay) }) : ""].filter(Boolean).join(" · ");
+
+const isLoss = (v: number | null | undefined) => v != null && Math.round(v) < 0;
+const loss = say("loss", "loss");
+const weekOf = (b: Business) => (week ? b.weeks.find((w) => w.n === week.n) ?? null : null);
+const planHref = `/ledger/plan?ledger=${book.id}`;
+
+const LINES = [
+  ["moneyIn", say("line.moneyIn", "Money in")], ["goods", say("line.goods", "Goods")], ["wages", say("line.wages", "Wages")],
+  ["rent", say("line.rent", "Rent")], ["ads", say("line.ads", "Advertising")], ["deliveries", say("line.deliveries", "Deliveries")],
+] as const;
+
+const CUSTOM = [
+  ["startMoney", say("custom.startMoney", "Starting money"), "$"],
+  ["taxPct", say("custom.taxPct", "Tax rate"), "%"],
+  ["marketPriceMultiplier", say("custom.market", "Cost of goods"), "×"],
+  ["salaryMultiplier", say("custom.salary", "Wages"), "×"],
+  ["baseCustomerPromotionMultiplier", say("custom.promotion", "Customers a promotion brings"), "×"],
+] as const;
+const normal = pack?.difficulties.find((d) => d.id === "normal") as Record<string, unknown> | undefined;
+
+const WORDS = {
+  loss,
+  "entry.title": say("entry.title", "Write week {n} · every business"),
+  "entry.save": say("entry.save", "Write week {n}"),
+  "saved.grid": say("saved.grid", "Week {n} written for {names}."),
+  "saved.none": say("saved.none", "Nothing written: no row has money in yet."),
+  "refuse.path": say("refuse.path", "{business} · {line}"),
+  "refuse.figure": say("refuse.figure", "Not a figure. Write it as the game shows it, like 1,370 or −400."),
+  "refuse.failed": say("refuse.failed", "That did not save. Nothing was written; try again."),
+  "refuse.weekPath": say("refuse.weekPath", "week {n}"),
+  and: say("and", "and"),
+  "head.week": say("head.week", "Week {n} · the company"),
+  "head.weekLoss": say("head.weekLoss", "Week {n} · the company, a loss"),
+  "total.week": say("total.week", "Week {n}"),
+  "settings.saved": say("settings.saved", "Saved."),
+  "settings.failed": say("settings.failed", "That did not save. Try again."),
+  "settings.namePath": say("settings.namePath", "ledger · name"),
+  "settings.name": say("settings.nameRefusal", "A ledger needs a name. The company's name in the game will do."),
+  ...Object.fromEntries(LINES.map(([k, v]) => [`line.${k}`, v])),
+};
+const STATE = {
+  ledgerId: book.id, n: nextN,
+  businesses: book.businesses.map((b) => ({ id: b.id, name: b.name, opened: b.opened, weeks: b.weeks })),
+};
+---
+<BaseLayout title={fill(say("meta.title", "{name} — the Ledger"), { name: book.name })}
+            description={say("meta.description", "A ledger: one company in one saved game of Big Ambitions.")} noindex>
+  <div class="page gd-full lg-root lb-company" data-company data-words={JSON.stringify(WORDS)} data-state={JSON.stringify(STATE)}>
+    <LedgerBar current="ledger" signedIn ledger={{ id: book.id, name: book.name }} planHref={planHref} />
+    <SwitchBar ledgerId={book.id} open={open} onScreen={book.onScreenBusinessId} tokens={tokens} />
+
+    <header class="lb-head">
+      <div class="lb-head-text">
+        <span class="gd-eyebrow">{say("eyebrow", "A ledger")}</span>
+        <h1>{book.name}</h1>
+        <span class="lb-meta">{meta}</span>
+      </div>
+      {book.businesses.length > 0 && (
+        <div class="lb-head-figure" data-head-figure>
+          <span class="gd-eyebrow" data-head-week>{week ? fill(isLoss(week.total) ? WORDS["head.weekLoss"] : WORDS["head.week"], { n: String(week.n) }) : say("head.noWeek", "No week written yet · the company")}</span>
+          <span class="lb-big" data-head-total>{money(week?.total ?? null)}{isLoss(week?.total) && <span class="lg-loss">{loss}</span>}</span>
+        </div>
+      )}
+    </header>
+
+    {book.businesses.length === 0 ? (
+      <Empty n={4} eyebrow={say("empty.eyebrow", "No business yet")} title={say("empty.title", "Plan the first business.")}
+             body={say("empty.body", "A plan costs nothing and saves nothing until you keep it here. Start with the type, or with a building you already have in mind.")}
+             action={say("empty.action", "Plan a business")} href={planHref} ringAria={say("empty.aria", "A ledger with no business yet")} />
+    ) : (
+      <>
+        <div>
+          <div class="lb-rows" role="table" aria-label={say("rows.aria", "The ledger's businesses")}>
+            {businesses.map((b) => {
+              const w = weekOf(b);
+              const t = w ? weekTotal(w) : null;
+              const kind = [b.view.typeName, b.view.neighbourhood, b.opened ? "" : say("row.notOpened", "not opened yet")].filter(Boolean).join(" · ");
+              return (
+                <div class="lb-row" role="row" data-business={b.id}>
+                  <span class="lb-row-who" role="rowheader">
+                    <a class="lb-row-name" href={`/ledger/${book.id}/${b.id}`}>{b.name}</a>
+                    <span class="lb-row-kind">{kind || say("row.noType", "no type yet")}</span>
+                  </span>
+                  <span class="lb-row-limit" role="cell">{b.view.first}</span>
+                  <span class="lb-row-fig" role="cell">
+                    <span class="lb-fig" data-row-figure>{money(t)}{isLoss(t) && <span class="lg-loss">{loss}</span>}</span>
+                    <span class="lb-plan">{fill(say("row.plan", "plan {x}"), { x: money(b.view.lines.total) })}</span>
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+          <div class="lb-total" data-total hidden={!week}>
+            <span data-total-label>{week ? fill(WORDS["total.week"], { n: String(week.n) }) : ""}</span>
+            <span class="lb-fig" data-total-figure>{money(week?.total ?? null)}{isLoss(week?.total) && <span class="lg-loss">{loss}</span>}</span>
+          </div>
+        </div>
+        <p class="lb-hint"><a href={planHref}>{say("rows.plan", "Plan another business")}</a></p>
+
+        <Console as="section" id="entry" class="lb-entry-console" aria-labelledby="lb-entry-title">
+          <div class="gd-console-head">
+            <span class="gd-eyebrow" id="lb-entry-title" data-entry-title>{fill(WORDS["entry.title"], { n: String(nextN) })}</span>
+            <span class="gd-note">{say("entry.note", "Tab along · Enter down · paste a row from a sheet")}</span>
+          </div>
+          <div class="lb-entry-scroll">
+            <div class="lb-entry" role="grid" aria-labelledby="lb-entry-title" data-entry>
+              <div class="lb-entry-row lb-entry-head" role="row">
+                <span role="columnheader">{say("entry.business", "Business")}</span>
+                {LINES.map(([, label]) => <span role="columnheader">{label}</span>)}
+                <span role="columnheader">{say("entry.week", "The week")}</span>
+              </div>
+              {book.businesses.map((b, r) => (
+                <div class="lb-entry-row" role="row" data-entry-row={b.id}>
+                  <span class="lb-entry-name" role="rowheader" title={b.name}>{b.name}</span>
+                  {LINES.map(([key, label], c) => (
+                    <input class="lg-input" type="text" inputmode="decimal" autocomplete="off" placeholder="—" role="gridcell"
+                           data-cell={key} data-row={r} data-col={c} aria-label={`${b.name} · ${label}`} />
+                  ))}
+                  <span class="lb-entry-week" role="gridcell" data-entry-week data-empty="yes">—</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div class="lg-actions">
+            <button type="button" class="lg-btn" data-entry-save>{fill(WORDS["entry.save"], { n: String(nextN) })}</button>
+            <span class="lb-hint">{say("entry.hint", "A row with no money in stays unwritten. Nothing marks it.")}</span>
+          </div>
+          {book.businesses.some((b) => !b.opened) && (
+            <p class="lb-hint">{say("entry.opens", "A business not opened yet is marked opened when its first week is written: then it counts in the company's week and can go on stream.")}</p>
+          )}
+          <SaveNote kind="saved" hidden data-entry-saved />
+          <SaveNote kind="refusal" hidden data-entry-refusal />
+        </Console>
+      </>
+    )}
+
+    <OnStream ledger={{ id: book.id, name: book.name }} open={open} onScreen={book.onScreenBusinessId} tokens={tokens}
+              figure={money(week?.total ?? null)} />
+
+    <Console as="section" class="lb-quiet" aria-labelledby="lb-settings-title" data-settings>
+      <div class="gd-console-head">
+        <span class="gd-eyebrow" id="lb-settings-title">{say("settings.eyebrow", "This ledger")}</span>
+        <span class="gd-note">{say("settings.note", "its name, its day, and deleting it")}</span>
+      </div>
+      <div class="lb-form">
+        <label class="lb-form-field">
+          <span class="lb-form-label">{say("settings.name", "Name")}</span>
+          <span class="lb-inline">
+            <input class="lg-text" type="text" maxlength="80" autocomplete="off" value={book.name} data-rename />
+          </span>
+        </label>
+        <label class="lb-form-field">
+          <span class="lb-form-label">{say("settings.day", "In-game day · optional")}</span>
+          <input class="lg-input lb-day" type="text" inputmode="numeric" autocomplete="off" placeholder="—"
+                 value={book.inGameDay != null ? String(book.inGameDay) : ""} data-day />
+        </label>
+        {book.difficulty === "custom" && (
+          <div class="lb-form-field" data-custom>
+            <span class="lb-form-label">{say("custom.title", "Custom difficulty")}</span>
+            <span class="lb-form-help">{say("custom.help", "The values your game was started with. A blank one is reckoned as Normal's, which is shown beside it.")}</span>
+            <div class="lb-custom">
+              {CUSTOM.map(([key, label, unit]) => (
+                <label class="lb-form-field">
+                  <span class="lb-form-help">{label}{normal?.[key] != null ? ` · ${say("custom.normal", "Normal")} ${unit === "$" ? money(Number(normal[key])) : unit === "%" ? `${normal[key]} %` : `×${normal[key]}`}` : ""}</span>
+                  <input class="lg-input" type="text" inputmode="decimal" autocomplete="off" placeholder="—" data-custom-key={key}
+                         value={book.custom?.[key] != null ? String(book.custom[key]) : ""} />
+                </label>
+              ))}
+            </div>
+          </div>
+        )}
+        <div class="lg-actions">
+          <button type="button" class="lg-btn" data-variant="secondary" data-settings-save>{say("settings.save", "Save")}</button>
+          <span class="lb-hint" data-settings-said aria-live="polite"></span>
+        </div>
+        <SaveNote kind="refusal" hidden data-settings-refusal />
+        <div class="lb-confirm">
+          <button type="button" class="lg-link" data-delete>{say("delete", "Delete this ledger")}</button>
+          <span class="lb-confirm" data-delete-confirm hidden>
+            <span>{say("delete.confirm", "Its businesses, every week written and its overlays go with it. OBS stops showing them at once.")}</span>
+            <button type="button" class="lg-btn" data-variant="secondary" data-size="sm" data-delete-yes>{say("delete.yes", "Delete it")}</button>
+            <button type="button" class="lg-link" data-delete-no>{say("delete.no", "Keep it")}</button>
+          </span>
+        </div>
+      </div>
+    </Console>
+
+    <LedgerFoot game={pack?.game ?? null} />
+  </div>
+</BaseLayout>
+
+<script>
+  import { mountCompany } from "../../lib/ledger/company";
+  import { mountOnStream } from "../../lib/ledger/onstream";
+  const root = document.querySelector<HTMLElement>("[data-company]");
+  if (root) mountCompany(root);
+  mountOnStream(document);
+</script>

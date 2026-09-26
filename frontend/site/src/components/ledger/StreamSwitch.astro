@@ -1,0 +1,78 @@
+---
+/* The planner's *Plan on stream* switch (overlays handoff A4–A5), with the
+ * *Chat sees* strip and the inline notes. lib/ledger/stream-switch.ts moves
+ * the wide switch to the right end of the stats bar and the strip and notes
+ * under it; the narrow switch stays in a fixed bottom bar (< 900px).
+ * Hidden until the script mounts it: without the script it could do nothing.
+ *
+ * Props: whether the reader is signed in, the ledger the plan streams
+ * through (`?ledger=` or the business's), the reader's ledgers (for the
+ * no-ledger note) and where Sign in goes. */
+import { copy } from "../../lib/copy";
+import { WORDS as STREAM_WORDS } from "../../lib/ledger/stream";
+
+interface Props {
+  signedIn: boolean;
+  ledger: { id: number; name: string } | null;
+  ledgers: { id: number; name: string }[];
+  signInHref: string;
+}
+const { signedIn, ledger, ledgers, signInHref } = Astro.props;
+const say = await copy("component:StreamSwitch");
+
+const WORDS = {
+  "label.off": say("label.off", "Plan on stream"),
+  "label.on": say("label.on", "On stream"),
+  "sub.off": say("sub.off", "off · chat sees nothing"),
+  "sub.on": say("sub.on", "chat sees this plan"),
+  "sub.noMint": say("sub.noMint", "no overlay minted yet"),
+  "sub.signedOut": say("sub.signedOut", "needs an account"),
+  "sub.noLedger": say("sub.noLedger", "no ledger chosen"),
+  "chat.none": say("chat.none", "Chat sees the figures above as they are now."),
+  "note.noMint": say("note.noMint", "No plan-on-stream overlay is minted for {ledger} yet, so chat has nothing to see this plan on."),
+  // A2's change sentences: the label the overlay prints
+  ...Object.fromEntries(Object.entries(STREAM_WORDS).filter(([k]) => k.startsWith("ch")).map(([k, v]) => [`stream.${k}`, say(`stream.${k}`, v)])),
+};
+const INIT = { signedIn, ledgerId: ledger?.id ?? null, ledgerName: ledger?.name ?? "", ledgers, signInHref };
+const off = say("label.off", "Plan on stream");
+const initialSub = !signedIn ? say("sub.signedOut", "needs an account") : ledger ? say("sub.off", "off · chat sees nothing") : say("sub.noLedger", "no ledger chosen");
+---
+<div class="lss" data-stream-switch data-words={JSON.stringify(WORDS)} data-init={JSON.stringify(INIT)} hidden>
+  <button type="button" class="lss-switch lss-wide" role="switch" aria-checked="false" data-switch data-switch-wide>
+    <span class="lss-disc" aria-hidden="true"></span>
+    <span class="lss-words"><span class="lss-label" data-switch-label>{off}</span><span class="lss-sub" data-switch-sub>{initialSub}</span></span>
+  </button>
+
+  <div class="lss-under" data-switch-under>
+    <div class="lss-strip" data-chat-sees hidden aria-live="polite">
+      <span class="lss-strip-eyebrow" data-chat-eyebrow hidden>{say("chat.eyebrow", "Chat sees")}</span>
+      <span class="lss-strip-line"><span data-chat-line>{say("chat.none", "Chat sees the figures above as they are now.")}</span><span class="lss-caret" data-chat-caret></span></span>
+    </div>
+    <div class="lss-note" data-switch-note hidden>
+      <span class="lg-note-path">{say("note.path", "plan on stream")}</span>
+      <span class="lss-note-body" data-note-for="nothing-minted">
+        <span data-note-nomint-text>{say("note.noMint", "No plan-on-stream overlay is minted for {ledger} yet, so chat has nothing to see this plan on.").replace("{ledger}", ledger?.name ?? "")}</span>
+        <a class="lg-btn" data-variant="secondary" data-size="sm" href={ledger ? `/ledger/${ledger.id}#stream` : "/ledger"} data-note-mint>{say("note.mint", "This ledger on stream")}</a>
+        <button type="button" class="lg-link" data-note-close>{say("note.notNow", "Not now")}</button>
+      </span>
+      <span class="lss-note-body" data-note-for="signed-out">
+        <span>{say("note.signedOut", "Streaming a plan needs an account: an overlay belongs to one, and this plan is not kept anywhere yet.")}</span>
+        <a class="lg-btn" data-variant="secondary" data-size="sm" href={signInHref}>{say("note.signIn", "Sign in")}</a>
+      </span>
+      <span class="lss-note-body" data-note-for="no-ledger">
+        <span data-note-choose>{say("note.noLedgerChoose", "A plan goes on stream through one ledger's overlay, and this plan is in none yet. Stream it through:")}</span>
+        <span data-note-start>{say("note.noLedgerStart", "A plan goes on stream through one ledger's overlay, and there is no ledger yet.")}</span>
+        <span class="lss-note-ledgers" data-note-ledgers></span>
+        <a class="lg-btn" data-variant="secondary" data-size="sm" href="/ledger#new" data-note-start>{say("note.start", "Start a ledger")}</a>
+        <button type="button" class="lg-link" data-note-close>{say("note.notNow", "Not now")}</button>
+      </span>
+    </div>
+  </div>
+
+  <div class="lss-bottom">
+    <button type="button" class="lss-switch lss-narrow" role="switch" aria-checked="false" data-switch>
+      <span class="lss-disc" aria-hidden="true"></span>
+      <span class="lss-words"><span class="lss-label" data-switch-label>{off}</span><span class="lss-sub" data-switch-sub>{initialSub}</span></span>
+    </button>
+  </div>
+</div>

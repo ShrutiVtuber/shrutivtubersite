@@ -1,0 +1,51 @@
+/* The planner's Plan on stream switch (overlays handoff A4): wide at the right
+   end of the sticky stats bar, narrow a fixed bottom bar 52px tall plus the
+   safe area. The Chat sees strip and the inline notes sit under the stats bar.
+   Never red: on is the accent wash and the filled now disc; off is the open ring.
+   Imported by pages/ledger/plan.astro. */
+
+.lss-switch { appearance: none; display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 6px 14px 6px 12px; box-sizing: border-box;
+  border: 1px solid var(--line-strong); border-radius: 4px; background: var(--surface-card); color: var(--ink);
+  font-family: var(--font-body); text-align: left; cursor: pointer; }
+.lss-switch:hover { background: var(--surface-veil); }
+.lss-switch:active { transform: translateY(1px); }
+.lss-switch:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.lss-switch[aria-checked="true"] { background: var(--accent-wash); border-color: var(--accent); color: var(--accent); }
+.lss-disc { flex: none; width: 12px; height: 12px; border-radius: 50%; box-sizing: border-box; border: 1.5px solid var(--ink); background: transparent; }
+.lss-switch[aria-checked="true"] .lss-disc { border: 0; background: var(--accent); }
+.lss-words { display: flex; flex-direction: column; line-height: 1.2; min-width: 0; }
+.lss-label { font-size: 14px; font-weight: 600; }
+.lss-sub { font-size: 12px; color: var(--ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* wide: in the stats bar's row, after the note */
+.lss-wide { flex: none; align-self: center; margin: 8px 0 8px 12px; }
+
+/* narrow: the fixed bottom bar */
+.lss-bottom { display: none; }
+@media (max-width: 899px) {
+  .lss-wide { display: none; }
+  .lss-bottom { display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; box-sizing: border-box; min-height: calc(52px + env(safe-area-inset-bottom));
+    padding: 4px 16px calc(4px + env(safe-area-inset-bottom)); align-items: center;
+    background: var(--surface-card); border-top: 1px solid var(--line-strong); box-shadow: var(--shadow-3); }
+  .lss-narrow { flex: 1 1 auto; min-width: 0; gap: 12px; }
+  .lss-narrow .lss-disc { width: 14px; height: 14px; }
+  .lss-narrow .lss-label { font-size: 15px; }
+  .lss-narrow .lss-sub { font-size: 13px; }
+  .lg-plan.lg-has-switch { padding-bottom: calc(64px + env(safe-area-inset-bottom) + var(--space-8, 64px)); }
+}
+
+/* under the stats bar: the Chat sees strip, full bleed on the accent wash */
+.lss-under { display: grid; min-width: 0; }
+.lss-strip { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; margin: 0 calc(-1 * clamp(16px, 4vw, 40px));
+  padding: 6px clamp(16px, 4vw, 40px); border-top: 1px solid var(--line); background: var(--accent-wash); }
+.lss-strip-eyebrow { font: 600 12px/1.2 var(--font-body); letter-spacing: .14em; text-transform: uppercase; color: var(--accent); }
+.lss-strip-line { font-size: 14px; font-variant-numeric: tabular-nums; color: var(--ink); }
+.lss-caret { margin-left: 6px; font-family: var(--font-mono); font-size: 12px; color: var(--ink-faint); }
+.lss-caret:empty { display: none; }
+
+/* the inline notes: the refusal note's grid, path on the left */
+.lss-note { display: grid; grid-template-columns: minmax(0, 160px) minmax(0, 1fr); gap: 6px 16px; align-items: baseline; padding: 12px 0; border-top: 1px solid var(--line); }
+.lss-note-body { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; font-size: 15px; }
+.lss-note-ledgers { display: flex; flex-wrap: wrap; gap: 8px; }
+.lss-note-ledgers:empty { display: none; }
+@media (max-width: 599px) { .lss-note { grid-template-columns: minmax(0, 1fr); gap: 4px; } }

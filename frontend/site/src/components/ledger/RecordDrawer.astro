@@ -1,0 +1,81 @@
+---
+/* The record drawer for one building (handoff README §7). The server draws
+ * the shell with its fixed words; lib/ledger/drawer.ts fills in the building
+ * and opens it. Desk: fixed on the right, 420px, over a scrim. 390: a bottom
+ * sheet from 22vh. Hidden until a row (or ?building=ID) opens it.
+ *
+ * Props: `dataLine`, the foot's data line (the same one LedgerFoot prints). */
+import { copy } from "../../lib/copy";
+
+interface Props { dataLine?: string }
+const { dataLine = "" } = Astro.props;
+const say = await copy("component:RecordDrawer");
+
+const WORDS = {
+  line: say("line", "{article} {what} in {hood}, where customers are {mix}."),
+  "article.a": say("article.a", "a"),
+  "article.an": say("article.an", "an"),
+  "noun.shop": say("noun.shop", "shop unit"),
+  "noun.office": say("noun.office", "office"),
+  "noun.warehouse": say("noun.warehouse", "warehouse"),
+  "noun.home": say("noun.home", "home"),
+  "noun.cinema": say("noun.cinema", "cinema building"),
+  "noun.theatre": say("noun.theatre", "theatre building"),
+  "noun.special": say("noun.special", "special building"),
+  "class.working": say("class.working", "working"),
+  "class.middle": say("class.middle", "middle"),
+  "class.upper": say("class.upper", "upper"),
+  and: say("and", "and"),
+  "mix.template": say("mix.template", "{classes} class"),
+  "mix.none": say("mix.none", "of every class"),
+  "facts.area": say("facts.area", "{n} m²"),
+  "facts.capacity": say("facts.capacity", "capacity {n}"),
+  "facts.traffic": say("facts.traffic", "traffic {n}"),
+  "b.hood": say("b.hood", "Neighbourhood"),
+  "b.area": say("b.area", "Floor area"),
+  "b.areaValue": say("b.areaValue", "{n} m²"),
+  "b.capacity": say("b.capacity", "Customer capacity"),
+  "b.capacityValue": say("b.capacityValue", "{n} an hour"),
+  "b.accepts": say("b.accepts", "Price customers accept"),
+  "b.ads": say("b.ads", "Advertising works"),
+  "b.traffic": say("b.traffic", "Traffic index"),
+  "b.rent": say("b.rent", "Rent"),
+  "b.rentValue": say("b.rentValue", "{x} a day"),
+  "b.deposit": say("b.deposit", "Deposit"),
+  "rob.rentYear": say("rob.rentYear", "Rent a game year"),
+  "rob.price": say("rob.price", "Price to buy"),
+  "rob.years": say("rob.years", "Game years of rent the price equals"),
+  "rob.yearsValue": say("rob.yearsValue", "{n} years"),
+  "rob.repays": say("rob.repays", "Buying repays itself after {n} game years of rent."),
+  "rob.rentCheaper": say("rob.rentCheaper", "Renting is the cheaper choice for any game you will finish."),
+  "rob.notForRent": say("rob.notForRent", "This building is not for rent or sale."),
+};
+---
+<div class="lp-drawer" data-record-drawer data-words={JSON.stringify(WORDS)} hidden>
+  <div class="lp-scrim" data-drawer-scrim></div>
+  <aside class="lp-panel" role="dialog" aria-modal="true" aria-label={say("aria", "A building")} data-drawer-panel>
+    <div class="lp-drawer-head">
+      <span class="gd-eyebrow">{say("eyebrow", "Building")}</span>
+      <button type="button" class="lg-link lp-close" data-drawer-close>{say("close", "Close")}</button>
+    </div>
+    <div>
+      <h2 class="lp-drawer-title" data-drawer-address></h2>
+      <p class="lp-drawer-line" data-drawer-line></p>
+      <p class="lp-drawer-facts" data-drawer-facts></p>
+    </div>
+    <div class="lg-almanac">
+      <div class="lg-group-head"><span class="gd-eyebrow">{say("building", "The building")}</span></div>
+      <div data-drawer-building></div>
+    </div>
+    <div class="lg-almanac">
+      <div class="lg-group-head"><span class="gd-eyebrow">{say("rob", "Rent or buy")}</span></div>
+      <div data-drawer-rob></div>
+      <p class="lp-verdict" data-drawer-verdict></p>
+      <a class="lg-link lp-weigh" href="/ledger/calculators#rob" data-drawer-weigh>{say("weigh", "Weigh it over the years you will play")}</a>
+    </div>
+    <div class="lp-drawer-foot">
+      <span class="lp-drawer-data">{dataLine}</span>
+      <a class="lg-btn" href="/ledger/plan" data-drawer-plan>{say("plan", "Plan a business here")}</a>
+    </div>
+  </aside>
+</div>

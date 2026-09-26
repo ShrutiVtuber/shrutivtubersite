@@ -1,0 +1,54 @@
+---
+/* The one-tap switch (design_handoff_ledger_overlays README §6): a sticky bar
+ * at the top of the ledger, there only while at least one overlay of this
+ * ledger is minted. "On screen now {business}", a mono note ("Ledger plate ·
+ * live", then "sent · on stream within a second" after a tap), and a 44px
+ * radio chip for each open business. One tap moves every minted element of
+ * this ledger; no mint form is involved.
+ *
+ * Driven by lib/ledger/onstream.ts, with OnStream.astro when both are on the
+ * page (they share one state; this bar alone mounts too).
+ */
+import { copy } from "../../lib/copy";
+import type { StreamToken } from "../../lib/ledger/onstream";
+
+interface Props {
+  ledgerId: number;
+  open: { id: number; name: string }[];
+  onScreen: number | null;
+  tokens: StreamToken[];
+}
+const { ledgerId, open, onScreen, tokens } = Astro.props;
+const say = await copy("component:LedgerSwitchBar");
+const current = onScreen ?? open[0]?.id ?? null;
+const name = open.find((b) => b.id === current)?.name ?? "";
+const WORDS = {
+  "switch.live": say("live", "{kind} · live"),
+  "switch.sent": say("sent", "sent · on stream within a second"),
+  "kind.ledger-plate": say("kind.plate", "Ledger plate"),
+  "kind.ledger-card": say("kind.card", "Business card"),
+  "kind.ledger-strip": say("kind.strip", "Company strip"),
+  "kind.ledger-limit": say("kind.limit", "Limit line"),
+  "kind.ledger-counter": say("kind.counter", "Week counter"),
+  "kind.ledger-plan-panel": say("kind.planPanel", "Plan on stream"),
+  "kind.ledger-plan-card": say("kind.planCard", "Plan on stream · card"),
+  "kind.guide-layout": say("kind.layout", "Layout"),
+};
+const latest = [...tokens].reverse().find((t) => !t.kind.startsWith("ledger-plan")) ?? tokens[tokens.length - 1];
+const note = latest ? WORDS["switch.live"].replace("{kind}", WORDS[`kind.${latest.kind}` as keyof typeof WORDS] ?? latest.kind) : "";
+---
+<div class="lb-switch" data-switch hidden={!tokens.length || !open.length}
+     data-words={JSON.stringify(WORDS)} data-state={JSON.stringify({ ledgerId, open, onScreen, tokens })}>
+  <div class="lb-switch-row">
+    <span class="lb-switch-label">{say("label", "On screen now")}</span>
+    <span class="lb-switch-name" data-switch-name>{name}</span>
+    <span class="lb-switch-note" data-switch-note aria-live="polite">{note}</span>
+  </div>
+  <div class="lb-switch-chips" role="radiogroup" aria-label={say("aria", "The business on screen")}>
+    {open.map((b) => (
+      <button type="button" class="lg-chip lb-on-chip" role="radio" data-on={b.id} aria-checked={String(b.id === current)}>
+        <span class="lb-on-dot" aria-hidden="true"></span>{b.name}
+      </button>
+    ))}
+  </div>
+</div>

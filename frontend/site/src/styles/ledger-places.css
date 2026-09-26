@@ -1,0 +1,105 @@
+/* The Ledger's Places and Calculators (handoff README §6–§8, SPEC §3.7–3.8):
+   the building finder, the record drawer and the three calculator consoles.
+   Imported by pages/ledger/places.astro and calculators.astro. Global class
+   names because the scripts draw most of it.
+
+   No new token, no hue, no red and no green; the section values come from
+   ledger.css (.lg-root). */
+
+/* ── Places: head and the index strip ────────────────────────────────────── */
+.lp-count, .lc-calc .lg-head-meta { font-family: var(--font-mono); font-size: 12px; color: var(--ink-soft); }
+.lp-strip { display: grid; gap: 8px; min-width: 0; }
+.lp-strip-head { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; align-items: baseline; }
+.lp-strip-note { font-family: var(--font-mono); font-size: 11px; color: var(--ink-faint); }
+.lp-tiles { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; min-height: 124px; }
+.lp-tile { appearance: none; flex: 1 0 136px; display: flex; flex-direction: column; gap: 3px; padding: 12px; text-align: left; cursor: pointer;
+  border: 1px solid var(--line); border-radius: 4px; background: var(--surface-card); color: var(--ink); font-family: var(--font-body); }
+.lp-tile:hover { border-color: var(--line-strong); }
+.lp-tile:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.lp-tile[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-wash); }
+.lp-tile-name { font-size: 14px; font-weight: 500; white-space: nowrap; }
+.lp-tile-count { font-family: var(--font-mono); font-size: 12px; font-variant-numeric: tabular-nums; }
+.lp-tile-accepts { font-family: var(--font-mono); font-size: 11px; color: var(--ink-soft); }
+.lp-tile-mix { font-size: 12px; line-height: 1.3; color: var(--ink-soft); }
+.lp-tile-rent { font-family: var(--font-mono); font-size: 11px; color: var(--ink-faint); }
+
+/* ── Places: the table ───────────────────────────────────────────────────── */
+.lp-table-wrap { display: grid; gap: 8px; min-width: 0; }
+.lp-table { border: 1px solid var(--line); border-radius: 4px; background: var(--surface-card); overflow: hidden; min-width: 0; }
+.lp-grid { display: grid; grid-template-columns: minmax(0, 1fr) 72px 64px 84px 120px 56px; gap: 12px; align-items: center; padding: 0 12px; }
+.lp-heads { padding: 10px 12px; border-bottom: 1px solid var(--line-strong); }
+.lp-head { appearance: none; border: 0; background: transparent; padding: 0; min-height: 28px; cursor: pointer; white-space: nowrap;
+  font: 600 12px/1.2 var(--font-body); letter-spacing: .14em; text-transform: uppercase; color: var(--ink-faint); text-align: left; }
+.lp-head[data-align="right"] { text-align: right; }
+.lp-head[data-on="yes"] { color: var(--accent); }
+.lp-head:hover:not(:disabled) { color: var(--ink); }
+.lp-head:disabled { cursor: default; opacity: .6; }
+.lp-head:focus-visible, .lp-pick:focus-visible, .lp-row-phone:focus-visible, .lp-scroll:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.lp-caret { font-family: var(--font-mono); letter-spacing: 0; }
+.lp-scroll { height: 600px; overflow-y: auto; position: relative; overscroll-behavior: contain; }
+.lp-inner { position: relative; }
+.lp-row { position: absolute; left: 0; right: 0; box-sizing: border-box; border-bottom: 1px solid var(--line); background: var(--surface-card); }
+.lp-row[data-chosen="yes"] { background: var(--surface-veil); }
+.lp-pick { appearance: none; border: 0; background: transparent; padding: 0; min-width: 0; text-align: left; cursor: pointer; color: var(--ink);
+  font-family: var(--font-body); display: flex; flex-direction: column; gap: 1px; }
+.lp-addr { font-size: 14px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lp-meta { font-family: var(--font-mono); font-size: 11px; color: var(--ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lp-n { text-align: right; font-family: var(--font-mono); font-size: 13px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.lp-read { justify-self: end; }
+.lp-foot-note { margin: 0; font-family: var(--font-mono); font-size: 11px; color: var(--ink-faint); }
+
+/* 390: rows of 88px, the whole row a button; the heads wrap as sort chips */
+@media (max-width: 899px) {
+  .lp-scroll { height: 520px; }
+  .lp-heads.lp-grid { display: flex; flex-wrap: wrap; gap: 4px 16px; }
+  .lp-heads > span:last-child { display: none; }
+  .lp-head { min-height: 44px; }
+  .lp-row-phone { appearance: none; width: 100%; border: 0; border-bottom: 1px solid var(--line); padding: 10px 12px; text-align: left; cursor: pointer;
+    color: var(--ink); font-family: var(--font-body); display: flex; flex-direction: column; justify-content: center; gap: 2px; }
+  .lp-row-top { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; min-width: 0; }
+  .lp-row-phone .lp-addr { font-size: 15px; }
+  .lp-week { font-family: var(--font-mono); font-size: 14px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .lp-hood { font-size: 13px; color: var(--ink-soft); }
+}
+
+/* ── the record drawer ───────────────────────────────────────────────────── */
+.lp-drawer[hidden] { display: none; }
+.lp-scrim { position: fixed; inset: 0; z-index: 60; background: color-mix(in srgb, var(--surface-inset) 50%, transparent); }
+.lp-panel { position: fixed; z-index: 61; top: 0; right: 0; bottom: 0; width: min(420px, 100vw); box-sizing: border-box; padding: 24px;
+  display: flex; flex-direction: column; gap: 16px; overflow-y: auto; overscroll-behavior: contain;
+  background: var(--surface-card); color: var(--ink); box-shadow: var(--shadow-3); }
+.lp-drawer-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.lp-close { font-size: 14px; min-height: 44px; }
+.lp-drawer-title { margin: 0; font-family: var(--font-display); font-size: 24px; font-weight: 600; line-height: 1.2; text-wrap: balance; }
+.lp-drawer-line { margin: 4px 0 0; font-size: 14px; color: var(--ink-soft); text-wrap: pretty; }
+.lp-drawer-facts { margin: 8px 0 0; font-family: var(--font-mono); font-size: 12px; color: var(--ink-soft); }
+.lp-verdict { margin: 8px 0 0; padding-left: 12px; border-left: 3px solid var(--line-strong); font-size: 14px; color: var(--ink-soft); text-wrap: pretty; }
+.lp-weigh { justify-self: start; margin-top: 4px; }
+.lp-drawer-foot { margin-top: auto; padding-top: 12px; border-top: 1px solid var(--line); display: flex; flex-direction: column; align-items: flex-start; gap: 12px; }
+.lp-drawer-data { font-family: var(--font-mono); font-size: 11px; color: var(--ink-faint); }
+@media (max-width: 899px) {
+  .lp-panel { top: 22vh; left: 0; width: auto; border-radius: 16px 16px 0 0; padding-bottom: calc(24px + env(safe-area-inset-bottom)); }
+}
+:root[data-drawer="open"] { overflow: hidden; }
+
+/* ── Calculators ─────────────────────────────────────────────────────────── */
+.lc-consoles { display: flex; flex-direction: column; gap: 32px; min-width: 0; }
+.lc-console { gap: 16px; min-width: 0; scroll-margin-top: 24px; }
+.lc-chip-run { display: contents; }
+.lc-scroll-chips { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: thin; padding-bottom: 2px; }
+.lc-select { width: auto; max-width: 100%; min-height: 36px; font-size: 14px; flex: 0 1 auto; min-width: 0; }
+.lc-stepper-row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+.lc-label { font-size: 14px; font-weight: 600; }
+.lc-step-wide { min-width: 112px; }
+.lc-best { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 0 16px; font-size: 14px; margin-top: 8px; }
+.lc-best-rows { display: contents; }
+.lc-th { font: 600 12px/1.2 var(--font-body); letter-spacing: .14em; text-transform: uppercase; color: var(--ink-faint); padding-bottom: 6px; border-bottom: 1px solid var(--line-strong); }
+.lc-th.lg-num { font-family: var(--font-body); text-align: right; }
+.lc-cell { padding: 7px 0; border-bottom: 1px solid var(--line); }
+.lc-cell.lg-num { text-align: right; font-size: 13px; white-space: nowrap; }
+.lc-foot { margin: 0; font-family: var(--font-mono); font-size: 11px; color: var(--ink-faint); max-width: 80ch; }
+.lc-result { display: grid; gap: 12px; max-width: 560px; }
+.lc-week { justify-self: end; font-family: var(--font-mono); font-size: 12px; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+.lc-refusal { padding-top: 12px; border-top: 1px solid var(--line); }
+.lc-verdict { margin: 0; padding-left: 12px; border-left: 3px solid var(--line-strong); font-family: var(--font-display); font-size: 18px; line-height: 1.4; text-wrap: pretty; }
+@media (max-width: 899px) { .lc-select { min-height: 44px; } }

@@ -1,29 +1,186 @@
 ---
-/* /ledger/places — ⚠ a holding page, so the Ledger's own tabs lead somewhere
- * honest. The real page is a later build (handoff README §6). It says
- * what will be here and sends a person to the planner; it shows nothing it
- * does not have. Not in the sitemap, and kept out of search until it is built. */
+/* /ledger/places — Find a building (handoff README §6, SPEC §3.8). Works
+ * signed out; it ranks for the plan in hand (the planner's unsaved plan).
+ *
+ * The server draws the shell: the head, the chip rows, the table's heads and
+ * its empty scroller, the empty state and the record drawer. The script
+ * (lib/ledger/places.ts) fetches the pack once, draws the index strip and
+ * the rows in view, and opens the drawer.
+ *
+ *   ?hood=ID  ?use=shop|…  ?cap=15|30|40|75   the filters (the planner's "See all" sets them)
+ *   ?building=ID                              opens that building's record
+ *   ?ledger=ID                                the ledger whose difficulty and courses rank (signed in)
+ *
+ * ⚠ Every word the script draws is in WORDS, as say() strings (data-words).
+ */
 import BaseLayout from "../../layouts/BaseLayout.astro";
 import Head from "../../components/guides/Head.astro";
 import Empty from "../../components/guides/Empty.astro";
 import LedgerBar from "../../components/ledger/LedgerBar.astro";
 import LedgerFoot from "../../components/ledger/LedgerFoot.astro";
-import { account } from "../../lib/account";
+import RecordDrawer from "../../components/ledger/RecordDrawer.astro";
+import { account, asReader } from "../../lib/account";
 import { copy } from "../../lib/copy";
-import { loadGame } from "../../lib/ledger/data";
+import { loadPack } from "../../lib/ledger/data";
+import { dataLine } from "../../lib/ledger/format";
+import { CAPS, USES } from "../../lib/ledger/places";
+import "../../styles/ledger-places.css";
 
 const say = await copy("ledger/places");
 const me = await account(Astro);
-const game = await loadGame();
+const pack = await loadPack();
+const loaded = !!pack;
+const params = Astro.url.searchParams;
+
+type LedgerRow = { id: number; name: string; difficulty: string; custom?: Record<string, unknown> | null; courses: string[] };
+const read = me ? await asReader(Astro, "/api/ledger/ledgers") : null;
+const ledgers: LedgerRow[] = read?.ok && Array.isArray(read.body)
+  ? read.body.map((l: any) => ({ id: l.id, name: l.name, difficulty: l.difficulty, custom: l.custom ?? null, courses: l.courses ?? [] }))
+  : [];
+const asked = Number(params.get("ledger") || 0) || 0;
+const ledger = ledgers.find((l) => l.id === asked) ?? ledgers[0] ?? null;
+
+const USE_NAMES: Record<string, string> = {
+  any: say("use.any", "any"),
+  shop: say("use.shop", "shop"),
+  office: say("use.office", "office"),
+  warehouse: say("use.warehouse", "warehouse"),
+  home: say("use.home", "home"),
+  cinema: say("use.cinema", "cinema"),
+  theatre: say("use.theatre", "theatre"),
+};
+
+const WORDS = {
+  ...Object.fromEntries(Object.entries(USE_NAMES).map(([k, v]) => [`use.${k}`, v])),
+  "use.special": say("use.special", "special"),
+  "things.any": say("things.any", "buildings"),
+  "things.shop": say("things.shop", "shops"),
+  "things.office": say("things.office", "offices"),
+  "things.warehouse": say("things.warehouse", "warehouses"),
+  "things.home": say("things.home", "homes"),
+  "things.cinema": say("things.cinema", "cinemas"),
+  "things.theatre": say("things.theatre", "theatres"),
+  "tile.count": say("tile.count", "{n} {things}"),
+  "tile.accepts": say("tile.accepts", "accepts {x}"),
+  "tile.levels": say("tile.levels", "rent {rent} · ads {ads}"),
+  "level.low": say("level.low", "low"),
+  "level.middling": say("level.middling", "middling"),
+  "level.high": say("level.high", "high"),
+  "class.working": say("class.working", "working"),
+  "class.middle": say("class.middle", "middle"),
+  "class.upper": say("class.upper", "upper"),
+  and: say("and", "and"),
+  "mix.template": say("mix.template", "{classes} class"),
+  "mix.none": say("mix.none", "every class"),
+  count: say("count", "{n} of {of}"),
+  "count.ranked": say("count.ranked", "{n} of {of} · ranked for the plan in hand"),
+  "finder.anyHood": say("finder.anyHood", "any neighbourhood"),
+  "finder.rankFor": say("finder.rankFor", "{type}, as planned"),
+  "finder.rankNone": say("finder.rankNone", "No plan in hand to rank for"),
+  "finder.cannotTrade": say("finder.cannotTrade", "cannot trade"),
+  "finder.read": say("finder.read", "Read"),
+  "row.area": say("row.area", "{n} m²"),
+  "row.capacity": say("row.capacity", "capacity {n}"),
+  "row.traffic": say("row.traffic", "traffic {n}"),
+  "row.rent": say("row.rent", "{x} a day"),
+  "empty.bodyCap": say("empty.bodyCap", "No building in {hood} has a capacity of {cap} an hour. The nearest match is one filter away."),
+  "empty.bodyUse": say("empty.bodyUse", "No {things} in {hood} match. The nearest match is one filter away."),
+};
+
+const STATE = {
+  ctx: ledger ? { difficulty: ledger.difficulty || "normal", courses: ledger.courses, ...(ledger.custom ? { custom: ledger.custom } : {}) }
+    : { difficulty: "normal", courses: [] },
+  building: params.get("building") || null,
+  hood: params.get("hood") || null,
+  use: params.get("use") || null,
+  cap: Number(params.get("cap") || 0) || null,
+};
+const drawerLine = pack?.game ? dataLine(pack.game, { build: say("data.build", "build {build}"), gathered: say("data.gathered", "gathered {date}") }) : "";
+const HEADS: [string, string, string][] = [
+  ["address", say("head.address", "Address"), "left"],
+  ["capacity", say("head.capacity", "Capacity"), "right"],
+  ["traffic", say("head.traffic", "Traffic"), "right"],
+  ["rent", say("head.rent", "Rent a day"), "right"],
+  ["week", say("head.week", "Planned week"), "right"],
+];
 ---
-<BaseLayout title={say("meta.title", "Find a building — the Ledger")} noindex>
-  <div class="page gd-full lg-root">
-    <LedgerBar current="places" signedIn={!!me} />
-    <Head as="h1" eyebrow={say("eyebrow", "Ledger")} title={say("title", "Find a building")} />
-    <Empty n={3} eyebrow={say("empty.eyebrow", "Not built yet")} title={say("empty.title", "The building finder is not built yet.")}
-           body={say("empty.body", "The finder lists every building in the game and ranks each for your plan. It is the next part of the Ledger to be built; until then the planner's Building section ranks them.")}
-           action={say("empty.action", "Plan a business")} href="/ledger/plan"
-           ringAria={say("empty.aria", "Not built yet")} />
-    <LedgerFoot game={game} />
+<BaseLayout title={say("meta.title", "Find a building — the Ledger")}
+            description={say("meta.description", "Every building in Big Ambitions, filtered by neighbourhood, use and capacity, and ranked for the business you are planning.")}>
+  <div class="page gd-full lg-root lp-places" data-places data-loaded={loaded ? "pending" : "no"}
+       data-words={JSON.stringify(WORDS)} data-state={JSON.stringify(STATE)}>
+    <LedgerBar current="places" signedIn={!!me} ledger={ledger ? { id: ledger.id, name: ledger.name } : null} />
+    <Head as="h1" eyebrow={say("eyebrow", "Places")} title={say("title", "Find a building")}>
+      <span class="lg-head-meta lp-count" data-places-count>{loaded ? say("count.start", "— of {of}").replace("{of}", String(pack!.buildings.length)) : ""}</span>
+    </Head>
+
+    {!loaded && (
+      <Empty n={3} eyebrow={say("notloaded.eyebrow", "Not loaded yet")}
+             title={say("notloaded.title", "The game's data is not loaded yet.")}
+             body={say("notloaded.body", "The finder lists every building from the game's own figures, gathered for one version of the game. Until they arrive there is nothing honest to list.")}
+             action={say("notloaded.action", "Back to the Ledger")} href="/ledger"
+             ringAria={say("notloaded.aria", "The game's data is not loaded")} />
+    )}
+
+    {loaded && (
+      <>
+        <section class="lp-strip" aria-labelledby="lp-strip-title">
+          <div class="lp-strip-head">
+            <span class="gd-eyebrow" id="lp-strip-title">{say("strip.title", "The seven neighbourhoods")}</span>
+            <span class="lp-strip-note">{say("strip.note", "an index, not a map · choose one to filter")}</span>
+          </div>
+          <div class="lp-tiles" data-hood-tiles></div>
+        </section>
+
+        <div class="lg-filters lp-filters">
+          <div class="lg-chips">
+            <span class="lg-chip-label">{say("filter.use", "use")}</span>
+            {USES.map((u) => <button type="button" class="lg-chip" data-use={u} aria-pressed={u === "shop" ? "true" : "false"}>{USE_NAMES[u]}</button>)}
+          </div>
+          <div class="lg-chips">
+            <span class="lg-chip-label">{say("filter.capacity", "capacity")}</span>
+            <button type="button" class="lg-chip" data-mono data-cap="" aria-pressed="true">{say("filter.any", "any")}</button>
+            {CAPS.map((c) => <button type="button" class="lg-chip" data-mono data-cap={String(c)} aria-pressed="false">{c}</button>)}
+          </div>
+          <div class="lg-chips">
+            <span class="lg-chip-label">{say("filter.rank", "rank for")}</span>
+            <button type="button" class="lg-chip" data-rank aria-pressed="false" disabled>{say("finder.rankNone", "No plan in hand to rank for")}</button>
+          </div>
+        </div>
+
+        <div data-places-empty hidden>
+          <Empty n={3} eyebrow={say("empty.eyebrow", "No buildings")} title={say("empty.title", "Widen one filter.")}
+                 body={say("empty.bodyCap", "No building in {hood} has a capacity of {cap} an hour. The nearest match is one filter away.")}
+                 ringAria={say("empty.aria", "No building matches")}>
+            <button slot="action" type="button" class="lg-btn" data-variant="secondary" data-size="sm" data-clear-filters>{say("empty.clear", "Clear the filters")}</button>
+          </Empty>
+        </div>
+
+        <div class="lp-table-wrap" data-places-table>
+          <div class="lp-table" role="region" aria-label={say("table.aria", "Buildings")}>
+            <div class="lp-heads lp-grid">
+              {HEADS.map(([key, name, align]) => (
+                <button type="button" class="lp-head" data-sort={key} data-align={align} aria-sort="none">
+                  <span>{name}</span> <span class="lp-caret" data-caret aria-hidden="true"></span>
+                </button>
+              ))}
+              <span></span>
+            </div>
+            <div class="lp-scroll" data-places-scroll tabindex="0" aria-label={say("scroll.aria", "The buildings, as a list you can scroll")}>
+              <div class="lp-inner" data-places-inner></div>
+            </div>
+          </div>
+          <p class="lp-foot-note">{say("foot", "Only the rows in view are drawn, so the whole list stays quick at 390.")}</p>
+        </div>
+      </>
+    )}
+
+    <LedgerFoot game={pack?.game ?? null} />
+    {loaded && <RecordDrawer dataLine={drawerLine} />}
   </div>
 </BaseLayout>
+
+<script>
+  import { mountPlaces } from "../../lib/ledger/places";
+  const root = document.querySelector<HTMLElement>("[data-places]");
+  if (root && root.dataset.loaded !== "no") mountPlaces(root);
+</script>

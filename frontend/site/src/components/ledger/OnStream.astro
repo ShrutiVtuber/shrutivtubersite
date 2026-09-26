@@ -1,0 +1,191 @@
+---
+/* This ledger on stream (design_handoff_ledger_overlays README §6): the mint
+ * form of *This build on stream*, for a ledger. Theme tiles with Ledger
+ * chosen, the element chips (the five plus the two plan-on-stream kinds), the
+ * business on screen, motion as radio cards, Mint, the shown-once field, and
+ * the overlays minted for this ledger, by kind and never by address.
+ *
+ * The script is lib/ledger/onstream.ts (mountOnStream), which also drives
+ * SwitchBar.astro. Every word it draws is in WORDS, via data-words.
+ *
+ * Props: the ledger, its OPEN businesses in the ledger's order (a plan that
+ * was never opened never goes on screen), which one is on screen, the
+ * overlays already minted (GET …/overlays), and what the theme previews show.
+ */
+import Console from "../guides/Console.astro";
+import SaveNote from "./SaveNote.astro";
+import { copy } from "../../lib/copy";
+import { THEMES as PLATE_THEMES } from "../../lib/plate";
+import { tokenRow, type StreamToken } from "../../lib/ledger/onstream";
+
+interface Props {
+  ledger: { id: number; name: string };
+  open: { id: number; name: string }[];
+  onScreen: number | null;
+  tokens: StreamToken[];
+  /** The figure the theme previews carry: the company's latest week, or a dash. */
+  figure: string;
+}
+const { ledger, open, onScreen, tokens, figure } = Astro.props;
+const say = await copy("component:LedgerOnStream");
+
+const KINDS = ["ledger-plate", "ledger-card", "ledger-strip", "ledger-limit", "ledger-counter", "ledger-plan-panel", "ledger-plan-card"];
+const WORDS: Record<string, string> = {
+  "kind.ledger-plate": say("kind.plate", "Ledger plate"),
+  "kind.ledger-card": say("kind.card", "Business card"),
+  "kind.ledger-strip": say("kind.strip", "Company strip"),
+  "kind.ledger-limit": say("kind.limit", "Limit line"),
+  "kind.ledger-counter": say("kind.counter", "Week counter"),
+  "kind.ledger-plan-panel": say("kind.planPanel", "Plan on stream"),
+  "kind.ledger-plan-card": say("kind.planCard", "Plan on stream · card"),
+  "kind.guide-layout": say("kind.layout", "Layout"),
+  "kindNote.ledger-plate": say("kindNote.plate", "The company, its week and every open business, with what limits the one on screen."),
+  "kindNote.ledger-card": say("kindNote.card", "The business on screen alone. Takes the Now card's place in a layout."),
+  "kindNote.ledger-strip": say("kindNote.strip", "One line: the company, the week, and the business on screen."),
+  "kindNote.ledger-limit": say("kindNote.limit", "Only what limits the business on screen. No money at all."),
+  "kindNote.ledger-counter": say("kindNote.counter", "The company's week total as a counter."),
+  "kindNote.ledger-plan-panel": say("kindNote.planPanel", "The plan you are working on, as you change it. Shows nothing until you turn on Plan on stream in the planner."),
+  "kindNote.ledger-plan-card": say("kindNote.planCard", "The plan you are working on, as a card in the Now card's place. Shows nothing until you turn on Plan on stream in the planner."),
+  "theme.ledger": say("theme.ledger", "Ledger"),
+  "theme.almanac": say("theme.almanac", "Almanac"),
+  "theme.grimoire": say("theme.grimoire", "Grimoire"),
+  "theme.plain": say("theme.plain", "Plain"),
+  "motion.full": say("motion.full", "Full"),
+  "motion.reduced": say("motion.reduced", "Reduced"),
+  "motion.still": say("motion.still", "Still"),
+  "motionName.full": say("motionName.full", "Full"),
+  "motionName.reduced": say("motionName.reduced", "Reduced"),
+  "motionName.still": say("motionName.still", "Still"),
+  "row.meta": say("row.meta", "{theme} theme · {motion} · minted {date}"),
+  "summary.theme": say("summary.theme", "{theme} theme"),
+  "summary.on": say("summary.on", "{business} on screen"),
+  revoke: say("revoke", "Revoke"),
+  "revoke.confirm": say("revoke.confirm", "OBS stops showing it at once."),
+  "revoke.yes": say("revoke.yes", "Revoke it"),
+  "revoke.no": say("revoke.no", "Keep it"),
+  copy: say("copy", "Copy"),
+  copied: say("copied", "Copied"),
+  failed: say("failed", "That did not go through. Nothing was minted; try again."),
+  revokeFailed: say("revokeFailed", "That did not go through. The overlay still draws; try again."),
+  "switch.live": say("switch.live", "{kind} · live"),
+  "switch.sent": say("switch.sent", "sent · on stream within a second"),
+};
+const THEME_NOTES: Record<string, string> = {
+  ledger: say("themeNote.ledger", "Big Ambitions · ruled rows"),
+  almanac: say("themeNote.almanac", "the house theme"),
+  grimoire: say("themeNote.grimoire", "Diablo IV"),
+  plain: say("themeNote.plain", "the fallback"),
+};
+const MOTION_RULES: Record<string, string> = {
+  full: say("motionRule.full", "The Done moment plays on goals. Figures change in one frame."),
+  reduced: say("motionRule.reduced", "One frame, and a mono line says what happened for two seconds."),
+  still: say("motionRule.still", "One frame. Nothing is said."),
+};
+const current = onScreen ?? open[0]?.id ?? null;
+const STATE = { ledgerId: ledger.id, open, onScreen, tokens };
+/* A 76px preview of each theme's ground and panel, with this ledger's own name and week. */
+const preview = (id: string) => {
+  const t = PLATE_THEMES[id];
+  const margin = t.margin ? `border-left:4px double ${t.margin};` : t.rule !== "none" ? `border-left:${t.rule};` : "";
+  return { ground: `background:${t.ground}`, panel: `background:${t.panel};border-radius:${Math.min(t.radius, 6)}px;${margin}${t.bottom !== "none" ? `border-bottom:${t.bottom};` : ""}`, ink: t.inkSoft };
+};
+const tiles = ["ledger", "almanac", "grimoire", "plain"];
+---
+<Console as="section" class="lb-stream" id="stream" data-stream data-words={JSON.stringify(WORDS)} data-state={JSON.stringify(STATE)}
+         aria-labelledby="lb-stream-eyebrow">
+  <div class="gd-console-head">
+    <span class="gd-eyebrow" id="lb-stream-eyebrow">{say("eyebrow", "This ledger on stream")}</span>
+    <span class="gd-note">{say("note", "only what you write for chat · never cash, notes or unopened plans")}</span>
+  </div>
+
+  <fieldset class="lb-field">
+    <legend class="lb-label">{say("label.theme", "Theme")}</legend>
+    <div class="lb-themes">
+      {tiles.map((id) => {
+        const p = preview(id);
+        return (
+          <label class="lb-theme">
+            <input class="lb-sr" type="radio" name={`stream-theme-${ledger.id}`} value={id} checked={id === "ledger"} data-theme-pick />
+            <span class="lb-theme-preview" style={p.ground} aria-hidden="true">
+              <span class="lb-theme-panel" style={p.panel}>
+                <span class="lb-theme-co">{ledger.name}</span>
+                <span class="lb-theme-fig" style={`color:${p.ink}`}>{figure}</span>
+              </span>
+            </span>
+            <span class="lb-theme-text">
+              <span class="lb-theme-name">{WORDS[`theme.${id}`]}<span class="lb-chosen">{say("chosen", "Chosen")}</span></span>
+              <span class="lb-theme-note">{THEME_NOTES[id]}</span>
+            </span>
+          </label>
+        );
+      })}
+    </div>
+  </fieldset>
+
+  <div class="lb-field" role="group" aria-labelledby="lb-shows-label">
+    <span class="lb-label" id="lb-shows-label">{say("label.shows", "What it shows")}</span>
+    <div class="lg-chips">
+      {KINDS.map((k) => <button type="button" class="lg-chip" data-kind={k} aria-pressed={String(k === "ledger-plate")}>{WORDS[`kind.${k}`]}</button>)}
+    </div>
+    <p class="lb-hint" data-kind-note>{WORDS["kindNote.ledger-plate"]}</p>
+    <div class="lg-chips" data-edges hidden>
+      <span class="lg-chip-label">{say("label.edge", "edge")}</span>
+      <button type="button" class="lg-chip" data-edge="" aria-pressed="true">{say("edge.bottom", "Bottom")}</button>
+      <button type="button" class="lg-chip" data-edge="top" aria-pressed="false">{say("edge.top", "Top")}</button>
+    </div>
+  </div>
+
+  <div class="lb-field" role="group" aria-labelledby="lb-who-label" data-who>
+    <span class="lb-label" id="lb-who-label">{say("label.who", "The business on screen")}</span>
+    {open.length > 0 ? (
+      <div class="lg-chips">
+        {open.map((b) => (
+          <button type="button" class="lg-chip lb-on-chip" data-on={b.id} aria-pressed={String(b.id === current)}>
+            <span class="lb-on-dot" aria-hidden="true"></span>{b.name}
+          </button>
+        ))}
+      </div>
+    ) : (
+      <p class="lb-hint">{say("who.none", "No business is open yet. A business goes on screen once it opens: write its first week, or open it from its page.")}</p>
+    )}
+    <p class="lb-hint">{say("who.hint", "Open businesses only, in the ledger's order. You can change it mid-stream from the ledger page without minting again.")}</p>
+  </div>
+
+  <fieldset class="lb-field">
+    <legend class="lb-label">{say("label.motion", "Motion")}</legend>
+    <div class="lb-motions">
+      {["full", "reduced", "still"].map((m) => (
+        <label class="lb-motion">
+          <input class="lb-sr" type="radio" name={`stream-motion-${ledger.id}`} value={m} checked={m === "full"} data-motion-pick />
+          <span class="lb-motion-name">{WORDS[`motion.${m}`]}</span>
+          <span class="lb-motion-rule">{MOTION_RULES[m]}</span>
+        </label>
+      ))}
+    </div>
+  </fieldset>
+
+  <div class="lg-actions">
+    <button type="button" class="lg-btn" data-mint>{say("mint", "Mint overlay")}</button>
+    <span class="lb-summary" data-summary aria-live="polite"></span>
+  </div>
+  <SaveNote kind="refusal" hidden data-stream-refusal rows={[{ path: say("refusal.path", "overlay · mint"), text: "" }]} />
+
+  <div class="lb-once" data-once hidden>
+    <span class="gd-eyebrow lb-rose">{say("once.eyebrow", "Minted · shown once")}</span>
+    <div class="lb-once-row">
+      <input class="lb-once-url" type="text" readonly data-once-url aria-label={say("once.aria", "The overlay's address, shown once")} />
+      <button type="button" class="lg-btn" data-variant="secondary" data-copy>{WORDS.copy}</button>
+    </div>
+    <p class="lb-once-text">{say("once.text", "This address is shown once and never again. Paste it into OBS as a browser source at 1920 × 1080. If you lose it, revoke this overlay and mint another.")}</p>
+  </div>
+
+  <div class="lb-minted">
+    <div class="lg-group-head">
+      <span class="gd-eyebrow">{say("minted.eyebrow", "Minted for this ledger")}</span>
+      <span class="lg-count">{say("minted.note", "listed by kind, never by address")}</span>
+    </div>
+    <ul class="lb-tokens" data-tokens set:html={tokens.map((t) => tokenRow(t, WORDS)).join("")}></ul>
+    <p class="lb-hint" data-tokens-none hidden={tokens.length > 0}>{say("minted.none", "None yet. Nothing from this ledger reaches the stream until you mint an overlay.")}</p>
+    <p class="lb-hint">{say("switch.note", "The bar stays at the top of the ledger while any overlay from it is minted. One tap changes the plate, the business card, the strip and the limit line together.")}</p>
+  </div>
+</Console>

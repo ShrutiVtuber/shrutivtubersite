@@ -326,6 +326,7 @@
 
 /* ── empty: no run selected ─────────────────────────────────────────────── */
 .gov-empty { left: 72px; top: 72px; width: 520px; padding: 30px 34px; display: flex; flex-direction: column; gap: 12px; background: var(--gt-panel-dim); border-color: color-mix(in srgb, var(--gt-border) 50%, transparent); }
+.gov-empty[hidden] { display: none; }   /* its display:flex would otherwise beat the attribute, and a drawn layout says "No run selected." */
 .gov-empty .say { font: var(--gt-display-weight) 34px/1.2 var(--gt-display); color: var(--gt-faint); }
 
 /* Motion is the overlay's own setting. Still: nothing moves, ever. Reduced:

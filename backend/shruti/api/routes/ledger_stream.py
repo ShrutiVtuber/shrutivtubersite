@@ -356,6 +356,44 @@ async def revoke_ledger_token(ledger_id: int, token_id: int, request: Request,
     await session.commit()
 
 
+class LedgerLayoutIn(_In):
+    layout: list = Field(default_factory=list)
+    theme: str = ""
+    motion: str = "reduced"
+    label: str = Field(default="", max_length=400)
+
+
+@router.post("/ledgers/{ledger_id}/layouts", status_code=201)
+async def mint_ledger_layout(ledger_id: int, body: LedgerLayoutIn, request: Request,
+                             session: AsyncSession = Depends(get_session)) -> dict:
+    """
+    A layout bound to this ledger, with no run: the gallery's *Big Ambitions ·
+    Ledger* (README §6, "Layouts gallery card"). Every Ledger element in it is
+    pointed at THIS ledger, whatever it named; a goal draws its group; a run's
+    elements have nothing to draw and stay empty. The same fair use as every
+    overlay, never a charge, the token once. It is listed and revoked with
+    this ledger's other overlays, and goes with the ledger.
+    """
+    from shruti.api.routes.overlay_guides import (MOTIONS, THEMES, clean_layout, refuse_a_collision,
+                                                  refuse_if_out_of_allowance)
+    g, user = await _my_ledger(session, request, ledger_id)
+    layout = [{**e, "ledger_id": g.id} if e.get("kind") in ALL_KINDS else e for e in clean_layout(body.layout)]
+    if not any(e.get("kind") in ALL_KINDS for e in layout):
+        raise HTTPException(422, "a ledger's layout holds at least one of the Ledger's elements")
+    refuse_a_collision(layout)
+    await _refuse_if_suspended(session, user)
+    await refuse_if_out_of_allowance(session, user)
+    token = secrets.token_urlsafe(24)
+    theme = body.theme if body.theme in THEMES else GAME_THEMES.get(g.game, "almanac")
+    row = OverlayToken(token=token, kind="guide-layout", label=body.label.strip()[:80] or g.name, user_id=user.id,
+                       ledger_id=g.id, theme=theme, motion=body.motion if body.motion in MOTIONS else "reduced",
+                       layout=layout)
+    session.add(row)
+    await session.commit()
+    await session.refresh(row)
+    return {**_token_view(row), "shows": "", "token": token, "path": f"/overlay/guide-layout?t={token}"}
+
+
 # ── the business on screen ──────────────────────────────────────────────────
 
 class OnScreenIn(_In):

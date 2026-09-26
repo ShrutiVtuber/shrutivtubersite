@@ -1,0 +1,221 @@
+---
+/* A business (handoff README §5, screens 20 and 21; SPEC §1.8, §3.4, §3.5).
+ * The eye lands first on What limits it, then on the weeks chart (the
+ * shape), then on the book (the figures):
+ *
+ *   head      eyebrow, h1, the mono meta line, Open the plan
+ *   limit     What limits it, reckoned from the KEPT plan with the planner's engine
+ *   weeks     the chart: the week as written (solid), the plan's week (dashed);
+ *             a week not written breaks the line, with no marker
+ *   book      desk: the plan column on the inset, closed by the rose margin
+ *             line, then each written week, newest first; phone: week chips
+ *             and one week at a time
+ *   #write    write a week: the draft total, the SAVED note, nothing else
+ *   #stream   This ledger on stream (the same console as the ledger's) and
+ *             the one-tap switch bar
+ *   remove    delete the business, asked once
+ *
+ * Private: signed out goes to sign in; anybody else's business is a 404, and
+ * so is one that is not in the ledger the address names.
+ * The script is lib/ledger/business.ts; every word it draws is in WORDS.
+ */
+import "../../../styles/ledger-book.css";
+import BaseLayout from "../../../layouts/BaseLayout.astro";
+import Console from "../../../components/guides/Console.astro";
+import Button from "../../../components/forms/Button.astro";
+import LedgerBar from "../../../components/ledger/LedgerBar.astro";
+import LedgerFoot from "../../../components/ledger/LedgerFoot.astro";
+import SaveNote from "../../../components/ledger/SaveNote.astro";
+import OnStream from "../../../components/ledger/OnStream.astro";
+import SwitchBar from "../../../components/ledger/SwitchBar.astro";
+import { account, asReader } from "../../../lib/account";
+import { copy } from "../../../lib/copy";
+import { loadPack } from "../../../lib/ledger/data";
+import { LIMIT_SENTENCES, LIMIT_WORDS } from "../../../lib/ledger/limit";
+import { ctxOf, keptView } from "../../../lib/ledger/kept";
+import { BOOK_WORDS, companyWeek, drawBook, drawChart, latestWeek, weekTotal, type WeekRow } from "../../../lib/ledger/book";
+import { fill, money } from "../../../lib/ledger/format";
+import type { StreamToken } from "../../../lib/ledger/onstream";
+
+const ledgerId = Astro.params.id ?? "";
+const businessId = Astro.params.business ?? "";
+if (!/^\d{1,12}$/.test(ledgerId) || !/^\d{1,12}$/.test(businessId)) return Astro.rewrite("/404");
+const me = await account(Astro);
+if (!me) return Astro.redirect(`/signin?next=${encodeURIComponent(`/ledger/${ledgerId}/${businessId}`)}`);
+const [read, tokensRead, pack, say, sayLimit] = await Promise.all([
+  asReader(Astro, `/api/ledger/ledgers/${ledgerId}`),
+  asReader(Astro, `/api/ledger/ledgers/${ledgerId}/overlays`),
+  loadPack(),
+  copy("ledger/[id]/[business]"),
+  copy("component:WhatLimitsIt"),
+]);
+if (!read.ok || !read.body?.id) return Astro.rewrite("/404");
+type Business = { id: number; name: string; plan: unknown; keptPlan: unknown; opened: boolean; weeks: WeekRow[] };
+const book = read.body as { id: number; name: string; difficulty: string; courses: string[]; custom: Record<string, number> | null;
+  onScreenBusinessId: number | null; businesses: Business[] };
+const business = book.businesses.find((b) => String(b.id) === businessId);
+if (!business) return Astro.rewrite("/404");
+const tokens: StreamToken[] = tokensRead.ok && Array.isArray(tokensRead.body) ? tokensRead.body : [];
+
+const limitWords: Record<string, string> = {};
+for (const [k, v] of Object.entries({ ...LIMIT_SENTENCES, ...LIMIT_WORDS })) limitWords[k] = sayLimit(k, v);
+const view = keptView(pack, business, ctxOf(book), limitWords);
+const open = book.businesses.filter((b) => b.opened).map((b) => ({ id: b.id, name: b.name }));
+const planned = view.lines.total;
+
+/* The book's and the chart's words, each through say(). */
+const BW: Record<string, string> = {
+  "line.moneyIn": say("line.moneyIn", "Money in"), "line.goods": say("line.goods", "Goods"), "line.wages": say("line.wages", "Wages"),
+  "line.rent": say("line.rent", "Rent"), "line.ads": say("line.ads", "Advertising"), "line.deliveries": say("line.deliveries", "Deliveries"),
+  "line.units": say("line.units", "Units"), "line.customers": say("line.customers", "Customers"),
+  "book.line": say("book.line", "Line"), "book.plan": say("book.plan", "The plan"), "book.week": say("book.week", "The week"),
+  "book.against": say("book.against", "Against the plan"), "book.col": say("book.col", "Week {n}"), "book.chip": say("book.chip", "Week {n}"),
+  "book.planBeneath": say("book.planBeneath", "plan beneath"), "book.planOf": say("book.planOf", "plan {x}"),
+  "book.aria": say("book.aria", "Each written week against the plan"),
+  "chart.week": say("chart.week", "wk {n}"), "chart.aria": say("chart.aria", "The week as written, week by week, against the plan's week of {plan}"),
+  "chart.ariaNoPlan": say("chart.ariaNoPlan", "The week as written, week by week"), "chart.dot": say("chart.dot", "Week {n}: {x}"),
+  loss: say("loss", "loss"),
+  saved: say("saved", "Week {n}: {total}."), savedLoss: say("savedLoss", "Week {n}: {total}, a loss."),
+  savedAgainst: say("savedAgainst", "Week {n}: {total}. {diff} {caret} against the plan."),
+  savedAgainstLoss: say("savedAgainstLoss", "Week {n}: {total}, a loss. {diff} {caret} against the plan."),
+};
+for (const k of Object.keys(BOOK_WORDS)) if (!(k in BW)) BW[k] = BOOK_WORDS[k];
+
+const points = business.weeks.map((w) => ({ n: w.n, v: weekTotal(w) }));
+const chart = drawChart(points, planned, BW);
+const bookHtml = drawBook(business.weeks, view.lines, BW);
+const nextN = Math.max((latestWeek(business.weeks)?.n ?? 0), (companyWeek(book.businesses)?.n ?? 0)) + 1;
+
+const kind = [view.typeName, view.address, view.neighbourhood,
+  planned != null ? fill(say("meta.planned", "planned week {x}"), { x: money(planned) }) : ""].filter(Boolean).join(" · ");
+const planHref = `/ledger/plan?business=${business.id}&ledger=${book.id}`;
+
+const FIELDS = [
+  ["n", say("write.week", "Week")], ["moneyIn", BW["line.moneyIn"]], ["goods", BW["line.goods"]], ["wages", BW["line.wages"]],
+  ["rent", BW["line.rent"]], ["ads", BW["line.ads"]], ["deliveries", BW["line.deliveries"]],
+  ["units", say("write.units", "Units · optional")], ["customers", say("write.customers", "Customers · optional")],
+] as const;
+
+const WORDS = {
+  ...BW,
+  "draft.some": say("draft.some", "The week: {x} · counts only the lines written"),
+  "draft.none": say("draft.none", "The week: — (money in is the one line it needs)"),
+  "refuse.moneyPath": say("refuse.moneyPath", "week · money in"),
+  "refuse.money": say("refuse.money", "A week needs its money in. The other lines can wait."),
+  "refuse.weekPath": say("refuse.weekPath", "week · number"),
+  "refuse.week": say("refuse.week", "A week is a whole number from 1, as the game counts them."),
+  "refuse.linePath": say("refuse.linePath", "week · {line}"),
+  "refuse.figure": say("refuse.figure", "Not a figure. Write it as the game shows it, like 1,370 or −400."),
+  "refuse.countPath": say("refuse.countPath", "week · {line}"),
+  "refuse.count": say("refuse.count", "A count is a whole number, 0 or more."),
+  "refuse.failed": say("refuse.failed", "That did not save. Nothing was written; try again."),
+  "saved.path": say("saved.path", "week {n}"),
+  "eyebrow.opened": say("eyebrow.opened", "A business · opened"),
+  "remove.failed": say("remove.failed", "That did not go through. The business is still here; try again."),
+  "remove.path": say("remove.path", "business · delete"),
+};
+const STATE = { ledgerId: book.id, businessId: business.id, opened: business.opened, planned, lines: view.lines, weeks: business.weeks };
+---
+<BaseLayout title={fill(say("meta.title", "{name} — {ledger} — the Ledger"), { name: business.name, ledger: book.name })}
+            description={say("meta.description", "A business in a ledger: its weeks, as written, beside its plan.")} noindex>
+  <div class="page gd-full lg-root lb-business" data-business-page data-words={JSON.stringify(WORDS)} data-state={JSON.stringify(STATE)}>
+    <LedgerBar current="business" signedIn ledger={{ id: book.id, name: book.name }} business={{ id: business.id, name: business.name }} planHref={planHref} />
+    <SwitchBar ledgerId={book.id} open={open} onScreen={book.onScreenBusinessId} tokens={tokens} />
+
+    <header class="lb-head">
+      <div class="lb-head-text">
+        <span class="gd-eyebrow" data-business-eyebrow>{business.opened ? WORDS["eyebrow.opened"] : say("eyebrow.planned", "A business · not opened yet")}</span>
+        <h1>{business.name}</h1>
+        <span class="lb-meta">{kind || say("meta.none", "no type or building in its plan yet")}</span>
+      </div>
+      <Button variant="secondary" href={planHref}>{say("plan", "Open the plan")}</Button>
+    </header>
+
+    <Console as="section" class="lg-limit" data-state={view.limit?.state ?? "unknown"} aria-labelledby="lb-limit-eyebrow">
+      <div class="gd-console-head">
+        <span class="gd-eyebrow" id="lb-limit-eyebrow">{say("limit.eyebrow", "What limits it")}</span>
+        <span class="gd-note">{view.note}</span>
+      </div>
+      <p class="lg-limit-text" aria-live="polite">{view.sentence}</p>
+    </Console>
+
+    <section class="lb-section" aria-labelledby="lb-weeks-title">
+      <div class="lb-section-head">
+        <h2 class="lb-h2" id="lb-weeks-title">{say("weeks.title", "The weeks")}</h2>
+        <span class="lb-legend">
+          <span><span class="lb-legend-line" aria-hidden="true"></span>{say("weeks.written", "the week, as written")}</span>
+          <span><span class="lb-legend-line" data-kind="plan" aria-hidden="true"></span>{say("weeks.plan", "the plan's week")}</span>
+        </span>
+      </div>
+      <div class="lb-chart" data-chart hidden={!chart} set:html={chart}></div>
+      <p class="lb-hint" data-chart-none hidden={!!chart}>{say("weeks.none", "The chart draws itself from the weeks written below, beside the plan's week.")}</p>
+    </section>
+
+    <section class="lb-section lb-book" aria-labelledby="lb-book-title">
+      <div class="lb-section-head">
+        <h2 class="lb-h2" id="lb-book-title">{say("book.title", "The book")}</h2>
+        <span class="gd-note">{say("book.note", "newest first · the plan's week beside it")}</span>
+      </div>
+      <div data-book set:html={bookHtml}></div>
+    </section>
+
+    <Console as="section" id="write" class="lb-write" aria-labelledby="lb-write-eyebrow">
+      <div class="gd-console-head">
+        <span class="gd-eyebrow" id="lb-write-eyebrow">{say("write.eyebrow", "Write a week")}</span>
+        <span class="gd-note">{say("write.note", "from the game's own screens · blank lines stay unwritten")}</span>
+      </div>
+      <div class="lb-write-fields" data-write>
+        {FIELDS.map(([key, label]) => (
+          <label>
+            <span class="lb-form-label">{label}</span>
+            <input class="lg-input" type="text" inputmode={key === "n" ? "numeric" : "decimal"} autocomplete="off" placeholder="—"
+                   data-field={key} value={key === "n" ? String(nextN) : ""} />
+          </label>
+        ))}
+      </div>
+      <label class="lb-form-field">
+        <span class="lb-form-label">{say("write.noteLabel", "Note")}</span>
+        <input class="lg-text" type="text" maxlength="500" autocomplete="off" data-field="note"
+               placeholder={say("write.notePlaceholder", "Only you see this. It never reaches a plate.")} />
+      </label>
+      <div class="lg-actions">
+        <button type="button" class="lg-btn" data-write-save>{say("write.save", "Write the week")}</button>
+        <span class="lb-draft" data-draft aria-live="polite">{WORDS["draft.none"]}</span>
+      </div>
+      {!business.opened && (
+        <p class="lb-hint">{say("write.opens", "It is not opened yet. Writing its first week marks it opened: then it counts in the company's week and can go on stream.")}</p>
+      )}
+      <SaveNote kind="saved" hidden data-write-saved />
+      <SaveNote kind="refusal" hidden data-write-refusal />
+    </Console>
+
+    <OnStream ledger={{ id: book.id, name: book.name }} open={open} onScreen={book.onScreenBusinessId} tokens={tokens}
+              figure={money(companyWeek(book.businesses)?.total ?? null)} />
+
+    <Console as="section" class="lb-quiet" aria-labelledby="lb-remove-eyebrow" data-remove>
+      <div class="gd-console-head">
+        <span class="gd-eyebrow" id="lb-remove-eyebrow">{say("remove.eyebrow", "This business")}</span>
+        <span class="gd-note">{say("remove.note", "deleting it, asked once")}</span>
+      </div>
+      <div class="lb-confirm">
+        <button type="button" class="lg-link" data-delete>{say("remove.delete", "Delete this business")}</button>
+        <span class="lb-confirm" data-delete-confirm hidden>
+          <span>{say("remove.confirm", "Its plan and every week written go with it. The ledger stays.")}</span>
+          <button type="button" class="lg-btn" data-variant="secondary" data-size="sm" data-delete-yes>{say("remove.yes", "Delete it")}</button>
+          <button type="button" class="lg-link" data-delete-no>{say("remove.no", "Keep it")}</button>
+        </span>
+      </div>
+      <SaveNote kind="refusal" hidden data-remove-refusal />
+    </Console>
+
+    <LedgerFoot game={pack?.game ?? null} />
+  </div>
+</BaseLayout>
+
+<script>
+  import { mountBusiness } from "../../../lib/ledger/business";
+  import { mountOnStream } from "../../../lib/ledger/onstream";
+  const root = document.querySelector<HTMLElement>("[data-business-page]");
+  if (root) mountBusiness(root);
+  mountOnStream(document);
+</script>

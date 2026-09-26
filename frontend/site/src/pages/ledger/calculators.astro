@@ -1,29 +1,199 @@
 ---
-/* /ledger/calculators — ⚠ a holding page, so the Ledger's own tabs lead somewhere
- * honest. The real page is a later build (handoff README §8). It says
- * what will be here and sends a person to the planner; it shows nothing it
- * does not have. Not in the sitemap, and kept out of search until it is built. */
+/* /ledger/calculators — three questions, one console each (handoff README §8).
+ * Works signed out. The server draws the consoles with their fixed words;
+ * lib/ledger/calculators.ts fetches the pack and answers with the engine.
+ *
+ *   #stair  What price · the staircase
+ *   #camp   Which campaigns   (the game's six campaigns, all 63 mixes)
+ *   #rob    Rent or buy
+ *
+ *   ?building=ID   the building #camp and #rob start on (the record drawer's link)
+ *   ?type=ID       the business type #stair starts on
+ *
+ * ⚠ Every word the script draws is in WORDS, as say() strings (data-words).
+ */
 import BaseLayout from "../../layouts/BaseLayout.astro";
 import Head from "../../components/guides/Head.astro";
+import Console from "../../components/guides/Console.astro";
 import Empty from "../../components/guides/Empty.astro";
 import LedgerBar from "../../components/ledger/LedgerBar.astro";
 import LedgerFoot from "../../components/ledger/LedgerFoot.astro";
-import { account } from "../../lib/account";
+import { account, asReader } from "../../lib/account";
 import { copy } from "../../lib/copy";
-import { loadGame } from "../../lib/ledger/data";
+import { loadPack } from "../../lib/ledger/data";
+import { STAIR_WORDS } from "../../lib/ledger/stair";
+import "../../styles/ledger-places.css";
 
 const say = await copy("ledger/calculators");
 const me = await account(Astro);
-const game = await loadGame();
+const pack = await loadPack();
+const loaded = !!pack;
+const params = Astro.url.searchParams;
+
+type LedgerRow = { id: number; name: string; difficulty: string; custom?: Record<string, unknown> | null; courses: string[] };
+const read = me ? await asReader(Astro, "/api/ledger/ledgers") : null;
+const ledgers: LedgerRow[] = read?.ok && Array.isArray(read.body)
+  ? read.body.map((l: any) => ({ id: l.id, name: l.name, difficulty: l.difficulty, custom: l.custom ?? null, courses: l.courses ?? [] }))
+  : [];
+const asked = Number(params.get("ledger") || 0) || 0;
+const ledger = ledgers.find((l) => l.id === asked) ?? ledgers[0] ?? null;
+
+const WORDS = {
+  // the staircase (lib/ledger/stair.ts)
+  ...Object.fromEntries(Object.entries(STAIR_WORDS).map(([k, v]) => [k, say(`stair.${k}`, v)])),
+  "stair.note": say("stair.note", "{hood} accepts {x} of market"),
+  "best.head": say("best.head", "{type} · product"),
+  "best.footPlan": say("best.footPlan", "Reckoned at the plan's {n} customers a week. Pricing under the market gains nothing."),
+  "best.footNone": say("best.footNone", "Its week needs a plan's customers: plan a {type} in {hood} and it shows here. Pricing under the market gains nothing."),
+  "building.option": say("building.option", "{address} · {use} · {n} m²"),
+  "use.shop": say("use.shop", "shop"),
+  "use.office": say("use.office", "office"),
+  "use.warehouse": say("use.warehouse", "warehouse"),
+  "use.home": say("use.home", "home"),
+  "use.cinema": say("use.cinema", "cinema"),
+  "use.theatre": say("use.theatre", "theatre"),
+  "use.special": say("use.special", "special"),
+  "camp.note": say("camp.note", "advertising works {x} in {hood}"),
+  "camp.targetValue": say("camp.targetValue", "+{n} %"),
+  "camp.reaches": say("camp.reaches", "+{n} % promotion"),
+  "camp.perDay": say("camp.perDay", "{x} a day"),
+  "camp.perWeek": say("camp.perWeek", "{x} a week"),
+  "camp.unreachable": say("camp.unreachable", "No mix reaches +{t} % at {address}. The most any mix reaches there is +{max} %, for {cost} a day; lower the target or advertise where it works better."),
+  "rob.note": say("rob.note", "rent a day × {days} · against the price"),
+  "rob.yearsValue": say("rob.yearsValue", "{n} game years"),
+  "rob.rentYear": say("rob.rentYear", "Rent a game year"),
+  "rob.rentOver": say("rob.rentOver", "Rent over {y} game years"),
+  "rob.price": say("rob.price", "Price to buy"),
+  "rob.equals": say("rob.equals", "Game years of rent the price equals"),
+  "rob.equalsValue": say("rob.equalsValue", "{n} years"),
+  "rob.rent": say("rob.rent", "Rent. Over {y} game years rent comes to {x}; buying costs {d} more than that, and only pays back after {n} game years."),
+  "rob.buy": say("rob.buy", "Buy. Over {y} game years renting would cost {d} more than the price."),
+  "rob.notForRent": say("rob.notForRent", "This building is not for rent or sale."),
+};
+
+const STATE = {
+  ctx: ledger ? { difficulty: ledger.difficulty || "normal", courses: ledger.courses, ...(ledger.custom ? { custom: ledger.custom } : {}) }
+    : { difficulty: "normal", courses: [] },
+  building: params.get("building") || null,
+  type: params.get("type") || null,
+};
+const meta = pack?.game
+  ? say("head.meta", "no ledger needed · {name} {version} · build {build}").replace("{name}", pack.game.name).replace("{version}", pack.game.version).replace("{build}", pack.game.build)
+  : "";
+const EVENTS: [string, string][] = [
+  ["monopoly", say("event.monopoly", "Monopoly")],
+  ["hype", say("event.hype", "Hype")],
+  ["shortage", say("event.shortage", "Shortage")],
+  ["backorder", say("event.backorder", "Backorder")],
+];
 ---
-<BaseLayout title={say("meta.title", "Calculators — the Ledger")} noindex>
-  <div class="page gd-full lg-root">
-    <LedgerBar current="calculators" signedIn={!!me} />
-    <Head as="h1" eyebrow={say("eyebrow", "Ledger")} title={say("title", "Calculators")} />
-    <Empty n={3} eyebrow={say("empty.eyebrow", "Not built yet")} title={say("empty.title", "The calculators are not built yet.")}
-           body={say("empty.body", "The price staircase, which campaigns reach a target, and rent or buy. They are the next part of the Ledger to be built; the planner already draws the staircase for each product.")}
-           action={say("empty.action", "Plan a business")} href="/ledger/plan"
-           ringAria={say("empty.aria", "Not built yet")} />
-    <LedgerFoot game={game} />
+<BaseLayout title={say("meta.title", "Calculators — the Ledger")}
+            description={say("meta.description", "Three Big Ambitions questions, answered from the game's own figures: what price to ask, which campaigns reach a promotion target cheapest, and whether to rent or buy.")}>
+  <div class="page gd-full lg-root lc-calc" data-calculators data-loaded={loaded ? "pending" : "no"}
+       data-words={JSON.stringify(WORDS)} data-state={JSON.stringify(STATE)}>
+    <LedgerBar current="calculators" signedIn={!!me} ledger={ledger ? { id: ledger.id, name: ledger.name } : null} />
+    <Head as="h1" eyebrow={say("eyebrow", "Calculators")} title={say("title", "One question each")}>
+      {meta && <span class="lg-head-meta">{meta}</span>}
+    </Head>
+
+    {!loaded && (
+      <Empty n={3} eyebrow={say("notloaded.eyebrow", "Not loaded yet")}
+             title={say("notloaded.title", "The game's data is not loaded yet.")}
+             body={say("notloaded.body", "The calculators answer from the game's own figures, gathered for one version of the game. Until they arrive there is nothing honest to work out.")}
+             action={say("notloaded.action", "Back to the Ledger")} href="/ledger"
+             ringAria={say("notloaded.aria", "The game's data is not loaded")} />
+    )}
+
+    {loaded && (
+      <div class="lc-consoles">
+        <Console as="section" id="stair" class="lc-console" aria-labelledby="lc-stair">
+          <div class="gd-console-head"><span class="gd-eyebrow" id="lc-stair">{say("stair.title", "What price · the staircase")}</span><span class="gd-note" data-stair-note></span></div>
+          <div class="lg-filters">
+            <label class="lg-chips">
+              <span class="lg-chip-label">{say("stair.for", "business")}</span>
+              <select class="lg-text lc-select" data-stair-type></select>
+            </label>
+            <div class="lg-chips"><span class="lg-chip-label">{say("stair.product", "product")}</span><span class="lc-chip-run" data-stair-products></span></div>
+            <div class="lg-chips lc-scroll-chips"><span class="lg-chip-label">{say("stair.hood", "neighbourhood")}</span><span class="lc-chip-run" data-stair-hoods></span></div>
+            <div class="lg-chips">
+              <span class="lg-chip-label">{say("stair.event", "market event")}</span>
+              {EVENTS.map(([id, name]) => <button type="button" class="lg-chip" data-stair-event={id} aria-pressed="false">{name}</button>)}
+            </div>
+          </div>
+          <div data-stair-plot></div>
+          <div class="lc-best">
+            <span class="lc-th" data-best-head></span>
+            <span class="lc-th lg-num">{say("best.price", "Best price")}</span>
+            <span class="lc-th lg-num">{say("best.week", "Its week")}</span>
+            <div class="lc-best-rows" data-best></div>
+          </div>
+          <p class="lc-foot" data-best-foot></p>
+        </Console>
+
+        <Console as="section" id="camp" class="lc-console" aria-labelledby="lc-camp">
+          <div class="gd-console-head"><span class="gd-eyebrow" id="lc-camp">{say("camp.title", "Which campaigns")}</span><span class="gd-note" data-camp-note></span></div>
+          <div class="lg-filters">
+            <div class="lc-stepper-row">
+              <span class="lc-label">{say("camp.target", "Promotion to reach")}</span>
+              <span class="lg-stepper">
+                <button type="button" class="lg-step" data-camp-dec aria-label={say("camp.less", "Less promotion")}>−</button>
+                <span class="lg-step-value lc-step-wide" data-camp-target aria-live="polite">{say("camp.targetStart", "+20 %")}</span>
+                <button type="button" class="lg-step" data-camp-inc aria-label={say("camp.more", "More promotion")}>+</button>
+              </span>
+            </div>
+            <div class="lg-chips lc-scroll-chips"><span class="lg-chip-label">{say("camp.hood", "neighbourhood")}</span><span class="lc-chip-run" data-camp-hoods></span></div>
+            <label class="lg-chips">
+              <span class="lg-chip-label">{say("camp.building", "building")}</span>
+              <select class="lg-text lc-select" data-camp-building></select>
+            </label>
+          </div>
+          <div class="lc-result" data-camp-found hidden>
+            <div class="lg-almanac">
+              <div class="lg-group-head"><span class="gd-eyebrow">{say("camp.mix", "The cheapest mix")}</span><span class="lg-count" data-camp-reach></span></div>
+              <div data-camp-rows></div>
+              <div class="lg-total"><span>{say("camp.cost", "Cost")}</span><span class="lg-val" data-camp-cost></span></div>
+              <span class="lc-week" data-camp-week></span>
+            </div>
+            <div class="lg-actions"><a class="lg-btn" data-variant="secondary" href="/ledger/plan?section=campaigns" data-camp-use>{say("camp.use", "Use this mix in the plan")}</a></div>
+          </div>
+          <div class="lg-note-rows lc-refusal" data-camp-none hidden>
+            <span class="lg-note-path">{say("camp.refusalPath", "campaigns · target")}</span>
+            <span class="lg-note-text" data-camp-refusal></span>
+          </div>
+        </Console>
+
+        <Console as="section" id="rob" class="lc-console" aria-labelledby="lc-rob">
+          <div class="gd-console-head"><span class="gd-eyebrow" id="lc-rob">{say("rob.title", "Rent or buy")}</span><span class="gd-note" data-rob-note></span></div>
+          <div class="lg-filters">
+            <div class="lg-chips lc-scroll-chips"><span class="lg-chip-label">{say("rob.hood", "neighbourhood")}</span><span class="lc-chip-run" data-rob-hoods></span></div>
+            <label class="lg-chips">
+              <span class="lg-chip-label">{say("rob.building", "building")}</span>
+              <select class="lg-text lc-select" data-rob-building></select>
+            </label>
+            <div class="lc-stepper-row">
+              <span class="lc-label">{say("rob.years", "How long you will play")}</span>
+              <span class="lg-stepper">
+                <button type="button" class="lg-step" data-rob-dec aria-label={say("rob.less", "Fewer years")}>−</button>
+                <span class="lg-step-value lc-step-wide" data-rob-years aria-live="polite">{say("rob.yearsStart", "5 game years")}</span>
+                <button type="button" class="lg-step" data-rob-inc aria-label={say("rob.more", "More years")}>+</button>
+              </span>
+            </div>
+          </div>
+          <div class="lc-result">
+            <div class="lg-almanac" data-rob-lines></div>
+            <p class="lc-verdict" data-rob-verdict></p>
+            <p class="lc-foot">{say("rob.notCounted", "Not counted†: rent from tenants in the rest of the building, and property tax.")}</p>
+          </div>
+        </Console>
+      </div>
+    )}
+
+    <LedgerFoot game={pack?.game ?? null} />
   </div>
 </BaseLayout>
+
+<script>
+  import { mountCalculators } from "../../lib/ledger/calculators";
+  const root = document.querySelector<HTMLElement>("[data-calculators]");
+  if (root && root.dataset.loaded !== "no") mountCalculators(root);
+</script>
