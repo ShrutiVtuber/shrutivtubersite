@@ -232,6 +232,22 @@ async def course_units(request: Request, preview: bool = False, session: AsyncSe
     return {"items": await units_json(session, preview)}
 
 
+@router.get("/course/lessons")
+async def course_lessons(raga: str | None = None, tala: str | None = None, recording: str | None = None,
+                         session: AsyncSession = Depends(get_session)) -> dict:
+    """Published lessons that discuss a raga or tala, or recommend a recording (a raga page's Lessons tab)."""
+    out = []
+    for l in await _published(session, False):
+        if l.lang != "en":
+            continue
+        f = l.front or {}
+        recs = [(r.get("id") if isinstance(r, dict) else r) for r in (f.get("recordings") or [])]
+        if (raga and raga in (f.get("ragas") or [])) or (tala and tala in (f.get("talas") or [])) or (recording and recording in recs):
+            out.append({"id": l.id, "slug": l.slug, "title": f.get("title", ""), "unit": l.unit, "order": l.order,
+                        "minutes": f.get("minutes", 0)})
+    return {"items": sorted(out, key=lambda x: (x["unit"], x["order"]))}
+
+
 @router.get("/course/lessons/{key}")
 async def course_lesson(key: str, request: Request, lang: str = "en", preview: bool = False,
                         session: AsyncSession = Depends(get_session)) -> dict:
@@ -641,7 +657,12 @@ async def guess(body: GuessIn, viewer: User | None = Depends(current_user),
     lessons = (await session.execute(select(CarnaticLesson.id, CarnaticLesson.front).where(
         CarnaticLesson.status == "published"))).all()
     linked = [lid for lid, f in lessons if r.raga in ((f or {}).get("ragas") or [])]
-    return {"right": right, "raga": r.raga, "ragaName": _raga_name(r.raga), "composition": r.composition,
+    # A close miss: the guess is the other raga of a confusable set with this one (EAR_TRAINING.md §4).
+    guessed = next((x for c in drills.CONFUSABLE for x in c["ragas"] if _raga_matches(body.guess, x)), None)
+    pair = None if right or guessed is None else next(
+        (c for c in drills.CONFUSABLE if r.raga in c["ragas"] and guessed in c["ragas"]), None)
+    return {"right": right, "close": pair is not None, "pair": pair and {"set": pair["set"], "differ": pair["differ"],
+            "guessName": _raga_name(guessed)}, "raga": r.raga, "ragaName": _raga_name(r.raga), "composition": r.composition,
             "composer": r.composer, "artists": r.artists, "listenFor": r.listen_for, "lessons": linked,
             "recording": recording_json(r)}
 

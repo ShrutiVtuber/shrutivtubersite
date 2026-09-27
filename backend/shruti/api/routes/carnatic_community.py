@@ -66,13 +66,29 @@ async def _exercise(session: AsyncSession, work: PracticeWork) -> dict | None:
 
 
 async def _rubric_questions(session: AsyncSession, work: PracticeWork) -> list[dict]:
-    if work.room == "carnatic-analysis":
-        return ANALYSIS_RUBRIC
     ex = await _exercise(session, work) or {}
-    return [q for q in (ex.get("rubric") or []) if isinstance(q, dict)]
+    own = [q for q in (ex.get("rubric") or []) if isinstance(q, dict)]
+    if work.room == "carnatic-analysis" and not own:
+        return ANALYSIS_RUBRIC
+    # Format 2 quotes the scale words; a YAML 1.1 reader could still hand us booleans.
+    return [{**q, "scale": [("yes" if w is True else "no" if w is False else w) for w in q["scale"]]} if q.get("scale") else q
+            for q in own]
+
+
+def _sentences(text: str) -> list[str]:
+    import re
+    return [x.strip() for x in re.split(r"(?<=[.!?])\s+", text or "") if x.strip()]
 
 
 def _part_label(key: str, parts: dict[str, PracticePart]) -> str:
+    if "@" in key:
+        # A reply to one sentence of a part: "text@2" is the text's third sentence.
+        base, _, n = key.partition("@")
+        sent = _sentences(parts[base].body_md if base in parts else "")
+        i = int(n) if n.isdigit() else -1
+        if 0 <= i < len(sent):
+            return f"on “{sent[i][:40]}{'…' if len(sent[i]) > 40 else ''}”"
+        key = base
     p = parts.get(key)
     if key.startswith("note:") and p is not None:
         t = (p.data or {}).get("t")
@@ -105,7 +121,8 @@ def _private_feedback(work: PracticeWork, parts: list[PracticePart], rec: Carnat
     if guess is not None and rec is not None and rec.raga:
         from shruti.api.routes.carnatic_course import _raga_matches
         out["guessRight"] = _raga_matches(str((guess.data or {}).get("raga", "")), rec.raga)
-    if ex and ex.get("compare") or (ex or {}).get("compare_with"):
+    pc = (ex or {}).get("private_check") or {}
+    if pc.get("against") == "transcription":
         out["compare"] = "Shruti hasn't made a reference transcription for this one yet."
     return out or None
 
@@ -147,9 +164,11 @@ async def work_json(session: AsyncSession, work: PracticeWork, viewer: User | No
     out["rubric"] = {"questions": questions, "totals": totals, "freeAnswers": free, "mine": mine_answers,
                      "answered": len(answers)}
     rec = None
-    if work.subject.startswith("recording:"):
-        rec = await session.get(CarnaticRecording, work.subject[10:])
     ex = await _exercise(session, work)
+    rid = work.subject[10:] if work.subject.startswith("recording:") else \
+        next((str(r.get("id")) for r in ((ex or {}).get("recordings") or []) if isinstance(r, dict)), None)
+    if rid:
+        rec = await session.get(CarnaticRecording, rid)
     out["private"] = _private_feedback(work, parts, rec, ex) if mine else None
     return out
 
@@ -229,6 +248,12 @@ async def _check_subject(session: AsyncSession, room: str, subject: str) -> None
         if not subject.startswith("exercise:") or ex is None or ex.kind != "practice":
             raise HTTPException(422, "That isn't a practice piece.")
     elif room == "carnatic-analysis":
+        if subject.startswith("exercise:"):
+            # A lesson's listening analysis (kind: listening), about its `recordings`.
+            ex = await session.get(CarnaticExercise, subject.removeprefix("exercise:"))
+            if ex is None or ex.kind != "listening":
+                raise HTTPException(422, "That isn't a listening analysis.")
+            return
         rec = await session.get(CarnaticRecording, subject.removeprefix("recording:"))
         if not subject.startswith("recording:") or rec is None or rec.status not in ("approved", "retired"):
             raise HTTPException(422, "That recording isn't in the Listening room.")
@@ -446,8 +471,9 @@ async def comment(work_id: int, body: CommentIn, user: User = Depends(require_us
     if w.user_id and w.user_id != user.id and await _blocked_by(session, author_id=w.user_id, speaker_id=user.id):
         raise HTTPException(403, "You can't reply to this piece.")
     part = body.part or ""
-    if part and (await session.execute(select(PracticePart.id).where(
-            PracticePart.work_id == w.id, PracticePart.key == part))).first() is None:
+    base, _, n = part.partition("@")
+    if part and ((n and not n.isdigit()) or (await session.execute(select(PracticePart.id).where(
+            PracticePart.work_id == w.id, PracticePart.key == base))).first() is None):
         raise HTTPException(422, "That part isn't in this piece.")
     c = PracticeComment(work_id=w.id, user_id=user.id, sign=part, body_md=body.body.strip())
     session.add(c)

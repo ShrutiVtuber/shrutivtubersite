@@ -1,0 +1,115 @@
+---
+/* The Listening room (LISTENING.md; artboard R1): the reference recordings
+ * Shruti approved, by raga and by form, each loading only when pressed; guess
+ * the raga; tap along with a beat map; the latest analyses; and suggesting
+ * a recording. Members' own performances are in the concert hall.
+ */
+import SwaraLayout from "../../../layouts/SwaraLayout.astro";
+import Hero from "../../../components/carnatic/Hero.astro";
+import Chip from "../../../components/carnatic/Chip.astro";
+import RecordingCard from "../../../components/carnatic/RecordingCard.astro";
+import { hrefIn, langOf } from "../../../lib/carnatic/i18n";
+import { visitor } from "../../../lib/carnatic/prefs";
+import { copy } from "../../../lib/copy";
+import { ago, recordings, works } from "../../../lib/carnatic/course";
+import { ragas as loadRagas, talas as loadTalas } from "../../../lib/carnatic/data";
+
+const lang = langOf(Astro);
+const say = await copy("carnatic/listen");
+const L = (p: string) => hrefIn(lang, p);
+const { me } = await visitor(Astro);
+const raga = Astro.url.searchParams.get("raga") ?? "";
+const form = Astro.url.searchParams.get("form") ?? "";
+const tapMode = Astro.url.searchParams.has("tap");
+const [all, rd, td, recent] = await Promise.all([recordings(), loadRagas(), loadTalas(), works(Astro, "carnatic-analysis")]);
+const live = all.filter((r) => r.status === "approved");
+const shown = live.filter((r) => (!raga || r.raga === raga) && (!form || r.form === form) && (!tapMode || r.beatMap));
+const ragaNames = new Map<string, string>([...(rd?.janyas ?? []), ...(rd?.performed ?? []), ...(rd?.melakartas ?? [])].map((x: any) => [x.id, x.name]));
+const talaName = (id: string) => (td?.practical ?? []).find((t: any) => t.id === id)?.name ?? (id ? id.replace(/_/g, " ") : "");
+const ragaChips = [...new Set(live.map((r) => r.raga).filter(Boolean))].sort((a, b) => (ragaNames.get(a) ?? a).localeCompare(ragaNames.get(b) ?? b));
+const formChips = [...new Set(live.map((r) => r.form).filter(Boolean))].sort();
+const recName = new Map(live.map((r) => [r.id, r.composition || r.title]));
+const filtered = Boolean(raga || form || tapMode);
+const groups = [
+  ...ragaChips.map((id) => ({ id, name: ragaNames.get(id) ?? id, href: `/carnatic/listen?raga=${id}` })),
+  ...formChips.filter((f) => live.some((r) => r.form === f && !r.raga)).map((f) => ({ id: `form:${f}`, name: f[0].toUpperCase() + f.slice(1), href: `/carnatic/listen?form=${f}` })),
+].map((g) => {
+  const rs = live.filter((r) => (g.id.startsWith("form:") ? !r.raga && r.form === g.id.slice(5) : r.raga === g.id));
+  return { ...g, href: L(g.href), n: rs.length, forms: [...new Set(rs.map((r) => r.form).filter(Boolean))], analyses: rs.reduce((a, r) => a + (r.analyses || 0), 0) };
+});
+const qs = (k: string, v: string) => L(`/carnatic/listen${v ? `?${k}=${encodeURIComponent(v)}` : ""}`);
+---
+<SwaraLayout title={`${say("title", "The Listening room")} · Swara Studio`}
+             description={say("desc", "Reference recordings of Carnatic music chosen by Shruti, with what to listen for; guess the raga, tap along with the tala, and read and write listening analyses.")}>
+  <Hero eyebrow={say("eyebrow", "Listen")} title={say("h1", "The Listening room")}
+        lede={say("lede", "Recordings Shruti chose, with what to listen for. Players load only when you press them.")} />
+
+  <div class="sw-toolbar">
+    <div class="sw-chips" role="group" aria-label={say("byRaga", "By raga")}>
+      <Chip href={L("/carnatic/listen")} active={!raga && !form}>{say("all", "All")}</Chip>
+      {ragaChips.map((r) => <Chip href={qs("raga", r)} active={raga === r}>{ragaNames.get(r) ?? r}</Chip>)}
+    </div>
+    {formChips.length > 0 && <div class="sw-chips" role="group" aria-label={say("byForm", "By form")}>
+      {formChips.map((f) => <Chip href={qs("form", f)} active={form === f}>{f}</Chip>)}
+    </div>}
+  </div>
+
+  <div class="li-cta">
+    <div><span class="t-eyebrow ch-blue">{say("guessH", "Guess the raga")}</span><b>{say("guessT", "Hear a recording before you know what it is")}</b>
+      <small>{say("guessP", "The raga is hidden until you commit a guess. Analyses stay hidden until then too.")}</small></div>
+    <a class="lr-btn" href={L("/carnatic/listen/guess")}>{say("tryOne", "Try one")}</a>
+  </div>
+
+  <div class="li-sec-h"><h2>{tapMode ? say("tapH", "Recordings you can tap along with") : say("refH", "Reference recordings")}</h2>
+    <small>{say("approved", "Approved by Shruti · {n}").replace("{n}", String(shown.length))}</small></div>
+  {tapMode && <p class="li-note" style="margin-top:-6px">{say("tapP", "These have a beat map: the tala grid follows the musicians, not a metronome.")}</p>}
+  {shown.length === 0 ? (
+    <p class="ch-empty">{live.length ? say("noneHere", "Nothing here yet for this choice.") : say("none", "The room is being filled: Shruti approves each recording before it appears.")}</p>
+  ) : filtered ? shown.map((r) => <RecordingCard r={r} href={L} ragaName={ragaNames.get(r.raga)} talaName={talaName(r.tala)} />) : (
+    <ul class="li-list">
+      {groups.map((g) => (
+        <li><a href={g.href}><b>{g.name}</b><small class="r">{say("nRec", "{n} recordings").replace("{n}", String(g.n))}</small>
+          <small>{g.forms.join(" · ")}</small><small class="r">{g.analyses ? say("nAn", "{n} analyses").replace("{n}", String(g.analyses)) : ""}</small></a></li>
+      ))}
+    </ul>
+  )}
+
+  <div class="li-sec-h"><h2>{say("analysesH", "Analyses")} <small>{recent.length || ""}</small></h2>
+    <a class="lr-link" href={L("/carnatic/listen/hall")}>{say("hall", "Members' own performances: the concert hall")} ›</a></div>
+  {recent.length === 0 ? <p class="li-note">{say("noAnalyses", "No analyses yet. Open a recording and write the first: timestamped notes on what you hear.")}</p> : (
+    <ul class="li-list">
+      {recent.slice(0, 12).map((w) => (
+        <li><a href={L(`/carnatic/room/${w.id}`)}>
+          <b>{w.title || say("untitled", "An analysis")}</b><small class="r">{ago(w.submittedAt)}</small>
+          <small>{w.author} · {recName.get(w.subject.replace("recording:", "")) ?? ""}</small><small class="r">{w.comments} replies · {w.votes} helpful</small>
+        </a></li>
+      ))}
+    </ul>
+  )}
+  <p class="li-note">{say("hiddenNote", "Analyses of recordings you haven't guessed yet are hidden in guess mode, so the discussion can't spoil them.")}</p>
+
+  <section class="li-suggest" aria-labelledby="suggest-h">
+    <form class="li-form" data-suggest>
+      <h2 id="suggest-h" class="ty-sec" style="margin:14px 0 4px">{say("suggestH", "Suggest a recording")}</h2>
+      <label>{say("link", "Link")}<input name="url" type="url" required placeholder="https://www.youtube.com/watch?v=…" /></label>
+      <div class="row">
+        <label>{say("raga", "Raga")}<input name="raga" list="li-ragas" value={raga} /></label>
+        <label>{say("composition", "Composition")}<input name="composition" /></label>
+      </div>
+      <label>{say("why", "Why this one")}<input name="why" required maxlength="300" placeholder={say("whyPh", "One line: what should a learner listen for?")} /></label>
+      <div class="st-actions"><button class="lr-btn lr-btn-s" type="submit">{me.signedIn ? say("send", "Send suggestion") : say("signIn", "Sign in to suggest")}</button><small data-used></small></div>
+      <p class="li-note" data-note aria-live="polite"></p>
+      <datalist id="li-ragas">{ragaChips.map((r) => <option value={r}>{ragaNames.get(r)}</option>)}</datalist>
+    </form>
+    <div>
+      <h3 class="t-eyebrow" style="margin-top:24px">{say("yours", "Your suggestions")}</h3>
+      <ul class="li-mine" data-mine>{!me.signedIn && <li><small>{say("signedOut", "Signed in, the recordings you suggest and what happened to them show here.")}</small></li>}</ul>
+    </div>
+  </section>
+</SwaraLayout>
+
+<script>
+  import { hydrateCards, hydrateSuggest } from "../../../lib/carnatic/client/listening";
+  hydrateCards();
+  hydrateSuggest(document.querySelector<HTMLFormElement>("[data-suggest]"), document.querySelector<HTMLElement>("[data-mine]"));
+</script>

@@ -1,0 +1,40 @@
+---
+/* Writing a practice piece or a lesson's listening analysis (artboards M2,
+ * M11). ?draft=<id> reopens a draft. */
+import SwaraLayout from "../../../../../../layouts/SwaraLayout.astro";
+import WorkEditor from "../../../../../../components/carnatic/WorkEditor.astro";
+import { hrefIn, langOf } from "../../../../../../lib/carnatic/i18n";
+import { visitor, swaraScript } from "../../../../../../lib/carnatic/prefs";
+import { copy } from "../../../../../../lib/copy";
+import { asReader } from "../../../../../../lib/account";
+import { notFound } from "../../../../../../lib/carnatic/notfound";
+import { exercise, lesson, recording } from "../../../../../../lib/carnatic/course";
+
+const lang = langOf(Astro);
+const say = await copy("carnatic/learn/[slug]/room/[ex]/write");
+const L = (p: string) => hrefIn(lang, p);
+const { me, settings } = await visitor(Astro);
+const [l, ex] = await Promise.all([lesson(Astro.params.slug!), exercise(Astro.params.ex!)]);
+if (!l || !ex || (ex.kind !== "practice" && ex.kind !== "listening")) return notFound(Astro);
+const draftId = Astro.url.searchParams.get("draft");
+const draft = draftId && me.signedIn ? (await asReader(Astro, `/api/carnatic/community/works/${encodeURIComponent(draftId)}`)).body : null;
+const recs = ((ex as any).recordings ?? []) as { id: string }[];
+const chosen = Astro.url.searchParams.get("recording") ?? recs[0]?.id;
+const rec = ex.kind === "listening" && chosen ? await recording(chosen) : null;
+const room = ex.kind === "practice" ? "carnatic-practice" : "carnatic-analysis";
+const roomHref = L(`/carnatic/learn/${l.slug}/room/${ex.id}`);
+const PROMPTS: Record<string, string> = {
+  phrases: "Is there a phrase you'd call the raga's signature? Note the time.", resting_notes: "Where do phrases come to rest? Note the times.",
+  gamakas: "Which swaras carry the most gamaka?", form_sections: "Where does each section begin? Where does the pallavi return?",
+  tala: "Which tala? Where is samam?", laya: "Where does the music speed up or settle?", other: "Anything else you noticed.",
+};
+const prompts = (((ex as any).notes_template ?? ["phrases", "resting_notes", "gamakas"]) as string[]).map((k) => PROMPTS[k] ?? k);
+---
+<SwaraLayout title={`${say("title", "Your piece")} · ${ex.title} · Swara Studio`} noindex
+             crumbs={[[say("crumbLearn", "Learn"), L("/carnatic/learn")], [`${say("unit", "Unit")} ${l.unit}`, L(`/carnatic/learn/unit/${l.unit}`)], [ex.kind === "practice" ? say("practice", "Practice piece") : say("listening", "Listening analysis"), roomHref], [say("yours", "Yours")]]}>
+  {ex.kind === "listening" && recs.length > 1 && (
+    <p class="lr-chips">{recs.map((x) => <a class="lr-chip" href={`?recording=${x.id}`} aria-current={x.id === chosen ? "true" : undefined}>{x.id}</a>)}</p>
+  )}
+  <WorkEditor room={room} subject={`exercise:${ex.id}`} title={String(ex.title)} eyebrow={`${ex.kind === "practice" ? say("practice", "Practice piece") : say("listening", "Listening analysis")} · ${ex.id}`}
+              ex={ex} recording={rec} draft={draft} roomHref={roomHref} script={swaraScript(settings, lang)} tamil={settings.tamilStyle} signedIn={me.signedIn} prompts={prompts} />
+</SwaraLayout>

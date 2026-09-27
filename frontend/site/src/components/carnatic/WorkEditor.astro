@@ -1,0 +1,97 @@
+---
+/* The editors (artboards M2, M11): a practice piece (text with its word
+ * range, optional notation, a link to your own recording) with friendly
+ * prechecks beside it, "hints, not rules"; or a listening analysis
+ * (timestamped notes by category with optional notation, and a summary)
+ * with guided prompts. Drafts save to the account; submitting asks for the
+ * site's publish agreement once.
+ */
+import PublishConsent from "../feedback/PublishConsent.astro";
+import { recordingLabel, type Recording } from "../../lib/carnatic/course";
+
+interface Props {
+  room: "carnatic-practice" | "carnatic-analysis"; subject: string; title: string; eyebrow: string;
+  ex?: any; recording?: Recording | null; draft?: any; roomHref: string; script: string; tamil: string; signedIn: boolean;
+  stage?: string; prompts?: string[];
+}
+const { room, subject, title, eyebrow, ex, recording, draft, roomHref, script, tamil, signedIn, stage, prompts = [] } = Astro.props;
+const sub = ex?.submission ?? {};
+const words: [number, number] | null = sub.text?.words ?? (room === "carnatic-practice" ? [20, 400] : null);
+const parts: any[] = draft?.parts ?? [];
+const text = parts.find((p) => p.key === "text")?.body ?? "";
+const link = parts.find((p) => p.key === "link")?.body ?? "";
+const summary = parts.find((p) => p.key === "summary")?.body ?? "";
+const analysis = room === "carnatic-analysis";
+const CATS = ["phrase", "resting note", "gamaka", "section", "tala", "laya", "other"];
+const page = { room, subject, title, draftId: draft?.id ?? null, words, parts, script, tamil, roomHref,
+  recording: recording && recording.status === "approved" ? { provider: recording.provider, url: recording.url, start: recording.clips[0]?.start, end: recording.clips[0]?.end } : null };
+---
+<div class="cm-cols" data-editor>
+  <div>
+    <p class="lr-eyebrow-top">{eyebrow}</p>
+    <div class="li-sec-h" style="margin:4px 0 12px"><h1 class="lr-title" style="margin:0">{analysis ? "Your analysis" : "Your piece"}</h1><small data-saved>{draft ? "Draft" : "Not saved yet"}</small></div>
+    {!signedIn && <p class="cm-notice">You can write here signed out, but saving and submitting need an account. <a href={`/signin?next=${encodeURIComponent(Astro.url.pathname)}`}>Sign in</a></p>}
+    <label class="li-form"><span>Title (optional)</span><input data-title maxlength="160" value={draft?.title ?? ""} placeholder={analysis ? "Low alapana, resting on Ri and Pa" : ""} /></label>
+
+    {analysis ? (
+      <>
+        <div class="an-player" style="margin-top:12px">
+          {recording ? <div data-player><button type="button" class="lr-btn" data-load>Load the recording</button><small class="lr-meta">{recordingLabel(recording)} · loads only when you press this</small></div>
+            : <p class="li-note">Choose the recording from the exercise's list first.</p>}
+          <div class="row"><span data-now>0:00</span>{recording?.clips?.[0] && <span>clip {recording.clips[0].start}{recording.clips[0].end && `-${recording.clips[0].end}`}</span>}</div>
+        </div>
+        <ul class="an-notes" data-notes></ul>
+        <div class="an-new">
+          <div class="row"><input data-at value="0:00" aria-label="Time (m:ss)" />
+            {CATS.map((c, i) => <button type="button" class="lr-chip" data-cat={c} aria-pressed={String(i === 0)}>{c}</button>)}</div>
+          <textarea data-note-body rows="3" maxlength="2000" placeholder="What do you hear at this moment?"></textarea>
+          <div class="row"><input data-note-notation placeholder="Notation (optional): P M G R" /><span style="flex:1"></span><button type="button" class="lr-btn lr-btn-s" data-add-note>Add note</button></div>
+          <small class="li-note">Notes can be edited until you publish. The time follows the player when it can read it; otherwise type it.</small>
+        </div>
+        <label class="li-form" style="margin-top:14px"><span>Summary</span><textarea data-summary rows="5" maxlength="4000">{summary}</textarea></label>
+        <small class="li-note" data-scount></small>
+      </>
+    ) : (
+      <>
+        <label class="li-form" style="margin-top:12px"><span>{sub.text?.label ?? "What you wrote"}</span>
+          <textarea data-text rows="9" maxlength="12000">{text}</textarea></label>
+        <div class="li-note" style="display:flex;justify-content:space-between"><span data-count></span><span>Markdown: **bold**, lists</span></div>
+        {sub.sargam && (
+          <div class="ex-card" style="margin-top:14px"><div class="ex-head"><b>Sargam {sub.sargam.required ? "" : "(optional)"}</b>
+            <span class="lr-meta">{[sub.sargam.raga && sub.sargam.raga !== "choose" ? sub.sargam.raga : "", sub.sargam.tala && sub.sargam.tala !== "choose" ? sub.sargam.tala : "no tala", sub.sargam.speed ? `speed ${sub.sargam.speed}` : ""].filter(Boolean).join(" · ")}</span></div>
+            <div data-sargam data-raga={sub.sargam.raga ?? ""} data-tala={sub.sargam.tala ?? ""} data-speed={sub.sargam.speed ?? ""}></div></div>
+        )}
+        {(sub.recording_link || !ex) && (
+          <label class="li-form" style="margin-top:14px"><span>Link to your own recording {sub.recording_link?.required ? "" : "(optional)"}</span>
+            <input data-link type="url" value={link} placeholder="https://youtu.be/…" />
+            <small>YouTube, SoundCloud, Vimeo or Bandcamp. It loads only when someone presses play. Nothing is uploaded here.</small></label>
+        )}
+      </>
+    )}
+    <p class="li-note" data-note aria-live="polite"></p>
+    <div class="st-actions" style="justify-content:flex-end"><button type="button" class="lr-btn lr-btn-s" data-save>Save draft</button><button type="button" class="lr-btn" data-submit>{analysis ? "Publish to the room" : "Submit to the room"}</button></div>
+  </div>
+  <aside class="cm-side soft">
+    {analysis ? (
+      <>
+        <span class="t-eyebrow">Things to listen for{stage && ` · your stage: ${stage}`}</span>
+        {prompts.map((p, i) => <p style={i >= 3 ? "opacity:.7" : undefined}>{p}</p>)}
+        <p class="cm-soft">Prompts, not a form. Answer the ones that help.</p>
+      </>
+    ) : (
+      <>
+        <span class="t-eyebrow">Before you submit</span>
+        <div data-hints><p>Save a draft to see the hints for this piece.</p></div>
+        <p class="cm-soft">These are hints, not rules. You can submit either way.</p>
+      </>
+    )}
+    <a class="lr-link" href={roomHref}>‹ Back to the room</a>
+  </aside>
+</div>
+{signedIn && <PublishConsent />}
+<script type="application/json" id="editor-data" set:html={JSON.stringify(page)} />
+<script>
+  import { hydrateEditor } from "../../lib/carnatic/client/community";
+  const root = document.querySelector<HTMLElement>("[data-editor]");
+  if (root) hydrateEditor(root, JSON.parse(document.getElementById("editor-data")!.textContent!));
+</script>

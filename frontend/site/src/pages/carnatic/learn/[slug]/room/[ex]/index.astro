@@ -1,0 +1,64 @@
+---
+/* A lesson's room (EXERCISES.md §2, LISTENING.md §4; artboards M1, M4): the
+ * brief of a practice piece or listening analysis, what readers will be
+ * asked, then the pieces others wrote, newest or most discussed. Hidden
+ * pieces and people the reader blocked are left out by the server.
+ */
+import SwaraLayout from "../../../../../../layouts/SwaraLayout.astro";
+import { hrefIn, langOf } from "../../../../../../lib/carnatic/i18n";
+import { copy } from "../../../../../../lib/copy";
+import { notFound } from "../../../../../../lib/carnatic/notfound";
+import { ago, exercise, lesson, works } from "../../../../../../lib/carnatic/course";
+
+const lang = langOf(Astro);
+const say = await copy("carnatic/learn/[slug]/room/[ex]");
+const L = (p: string) => hrefIn(lang, p);
+const [l, ex] = await Promise.all([lesson(Astro.params.slug!), exercise(Astro.params.ex!)]);
+if (!l || !ex || (ex.kind !== "practice" && ex.kind !== "listening")) return notFound(Astro);
+const room = ex.kind === "practice" ? "carnatic-practice" : "carnatic-analysis";
+const sort = Astro.url.searchParams.get("sort") === "discussed" ? "discussed" : "new";
+const list = await works(Astro, room, `exercise:${ex.id}`, sort);
+const sub: any = (ex as any).submission ?? {};
+const words = sub.text?.words as [number, number] | undefined;
+const submit = [
+  sub.text && (sub.text.required ? `Text${words ? `, ${words[0]}-${words[1]} words` : ""}` : "text (optional)"),
+  sub.sargam && `${sub.sargam.required ? "a" : "optionally a"} sargam line${sub.sargam.raga && sub.sargam.raga !== "choose" ? ` in ${sub.sargam.raga}` : ""}`,
+  sub.konnakol && "konnakol syllables", sub.timestamps && "timestamps in the recording", sub.analysis && "your listening analysis",
+  sub.recording_link && `${sub.recording_link.required ? "a" : "optionally a"} link to your own recording (YouTube, SoundCloud, Vimeo or Bandcamp)`,
+].filter(Boolean).join("; ");
+const rubric = ((ex as any).rubric ?? []) as { id: string; ask: string; scale?: string[]; answer?: string }[];
+const kindLabel = ex.kind === "practice" ? say("practice", "Practice piece") : say("listening", "Listening analysis");
+---
+<SwaraLayout title={`${ex.title} · ${kindLabel} · Swara Studio`} description={String((ex as any).prompt ?? ex.title).slice(0, 300)}
+             crumbs={[[say("crumbLearn", "Learn"), L("/carnatic/learn")], [`${say("unit", "Unit")} ${l.unit}`, L(`/carnatic/learn/unit/${l.unit}`)], [l.title, L(`/carnatic/learn/${l.slug}`)], [kindLabel]]}>
+  <div class="cm-cols">
+    <div>
+      <p class="lr-eyebrow-top">{kindLabel} · {ex.id} · {say("from", "from “{t}”").replace("{t}", l.title)}</p>
+      <h1 class="lr-title">{ex.title}</h1>
+      {(ex as any).prompt && <p class="cu-lede">{(ex as any).prompt}</p>}
+      <dl class="cm-brief">
+        {submit && <><dt>{say("submit", "Submit")}</dt><dd>{submit[0].toUpperCase() + submit.slice(1)}.</dd></>}
+        <dt>{say("who", "Who reads it")}</dt><dd>{say("whoP", "Other learners who open this piece. They can reply and answer a few short questions. Nobody gets a grade.")}</dd>
+        {rubric.length > 0 && <><dt>{say("questions", "Their questions")}</dt><dd>{rubric.map((q) => q.ask).join(" · ")}{rubric.some((q) => q.scale) && ` ${say("answered", "Each answered")} ${rubric.find((q) => q.scale)!.scale!.join(" / ")}.`}</dd></>}
+      </dl>
+      <div class="st-actions"><a class="lr-btn" href={L(`/carnatic/learn/${l.slug}/room/${ex.id}/write`)}>{say("write", "Write yours")}</a>
+        <a class="lr-link" href="#room">{say("read", "Read the room · {n} pieces").replace("{n}", String(list.length))}</a></div>
+    </div>
+    <aside class="cm-side">
+      <span class="t-eyebrow">{say("howH", "How the room works")}</span>
+      <p>{say("how1", "One vote per person, on pieces that helped you. Replies can be on the whole piece or on one part of it.")}</p>
+      <p>{say("how2", "Report anything that shouldn't be here. When three different people report something, it's hidden until Shruti looks. Reporters are never shown to anyone.")}</p>
+    </aside>
+  </div>
+
+  <div class="li-sec-h" id="room"><h2>{say("roomH", "The room")}</h2>
+    <div class="lr-seg"><a href="?sort=new#room" aria-current={sort === "new" ? "true" : undefined}>{say("newest", "Newest")}</a><a href="?sort=discussed#room" aria-current={sort === "discussed" ? "true" : undefined}>{say("discussed", "Most discussed")}</a></div></div>
+  {list.length === 0 ? <p class="li-note">{say("empty", "Nobody has written one yet. Yours could be the first.")}</p> : (
+    <ul class="li-list">{list.map((w) => (
+      <li><a href={L(`/carnatic/room/${w.id}`)}>
+        <span><b class="cm-au">{w.author}</b>{w.authorId === null && <small> · {say("deleted", "account deleted")}</small>}{w.hidden && <small> · {say("hiddenMine", "hidden while Shruti reviews reports")}</small>}</span><small class="r">{ago(w.submittedAt)}</small>
+        <span class="cm-ex">{w.excerpt || w.title}</span><small class="r">{w.comments} replies · {w.votes} helpful</small>
+      </a></li>
+    ))}</ul>
+  )}
+</SwaraLayout>

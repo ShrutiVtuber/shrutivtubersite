@@ -1,0 +1,35 @@
+---
+/* Writing an analysis of a recording in the Listening room (artboard M11):
+ * timestamped notes by category, optional notation, a summary, with prompts
+ * for the learner's stage. ?draft=<id> reopens a draft. */
+import SwaraLayout from "../../../../../layouts/SwaraLayout.astro";
+import WorkEditor from "../../../../../components/carnatic/WorkEditor.astro";
+import { hrefIn, langOf } from "../../../../../lib/carnatic/i18n";
+import { visitor, swaraScript } from "../../../../../lib/carnatic/prefs";
+import { copy } from "../../../../../lib/copy";
+import { asReader } from "../../../../../lib/account";
+import { notFound } from "../../../../../lib/carnatic/notfound";
+import { recording, recordingLabel } from "../../../../../lib/carnatic/course";
+import { ragas as loadRagas } from "../../../../../lib/carnatic/data";
+
+const lang = langOf(Astro);
+const say = await copy("carnatic/listen/recording/[id]/write");
+const L = (p: string) => hrefIn(lang, p);
+const { me, settings } = await visitor(Astro);
+const r = await recording(Astro.params.id!);
+if (!r || r.status !== "approved") return notFound(Astro);
+const rd = await loadRagas();
+const ragaName = [...(rd?.janyas ?? []), ...(rd?.performed ?? []), ...(rd?.melakartas ?? [])].find((x: any) => x.id === r.raga)?.name ?? r.raga;
+const draftId = Astro.url.searchParams.get("draft");
+const draft = draftId && me.signedIn ? (await asReader(Astro, `/api/carnatic/community/works/${encodeURIComponent(draftId)}`)).body : null;
+const prompts = [
+  say("p1", "Where do phrases come to rest? Note the times."), say("p2", "Which swaras carry the most gamaka?"),
+  say("p3", "Is there a phrase you'd call the raga's signature?"), say("p4", "Next stage, after unit 14: form. Where does the pallavi return?"),
+];
+---
+<SwaraLayout title={`${say("title", "Your analysis")} · ${recordingLabel(r)} · Swara Studio`} noindex
+             crumbs={[[say("crumb", "Listen"), L("/carnatic/listen")], ...(r.raga ? [[ragaName, L(`/carnatic/ragas/${r.raga}#listening`)] as [string, string]] : []), [say("yours", "Your analysis")]]}>
+  <WorkEditor room="carnatic-analysis" subject={`recording:${r.id}`} title={`${recordingLabel(r)}`} eyebrow={`${say("eyebrow", "Listening analysis")}${ragaName ? ` · ${ragaName}` : ""}`}
+              recording={r} draft={draft} roomHref={L(`/carnatic/listen/recording/${r.id}`)} script={swaraScript(settings, lang)} tamil={settings.tamilStyle}
+              signedIn={me.signedIn} stage={say("stage", "raga")} prompts={prompts} />
+</SwaraLayout>

@@ -1,0 +1,185 @@
+---
+/* A piece or an analysis in a room (artboards M3, M5-M9, M12-M13): what the
+ * author wrote (text sentences, notation, their own recording, timestamped
+ * notes on the recording it's about), "What readers said" (the rubric as
+ * totals, one answer set each), "This helped me", replies to the whole piece
+ * or to one part, report and block from the ⋯ menu. The author sees their
+ * private feedback and, if reports hid the piece, a quiet line saying so.
+ * Anyone else gets "This piece isn't available" for a hidden one.
+ */
+import SwaraLayout from "../../../layouts/SwaraLayout.astro";
+import PublishConsent from "../../../components/feedback/PublishConsent.astro";
+import { hrefIn, langOf } from "../../../lib/carnatic/i18n";
+import { visitor, swaraScript } from "../../../lib/carnatic/prefs";
+import { copy } from "../../../lib/copy";
+import { asReader } from "../../../lib/account";
+import { ago, exercise, recording, recordingLabel, units } from "../../../lib/carnatic/course";
+import { phraseHtml } from "../../../lib/carnatic/render";
+
+const lang = langOf(Astro);
+const say = await copy("carnatic/room/[id]");
+const L = (p: string) => hrefIn(lang, p);
+const { me, settings } = await visitor(Astro);
+const got = await asReader(Astro, `/api/carnatic/community/works/${encodeURIComponent(Astro.params.id!)}`);
+const unavailable = !got.ok;
+if (!got.ok) Astro.response.status = 404;
+const w: any = got.ok ? got.body : null;
+const exId = w?.subject?.startsWith("exercise:") ? w.subject.slice(9) : null;
+const [ex, all, rec] = await Promise.all([exId ? exercise(exId) : null, units(), null as any]);
+const recId = w ? (w.subject.startsWith("recording:") ? w.subject.slice(10) : ((ex as any)?.recordings?.[0]?.id ?? null)) : null;
+const r = recId ? await recording(recId) : null;
+const lessonRow = ex?.lesson ? all.flatMap((u) => u.lessons.map((l) => ({ ...l, unit: u.n }))).find((l) => l.id === ex.lesson) : null;
+const roomHref = ex && lessonRow ? L(`/carnatic/learn/${lessonRow.slug}/room/${ex.id}`) : r ? L(`/carnatic/listen/recording/${r.id}`) : L("/carnatic/listen");
+const suspended = me.signedIn ? (await asReader(Astro, "/api/carnatic/me/community")).body?.suspended ?? null : null;
+const script = swaraScript(settings, lang);
+const parts: any[] = w?.parts ?? [];
+const text = parts.find((p) => p.key === "text")?.body ?? "";
+const sentences = (s: string) => s.split(/\n\s*\n/).map((para) => para.split(/(?<=[.!?])\s+/).filter(Boolean));
+let si = -1;
+const paras = sentences(text).map((ss) => ss.map((x) => ({ i: ++si, x })));
+const sargam = parts.find((p) => p.key === "sargam");
+const link = parts.find((p) => p.key === "link");
+const notes = parts.filter((p) => p.key.startsWith("note:")).sort((a, b) => String(a.data?.t).localeCompare(String(b.data?.t), undefined, { numeric: true }));
+const summary = parts.find((p) => p.key === "summary")?.body ?? "";
+const provider = (u: string) => (/youtu/.test(u) ? "youtube" : /vimeo/.test(u) ? "vimeo" : /soundcloud/.test(u) ? "soundcloud" : /bandcamp/.test(u) ? "bandcamp" : "");
+const brief = (ex as any)?.prompt ?? (r ? say("analysisBrief", "Timestamped notes on what you hear in this recording.") : "");
+const page = { id: w?.id, mine: !!w?.mine, authorId: w?.authorId ?? null, author: w?.author ?? "", rubric: w?.rubric ?? null, voted: !!w?.voted, votes: w?.votes ?? 0,
+  suspended: suspended ? "1" : null, recording: r && r.status === "approved" ? { provider: r.provider, url: r.url, start: r.clips[0]?.start } : null };
+const title = w ? (w.title || (r ? say("analysisOf", "An analysis of {r}").replace("{r}", recordingLabel(r)) : (ex as any)?.title ?? say("piece", "A piece"))) : say("na", "This piece isn't available");
+---
+<SwaraLayout title={`${title} · Swara Studio`} noindex={!w || w.hidden}
+             description={(w?.excerpt || brief || title).slice(0, 300)}
+             crumbs={[[say("crumbLearn", ex ? "Learn" : "Listen"), ex ? L("/carnatic/learn") : L("/carnatic/listen")],
+                      ...(lessonRow ? [[`${say("unit", "Unit")} ${lessonRow.unit}`, L(`/carnatic/learn/unit/${lessonRow.unit}`)] as [string, string]] : []),
+                      [say("room", "The room"), roomHref], [w?.author ?? say("na", "This piece isn't available")]]}>
+  {unavailable ? (
+    <div class="st-wrap" style="padding: 24px 0 40px">
+      <h1 class="lr-title">{say("na", "This piece isn't available")}</h1>
+      <p class="cu-lede">{say("naP", "It may have been taken down, hidden while Shruti reviews reports, or written by someone you've blocked or who blocked you.")}</p>
+      <a class="lr-link" href={L("/carnatic/learn")}>{say("backLearn", "Back to the course")} ›</a>
+    </div>
+  ) : (
+    <div class="cm-cols" data-work>
+      <article>
+        <h1 class="sr-only">{title}</h1>
+        {w.hidden && w.mine && (
+          <div class="cm-notice"><p><b>{say("hiddenH", "Hidden while Shruti reviews reports")}</b></p><p>{say("hiddenP", "Only you can see this piece right now. Several people reported it, so it's out of the room until Shruti looks. If she finds nothing wrong, it comes back as it was.")}</p></div>
+        )}
+        <div class="cm-head">
+          <b>{w.author}</b><small>{ago(w.submittedAt)}{w.authorId === null ? ` · ${say("deleted", "account deleted")}` : ""}</small>
+          <span class="spacer"></span>
+          {me.signedIn && (
+            <div class="cm-menu-wrap">
+              <button type="button" class="cm-menu-btn" data-menu-btn aria-label={say("more", "More")}>⋯</button>
+              <div class="cm-menu" data-menu hidden>
+                {w.mine ? <button type="button" data-withdraw>{say("withdraw", "Take it out of the room")}</button> : <>
+                  <button type="button" data-report-work>{say("report", "Report this piece")}</button>
+                  {w.authorId && <button type="button" data-block>{say("block", "Block {name}").replace("{name}", w.author)}</button>}
+                </>}
+              </div>
+            </div>
+          )}
+        </div>
+        {w.title && <h2 class="cm-sec" style="border:0;padding:0;margin:10px 0 6px">{w.title}</h2>}
+
+        {w.mine && w.private && (
+          <div class="cm-private"><b>{say("privateH", "Just for you")}</b>
+            {w.private.sectionsMarked !== undefined && <p>{say("sections", "You marked {f} of the {m} sections Shruti marked.").replace("{f}", String(w.private.sectionsFound)).replace("{m}", String(w.private.sectionsMarked))}</p>}
+            {w.private.guessRight !== undefined && <p>{w.private.guessRight ? say("guessRight", "Your guess of the raga was right.") : say("guessWrong", "Your guess of the raga wasn't this one's raga.")}</p>}
+            {w.private.compare && <p>{w.private.compare}</p>}
+          </div>
+        )}
+
+        {text && (
+          <div class="cm-prose">
+            {paras.map((ss) => <p>{ss.map((s) => <><span data-part={`text@${s.i}`}>{s.x}</span>{" "}</>)}</p>)}
+          </div>
+        )}
+        {sargam && (
+          <div class="lr-embed lr-sargam" data-embed="sargam" data-part="sargam" data-part-label={say("theNotation", "on the notation")} data-line={sargam.body} data-raga={sargam.data?.raga ?? ""}>
+            <div class="lr-sg-top"><button type="button" class="lr-play" data-play aria-label={say("play", "Play")}><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M5 3l8 5-8 5z" fill="currentColor"/></svg></button>
+              <div class="lr-sg-lines"><div class={`lr-sg-row sn-script-${script}`} set:html={phraseHtml(sargam.body, { script, tamil: settings.tamilStyle, subs: true })} /></div></div>
+            <div class="lr-sg-foot"><span class="lr-synth">synthesised approximation</span><span class="lr-meta">{[sargam.data?.raga, sargam.data?.tala].filter(Boolean).join(" · ") || "no tala"}</span></div>
+          </div>
+        )}
+        {link && (
+          <div class="lr-embed lr-ex" data-link-box data-part="link" data-part-label={say("theRecording", "on the recording")}>
+            <div class="lr-ex-t"><b>{say("ownRec", "Their own recording")}</b><small>{link.body.replace(/^https?:\/\/(www\.)?/, "").slice(0, 60)} · {say("loads", "loads when you press play")}</small></div>
+            <button type="button" class="lr-btn lr-btn-s" data-link-load data-provider={provider(link.body)} data-url={link.body}>{say("loadPlayer", "Load player")}</button>
+          </div>
+        )}
+        {(notes.length > 0 || summary) && r && (
+          <div class="an-player">
+            {r.status === "approved" ? <div data-player><button type="button" class="lr-btn" data-load>{say("load", "Load the recording")}</button><small class="lr-meta">{recordingLabel(r)} · {say("loadsOnly", "loads only when you press this")}</small></div>
+              : <p class="li-note">{say("retired", "The recording is no longer online; the notes stay.")}</p>}
+          </div>
+        )}
+        {notes.length > 0 && (
+          <ul class="an-notes">
+            {notes.map((n) => (
+              <li data-part={n.key} data-part-label={`the ${n.data?.t} note`}><button type="button" class="an-t" data-t={n.data?.t}>{n.data?.t}</button>
+                <div><span class="an-cat">{n.data?.category}</span>{n.data?.notation && <span class="an-not" set:html={phraseHtml(n.data.notation, { script, tamil: settings.tamilStyle, subs: true })} />}<p>{n.body}</p></div></li>
+            ))}
+          </ul>
+        )}
+        {summary && <div class="cm-prose" data-part="summary" data-part-label={say("theSummary", "on the summary")}><p>{summary}</p></div>}
+
+        {w.rubric?.questions?.length > 0 && (
+          <section>
+            <h2 class="cm-sec">{say("said", "What readers said")}</h2>
+            {w.rubric.questions.map((q: any) => q.scale ? (
+              <div class="cm-q" data-q={q.id}>
+                <p>{q.ask}</p>
+                <div class="lr-seg cm-seg">{q.scale.map((a: string) => <button type="button" data-a={a} aria-pressed={String(w.rubric.mine?.[q.id] === a)} disabled={w.mine}>{a}</button>)}</div>
+                <small data-totals>{Object.entries(w.rubric.totals?.[q.id] ?? {}).map(([k, v]) => `${k} ${v}`).join("   ")}</small>
+              </div>
+            ) : (
+              <div class="cm-q"><p>{q.ask}</p><small>{say("freeN", "{n} answered").replace("{n}", String(w.rubric.freeAnswers?.[q.id] ?? 0))}</small>
+                {!w.mine && <textarea data-free={q.id} rows="2" maxlength="600" placeholder={say("freePh", "Only the author sees what you write here.")}>{w.rubric.mine?.[q.id] ?? ""}</textarea>}</div>
+            ))}
+          </section>
+        )}
+        <div class="cm-vote">
+          {!w.mine && <button type="button" class="lr-btn lr-btn-s" data-vote aria-pressed={String(w.voted)}>{say("helped", "This helped me")}</button>}
+          <span data-votes>{w.votes} found this helpful · one vote each</span>
+        </div>
+
+        <h2 class="cm-sec" style="border-top:0" data-reply-count>{say("replies", "Replies")}</h2>
+        <ul class="cm-replies" data-replies></ul>
+        {!me.signedIn ? (
+          <p class="li-note"><a href={`/signin?next=${encodeURIComponent(Astro.url.pathname)}`}>{say("signIn", "Sign in to reply")}</a></p>
+        ) : suspended ? (
+          <div class="cm-notice"><p><b>{say("suspH", "You can't post in the rooms for now")}</b></p>
+            <p>{say("suspP", "Posting and replying are paused on your account{until}. You can still read everything, take lessons, quizzes and drills, and your own practice history is unchanged.").replace("{until}", suspended.until ? ` until ${new Date(suspended.until).toLocaleDateString("en-GB", { day: "numeric", month: "long" })}` : "")}</p>
+            <p class="cm-soft">{say("suspAppeal", "Shruti has written to you with the reason. Reply to her message if you think it's a mistake.")}</p></div>
+        ) : (
+          <form class="cm-reply" data-reply-form>
+            <p class="cm-chip" data-reply-part hidden>{say("replyingTo", "Replying")} <span></span> <button type="button" class="lr-link">{say("toWhole", "reply to the whole piece instead")}</button></p>
+            <textarea maxlength="2000" placeholder={say("replyPh", "Reply to the whole piece, or select a sentence or note above to reply to that part")}></textarea>
+            <div class="st-actions"><small class="li-note" data-reply-note></small><button type="submit" class="lr-btn">{say("reply", "Reply")}</button></div>
+          </form>
+        )}
+      </article>
+      <aside class="cm-side soft">
+        <a class="lr-link" href={roomHref}>‹ {say("back", "Back to the room")}</a>
+        {brief && <p>{say("brief", "Brief")}: {brief}</p>}
+      </aside>
+    </div>
+  )}
+  {me.signedIn && <PublishConsent />}
+  <script type="application/json" id="work-data" set:html={JSON.stringify(page)} />
+</SwaraLayout>
+
+<script>
+  import { hydrateWork } from "../../../lib/carnatic/client/community";
+  import { playLine } from "../../../lib/carnatic/client/phrase";
+  import { settings } from "../../../lib/carnatic/client/state";
+  import { pitchHz } from "../../../lib/carnatic/notation";
+  const root = document.querySelector<HTMLElement>("[data-work]");
+  const data = JSON.parse(document.getElementById("work-data")!.textContent!);
+  if (root) hydrateWork(root, data);
+  document.querySelectorAll<HTMLElement>('[data-embed="sargam"]').forEach((c) => c.querySelector("[data-play]")?.addEventListener("click", (e) => {
+    e.stopPropagation();
+    playLine(c.dataset.line!, { saHz: pitchHz(settings().sa || "C3") });
+  }));
+</script>

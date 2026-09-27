@@ -5,19 +5,19 @@
  * only when that is pressed. Bandcamp links open on Bandcamp (its player
  * needs ids a link does not carry). Signed out, the room is readable; sharing,
  * liking and commenting ask for an account. */
-import SwaraLayout from "../../layouts/SwaraLayout.astro";
-import Hero from "../../components/carnatic/Hero.astro";
-import Chip from "../../components/carnatic/Chip.astro";
-import Badge from "../../components/navigation/Badge.astro";
-import { hrefIn, langOf, words } from "../../lib/carnatic/i18n";
-import { ragas } from "../../lib/carnatic/data";
-import { visitor } from "../../lib/carnatic/prefs";
-import { asReader } from "../../lib/account";
-import { copy } from "../../lib/copy";
+import SwaraLayout from "../../../layouts/SwaraLayout.astro";
+import Hero from "../../../components/carnatic/Hero.astro";
+import Chip from "../../../components/carnatic/Chip.astro";
+import Badge from "../../../components/navigation/Badge.astro";
+import { hrefIn, langOf, words } from "../../../lib/carnatic/i18n";
+import { ragas } from "../../../lib/carnatic/data";
+import { visitor } from "../../../lib/carnatic/prefs";
+import { asReader } from "../../../lib/account";
+import { copy } from "../../../lib/copy";
 
 const lang = langOf(Astro);
 const tr = await words(lang);
-const say = await copy("carnatic/listen");
+const say = await copy("carnatic/listen/hall");
 const L = (p: string) => hrefIn(lang, p);
 const { me } = await visitor(Astro);
 const f = { raga: Astro.url.searchParams.get("raga") ?? "", tala: Astro.url.searchParams.get("tala") ?? "", instrument: Astro.url.searchParams.get("instrument") ?? "" };
@@ -38,11 +38,11 @@ const INSTRUMENTS = ["venu", "voice", "veena", "violin", "mridangam"];
   <Hero eyebrow={tr("nav.listen")} title={say("title", "Concert hall")} lede={say("lede", "Compositions and performances by members. Players load only when you ask.")} />
   <div class="sw-toolbar">
     <div class="sw-chips">
-      {chips.map(([k, v, label]) => <Chip href={L(`/carnatic/listen${k ? `?${k}=${encodeURIComponent(v)}` : ""}`)} active={k ? f[k as "raga"] === v : !qs}>{label}</Chip>)}
+      {chips.map(([k, v, label]) => <Chip href={L(`/carnatic/listen/hall${k ? `?${k}=${encodeURIComponent(v)}` : ""}`)} active={k ? f[k as "raga"] === v : !qs}>{label}</Chip>)}
     </div>
     <span class="spacer"></span>
     {me.signedIn ? <button type="button" class="ls-share" data-share-open>{say("share", "Share your own")}</button>
-                 : <a class="ls-share" href="/signin?next=/carnatic/listen">{say("shareSignIn", "Sign in to share your own")}</a>}
+                 : <a class="ls-share" href="/signin?next=/carnatic/listen/hall">{say("shareSignIn", "Sign in to share your own")}</a>}
   </div>
 
   {me.signedIn && (
@@ -93,7 +93,7 @@ const INSTRUMENTS = ["venu", "voice", "veena", "violin", "mridangam"];
 </SwaraLayout>
 
 <script>
-  import { csrf } from "../../lib/carnatic/client/state";
+  import { csrf } from "../../../lib/carnatic/client/state";
   /* Build the third-party player only on press. */
   const embed = (kind: string, url: string): string | null => {
     try {

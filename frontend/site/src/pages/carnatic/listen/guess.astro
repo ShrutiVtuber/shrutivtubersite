@@ -1,0 +1,35 @@
+---
+/* Guess the raga (LISTENING.md §5; artboards R3-R5): listen, commit a guess
+ * with how sure you are, then the reveal, with a close miss named as the
+ * pair it is and brought back later. Signed out, the guess is checked and
+ * nothing is stored. Only ragas the learner has studied are suggested.
+ */
+import SwaraLayout from "../../../layouts/SwaraLayout.astro";
+import { hrefIn, langOf } from "../../../lib/carnatic/i18n";
+import { copy } from "../../../lib/copy";
+import { recordings, units } from "../../../lib/carnatic/course";
+import { ragas as loadRagas } from "../../../lib/carnatic/data";
+
+const lang = langOf(Astro);
+const say = await copy("carnatic/listen/guess");
+const [recs, rd, all] = await Promise.all([recordings(), loadRagas(), units()]);
+const live = recs.filter((r) => r.status === "approved" && r.raga);
+const page = {
+  lang,
+  recordings: live.map((r, i) => ({ id: r.id, provider: r.provider, url: r.url, start: r.clips[0]?.start, end: r.clips[0]?.end, n: i + 1 })),
+  ragas: [...new Set([...(rd?.janyas ?? []), ...(rd?.performed ?? [])].map((x: any) => x.name))].sort(),
+  lessons: Object.fromEntries(all.flatMap((u) => u.lessons.filter((l) => l.available).map((l) => [l.id, { title: l.title, slug: l.slug, unit: u.n }]))),
+};
+---
+<SwaraLayout title={`${say("title", "Guess the raga")} · Swara Studio`} noindex
+             description={say("desc", "Hear a recording before you know what it is, then guess the raga.")}>
+  <div data-guess><noscript><p class="ch-empty">{say("noscript", "Guessing needs JavaScript to keep the raga covered until you commit.")}</p></noscript></div>
+  <script type="application/json" id="guess-data" set:html={JSON.stringify(page)} />
+</SwaraLayout>
+
+<script>
+  import { runGuess } from "../../../lib/carnatic/client/listening";
+  const data = JSON.parse(document.getElementById("guess-data")!.textContent!);
+  const href = (p: string) => (data.lang === "en" ? p : `${p}${p.includes("?") ? "&" : "?"}lang=${data.lang}`);
+  void runGuess(document.querySelector<HTMLElement>("[data-guess]")!, { ...data, href }, new URLSearchParams(location.search).get("r"));
+</script>

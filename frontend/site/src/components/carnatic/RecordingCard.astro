@@ -1,0 +1,47 @@
+---
+/* One reference recording (LISTENING.md §2; artboard R1): the click-to-load
+ * player on the left (nothing from the provider loads before the press), and
+ * what Shruti wrote about it on the right: what it is, what to listen for,
+ * her section marks as seek chips, and the analyses. In guess mode the raga,
+ * title and composition stay covered until the learner commits a guess.
+ */
+import type { Recording } from "../../lib/carnatic/course";
+import { recordingLabel } from "../../lib/carnatic/course";
+
+interface Props { r: Recording; href: (p: string) => string; ragaName?: string; talaName?: string; guess?: boolean; label?: string; compact?: boolean }
+const { r, href, ragaName, talaName, guess = false, label, compact = false } = Astro.props;
+const PROVIDER: Record<string, string> = { youtube: "YouTube", vimeo: "Vimeo", soundcloud: "SoundCloud", bandcamp: "Bandcamp", archive: "the Internet Archive" };
+const clip = r.clips?.[0];
+const meta = [r.form, r.composer, talaName].filter(Boolean).join(" · ");
+const who = [r.instrument, r.artists?.slice(0, 2).join(", ")].filter(Boolean).join(" · ");
+---
+<article class:list={["lr-reccard", compact && "is-compact"]} data-rec-card data-id={r.id} data-provider={r.provider} data-url={r.url}
+         data-start={clip?.start ?? ""} data-end={clip?.end ?? ""}>
+  <div class="lr-reccard-player" data-player>
+    <button type="button" class="lr-btn" data-load>Load the recording</button>
+    <small>{PROVIDER[r.provider] ?? "The provider"} · loads only when you press this</small>
+  </div>
+  <div class="lr-reccard-t">
+    {guess ? (
+      <p class="lr-reccard-h"><b>{label ?? "A recording"}</b> <span>The raga, title and composition are covered until you guess.</span></p>
+    ) : (
+      <>
+        <p class="lr-reccard-h"><b>{r.composition || recordingLabel(r)}</b>{meta && <span>{meta}</span>}</p>
+        {(ragaName || who) && <p class="lr-reccard-who">{[ragaName, who].filter(Boolean).join(" · ")}</p>}
+        {r.listenFor && <p class="lr-reccard-lf"><span class="lr-eyebrow">Listen for</span> {r.listenFor}</p>}
+        {r.sections?.length > 0 && (
+          <div class="lr-chips" aria-label="Sections">
+            {r.sections.map((s) => <button type="button" class="lr-chip" data-seek={s.t}><span class="mono">{s.t}</span> {s.label}</button>)}
+          </div>
+        )}
+        {clip && r.sections?.length === 0 && <p class="lr-meta">Clip {clip.start}{clip.end && `–${clip.end}`}{clip.label && ` · ${clip.label}`}</p>}
+        {!compact && (
+          <p class="lr-reccard-links">
+            <a href={href(`/carnatic/listen/recording/${r.id}`)}>{r.analyses ? `${r.analyses} analys${r.analyses === 1 ? "is" : "es"}` : "Write the first analysis"} ›</a>
+            {r.beatMap && <a href={href(`/carnatic/listen/tap/${r.id}`)}>Tap along ›</a>}
+          </p>
+        )}
+      </>
+    )}
+  </div>
+</article>

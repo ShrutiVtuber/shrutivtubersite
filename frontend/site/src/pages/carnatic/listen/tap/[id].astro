@@ -1,0 +1,48 @@
+---
+/* Tap along to a recording (SELF_TEST.md K.16, LISTENING.md §6; artboard R6):
+ * the tala grid follows Shruti's beat map of this performance, so the counts
+ * move with the musicians rather than a metronome; if the player pauses,
+ * the grid pauses too. */
+import SwaraLayout from "../../../../layouts/SwaraLayout.astro";
+import { hrefIn, langOf } from "../../../../lib/carnatic/i18n";
+import { copy } from "../../../../lib/copy";
+import { notFound } from "../../../../lib/carnatic/notfound";
+import { recording, recordingLabel } from "../../../../lib/carnatic/course";
+import { talas as loadTalas } from "../../../../lib/carnatic/data";
+
+const lang = langOf(Astro);
+const say = await copy("carnatic/listen/tap/[id]");
+const L = (p: string) => hrefIn(lang, p);
+const r = await recording(Astro.params.id!);
+if (!r || r.status !== "approved" || !r.beatMap) return notFound(Astro);
+const td = await loadTalas();
+const talaId = (r.beatMap as any).tala || r.tala || "adi";
+const tala = [...(td?.practical ?? []), ...(td?.suladi ?? [])].find((t: any) => t.id === talaId);
+const clip = r.clips.find((c) => c.id === r.beatMap!.clip) ?? r.clips[0];
+const data = { id: r.id, provider: r.provider, url: r.url, clipStart: clip?.start, samam: r.beatMap.samam, counts: tala?.counts ?? [], talaName: tala?.name ?? talaId };
+---
+<SwaraLayout title={`${say("title", "Tap along to a recording")} · Swara Studio`} noindex
+             crumbs={[[say("crumb", "Listening room"), L("/carnatic/listen")], [recordingLabel(r), L(`/carnatic/listen/recording/${r.id}`)], [say("tapCrumb", "Tap along")]]}>
+  <div class="li-sec-h" style="margin-top:8px"><h1 class="lr-title" style="margin:0">{say("title", "Tap along to a recording")}</h1>
+    <small>K.16 · {recordingLabel(r)} · {data.talaName}</small></div>
+  <div class="li-tap" data-tapalong>
+    <div class="lr-reccard-player" data-player style="border-radius:10px">
+      <button type="button" class="lr-btn" data-load>{say("load", "Load the recording")}</button>
+      <small>{say("loadP", "Loads only when you press this. Then press play in its player.")}</small>
+    </div>
+    <div class="ex-card">
+      <div class="ex-head"><span>{say("beatMap", "Beat map by Shruti")}</span><span class="mono" data-av></span></div>
+      <div class="li-grid" data-grid></div>
+      <p class="tt-note" data-note>{say("note", "Tap on each count, or press the space bar.")}</p>
+      <button type="button" class="tt-pad" data-tap>{say("tap", "Tap on each count")}</button>
+      <div class="ex-actions"><button type="button" class="ex-btn ex-btn-s" data-finish>{say("finish", "Finish")}</button></div>
+    </div>
+  </div>
+  <p class="li-note">{say("foot", "The tala grid follows Shruti's beat map of this performance, so the counts move with the musicians rather than a metronome. If the player is paused, the grid pauses too.")}</p>
+  <script type="application/json" id="tap-data" set:html={JSON.stringify(data)} />
+</SwaraLayout>
+
+<script>
+  import { runTapAlong } from "../../../../lib/carnatic/client/listening";
+  runTapAlong(document.querySelector<HTMLElement>("[data-tapalong]")!, JSON.parse(document.getElementById("tap-data")!.textContent!));
+</script>

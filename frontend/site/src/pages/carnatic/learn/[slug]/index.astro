@@ -6,13 +6,13 @@
  * client/lesson.ts. Visitors see published lessons only; the operator can
  * add ?preview=true to read a draft, and the page says so.
  */
-import SwaraLayout from "../../../layouts/SwaraLayout.astro";
-import { hrefIn, langOf, LANG_NAME } from "../../../lib/carnatic/i18n";
-import { visitor, swaraScript } from "../../../lib/carnatic/prefs";
-import { notFound } from "../../../lib/carnatic/notfound";
-import { copy } from "../../../lib/copy";
-import { drills, exercises, glossary, isOperator, lesson, lessonContext, units } from "../../../lib/carnatic/course";
-import { confidenceLine, renderLesson } from "../../../lib/carnatic/lesson";
+import SwaraLayout from "../../../../layouts/SwaraLayout.astro";
+import { hrefIn, langOf, LANG_NAME } from "../../../../lib/carnatic/i18n";
+import { visitor, swaraScript } from "../../../../lib/carnatic/prefs";
+import { notFound } from "../../../../lib/carnatic/notfound";
+import { copy } from "../../../../lib/copy";
+import { drills, exercises, glossary, isOperator, lesson, lessonContext, units } from "../../../../lib/carnatic/course";
+import { confidenceLine, renderLesson } from "../../../../lib/carnatic/lesson";
 
 const lang = langOf(Astro);
 const say = await copy("carnatic/learn/[slug]");
@@ -170,7 +170,7 @@ const outOfDate = lang !== "en" && l.translation?.outOfDate;
 </SwaraLayout>
 
 <script>
-  import { hydrateLesson } from "../../../lib/carnatic/client/lesson";
+  import { hydrateLesson } from "../../../../lib/carnatic/client/lesson";
   const root = document.querySelector<HTMLElement>("[data-lesson-root]");
   const data = JSON.parse(document.getElementById("lesson-data")?.textContent ?? "null");
   if (root && data) hydrateLesson(root, data);

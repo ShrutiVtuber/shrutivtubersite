@@ -296,6 +296,11 @@ def parse_recordings(folder: Path) -> list[dict]:
         parts = [p.strip() for p in comp_line.split(" / ")]
         composition = parts[0] if parts else ""
         composer = parts[1] if len(parts) > 1 else ""
+        # "Chakkani Rajamargamu; composer Thyagaraja": the writers put the composer after a semicolon.
+        if "; composer" in composition.lower():
+            composition, _, rest = composition.partition(";")
+            composer = composer or re.sub(r"(?i)^\s*composer\s*", "", rest).strip()
+        composition = composition.strip()
         form = (parts[2] if len(parts) > 2 else "") or get("Form") or r["formSection"]
         artists_text = get("Artist(s)", "Artists", "Artists as stated")
         flags_text = get("Flags")
@@ -304,7 +309,7 @@ def parse_recordings(folder: Path) -> list[dict]:
             "title": get("Title"), "channel": get("Channel"),
             "uploader_kind": uploader_kind(get("Uploader", "Uploader type")),
             "artists": [a.strip() for a in re.split(r";", artists_text) if a.strip()],
-            "composition": composition, "composer": composer, "form": (r["formSection"] or form.split(" ")[0].lower()),
+            "composition": composition, "composer": composer, "form": (r["formSection"] or re.sub(r"[^a-z-]", "", (form.split(" ")[0] if form else "").lower())),
             "raga": r["raga"], "tala": "",
             "page_says": {"text": get("Raga / tala on page", "Raga / tala as page states", "Raga / tala as stated",
                                       "Page states", "Raga as stated")},

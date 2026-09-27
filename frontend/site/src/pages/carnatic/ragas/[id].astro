@@ -20,6 +20,9 @@ import { phraseHtml } from "../../../lib/carnatic/render";
 import { inline } from "../../../lib/carnatic/notation";
 import { ragaView } from "../../../lib/carnatic/ragapage";
 import { notFound } from "../../../lib/carnatic/notfound";
+import RecordingCard from "../../../components/carnatic/RecordingCard.astro";
+import { ago, lessonsAbout, recordings as loadRecordings, works } from "../../../lib/carnatic/course";
+import { copy } from "../../../lib/copy";
 
 const lang = langOf(Astro);
 const tr = await words(lang);
@@ -56,6 +59,14 @@ const suggest = noPa ? (hasM2 ? "mute" : "ma") : "pa";
 const ROLE_LABEL = { jiva: tr("raga.jiva"), nyasa: tr("raga.nyasa"), graha: tr("raga.graha") };
 const iso = r.iso ?? "";
 const description = `${r.name}: ${r.kind === "janya" ? `a janya raga of melakarta ${r.parent.number} ${r.parent.name}` : `melakarta ${r.parent.number}`}. Characteristic phrases, arohana ${r.arohana.replace(/!\w/g, "")}, avarohana ${r.avarohana}, gamaka character and well-known compositions, with sources.`;
+/* v2: the Listening tab (reference recordings, guess, analyses) and the lessons that discuss the raga. */
+const say = await copy("carnatic/ragas/[id]");
+const [recsAll, ragaLessons] = await Promise.all([loadRecordings({ raga: r.id }), lessonsAbout({ raga: r.id })]);
+const recs = recsAll.filter((x) => x.status === "approved");
+const talaNames: Record<string, string> = { adi: "Adi", rupaka_3count: "Rupaka", misra_chapu: "Misra chapu", khanda_chapu: "Khanda chapu", adi_2_kalai: "Adi, 2 kalai" };
+const analyses = (await Promise.all(recs.map((x) => works(Astro, "carnatic-analysis", `recording:${x.id}`)))).flat()
+  .sort((a, b) => String(b.submittedAt).localeCompare(String(a.submittedAt)));
+const recTitle = new Map(recs.map((x) => [x.id, x.composition || x.title]));
 const jsonLd = { "@context": "https://schema.org", "@type": "DefinedTerm", name: r.name, alternateName: [iso, ...names.map((n) => n.text)].filter(Boolean),
   description, inDefinedTermSet: "https://shrutivtuber.com/carnatic/ragas" };
 ---
@@ -82,6 +93,10 @@ const jsonLd = { "@context": "https://schema.org", "@type": "DefinedTerm", name:
     <button type="button" class="rp-drone" data-raga-drone={suggest} aria-pressed="false" data-on={tr("raga.dronePlaying")} data-off={tr("raga.drone")}>{tr("raga.drone")}</button>
   </div>
 
+  <nav class="rp-tabs" aria-label={say("tabs", "On this page")}>
+    <a href="#top">{say("tab.overview", "Overview")}</a><a href="#rp-ph">{say("tab.phrases", "Phrases")}</a><a href="#rp-co">{say("tab.comps", "Compositions")}</a>
+    <a href="#listening">{say("tab.listening", "Listening")}</a><a href="#lessons">{say("tab.lessons", "Lessons")}</a>
+  </nav>
   <div class="sw-cols">
     <div class="sw-main">
       <section class="sw-section" aria-labelledby="rp-ph">
@@ -203,9 +218,42 @@ const jsonLd = { "@context": "https://schema.org", "@type": "DefinedTerm", name:
       </div>
     </aside>
   </div>
+
+  <section id="listening" class="rp-listening" aria-labelledby="rp-li">
+    <div class="li-sec-h"><h2 id="rp-li">{say("refH", "Reference recordings")}</h2>
+      <small>{say("approved", "Approved by Shruti · {n} for this raga").replace("{n}", String(recs.length))}</small></div>
+    {recs.length === 0 ? <p class="ch-empty">{say("noRecs", "No recording of {raga} is in the Listening room yet. Shruti approves each one before it appears here.").replace("{raga}", r.name)}</p>
+      : recs.slice(0, 3).map((x) => <RecordingCard r={x} href={L} talaName={talaNames[x.tala] ?? x.tala.replace(/_/g, " ")} />)}
+    {recs.length > 3 && <p><a class="lr-link" href={L(`/carnatic/listen?raga=${r.id}`)}>{say("allRecs", "All {n} reference recordings").replace("{n}", String(recs.length))} ›</a></p>}
+    <div class="li-cta">
+      <div><span class="t-eyebrow ch-blue">{say("guessH", "Guess the raga")}</span><b>{say("guessT", "Hear a recording before you know what it is")}</b>
+        <small>{say("guessP", "The raga is hidden until you commit a guess. Analyses stay hidden until then too.")}</small></div>
+      <a class="lr-btn" href={L("/carnatic/listen/guess")}>{say("tryOne", "Try one")}</a>
+    </div>
+    <div class="li-sec-h"><h2>{say("analysesH", "Analyses")} <small>{analyses.length || ""}</small></h2>
+      {recs[0] && <a class="lr-link" href={L(`/carnatic/listen/recording/${recs[0].id}/write`)}>{say("write", "Write an analysis")}</a>}</div>
+    {analyses.length === 0 ? <p class="li-note">{say("noAnalyses", "No analyses of these recordings yet.")}</p> : (
+      <ul class="li-list">{analyses.slice(0, 8).map((w) => (
+        <li><a href={L(`/carnatic/room/${w.id}`)}><b>{w.title || say("untitled", "An analysis")}</b><small class="r">{ago(w.submittedAt)}</small>
+          <small>{w.author} · {recTitle.get(w.subject.replace("recording:", "")) ?? ""}</small><small class="r">{w.comments} replies · {w.votes} helpful</small></a></li>
+      ))}</ul>
+    )}
+    <p class="li-note"><a href={L(`/carnatic/listen?raga=${r.id}#suggest-h`)}>{say("suggest", "Suggest a recording of {raga}").replace("{raga}", r.name)} ›</a></p>
+  </section>
+
+  <section id="lessons" class="rp-lessons" aria-labelledby="rp-le">
+    <div class="li-sec-h"><h2 id="rp-le">{say("lessonsH", "Lessons about {raga}").replace("{raga}", r.name)}</h2></div>
+    {ragaLessons.length === 0 ? <p class="li-note">{say("noLessons", "No published lesson discusses this raga yet.")}</p> : (
+      <ul class="li-list">{ragaLessons.map((l) => (
+        <li><a href={L(`/carnatic/learn/${l.slug}`)}><b>{l.title}</b><small class="r">{l.minutes} min</small><small>{say("unitLesson", "Unit {u} · lesson {n}").replace("{u}", String(l.unit)).replace("{n}", String(l.order))}</small><small></small></a></li>
+      ))}</ul>
+    )}
+  </section>
 </SwaraLayout>
 
 <script>
+  import { hydrateCards } from "../../../lib/carnatic/client/listening";
+  hydrateCards();
   import { phraseHtml } from "../../../lib/carnatic/render";
   import { playLine } from "../../../lib/carnatic/client/phrase";
   import { settings, setSettings, startDrone, theDrone, stopDrone, onDrone } from "../../../lib/carnatic/client/state";

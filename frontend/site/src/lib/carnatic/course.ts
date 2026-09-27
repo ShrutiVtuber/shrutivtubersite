@@ -160,3 +160,32 @@ export function duration(minutes: number): string {
   const m = minutes % 60;
   return m ? `${h} h ${m} min` : `${h} h`;
 }
+
+export interface WorkSummary {
+  id: number; room: string; subject: string; title: string; author: string; authorId: number | null; mine: boolean;
+  submittedAt: string | null; votes: number; comments: number; excerpt: string; hidden: boolean;
+}
+
+/** Community works in a room about one subject, as the viewer may see them (blocks and hidden ones left out). */
+export async function works(astro: any, room: string, subject?: string, sort: "new" | "discussed" = "new"): Promise<WorkSummary[]> {
+  const q = new URLSearchParams({ room, sort, ...(subject ? { subject } : {}) });
+  const r = await asReader(astro, `/api/carnatic/community/works?${q}`);
+  return r.ok ? r.body?.items ?? [] : [];
+}
+
+export async function lessonsAbout(filter: { raga?: string; tala?: string; recording?: string }): Promise<{ id: string; slug: string; title: string; unit: number; order: number; minutes: number }[]> {
+  const q = new URLSearchParams(Object.entries(filter).filter(([, v]) => v) as [string, string][]);
+  return (await get<{ items: any[] }>(`/api/carnatic/course/lessons?${q}`))?.items ?? [];
+}
+
+/** "2 days ago", "1 week ago": for lists. */
+export function ago(iso: string | null): string {
+  if (!iso) return "";
+  const d = (Date.now() - new Date(iso).getTime()) / 86400000;
+  if (d < 1) return "today";
+  if (d < 2) return "yesterday";
+  if (d < 7) return `${Math.floor(d)} days ago`;
+  if (d < 14) return "1 week ago";
+  if (d < 60) return `${Math.floor(d / 7)} weeks ago`;
+  return new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+}

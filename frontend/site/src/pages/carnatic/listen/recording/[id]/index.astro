@@ -1,0 +1,77 @@
+---
+/* One recording in the Listening room: the player with Shruti's clips and
+ * section marks, what to listen for, the lessons that recommend it, tapping
+ * along when it has a beat map, and its analyses (timestamped notes by
+ * members, with replies). A retired recording keeps its analyses and says
+ * the link has gone.
+ */
+import SwaraLayout from "../../../../../layouts/SwaraLayout.astro";
+import RecordingCard from "../../../../../components/carnatic/RecordingCard.astro";
+import { hrefIn, langOf } from "../../../../../lib/carnatic/i18n";
+import { copy } from "../../../../../lib/copy";
+import { notFound } from "../../../../../lib/carnatic/notfound";
+import { ago, lessonsAbout, recording, recordingLabel, works } from "../../../../../lib/carnatic/course";
+import { ragas as loadRagas, talas as loadTalas } from "../../../../../lib/carnatic/data";
+
+const lang = langOf(Astro);
+const say = await copy("carnatic/listen/recording/[id]");
+const L = (p: string) => hrefIn(lang, p);
+const r = await recording(Astro.params.id!);
+if (!r) return notFound(Astro);
+const sort = Astro.url.searchParams.get("sort") === "discussed" ? "discussed" : "new";
+const [rd, td, list, lessons] = await Promise.all([loadRagas(), loadTalas(), works(Astro, "carnatic-analysis", `recording:${r.id}`, sort), lessonsAbout({ recording: r.id })]);
+const ragaName = [...(rd?.janyas ?? []), ...(rd?.performed ?? []), ...(rd?.melakartas ?? [])].find((x: any) => x.id === r.raga)?.name;
+const talaName = (td?.practical ?? []).find((t: any) => t.id === r.tala)?.name ?? (r.tala ? r.tala.replace(/_/g, " ") : "");
+const title = r.status === "retired" ? say("retired", "A recording no longer online") : r.composition || recordingLabel(r);
+---
+<SwaraLayout title={`${title}${ragaName ? ` · ${ragaName}` : ""} · Swara Studio`} description={(r.listenFor || `${title}, a reference recording in the Swara Studio Listening room.`).slice(0, 300)}
+             crumbs={[[say("crumb", "Listening room"), L("/carnatic/listen")], ...(r.raga ? [[ragaName ?? r.raga, L(`/carnatic/ragas/${r.raga}`)] as [string, string]] : []), [title]]}>
+  <p class="lr-eyebrow-top">{[ragaName, r.form, talaName].filter(Boolean).join(" · ")}</p>
+  <h1 class="lr-title">{title}</h1>
+  {r.status === "retired" ? (
+    <p class="ch-empty">{say("retiredP", "The link to this recording stopped working, so it's no longer played here. Its analyses stay, for what they noticed.")}</p>
+  ) : (
+    <RecordingCard r={r} href={L} ragaName={ragaName} talaName={talaName} compact />
+  )}
+  {r.clips.length > 1 && (
+    <p class="lr-chips">{r.clips.map((c) => <button type="button" class="lr-chip" data-clip={c.start}><span class="mono">{c.start}{c.end && `–${c.end}`}</span> {c.label}</button>)}</p>
+  )}
+  <p class="lr-reccard-links">
+    {r.beatMap && <a href={L(`/carnatic/listen/tap/${r.id}`)}>{say("tap", "Tap along with the tala")} ›</a>}
+    {r.raga && <a href={L(`/carnatic/ragas/${r.raga}#listening`)}>{say("more", "More recordings of {raga}").replace("{raga}", ragaName ?? r.raga)} ›</a>}
+  </p>
+  {lessons.length > 0 && (
+    <p class="li-note">{say("inLessons", "Recommended in")} {lessons.map((l, i) => <>{i > 0 && " · "}<a href={L(`/carnatic/learn/${l.slug}`)}>{l.title}</a></>)}</p>
+  )}
+
+  <div class="li-sec-h">
+    <h2>{say("analysesH", "Analyses")} <small>{list.length || ""}</small></h2>
+    <div class="st-actions" style="margin:0">
+      <div class="lr-seg"><a href="?sort=new" aria-current={sort === "new" ? "true" : undefined}>{say("newest", "Newest")}</a><a href="?sort=discussed" aria-current={sort === "discussed" ? "true" : undefined}>{say("discussed", "Most discussed")}</a></div>
+      {r.status !== "retired" && <a class="lr-link" href={L(`/carnatic/listen/recording/${r.id}/write`)}>{say("write", "Write an analysis")}</a>}
+    </div>
+  </div>
+  {list.length === 0 ? <p class="li-note">{say("none", "Nobody has written about this one yet. An analysis is a few timestamped notes on what you hear: phrases, resting notes, gamakas, sections, the tala.")}</p> : (
+    <ul class="li-list">
+      {list.map((w) => (
+        <li><a href={L(`/carnatic/room/${w.id}`)}>
+          <b>{w.title || say("untitled", "An analysis")}</b><small class="r">{ago(w.submittedAt)}</small>
+          <small>{w.author}{w.excerpt && ` · ${w.excerpt.slice(0, 90)}`}</small><small class="r">{w.comments} replies · {w.votes} helpful</small>
+        </a></li>
+      ))}
+    </ul>
+  )}
+</SwaraLayout>
+
+<script>
+  import { hydrateCards } from "../../../../../lib/carnatic/client/listening";
+  hydrateCards();
+  document.querySelectorAll<HTMLElement>("[data-clip]").forEach((b) => b.addEventListener("click", () => {
+    const seek = document.createElement("button");
+    seek.dataset.seek = b.dataset.clip;
+    // Reuse the card's own seek path: load if needed, then seek.
+    const card = document.querySelector<HTMLElement>("[data-rec-card]");
+    const chip = card?.querySelector<HTMLElement>(`[data-seek="${b.dataset.clip}"]`);
+    if (chip) chip.click(); else { card?.setAttribute("data-start", b.dataset.clip ?? ""); card?.querySelector<HTMLElement>("[data-load]")?.click(); }
+  }));
+</script>
