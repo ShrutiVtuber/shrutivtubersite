@@ -362,6 +362,7 @@ def _rec(r: CarnaticRecording, suggester: str | None = None) -> dict:
             "composition": r.composition, "composer": r.composer, "form": r.form, "raga": r.raga, "tala": r.tala,
             "pageSays": r.page_says, "listenFor": r.listen_for, "flags": r.flags, "duration": r.duration,
             "clips": r.clips, "sections": r.sections, "beatMap": r.beat_map, "marks": r.marks or {}, "guessMode": r.guess_mode, "reason": r.reason,
+            "thumbnail": r.thumbnail, "embeddable": r.embeddable, "linkHistory": r.link_history or [],
             "decidedAt": _iso(r.decided_at), "approvedAt": _iso(r.approved_at),
             "suggestion": ({**(r.suggestion or {}), "by": suggester} if r.suggestion is not None else None),
             "research": (r.raw or {}).get("file", "")}
@@ -753,3 +754,252 @@ async def fill_waiting(ex_id: str, body: WaitingAnswer, session: AsyncSession = 
     row.data, row.admin_edited, row.edited_at, row.updated_at = data, True, _now(), _now()
     await session.commit()
     return {"ok": True}
+
+
+
+# ── adding a video, and swapping the video in a slot ────────────────────────
+
+OEMBED = {"youtube": "https://www.youtube.com/oembed", "vimeo": "https://vimeo.com/api/oembed.json",
+          "soundcloud": "https://soundcloud.com/oembed"}
+UPLOADER_KINDS = ("official-artist", "label", "broadcaster", "institution", "unofficial")
+
+
+async def lookup_link(url: str) -> dict:
+    """
+    What the provider says about a link (oEmbed): title, channel, thumbnail,
+    and whether it may be embedded. YouTube answers 401 and Vimeo 403 when
+    the owner has turned embedding off; 404 means private, deleted or wrong.
+    """
+    import httpx
+    from shruti.core.carnatic import player_of
+    provider = player_of(url)
+    if provider is None:
+        return {"ok": False, "provider": None, "reason": "Paste a YouTube, Vimeo, SoundCloud or Bandcamp link (https)."}
+    out = {"ok": True, "provider": provider, "url": url.strip(), "title": "", "channel": "", "thumbnail": "",
+           "embeddable": None, "reason": ""}
+    ep = OEMBED.get(provider)
+    if ep is None:
+        out["reason"] = "Bandcamp links open on Bandcamp; there's no player to check."
+        return out
+    try:
+        async with httpx.AsyncClient(timeout=8, follow_redirects=True) as client:
+            r = await client.get(ep, params={"url": url.strip(), "format": "json"})
+    except httpx.HTTPError:
+        out["reason"] = "The provider didn't answer. You can still save it and check later."
+        return out
+    if r.status_code in (401, 403):
+        out.update(embeddable=False, reason="The owner has turned embedding off: it can't play on the site. Find another upload.")
+        return out
+    if r.status_code == 404:
+        out.update(ok=False, reason="The provider can't find it: private, deleted, or a wrong link.")
+        return out
+    if r.status_code != 200:
+        out["reason"] = f"The provider answered {r.status_code}. You can still save it and check later."
+        return out
+    try:
+        d = r.json()
+    except ValueError:
+        return out
+    out.update(title=str(d.get("title") or ""), channel=str(d.get("author_name") or ""),
+               thumbnail=str(d.get("thumbnail_url") or ""), embeddable=bool(d.get("html")) or None)
+    return out
+
+
+class LinkIn(BaseModel):
+    url: str = Field(min_length=8, max_length=500)
+
+
+@router.post("/recordings/lookup")
+async def lookup(body: LinkIn) -> dict:
+    return await lookup_link(body.url)
+
+
+class NewRecording(BaseModel):
+    url: str = Field(min_length=8, max_length=500)
+    id: str | None = Field(default=None, max_length=80)
+    status: str = Field(default="candidate", pattern="^(candidate|approved)$")
+    raga: str = Field(default="", max_length=60)
+    composition: str = Field(default="", max_length=200)
+    composer: str = Field(default="", max_length=120)
+    form: str = Field(default="", max_length=40)
+    tala: str = Field(default="", max_length=40)
+    instrument: str = Field(default="", max_length=40)
+    artists: list[str] = Field(default_factory=list, max_length=12)
+    uploaderKind: str = Field(default="", max_length=30)
+    listenFor: str = Field(default="", max_length=600)
+
+
+async def _next_id(session: AsyncSession, stem: str) -> str:
+    stem = re.sub(r"[^a-z0-9-]+", "-", stem.lower()).strip("-") or "recording"
+    taken = {r[0] for r in (await session.execute(select(CarnaticRecording.id).where(CarnaticRecording.id.like(f"{stem}-%")))).all()}
+    n = 1
+    while f"{stem}-{n:02d}" in taken:
+        n += 1
+    return f"{stem}-{n:02d}"
+
+
+@router.post("/recordings", status_code=201)
+async def add_recording(body: NewRecording, by: str = Depends(require_admin), session: AsyncSession = Depends(get_session)) -> dict:
+    """A video she adds herself: into a named slot (a lesson's id for it) or a new one."""
+    if body.uploaderKind and body.uploaderKind not in UPLOADER_KINDS:
+        raise HTTPException(422, f"Uploader is one of {', '.join(UPLOADER_KINDS)}.")
+    found = await lookup_link(body.url)
+    if not found["ok"]:
+        raise HTTPException(422, found["reason"])
+    rid = (body.id or "").strip().lower()
+    if rid:
+        if not re.fullmatch(r"[a-z0-9]+(-[a-z0-9]+)*", rid):
+            raise HTTPException(422, "A slot id is lower-case letters, digits and hyphens, like mohanam-03.")
+        if await session.get(CarnaticRecording, rid) is not None:
+            raise HTTPException(409, "That slot already has a video: swap it instead.")
+    else:
+        rid = await _next_id(session, body.raga or f"form-{body.form or 'misc'}")
+    flags = ["embedding turned off"] if found.get("embeddable") is False else []
+    if body.uploaderKind == "unofficial":
+        flags.append("unofficial upload")
+    r = CarnaticRecording(id=rid, status=body.status, provider=found["provider"], url=body.url.strip(),
+                          title=found.get("title", ""), channel=found.get("channel", ""), thumbnail=found.get("thumbnail", ""),
+                          embeddable=found.get("embeddable"), uploader_kind=body.uploaderKind, artists=body.artists,
+                          instrument=body.instrument, composition=body.composition, composer=body.composer, form=body.form,
+                          raga=body.raga, tala=body.tala, listen_for=body.listenFor, flags=flags,
+                          raw={"added": {"by": by, "at": _iso(_now()), "in": "studio"}}, admin_edited=True,
+                          decided_at=_now() if body.status == "approved" else None,
+                          approved_at=_now() if body.status == "approved" else None)
+    session.add(r)
+    await session.commit()
+    _clear_guess_cache()
+    return {**_rec(r), "lookup": found}
+
+
+class SwapIn(BaseModel):
+    url: str = Field(min_length=8, max_length=500)
+    keepTimes: bool = False
+    note: str = Field(default="", max_length=300)
+
+
+@router.post("/recordings/{rid}/swap")
+async def swap(rid: str, body: SwapIn, by: str = Depends(require_admin), session: AsyncSession = Depends(get_session)) -> dict:
+    """
+    Replace the video in a slot, keeping its id, so every lesson, exercise and
+    embed that uses it follows. The old link (and its clip, section and beat
+    map times, which belong to that video) go into the slot's history.
+    """
+    r = await session.get(CarnaticRecording, rid)
+    if r is None:
+        raise HTTPException(404, "No such recording.")
+    found = await lookup_link(body.url)
+    if not found["ok"]:
+        raise HTTPException(422, found["reason"])
+    old = {"url": r.url, "provider": r.provider, "title": r.title, "channel": r.channel, "thumbnail": r.thumbnail,
+           "uploaderKind": r.uploader_kind, "at": _iso(_now()), "by": by, "note": body.note,
+           "times": {"clips": r.clips, "sections": r.sections, "beatMap": r.beat_map, "marks": r.marks}}
+    r.link_history = [*(r.link_history or []), old]
+    r.url, r.provider = body.url.strip(), found["provider"]
+    r.title, r.channel, r.thumbnail, r.embeddable = found.get("title", ""), found.get("channel", ""), found.get("thumbnail", ""), found.get("embeddable")
+    r.flags = [f for f in (r.flags or []) if f != "embedding turned off"] + (["embedding turned off"] if found.get("embeddable") is False else [])
+    if not body.keepTimes:
+        r.clips, r.sections, r.beat_map, r.marks = [], [], None, {}
+    r.admin_edited, r.updated_at = True, _now()
+    await session.commit()
+    return {**_rec(r), "lookup": found}
+
+
+def _clear_guess_cache() -> None:
+    from shruti.api.routes.carnatic_course import _guess_cache
+    _guess_cache.clear()
+
+
+# ── the videos the course needs (course/tools/recordings_needed.py, from the database) ──
+
+ABOUT_VIDEO = re.compile(r"recording|video|clip|timestamp|beat map|by ear|youtube|listen", re.I)
+RECORDING_TAG = re.compile(r"\{\{\s*recording\s+([^}]*)\}\}")
+TAG_ATTR = re.compile(r'(\w+)=("([^"]*)"|\S+)')
+
+
+def _unofficial(r: CarnaticRecording) -> bool:
+    return r.uploader_kind == "unofficial" or any("unofficial" in f.lower() or "rights" in f.lower() for f in (r.flags or []))
+
+
+@router.get("/needed")
+async def needed(unit: int | None = None, session: AsyncSession = Depends(get_session)) -> dict:
+    """
+    Every place the course uses a video (recommended listening, an embed in a
+    lesson, a listening exercise) with what it must demonstrate and the state
+    of its slot: found or not, approved, official or not, embeddable, clip
+    set; the slots to find; her notes about recordings; and the listening
+    exercises waiting for her times or answers. Checkmarks follow the data.
+    """
+    lessons = (await session.execute(select(CarnaticLesson).where(CarnaticLesson.lang == "en")
+                                     .order_by(CarnaticLesson.unit, CarnaticLesson.order))).scalars().all()
+    if unit is not None:
+        lessons = [l for l in lessons if l.unit == unit]
+    lesson_ids = {l.id for l in lessons}
+    recs = {r.id: r for r in (await session.execute(select(CarnaticRecording))).scalars().all()}
+    uses: list[dict] = []
+    notes: list[dict] = []
+    for l in lessons:
+        f = l.front or {}
+        for x in f.get("recordings") or []:
+            rid = x.get("id") if isinstance(x, dict) else x
+            uses.append({"lesson": l.id, "title": f.get("title", ""), "where": "recommended listening",
+                         "what": (x.get("why") if isinstance(x, dict) else "") or "", "rid": rid, "clip": ""})
+        for m in RECORDING_TAG.finditer(l.body or ""):
+            a = {k: (v2 or v) for k, v, v2 in TAG_ATTR.findall(m.group(1))}
+            clip = f"{a.get('start', '')}–{a.get('end', '')}".strip("–")
+            uses.append({"lesson": l.id, "title": f.get("title", ""), "where": "played in the lesson" + (" (guess first)" if a.get("guess") == "true" else ""),
+                         "what": "", "rid": a.get("id"), "clip": clip, "line": (l.body or "").count("\n", 0, m.start()) + 1})
+        for m in re.finditer(r"<!--\s*Sophia:(.*?)-->", l.body or "", re.S):
+            text = " ".join(m.group(1).split())
+            if ABOUT_VIDEO.search(text):
+                notes.append({"lesson": l.id, "title": f.get("title", ""), "text": text,
+                              "line": (l.body or "").count("\n", 0, m.start()) + 1})
+    annotate: list[dict] = []
+    titles = {l.id: (l.front or {}).get("title", "") for l in lessons}
+    for e in (await session.execute(select(CarnaticExercise).where(CarnaticExercise.kind == "listening")
+                                    .order_by(CarnaticExercise.id))).scalars().all():
+        if e.lesson not in lesson_ids:
+            continue
+        d = e.data or {}
+        for x in d.get("recordings") or []:
+            rid = x.get("id") if isinstance(x, dict) else x
+            clip = f"{x.get('start', '')}–{x.get('end', '')}".strip("–") if isinstance(x, dict) else ""
+            uses.append({"lesson": e.lesson, "title": titles.get(e.lesson, ""), "where": f"exercise {e.id}" + (" (guess the raga)" if d.get("guess") else ""),
+                         "what": d.get("prompt", ""), "rid": rid, "clip": clip, "exercise": e.id})
+        waiting = [(i, a) for i, a in enumerate(d.get("auto") or []) if isinstance(a, dict) and "answer" in a
+                   and a.get("answer") in (None, "", [], {}) and not a.get("answer_from")]
+        all_auto = [a for a in d.get("auto") or [] if isinstance(a, dict)]
+        if waiting or any(a.get("answer") not in (None, "") for a in all_auto if "answer" in a):
+            annotate.append({"exercise": e.id, "lesson": e.lesson, "title": d.get("title", ""),
+                             "recordings": [x.get("id") if isinstance(x, dict) else x for x in d.get("recordings") or []],
+                             "marks": [{"index": i, "text": a.get("text") or a.get("type", ""), "type": a.get("type")} for i, a in waiting],
+                             "done": not waiting})
+
+    def slot(u: dict) -> dict:
+        r = recs.get(u["rid"])
+        state = {"found": r is not None, "approved": bool(r and r.status == "approved"),
+                 "official": bool(r and not _unofficial(r)), "embeddable": None if r is None else r.embeddable,
+                 "clipSet": bool(u.get("clip") or (r and r.clips)), "status": r.status if r else "missing"}
+        cand = None if r is None else {"title": r.title, "channel": r.channel, "uploaderKind": r.uploader_kind,
+                                         "url": r.url, "flags": r.flags or [], "listenFor": r.listen_for, "thumbnail": r.thumbnail}
+        return {**u, "state": state, "candidate": cand,
+                "done": state["approved"] and state["official"] and state["embeddable"] is not False}
+
+    rows = [slot(u) for u in uses if u.get("rid")]
+    by_lesson: dict[str, list[dict]] = {}
+    for x in rows:
+        by_lesson.setdefault(x["lesson"], []).append(x)
+    used = {x["rid"] for x in rows}
+    missing = sorted({x["rid"] for x in rows if not x["state"]["found"]})
+    unofficial = sorted({x["rid"] for x in rows if x["state"]["found"] and not x["state"]["official"]})
+    return {
+        "summary": {"used": len(used), "lessons": len(by_lesson), "missing": len(missing), "unofficial": len(unofficial),
+                    "notes": len(notes), "toMark": sum(1 for a in annotate if not a["done"]),
+                    "approved": sum(1 for rid in used if rid in recs and recs[rid].status == "approved"),
+                    "spare": sum(1 for rid, r in recs.items() if rid not in used and r.status != "rejected")},
+        "missing": [{"rid": rid, "uses": [x for x in rows if x["rid"] == rid]} for rid in missing],
+        "unofficial": [{"rid": rid, "candidate": slot({"rid": rid, "lesson": "", "title": "", "where": "", "what": ""})["candidate"],
+                        "lessons": sorted({x["lesson"] for x in rows if x["rid"] == rid})} for rid in unofficial],
+        "notes": notes,
+        "lessons": [{"lesson": lid, "title": titles.get(lid, ""), "slots": xs} for lid, xs in sorted(by_lesson.items())],
+        "annotate": annotate,
+    }

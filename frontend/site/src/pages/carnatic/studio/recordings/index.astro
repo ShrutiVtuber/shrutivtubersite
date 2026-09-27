@@ -33,7 +33,9 @@ const balRows = ((bal?.items ?? []) as any[]).map((b) => {
 ---
 <StudioLayout title="Recordings" counts={{ recordings: counts.candidate }}>
   <div class="sa-head"><h1>Recordings</h1><span class="spacer"></span>
-    {TABS.map(([v, label]) => <a class="lr-link" href={`?view=${v}`} style={view === v ? "font-weight:600" : "text-decoration:none"}>{label}</a>)}</div>
+    <a class="lr-link" href="/carnatic/studio/recordings/needed" style="text-decoration:none">Recordings needed</a>
+    {TABS.map(([v, label]) => <a class="lr-link" href={`?view=${v}`} style={view === v ? "font-weight:600" : "text-decoration:none"}>{label}</a>)}
+    <a class="sa-btn primary" href="/carnatic/studio/recordings/add">Add a video</a></div>
   {view !== "balance" && (
     <>
       <form class="sa-row" style="margin-bottom:12px" method="get">

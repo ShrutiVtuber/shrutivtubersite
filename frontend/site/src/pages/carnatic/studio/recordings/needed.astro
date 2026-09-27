@@ -1,0 +1,82 @@
+---
+/* Recordings needed (Studio → Recordings): the course's video to-do list,
+ * the same content as course/tools/recordings_needed.py but built from the
+ * database, so the checkmarks follow what is really so: approved, official,
+ * embeddable, clip set, answers set. Filter by unit. */
+import StudioLayout from "../../../../layouts/StudioLayout.astro";
+import { studio, studioGate } from "../../../../lib/carnatic/course";
+
+const gate = await studioGate(Astro);
+if (gate) return gate;
+const unit = Astro.url.searchParams.get("unit") ? Number(Astro.url.searchParams.get("unit")) : null;
+const [n, t] = await Promise.all([studio(Astro, `/needed${unit ? `?unit=${unit}` : ""}`), studio(Astro, "/tree")]);
+const sum = n?.summary ?? {};
+const units: any[] = t?.units ?? [];
+const tick = (ok: boolean) => (ok ? "☑" : "☐");
+---
+<StudioLayout title="Recordings needed">
+  <div class="sa-head"><a class="lr-link" href="/carnatic/studio/recordings">‹ Recordings</a><h1>Recordings needed</h1><span class="spacer"></span>
+    <select data-unit aria-label="Unit"><option value="">All units</option>{units.map((u) => <option value={u.n} selected={u.n === unit}>Unit {u.n}: {u.title}</option>)}</select>
+    <a class="sa-btn primary" href="/carnatic/studio/recordings/add">Add a video</a></div>
+  <div class="sa-checks">
+    <p><strong>{sum.used} videos are used by the course</strong>, in {sum.lessons} lessons; {sum.approved} approved so far.</p>
+    <p><strong>To find:</strong> {sum.missing} the research never found, {sum.unofficial} whose only candidate is an unofficial upload, and {sum.notes} of your editor notes that are about recordings.</p>
+    <p><strong>To mark:</strong> {sum.toMark} listening exercises need your clip times or answers before they can check themselves.</p>
+    {!unit && <p>{sum.spare} more candidates aren't used by any lesson yet (spares for the Listening room).</p>}
+    <p class="sa-soft">How to judge a video: it shows what "Must demonstrate" says, is an official upload (artist, label, broadcaster or institution) where possible, allows embedding, and is the raga and tala the lesson says. To replace one, swap it in its slot so the lessons that use it follow.</p>
+  </div>
+
+  <h2 class="t-eyebrow" style="margin-top:20px">1. To find</h2>
+  {(n?.missing ?? []).length > 0 && (
+    <div class="sa-card" style="margin-bottom:12px"><b>Used by the course but no video yet</b>
+      <ul class="sa-rev">{n.missing.map((m: any) => (
+        <li><span>☐ <b class="mono">{m.rid}</b> · <a href={`/carnatic/studio/recordings/add?slot=${m.rid}`}>Add a video to this slot</a></span>
+          {m.uses.map((u: any) => <span class="sa-soft">{u.lesson} {u.title} ({u.where}){u.what && <> · must demonstrate: {u.what}</>}</span>)}</li>
+      ))}</ul></div>
+  )}
+  {(n?.unofficial ?? []).length > 0 && (
+    <div class="sa-card" style="margin-bottom:12px"><b>Only an unofficial upload so far</b> <span class="sa-soft">find an official one and swap it in</span>
+      <ul class="sa-rev">{n.unofficial.map((u: any) => (
+        <li><span>☐ <a href={`/carnatic/studio/recordings/${u.rid}`} class="mono">{u.rid}</a>: {u.candidate?.title} ({u.candidate?.channel})</span>
+          <span class="sa-soft">Used in {u.lessons.join(", ")} · <a href={u.candidate?.url} target="_blank" rel="noopener">open</a> · <a href={`/carnatic/studio/recordings/${u.rid}#swap`}>swap the video</a></span></li>
+      ))}</ul></div>
+  )}
+  {(n?.notes ?? []).length > 0 && (
+    <div class="sa-card" style="margin-bottom:12px"><b>Your editor notes about recordings</b>
+      <ul class="sa-rev">{n.notes.map((x: any) => <li><span>☐ <a href={`/carnatic/studio/lessons/${x.lesson}?line=${x.line}`}><b>{x.lesson} {x.title}:</b></a> {x.text}</span></li>)}</ul></div>
+  )}
+
+  <h2 class="t-eyebrow" style="margin-top:20px">2. To check and approve, lesson by lesson</h2>
+  <p class="sa-soft">Each box follows the data: approved · an official upload · embedding allowed · clip set.</p>
+  {(n?.lessons ?? []).map((l: any) => (
+    <section class="sa-card" style="margin-bottom:10px">
+      <b><a href={`/carnatic/studio/lessons/${l.lesson}`}>{l.lesson} {l.title}</a></b>
+      <ul class="sa-rev">{l.slots.map((x: any) => (
+        <li>
+          <span>{tick(x.done)} <b class="mono">{x.rid}</b> ({x.where}{x.clip && `, clip ${x.clip}`})
+            · {x.state.found ? <a href={`/carnatic/studio/recordings/${x.rid}`}>open</a> : <a href={`/carnatic/studio/recordings/add?slot=${x.rid}`}>add a video</a>}</span>
+          {(x.what || x.candidate?.listenFor) && <span class="sa-soft">Must demonstrate: {x.what || x.candidate?.listenFor}</span>}
+          {x.candidate ? (
+            <span class="sa-soft">Candidate: {x.candidate.title} · {x.candidate.channel} · {x.candidate.uploaderKind || "uploader not stated"}
+              {(x.candidate.flags ?? []).length > 0 && <> · flags: {x.candidate.flags.join("; ")}</>}</span>
+          ) : <span class="sa-tag">No candidate yet: this one has to be found.</span>}
+          <span class="sa-soft">{tick(x.state.approved)} approved ({x.state.status}) · {tick(x.state.official)} official · {tick(x.state.embeddable !== false)} embeddable{x.state.embeddable === null ? " (not checked)" : ""} · {tick(x.state.clipSet)} clip set</span>
+        </li>
+      ))}</ul>
+    </section>
+  ))}
+
+  <h2 class="t-eyebrow" style="margin-top:20px">3. To mark (clip times and answers)</h2>
+  <p class="sa-soft">Open the video, set the clip or section times, and fill in the answers the exercise asks for (also on <a href="/carnatic/studio/lessons?tab=waiting">Waiting for your annotation</a>). Until then these exercises work as peer discussion only.</p>
+  <ul class="sa-rev">{(n?.annotate ?? []).map((a: any) => (
+    <li><span>{tick(a.done)} <b class="mono">{a.exercise}</b> ({a.lesson}) · {a.recordings.map((r: string, i: number) => <>{i > 0 && ", "}<a href={`/carnatic/studio/recordings/${r}`}>{r}</a></>)}</span>
+      {a.marks.length > 0 && <span class="sa-soft">Mark: {a.marks.map((m: any) => m.text).join("; ")}</span>}</li>
+  ))}</ul>
+</StudioLayout>
+
+<script>
+  document.querySelector<HTMLSelectElement>("[data-unit]")?.addEventListener("change", (e) => {
+    const v = (e.target as HTMLSelectElement).value;
+    location.search = v ? `?unit=${v}` : "";
+  });
+</script>

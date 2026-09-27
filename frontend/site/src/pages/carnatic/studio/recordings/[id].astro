@@ -53,6 +53,18 @@ const lines = {
         <p class="sa-soft">Tap along once with the space bar, one tap a samam, then correct. Taps more than 80 ms off the smoothed tempo are listed for a second look.</p>
         <ul class="sa-list" data-beat-flags></ul><p class="sa-soft" data-beat-sum></p>
         <label class="sa-soft">Tala of the beat map <input class="sa-btn" data-bm-tala value={r.beatMap?.tala || r.tala || "adi"} /></label></div>
+      <div class="sa-card" id="swap" data-swap><b>The video in this slot</b>
+        <p class="sa-soft" style="margin:4px 0">Every lesson, exercise and embed that uses <span class="mono">{r.id}</span> plays whatever link is here.</p>
+        {r.thumbnail && <img src={r.thumbnail} alt="" style="width:100%;border-radius:8px" loading="lazy" referrerpolicy="no-referrer" />}
+        <p style="margin:6px 0"><a href={r.url} target="_blank" rel="noopener">{r.title || r.url}</a><br /><span class="sa-soft">{r.channel}{r.uploaderKind && ` · ${r.uploaderKind}`}{r.embeddable === false ? " · embedding turned off" : ""}</span></p>
+        <label class="sa-form"><span style="grid-column:1/-1">Swap in another video</span><input style="grid-column:1/-1" data-swap-url type="url" placeholder="https://…" /></label>
+        <label class="sa-soft"><input type="checkbox" data-keep-times /> Keep the clip, section and beat-map times (only if it's the same performance)</label>
+        <input class="sa-btn" data-swap-note placeholder="Why (for the history, optional)" style="width:100%;margin:6px 0" />
+        <div class="sa-row"><button type="button" class="sa-btn" data-swap-lookup>Look it up</button><button type="button" class="sa-btn primary" data-swap-go>Swap</button></div>
+        <div data-swap-preview class="sa-soft"></div>
+        {(r.linkHistory ?? []).length > 0 && <><p style="margin:10px 0 2px"><b>Earlier videos in this slot</b></p>
+          <ul class="sa-rev">{[...r.linkHistory].reverse().map((h: any) => <li><a href={h.url} target="_blank" rel="noopener">{h.title || h.url}</a><span class="sa-soft">{h.channel} · replaced {new Date(h.at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}{h.by && ` by ${h.by}`}{h.note && ` · ${h.note}`}</span></li>)}</ul></>}
+      </div>
       <div class="sa-card"><b>What it is</b>
         <div class="sa-form" style="margin-top:8px" data-meta>
           <label>Raga<input name="raga" value={r.raga} /></label><label>Tala<input name="tala" value={r.tala} /></label>
@@ -153,6 +165,23 @@ const lines = {
       korvais: rows("korvais").map(([start, landing]) => ({ start, landing: Number(landing) })),
     };
   };
+  // swapping the video in the slot
+  const swapUrl = $<HTMLInputElement>("[data-swap-url]");
+  const swapPrev = $("[data-swap-preview]");
+  const post = (url: string, body: unknown) => fetch(url, { method: "POST", headers: { "content-type": "application/json", "x-csrf-token": csrf() }, body: JSON.stringify(body) });
+  $("[data-swap-lookup]").addEventListener("click", async () => {
+    if (!swapUrl.value.trim()) return;
+    const d = await (await post("/api/carnatic/studio/recordings/lookup", { url: swapUrl.value.trim() })).json();
+    swapPrev.innerHTML = `${d.thumbnail ? `<img src="${esc(d.thumbnail)}" alt="" style="width:100%;border-radius:8px" referrerpolicy="no-referrer">` : ""}<p><b>${esc(d.title || "(no title)")}</b> · ${esc(d.channel)}</p>`
+      + (d.embeddable === false ? `<p class="sa-tag">Embedding is turned off: it can't play on the site.</p>` : d.reason ? `<p>${esc(d.reason)}</p>` : "");
+  });
+  $("[data-swap-go]").addEventListener("click", async () => {
+    if (!swapUrl.value.trim()) return;
+    if (!confirm("Swap the video in this slot? The old link goes into its history; every lesson that uses the slot plays the new one.")) return;
+    const r = await post(`/api/carnatic/studio/recordings/${R.id}/swap`, { url: swapUrl.value.trim(), keepTimes: $<HTMLInputElement>("[data-keep-times]").checked, note: $<HTMLInputElement>("[data-swap-note]").value });
+    if (r.ok) location.reload(); else swapPrev.textContent = `Didn't swap (${r.status}): ${(await r.text()).slice(0, 160)}`;
+  });
+
   $("[data-save]").addEventListener("click", async () => {
     const meta: Record<string, string> = {};
     document.querySelectorAll<HTMLInputElement>("[data-meta] [name]").forEach((x) => { meta[x.name] = x.value; });

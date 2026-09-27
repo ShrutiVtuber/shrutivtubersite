@@ -1,0 +1,85 @@
+---
+/* Add a video (Studio → Recordings): paste a YouTube, Vimeo or SoundCloud
+ * link, see what the provider says (title, channel, thumbnail, and whether
+ * embedding is allowed), then save it as a recording, into a named slot the
+ * course already uses (?slot=mohanam-03) or a new one. */
+import StudioLayout from "../../../../layouts/StudioLayout.astro";
+import { studio, studioGate } from "../../../../lib/carnatic/course";
+import { ragas as loadRagas, talas as loadTalas } from "../../../../lib/carnatic/data";
+
+const gate = await studioGate(Astro);
+if (gate) return gate;
+const slot = Astro.url.searchParams.get("slot") ?? "";
+const [rd, td, needed] = await Promise.all([loadRagas(), loadTalas(), slot ? studio(Astro, "/needed") : null]);
+const ragaOpts = [...(rd?.janyas ?? []), ...(rd?.performed ?? []), ...(rd?.melakartas ?? [])].map((r: any) => ({ id: r.id, name: r.name })).sort((a, b) => a.name.localeCompare(b.name));
+const talaOpts = (td?.practical ?? []).map((t: any) => ({ id: t.id, name: t.name }));
+const uses = slot ? ((needed?.lessons ?? []) as any[]).flatMap((l) => l.slots).filter((x: any) => x.rid === slot) : [];
+const guessRaga = slot.replace(/-\d+$/, "");
+const FORMS = ["kriti", "varnam", "alapana", "tanam", "niraval", "kalpanaswaram", "tani", "geetham", "swarajati", "jatiswaram", "tillana", "padam", "javali", "ragamalika", "viruttam", "kirtana", "rtp", "concert", "lecdem", "tanpura", "konnakol"];
+---
+<StudioLayout title="Add a video">
+  <div class="sa-head"><a class="lr-link" href="/carnatic/studio/recordings">‹ Recordings</a><h1>Add a video{slot && <> to <span class="mono">{slot}</span></>}</h1></div>
+  {uses.length > 0 && (
+    <div class="sa-checks"><b>This slot is used in</b>{uses.map((u: any) => <p class="blocks">{u.lesson} {u.title} · {u.where}{u.what && <> · must demonstrate: {u.what}</>}</p>)}</div>
+  )}
+  <div class="sa-edit" data-add data-slot={slot}>
+    <div class="sa-card" style="display:grid;gap:12px">
+      <label class="sa-form"><span class="wide" style="grid-column:1/-1"><b>Link</b></span>
+        <input class="wide" style="grid-column:1/-1" data-url type="url" placeholder="https://www.youtube.com/watch?v=… · vimeo.com/… · soundcloud.com/…" /></label>
+      <div class="sa-row"><button type="button" class="sa-btn" data-lookup>Look it up</button><span class="sa-soft" data-lookup-note>We ask the provider for its title and channel, and whether it may be embedded.</span></div>
+      <div class="sa-form" data-fields>
+        <label>Slot id<input name="id" value={slot} placeholder={slot ? "" : "new slot: made from the raga or form"} /></label>
+        <label>Uploader<select name="uploaderKind"><option value="">choose…</option>{["official-artist", "label", "broadcaster", "institution", "unofficial"].map((k) => <option value={k}>{k.replace("-", " ")}</option>)}</select></label>
+        <label>Raga<input name="raga" list="st-ragas" value={ragaOpts.some((r) => r.id === guessRaga) ? guessRaga : ""} /></label>
+        <label>Tala<select name="tala"><option value="">not stated</option>{talaOpts.map((t: any) => <option value={t.id}>{t.name}</option>)}</select></label>
+        <label>Form<input name="form" list="st-forms" value={slot.startsWith("form-") ? slot.replace(/^form-/, "").replace(/-\d+$/, "") : ""} /></label>
+        <label>Instrument<input name="instrument" list="st-instr" /></label>
+        <label class="wide">Composition<input name="composition" /></label>
+        <label>Composer<input name="composer" /></label>
+        <label>Artists (comma between)<input name="artists" /></label>
+        <label class="wide">Listen for<textarea name="listenFor" rows="3" placeholder="What a learner should hear in it: one or two sentences."></textarea></label>
+      </div>
+      <div class="sa-row"><button type="button" class="sa-btn" data-save="candidate">Save as a candidate</button><button type="button" class="sa-btn primary" data-save="approved">Save and approve</button><span class="sa-soft" data-note></span></div>
+    </div>
+    <div class="sa-card" data-preview-card>
+      <p class="sa-soft">What the provider says appears here: title, channel, thumbnail and whether it can play on the site.</p>
+    </div>
+  </div>
+  <datalist id="st-ragas">{ragaOpts.map((r) => <option value={r.id}>{r.name}</option>)}</datalist>
+  <datalist id="st-forms">{FORMS.map((f) => <option value={f} />)}</datalist>
+  <datalist id="st-instr">{["voice", "veena", "violin", "venu", "mridangam", "nagaswaram", "ensemble"].map((f) => <option value={f} />)}</datalist>
+</StudioLayout>
+
+<script>
+  import { csrf } from "../../../../lib/carnatic/client/state";
+  const root = document.querySelector<HTMLElement>("[data-add]")!;
+  const esc = (s: string) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
+  const post = (url: string, body: unknown) => fetch(url, { method: "POST", headers: { "content-type": "application/json", "x-csrf-token": csrf() }, body: JSON.stringify(body) });
+  const url = root.querySelector<HTMLInputElement>("[data-url]")!;
+  const card = root.querySelector<HTMLElement>("[data-preview-card]")!;
+  const note = root.querySelector<HTMLElement>("[data-note]")!;
+  const show = (d: any) => {
+    const verdict = d.embeddable === false ? `<p class="sa-tag">Embedding is turned off: it can't play on the site. ${esc(d.reason)}</p>`
+      : d.embeddable ? `<p class="sa-soft">Embedding allowed.</p>` : `<p class="sa-soft">${esc(d.reason || "The provider didn't say whether it may be embedded.")}</p>`;
+    card.innerHTML = (d.thumbnail ? `<img src="${esc(d.thumbnail)}" alt="" style="width:100%;border-radius:8px" loading="lazy" referrerpolicy="no-referrer">` : "")
+      + `<p><b>${esc(d.title || "(no title)")}</b><br><span class="sa-soft">${esc(d.channel)} · ${esc(d.provider ?? "")}</span></p>${verdict}`;
+  };
+  root.querySelector("[data-lookup]")!.addEventListener("click", async () => {
+    if (!url.value.trim()) return;
+    root.querySelector("[data-lookup-note]")!.textContent = "Asking the provider…";
+    const r = await post("/api/carnatic/studio/recordings/lookup", { url: url.value.trim() });
+    const d = await r.json();
+    root.querySelector("[data-lookup-note]")!.textContent = d.ok ? "" : d.reason;
+    show(d);
+  });
+  root.querySelectorAll<HTMLButtonElement>("[data-save]").forEach((b) => b.addEventListener("click", async () => {
+    const v = (n: string) => (root.querySelector(`[data-fields] [name="${n}"]`) as HTMLInputElement).value.trim();
+    const body = { url: url.value.trim(), id: v("id") || null, status: b.dataset.save, raga: v("raga"), tala: v("tala"), form: v("form"),
+      instrument: v("instrument"), composition: v("composition"), composer: v("composer"), uploaderKind: v("uploaderKind"),
+      artists: v("artists").split(",").map((x) => x.trim()).filter(Boolean), listenFor: v("listenFor") };
+    const r = await post("/api/carnatic/studio/recordings", body);
+    const d = await r.json().catch(() => null);
+    if (r.ok) { location.href = `/carnatic/studio/recordings/${d.id}`; return; }
+    note.textContent = typeof d?.detail === "string" ? d.detail : d?.detail?.[0]?.msg ?? `Didn't save (${r.status}).`;
+  }));
+</script>

@@ -168,6 +168,10 @@ class CarnaticRecording(TimestampMixin, table=True):
     # In guess mode (LISTENING.md §5): its analyses stay hidden from anyone who hasn't guessed it.
     # Also on for any recording a guess: true exercise or a {{recording … guess=true}} tag names.
     guess_mode: bool = False
+    # A slot's earlier links, newest last: [{url, provider, title, channel, at, by}] (the swap history).
+    link_history: list = Field(default_factory=list, sa_column=Column(JSONB, nullable=False, server_default="[]"))
+    thumbnail: str = ""
+    embeddable: Optional[bool] = None     # from oEmbed: None when the provider didn't say
     # Decisions
     reason: str = ""                # a rejection reason the suggester sees
     decided_at: Optional[datetime] = Field(default=None, sa_type=UTC_TS)

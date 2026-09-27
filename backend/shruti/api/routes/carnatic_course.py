@@ -570,7 +570,7 @@ def recording_json(r: CarnaticRecording, *, reveal: bool = True, analyses: int |
            "channel": r.channel, "artists": r.artists, "instrument": r.instrument, "composition": r.composition,
            "composer": r.composer, "form": r.form, "raga": r.raga, "tala": r.tala, "listenFor": r.listen_for,
            "clips": r.clips or [], "sections": r.sections or [], "beatMap": r.beat_map,
-           "annotations": r.marks or {}, "analyses": None if locked else analyses, **guess}
+           "annotations": r.marks or {}, "thumbnail": r.thumbnail, "analyses": None if locked else analyses, **guess}
     if not reveal:
         for k in ("title", "channel", "artists", "composition", "composer", "raga", "listenFor", "sections"):
             out[k] = None

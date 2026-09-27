@@ -838,6 +838,15 @@ Only recordings Sophia has **approved** are ever returned.
   "analyses": 14 }
 ```
 
+**Slots.** A recording's `id` is a slot: lessons, exercises and embeds
+name the id, never the link. Shruti can swap the video in a slot in the
+Studio (the old link is kept in the slot's history there), so the `url`,
+`provider`, `title`, `channel` and `thumbnail` of an id can change: cache
+by id, and fetch the recording again rather than keeping its link for
+long. `thumbnail` is the provider's (oEmbed) image, or `""`; load it only
+where the provider's own images are acceptable. Recordings whose owner has
+turned embedding off are never approved for playing.
+
 **Guess mode** (LISTENING.md §5.4). A recording is in guess mode when
 Shruti marks it so in the Studio, or when a `guess: true` exercise or a
 lesson's `{{recording … guess=true}}` names it. Every recording carries
@@ -998,4 +1007,8 @@ course/EDITING.md (`GET …/questions`, `PUT …/questions/{id}` with
 never touches her answers), and the items waiting for her annotation
 (`GET …/waiting`, `PUT …/waiting/{exercise}` with `{part, index,
 answer}`). Recording marks for the ear trainer are set with `PUT
-…/recordings/{id}` and `marks`.
+…/recordings/{id}` and `marks`. Videos: `POST …/recordings/lookup` (oEmbed:
+title, channel, thumbnail, embeddable), `POST …/recordings` (add, into a
+named slot or a new one), `POST …/recordings/{id}/swap` (replace the link,
+keep the id; `linkHistory` holds the earlier ones), and `GET
+…/needed?unit=` (the videos the course needs, with state).

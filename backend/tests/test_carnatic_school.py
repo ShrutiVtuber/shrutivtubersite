@@ -506,3 +506,57 @@ async def _guess_first():
 @needs_db
 def test_guess_mode_hides_analyses_until_you_have_guessed() -> None:
     asyncio.run(_guess_first())
+
+
+async def _video_slots(monkeypatch):
+    from fastapi import HTTPException
+    from shruti.models.carnatic_course import CarnaticRecording
+    tag = uuid.uuid4().hex[:6]
+    lid = f"T{tag}.L01"
+
+    async def fake(url):
+        if "gone" in url:
+            return {"ok": False, "provider": "youtube", "reason": "The provider can't find it."}
+        off = "noembed" in url
+        return {"ok": True, "provider": "youtube", "url": url, "title": f"T {url[-4:]}", "channel": "C", "thumbnail": "",
+                "embeddable": False if off else True, "reason": ""}
+    monkeypatch.setattr(studio, "lookup_link", fake)
+    b = _bundle(tag)
+    b["lessons"][0]["body"] += f"\n{{{{recording id=slot-{tag}-01}}}}\n"
+    b["lessons"][0]["hash"] = "changed"
+    engine, s = await _session()
+    async with s:
+        await course.import_bundle(s, b)
+        await s.commit()
+        need = await studio.needed(1, s)
+        assert f"slot-{tag}-01" in [m["rid"] for m in need["missing"]]
+        # Add a video into the missing slot; a link embedding is off for is flagged.
+        added = await studio.add_recording(studio.NewRecording(url="https://youtu.be/noembed", id=f"slot-{tag}-01",
+                                                               raga="mohanam", uploaderKind="label"), "op", s)
+        assert added["id"] == f"slot-{tag}-01" and added["embeddable"] is False and "embedding turned off" in added["flags"]
+        with pytest.raises(HTTPException):
+            await studio.add_recording(studio.NewRecording(url="https://youtu.be/x2", id=f"slot-{tag}-01"), "op", s)
+        with pytest.raises(HTTPException):
+            await studio.add_recording(studio.NewRecording(url="https://youtu.be/gone"), "op", s)
+        new = await studio.add_recording(studio.NewRecording(url="https://youtu.be/abcd", raga=f"r{tag}"), "op", s)
+        assert new["id"] == f"r{tag}-01"
+        # Swap the video in the slot: same id, old link in history, times cleared.
+        rid = f"slot-{tag}-01"
+        await studio.annotate(rid, studio.Annotations(clips=[{"start": "0:10", "end": "0:40"}]), s)
+        sw = await studio.swap(rid, studio.SwapIn(url="https://youtu.be/wxyz", note="official upload"), "op", s)
+        assert sw["id"] == rid and sw["url"].endswith("wxyz") and sw["embeddable"] is True
+        assert sw["linkHistory"][-1]["url"].endswith("noembed") and sw["linkHistory"][-1]["times"]["clips"]
+        assert sw["clips"] == [] and "embedding turned off" not in sw["flags"]
+        # The needed list follows the data: found now, not yet approved.
+        need = await studio.needed(1, s)
+        slot = next(x for l in need["lessons"] for x in l["slots"] if x["rid"] == rid)
+        assert slot["state"]["found"] and not slot["state"]["approved"] and not slot["done"]
+        await studio.decide(rid, studio.Decision(action="approve"), s)
+        slot = next(x for l in (await studio.needed(1, s))["lessons"] for x in l["slots"] if x["rid"] == rid)
+        assert slot["done"]
+    await engine.dispose()
+
+
+@needs_db
+def test_she_adds_videos_and_swaps_the_video_in_a_slot(monkeypatch) -> None:
+    asyncio.run(_video_slots(monkeypatch))

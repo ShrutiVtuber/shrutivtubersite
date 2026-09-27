@@ -90,6 +90,11 @@ const page = { id, lang, status: l.status, revision: l.revision, front: f, body:
         <div class="sa-row" style="justify-content:space-between;margin-bottom:6px"><span><b>Body</b> <span class="sa-soft">plain text · embed tags stay as text · editor notes are &lt;!-- --&gt;</span></span><span class="sa-soft" data-words></span></div>
         <textarea data-body spellcheck="true">{l.body}</textarea>
       </div>
+      <div class="sa-card" data-use-rec><b>Use a recording here</b> <span class="sa-soft">Put the cursor in the body where it should play, or on a {"{{recording …}}"} line to change which recording that slot uses.</span>
+        <div class="sa-row" style="margin:8px 0"><input class="sa-btn" data-rec-q placeholder="Search recordings: raga, title, id" style="flex:1" /><button type="button" class="sa-btn" data-rec-search>Search</button>
+          <a class="lr-link" href="/carnatic/studio/recordings/add" target="_blank">Add a video</a></div>
+        <ul class="sa-rev" data-rec-results></ul>
+      </div>
       <div class="sa-card" data-notes-card><b>Editor notes</b><ul class="sa-rev" data-notes></ul></div>
     </div>
     <div>
@@ -210,6 +215,44 @@ const page = { id, lang, status: l.status, revision: l.revision, front: f, body:
   };
   $("[data-save]").addEventListener("click", () => void save(status.value === "published" && P.status !== "published" ? P.status : status.value));
   $("[data-publish]").addEventListener("click", () => void save("published"));
+
+  // use a recording here: insert an embed at the cursor, or re-point the {{recording}} tag on that line
+  const recResults = $("[data-rec-results]");
+  const lineAt = () => {
+    const pos = body.selectionStart ?? 0;
+    const start = body.value.lastIndexOf("\n", pos - 1) + 1;
+    const end = body.value.indexOf("\n", pos);
+    return { start, end: end < 0 ? body.value.length : end };
+  };
+  const useHere = (rid: string) => {
+    const { start, end } = lineAt();
+    const line = body.value.slice(start, end);
+    if (/\{\{\s*recording\b/.test(line)) {
+      body.value = body.value.slice(0, start) + line.replace(/\bid=("?)[a-z0-9-]+\1/, `id=${rid}`) + body.value.slice(end);
+    } else {
+      const ins = `${line.trim() ? "\n\n" : ""}{{recording id=${rid}}}\n`;
+      body.value = body.value.slice(0, end) + ins + body.value.slice(end);
+    }
+    const tools = $(`[data-front] [name="tools"]`) as HTMLInputElement;
+    if (!list(tools.value).includes("recording")) tools.value = [...list(tools.value), "recording"].join(", ");
+    onEdit();
+  };
+  const addRecommended = (rid: string) => {
+    const f = $(`[data-front] [name="recordings"]`) as HTMLTextAreaElement;
+    if (!f.value.split("\n").some((l) => l.trim().startsWith(rid))) f.value = `${f.value.trim()}${f.value.trim() ? "\n" : ""}${rid} · `;
+    f.focus();
+    onEdit();
+  };
+  $("[data-rec-search]").addEventListener("click", async () => {
+    const q = ($("[data-rec-q]") as HTMLInputElement).value.trim();
+    const r = await fetch(`/api/carnatic/studio/recordings?${new URLSearchParams(q ? { q } : {})}`).then((x) => x.json());
+    const byRaga = q ? (await fetch(`/api/carnatic/studio/recordings?raga=${encodeURIComponent(q.toLowerCase())}`).then((x) => x.json())).items : [];
+    const items = [...new Map([...byRaga, ...r.items].map((x: any) => [x.id, x])).values()].slice(0, 20);
+    recResults.innerHTML = items.map((x: any) => `<li><span><b class="mono">${esc(x.id)}</b> · ${esc(x.composition || x.title || "")} <span class="sa-soft">${esc(x.status)}${x.embeddable === false ? " · embedding off" : ""}</span></span>`
+      + `<span class="sa-row"><button type="button" class="lr-link" data-here="${esc(x.id)}">Use it here</button><button type="button" class="lr-link" data-rec-add="${esc(x.id)}">Add to recommended listening</button></span></li>`).join("") || `<li class="sa-soft">Nothing found.</li>`;
+    recResults.querySelectorAll<HTMLElement>("[data-here]").forEach((b) => b.addEventListener("click", () => useHere(b.dataset.here!)));
+    recResults.querySelectorAll<HTMLElement>("[data-rec-add]").forEach((b) => b.addEventListener("click", () => addRecommended(b.dataset.recAdd!)));
+  });
 
   // history
   $("[data-history]").addEventListener("click", async () => {
