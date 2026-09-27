@@ -72,7 +72,7 @@ const outOfDate = lang !== "en" && l.translation?.outOfDate;
         {r.toc.filter((t) => t.level === 2).map((t) => <a href={`#${t.id}`}>{t.text}</a>)}
       </nav>
       <div class="lr-rail-foot">
-        <span class="mono" data-left>{l.minutes} min left · {l.words.toLocaleString("en")} words</span>
+        <span class="mono" data-left>{say("left", "{m} min left · {w} words").replace("{m}", String(l.minutes)).replace("{w}", l.words.toLocaleString("en"))}</span>
         <span>{say("remembered", "Your place is remembered on this device.")}</span>
       </div>
     </aside>

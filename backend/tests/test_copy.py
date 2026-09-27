@@ -575,7 +575,9 @@ def test_every_visible_string_is_editable() -> None:
     offenders: list[str] = []
     for f in sorted(SRC.rglob("*.astro")):
         # The admin is hers to read, not her audience's.
-        if "/admin/" in str(f) or "/overlay/" in str(f) or f.name == "AdminLayout.astro":
+        # The Swara Studio admin (/carnatic/studio) is the same: hers, apart from the site admin.
+        if ("/admin/" in str(f) or "/overlay/" in str(f) or "/carnatic/studio/" in str(f)
+                or f.name in ("AdminLayout.astro", "StudioLayout.astro")):
             continue
         text = f.read_text(encoding="utf-8")
         if text.startswith("---"):

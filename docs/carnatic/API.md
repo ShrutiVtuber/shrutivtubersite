@@ -856,6 +856,16 @@ checked and nothing is stored. Stored guesses: `GET
 learner until they have guessed it (`GET …/analyses` answers `{"locked":
 true}` until then, for recordings in guess mode).
 
+A close miss comes back named as its pair: `"close": true, "pair": {"set":
+"C9", "differ": "…", "guessName": "Bhairavi"}` when the guess is the other
+raga of a confusable set (EAR_TRAINING.md §4) with this one; otherwise
+`"close": false, "pair": null`.
+
+Lessons that discuss a raga or tala, or recommend a recording (a raga
+page's Lessons tab): `GET /api/carnatic/course/lessons?raga=kharaharapriya`
+(or `?tala=adi`, `?recording=mohanam-02`) → `{"items": [{"id", "slug",
+"title", "unit", "order", "minutes"}]}`, published lessons only.
+
 ### 14c. Suggesting a recording
 
 `POST /api/carnatic/listening/suggestions` (auth, not suspended) with
@@ -926,6 +936,16 @@ Deleted accounts show as `"author": "somebody"`, `"authorId": null`
   `{"items": [{"id", "author", "authorId", "mine", "part": "note:1" | null,
   "partLabel": "the 2:14 phrase", "body", "createdAt"}]}`;
   `POST` with `{"body", "part"}`; `DELETE /api/carnatic/community/comments/{id}` (own).
+  `part` is a part key (`text`, `sargam`, `note:3`, `summary`) or one
+  sentence of a part, `text@2` (the text's third sentence, split after
+  `.`, `!` or `?`); its `partLabel` then quotes the sentence's start.
+- `GET /api/carnatic/community/feedback` (auth) → `{"items": [{"kind":
+  "reply" | "rubric" | "votes", "work": 41, "workTitle", "who", "text",
+  "count", "at"}]}`: replies, rubric answers and votes on one's own pieces
+  and analyses, newest first (the dashboard's "Feedback on your pieces").
+- Lesson listening analyses (`kind: listening` exercises) are works in
+  `carnatic-analysis` with subject `exercise:U04.L10.A1`; their rubric is
+  the exercise's own.
 
 ### 15d. Reports, blocks, suspension
 
@@ -959,3 +979,11 @@ lesson progress offline and send them when back online.
 editor (form, text, live preview, checks, editor notes, revision history),
 exercises, recordings queue and annotation, balance, moderation, glossary,
 review. Its API lives under `/api/carnatic/studio/*` and is not for the app.
+What waits for Sophia is gathered in the lessons tree: her open notes
+(`GET …/notes`, each with its line), the Questions for Sophia from
+course/EDITING.md (`GET …/questions`, `PUT …/questions/{id}` with
+`{answer, done}`, `GET …/questions/export?format=csv|json`; an import
+never touches her answers), and the items waiting for her annotation
+(`GET …/waiting`, `PUT …/waiting/{exercise}` with `{part, index,
+answer}`). Recording marks for the ear trainer are set with `PUT
+…/recordings/{id}` and `marks`.

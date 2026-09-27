@@ -7,6 +7,9 @@
  */
 import type { Recording } from "../../lib/carnatic/course";
 import { recordingLabel } from "../../lib/carnatic/course";
+import { copy } from "../../lib/copy";
+
+const say = await copy("component:RecordingCard");
 
 interface Props { r: Recording; href: (p: string) => string; ragaName?: string; talaName?: string; guess?: boolean; label?: string; compact?: boolean }
 const { r, href, ragaName, talaName, guess = false, label, compact = false } = Astro.props;
@@ -18,17 +21,17 @@ const who = [r.instrument, r.artists?.slice(0, 2).join(", ")].filter(Boolean).jo
 <article class:list={["lr-reccard", compact && "is-compact"]} data-rec-card data-id={r.id} data-provider={r.provider} data-url={r.url}
          data-start={clip?.start ?? ""} data-end={clip?.end ?? ""}>
   <div class="lr-reccard-player" data-player>
-    <button type="button" class="lr-btn" data-load>Load the recording</button>
-    <small>{PROVIDER[r.provider] ?? "The provider"} · loads only when you press this</small>
+    <button type="button" class="lr-btn" data-load>{say("load", "Load the recording")}</button>
+    <small>{say("loadsOnly", "{provider} · loads only when you press this").replace("{provider}", PROVIDER[r.provider] ?? "The provider")}</small>
   </div>
   <div class="lr-reccard-t">
     {guess ? (
-      <p class="lr-reccard-h"><b>{label ?? "A recording"}</b> <span>The raga, title and composition are covered until you guess.</span></p>
+      <p class="lr-reccard-h"><b>{label ?? say("aRecording", "A recording")}</b> <span>{say("covered", "The raga, title and composition are covered until you guess.")}</span></p>
     ) : (
       <>
         <p class="lr-reccard-h"><b>{r.composition || recordingLabel(r)}</b>{meta && <span>{meta}</span>}</p>
         {(ragaName || who) && <p class="lr-reccard-who">{[ragaName, who].filter(Boolean).join(" · ")}</p>}
-        {r.listenFor && <p class="lr-reccard-lf"><span class="lr-eyebrow">Listen for</span> {r.listenFor}</p>}
+        {r.listenFor && <p class="lr-reccard-lf"><span class="lr-eyebrow">{say("listenFor", "Listen for")}</span> {r.listenFor}</p>}
         {r.sections?.length > 0 && (
           <div class="lr-chips" aria-label="Sections">
             {r.sections.map((s) => <button type="button" class="lr-chip" data-seek={s.t}><span class="mono">{s.t}</span> {s.label}</button>)}

@@ -46,7 +46,7 @@ const available = flat.some((x) => x.available);
     </a>
     <div class="ch-path">
       <span class="t-eyebrow ch-rose">{say("pathH", "The beginner path")}</span>
-      <a href={L("/carnatic/lessons")}><b>{say("pathT", "50 exercises and 4 varnams")}</b></a>
+      <a href="/carnatic/lessons"><b>{say("pathT", "50 exercises and 4 varnams")}</b></a>
       <small>{say("pathP", "The traditional practice order. It runs alongside these units:")}</small>
       <div class="ch-pills">{[4, 5, 6, 13].map((n) => <a class="ch-pill" href={L(`/carnatic/learn/unit/${n}`)}>{say("unitWord", "Unit")} {n}</a>)}</div>
     </div>
@@ -106,7 +106,7 @@ const available = flat.some((x) => x.available);
       </section>
     ))}
   </div>
-  <p class="ch-foot"><a href={L("/carnatic/learn/glossary")}>{say("glossary", "Glossary")} ›</a></p>
+  <p class="ch-foot"><a href="/carnatic/learn/glossary">{say("glossary", "Glossary")} ›</a></p>
 
   <script type="application/json" id="course-index" set:html={JSON.stringify({ lessons: searchIndex, flat: flat.map((x) => ({ id: x.id, slug: x.slug, title: x.title, unit: x.unit, order: x.order, minutes: x.minutes, available: x.available })), words: {
     progress: say("progress", "{o} opened · {c} completed"), notOpened: say("notOpened", "not opened yet"),

@@ -401,3 +401,51 @@ async def _community():
 @needs_db
 def test_the_practice_room_rules_hold_for_school_pieces() -> None:
     asyncio.run(_community())
+
+
+async def _everything_waiting_for_her():
+    from shruti.models.carnatic_course import CarnaticQuestion
+    tag = uuid.uuid4().hex[:6]
+    lid = f"T{tag}.L01"
+    b = _bundle(tag)
+    b["questions"] = [{"id": f"q{tag}", "group": "By ear", "text": "kalyani-02's tala.", "lessons": [lid], "position": 0}]
+    b["exercises"].append({"id": f"{lid}.A1", "unit": 1, "lesson": lid, "kind": "listening", "hash": "h9",
+                           "data": {"id": f"{lid}.A1", "kind": "listening", "recordings": [{"id": f"rec-{tag}-01"}],
+                                    "auto": [{"type": "timestamp", "text": "When does the anupallavi begin?", "answer": None,
+                                              "tolerance": 6}]}})
+    engine, s = await _session()
+    async with s:
+        await course.import_bundle(s, b)
+        await s.commit()
+        # Her notes, each with its line, so the editor can open on it.
+        notes = [n for n in (await studio.notes(s))["items"] if n["lesson"] == lid]
+        assert notes and notes[0]["who"] == "Sophia" and notes[0]["line"] > 1 and "a note for later" in notes[0]["text"]
+        # The question: answered, then the file rewords it; her answer stays.
+        await studio.answer_question(f"q{tag}", studio.QuestionIn(answer="Adi, 2 kalai", done=True), s)
+        b["questions"][0]["text"] = "kalyani-02's tala, by ear."
+        await course.import_bundle(s, b)
+        await s.commit()
+        q = await s.get(CarnaticQuestion, f"q{tag}")
+        await s.refresh(q)
+        assert q.text.endswith("by ear.") and q.answer == "Adi, 2 kalai" and q.done
+        csv = await studio.export_questions("csv", s)
+        assert "Adi, 2 kalai" in csv.body.decode()
+        # The item waiting for her time: listed with its recording, hidden from learners until she sets it.
+        waiting = [w for w in (await studio.waiting(s))["items"] if w["exercise"] == f"{lid}.A1"]
+        assert waiting and waiting[0]["recording"] == f"rec-{tag}-01"
+        assert routes._ready({"auto": [{"answer": None}], "id": "x"})["auto"] == []
+        await studio.fill_waiting(f"{lid}.A1", studio.WaitingAnswer(part="auto", index=0, answer="1:32"), s)
+        assert not [w for w in (await studio.waiting(s))["items"] if w["exercise"] == f"{lid}.A1"]
+    await engine.dispose()
+
+
+@needs_db
+def test_the_studio_brings_everything_waiting_for_her_into_one_place() -> None:
+    asyncio.run(_everything_waiting_for_her())
+
+
+def test_a_close_guess_is_named_as_its_pair() -> None:
+    pair = next(c for c in drills.CONFUSABLE if set(c["ragas"]) == {"kharaharapriya", "bhairavi"})
+    assert pair["set"] == "C9"
+    src = inspect.getsource(routes.guess)
+    assert '"close"' in src and "CONFUSABLE" in src

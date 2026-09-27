@@ -21,6 +21,7 @@ import { site, SITE_API, SITE_URL } from "../lib/api";
 import { paths as journalPaths, read as readJournal } from "../lib/journal/parse";
 import { lessons as carnaticLessons, ragas as carnaticRagas, talas as carnaticTalas } from "../lib/carnatic/data";
 import { lessonList } from "../lib/carnatic/lessons";
+import { units as courseUnits } from "../lib/carnatic/course";
 
 
 /* One origin for the whole site, read at runtime. See lib/env.ts. */
@@ -180,7 +181,9 @@ export const GET: APIRoute = async () => {
       ["/carnatic", "0.9"], ["/carnatic/ragas", "0.8"], ["/carnatic/talas", "0.7"],
       ["/carnatic/path", "0.7"], ["/carnatic/lessons", "0.7"], ["/carnatic/gamakas", "0.7"],
       ["/carnatic/practice/tuner", "0.8"], ["/carnatic/practice/tala", "0.7"], ["/carnatic/practice/quiz", "0.6"],
-      ["/carnatic/compose", "0.6"], ["/carnatic/listen", "0.5"], ["/carnatic/support", "0.4"],
+      ["/carnatic/compose", "0.6"], ["/carnatic/listen", "0.7"], ["/carnatic/support", "0.4"],
+      ["/carnatic/learn", "0.9"], ["/carnatic/learn/glossary", "0.6"], ["/carnatic/practice", "0.7"],
+      ["/carnatic/practice/ear", "0.7"], ["/carnatic/practice/skills", "0.4"], ["/carnatic/listen/hall", "0.5"],
       ...["voice", "venu", "veena", "violin", "mridangam"].map((i) => [`/carnatic/instruments/${i}`, "0.6"]),
     ]) add(path, priority, "monthly");
     try {
@@ -189,6 +192,11 @@ export const GET: APIRoute = async () => {
       for (const r of [...(rg?.janyas ?? []), ...(rg?.performed ?? [])]) add(`/carnatic/ragas/${encodeURIComponent(r.id)}`, "0.6", "monthly");
       for (const x of tl?.practical ?? []) if (x.slug) add(`/carnatic/talas/${x.slug}`, "0.5", "monthly");
       if (ls) for (const l of lessonList(ls, (id) => id)) add(`/carnatic/lessons/${l.slug}`, "0.5", "monthly");
+      // v2: the course's units and its published lessons
+      for (const u of await courseUnits()) {
+        add(`/carnatic/learn/unit/${u.n}`, "0.6", "weekly");
+        for (const l of u.lessons) if (l.available) add(`/carnatic/learn/${l.slug}`, "0.7", "weekly");
+      }
     } catch {
       /* The data is not synced here; the fixed pages above still stand. */
     }

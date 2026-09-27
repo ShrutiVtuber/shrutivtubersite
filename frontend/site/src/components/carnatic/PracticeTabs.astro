@@ -1,21 +1,20 @@
 ---
 /* Practice's own tabs (README_v2 §5-§6, artboard P1): Test yourself, Ear
- * training, Skill map, Tuner, Tala trainer. */
-import { hrefIn, langOf } from "../../lib/carnatic/i18n";
+ * training, Skill map, Tuner, Tala trainer. Written out as links (not
+ * mapped from a list) so each place is a link in the source. */
+import { langOf } from "../../lib/carnatic/i18n";
 import { copy } from "../../lib/copy";
 import { localize } from "../../lib/carnatic/v2strings";
 
 const lang = langOf(Astro);
-const say = localize(lang, await copy("carnatic/practice"));
-const here = Astro.url.pathname;
-const TABS: [string, string, (p: string) => boolean][] = [
-  ["/carnatic/practice", say("tab.test", "Test yourself"), (p) => p === "/carnatic/practice" || p.startsWith("/carnatic/practice/test")],
-  ["/carnatic/practice/ear", say("tab.ear", "Ear training"), (p) => p.startsWith("/carnatic/practice/ear")],
-  ["/carnatic/practice/skills", say("tab.skills", "Skill map"), (p) => p.startsWith("/carnatic/practice/skills")],
-  ["/carnatic/practice/tuner", say("tab.tuner", "Tuner"), (p) => p.startsWith("/carnatic/practice/tuner")],
-  ["/carnatic/practice/tala", say("tab.tala", "Tala trainer"), (p) => p.startsWith("/carnatic/practice/tala")],
-];
+const say = localize(lang, await copy("component:PracticeTabs"));
+const here = Astro.url.pathname.replace(/\/$/, "");
+const on = (p: string, exact = false) => (exact ? here === p || here.startsWith(`${p}/test`) : here.startsWith(p)) ? "page" : undefined;
 ---
 <nav class="pt-tabs" aria-label={say("tabs", "Practice")}>
-  {TABS.map(([href, label, on]) => <a href={hrefIn(lang, href)} aria-current={on(here.replace(/\/$/, "")) ? "page" : undefined}>{label}</a>)}
+  <a href="/carnatic/practice" aria-current={on("/carnatic/practice", true)}>{say("tab.test", "Test yourself")}</a>
+  <a href="/carnatic/practice/ear" aria-current={on("/carnatic/practice/ear")}>{say("tab.ear", "Ear training")}</a>
+  <a href="/carnatic/practice/skills" aria-current={on("/carnatic/practice/skills")}>{say("tab.skills", "Skill map")}</a>
+  <a href="/carnatic/practice/tuner" aria-current={on("/carnatic/practice/tuner")}>{say("tab.tuner", "Tuner")}</a>
+  <a href="/carnatic/practice/tala" aria-current={on("/carnatic/practice/tala")}>{say("tab.tala", "Tala trainer")}</a>
 </nav>

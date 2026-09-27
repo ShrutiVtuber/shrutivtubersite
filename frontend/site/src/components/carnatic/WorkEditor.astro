@@ -8,6 +8,10 @@
  */
 import PublishConsent from "../feedback/PublishConsent.astro";
 import { recordingLabel, type Recording } from "../../lib/carnatic/course";
+import { copy } from "../../lib/copy";
+import Copy from "../content/Copy.astro";
+
+const say = await copy("component:WorkEditor");
 
 interface Props {
   room: "carnatic-practice" | "carnatic-analysis"; subject: string; title: string; eyebrow: string;
@@ -30,8 +34,8 @@ const page = { room, subject, title, draftId: draft?.id ?? null, words, parts, s
   <div>
     <p class="lr-eyebrow-top">{eyebrow}</p>
     <div class="li-sec-h" style="margin:4px 0 12px"><h1 class="lr-title" style="margin:0">{analysis ? "Your analysis" : "Your piece"}</h1><small data-saved>{draft ? "Draft" : "Not saved yet"}</small></div>
-    {!signedIn && <p class="cm-notice">You can write here signed out, but saving and submitting need an account. <a href={`/signin?next=${encodeURIComponent(Astro.url.pathname)}`}>Sign in</a></p>}
-    <label class="li-form"><span>Title (optional)</span><input data-title maxlength="160" value={draft?.title ?? ""} placeholder={analysis ? "Low alapana, resting on Ri and Pa" : ""} /></label>
+    {!signedIn && <p class="cm-notice"><Copy text={say("signedOut", "You can write here signed out, but saving and submitting need an account. [Sign in]({href})").replace("{href}", `/signin?next=${encodeURIComponent(Astro.url.pathname)}`)} /></p>}
+    <label class="li-form"><span>{say("titleL", "Title (optional)")}</span><input data-title maxlength="160" value={draft?.title ?? ""} placeholder={analysis ? "Low alapana, resting on Ri and Pa" : ""} /></label>
 
     {analysis ? (
       <>

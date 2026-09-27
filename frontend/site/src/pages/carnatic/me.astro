@@ -78,7 +78,6 @@ const dash = {
     <section class="md-card"><span class="t-eyebrow">{say("feedbackH", "Feedback on your pieces")}</span><ul class="md-list" data-feedback>
       <li class="md-soft">{me.signedIn ? say("feedbackNone", "Replies and rubric answers on your pieces and analyses show here.") : say("feedbackOut", "Signed in, replies to your pieces and analyses show here.")}</li></ul></section>
   </div>
-  <script type="application/json" id="dash-data" set:html={JSON.stringify(dash)} />
   <h2 class="ty-sec">{say("pathSongsH", "The beginner path and your songs")}</h2>
   {!me.signedIn ? (
     <div class="sw-empty me-out">
@@ -125,6 +124,7 @@ const dash = {
     </section>
   </div>
   )}
+  <script type="application/json" id="dash-data" set:html={JSON.stringify(dash)} />
 </SwaraLayout>
 
 <script>

@@ -76,7 +76,7 @@ const qs = (k: string, v: string) => L(`/carnatic/listen${v ? `?${k}=${encodeURI
   )}
 
   <div class="li-sec-h"><h2>{say("analysesH", "Analyses")} <small>{recent.length || ""}</small></h2>
-    <a class="lr-link" href={L("/carnatic/listen/hall")}>{say("hall", "Members' own performances: the concert hall")} ›</a></div>
+    <a class="lr-link" href="/carnatic/listen/hall">{say("hall", "Members' own performances: the concert hall")} ›</a></div>
   {recent.length === 0 ? <p class="li-note">{say("noAnalyses", "No analyses yet. Open a recording and write the first: timestamped notes on what you hear.")}</p> : (
     <ul class="li-list">
       {recent.slice(0, 12).map((w) => (
