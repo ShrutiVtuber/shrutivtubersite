@@ -17,7 +17,7 @@ export interface Boot {
 
 const KEY = "swara.settings";
 const COOKIE_KEYS = ["lang", "swaraLetters", "tamilStyle", "subscripts", "otherScripts", "instrument", "sa", "flute",
-  "hand", "droneTuning", "playbackTuning", "tempo", "fourthSpeed", "eighthAlankaram", "theme"];
+  "hand", "droneTuning", "playbackTuning", "tempo", "fourthSpeed", "eighthAlankaram", "theme", "timing"];
 
 let state: Boot | null = null;
 let updatedAt: string | null = null;

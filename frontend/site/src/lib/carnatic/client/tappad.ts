@@ -44,7 +44,12 @@ export interface PadOpts {
   /** Keys work while the pad is on the page; a page with several pads can turn them off. */
   keys?: boolean;
   hint?: HTMLElement | null;
+  /** While attached, this pad alone gets the keys (the calibration dialog). */
+  exclusive?: boolean;
 }
+
+/** The pad that has the keys to itself, if any. */
+let keyOwner: HTMLElement | null = null;
 
 /** Attach the pad behaviour to an element. Returns a function that detaches it. */
 export function attachPad(el: HTMLElement, o: PadOpts): () => void {
@@ -81,9 +86,9 @@ export function attachPad(el: HTMLElement, o: PadOpts): () => void {
   };
   const cancel = (e: PointerEvent) => { starts.delete(e.pointerId); reader.cancel(e.pointerId); };
   const key = (e: KeyboardEvent) => {
-    if (o.keys === false || !el.isConnected) return;
+    if (o.keys === false || !el.isConnected || (keyOwner && keyOwner !== el)) return;
     const kind = KEYS[e.code];
-    if (!kind || e.repeat || (e.target as HTMLElement)?.closest("input, textarea, select, [contenteditable]")) return;
+    if (!kind || e.repeat || (e.target as HTMLElement)?.closest?.("input, textarea, select, [contenteditable]")) return;
     e.preventDefault();
     o.onTap(clapsOnly() ? "clap" : kind, audioTimeOf(e));
   };
@@ -93,6 +98,7 @@ export function attachPad(el: HTMLElement, o: PadOpts): () => void {
   el.addEventListener("pointercancel", cancel);
   el.addEventListener("contextmenu", (e) => e.preventDefault());
   document.addEventListener("keydown", key);
+  if (o.exclusive) keyOwner = el;
   if (o.hint) o.hint.textContent = clapsOnly() ? HINT_CLAPS : HINT_GESTURES;
   return () => {
     el.removeEventListener("pointerdown", down);
@@ -100,6 +106,7 @@ export function attachPad(el: HTMLElement, o: PadOpts): () => void {
     el.removeEventListener("pointerup", up);
     el.removeEventListener("pointercancel", cancel);
     document.removeEventListener("keydown", key);
+    if (keyOwner === el) keyOwner = null;
   };
 }
 

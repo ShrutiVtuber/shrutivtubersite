@@ -312,7 +312,8 @@ an older one's fields); values are checked.
   "theme": "system",            "instrument": "venu",        "hand": "right",
   "sa": "E5",                   "flute": "E",                "droneTuning": "pa",
   "playbackTuning": "just",     "subscripts": "info",        "otherScripts": "show",
-  "tempo": 60,                  "fourthSpeed": false,        "eighthAlankaram": false
+  "tempo": 60,                  "fourthSpeed": false,        "eighthAlankaram": false,
+  "timing": "relaxed",          "tapOffsets": { "web:android:chrome:default": 42, "app:android:pixel-8:speaker": 18 }
 }
 ```
 
@@ -332,6 +333,39 @@ an older one's fields); values are checked.
 | `otherScripts` | `show` `hide` | `show` |
 | `tempo` | 40–70 counts per minute at speed 1 | 60 |
 | `fourthSpeed`, `eighthAlankaram` | booleans | `false` |
+| `timing` | `relaxed` (perfect ±60 ms, on time ±120 ms), `standard` (±30/±80), `strict` (±20/±50) | `relaxed` |
+| `tapOffsets` | up to 32 entries, device-and-output key (≤ 120 characters) → calibrated offset in ms, −400…400, rounded | absent (not calibrated) |
+
+**Tap timing, shared by the site and the app.** Both must score taps the same
+way:
+
+- **Scheduling.** Count *n* sounds at `start + n × count`, an absolute time
+  on the audio clock. Nothing is added up count by count. A lookahead
+  scheduler hands every sound due in the next 100–200 ms (the site uses
+  150 ms) to the audio engine on a short timer (the site uses 25 ms). A
+  cycle is never scheduled when the one before it ends. While the page is
+  hidden, the site schedules 1.5 s ahead. Back in view, it re-anchors to the
+  next count still ahead and skips the missed ones rather than playing them
+  in a burst.
+- **One clock.** The hand, the grid highlight and scoring all derive from the
+  audio clock less the output latency (`outputLatency + baseLatency` on the
+  web). A tap's time is its input event's own timestamp carried over to that
+  clock.
+- **Windows.** `timing` gives perfect and on-time windows. Each is capped at
+  40 % of the gap between adjacent targets, so dense targets never match the
+  wrong one. An exercise's `window_ms` overrides the setting but is still
+  capped.
+- **Offset.** Tap to 14 clicks (use 12–16). Drop taps more than 2.5 median
+  absolute deviations from the median, and never keep one more than 200 ms
+  from it. Then take the median. It needs at least 8 kept taps. A tap's
+  score is `tap − (target + latency) − offset`, where positive means late.
+  During play the offset moves 5 % towards each scored tap's raw offset
+  (taps over 150 ms from it are ignored), never more than 40 ms from the
+  calibrated value. That running value is not saved.
+- **Keys.** Keys in `tapOffsets` name the device and the output. The site
+  uses `web:<platform>:<browser>:<sinkId or default>`; the app should use
+  `app:<platform>:<model>:<output route>`. Each client writes only its own
+  keys and keeps the others as it found them. "Reset" removes the entry.
 
 Drone and playback are synthesised in **just intonation relative to Sa**
 (S 1, R1 16/15, R2 9/8, G2 6/5, G3 5/4, M1 4/3, M2 45/32, P 3/2, D1 8/5,

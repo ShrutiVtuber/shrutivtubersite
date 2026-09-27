@@ -3,6 +3,8 @@
  * suggesting a recording, guess the raga (listen, guess, reveal), and
  * tapping along with a recording's beat map.
  */
+import { calibratedOffset, calibrateButton, timingSelect, windowsNow } from "./timing";
+import { rate } from "../beatclock";
 import { loadPlayer, type Player } from "./embed";
 import { boot, csrf } from "./state";
 import { ctx, talaSound } from "./audio";
@@ -178,8 +180,10 @@ export function runTapAlong(root: HTMLElement, t: TapAlong) {
     let best = -1;
     for (let i = 0; i < countTimes.length; i++) if (!hit.has(i) && (best < 0 || Math.abs(countTimes[i] - s) < Math.abs(countTimes[best] - s))) best = i;
     if (best < 0) return;
-    const off = (s - countTimes[best]) * 1000;
+    // Less this device's calibrated offset; the windows from the Timing setting, capped at 40 % of a count.
+    const off = (s - countTimes[best]) * 1000 - (calibratedOffset() ?? 0);
     if (Math.abs(off) > 400) return;
+    const w = windowsNow((countTimes[Math.min(best + 1, countTimes.length - 1)] - countTimes[Math.max(0, best - 1)]) / 2 || 1);
     const action = t.counts[best % n]?.action ?? "clap";
     if (clapsOnly() && action !== "clap") { note.textContent = `That count is ${action === "finger" ? "a finger count" : action === "wave" ? "a wave" : "silent"}: shown, not scored.`; return; }
     const v = judge(kind, { kind: action }, clapsOnly());
@@ -187,8 +191,9 @@ export function runTapAlong(root: HTMLElement, t: TapAlong) {
     hit.add(best);
     const cell = cells[best % n];
     cell.classList.remove("hit", "off");
-    cell.classList.add(Math.abs(off) <= 80 ? "hit" : "off");
-    if (Math.abs(off) <= 30) results.perfect++; else if (Math.abs(off) <= 80) results.onTime++; else if (off < 0) results.early++; else results.late++;
+    const r = rate(off, w);
+    cell.classList.add(r === "perfect" || r === "onTime" ? "hit" : "off");
+    results[r]++;
     note.textContent = `${results.perfect + results.onTime} on time · ${results.early} early · ${results.late} late`;
   };
   const pad = root.querySelector<HTMLElement>("[data-tap]");
@@ -197,7 +202,10 @@ export function runTapAlong(root: HTMLElement, t: TapAlong) {
     hint.className = "tt-hint";
     pad.insertAdjacentElement("afterend", hint);
     attachPad(pad, { onTap: tap, hint });
-    hint.insertAdjacentElement("afterend", clapsOnlyToggle());
+    const row = document.createElement("div");
+    row.className = "tt-settings";
+    row.append(clapsOnlyToggle(), timingSelect(), calibrateButton());
+    hint.insertAdjacentElement("afterend", row);
   }
   root.querySelector("[data-finish]")?.addEventListener("click", () => {
     const of = hit.size ? Math.max(hit.size, Math.max(...hit) - Math.min(...hit) + 1) : 0;

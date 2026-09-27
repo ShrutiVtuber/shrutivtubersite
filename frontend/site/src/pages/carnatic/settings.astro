@@ -48,6 +48,7 @@ const GROUPS: [string, Row[]][] = [
   [say("g.practice", "Practice"), [
     [say("fourth", "Fourth speed"), "fourthSpeed", [["false", "Off"], ["true", "On"]]],
     [say("eighth", "8th alankaram (sankeerna eka)"), "eighthAlankaram", [["false", "Off"], ["true", "On"]]],
+    [say("timing", "Tap timing"), "timing", [["relaxed", say("timing.relaxed", "Relaxed ±60/±120 ms")], ["standard", say("timing.standard", "Standard ±30/±80 ms")], ["strict", say("timing.strict", "Strict ±20/±50 ms")]]],
   ]],
 ];
 const current = (key: string) => String((settings as any)[key]);
@@ -69,6 +70,12 @@ const current = (key: string) => String((settings as any)[key]);
         ))}
         {name === say("g.language", "Language") && <p class="sw-note">{say("unverified", "Tamil, Telugu and Kannada are drafts until a native reader checks them; so are the raga names in those scripts, which carry an \"unverified\" mark. Where Tamil sources give both spellings, the setting above picks one; grantha (ஸ, ஸ்ரீ) is the default.")}</p>}
         {name === say("g.drone", "Drone") && <p class="sw-note">{say("ji", "Just intonation: textbook just-intonation values; performers vary. The tuner's cents are measured against equal temperament and say so.")}</p>}
+        {name === say("g.practice", "Practice") && (
+          <>
+            <div class="st-row"><span class="st-label">{say("calibrate", "Tap calibration (this device and output)")}</span><div data-cal-slot></div></div>
+            <p class="sw-note">{say("calibrateP", "Calibrate: tap along with 14 clicks; the median offset, stray taps left out, is kept for this device and its speakers or headphones, and follows you slowly while you play. Relaxed timing counts a tap within 60 ms as perfect and within 120 ms as on time.")}</p>
+          </>
+        )}
         {name === say("g.instrument", "Your instrument and Sa") && flutes.length > 0 && <p class="sw-note">{say("flutes", "Every flute size is selectable in the app and the tuner, bass flutes included")}: {flutes.join(", ")}.</p>}
       </section>
     ))}
@@ -98,9 +105,11 @@ const current = (key: string) => String((settings as any)[key]);
 <script>
   import { settings, setSettings, csrf } from "../../lib/carnatic/client/state";
   import { qrSvg } from "../../lib/carnatic/client/qr";
+  import { calibrateButton } from "../../lib/carnatic/client/timing";
   const root = document.querySelector<HTMLElement>("[data-settings]");
   if (root) {
     const defaults = JSON.parse(root.dataset.defaults!);
+    root.querySelector("[data-cal-slot]")?.appendChild(calibrateButton());
     const paint = () => {
       const s = settings();
       root.querySelectorAll<HTMLElement>("[data-key]").forEach((row) => {

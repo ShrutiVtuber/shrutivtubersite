@@ -87,7 +87,7 @@ export class GestureReader {
   }
 }
 
-/** The five counts' window: perfect ±30 ms, on time ±80 ms, otherwise early or late. */
+/** The standard timing windows (perfect ±30 ms, on time ±80 ms). The default is relaxed: see beatclock.ts windows(). */
 export function rateMs(deltaMs: number, perfect = 30, onTime = 80): "perfect" | "onTime" | "early" | "late" {
   const a = Math.abs(deltaMs);
   if (a <= perfect) return "perfect";

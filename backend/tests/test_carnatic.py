@@ -115,6 +115,16 @@ def test_settings_are_checked_and_unknown_keys_are_kept() -> None:
             rules.clean_settings(bad)
 
 
+def test_tap_timing_and_calibration_settings() -> None:
+    assert rules.DEFAULTS["timing"] == "relaxed"
+    clean = rules.clean_settings({"timing": "strict", "tapOffsets": {"web:android:chrome:default": 42.4, "app:ios": -12}})
+    assert clean["timing"] == "strict" and clean["tapOffsets"] == {"web:android:chrome:default": 42, "app:ios": -12}
+    for bad in ({"timing": "loose"}, {"tapOffsets": []}, {"tapOffsets": {"x": 900}}, {"tapOffsets": {"x": True}},
+                {"tapOffsets": {"": 3}}, {"tapOffsets": {f"d{i}": 1 for i in range(40)}}):
+        with pytest.raises(rules.Invalid):
+            rules.clean_settings(bad)
+
+
 def test_the_default_sa_follows_the_owners_decisions() -> None:
     assert rules.DEFAULT_SA["voice"] == "C3" and rules.DEFAULT_SA["venu"] == "E5"
     assert rules.DEFAULT_SA["veena"] == "E3" and rules.DEFAULT_SA["violin"].startswith("E")

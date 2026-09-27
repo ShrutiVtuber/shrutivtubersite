@@ -86,7 +86,7 @@ DEFAULTS = {
     "lang": "en", "swaraLetters": "interface", "tamilStyle": "grantha", "theme": "system",
     "instrument": "voice", "hand": "right", "sa": DEFAULT_SA["voice"], "flute": "E",
     "droneTuning": "pa", "playbackTuning": "just", "subscripts": "info", "otherScripts": "show",
-    "tempo": 60, "fourthSpeed": False, "eighthAlankaram": False,
+    "tempo": 60, "fourthSpeed": False, "eighthAlankaram": False, "timing": "relaxed",
 }
 
 CHOICES = {
@@ -100,6 +100,8 @@ CHOICES = {
     "playbackTuning": ("just", "equal"),
     "subscripts": ("info", "always"),
     "otherScripts": ("show", "hide"),
+    # Tap timing windows: relaxed ±60/±120 ms, standard ±30/±80, strict ±20/±50.
+    "timing": ("relaxed", "standard", "strict"),
 }
 PITCH = re.compile(r"^[A-G]#?[1-6]$")
 FLUTE = re.compile(r"^[A-G]#?( bass)?$")
@@ -132,6 +134,16 @@ def clean_settings(given: dict) -> dict:
     for key in ("fourthSpeed", "eighthAlankaram"):
         if key in out and not isinstance(out[key], bool):
             raise Invalid(f"{key} is true or false.")
+    if "tapOffsets" in out:
+        # Calibrated tap offsets in ms, per device and output (a short key each).
+        offs = out["tapOffsets"]
+        if not isinstance(offs, dict) or len(offs) > 32 or not all(
+            isinstance(k, str) and 0 < len(k) <= 120
+            and isinstance(v, (int, float)) and not isinstance(v, bool) and -400 <= v <= 400
+            for k, v in offs.items()
+        ):
+            raise Invalid("tapOffsets maps up to 32 devices to an offset between -400 and 400 ms.")
+        out["tapOffsets"] = {k: round(v) for k, v in offs.items()}
     return out
 
 

@@ -19,7 +19,7 @@ if (!k) return notFound(Astro);
 if (k.plays?.recording) return Astro.redirect(L("/carnatic/listen?tap=1"), 302);
 const lesson = all.flatMap((u) => u.lessons).find((l) => l.id === k.unlockedBy);
 ---
-<SwaraLayout title={`${k.id} ${k.title} · Swara Studio`} description={say("desc", "Keep the tala with your taps: perfect within 30 ms, on time within 80 ms. Results are for you only.")}
+<SwaraLayout title={`${k.id} ${k.title} · Swara Studio`} description={say("descTiming", "Keep the tala with your taps: perfect within 60 ms, on time within 120 ms (relaxed timing; standard and strict are in settings). Results are for you only.")}
              crumbs={[[say("crumb", "Test yourself"), L("/carnatic/practice")], [k.id]]}>
   <PracticeTabs />
   <div class="st-wrap">

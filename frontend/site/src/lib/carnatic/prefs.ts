@@ -17,6 +17,10 @@ export interface Settings {
   sa: string; flute: string; droneTuning: "pa" | "ma" | "ni" | "mute"; playbackTuning: "just" | "equal";
   subscripts: "info" | "always"; otherScripts: "show" | "hide"; tempo: number;
   fourthSpeed: boolean; eighthAlankaram: boolean;
+  /** Tap timing windows: relaxed ±60/±120 ms (default), standard ±30/±80, strict ±20/±50. */
+  timing?: "relaxed" | "standard" | "strict";
+  /** Calibrated tap offsets in ms, per device and output (client/timing.ts outputKey). */
+  tapOffsets?: Record<string, number>;
 }
 
 /* DECISIONS.md, 26 Sep 2026: voice C, flute the learner's (E5 suggested),
@@ -28,7 +32,7 @@ export const DEFAULT_SA: Record<Settings["instrument"], string> = {
 export const DEFAULTS: Settings = {
   lang: "en", swaraLetters: "interface", tamilStyle: "grantha", theme: "system", instrument: "voice",
   hand: "right", sa: DEFAULT_SA.voice, flute: "E", droneTuning: "pa", playbackTuning: "just",
-  subscripts: "info", otherScripts: "show", tempo: 60, fourthSpeed: false, eighthAlankaram: false,
+  subscripts: "info", otherScripts: "show", tempo: 60, fourthSpeed: false, eighthAlankaram: false, timing: "relaxed",
 };
 
 export const PREFS_COOKIE = "swara_prefs";

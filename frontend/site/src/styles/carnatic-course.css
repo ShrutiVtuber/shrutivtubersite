@@ -810,6 +810,21 @@
 .tap-pad, .tt-pad, .tr-tap { touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 .tt-hint { margin: 6px 0 0; font-size: 12px; color: var(--ink-soft); }
 .tap-claps { display: inline-flex; gap: 6px; align-items: center; font-size: 12px; color: var(--ink-soft); margin-top: 4px; }
+/* Timing and calibration (client/timing.ts), beside every tap pad */
+.tt-settings { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; margin-top: 4px; min-width: 0; }
+.tap-timing { display: inline-flex; gap: 6px; align-items: center; font-size: 12px; color: var(--ink-soft); }
+.tap-timing select { font: 12px var(--font-body); color: var(--ink); background: var(--surface-card); border: 1px solid var(--line); border-radius: 6px; padding: 4px 6px; max-width: 100%; }
+.cal { display: inline-flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; font-size: 12px; color: var(--ink-soft); min-width: 0; }
+.cal-go, .cal-reset { appearance: none; border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent); border-radius: var(--radius-sm); background: transparent; color: var(--accent); font: 600 12px/1 var(--font-body); padding: 7px 12px; cursor: pointer; }
+.cal-reset { border-color: var(--line); color: var(--ink-soft); }
+.cal-reset[hidden] { display: none; }
+.cal-state { font-family: var(--font-mono); }
+.cal-dialog { width: min(440px, calc(100vw - 32px)); box-sizing: border-box; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-card); color: var(--ink); padding: 20px; }
+.cal-dialog::backdrop { background: rgb(0 0 0 / 0.45); }
+.cal-h { margin: 0 0 6px; font: 400 22px/1.2 var(--font-display); }
+.cal-p { margin: 0 0 12px; font-size: 14px; line-height: 1.45; color: var(--ink-soft); min-height: 1em; }
+.cal-pad { appearance: none; display: block; width: 100%; min-height: 150px; margin: 0 0 12px; border: 1px solid var(--accent); border-radius: 8px; background: var(--accent-wash); color: var(--accent); font: 18px/1.3 var(--font-body); cursor: pointer; }
+.cal-row { display: flex; gap: 10px; justify-content: flex-end; }
 .ch-also { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
 .ch-also-card { border: 1px solid var(--line); border-radius: 10px; padding: 14px 18px; display: grid; gap: 4px; text-decoration: none; color: var(--ink); background: var(--surface-card); }
 .ch-also-card b { font: 400 19px var(--font-display); }

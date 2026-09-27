@@ -12,9 +12,13 @@
  *   samam after each gap; `variants` the learner chooses from; `tempo_range`;
  *   `window_ms`.
  *
- * The five counts (perfect ±30 ms, on time ±80 ms, early, late, missed; at
- * dense targets the window shrinks to 40 % of the gap), the personal best at
- * this step, and "Start by tapping". A tap on a count that isn't scored is
+ * The five counts (perfect, on time, early, late, missed) by the Timing
+ * setting (relaxed ±60/±120 ms by default, standard ±30/±80, strict
+ * ±20/±50; `window_ms` overrides; never more than 40 % of the gap between
+ * targets), measured from the beat as heard (output latency) less the
+ * learner's calibrated offset, the personal best at this step, and "Start by
+ * tapping". Sounds go to Web Audio through a lookahead scheduler (150 ms
+ * ahead, refilled every 25 ms), at absolute times from the start. A tap on a count that isn't scored is
  * shown ("that count is a finger count"), never counted against anyone.
  */
 import { blip, ctx, talaSound } from "./audio";
@@ -24,6 +28,8 @@ import { settings } from "./state";
 import { pitchHz } from "../notation";
 import { judge, type Gesture } from "../gestures";
 import { attachPad, clapsOnly, clapsOnlyToggle } from "./tappad";
+import { TapJudge, calibrateButton, latency, timingSelect, windowsNow } from "./timing";
+import { rate } from "../beatclock";
 
 export interface Segment { avartanams: number; speed?: number; nadai?: number }
 export interface TapSpec {
@@ -92,6 +98,10 @@ export class TapTask {
   private targets: { at: number; kind: string; hit?: number; anga?: number; want: string }[] = [];
   private detach: (() => void) | null = null;
   private timer = 0;
+  private refill = 0;
+  private onVisible = () => {};
+  private judge = new TapJudge();
+  private w = { perfect: 60, onTime: 120 };
   private t0 = 0;
   private started = "";
 
@@ -158,7 +168,10 @@ export class TapTask {
       hint.className = "tt-hint";
       pad.insertAdjacentElement("afterend", hint);
       this.detach = attachPad(pad, { onTap: (kind, at) => this.tap(kind, at), hint });
-      hint.insertAdjacentElement("afterend", clapsOnlyToggle(() => this.draw()));
+      const row = document.createElement("div");
+      row.className = "tt-settings";
+      row.append(clapsOnlyToggle(() => this.draw()), timingSelect(), calibrateButton());
+      hint.insertAdjacentElement("afterend", row);
     }
   }
 
@@ -167,7 +180,11 @@ export class TapTask {
     const counts = this.data.counts;
     const beat = 60 / this.tempo;
     const n = counts.length;
+    void ac.resume?.();
     this.t0 = ac.currentTime + 0.3;
+    this.judge = new TapJudge();
+    // Everything that sounds, handed to Web Audio a little ahead of time (below).
+    const sounds: { at: number; play: () => void }[] = [];
     this.started = new Date().toISOString();
     this.targets = [];
     this.running = true;
@@ -210,11 +227,11 @@ export class TapTask {
         const c = counts[i];
         const at = avStart + i * beat;
         if (!quiet) {
-          if (phase === "all") talaSound(c.action, at, { samam: c.samam, finger: c.finger });
-          else if (phase === "claps" && c.action === "clap") talaSound("clap", at, { samam: c.samam });
-          else if (phase === "samam" && i === 0) talaSound("clap", at, { samam: true });
+          if (phase === "all") sounds.push({ at, play: () => talaSound(c.action, at, { samam: c.samam, finger: c.finger }) });
+          else if (phase === "claps" && c.action === "clap") sounds.push({ at, play: () => talaSound("clap", at, { samam: c.samam }) });
+          else if (phase === "samam" && i === 0) sounds.push({ at, play: () => talaSound("clap", at, { samam: true }) });
           // the nadai heard as subdivisions when it isn't the tala's default, or changes
-          if (nadai !== this.data.defaultNadai && !this.data.syllables) for (let m = 0; m < nadai; m++) blip(m === 0 ? 1320 : 990, at + (m * beat) / nadai, 0.03, 0.03);
+          if (nadai !== this.data.defaultNadai && !this.data.syllables) for (let m = 0; m < nadai; m++) { const x = at + (m * beat) / nadai; sounds.push({ at: x, play: () => blip(m === 0 ? 1320 : 990, x, 0.03, 0.03) }); }
         }
         if (!scored) continue;
         // With whole-hand gestures each count of the hand is a target of its own kind; claps only keeps the claps.
@@ -230,7 +247,7 @@ export class TapTask {
         const unit = beat / UNITS[speed];
         const fromEduppu = av === this.countIn && this.spec.eduppu ? Math.round(Number(this.spec.eduppu) * UNITS[speed]) : 0;
         const line = Array.from({ length: per - fromEduppu }, () => this.data.melody![mi++ % this.data.melody!.length]).join(" ");
-        playLine(line, { saHz, tuning: s.playbackTuning, unit, at: startAt, scale: undefined });
+        sounds.push({ at: startAt, play: () => playLine(line, { saHz, tuning: s.playbackTuning, unit, at: startAt, scale: undefined }) });
         if (av === this.countIn && kinds.includes("entry")) this.targets.push({ at: startAt, kind: "entry", anga: 0, want: "any" });
       }
       if (this.data.syllables && scored) {
@@ -239,7 +256,7 @@ export class TapTask {
           const syl = this.data.syllables[si];
           const at = avStart + (m * beat) / nadai;
           if (syl === "," || syl === "-") continue;
-          if (phase !== "none") blip(m % nadai === 0 ? 1320 : 990, at, 0.04, 0.06);
+          if (phase !== "none") sounds.push({ at, play: () => blip(m % nadai === 0 ? 1320 : 990, at, 0.04, 0.06) });
           if (kinds.includes("syllables")) this.targets.push({ at, kind: "syllable", anga: 0, want: "any" });
         }
       }
@@ -250,6 +267,31 @@ export class TapTask {
       this.targets.push({ at: this.t0 + this.countIn * n * beat + (matras / nadai) * beat, kind: "landing", anga: 0, want: "any" });
     }
     this.targets.sort((a, b) => a.at - b.at);
+    // The windows for this run: the setting (or the task's window_ms), capped at 40 % of the densest gap.
+    const gaps = this.targets.slice(1).map((t, i) => t.at - this.targets[i].at).filter((x) => x > 0.001);
+    const dense = gaps.length ? Math.min(...gaps) : beat;
+    const wm = this.spec.window_ms;
+    const base = windowsNow(dense);
+    this.w = wm ? { perfect: Math.min(wm.perfect ?? base.perfect, dense * 400), onTime: Math.min(wm.on_time ?? base.onTime, dense * 400) } : base;
+    // The lookahead scheduler: every sound due in the next 150 ms (1.5 s with the tab hidden), every 25 ms.
+    sounds.sort((a, b) => a.at - b.at);
+    let next = 0;
+    const fill = () => {
+      const now = ctx().currentTime;
+      const ahead = document.hidden ? 1.5 : 0.15;
+      while (next < sounds.length && sounds[next].at < now + ahead) {
+        // Back from a hidden tab: sounds already past are skipped, not played in a burst.
+        if (sounds[next].at >= now - 0.01) sounds[next].play();
+        next++;
+      }
+      if (next >= sounds.length) window.clearInterval(this.refill);
+    };
+    window.clearInterval(this.refill);
+    fill();
+    this.refill = window.setInterval(fill, 25);
+    document.removeEventListener("visibilitychange", this.onVisible);
+    this.onVisible = () => { if (!document.hidden) { void ctx().resume?.(); fill(); } };
+    document.addEventListener("visibilitychange", this.onVisible);
     const end = this.t0 + total * n * beat + 0.4;
     const phaseEls = [...this.root.querySelectorAll<HTMLElement>("[data-phase]")];
     const pad = this.root.querySelector<HTMLElement>("[data-pad]");
@@ -257,7 +299,8 @@ export class TapTask {
     const note = this.root.querySelector<HTMLElement>("[data-note]");
     const tick = () => {
       const now = ctx().currentTime;
-      const av = Math.floor((now - this.t0) / (n * beat));
+      const heard = now - latency();
+      const av = Math.floor((heard - this.t0) / (n * beat));
       const k = av - this.countIn;
       if (note && !note.dataset.keep) note.textContent = av < this.countIn ? "Counting in…" : silent.has(av) ? "The audio is out: keep going." : "";
       const p = k < 0 ? -1 : Math.min(fade.length - 1, Math.floor((k * fade.length) / this.avartanams));
@@ -269,12 +312,12 @@ export class TapTask {
 
   private tap(kind: Gesture = "clap", at?: number) {
     if (!this.running) { this.start(); return; }
-    const now = at ?? ctx().currentTime;
+    const tapAt = at ?? ctx().currentTime;
+    // Where the tap falls against the beats as heard, less this device's offset.
+    const now = tapAt - latency() - this.judge.offset / 1000;
     const beat = 60 / this.tempo;
     const gaps = this.targets.slice(1).map((t, i) => t.at - this.targets[i].at).filter((x) => x > 0.001);
     const dense = gaps.length ? Math.min(...gaps) : beat;
-    const onTime = (this.spec.window_ms?.on_time ?? 80) / 1000;
-    const win = Math.min(onTime, 0.4 * dense);
     let best: typeof this.targets[number] | null = null;
     for (const t of this.targets) if (t.hit === undefined && (!best || Math.abs(now - t.at) < Math.abs(now - best.at))) best = t;
     const note = this.root.querySelector<HTMLElement>("[data-note]");
@@ -291,24 +334,23 @@ export class TapTask {
     const verdict = judge(kind, { kind: best.want }, clapsOnly());
     if (!verdict.ok) { if (note) note.textContent = verdict.note; return; }
     if (note) note.textContent = "";
-    best.hit = (now - best.at) * 1000;
+    best.hit = this.judge.delta(tapAt, best.at);
     // A nadai change is right within half a count; the others use the timing windows.
-    if (best.kind === "nadai_change") best.hit = Math.abs(best.hit) <= beat * 500 ? Math.sign(best.hit) * Math.min(Math.abs(best.hit), 80) : best.hit;
-    else if (Math.abs(best.hit) > win * 1000 && Math.abs(best.hit) <= onTime * 1000) best.hit = Math.sign(best.hit) * (onTime * 1000 + 1);
+    if (best.kind === "nadai_change") best.hit = Math.abs(best.hit) <= beat * 500 ? Math.sign(best.hit) * Math.min(Math.abs(best.hit), this.w.onTime) : best.hit;
   }
 
   private finish() {
     this.running = false;
-    const perfectMs = this.spec.window_ms?.perfect ?? 30;
-    const onTimeMs = this.spec.window_ms?.on_time ?? 80;
+    window.clearInterval(this.refill);
+    document.removeEventListener("visibilitychange", this.onVisible);
     const r = { perfect: 0, onTime: 0, early: 0, late: 0, missed: 0 };
     const earlyByAnga: Record<string, number> = {};
     for (const t of this.targets) {
       if (t.hit === undefined) { r.missed++; continue; }
-      const a = Math.abs(t.hit);
-      if (a <= perfectMs) r.perfect++;
-      else if (a <= onTimeMs) r.onTime++;
-      else if (t.hit < 0) { r.early++; earlyByAnga[String(t.anga ?? 0)] = (earlyByAnga[String(t.anga ?? 0)] ?? 0) + 1; }
+      const v = rate(t.hit, this.w);
+      if (v === "perfect") r.perfect++;
+      else if (v === "onTime") r.onTime++;
+      else if (v === "early") { r.early++; earlyByAnga[String(t.anga ?? 0)] = (earlyByAnga[String(t.anga ?? 0)] ?? 0) + 1; }
       else r.late++;
     }
     const of = this.targets.length;

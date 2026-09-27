@@ -3,9 +3,11 @@
  *
  * Learn: the hand performs each count slowly while the syllables are shown.
  * Follow: count along with the audio; nothing is scored.
- * Play: tap on the claps. Version 1 scores CLAPS ONLY: perfect ±30 ms, on
- * time ±80 ms, otherwise early or late. A tap on a finger count or a wave says
- * so and is not scored. No lives, no streak to break, and no red.
+ * Play: tap on the claps. Version 1 scores CLAPS ONLY, by the Timing setting
+ * (relaxed ±60/±120 ms by default, standard ±30/±80, strict ±20/±50; never
+ * more than 40 % of a count), against the beat as HEARD (output latency) and
+ * less the learner's calibrated offset (Calibrate). A tap on a finger count or
+ * a wave says so and is not scored. No lives, no streak to break, and no red.
  *
  * Konnakol is shown, not spoken: the recorded voice comes later (DECISIONS
  * tala §10); until then the call and response is syllables with click cues.
@@ -38,6 +40,7 @@ const nadai = NADAI.find(([n]) => n === nadaiName) ?? NADAI[1];
 const isChapu = tala?.id.includes("chapu");
 const syllables = tala ? (isChapu ? String(tala.konnakol ?? "").split(" ") : tala.counts.map(() => nadai[2])) : [];
 const tempo = settings.tempo ?? 60;
+const timing = ["relaxed", "standard", "strict"].includes(String(settings.timing)) ? String(settings.timing) : "relaxed";
 const claps = tala ? tala.counts.filter((c) => c.action === "clap").map((c) => c.n) : [];
 ---
 <SwaraLayout title={say("meta.title", "Tala trainer · Swara Studio")}
@@ -68,6 +71,11 @@ const claps = tala ? tala.counts.filter((c) => c.action === "clap").map((c) => c
         )}
         <span class="t-eyebrow sw-eyebrow">{say("tempoH", "Tempo")}</span>
         <div class="sw-chips">{[40, 48, 60, 70, 80].map((b) => <Chip data-tempo-btn={b} active={b === tempo}>{b} / min</Chip>)}</div>
+        <span class="t-eyebrow sw-eyebrow">{say("timingH", "Timing")}</span>
+        <div class="tr-timing">
+          <div class="sw-chips">{[["relaxed", say("timing.relaxed", "Relaxed")], ["standard", say("timing.standard", "Standard ±30/±80 ms")], ["strict", say("timing.strict", "Strict")]].map(([v, l]) => <Chip data-timing-btn={v} active={v === timing}>{l}</Chip>)}</div>
+          <div data-cal-slot></div>
+        </div>
       </div>
 
       <div class="tr-body">
@@ -103,6 +111,8 @@ const claps = tala ? tala.counts.filter((c) => c.action === "clap").map((c) => c
   import { attachPad, clapsOnly, clapsOnlyToggle, HINT_CLAPS, HINT_GESTURES } from "../../../lib/carnatic/client/tappad";
   import { judge, type Gesture } from "../../../lib/carnatic/gestures";
   import { TalaClock, rate } from "../../../lib/carnatic/client/tala";
+  import { TapJudge, calibrateButton, onCalibration, setTimingMode, windowsNow } from "../../../lib/carnatic/client/timing";
+  import type { TimingMode } from "../../../lib/carnatic/beatclock";
   import { bindTalaView } from "../../../lib/carnatic/client/talaview";
   import { ctx } from "../../../lib/carnatic/client/audio";
 
@@ -119,13 +129,21 @@ const claps = tala ? tala.counts.filter((c) => c.action === "clap").map((c) => c
     let call = false;
     bindTalaView(clock, grid, hand, (i) => {
       if (call && i === 0) {
-        const cycle = clock.times[clock.times.length - 1]?.cycle ?? 0;
+        const cycle = clock.heard()?.cycle ?? 0;
         turn.textContent = cycle % 2 === 0 ? "Call: listen and watch" : "Response: your turn";
       }
     });
     const go = root.querySelector<HTMLButtonElement>("[data-go]")!;
     const paint = () => { go.textContent = clock.playing ? "Pause" : "Play"; go.setAttribute("aria-pressed", String(clock.playing)); };
-    go.addEventListener("click", () => { clock.playing ? clock.stop() : clock.start(); paint(); });
+    let timer = new TapJudge();
+    const begin = () => { timer = new TapJudge(); clock.start(); };
+    onCalibration(() => { timer = new TapJudge(); });
+    root.querySelector("[data-cal-slot]")!.appendChild(calibrateButton());
+    root.querySelectorAll<HTMLButtonElement>("[data-timing-btn]").forEach((b) => b.addEventListener("click", () => {
+      setTimingMode(b.dataset.timingBtn as TimingMode);
+      root.querySelectorAll("[data-timing-btn]").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+    }));
+    go.addEventListener("click", () => { clock.playing ? clock.stop() : begin(); paint(); });
 
     root.querySelectorAll<HTMLButtonElement>("[data-mode-btn]").forEach((b) => b.addEventListener("click", () => {
       mode = b.dataset.modeBtn!;
@@ -140,14 +158,13 @@ const claps = tala ? tala.counts.filter((c) => c.action === "clap").map((c) => c
       root.querySelector<HTMLElement>("[data-mode-note]")!.textContent = notes[mode];
       clock.bpm = mode === "learn" ? Math.min(bpm, 40) : bpm;
       root.querySelector<HTMLElement>("[data-bpm]")!.textContent = String(clock.bpm);
-      if (clock.playing) clock.start();
+      if (clock.playing) begin();
     }));
     root.querySelectorAll<HTMLButtonElement>("[data-tempo-btn]").forEach((b) => b.addEventListener("click", () => {
       bpm = Number(b.dataset.tempoBtn);
       root.querySelectorAll("[data-tempo-btn]").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
       clock.bpm = mode === "learn" ? Math.min(bpm, 40) : bpm;
       root.querySelector<HTMLElement>("[data-bpm]")!.textContent = String(clock.bpm);
-      if (clock.playing) clock.start();
     }));
     root.querySelector<HTMLButtonElement>("[data-call]")?.addEventListener("click", (e) => {
       call = !call;
@@ -162,7 +179,7 @@ const claps = tala ? tala.counts.filter((c) => c.action === "clap").map((c) => c
     const note = root.querySelector<HTMLElement>("[data-tap-note]")!;
     const baseNote = note.textContent;
     const tap = (kind: Gesture = "clap", at?: number) => {
-      if (!clock.playing) { clock.start(); paint(); return; }
+      if (!clock.playing) { begin(); paint(); return; }
       const now = at ?? ctx().currentTime;
       const hit = clock.nearest(now);
       if (!hit) return;
@@ -175,11 +192,14 @@ const claps = tala ? tala.counts.filter((c) => c.action === "clap").map((c) => c
       const v = judge(kind, { kind: c.action }, clapsOnly());
       if (!v.ok) { note.textContent = v.note; return; }
       note.textContent = baseNote;
-      const ms = hit.delta * 1000;
-      const r = rate(ms);
-      if (r === "perfect") scores.perfect++; else if (r === "ontime") scores.ontime++; else scores.off++;
+      // From the beat as heard, less this device's offset (and its slow running correction).
+      const ms = timer.delta(now, hit.at);
+      const w = windowsNow(clock.countSeconds);
+      const r = rate(ms, w);
+      if (r === "perfect") scores.perfect++; else if (r === "onTime") scores.ontime++; else scores.off++;
       for (const [k, v2] of Object.entries(scores)) root.querySelector<HTMLElement>(`[data-score="${k}"]`)!.textContent = String(v2);
-      marker.style.left = `${50 + Math.max(-50, Math.min(50, (ms / 150) * 50))}%`;
+      const span = w.onTime * 1.5;
+      marker.style.left = `${50 + Math.max(-50, Math.min(50, (ms / span) * 50))}%`;
       marker.dataset.rating = r;
     };
     const padEl = root.querySelector<HTMLElement>("[data-tap]")!;
@@ -200,6 +220,7 @@ const claps = tala ? tala.counts.filter((c) => c.action === "clap").map((c) => c
   .tr-body { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 380px); gap: 24px; align-items: start; }
   .tr-left { display: grid; gap: 12px; min-width: 0; }
   .tr-turn { color: var(--accent); }
+  .tr-timing { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; min-width: 0; }
   .tr-play { display: grid; gap: 12px; }
   .tr-tap { appearance: none; touch-action: none; min-height: 180px; border: 1px solid var(--accent); border-radius: 8px; background: var(--accent-wash); color: var(--accent); font: 40px / 1 var(--font-display); cursor: pointer; touch-action: manipulation; }
   .tr-tap:active { transform: translateY(1px); }
