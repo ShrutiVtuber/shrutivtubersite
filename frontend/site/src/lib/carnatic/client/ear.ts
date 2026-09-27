@@ -17,6 +17,7 @@ import { genData, sargamPad, sargamResultHtml } from "./exercise";
 import { loadPlayer } from "./embed";
 import { attempts, dueCards, ensureCard, recordAttempt, review, wordFor } from "./learner";
 import { playLine } from "./phrase";
+import { attachPad } from "./tappad";
 import { settings, startDrone, stopDrone, theDrone } from "./state";
 import { pitchHz } from "../notation";
 
@@ -755,18 +756,17 @@ export async function runSession(root: HTMLElement, levels: Level[], drills: Dri
     } else if (q.kind === "tap") {
       box.innerHTML = `<button type="button" class="tt-pad" data-tap>Tap here (or press space)</button><p class="tt-note" data-tap-note>Press play, then tap once at the moment.</p>`;
       const pad = box.querySelector<HTMLButtonElement>("[data-tap]")!;
-      const tap = () => {
+      let off = () => {};
+      const tap = (_kind: string, at: number) => {
         const target = q.tapAt?.();
         if (target == null) { box.querySelector("[data-tap-note]")!.textContent = "Press play first."; return; }
-        const off = ctx().currentTime - target;
-        const right = Math.abs(off) <= (q.tolerance ?? 0.08);
-        document.removeEventListener("keydown", key);
+        const d = at - target;
+        const right = Math.abs(d) <= (q.tolerance ?? 0.08);
+        off();
         pad.remove();
-        answered(right, `<p class="ex-partial">${Math.abs(off) < 0.01 ? "Right on it." : `${Math.round(Math.abs(off) * 1000)} ms ${off < 0 ? "early" : "late"}.`}</p>`);
+        answered(right, `<p class="ex-partial">${Math.abs(d) < 0.01 ? "Right on it." : `${Math.round(Math.abs(d) * 1000)} ms ${d < 0 ? "early" : "late"}.`}</p>`);
       };
-      const key = (e: KeyboardEvent) => { if (e.code === "Space") { e.preventDefault(); tap(); } };
-      pad.addEventListener("pointerdown", tap);
-      document.addEventListener("keydown", key);
+      off = attachPad(pad, { onTap: tap });
     }
   };
 

@@ -23,7 +23,8 @@ const SRC = fileURLToPath(new URL("../src", import.meta.url));
 /* Her own screens, and OBS sources nobody reads. The admin's labels are the
    tool she edits WITH; the overlays render into a stream at 1920×1080 where a
    <title> is never seen. */
-const SKIP_DIRS = ["pages/admin", "pages/overlay"];
+/* The Swara Studio admin (/carnatic/studio) is her tool too, apart from the site admin. */
+const SKIP_DIRS = ["pages/admin", "pages/overlay", "pages/carnatic/studio"];
 
 /* Attributes a person reads or hears. NOT data-* state flags: data-empty="true"
    is a switch the CSS reads, and an early version of this reported it. */

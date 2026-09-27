@@ -22,6 +22,8 @@ import { attempts, recordAttempt } from "./learner";
 import { playLine } from "./phrase";
 import { settings } from "./state";
 import { pitchHz } from "../notation";
+import { judge, type Gesture } from "../gestures";
+import { attachPad, clapsOnly, clapsOnlyToggle } from "./tappad";
 
 export interface Segment { avartanams: number; speed?: number; nadai?: number }
 export interface TapSpec {
@@ -87,11 +89,11 @@ const UNITS: Record<number, number> = { 1: 1, 2: 2, 3: 4, 4: 8 };
 export class TapTask {
   private tempo: number;
   private running = false;
-  private targets: { at: number; kind: string; hit?: number; anga?: number }[] = [];
+  private targets: { at: number; kind: string; hit?: number; anga?: number; want: string }[] = [];
+  private detach: (() => void) | null = null;
   private timer = 0;
   private t0 = 0;
   private started = "";
-  private keyHandler: ((e: KeyboardEvent) => void) | null = null;
 
   constructor(private root: HTMLElement, private spec: TapSpec, private data: TapData, private onVariant?: (i: number) => void, private variant = 0) {
     this.tempo = Number(spec.tempo ?? (spec.tempo_range ? spec.tempo_range[0] + 10 : 60));
@@ -149,16 +151,15 @@ export class TapTask {
       this.draw();
     });
     const pad = this.root.querySelector<HTMLElement>("[data-pad]");
-    pad?.addEventListener("pointerdown", (e) => { e.preventDefault(); this.tap(); });
-    if (this.keyHandler) document.removeEventListener("keydown", this.keyHandler);
-    this.keyHandler = (e: KeyboardEvent) => {
-      if (e.code !== "Space" || (e.target as HTMLElement)?.closest("input, textarea, select")) return;
-      if (!this.root.isConnected) { document.removeEventListener("keydown", this.keyHandler!); return; }
-      if (!this.root.querySelector("[data-pad]")) return;
-      e.preventDefault();
-      this.tap();
-    };
-    document.addEventListener("keydown", this.keyHandler);
+    this.detach?.();
+    this.detach = null;
+    if (pad) {
+      const hint = document.createElement("p");
+      hint.className = "tt-hint";
+      pad.insertAdjacentElement("afterend", hint);
+      this.detach = attachPad(pad, { onTap: (kind, at) => this.tap(kind, at), hint });
+      hint.insertAdjacentElement("afterend", clapsOnlyToggle(() => this.draw()));
+    }
   }
 
   private start() {
@@ -203,7 +204,7 @@ export class TapTask {
       const phase = !scored ? "all" : fade[Math.min(fade.length - 1, Math.floor((k * fade.length) / this.avartanams))];
       const quiet = silent.has(av);
       const avStart = this.t0 + av * n * beat;
-      if (scored && nadai !== prevNadai && kinds.includes("nadai_change")) this.targets.push({ at: avStart, kind: "nadai_change", anga: 0 });
+      if (scored && nadai !== prevNadai && kinds.includes("nadai_change")) this.targets.push({ at: avStart, kind: "nadai_change", anga: 0, want: "any" });
       if (scored) prevNadai = nadai;
       for (let i = 0; i < n; i++) {
         const c = counts[i];
@@ -216,9 +217,11 @@ export class TapTask {
           if (nadai !== this.data.defaultNadai && !this.data.syllables) for (let m = 0; m < nadai; m++) blip(m === 0 ? 1320 : 990, at + (m * beat) / nadai, 0.03, 0.03);
         }
         if (!scored) continue;
-        if (kinds.includes("claps") && c.action === "clap") this.targets.push({ at, kind: "clap", anga: c.anga });
-        else if (kinds.includes("every_count")) this.targets.push({ at, kind: "count", anga: c.anga });
-        if (kinds.includes("samam") && i === 0 && (!this.spec.dropout || after.has(av))) this.targets.push({ at, kind: "samam", anga: 0 });
+        // With whole-hand gestures each count of the hand is a target of its own kind; claps only keeps the claps.
+        if (kinds.includes("claps") && c.action === "clap") this.targets.push({ at, kind: "clap", anga: c.anga, want: "clap" });
+        else if (kinds.includes("claps") && !clapsOnly() && (c.action === "finger" || c.action === "wave")) this.targets.push({ at, kind: c.action, anga: c.anga, want: c.action });
+        else if (kinds.includes("every_count") && c.action !== "silent") this.targets.push({ at, kind: "count", anga: c.anga, want: "any" });
+        if (kinds.includes("samam") && i === 0 && (!this.spec.dropout || after.has(av))) this.targets.push({ at, kind: "samam", anga: 0, want: "any" });
       }
       if (quiet || !scored && !this.data.syllables && !this.data.melody) continue;
       const startAt = avStart + (av === this.countIn && this.spec.eduppu ? Number(this.spec.eduppu) * beat : 0);
@@ -228,7 +231,7 @@ export class TapTask {
         const fromEduppu = av === this.countIn && this.spec.eduppu ? Math.round(Number(this.spec.eduppu) * UNITS[speed]) : 0;
         const line = Array.from({ length: per - fromEduppu }, () => this.data.melody![mi++ % this.data.melody!.length]).join(" ");
         playLine(line, { saHz, tuning: s.playbackTuning, unit, at: startAt, scale: undefined });
-        if (av === this.countIn && kinds.includes("entry")) this.targets.push({ at: startAt, kind: "entry", anga: 0 });
+        if (av === this.countIn && kinds.includes("entry")) this.targets.push({ at: startAt, kind: "entry", anga: 0, want: "any" });
       }
       if (this.data.syllables && scored) {
         const per = n * nadai;
@@ -237,14 +240,14 @@ export class TapTask {
           const at = avStart + (m * beat) / nadai;
           if (syl === "," || syl === "-") continue;
           if (phase !== "none") blip(m % nadai === 0 ? 1320 : 990, at, 0.04, 0.06);
-          if (kinds.includes("syllables")) this.targets.push({ at, kind: "syllable", anga: 0 });
+          if (kinds.includes("syllables")) this.targets.push({ at, kind: "syllable", anga: 0, want: "any" });
         }
       }
     }
     if (kinds.includes("landing") && this.data.syllables) {
       const matras = this.data.landingMatra ?? this.data.syllables.length;
       const nadai = Number(segOf[0]?.nadai ?? this.data.defaultNadai);
-      this.targets.push({ at: this.t0 + this.countIn * n * beat + (matras / nadai) * beat, kind: "landing", anga: 0 });
+      this.targets.push({ at: this.t0 + this.countIn * n * beat + (matras / nadai) * beat, kind: "landing", anga: 0, want: "any" });
     }
     this.targets.sort((a, b) => a.at - b.at);
     const end = this.t0 + total * n * beat + 0.4;
@@ -264,9 +267,9 @@ export class TapTask {
     this.timer = window.setInterval(tick, 60);
   }
 
-  private tap() {
+  private tap(kind: Gesture = "clap", at?: number) {
     if (!this.running) { this.start(); return; }
-    const now = ctx().currentTime;
+    const now = at ?? ctx().currentTime;
     const beat = 60 / this.tempo;
     const gaps = this.targets.slice(1).map((t, i) => t.at - this.targets[i].at).filter((x) => x > 0.001);
     const dense = gaps.length ? Math.min(...gaps) : beat;
@@ -276,14 +279,18 @@ export class TapTask {
     for (const t of this.targets) if (t.hit === undefined && (!best || Math.abs(now - t.at) < Math.abs(now - best.at))) best = t;
     const note = this.root.querySelector<HTMLElement>("[data-note]");
     const reach = best?.kind === "nadai_change" ? beat / 2 : Math.max(0.25, dense / 2);
+    const n = this.data.counts.length;
+    const count = this.data.counts[((Math.round((now - this.t0) / beat) % n) + n) % n];
     if (!best || Math.abs(now - best.at) > reach) {
-      const n = this.data.counts.length;
-      const c = this.data.counts[((Math.round((now - this.t0) / beat) % n) + n) % n];
-      if (note && c && this.targetKinds.includes("claps")) {
-        note.textContent = c.action === "clap" ? "" : `That count is ${c.action === "finger" ? "a finger count" : c.action === "wave" ? "a wave" : "silent"}: shown, not scored.`;
+      // Nothing scored here: a silent count (or, claps only, a finger count or wave) is shown, not scored.
+      if (note && count && this.targetKinds.includes("claps")) {
+        note.textContent = count.action === "clap" ? "" : `That count is ${count.action === "finger" ? "a finger count" : count.action === "wave" ? "a wave" : "silent"}: shown, not scored.`;
       }
       return;
     }
+    const verdict = judge(kind, { kind: best.want }, clapsOnly());
+    if (!verdict.ok) { if (note) note.textContent = verdict.note; return; }
+    if (note) note.textContent = "";
     best.hit = (now - best.at) * 1000;
     // A nadai change is right within half a count; the others use the timing windows.
     if (best.kind === "nadai_change") best.hit = Math.abs(best.hit) <= beat * 500 ? Math.sign(best.hit) * Math.min(Math.abs(best.hit), 80) : best.hit;

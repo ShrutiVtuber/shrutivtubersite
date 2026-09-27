@@ -46,10 +46,10 @@ const page = { room, subject, title, draftId: draft?.id ?? null, words, parts, s
         </div>
         <ul class="an-notes" data-notes></ul>
         <div class="an-new">
-          <div class="row"><input data-at value="0:00" aria-label="Time (m:ss)" />
+          <div class="row"><input data-at value="0:00" aria-label={say("time", "Time (m:ss)")} />
             {CATS.map((c, i) => <button type="button" class="lr-chip" data-cat={c} aria-pressed={String(i === 0)}>{c}</button>)}</div>
-          <textarea data-note-body rows="3" maxlength="2000" placeholder="What do you hear at this moment?"></textarea>
-          <div class="row"><input data-note-notation placeholder="Notation (optional): P M G R" /><span style="flex:1"></span><button type="button" class="lr-btn lr-btn-s" data-add-note>Add note</button></div>
+          <textarea data-note-body rows="3" maxlength="2000" placeholder={say("what", "What do you hear at this moment?")}></textarea>
+          <div class="row"><input data-note-notation placeholder={say("notation", "Notation (optional): P M G R")} /><span style="flex:1"></span><button type="button" class="lr-btn lr-btn-s" data-add-note>Add note</button></div>
           <small class="li-note">Notes can be edited until you publish. The time follows the player when it can read it; otherwise type it.</small>
         </div>
         <label class="li-form" style="margin-top:14px"><span>Summary</span><textarea data-summary rows="5" maxlength="4000">{summary}</textarea></label>
@@ -67,13 +67,13 @@ const page = { room, subject, title, draftId: draft?.id ?? null, words, parts, s
         )}
         {(sub.recording_link || !ex) && (
           <label class="li-form" style="margin-top:14px"><span>Link to your own recording {sub.recording_link?.required ? "" : "(optional)"}</span>
-            <input data-link type="url" value={link} placeholder="https://youtu.be/…" />
+            <input data-link type="url" value={link} placeholder={say("linkPh", "https://youtu.be/…")} />
             <small>YouTube, SoundCloud, Vimeo or Bandcamp. It loads only when someone presses play. Nothing is uploaded here.</small></label>
         )}
       </>
     )}
     <p class="li-note" data-note aria-live="polite"></p>
-    <div class="st-actions" style="justify-content:flex-end"><button type="button" class="lr-btn lr-btn-s" data-save>Save draft</button><button type="button" class="lr-btn" data-submit>{analysis ? "Publish to the room" : "Submit to the room"}</button></div>
+    <div class="st-actions" style="justify-content:flex-end"><button type="button" class="lr-btn lr-btn-s" data-save>{say("save", "Save draft")}</button><button type="button" class="lr-btn" data-submit>{analysis ? "Publish to the room" : "Submit to the room"}</button></div>
   </div>
   <aside class="cm-side soft">
     {analysis ? (
@@ -89,7 +89,7 @@ const page = { room, subject, title, draftId: draft?.id ?? null, words, parts, s
         <p class="cm-soft">These are hints, not rules. You can submit either way.</p>
       </>
     )}
-    <a class="lr-link" href={roomHref}>‹ Back to the room</a>
+    <a class="lr-link" href={roomHref}>‹ {say("back", "Back to the room")}</a>
   </aside>
 </div>
 {signedIn && <PublishConsent />}

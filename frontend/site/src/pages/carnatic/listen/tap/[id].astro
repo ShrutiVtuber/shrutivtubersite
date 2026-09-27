@@ -24,7 +24,7 @@ const data = { id: r.id, provider: r.provider, url: r.url, clipStart: clip?.star
 <SwaraLayout title={`${say("title", "Tap along to a recording")} · Swara Studio`} noindex
              crumbs={[[say("crumb", "Listening room"), L("/carnatic/listen")], [recordingLabel(r), L(`/carnatic/listen/recording/${r.id}`)], [say("tapCrumb", "Tap along")]]}>
   <div class="li-sec-h" style="margin-top:8px"><h1 class="lr-title" style="margin:0">{say("title", "Tap along to a recording")}</h1>
-    <small>K.16 · {recordingLabel(r)} · {data.talaName}</small></div>
+    <small>{say("meta", "K.16 · {rec} · {tala}").replace("{rec}", recordingLabel(r)).replace("{tala}", data.talaName)}</small></div>
   <div class="li-tap" data-tapalong>
     <div class="lr-reccard-player" data-player style="border-radius:10px">
       <button type="button" class="lr-btn" data-load>{say("load", "Load the recording")}</button>

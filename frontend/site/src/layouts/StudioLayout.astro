@@ -9,6 +9,9 @@ import "../styles/site.css";
 import "../styles/carnatic.css";
 import "../styles/carnatic-course.css";
 import { DEFAULTS } from "../lib/carnatic/prefs";
+import { copy } from "../lib/copy";
+
+const say = await copy("component:StudioLayout");
 
 interface Props { title: string; counts?: Record<string, number> }
 const { title, counts = {} } = Astro.props;
@@ -25,18 +28,18 @@ const boot = { lang: "en", signedIn: false, supporter: false, partsPerSong: null
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>{title} · Swara Studio admin</title>
+    <title>{title} · {say("admin", "Swara Studio admin")}</title>
     <meta name="robots" content="noindex, nofollow" />
     <link rel="icon" href="/favicon.ico" sizes="any" />
     <script is:inline src="/first-paint.js"></script>
   </head>
   <body class="st-body">
     <aside class="sa-side">
-      <a class="sa-brand" href="/carnatic/studio/lessons"><span>Swara Studio</span><small>Admin · Shruti</small></a>
-      <nav class="sa-nav" aria-label="Swara Studio admin">
+      <a class="sa-brand" href="/carnatic/studio/lessons"><span>{say("name", "Swara Studio")}</span><small>{say("who", "Admin · Shruti")}</small></a>
+      <nav class="sa-nav" aria-label={say("admin", "Swara Studio admin")}>
         {NAV.map(([href, label, key]) => <a href={href} aria-current={here.startsWith(href) ? "page" : undefined}>{label}{counts[key] !== undefined && <small>{counts[key]}</small>}</a>)}
       </nav>
-      <a class="sa-back" href="/admin">‹ Site admin</a>
+      <a class="sa-back" href="/admin">‹ {say("back", "Site admin")}</a>
     </aside>
     <main class="sa-main" id="main"><slot /></main>
     <script type="application/json" id="swara-boot" set:html={JSON.stringify(boot)} />

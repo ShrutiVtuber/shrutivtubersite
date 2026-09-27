@@ -100,6 +100,8 @@ const claps = tala ? tala.counts.filter((c) => c.action === "clap").map((c) => c
 </SwaraLayout>
 
 <script>
+  import { attachPad, clapsOnly, clapsOnlyToggle, HINT_CLAPS, HINT_GESTURES } from "../../../lib/carnatic/client/tappad";
+  import { judge, type Gesture } from "../../../lib/carnatic/gestures";
   import { TalaClock, rate } from "../../../lib/carnatic/client/tala";
   import { bindTalaView } from "../../../lib/carnatic/client/talaview";
   import { ctx } from "../../../lib/carnatic/client/audio";
@@ -159,28 +161,33 @@ const claps = tala ? tala.counts.filter((c) => c.action === "clap").map((c) => c
     const marker = root.querySelector<HTMLElement>("[data-marker]")!;
     const note = root.querySelector<HTMLElement>("[data-tap-note]")!;
     const baseNote = note.textContent;
-    const tap = () => {
+    const tap = (kind: Gesture = "clap", at?: number) => {
       if (!clock.playing) { clock.start(); paint(); return; }
-      const now = ctx().currentTime;
+      const now = at ?? ctx().currentTime;
       const hit = clock.nearest(now);
       if (!hit) return;
       const c = counts[hit.index];
-      if (c.action !== "clap") {
+      // Claps only: the claps are scored, other counts shown. Whole-hand gestures: every count by its kind.
+      if (clapsOnly() && c.action !== "clap") {
         note.textContent = `Count ${c.n} is ${c.action === "finger" ? "a finger count" : c.action === "wave" ? "a wave" : "silent"}: shown, not scored.`;
         return;
       }
+      const v = judge(kind, { kind: c.action }, clapsOnly());
+      if (!v.ok) { note.textContent = v.note; return; }
       note.textContent = baseNote;
       const ms = hit.delta * 1000;
       const r = rate(ms);
       if (r === "perfect") scores.perfect++; else if (r === "ontime") scores.ontime++; else scores.off++;
-      for (const [k, v] of Object.entries(scores)) root.querySelector<HTMLElement>(`[data-score="${k}"]`)!.textContent = String(v);
+      for (const [k, v2] of Object.entries(scores)) root.querySelector<HTMLElement>(`[data-score="${k}"]`)!.textContent = String(v2);
       marker.style.left = `${50 + Math.max(-50, Math.min(50, (ms / 150) * 50))}%`;
       marker.dataset.rating = r;
     };
-    root.querySelector("[data-tap]")!.addEventListener("pointerdown", (e) => { e.preventDefault(); tap(); });
-    document.addEventListener("keydown", (e) => {
-      if (e.code === "Space" && mode === "play" && !(e.target as HTMLElement)?.closest("input, textarea, select")) { e.preventDefault(); tap(); }
-    });
+    const padEl = root.querySelector<HTMLElement>("[data-tap]")!;
+    const hint = document.createElement("p");
+    hint.className = "tt-hint";
+    padEl.insertAdjacentElement("afterend", hint);
+    attachPad(padEl, { onTap: (kind, at) => { if (mode === "play" || !clock.playing) tap(kind, at); }, hint });
+    hint.insertAdjacentElement("afterend", clapsOnlyToggle(() => { hint.textContent = clapsOnly() ? HINT_CLAPS : HINT_GESTURES; }));
   }
 </script>
 
@@ -194,7 +201,7 @@ const claps = tala ? tala.counts.filter((c) => c.action === "clap").map((c) => c
   .tr-left { display: grid; gap: 12px; min-width: 0; }
   .tr-turn { color: var(--accent); }
   .tr-play { display: grid; gap: 12px; }
-  .tr-tap { appearance: none; min-height: 180px; border: 1px solid var(--accent); border-radius: 8px; background: var(--accent-wash); color: var(--accent); font: 40px / 1 var(--font-display); cursor: pointer; touch-action: manipulation; }
+  .tr-tap { appearance: none; touch-action: none; min-height: 180px; border: 1px solid var(--accent); border-radius: 8px; background: var(--accent-wash); color: var(--accent); font: 40px / 1 var(--font-display); cursor: pointer; touch-action: manipulation; }
   .tr-tap:active { transform: translateY(1px); }
   .tr-strip { position: relative; display: flex; justify-content: space-between; align-items: end; height: 30px; padding: 4px 8px; border-radius: 6px; font: 10px / 1 var(--font-mono); color: var(--ink-faint);
     background: linear-gradient(90deg, var(--surface-inset) 0 25%, var(--surface-veil) 25% 40%, var(--accent-wash) 40% 60%, var(--surface-veil) 60% 75%, var(--surface-inset) 75%); }

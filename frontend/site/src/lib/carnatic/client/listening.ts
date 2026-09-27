@@ -8,6 +8,8 @@ import { boot, csrf } from "./state";
 import { ctx, talaSound } from "./audio";
 import { recordAttempt } from "./learner";
 import { ragaKey } from "../answers";
+import { judge, type Gesture } from "../gestures";
+import { attachPad, clapsOnly, clapsOnlyToggle } from "./tappad";
 
 const esc = (s: string) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 const toS = (t?: string | null) => (t ? t.split(":").reduce((a, x) => a * 60 + Number(x), 0) : undefined);
@@ -168,14 +170,20 @@ export function runTapAlong(root: HTMLElement, t: TapAlong) {
     requestAnimationFrame(tick);
   };
   requestAnimationFrame(tick);
-  const tap = () => {
-    const s = now();
+  const tap = (kind: Gesture, at: number) => {
+    // The player's clock at the moment of the tap (the tap's audio time, carried back from now).
+    const cur = now();
+    const s = cur == null ? null : cur - Math.max(0, ctx().currentTime - at);
     if (s == null) { note.textContent = "Load the recording and press play in its player first: the grid follows it."; return; }
     let best = -1;
     for (let i = 0; i < countTimes.length; i++) if (!hit.has(i) && (best < 0 || Math.abs(countTimes[i] - s) < Math.abs(countTimes[best] - s))) best = i;
     if (best < 0) return;
     const off = (s - countTimes[best]) * 1000;
     if (Math.abs(off) > 400) return;
+    const action = t.counts[best % n]?.action ?? "clap";
+    if (clapsOnly() && action !== "clap") { note.textContent = `That count is ${action === "finger" ? "a finger count" : action === "wave" ? "a wave" : "silent"}: shown, not scored.`; return; }
+    const v = judge(kind, { kind: action }, clapsOnly());
+    if (!v.ok) { note.textContent = v.note; return; }
     hit.add(best);
     const cell = cells[best % n];
     cell.classList.remove("hit", "off");
@@ -183,8 +191,14 @@ export function runTapAlong(root: HTMLElement, t: TapAlong) {
     if (Math.abs(off) <= 30) results.perfect++; else if (Math.abs(off) <= 80) results.onTime++; else if (off < 0) results.early++; else results.late++;
     note.textContent = `${results.perfect + results.onTime} on time · ${results.early} early · ${results.late} late`;
   };
-  root.querySelector("[data-tap]")?.addEventListener("pointerdown", (e) => { e.preventDefault(); tap(); });
-  document.addEventListener("keydown", (e) => { if (e.code === "Space" && !(e.target as HTMLElement)?.closest("input, textarea")) { e.preventDefault(); tap(); } });
+  const pad = root.querySelector<HTMLElement>("[data-tap]");
+  if (pad) {
+    const hint = document.createElement("p");
+    hint.className = "tt-hint";
+    pad.insertAdjacentElement("afterend", hint);
+    attachPad(pad, { onTap: tap, hint });
+    hint.insertAdjacentElement("afterend", clapsOnlyToggle());
+  }
   root.querySelector("[data-finish]")?.addEventListener("click", () => {
     const of = hit.size ? Math.max(hit.size, Math.max(...hit) - Math.min(...hit) + 1) : 0;
     recordAttempt({ itemId: "K.16", kind: "tap", startedAt: new Date().toISOString(), seconds: 0, result: { ...results, missed: Math.max(0, of - hit.size), of, recording: t.id } });

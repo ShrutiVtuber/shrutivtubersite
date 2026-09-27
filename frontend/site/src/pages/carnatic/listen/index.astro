@@ -92,7 +92,7 @@ const qs = (k: string, v: string) => L(`/carnatic/listen${v ? `?${k}=${encodeURI
   <section class="li-suggest" aria-labelledby="suggest-h">
     <form class="li-form" data-suggest>
       <h2 id="suggest-h" class="ty-sec" style="margin:14px 0 4px">{say("suggestH", "Suggest a recording")}</h2>
-      <label>{say("link", "Link")}<input name="url" type="url" required placeholder="https://www.youtube.com/watch?v=…" /></label>
+      <label>{say("link", "Link")}<input name="url" type="url" required placeholder={say("linkPh", "https://www.youtube.com/watch?v=…")} /></label>
       <div class="row">
         <label>{say("raga", "Raga")}<input name="raga" list="li-ragas" value={raga} /></label>
         <label>{say("composition", "Composition")}<input name="composition" /></label>

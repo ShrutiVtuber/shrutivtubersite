@@ -33,7 +33,7 @@ const who = [r.instrument, r.artists?.slice(0, 2).join(", ")].filter(Boolean).jo
         {(ragaName || who) && <p class="lr-reccard-who">{[ragaName, who].filter(Boolean).join(" · ")}</p>}
         {r.listenFor && <p class="lr-reccard-lf"><span class="lr-eyebrow">{say("listenFor", "Listen for")}</span> {r.listenFor}</p>}
         {r.sections?.length > 0 && (
-          <div class="lr-chips" aria-label="Sections">
+          <div class="lr-chips" aria-label={say("sections", "Sections")}>
             {r.sections.map((s) => <button type="button" class="lr-chip" data-seek={s.t}><span class="mono">{s.t}</span> {s.label}</button>)}
           </div>
         )}
