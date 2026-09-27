@@ -572,13 +572,14 @@ list changes.
 `GET /api/carnatic/course/bundle` (ETag as above) →
 
 ```json
-{ "format": 1, "digest": "…", "updatedAt": "…",
+{ "format": 2, "digest": "…", "updatedAt": "…",
   "units":     [Unit, …],          // all 21, always
   "lessons":   [Lesson, …],        // published lessons, full text
   "exercises": [Exercise, …],      // exercises of published lessons, plus checkpoints
   "glossary":  [Term, …],
-  "drills":    {"families": […], "levels": […], "ragaFlags": {…}},
-  "tala_keeping": [TalaTask, …] }  // K.01-K.16
+  "drills":    {"families": […], "levels": […], "ragaFlags": {…}, "confusable": […],
+                "talaKeeping": [TalaTask, …], "topics": {…}},
+  "tala_keeping": [TalaTask, …] }  // K.01-K.16 (the same list as drills.talaKeeping)
 ```
 
 Or piecewise, same shapes:
@@ -599,7 +600,9 @@ Or piecewise, same shapes:
                  "minutes": 15, "level": "intermediate",
                  "available": true,             // a published lesson exists
                  "hasListening": true, "hasPractice": false } ],
-  "checkpoint": "CP.U09" }                      // or null
+  "recordings": [ {"id": "mohanam-02", "why": "…", "lesson": "U12.L03",
+                   "available": true} ],        // what the unit's lessons recommend
+  "checkpoint": "CP.U09" }                      // the unit's kind: checkpoint exercise, or null
 ```
 
 Units come from the syllabus, so all 21 units and all 173 lessons are
@@ -632,27 +635,84 @@ already split out; `{{kind k=v}}` lines and ```` ```sargam ```` fences are
 embeds; `> [!listen]`, `> [!schools]`, `> [!sources]` quote blocks are the
 three boxes; `[^key]` are footnote markers numbered by `sources[].n`.
 
-Tolerated extensions (until format 2 lands): a tap task embedded with
-`{{quiz id=U04.L02.T1}}` (render it as a tap task: look the id up in the
-exercises); `{{tap id=…}}` means the same. Unknown tags render as a quiet
-grey box naming the tag, never as an error and never hiding text.
+**Format 2** (course/FORMAT.md, 27 Sep 2026; FORMAT_CHANGES.md lists what
+changed). The import accepts format 2 only; nothing in the API carries the
+format-1 fields any more. For a reader:
+
+- Embed tags: `drone`, `sargam`, `tala` (no `kalai`: 2-kalai Adi is
+  `id=adi_2_kalai`; `nadai` only when not the tala's default),
+  `raga`, `mela`, `gamaka`, `konnakol` (`eduppu=` in counts after samam,
+  not `start=`), `recording` (`guess=true` hides the raga until the reader
+  commits a guess; `start`/`end` are "m:ss"), `quiz`, `tap`, `practice`,
+  `listen` (the tag follows the exercise's kind), `drill` (`set=C3` or
+  `set="C4,C5"`, `count=`), `selftest id=K.04` (a card with Start, opening
+  the self-test), `checkpoint unit=4` (a card with Start: "10-15 minutes, a
+  profile in words for each skill, not a score"), `tuner`, `composer`.
+  A key a tag doesn't know is ignored by readers (the Studio preview shows
+  a grey box); an unknown tag is a quiet grey box, never an error.
+- ```` ```text ```` fences are shown exactly as written in a monospace
+  face and never played. Only ```` ```sargam ```` fences are notation.
+- `[the lesson on kalai](U08.L07)`: a link whose target is a lesson id.
+  Resolve it with the unit list (id → slug and title); an unpublished
+  lesson is plain text.
+- Glossary terms carry no markup. The reader underlines the **first**
+  occurrence in a lesson of any of a term's `forms` (whole words, any
+  case), in paragraphs, list items, table cells and boxes, not in
+  headings, embeds, notation or links, and not in the lesson that teaches
+  the term (`lesson`). Where forms overlap the longest match wins.
 
 Translations: lessons are English only at launch. When a published
 translation exists for the requested `?lang=ta|te|kn`, it is returned with
 `"translation": {…}`; otherwise the English is returned and the client
 shows the quiet "not yet translated" line.
 
-**Exercise**: the exercise as FORMAT.md §4 defines it, converted to JSON,
-with the writers' extensions kept as they are (`also`, `also_recordings`,
-`recordings_also`, `recording_choices`, `pool`, `comparison` on listening
-exercises; `speed: [1,2,3]`, `nadai: [4,3,5]` or `nadai_sequence`,
-`plays`, `eduppu`, `line`, `targets: entry`, `tempo_range` on taps;
-`line` and `raga`/`tala` on fill and sargam items; `checkpoint: true`,
-`includes`/`drills`, `skills` on checkpoints). Clients should treat
-unknown fields as absent. Answers are included (the app checks offline).
+**Exercise**: the exercise as FORMAT.md §4-§5 defines it (format 2),
+converted to JSON. Kinds: `quiz`, `tap`, `practice`, `listening`,
+`checkpoint`. Answers are included (the app checks offline). In short:
 
-**Term** (glossary): `{ "term": "vakra", "slug": "vakra", "definition":
-"one line", "lesson": "U07.L05", "aliases": ["vakra raga"] }`.
+- Quiz item types: `choice` (`select: many`), `order`, `match` (`pairs:
+  [{left, right}]`, drawn as one choice card per pair, the options being
+  all the rights), `number` (`tolerance`, `close`, `unit`), `text`
+  (`accept`; in a guess `answer_from: raga`, `suggest`), `sargam`
+  (`check_holds`, `check_octaves`, `check_bars`, `enharmonic`, `checks`),
+  `fill` (`line` with `_` gaps, `answer` one token per gap), `ear` (synth,
+  kriya or konnakol audio only), `timestamp` (`recording`, `answer`
+  "m:ss", `tolerance` seconds, default 6), `tap` (a moment in a recording:
+  `answer` "m:ss.s", `tolerance_ms`, default 150), `generated`,
+  `construct` (`eduppu` in counts after samam or `ask_start`, `checks`:
+  `lands_on`, `three_equal`, `total_matras` a number, list or
+  `from_eduppu`, `groups_decreasing`, `fits_tala`, `only_raga_swaras`,
+  `direction`).
+- An item whose answer waits for Sophia's annotation (`answer: null`) is
+  **not returned**; the exercise then carries `"waiting": n`.
+- Tap tasks: `tala`, `tempo`, `tempo_range`, `segments: [{avartanams,
+  speed, nadai}]` (or `speed`, `nadai`, `avartanams`), `targets` (a list
+  of `claps`, `every_count`, `samam`, `syllables`, `entry`, `landing`,
+  `nadai_change`), `count_in`, `fade` (`[all, claps, samam, none]`),
+  `plays` (`{abhyasa}`, `{line, raga}`, `{konnakol}`, `{example}`,
+  `{recording}`), `eduppu`, `dropout: [1, 3]`, `variants`, `window_ms`.
+  Always the five counts; no `report`.
+- Listening: `recordings: [{id, start, end}]`, `pick: all | one | random`,
+  `guess`, `auto` items (each with `recording:` when there are several),
+  `notes_template`, `rubric` (`scale` words are strings, never booleans).
+- Practice: `submission` parts (`sargam`, `konnakol`, `text`,
+  `timestamps`, `clip_time`, `analysis`, `recording_link`), `prechecks`,
+  `private_check: {against: data | scales | readings | transcription, …,
+  report}`, `rubric`.
+- Checkpoint (`CP.Unn`, one per unit, listed by the unit and with
+  `?unit=`): `skills: [{id, name}]`, `parts` drawn at run time in order
+  (`{quiz, count, skill}` random items of a quiz; `{tap, avartanams,
+  skill}` a tap task or K self-test, counting as right in the share of
+  its targets perfect or on time; `{drill, set, count, skill}` ear items,
+  counting in the share right; `{items: n, skill}` the next written
+  items), `items` (written items; any not called by a part are added at
+  the end). The result is a profile per skill in three words (§12b).
+
+**Term** (glossary, `course/glossary.yaml`, 474 terms): `{ "term":
+"eduppu", "slug": "eduppu", "iso": "eḍuppu", "forms": ["eduppu",
+"eduppus"], "definition": "…", "lesson": "U08.L08", "source":
+"laya-5" }`. `forms` is what a reader matches in lesson text (`aliases`
+is the same list under its old name, kept for one release).
 
 ## 11. Lesson progress (synced)
 
@@ -742,11 +802,15 @@ Sahana, Begada, Anandabhairavi, Varali, Saveri, Kanada, Atana, and the
 pairs EAR_TRAINING.md §3 names) are drilled only from recordings; Sophia
 changes the flags in the admin.
 
-Tala keeping: `tala_keeping` in the bundle holds K.01-K.16 as tap tasks
-(`{"id": "K.02", "title": "…", "tala": "adi", "tempoRange": [50, 80],
-"targets": "claps", "fade": ["all", "claps", "samam", "none"],
-"unlockedBy": "U04.L02"}`). Timing: perfect ±30 ms, on time ±80 ms,
-shrinking to 40 % of the gap at dense targets.
+Tala keeping: `talaKeeping` (and `tala_keeping` in the bundle) holds
+K.01-K.16 from `course/exercises/selftest.yaml`, as format-2 tap tasks
+(`{"id": "K.02", "kind": "tap", "title": "…", "lesson": "U04.L02",
+"unlockedBy": "U04.L02", "tala": "adi", "tempo": 60, "tempo_range": [50,
+80], "avartanams": 4, "targets": ["claps"], "count_in": 1, "fade": ["all",
+"claps", "samam", "none"]}`); `GET /api/carnatic/course/exercises/K.02`
+returns one. K.16 (`plays: {recording: any}`) needs an approved recording
+with a beat map. Timing: perfect ±30 ms, on time ±80 ms, shrinking to
+40 % of the gap at dense targets; `window_ms` overrides.
 
 ## 14. The Listening room
 
@@ -767,6 +831,10 @@ Only recordings Sophia has **approved** are ever returned.
   "listenFor": "…", "clips": [{"id": "a", "start": "1:10", "end": "1:40", "label": "…"}],
   "sections": [{"t": "2:14", "label": "anupallavi"}],     // Sophia's marks (answer keys: see below)
   "beatMap": {"clip": "a", "samam": [12.40, 20.41, …]} | null,
+  "annotations": {                                        // her marks the ear trainer drills on
+    "transcriptions": [{"start": "1:10", "end": "1:18", "sargam": "G P D S' …"}],   // PD.09
+    "gamakas": [{"t": "2:31", "gamakas": ["kampita", "jaru-down"]}],             // GM.07
+    "korvais": [{"start": "5:02", "landing": 318.4}] },                         // TL.11 (seconds)
   "analyses": 14 }
 ```
 

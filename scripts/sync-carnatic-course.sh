@@ -20,7 +20,8 @@
 set -euo pipefail
 
 if [ -z "${SWARA_COURSE:-}" ]; then
-  for candidate in "$HOME/Documents/development/swara-studio-main/course" \
+  for candidate in "$HOME/Documents/development/swara-studio-trunk/course" \
+                   "$HOME/Documents/development/swara-studio-main/course" \
                    "$HOME/Documents/development/swara-studio/course"; do
     if [ -d "$candidate/lessons" ]; then SWARA_COURSE="$candidate"; break; fi
   done
