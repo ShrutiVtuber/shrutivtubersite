@@ -575,3 +575,37 @@ async def unblock(user_id: int, user: User = Depends(require_user),
                                                       PracticeBlock.blocked_id == user_id))
     await session.commit()
     return Response(status_code=204)
+
+
+# ── feedback on one's own pieces (SELF_TEST.md §5 item 5) ──────────────────
+
+@router.get("/feedback")
+async def my_feedback(user: User = Depends(require_user), session: AsyncSession = Depends(get_session)) -> dict:
+    """Replies, rubric answers and votes on the viewer's own pieces and analyses, newest first."""
+    mine = (await session.execute(select(PracticeWork).where(
+        PracticeWork.user_id == user.id, PracticeWork.room.in_(ROOMS), PracticeWork.submitted_at.is_not(None)))).scalars().all()
+    if not mine:
+        return {"items": []}
+    ids = {w.id: w for w in mine}
+    hidden = await _hidden_from(session, user)
+    out: list[dict] = []
+    for c in (await session.execute(select(PracticeComment).where(
+            PracticeComment.work_id.in_(ids), PracticeComment.user_id != user.id, PracticeComment.hidden.is_(False))
+            .order_by(PracticeComment.id.desc()).limit(20))).scalars().all():
+        if c.user_id in hidden:
+            continue
+        author = await session.get(User, c.user_id) if c.user_id else None
+        out.append({"kind": "reply", "work": c.work_id, "workTitle": ids[c.work_id].title, "who": _name(author),
+                    "text": c.body_md[:120], "at": _iso(c.created_at)})
+    for w in mine:
+        answers = (await session.execute(select(PracticeRubric).where(PracticeRubric.work_id == w.id))).scalars().all()
+        if answers:
+            latest = max((a.updated_at or a.created_at for a in answers), default=None)
+            out.append({"kind": "rubric", "work": w.id, "workTitle": w.title, "count": len(answers), "at": _iso(latest)})
+        votes = (await session.execute(select(PracticeVote).where(PracticeVote.work_id == w.id)
+                                       .order_by(PracticeVote.id.desc()))).scalars().all()
+        if votes:
+            out.append({"kind": "votes", "work": w.id, "workTitle": w.title, "count": len(votes),
+                        "at": _iso(votes[0].created_at)})
+    out.sort(key=lambda x: x.get("at") or "", reverse=True)
+    return {"items": out[:12]}

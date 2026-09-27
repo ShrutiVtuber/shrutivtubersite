@@ -4,7 +4,6 @@
  * ⚠ No guilt: the log counts time and never days missed; there is no streak
  * and nothing to lose. Signed out, the page says what signing in keeps. */
 import SwaraLayout from "../../layouts/SwaraLayout.astro";
-import Hero from "../../components/carnatic/Hero.astro";
 import Button from "../../components/forms/Button.astro";
 import { hrefIn, langOf, words } from "../../lib/carnatic/i18n";
 import { visitor } from "../../lib/carnatic/prefs";
@@ -12,6 +11,7 @@ import { asReader } from "../../lib/account";
 import { lessons } from "../../lib/carnatic/data";
 import { lessonList } from "../../lib/carnatic/lessons";
 import { copy } from "../../lib/copy";
+import { drills as loadDrills, units as loadUnits } from "../../lib/carnatic/course";
 
 const lang = langOf(Astro);
 const tr = await words(lang);
@@ -52,9 +52,33 @@ const monthName = new Date().toLocaleDateString("en-GB", { month: "long" });
 const name = me.displayName || "";
 const nextSpeed = next ? Math.min(3, (done[next.id]?.length ?? 0) + 1) : 1;
 const heading = name ? say("hello", "Hello, {name}").replace("{name}", name) : say("title", "Your practice");
+const [allUnits, dr] = await Promise.all([loadUnits(), loadDrills()]);
+const dash = {
+  lessons: allUnits.flatMap((u) => u.lessons.filter((l) => l.available).map((l) => ({ id: l.id, slug: l.slug, title: l.title, unit: u.n, order: l.order }))),
+  units: allUnits.map((u) => ({ n: u.n, ids: u.lessons.map((l) => l.id), checkpoint: u.checkpoint })),
+  levels: (dr?.levels ?? []).map((l) => ({ id: l.id, family: l.family, title: l.title })),
+  tala: (dr?.talaKeeping ?? []).map((k: any) => ({ id: k.id, title: k.title, range: k.tempo_range ?? k.tempoRange ?? [40, 140] })),
+  signedIn: me.signedIn, month, lang,
+};
 ---
 <SwaraLayout title={say("meta.title", "Your practice · Swara Studio")} noindex description={say("meta.description", "Where you left off, your practice time and your songs.")}>
-  <Hero eyebrow={say("eyebrow", "Your practice")} title={heading} lede={say("lede", "Where you left off, and what you have made.")} />
+  <div class="li-sec-h" style="margin-top:18px"><h1 class="lr-title" id="sw-title" style="margin:0">{heading}</h1><small data-level></small></div>
+  <div class="md-grid" data-dash>
+    <section class="md-card"><span class="t-eyebrow">{say("weekH", "This week")}</span>
+      <div class="md-bars" data-week aria-hidden="true"></div>
+      <p class="md-legend"><i class="a"></i>{say("kLessons", "lessons and quizzes")} <i class="b"></i>{say("kEar", "ear and tala")}</p>
+      <p class="md-p" data-week-line>{say("weekNone", "Nothing yet this week. That's fine: the log counts time, never days missed.")}</p></section>
+    <section class="md-card md-review"><span class="t-eyebrow ch-blue">{say("reviewH", "Ready to review")}</span>
+      <p class="md-big" data-due>{say("dueNone", "Nothing to review")}</p>
+      <a class="lr-btn" href={L("/carnatic/practice/test?review=1")} data-due-quiz hidden>{say("start", "Start")}</a>
+      <a class="lr-link" href={L("/carnatic/practice/ear?review=1")} data-due-ear hidden></a></section>
+    <section class="md-card"><span class="t-eyebrow">{say("nextH", "Suggested next")}</span><ul class="md-list" data-next></ul></section>
+    <section class="md-card"><span class="t-eyebrow">{say("bestsH", "Personal bests")}</span><ul class="md-list" data-bests><li class="md-soft">{say("bestsNone", "Your bests appear here after a quiz, a checkpoint or a tap task.")}</li></ul></section>
+    <section class="md-card"><span class="t-eyebrow">{say("feedbackH", "Feedback on your pieces")}</span><ul class="md-list" data-feedback>
+      <li class="md-soft">{me.signedIn ? say("feedbackNone", "Replies and rubric answers on your pieces and analyses show here.") : say("feedbackOut", "Signed in, replies to your pieces and analyses show here.")}</li></ul></section>
+  </div>
+  <script type="application/json" id="dash-data" set:html={JSON.stringify(dash)} />
+  <h2 class="ty-sec">{say("pathSongsH", "The beginner path and your songs")}</h2>
   {!me.signedIn ? (
     <div class="sw-empty me-out">
       <span class="marks" aria-hidden="true">| ||</span>
@@ -96,13 +120,93 @@ const heading = name ? say("hello", "Hello, {name}").replace("{name}", name) : s
       <p class="t-eyebrow sw-eyebrow">{say("postsH", "Your posts in Listen")}</p>
       {myPosts.length === 0 ? (
         <div class="sw-empty"><span class="marks" aria-hidden="true">| |</span><h3>{say("noPostsH", "Nothing shared yet")}</h3><p>{say("noPostsP", "When a song is ready, publish its sheet and share a performance link here.")}</p></div>
-      ) : <ul class="me-songs">{myPosts.map((p: any) => <li><a href={L("/carnatic/listen")}><span class="me-st">{p.title}</span><span class="sw-mono">{p.likes} likes · {p.comments} comments</span></a></li>)}</ul>}
+      ) : <ul class="me-songs">{myPosts.map((p: any) => <li><a href={L("/carnatic/listen/hall")}><span class="me-st">{p.title}</span><span class="sw-mono">{p.likes} likes · {p.comments} comments</span></a></li>)}</ul>}
     </section>
   </div>
   )}
 </SwaraLayout>
 
 <script>
+  import { allLessons, attempts, dueCards, syncCards, syncLessons, wordFor } from "../../lib/carnatic/client/learner";
+  import { comfortable } from "../../lib/carnatic/client/ear";
+  const D = JSON.parse(document.getElementById("dash-data")!.textContent!);
+  const esc = (s: string) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
+  const href = (p: string) => (D.lang === "en" ? p : `${p}${p.includes("?") ? "&" : "?"}lang=${D.lang}`);
+  const paint = async () => {
+    const lessons = allLessons();
+    let tries = attempts();
+    if (D.signedIn) {
+      const r = await fetch("/api/carnatic/me/attempts?limit=400").then((x) => (x.ok ? x.json() : { items: [] })).catch(() => ({ items: [] }));
+      const seen = new Set(tries.map((a) => a.id));
+      tries = [...tries, ...(r.items ?? []).filter((a: any) => !seen.has(a.id))];
+    }
+    // this week: minutes a day, lessons and quizzes against ear and tala
+    const days = Array.from({ length: 7 }, (_, i) => { const d = new Date(); d.setDate(d.getDate() - 6 + i); return d.toISOString().slice(0, 10); });
+    const per = days.map((day) => {
+      const t = tries.filter((a) => String(a.startedAt).slice(0, 10) === day);
+      const ear = t.filter((a) => a.kind === "drill" || a.kind === "tap").reduce((n, a) => n + (a.seconds || 0), 0);
+      const quiz = t.filter((a) => !(a.kind === "drill" || a.kind === "tap")).reduce((n, a) => n + (a.seconds || 0), 0);
+      const read = Object.values(lessons).filter((s: any) => String(s.openedAt ?? "").slice(0, 10) === day).length * 600;
+      return { a: quiz + read, b: ear };
+    });
+    const max = Math.max(600, ...per.map((x) => x.a + x.b));
+    document.querySelector("[data-week]")!.innerHTML = per.map((x) => `<span><i class="b" style="height:${(x.b / max) * 100}%"></i><i class="a" style="height:${(x.a / max) * 100}%"></i></span>`).join("");
+    const mins = Math.round(per.reduce((n, x) => n + x.a + x.b, 0) / 60);
+    const active = per.filter((x) => x.a + x.b > 0).length;
+    if (mins) document.querySelector("[data-week-line]")!.textContent = `About ${mins} minutes over ${active} day${active === 1 ? "" : "s"}. Reading is counted as ten minutes a lesson opened.`;
+    // review
+    const due = dueCards();
+    const quiz = due.filter((c) => c.key.includes("#") || c.key.startsWith("gen:")).length;
+    const ear = due.length - quiz;
+    document.querySelector("[data-due]")!.textContent = due.length ? `${due.length} card${due.length === 1 ? "" : "s"} ready to review` : "Nothing to review";
+    document.querySelector<HTMLElement>("[data-due-quiz]")!.hidden = !quiz;
+    const earA = document.querySelector<HTMLElement>("[data-due-ear]")!;
+    earA.hidden = !ear; earA.textContent = `${ear} ear-training card${ear === 1 ? "" : "s"} ›`;
+    // suggested next: the next lesson on the path, a drill level, a checkpoint, a tempo step up
+    const next: string[] = [];
+    const doneIds = D.lessons.filter((l: any) => lessons[l.id]?.completedAt).map((l: any) => l.id);
+    const lastDone = D.lessons.map((l: any) => l.id).lastIndexOf(doneIds[doneIds.length - 1]);
+    const nl = D.lessons.slice(lastDone + 1).find((l: any) => !lessons[l.id]?.completedAt) ?? D.lessons[0];
+    if (nl) next.push(`<li><span class="md-k">Next lesson</span><a href="${href(`/carnatic/learn/${nl.slug}`)}">Unit ${nl.unit} · Lesson ${nl.order} · ${esc(nl.title)}</a></li>`);
+    const ready = D.levels.find((l: any, i: number) => comfortable(l.id) && D.levels[i + 1]?.family === l.family && !comfortable(D.levels[i + 1].id));
+    if (ready) { const n = D.levels[D.levels.indexOf(ready) + 1]; next.push(`<li><span class="md-k">Ready for</span><a href="${href(`/carnatic/practice/ear?level=${n.id}`)}">${n.id} · ${esc(n.title.toLowerCase())}</a></li>`); }
+    const cp = D.units.find((u: any) => u.checkpoint && u.ids.length && u.ids.every((id: string) => lessons[id]?.completedAt) && !tries.some((a) => a.itemId === u.checkpoint));
+    if (cp) next.push(`<li><span class="md-k">A checkpoint</span><a href="${href(`/carnatic/practice/test?checkpoint=${cp.n}`)}">Unit ${cp.n} checkpoint</a></li>`);
+    const taps = tries.filter((a) => a.kind === "tap" && /^K\./.test(a.itemId)).sort((a, b) => String(b.startedAt).localeCompare(String(a.startedAt)));
+    if (taps[0]) {
+      const k = D.tala.find((x: any) => x.id === taps[0].itemId);
+      const t = Math.min(k?.range?.[1] ?? 140, (taps[0].result?.tempo ?? 60) + 6);
+      next.push(`<li><span class="md-k">One tempo step up</span><a href="${href(`/carnatic/practice/tap/${taps[0].itemId}`)}">${esc(taps[0].itemId)} at ${t} a minute</a></li>`);
+    }
+    document.querySelector("[data-next]")!.innerHTML = next.join("") || `<li class="md-soft">Open a lesson to begin.</li>`;
+    // personal bests: the newest improvements
+    const bests: string[] = [];
+    const byItem = new Map<string, any[]>();
+    for (const a of tries) byItem.set(a.itemId, [...(byItem.get(a.itemId) ?? []), a]);
+    const score = (a: any) => a.kind === "tap" ? (a.result?.perfect ?? 0) + (a.result?.onTime ?? 0) : a.result?.right ?? 0;
+    const rows = [...byItem.entries()].map(([id, xs]) => ({ id, best: xs.reduce((b, a) => (score(a) > score(b) ? a : b)) })).sort((a, b) => String(b.best.startedAt).localeCompare(String(a.best.startedAt)));
+    for (const r of rows.slice(0, 4)) {
+      const a = r.best;
+      const of = a.result?.of ?? 0;
+      const val = a.kind === "checkpoint" ? Object.entries(a.result?.skills ?? {}).slice(0, 1).map(([k, v]: any) => `${k}: ${wordFor(v.right, v.of)}`).join("") : `${score(a)} / ${of}`;
+      bests.push(`<li><span>${esc(r.id)}</span><span class="md-v">${esc(val)}</span></li>`);
+    }
+    if (bests.length) document.querySelector("[data-bests]")!.innerHTML = bests.join("");
+    // level label from completed checkpoints
+    const cps = new Set(tries.filter((a) => a.kind === "checkpoint").map((a) => a.itemId));
+    const has = (a: number, b: number) => Array.from({ length: b - a + 1 }, (_, i) => `CP.U${String(a + i).padStart(2, "0")}`).every((x) => cps.has(x));
+    document.querySelector("[data-level]")!.textContent = has(16, 21) ? "Advanced · units 16-21" : has(8, 15) ? "Intermediate · units 8-15" : has(1, 7) ? "Foundations · units 1-7" : "";
+    // feedback
+    if (D.signedIn) {
+      const f = await fetch("/api/carnatic/community/feedback").then((x) => (x.ok ? x.json() : { items: [] })).catch(() => ({ items: [] }));
+      if (f.items?.length) document.querySelector("[data-feedback]")!.innerHTML = f.items.slice(0, 4).map((x: any) => `<li><a href="${href(`/carnatic/room/${x.work}`)}">${
+        x.kind === "reply" ? `${esc(x.who)} replied on your piece` : x.kind === "rubric" ? `${x.count} rubric answer${x.count === 1 ? "" : "s"} on ${esc(x.workTitle || "your piece")}` : `${x.count} found ${esc(x.workTitle || "your piece")} helpful`}</a>`
+        + `<small>${x.kind === "reply" ? `“${esc(x.text.slice(0, 40))}…” · ` : ""}${new Date(x.at).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}</small></li>`).join("");
+    }
+  };
+  void paint();
+  if (D.signedIn) void Promise.all([syncLessons(), syncCards()]).then(() => paint());
+
   /* Good morning / afternoon / evening in the visitor's own hours. */
   const h1 = document.querySelector("#sw-title") as HTMLElement | null;
   if (h1 && h1.textContent?.startsWith("Hello, ")) {

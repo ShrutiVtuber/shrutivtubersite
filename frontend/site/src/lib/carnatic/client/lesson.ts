@@ -6,9 +6,9 @@
  * which is the learner's own decision: nothing is marked for them.
  */
 import { confidenceLine } from "../lesson";
-import { genData, mountQuiz, type EngineOpts } from "./exercise";
+import { genData, mountQuiz, prepare, type EngineOpts } from "./exercise";
 import { loadPlayer } from "./embed";
-import { lessonState, syncLessons, updateLesson } from "./learner";
+import { ensureCard, lessonState, syncLessons, updateLesson } from "./learner";
 import { playLine } from "./phrase";
 import { Mic, readSwara } from "./pitch";
 import { blip, ctx, talaSound } from "./audio";
@@ -267,6 +267,8 @@ export function hydrateLesson(root: HTMLElement, data: PageData) {
   complete?.addEventListener("click", () => {
     const done = !!lessonState(data.id).completedAt;
     updateLesson(data.id, { completedAt: done ? null : new Date().toISOString() });
+    // SELF_TEST.md §6: a lesson's quiz items become review cards when the learner completes it (10 new a day at most).
+    if (!done) for (const ex of Object.values(data.exercises)) if ((ex as any).kind === "quiz") for (const p of prepare(ex as any)) ensureCard(p.key);
     paintComplete();
   });
   paintComplete();
