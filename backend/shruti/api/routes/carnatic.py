@@ -25,7 +25,7 @@ from sqlalchemy import delete, func, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
-from shruti.api.deps import require_admin
+from shruti.api.deps import require_admin, school_open
 from shruti.api.routes.accounts import current_user, require_user
 from shruti.core import carnatic as rules
 from shruti.core.config import get_settings
@@ -37,7 +37,7 @@ from shruti.models.carnatic import (
     CarnaticProfile, CarnaticProgress, CarnaticReport, CarnaticReview, CarnaticSong,
 )
 
-router = APIRouter(prefix="/api/carnatic", tags=["carnatic"])
+router = APIRouter(prefix="/api/carnatic", tags=["carnatic"], dependencies=[Depends(school_open)])
 
 # Per backend process; see docs/carnatic/API.md §1b.
 FAILED_BY_CLIENT = rules.Window(limit=10)

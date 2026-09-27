@@ -31,12 +31,13 @@ from shruti.api.routes.practice import (
     REPORT_REASONS, REPORTS_TO_HIDE, _blocked_by, _count_reports, _hidden_from, _name, _refuse_if_suspended,
 )
 from shruti.core import carnatic_checks as checks
+from shruti.api.deps import school_open
 from shruti.core.db import get_session
 from shruti.models.accounts import User
 from shruti.models.carnatic_course import CarnaticExercise, CarnaticRecording, PracticePart, PracticeRubric
 from shruti.models.practice import PracticeBlock, PracticeComment, PracticeReport, PracticeVote, PracticeWork
 
-router = APIRouter(prefix="/api/carnatic/community", tags=["carnatic-community"])
+router = APIRouter(prefix="/api/carnatic/community", tags=["carnatic-community"], dependencies=[Depends(school_open)])
 
 ROOMS = {"carnatic-practice", "carnatic-analysis"}
 # LISTENING.md §4c: the practice room's reasons, with "not-a-reading" replaced.

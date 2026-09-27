@@ -20,6 +20,7 @@ from sqlalchemy import delete, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
+from shruti.api.deps import school_open
 from shruti.api.routes.accounts import current_user, require_user
 from shruti.core import carnatic as rules
 from shruti.core import carnatic_course as course
@@ -31,7 +32,7 @@ from shruti.models.carnatic_course import (
     CarnaticLesson, CarnaticLessonState, CarnaticRagaFlag, CarnaticRecording, CarnaticUnit,
 )
 
-router = APIRouter(prefix="/api/carnatic", tags=["carnatic-course"])
+router = APIRouter(prefix="/api/carnatic", tags=["carnatic-course"], dependencies=[Depends(school_open)])
 
 LEVEL_LABEL = {"foundations": "Foundations", "intermediate": "Intermediate", "advanced": "Advanced",
                "any time": "Any time"}

@@ -3,7 +3,7 @@
  * Visitors read published lessons only. The operator, signed in to the
  * admin, sees drafts too ("preview"), with a line saying so on the page.
  */
-import { SITE_API } from "../api";
+import { SITE_API, schoolHeaders } from "../api";
 import { asAdmin } from "../admin";
 import { asReader } from "../account";
 import { ragas as loadRagas, talas as loadTalas } from "./data";
@@ -38,7 +38,7 @@ async function get<T>(path: string, astro?: any): Promise<T | null> {
     return r.ok ? (r.body as T) : null;
   }
   try {
-    const r = await fetch(`${SITE_API}${path}`);
+    const r = await fetch(`${SITE_API}${path}`, { headers: schoolHeaders(path) });
     return r.ok ? ((await r.json()) as T) : null;
   } catch {
     return null;

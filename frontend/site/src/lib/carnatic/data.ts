@@ -10,7 +10,7 @@
  * designed absent state, and the drone, the tuner and the tala trainer, which
  * need none of it, still work.
  */
-import { SITE_API } from "../api";
+import { SITE_API, schoolHeaders } from "../api";
 
 export interface Manifest {
   digest: string;
@@ -27,7 +27,7 @@ async function fetchJson(path: string, timeoutMs = 8000): Promise<any | null> {
   const control = new AbortController();
   const timer = setTimeout(() => control.abort(), timeoutMs);
   try {
-    const r = await fetch(`${SITE_API}${path}`, { signal: control.signal });
+    const r = await fetch(`${SITE_API}${path}`, { signal: control.signal, headers: schoolHeaders(path) });
     return r.ok ? await r.json() : null;
   } catch {
     return null;

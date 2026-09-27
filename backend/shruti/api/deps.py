@@ -55,3 +55,36 @@ async def require_admin(
         raise HTTPException(401, "not authenticated")
 
     return subject
+
+
+async def school_open(request: Request, session: AsyncSession = Depends(get_session)) -> None:
+    """
+    Swara Studio's API while the school is hidden (`page.carnatic` = 0).
+
+    The pages already 404 for everyone but her (the site middleware); without
+    this the API behind them answered anybody who knew an address: the raga
+    data, the course, posting to Listen. So while the school is unpublished it
+    answers only three callers, and everyone else gets the same 404 as the
+    pages:
+
+    - the operator, by her session (her own browser, previewing);
+    - the site itself, rendering her preview on the server without her cookie,
+      by the internal secret (`X-Shruti-Internal`, as the bot bridge uses);
+    - nobody else. A missing secret refuses rather than opens.
+
+    Once she publishes the school this costs one settings read and passes.
+    """
+    import os
+
+    from shruti.core.settings_store import sections_live
+
+    if (await sections_live(session)).get("carnatic", True):
+        return
+    secret = os.environ.get("SHRUTI_INTERNAL_SECRET", "").strip()
+    given = request.headers.get("X-Shruti-Internal", "")
+    if secret and hmac.compare_digest(given, secret):
+        return
+    try:
+        await require_admin(request, session)
+    except HTTPException:
+        raise HTTPException(404, "Not found") from None

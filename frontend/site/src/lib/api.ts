@@ -12,13 +12,24 @@
 import { env, origin } from "./env";
 
 export const SITE_API = env("SHRUTI_API_INTERNAL", "http://backend:8000");
+
+/* Swara Studio's API answers only the operator while the school is hidden
+ * (backend `school_open`). The pages Sophia previews are rendered here, on the
+ * server, without her cookie, so these calls say they come from the site
+ * itself with the internal secret. Only /api/carnatic calls carry it: the
+ * secret also opens the bot bridge, and nothing else here needs it. */
+const INTERNAL_SECRET = env("SHRUTI_INTERNAL_SECRET", "");
+export function schoolHeaders(path: string): Record<string, string> {
+  return INTERNAL_SECRET && path.startsWith("/api/carnatic") ? { "X-Shruti-Internal": INTERNAL_SECRET } : {};
+}
 const ASTRO_API = env("SHRUTI_ASTRO_INTERNAL", "http://shruti-astro:8000");
 
 async function get<T>(base: string, path: string, timeoutMs = 6000): Promise<T | null> {
   const control = new AbortController();
   const timer = setTimeout(() => control.abort(), timeoutMs);
   try {
-    const response = await fetch(`${base}${path}`, { signal: control.signal });
+    const headers = base === SITE_API ? schoolHeaders(path) : {};
+    const response = await fetch(`${base}${path}`, { signal: control.signal, headers });
     if (!response.ok) return null;
     return (await response.json()) as T;
   } catch {
