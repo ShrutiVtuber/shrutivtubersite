@@ -18,7 +18,7 @@ import { type Script, type TamilStyle, tokenize } from "./notation";
 import { phraseHtml } from "./render";
 
 export interface LessonSource { key: string; n: number; cite: string; url?: string | null; research?: string | null; confidence?: string }
-export interface GlossaryTerm { term: string; slug: string; definition: string; lesson?: string; aliases?: string[] }
+export interface GlossaryTerm { term: string; slug: string; definition: string; lesson?: string; forms?: string[]; aliases?: string[]; iso?: string; source?: string }
 export interface RecordingInfo {
   id: string; available: boolean; label: string; why?: string; provider?: string; url?: string;
   raga?: string | null; clips?: { id: string; start: string; end: string; label: string }[];
@@ -42,6 +42,13 @@ export interface LessonCtx {
   href?: (path: string) => string;
   saLabel?: string;
   slug?: string;
+  /** The lesson being drawn: its own glossary terms aren't underlined in it (FORMAT.md §3e). */
+  lessonId?: string;
+  /** The Studio preview: a key a tag doesn't know becomes a grey box (the reader ignores it). */
+  strict?: boolean;
+  /** Self-test titles (K ids) and unit titles, for the selftest and checkpoint cards. */
+  selftests?: Record<string, { title: string; minutes?: number }>;
+  unitTitles?: Record<number, string>;
 }
 
 export interface Rendered {
@@ -87,44 +94,42 @@ export function countWords(body: string): number {
 class Inline {
   seen = new Set<string>();
   used: string[] = [];
-  private terms: { re: RegExp; t: GlossaryTerm }[];
+  private re: RegExp | null = null;
+  private byForm = new Map<string, GlossaryTerm>();
 
   constructor(private ctx: LessonCtx) {
-    const list: { re: RegExp; t: GlossaryTerm; len: number }[] = [];
+    const forms: string[] = [];
     for (const t of ctx.glossary ?? []) {
-      for (const w of [t.term, ...(t.aliases ?? [])]) {
-        if (!w) continue;
-        const src = w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-        list.push({ re: new RegExp(`(^|[^A-Za-z])(${src})(?![A-Za-z])`, "i"), t, len: w.length });
+      if (ctx.lessonId && t.lesson === ctx.lessonId) continue; // not in the lesson that teaches it
+      for (const w of t.forms?.length ? t.forms : [t.term, ...(t.aliases ?? [])]) {
+        const k = String(w ?? "").trim().toLowerCase();
+        if (!k || this.byForm.has(k)) continue;
+        this.byForm.set(k, t);
+        forms.push(k);
       }
     }
-    // Longer terms first: "vakra raga" before "raga".
-    this.terms = list.sort((a, b) => b.len - a.len);
+    if (forms.length) {
+      // Longest first, so "mandra sthayi" wins over "mandra" at the same place.
+      const alt = forms.sort((a, b) => b.length - a.length).map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|");
+      this.re = new RegExp(`(?<![\\p{L}\\p{N}])(${alt})(?![\\p{L}\\p{N}])`, "giu");
+    }
   }
 
-  /** Plain text: escaped, with the first use of each glossary term marked. */
+  /** Plain text: escaped, with the first use of each glossary term marked (whole words, any case). */
   plain(text: string, glossary: boolean): string {
-    if (!glossary || !this.terms.length) return esc(text);
+    if (!glossary || !this.re) return esc(text);
     let out = "";
-    let rest = text;
-    // Repeatedly find the earliest unseen term in the remaining text.
-    for (;;) {
-      let best: { at: number; len: number; t: GlossaryTerm; word: string } | null = null;
-      for (const { re, t } of this.terms) {
-        if (this.seen.has(t.slug)) continue;
-        const m = re.exec(rest);
-        if (!m) continue;
-        const at = m.index + m[1].length;
-        if (!best || at < best.at) best = { at, len: m[2].length, t, word: m[2] };
-      }
-      if (!best) break;
-      out += esc(rest.slice(0, best.at));
-      this.seen.add(best.t.slug);
-      this.used.push(best.t.slug);
-      out += `<button type="button" class="lr-term" data-term="${esc(best.t.slug)}">${esc(best.word)}</button>`;
-      rest = rest.slice(best.at + best.len);
+    let i = 0;
+    this.re.lastIndex = 0;
+    for (const m of text.matchAll(this.re)) {
+      const t = this.byForm.get(m[1].toLowerCase());
+      if (!t || this.seen.has(t.slug)) continue;
+      this.seen.add(t.slug);
+      this.used.push(t.slug);
+      out += esc(text.slice(i, m.index)) + `<button type="button" class="lr-term" data-term="${esc(t.slug)}">${esc(m[1])}</button>`;
+      i = (m.index ?? 0) + m[1].length;
     }
-    return out + esc(rest);
+    return out + esc(text.slice(i));
   }
 
   render(text: string, glossary = true): string {
@@ -148,8 +153,15 @@ class Inline {
       } else if (m[4]) {
         const mm = /^\[([^\]]+)\]\(([^)]+)\)$/.exec(tok)!;
         const url = mm[2];
-        const ext = /^https?:/.test(url);
-        out += `<a href="${esc(url)}"${ext ? ' rel="noopener nofollow"' : ""}>${this.render(mm[1], false)}</a>`;
+        if (/^U\d\d\.L\d\d$/.test(url)) {
+          // A lesson link by id (FORMAT.md §3): the site gives its title and address.
+          const l = ctx.lessonTitles?.[url];
+          out += l ? `<a href="${esc((ctx.href ?? ((p: string) => p))(`/carnatic/learn/${l.slug}`))}" title="${esc(l.title)}">${this.render(mm[1], false)}</a>`
+            : `<span class="lr-dead" title="${esc(url)} isn't published yet">${this.render(mm[1], false)}</span>`;
+        } else {
+          const ext = /^https?:/.test(url);
+          out += `<a href="${esc(url)}"${ext ? ' rel="noopener nofollow"' : ""}>${this.render(mm[1], false)}</a>`;
+        }
       } else if (m[5]) out += `<strong>${this.render(tok.slice(2, -2), glossary)}</strong>`;
       else if (m[6]) out += `<em>${this.render(tok.slice(1, -1), glossary)}</em>`;
       else if (m[7]) out += `<em>${this.render(tok.slice(1, -1), glossary)}</em>`;
@@ -227,12 +239,12 @@ function recordingHtml(attrs: Record<string, string>, ctx: LessonCtx): string {
   if (!r || !r.available || !r.url) {
     return `<div class="lr-embed lr-rec lr-rec-off" data-embed="recording" data-id="${esc(attrs.id)}">`
       + `<div class="lr-rec-box"><p>This recording isn't available here yet.</p><small>Shruti hasn't approved it for the Listening room, or its link has stopped working. The lesson reads fine without it.</small></div>`
-      + `<div class="lr-rec-foot"><b>${esc(attrs.hide_raga === "true" ? "A recording" : r?.label ?? attrs.id)}</b></div></div>`;
+      + `<div class="lr-rec-foot"><b>${esc(attrs.guess === "true" ? "A recording" : r?.label ?? attrs.id)}</b></div></div>`;
   }
-  const label = attrs.hide_raga === "true" ? "A recording (the raga is hidden until you guess)" : r.label;
-  return `<div class="lr-embed lr-rec" data-embed="recording" data-id="${esc(r.id)}" data-provider="${esc(r.provider ?? "")}" data-url="${esc(r.url)}" data-start="${esc(attrs.start ?? "")}" data-end="${esc(attrs.end ?? "")}" data-hide-raga="${attrs.hide_raga === "true"}">`
+  const label = attrs.guess === "true" ? "A recording (the raga is hidden until you guess)" : r.label;
+  return `<div class="lr-embed lr-rec" data-embed="recording" data-id="${esc(r.id)}" data-provider="${esc(r.provider ?? "")}" data-url="${esc(r.url)}" data-start="${esc(attrs.start ?? "")}" data-end="${esc(attrs.end ?? "")}" data-guess="${attrs.guess === "true"}">`
     + `<div class="lr-rec-box" data-rec-box><button type="button" class="lr-btn" data-load>Load the recording</button><small>Nothing loads from the provider until you press this.</small></div>`
-    + `<div class="lr-rec-foot"><b>${esc(label)}</b>${r.why && attrs.hide_raga !== "true" ? `<span>${esc(r.why)}</span>` : ""}`
+    + `<div class="lr-rec-foot"><b>${esc(label)}</b>${r.why && attrs.guess !== "true" ? `<span>${esc(r.why)}</span>` : ""}`
     + (attrs.start ? `<span class="lr-meta">${esc(attrs.start)}${attrs.end ? `–${esc(attrs.end)}` : ""}</span>` : "")
     + `<a href="${esc(room)}">Listening room ›</a></div></div>`;
 }
@@ -266,14 +278,45 @@ function exerciseCard(kind: string, id: string, ctx: LessonCtx): string {
     + `<button type="button" class="lr-btn" data-expand>Start</button><div class="lr-ex-body" data-ex-body hidden></div></div>`;
 }
 
-function drillCard(id: string, ctx: LessonCtx): string {
+function drillCard(attrs: Record<string, string>, ctx: LessonCtx): string {
   const href = ctx.href ?? ((p: string) => p);
+  const id = attrs.id;
   const title = ctx.drillTitles?.[id];
   if (!title) return grey(`Drill ${id} isn't in the ear trainer.`);
-  return `<div class="lr-embed lr-ex" data-embed="drill"><div class="lr-ex-t"><span class="lr-eyebrow">Ear training · ${esc(id)}</span>`
-    + `<b>${esc(title)}</b><small>Synthesised approximation · about 5 minutes</small></div>`
-    + `<a class="lr-btn lr-btn-s" href="${esc(href(`/carnatic/practice/ear/${id}`))}">Start the drill</a></div>`;
+  const sets = (attrs.set ?? "").split(",").map((x) => x.trim()).filter(Boolean);
+  const q = new URLSearchParams({ level: id, ...(sets.length ? { set: sets.join(",") } : {}), ...(attrs.count ? { count: attrs.count } : {}) });
+  return `<div class="lr-embed lr-ex" data-embed="drill"><div class="lr-ex-t"><span class="lr-eyebrow">Ear training · ${esc(id)}${sets.length ? ` · set ${esc(sets.join(", "))}` : ""}</span>`
+    + `<b>${esc(title)}</b><small>${attrs.count ? `${esc(attrs.count)} items · ` : ""}answers explained · wrong ones come back later</small></div>`
+    + `<a class="lr-btn lr-btn-s" href="${esc(href(`/carnatic/practice/ear?${q}`))}">Start the drill</a></div>`;
 }
+
+function selftestCard(attrs: Record<string, string>, ctx: LessonCtx): string {
+  const href = ctx.href ?? ((p: string) => p);
+  const k = ctx.selftests?.[attrs.id];
+  if (!attrs.id || !k) return grey(`Self-test ${attrs.id ?? "?"} isn't in Test yourself.`);
+  return `<div class="lr-embed lr-ex" data-embed="selftest"><div class="lr-ex-t"><span class="lr-eyebrow">Tala keeping · ${esc(attrs.id)} · now in Test yourself</span>`
+    + `<b>${esc(k.title)}</b><small>Tap along; perfect, on time, early, late and missed are counted for you only</small></div>`
+    + `<a class="lr-btn" href="${esc(href(`/carnatic/practice/tap/${attrs.id}`))}">Start</a></div>`;
+}
+
+function checkpointCard(attrs: Record<string, string>, ctx: LessonCtx): string {
+  const href = ctx.href ?? ((p: string) => p);
+  const n = Number(attrs.unit);
+  if (!n) return grey("A checkpoint tag needs unit=.");
+  const title = ctx.unitTitles?.[n];
+  return `<div class="lr-embed lr-ex" data-embed="checkpoint"><div class="lr-ex-t"><span class="lr-eyebrow lr-rose">Unit ${n} checkpoint</span>`
+    + `<b>${esc(title ? `Where you are with ${title.charAt(0).toLowerCase()}${title.slice(1)}` : `Unit ${n}`)}</b><small>10-15 minutes, a profile in words for each skill, not a score</small></div>`
+    + `<a class="lr-btn" href="${esc(href(`/carnatic/practice/test?checkpoint=${n}`))}">Start</a></div>`;
+}
+
+/** The keys each tag takes (FORMAT.md §3a). */
+const EMBED_KEYS: Record<string, string[]> = {
+  drone: ["tuning", "autoplay"], sargam: ["line", "raga", "tala", "speed", "eduppu", "caption", "sahitya", "gamaka", "label", "nadai"],
+  tala: ["id", "nadai", "eduppu", "mode", "tempo", "konnakol"], raga: ["slug", "show"], mela: ["n", "grid", "highlight"],
+  gamaka: ["name", "on", "raga"], konnakol: ["example", "pattern", "tala", "nadai", "eduppu"], recording: ["id", "start", "end", "guess"],
+  quiz: ["id"], tap: ["id"], practice: ["id"], listen: ["id"], drill: ["id", "set", "count"], selftest: ["id"], checkpoint: ["unit"],
+  tuner: ["raga"], composer: ["raga", "tala", "line"],
+};
 
 function ragaCard(attrs: Record<string, string>, ctx: LessonCtx): string {
   const r = ctx.ragas?.[attrs.slug];
@@ -307,7 +350,7 @@ function talaCard(attrs: Record<string, string>, ctx: LessonCtx): string {
   const href = ctx.href ?? ((p: string) => p);
   const name = ctx.talaNames?.[attrs.id] ?? (attrs.id ?? "").replace(/_/g, " ");
   if (!attrs.id) return grey("A tala tag needs id=.");
-  const bits = [attrs.nadai && `nadai ${attrs.nadai}`, attrs.kalai && `${attrs.kalai} kalai`, attrs.speed && `speed ${attrs.speed}`,
+  const bits = [attrs.nadai && `nadai ${attrs.nadai}`, attrs.speed && `speed ${attrs.speed}`,
     attrs.eduppu && `starts ${attrs.eduppu} after samam`, attrs.tempo && `${attrs.tempo} a minute`].filter(Boolean).join(" · ");
   const q = new URLSearchParams({ tala: attrs.id, ...(attrs.mode ? { mode: attrs.mode } : {}), ...(attrs.nadai ? { nadai: attrs.nadai } : {}) });
   return `<div class="lr-embed lr-tala" data-embed="tala" data-tala="${esc(attrs.id)}" data-nadai="${esc(attrs.nadai ?? "")}" data-tempo="${esc(attrs.tempo ?? "")}">`
@@ -331,9 +374,9 @@ function konnakolCard(attrs: Record<string, string>, ctx: LessonCtx): string {
   if (!pattern && !attrs.example) return grey("A konnakol tag needs pattern= or example=.");
   const syl = pattern.split(/\s+/).filter(Boolean);
   const tala = attrs.tala ? ctx.talaNames?.[attrs.tala] ?? attrs.tala.replace(/_/g, " ") : "";
-  return `<div class="lr-embed lr-konnakol" data-embed="konnakol" data-pattern="${esc(pattern)}" data-tala="${esc(attrs.tala ?? "")}" data-nadai="${esc(attrs.nadai ?? "4")}">`
+  return `<div class="lr-embed lr-konnakol" data-embed="konnakol" data-pattern="${esc(pattern)}" data-tala="${esc(attrs.tala ?? "")}" data-nadai="${esc(attrs.nadai ?? "4")}" data-eduppu="${esc(attrs.eduppu ?? "0")}">`
     + `<div class="lr-kn-row">${syl.length ? syl.map((s) => `<span class="${s === "," ? "gap" : ""}">${s === "," ? "·" : esc(s)}</span>`).join("") : `<span>${esc(attrs.example ?? "")}</span>`}</div>`
-    + `<div class="lr-sg-foot"><button type="button" class="lr-play" data-konnakol aria-label="Play the syllables">${playIcon}</button><span class="lr-caption">Konnakol${tala ? ` · ${esc(tala)}` : ""}${attrs.nadai ? ` · nadai ${esc(attrs.nadai)}` : ""}${attrs.start ? ` · from matra ${esc(attrs.start)}` : ""}</span><span class="lr-synth">click and pitch cues</span></div></div>`;
+    + `<div class="lr-sg-foot"><button type="button" class="lr-play" data-konnakol aria-label="Play the syllables">${playIcon}</button><span class="lr-caption">Konnakol${tala ? ` · ${esc(tala)}` : ""}${attrs.nadai ? ` · nadai ${esc(attrs.nadai)}` : ""}${attrs.eduppu ? ` · starts ${esc(attrs.eduppu)} after samam` : ""}</span><span class="lr-synth">click and pitch cues</span></div></div>`;
 }
 
 function tunerCard(attrs: Record<string, string>, ctx: LessonCtx): string {
@@ -352,13 +395,19 @@ function composerCard(attrs: Record<string, string>, ctx: LessonCtx): string {
 }
 
 export function embedHtml(kind: string, attrs: Record<string, string>, ctx: LessonCtx): string {
+  if (ctx.strict && EMBED_KEYS[kind]) {
+    const unknown = Object.keys(attrs).filter((k) => !EMBED_KEYS[kind].includes(k));
+    if (unknown.length) return grey(`{{${kind}}} doesn't take ${unknown.join(", ")}.`);
+  }
   switch (kind) {
     case "drone": return droneHtml(attrs, ctx);
     case "sargam": return attrs.line ? sargamHtml([attrs.line, ...(attrs.sahitya ? [`~ ${attrs.sahitya}`] : [])], attrs, ctx) : grey("A sargam tag needs line=\"…\".");
     case "recording": return attrs.id ? recordingHtml(attrs, ctx) : grey("A recording tag needs id=.");
     case "quiz": case "tap": return attrs.id ? exerciseCard(kind, attrs.id, ctx) : grey(`A ${kind} tag needs id=.`);
     case "practice": case "listen": return attrs.id ? exerciseCard(kind, attrs.id, ctx) : grey(`A ${kind} tag needs id=.`);
-    case "drill": return attrs.id ? drillCard(attrs.id, ctx) : grey("A drill tag needs id=.");
+    case "drill": return attrs.id ? drillCard(attrs, ctx) : grey("A drill tag needs id=.");
+    case "selftest": return selftestCard(attrs, ctx);
+    case "checkpoint": return checkpointCard(attrs, ctx);
     case "raga": return ragaCard(attrs, ctx);
     case "mela": return melaCard(attrs, ctx);
     case "tala": return talaCard(attrs, ctx);
@@ -404,7 +453,10 @@ export function renderLesson(body: string, ctx: LessonCtx): Rendered {
       if (info.startsWith("sargam")) {
         embeds.push({ kind: "sargam" });
         out.push(sargamHtml(inner, parseAttrs(info.slice(6)), ctx));
-      } else out.push(`<pre class="lr-pre"><code>${esc(inner.join("\n"))}</code></pre>`);
+      } else {
+        // ```text (and any other fence): shown exactly as written, never played.
+        out.push(`<pre class="lr-pre lr-text">${esc(inner.join("\n"))}</pre>`);
+      }
       continue;
     }
 

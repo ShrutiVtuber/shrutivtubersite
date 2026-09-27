@@ -1,0 +1,106 @@
+---
+/* The ear trainer (EAR_TRAINING.md; artboards P7, P10-P11): the families
+ * and their levels, each opening with the lesson that teaches it (advice,
+ * not a lock), and a session when a level is chosen (?level=SW.04) or the
+ * due cards are reviewed (?review=1). The confusable pairs have their own
+ * page. */
+import SwaraLayout from "../../../../layouts/SwaraLayout.astro";
+import PracticeTabs from "../../../../components/carnatic/PracticeTabs.astro";
+import { hrefIn, langOf } from "../../../../lib/carnatic/i18n";
+import { visitor, swaraScript } from "../../../../lib/carnatic/prefs";
+import { copy } from "../../../../lib/copy";
+import { drills, units } from "../../../../lib/carnatic/course";
+
+const lang = langOf(Astro);
+const say = await copy("carnatic/practice/ear");
+const L = (p: string) => hrefIn(lang, p);
+const { settings } = await visitor(Astro);
+const [dr, all] = await Promise.all([drills(), units()]);
+const lessons = new Map(all.flatMap((u) => u.lessons.map((l) => [l.id, { ...l, unit: u.n }] as const)));
+const fams = (dr?.families ?? []).map((f) => ({ ...f, levels: (dr?.levels ?? []).filter((l) => l.family === f.id) }));
+const opensLine = (levels: { unlockedBy: string }[]) => {
+  const us = [...new Set(levels.map((l) => Number(l.unlockedBy.slice(1, 3))))].sort((a, b) => a - b);
+  return us.length === 1 ? say("opensOne", "Opens with unit {u}.").replace("{u}", String(us[0]))
+    : say("opensMany", "Levels open through units {list}.").replace("{list}", us.slice(0, -1).join(", ") + " and " + us[us.length - 1]);
+};
+const sessionMode = Astro.url.searchParams.has("level") || Astro.url.searchParams.has("review");
+const page = {
+  drills: dr, script: swaraScript(settings, lang), tamil: settings.tamilStyle, lang,
+  lessons: Object.fromEntries([...lessons].map(([id, l]) => [id, { title: l.title, href: L(`/carnatic/learn/${l.slug}`) }])),
+};
+---
+<SwaraLayout title={`${say("title", "Ear training")} · Swara Studio`} description={say("desc", "A graded ear trainer tied to the course: swaras against the drone, phrase dictation, raga phrases, recordings, gamakas, tala and laya, melakarta scales and forms.")}>
+  <PracticeTabs />
+  {sessionMode ? (
+    <div class="et-session" data-session><noscript><p class="ch-empty">{say("noscript", "The ear trainer needs JavaScript to play its sounds.")}</p></noscript></div>
+  ) : (
+    <>
+      <p class="et-intro">{say("intro", "Eight drill families, each a ladder of levels. A level opens when you finish the lesson that teaches it; the others show which lesson that is. You can open them anyway.")}</p>
+      {fams.map((f) => (
+        <section class="et-fam" aria-labelledby={`fam-${f.id}`}>
+          <div class="et-fam-h">
+            <h2 id={`fam-${f.id}`}><span class="mono">{f.id}</span> {f.title}</h2>
+            <small>{f.answerBy}</small>
+            {f.note && <small class="et-scale">{f.note[0].toUpperCase() + f.note.slice(1)}</small>}
+            <p data-fam-word={f.id} data-levels={f.levels.map((l) => l.id).join(" ")}>{say("new", "New")}</p>
+          </div>
+          <div>
+            <div class="et-levels">
+              {f.levels.map((l) => (
+                <a href={L(`/carnatic/practice/ear?level=${l.id}`)} class="et-lv" data-lv={l.id} data-unlocked-by={l.unlockedBy}
+                   title={`${l.id} · ${l.title}${lessons.get(l.unlockedBy) ? ` · opens with ${l.unlockedBy.replace("U", "").replace(".L", ".")}, ${lessons.get(l.unlockedBy)!.title}` : ""}`}>
+                  <b>{l.id.slice(3)}</b><span>{l.title}</span>
+                </a>
+              ))}
+            </div>
+            <p class="et-opens">{opensLine(f.levels)}{f.id === "PR" && <> <a href="#pairs">{say("pairsLink", "The confusable pairs")} ›</a></>}</p>
+          </div>
+        </section>
+      ))}
+      <section class="et-pairs" id="pairs" aria-labelledby="pairs-h">
+        <h2 id="pairs-h" class="ty-sec">{say("pairsH", "Confusable pairs")}</h2>
+        <div class="ty-chips">
+          {(dr?.confusable ?? []).map((c) => (
+            <a class="ty-chip" href={L(`/carnatic/practice/ear/pair/${c.set}`)}>{c.ragas.map((r) => r.replace(/-/g, " ").replace(/^\w/, (x) => x.toUpperCase())).join(" · ")} <small>{c.set}{c.mode.startsWith("recording") ? " · recordings" : ""}</small></a>
+          ))}
+        </div>
+      </section>
+      <p class="et-legend"><span class="et-key comfy"></span>{say("kComfy", "comfortable")} <span class="et-key open"></span>{say("kOpen", "open")} <span class="et-key later"></span>{say("kLater", "opens after a lesson (advice, not a lock: you can still try it)")}</p>
+    </>
+  )}
+  <script type="application/json" id="ear-data" set:html={JSON.stringify(page)} />
+</SwaraLayout>
+
+<script>
+  import { allLessons, syncLessons } from "../../../../lib/carnatic/client/learner";
+  import { boot } from "../../../../lib/carnatic/client/state";
+  import { comfortable, familyHistory, runSession } from "../../../../lib/carnatic/client/ear";
+  const data = JSON.parse(document.getElementById("ear-data")!.textContent!);
+  const q = new URLSearchParams(location.search);
+  const href = (p: string) => (data.lang === "en" ? p : `${p}${p.includes("?") ? "&" : "?"}lang=${data.lang}`);
+  const done = (id: string) => !!allLessons()[id]?.completedAt;
+  const host = document.querySelector<HTMLElement>("[data-session]");
+  if (host && data.drills) {
+    const level = data.drills.levels.find((l: any) => l.id === q.get("level"));
+    void runSession(host, level ? [level] : [], data.drills, {
+      script: data.script, tamil: data.tamil, review: q.has("review"), set: q.get("set"), done, backHref: href("/carnatic/practice/ear"),
+      lessonHref: (id: string) => data.lessons[id] ?? null,
+    });
+  } else {
+    const paint = () => {
+      document.querySelectorAll<HTMLElement>("[data-lv]").forEach((a) => {
+        const id = a.dataset.lv!;
+        a.classList.toggle("comfy", comfortable(id));
+        a.classList.toggle("open", done(a.dataset.unlockedBy!));
+      });
+      document.querySelectorAll<HTMLElement>("[data-fam-word]").forEach((p) => {
+        const levels = (p.dataset.levels ?? "").split(" ").map((id) => data.drills.levels.find((l: any) => l.id === id)).filter(Boolean);
+        const h = familyHistory(levels);
+        const lv = h.highest ? data.drills.levels.find((l: any) => l.id === h.highest) : null;
+        p.textContent = lv ? `Comfortable to ${lv.id}, ${lv.title.toLowerCase()}` : h.word === "new" ? "New" : `${h.word[0].toUpperCase()}${h.word.slice(1)}`;
+      });
+    };
+    paint();
+    if (boot().signedIn) void syncLessons().then(paint);
+  }
+</script>

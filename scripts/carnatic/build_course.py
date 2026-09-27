@@ -10,9 +10,11 @@ private swara-studio repository and never committed here. This script reads
 it as it is and writes ONE JSON file the backend imports into the database
 (`python -m shruti.carnatic_import`), where she edits it in the admin.
 
-It parses, it doesn't judge: YAML becomes JSON, markdown bodies are kept
-exactly as written (editor notes included; the API strips them), and the
-writers' extensions to FORMAT.md are carried through untouched. Each item
+It reads format 2 (course/FORMAT.md; FORMAT_CHANGES.md lists what changed
+from format 1) and refuses anything else: a lesson that doesn't say
+`format: 2`, and the format-1 fields the drafts invented, are errors that
+name the file and the field. Markdown bodies are kept exactly as written
+(editor notes included; the API strips them). Each item
 gets a hash of its file content, so the import can tell a file that changed
 from one that didn't, and never overwrites a lesson Sophia has edited.
 
@@ -31,7 +33,21 @@ from pathlib import Path
 
 import yaml
 
-FORMAT = 1
+FORMAT = 2
+LESSON_REQUIRED = ("format", "id", "slug", "lang", "revision", "status", "unit", "order", "title", "summary",
+                   "level", "minutes", "goals", "sources")
+KINDS = {"quiz", "tap", "practice", "listening", "checkpoint"}
+# Format-1 and draft fields format 2 replaced (FORMAT_CHANGES.md), and what replaced them.
+DROPPED = {
+    "checkpoint": "kind: checkpoint", "includes": "parts:", "drills": "parts: [{drill: ...}]",
+    "recording": "recordings: [{id, start, end}]", "clip": "recordings: [{id, start, end}]",
+    "also": "recordings:", "also_recordings": "recordings:", "recordings_also": "recordings:", "pool": "recordings: + pick",
+    "alternatives": "recordings: + pick", "comparison": "recordings:", "recording_choices": "recordings: + pick",
+    "hide_raga": "guess: true", "compare_with": "private_check", "compare": "private_check", "report": "(removed: always the five counts)",
+    "nadai_sequence": "segments:", "extra_targets": "targets: [...]",
+}
+ITEM_DROPPED = {"accept_from": "answer_from: raga", "choices": "suggest: [slugs]", "hide_raga": "guess: true",
+                "compare_with": "private_check"}
 
 
 class BuildError(Exception):
@@ -128,24 +144,50 @@ def parse_lesson(path: Path) -> dict:
         raise BuildError(f"{path.name}: no front matter")
     _, fm, body = raw.split("---", 2)
     front = plain(yaml.safe_load(fm) or {})
-    missing = [k for k in ("id", "slug", "lang", "unit", "order", "title", "status") if k not in front]
+    if front.get("format") != FORMAT:
+        raise BuildError(f"{path.name}: says format {front.get('format')!r}; the site reads format 2 (FORMAT_CHANGES.md)")
+    missing = [k for k in LESSON_REQUIRED if front.get(k) in (None, "", [])]
     if missing:
         raise BuildError(f"{path.name}: front matter lacks {', '.join(missing)}")
+    if front.get("level") not in ("beginner", "intermediate", "advanced"):
+        raise BuildError(f"{path.name}: level {front.get('level')!r} isn't beginner, intermediate or advanced")
     return {"file": f"lessons/{path.parent.name}/{path.name}", "hash": sha(raw), "front": front,
             "body": body.lstrip("\n")}
 
 
 # ── exercises ────────────────────────────────────────────────────────────────
 
-def unit_of(ex_id: str, fallback: int) -> int:
-    m = re.match(r"U(\d\d)\.", ex_id) or re.match(r"CP\.U(\d\d)$", ex_id)
+def unit_of(ex_id: str, fallback: int, lesson: str = "") -> int:
+    m = re.match(r"U(\d\d)\.", ex_id) or re.match(r"CP\.U(\d\d)$", ex_id) or re.match(r"U(\d\d)\.", lesson or "")
     return int(m.group(1)) if m else fallback
+
+
+def check_exercise(where: str, ex: dict) -> None:
+    """Format 2 only: the fields format 1 and the drafts used are errors that say what replaced them."""
+    if ex.get("kind") not in KINDS:
+        raise BuildError(f"{where}: {ex['id']} has kind {ex.get('kind')!r}; format 2 kinds are {', '.join(sorted(KINDS))}")
+    for key, instead in DROPPED.items():
+        if key in ex:
+            raise BuildError(f"{where}: {ex['id']} uses {key}:, which format 2 replaced with {instead}")
+    if "recordings" in ex and not all(isinstance(r, dict) and r.get("id") for r in ex["recordings"]):
+        raise BuildError(f"{where}: {ex['id']} recordings: must be a list of {{id, start, end}}")
+    if ex["kind"] == "tap" and "targets" in ex and not isinstance(ex["targets"], list):
+        raise BuildError(f"{where}: {ex['id']} targets: must be a list")
+    if ex["kind"] == "checkpoint" and not (isinstance(ex.get("skills"), list) and all(isinstance(k, dict) for k in ex["skills"])):
+        raise BuildError(f"{where}: {ex['id']} skills: must be a list of {{id, name}}")
+    for key in ("items", "auto"):
+        for n, item in enumerate(ex.get(key) or [], 1):
+            for bad, instead in ITEM_DROPPED.items():
+                if isinstance(item, dict) and bad in item:
+                    raise BuildError(f"{where}: {ex['id']} item {n} uses {bad}:, which format 2 replaced with {instead}")
+            if isinstance(item, dict) and item.get("type") == "ear" and (item.get("audio") or {}).get("kind") == "recording":
+                raise BuildError(f"{where}: {ex['id']} item {n}: an ear item can't play a recording (a choice with recording: instead)")
 
 
 def parse_exercises(folder: Path) -> list[dict]:
     out: list[dict] = []
     seen: set[str] = set()
-    for path in sorted(folder.glob("u*.yaml")):
+    for path in sorted(folder.glob("u*.yaml")) + sorted(folder.glob("selftest.yaml")):
         fallback = int(re.sub(r"\D", "", path.stem) or 0)
         items = yaml.safe_load(path.read_text(encoding="utf-8")) or []
         for ex in items:
@@ -155,13 +197,14 @@ def parse_exercises(folder: Path) -> list[dict]:
             if ex["id"] in seen:
                 raise BuildError(f"{path.name}: {ex['id']} is defined twice")
             seen.add(ex["id"])
-            out.append({"id": ex["id"], "unit": unit_of(ex["id"], fallback), "lesson": ex.get("lesson", ""),
+            check_exercise(path.name, ex)
+            out.append({"id": ex["id"], "unit": unit_of(ex["id"], fallback, ex.get("lesson", "")), "lesson": ex.get("lesson", ""),
                         "kind": ex.get("kind", "quiz"), "hash": sha(canon(ex)), "data": ex,
                         "file": f"exercises/{path.name}"})
     return out
 
 
-# ── glossary (created by the editor pass) ───────────────────────────────────
+# ── glossary (FORMAT.md §3e: term, iso, forms, definition, lesson, source) ──
 
 def parse_glossary(path: Path) -> list[dict]:
     if not path.is_file():
@@ -173,9 +216,13 @@ def parse_glossary(path: Path) -> list[dict]:
         term = str(e.get("term", "")).strip()
         if not term:
             continue
+        if "aliases" in e:
+            raise BuildError(f"glossary.yaml: {term} uses aliases:, which format 2 calls forms:")
         slug = e.get("slug") or re.sub(r"[^a-z0-9]+", "-", term.lower()).strip("-")
-        entry = {"slug": slug, "term": term, "definition": str(e.get("definition", "")).strip(),
-                 "lesson": e.get("lesson", "") or "", "aliases": list(e.get("aliases", []) or [])}
+        forms = [str(f) for f in (e.get("forms") or [term])]
+        entry = {"slug": slug, "term": term, "definition": " ".join(str(e.get("definition", "")).split()),
+                 "lesson": e.get("lesson", "") or "", "aliases": forms, "iso": str(e.get("iso", "") or ""),
+                 "source": str(e.get("source", "") or "")}
         out.append({**entry, "hash": sha(canon(entry))})
     return out
 

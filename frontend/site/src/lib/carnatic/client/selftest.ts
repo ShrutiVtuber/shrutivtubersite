@@ -22,6 +22,7 @@ const esc = (s: string) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, 
 interface UnitRow { n: number; title: string; lessons: { id: string; slug: string; title: string; available: boolean; order: number }[] }
 export interface TestPage {
   units: UnitRow[];
+  drills?: any;
   topics: Record<string, number[]>;
   script: EngineOpts["script"];
   tamil: EngineOpts["tamil"];
@@ -32,7 +33,7 @@ const exCache = new Map<number, Promise<Exercise[]>>();
 function unitExercises(n: number): Promise<Exercise[]> {
   if (!exCache.has(n)) {
     exCache.set(n, fetch(`/api/carnatic/course/exercises?unit=${n}`).then((r) => (r.ok ? r.json() : { items: [] }))
-      .then((b) => (b.items as Exercise[]).filter((e) => e.kind === "quiz")).catch(() => []));
+      .then((b) => (b.items as Exercise[]).filter((e) => e.kind === "quiz" || e.kind === "checkpoint")).catch(() => []));
   }
   return exCache.get(n)!;
 }
@@ -52,6 +53,8 @@ export interface BuiltSet {
   kind: "lesson" | "unit" | "mixed" | "topic" | "review" | "checkpoint";
   eyebrow: string; title: string; items: PreparedItem[]; itemId: string; recordKind: "quiz" | "checkpoint" | "review";
   unit?: UnitRow; empty?: string; again?: string;
+  /** Checkpoints: the lesson that teaches each skill, for "Suggested next". */
+  skillLesson?: Record<string, string>;
 }
 
 /** The item for a generator card ("gen:name:category") asked afresh. */
@@ -67,7 +70,7 @@ export async function buildSet(q: URLSearchParams, page: TestPage): Promise<Buil
   const titleOf = new Map(page.units.flatMap((u) => u.lessons.map((l) => [l.id, l.title] as const)));
   const lessonsIn = (units: number[]) => page.units.filter((u) => units.includes(u.n)).flatMap((u) => u.lessons);
   const itemsOf = async (units: number[]) => (await Promise.all(units.map(unitExercises))).flat();
-  const quizOf = async (units: number[]) => (await itemsOf(units)).filter((e) => !e.checkpoint && !e.id.startsWith("CP."));
+  const quizOf = async (units: number[]) => (await itemsOf(units)).filter((e) => e.kind === "quiz");
   const touched = (ids: string[]) => {
     const done = ids.filter((id) => lessons[id]?.completedAt);
     return done.length ? done : ids.filter((id) => lessons[id]?.openedAt);
@@ -91,32 +94,59 @@ export async function buildSet(q: URLSearchParams, page: TestPage): Promise<Buil
     const u = page.units.find((x) => x.n === n);
     const cpId = `CP.U${String(n).padStart(2, "0")}`;
     const unitExs = await itemsOf([n]);
-    const defined = unitExs.find((e) => e.id === cpId);
-    if (defined) {
-      // A checkpoint written in the course: its own items, each under one of its skills
-      // (listening items under a listening skill when it names one).
-      const skills: string[] = defined.skills?.length ? defined.skills : [u?.title ?? `unit ${n}`];
-      const listen = skills.find((x) => /listen|ear/.test(x)) ?? skills[0];
-      const items = prepare(defined).map((p) => ({ ...p, skill: p.item.skill ?? (["ear", "timestamp"].includes(p.item.type) ? listen : skills[0]) }));
-      const tries = attempts({ itemId: cpId, kind: "checkpoint" }).length;
-      const nth = ["first", "second", "third", "fourth", "fifth"][tries] ?? `attempt ${tries + 1}`;
-      return { kind: "checkpoint", eyebrow: `Unit ${n} checkpoint · ${u?.title ?? ""} · ${nth} attempt`,
-               title: `Where you are with ${u ? u.title.charAt(0).toLowerCase() + u.title.slice(1) : `unit ${n}`}`, items,
-               itemId: cpId, recordKind: "checkpoint", unit: u };
+    const cp = unitExs.find((e) => e.id === cpId && e.kind === "checkpoint");
+    const tries = attempts({ itemId: cpId, kind: "checkpoint" }).length;
+    const nth = ["first", "second", "third", "fourth", "fifth"][tries] ?? `attempt ${tries + 1}`;
+    const head = { kind: "checkpoint" as const, eyebrow: `Unit ${n} checkpoint · ${u?.title ?? ""} · ${nth} attempt`,
+      title: `Where you are with ${u ? u.title.charAt(0).toLowerCase() + u.title.slice(1) : `unit ${n}`}`, itemId: cpId,
+      recordKind: "checkpoint" as const, unit: u };
+    if (cp) {
+      // FORMAT.md §5: parts drawn at run time, in order, each under a skill; written items by {items: n}.
+      const skillName = new Map<string, string>((cp.skills ?? []).map((k: any) => [k.id, k.name]));
+      const name = (id: string) => skillName.get(id) ?? id;
+      const written = prepare({ ...cp, items: cp.items ?? [] });
+      let wi = 0;
+      const items: PreparedItem[] = [];
+      const skillLesson: Record<string, string> = {};
+      const byId = new Map(unitExs.map((e) => [e.id, e] as const));
+      const K = new Map<string, any>((page.drills?.talaKeeping ?? []).map((k: any) => [k.id, k] as const));
+      const levels = new Map<string, any>((page.drills?.levels ?? []).map((l: any) => [l.id, l] as const));
+      for (const part of cp.parts ?? []) {
+        const skill = name(part.skill);
+        if (part.quiz) {
+          const ex = byId.get(part.quiz) ?? (await quizOf([unitOf(part.quiz)])).find((e) => e.id === part.quiz);
+          if (!ex) continue;
+          const pool = shuffle(prepare(ex));
+          items.push(...pool.slice(0, part.count ?? pool.length).map((p) => ({ ...p, skill })));
+          if (ex.lesson && !skillLesson[skill]) skillLesson[skill] = ex.lesson;
+        } else if (part.tap) {
+          const spec = K.get(part.tap) ?? byId.get(part.tap);
+          if (!spec) continue;
+          items.push({ key: `${cpId}#${part.tap}`, label: "Tala keeping", exId: part.tap, skill,
+            item: { type: "_tap", text: `${spec.title}. Tap along; this part counts in the share of taps perfect or on time.`, spec,
+                    overrides: part.avartanams ? { avartanams: part.avartanams, segments: undefined } : {} } });
+        } else if (part.drill) {
+          const level = levels.get(part.drill);
+          if (!level || !page.drills) continue;
+          items.push({ key: `${cpId}#${part.drill}`, label: "Ear training", exId: part.drill, skill,
+            item: { type: "_drill", text: `${level.title}: ${part.count ?? 4} items.`, level, drills: page.drills, count: part.count ?? 4, set: part.set ?? null } });
+        } else if (part.items) {
+          for (let k = 0; k < Number(part.items) && wi < written.length; k++, wi++) items.push({ ...written[wi], skill });
+        }
+      }
+      const first = cp.skills?.[0]?.id ? name(cp.skills[0].id) : u?.title ?? "";
+      for (; wi < written.length; wi++) items.push({ ...written[wi], skill: first });
+      return { ...head, items, skillLesson };
     }
     const byLesson = new Map<string, PreparedItem[]>();
-    for (const p of unitExs.filter((e) => !e.checkpoint && !e.id.startsWith("CP.")).flatMap(prepare)) {
+    for (const p of unitExs.filter((e) => e.kind === "quiz").flatMap(prepare)) {
       const k = p.lesson ?? "";
       byLesson.set(k, [...(byLesson.get(k) ?? []), { ...p, skill: titleOf.get(k) ?? k }]);
     }
     // Balanced: up to 3 from each lesson, 14 at most (10-15 minutes).
     const per = Math.max(2, Math.min(3, Math.ceil(14 / Math.max(1, byLesson.size))));
     const items = shuffle([...byLesson.values()].flatMap((xs) => shuffle(xs).slice(0, per))).slice(0, 14);
-    const tries = attempts({ itemId: `CP.U${String(n).padStart(2, "0")}`, kind: "checkpoint" }).length;
-    const nth = ["First", "Second", "Third", "Fourth", "Fifth"][tries] ?? `Attempt ${tries + 1}`;
-    return { kind: "checkpoint", eyebrow: `Unit ${n} checkpoint · ${u?.title ?? ""} · ${nth.toLowerCase()} attempt`,
-             title: `Where you are with ${u ? u.title.charAt(0).toLowerCase() + u.title.slice(1) : `unit ${n}`}`, items,
-             itemId: `CP.U${String(n).padStart(2, "0")}`, recordKind: "checkpoint", unit: u };
+    return { ...head, items };
   }
   if (q.get("topic")) {
     const t = q.get("topic")!;
@@ -201,7 +231,7 @@ export function checkpointProfile(root: HTMLElement, set: BuiltSet, s: Summary, 
   for (const it of s.items) {
     const k = it.skill ?? "other";
     const v = now.get(k) ?? { right: 0, of: 0 };
-    v.of += 1; if (it.right) v.right += 1;
+    v.of += 1; v.right += it.share !== undefined ? it.share : it.right ? 1 : 0;
     now.set(k, v);
   }
   // Earlier attempts (the one just recorded is the last).
@@ -212,13 +242,13 @@ export function checkpointProfile(root: HTMLElement, set: BuiltSet, s: Summary, 
     const word = wordFor(v.right, v.of);
     const past = history.map((a) => a.result?.skills?.[skill]).filter(Boolean).map((x: any) => wordFor(x.right, x.of));
     const best = past.reduce((b, x) => (rank(x) > rank(b) ? x : b), word);
-    const lesson = set.unit?.lessons.find((l) => l.title === skill);
-    return `<li><span class="st-skill"><b>${esc(skill)}</b><small>${v.right} of ${v.of}${lesson ? ` · <a href="${esc(page.href(`/carnatic/learn/${lesson.slug}`))}">lesson ${set.unit!.n}.${String(lesson.order).padStart(2, "0")}</a>` : ""}</small></span>`
+    const lesson = set.unit?.lessons.find((l) => l.title === skill || l.id === set.skillLesson?.[skill]);
+    return `<li><span class="st-skill"><b>${esc(skill)}</b><small>${Math.round(v.right * 10) / 10} of ${v.of}${lesson ? ` · <a href="${esc(page.href(`/carnatic/learn/${lesson.slug}`))}">lesson ${set.unit!.n}.${String(lesson.order).padStart(2, "0")}</a>` : ""}</small></span>`
       + `<span class="st-wb"><span class="st-word${word === "comfortable" ? " is-top" : ""}">${word}</span><span class="st-best">best: ${best}</span></span>`
       + `${chart(past.length ? past : [word])}</li>`;
   }).join("");
   const weakest = [...now].map(([k, v]) => ({ k, share: v.of ? v.right / v.of : 0 })).sort((a, b) => a.share - b.share)[0];
-  const lesson = weakest && set.unit?.lessons.find((l) => l.title === weakest.k);
+  const lesson = weakest && set.unit?.lessons.find((l) => l.title === weakest.k || l.id === set.skillLesson?.[weakest.k]);
   root.innerHTML = `<p class="lr-eyebrow-top">${esc(set.eyebrow)}</p><h1 class="lr-title">${esc(set.title)}</h1>`
     + `<ul class="st-profile">${rows}</ul>`
     + `<p class="st-note">Three words only: new · getting there · comfortable. <span>Chart rows, top to bottom: comfortable, getting there, new.</span></p>`

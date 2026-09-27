@@ -49,8 +49,11 @@ def _iso(dt):
 
 
 async def _exercise_ids(session: AsyncSession) -> set[str]:
-    ids = {r[0] for r in (await session.execute(select(CarnaticExercise.id))).all()}
-    return ids | {k["id"] for k in drills.TALA_KEEPING}
+    return set((await _exercise_kinds(session)).keys()) | {k["id"] for k in drills.TALA_KEEPING}
+
+
+async def _exercise_kinds(session: AsyncSession) -> dict[str, str]:
+    return {r[0]: r[1] for r in (await session.execute(select(CarnaticExercise.id, CarnaticExercise.kind))).all()}
 
 
 DRILL_IDS = {l["id"] for l in drills.LEVELS}
@@ -112,7 +115,7 @@ async def _lesson(session: AsyncSession, lesson_id: str, lang: str) -> CarnaticL
 @router.get("/lessons/{lesson_id}")
 async def lesson(lesson_id: str, lang: str = "en", session: AsyncSession = Depends(get_session)) -> dict:
     row = await _lesson(session, lesson_id, lang)
-    check = course.check_lesson(row.front, row.body, await _exercise_ids(session), DRILL_IDS)
+    check = course.check_lesson(row.front, row.body, await _exercise_ids(session), DRILL_IDS, await _exercise_kinds(session))
     return _lesson_admin(row, check)
 
 
@@ -125,7 +128,7 @@ class LessonDraft(BaseModel):
 async def check(lesson_id: str, body: LessonDraft, lang: str = "en",
                 session: AsyncSession = Depends(get_session)) -> dict:
     row = await _lesson(session, lesson_id, lang)
-    result = course.check_lesson(body.front, body.body, await _exercise_ids(session), DRILL_IDS)
+    result = course.check_lesson(body.front, body.body, await _exercise_ids(session), DRILL_IDS, await _exercise_kinds(session))
     result["meaningChange"] = course.is_meaning_change(row.body, body.body)
     return result
 
@@ -146,7 +149,7 @@ async def save(lesson_id: str, body: LessonSave, lang: str = "en", by: str = Dep
     revision, which marks translations out of date.
     """
     row = await _lesson(session, lesson_id, lang)
-    result = course.check_lesson(body.front, body.body, await _exercise_ids(session), DRILL_IDS)
+    result = course.check_lesson(body.front, body.body, await _exercise_ids(session), DRILL_IDS, await _exercise_kinds(session))
     if body.status == "published" and not result["publishable"]:
         return JSONResponse(status_code=422, content={"code": "NOT_PUBLISHABLE", "check": result,
                                                       "detail": "Saved nothing: fix these before publishing."})
@@ -215,7 +218,7 @@ async def restore(lesson_id: str, rev_id: int, lang: str = "en", by: str = Depen
                                        body=row.body, source="restore", by=by,
                                        note=f"restored revision of {_iso(rev.created_at)}", created_at=_now()))
     await session.commit()
-    return _lesson_admin(row, course.check_lesson(row.front, row.body, await _exercise_ids(session), DRILL_IDS))
+    return _lesson_admin(row, course.check_lesson(row.front, row.body, await _exercise_ids(session), DRILL_IDS, await _exercise_kinds(session)))
 
 
 @router.post("/lessons/{lesson_id}/take-file")
@@ -234,7 +237,7 @@ async def take_file(lesson_id: str, lang: str = "en", by: str = Depends(require_
                                        body=row.body, source="import", by=by, note="took the file version",
                                        created_at=_now()))
     await session.commit()
-    return _lesson_admin(row, course.check_lesson(row.front, row.body, await _exercise_ids(session), DRILL_IDS))
+    return _lesson_admin(row, course.check_lesson(row.front, row.body, await _exercise_ids(session), DRILL_IDS, await _exercise_kinds(session)))
 
 
 # ── exercises and glossary ──────────────────────────────────────────────────
@@ -279,16 +282,20 @@ async def exercise_take_file(ex_id: str, session: AsyncSession = Depends(get_ses
 
 class TermIn(BaseModel):
     term: str = Field(min_length=1, max_length=80)
-    definition: str = Field(min_length=1, max_length=300)
+    definition: str = Field(min_length=1, max_length=800)
     lesson: str = Field(default="", max_length=20)
-    aliases: list[str] = Field(default_factory=list, max_length=12)
+    forms: list[str] | None = Field(default=None, max_length=24)
+    aliases: list[str] = Field(default_factory=list, max_length=24)   # the old name for forms
+    iso: str = Field(default="", max_length=120)
+    source: str = Field(default="", max_length=80)
 
 
 @router.get("/glossary")
 async def glossary(session: AsyncSession = Depends(get_session)) -> dict:
     rows = (await session.execute(select(CarnaticGlossary).order_by(CarnaticGlossary.term))).scalars().all()
     return {"items": [{"slug": g.slug, "term": g.term, "definition": g.definition, "lesson": g.lesson,
-                       "aliases": g.aliases, "edited": g.admin_edited, "newerFile": bool(g.file_hash)} for g in rows]}
+                       "forms": g.aliases, "iso": g.iso, "source": g.source, "edited": g.admin_edited,
+                       "newerFile": bool(g.file_hash), "fileData": g.file_data if g.file_hash else None} for g in rows]}
 
 
 @router.put("/glossary/{slug}")
@@ -300,10 +307,13 @@ async def save_term(slug: str, body: TermIn, session: AsyncSession = Depends(get
     if row is None:
         row = CarnaticGlossary(slug=slug)
         session.add(row)
-    row.term, row.definition, row.lesson, row.aliases = body.term.strip(), body.definition.strip(), body.lesson, body.aliases
+    forms = body.forms if body.forms is not None else body.aliases
+    row.term, row.definition, row.lesson = body.term.strip(), body.definition.strip(), body.lesson
+    row.aliases, row.iso, row.source = [f.strip() for f in forms if f.strip()], body.iso.strip(), body.source.strip()
     row.admin_edited, row.updated_at = True, _now()
     await session.commit()
-    return {"slug": slug, "term": row.term, "definition": row.definition, "lesson": row.lesson, "aliases": row.aliases}
+    return {"slug": slug, "term": row.term, "definition": row.definition, "lesson": row.lesson, "forms": row.aliases,
+            "iso": row.iso, "source": row.source}
 
 
 @router.delete("/glossary/{slug}", status_code=204)
@@ -323,7 +333,7 @@ def _rec(r: CarnaticRecording, suggester: str | None = None) -> dict:
             "channel": r.channel, "uploaderKind": r.uploader_kind, "artists": r.artists, "instrument": r.instrument,
             "composition": r.composition, "composer": r.composer, "form": r.form, "raga": r.raga, "tala": r.tala,
             "pageSays": r.page_says, "listenFor": r.listen_for, "flags": r.flags, "duration": r.duration,
-            "clips": r.clips, "sections": r.sections, "beatMap": r.beat_map, "reason": r.reason,
+            "clips": r.clips, "sections": r.sections, "beatMap": r.beat_map, "marks": r.marks or {}, "reason": r.reason,
             "decidedAt": _iso(r.decided_at), "approvedAt": _iso(r.approved_at),
             "suggestion": ({**(r.suggestion or {}), "by": suggester} if r.suggestion is not None else None),
             "research": (r.raw or {}).get("file", "")}
@@ -384,6 +394,7 @@ class Annotations(BaseModel):
     sections: list[dict] | None = None
     beatMap: dict | None = None
     clearBeatMap: bool = False
+    marks: dict | None = None
     listenFor: str | None = None
     raga: str | None = None
     tala: str | None = None
@@ -392,6 +403,23 @@ class Annotations(BaseModel):
     composition: str | None = None
     composer: str | None = None
     artists: list[str] | None = None
+
+
+def _clean_marks(m: dict) -> dict:
+    """Her marks for the ear trainer, trimmed to the shapes the drills read."""
+    def secs(x) -> float | None:
+        try:
+            return round(float(x), 3)
+        except (TypeError, ValueError):
+            return None
+    out: dict = {}
+    out["transcriptions"] = [{"start": str(t.get("start", "")), "end": str(t.get("end", "")), "sargam": str(t.get("sargam", ""))[:400]}
+                             for t in (m.get("transcriptions") or []) if isinstance(t, dict) and t.get("sargam")][:50]
+    out["gamakas"] = [{"t": str(g.get("t", "")), "gamakas": [str(x) for x in (g.get("gamakas") or [])][:6]}
+                      for g in (m.get("gamakas") or []) if isinstance(g, dict) and g.get("gamakas")][:50]
+    out["korvais"] = [{"start": str(k.get("start", "")), "landing": secs(k.get("landing"))}
+                      for k in (m.get("korvais") or []) if isinstance(k, dict) and secs(k.get("landing")) is not None][:50]
+    return out
 
 
 @router.put("/recordings/{rid}")
@@ -412,6 +440,8 @@ async def annotate(rid: str, body: Annotations, session: AsyncSession = Depends(
                       "counts": counts}
     if body.clearBeatMap:
         r.beat_map = None
+    if body.marks is not None:
+        r.marks = _clean_marks(body.marks)
     for field, attr in (("listenFor", "listen_for"), ("raga", "raga"), ("tala", "tala"), ("form", "form"),
                         ("instrument", "instrument"), ("composition", "composition"), ("composer", "composer"),
                         ("artists", "artists")):

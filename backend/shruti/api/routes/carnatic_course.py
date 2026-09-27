@@ -122,7 +122,7 @@ async def units_json(session: AsyncSession, preview: bool) -> list[dict]:
     checkpoints: dict[int, str] = {}
     for eid, lesson, kind, data in ex_rows:
         kinds.setdefault(lesson, set()).add(kind)
-        if (data or {}).get("checkpoint") or eid.startswith("CP."):
+        if kind == "checkpoint":
             unit = int(eid[4:6]) if eid.startswith("CP.U") else 0
             if unit:
                 checkpoints[unit] = eid
@@ -171,8 +171,23 @@ async def _exercises(session: AsyncSession, preview: bool, *, unit: int | None =
     if not preview:
         published = {l.id for l in await _published(session, False)}
         published_units = {int(i[1:3]) for i in published}
-        rows = [r for r in rows if r.lesson in published or (r.id.startswith("CP.") and r.unit in published_units)]
-    return [{**r.data, "id": r.id, "unit": r.unit} for r in rows]
+        rows = [r for r in rows if r.lesson in published or (r.kind == "checkpoint" and r.unit in published_units)]
+    return [_ready({**r.data, "id": r.id, "unit": r.unit}) for r in rows]
+
+
+def _waiting(item) -> bool:
+    """An item whose answer waits for Sophia's annotation (`answer: null`, FORMAT.md §4a)."""
+    return isinstance(item, dict) and "answer" in item and item["answer"] is None and not item.get("answer_from")
+
+
+def _ready(ex: dict) -> dict:
+    """Items waiting for an annotation are hidden until they have one."""
+    for key in ("items", "auto"):
+        if isinstance(ex.get(key), list):
+            kept = [i for i in ex[key] if not _waiting(i)]
+            if len(kept) != len(ex[key]):
+                ex = {**ex, key: kept, "waiting": ex.get("waiting", 0) + len(ex[key]) - len(kept)}
+    return ex
 
 
 async def _flags(session: AsyncSession) -> dict[str, bool]:
@@ -183,9 +198,7 @@ async def _flags(session: AsyncSession) -> dict[str, bool]:
 async def _glossary(session: AsyncSession) -> list[dict]:
     rows = (await session.execute(select(CarnaticGlossary).order_by(CarnaticGlossary.term))).scalars().all()
     return [{"term": g.term, "slug": g.slug, "definition": g.definition, "lesson": g.lesson,
-             "aliases": g.aliases or [],
-             # glossary.yaml may give a scholarly spelling (`translit`/`iast`); shown beside the term.
-             "translit": str((g.file_data or {}).get("translit") or (g.file_data or {}).get("iast") or "")} for g in rows]
+             "forms": g.aliases or [], "aliases": g.aliases or [], "iso": g.iso, "source": g.source} for g in rows]
 
 
 _version_cache: dict[str, tuple[float, dict]] = {}
@@ -255,11 +268,11 @@ async def course_exercise(ex_id: str, request: Request, preview: bool = False,
     if row is not None:
         items = await _exercises(session, preview, lesson=row.lesson) if row.lesson else []
         hit = next((x for x in items if x["id"] == ex_id), None)
-        if hit is None and (preview or ex_id.startswith("CP.")):
+        if hit is None and (preview or row.kind == "checkpoint" or ex_id.startswith("K.")):
             hit = {**row.data, "id": row.id, "unit": row.unit}
         if hit is not None:
             return hit
-    k = next((k for k in drills.TALA_KEEPING if k["id"] == ex_id), None)
+    k = next((k for k in await _tala_keeping(session) if k["id"] == ex_id), None)
     if k is not None:
         return k
     raise HTTPException(404, "No such exercise.")
@@ -270,9 +283,27 @@ async def course_glossary(session: AsyncSession = Depends(get_session)) -> dict:
     return {"items": await _glossary(session)}
 
 
+async def _tala_keeping(session: AsyncSession) -> list[dict]:
+    """K.01-K.16: from exercises/selftest.yaml once imported (format 2), else the built-in table."""
+    rows = (await session.execute(select(CarnaticExercise).where(CarnaticExercise.id.like("K.%"))
+                                  .order_by(CarnaticExercise.id))).scalars().all()
+    if not rows:
+        return drills.TALA_KEEPING
+    out = []
+    for r in rows:
+        d = {**r.data, "id": r.id}
+        d.setdefault("unlockedBy", d.get("lesson", ""))
+        out.append(d)
+    return out
+
+
+async def _drills(session: AsyncSession) -> dict:
+    return {**drills.definitions(await _flags(session)), "talaKeeping": await _tala_keeping(session)}
+
+
 @router.get("/course/drills")
 async def course_drills(session: AsyncSession = Depends(get_session)) -> dict:
-    return drills.definitions(await _flags(session))
+    return await _drills(session)
 
 
 @router.get("/course/bundle")
@@ -284,10 +315,10 @@ async def course_bundle(request: Request, session: AsyncSession = Depends(get_se
         return Response(status_code=304, headers={"ETag": tag})
     approved = await _approved_ids(session)
     lessons = [lesson_json(l, approved) for l in await _published(session, False)]
-    body = {"format": 1, "digest": v["digest"], "updatedAt": v["updatedAt"],
+    body = {"format": 2, "digest": v["digest"], "updatedAt": v["updatedAt"],
             "units": await units_json(session, False), "lessons": lessons,
             "exercises": await _exercises(session, False), "glossary": await _glossary(session),
-            "drills": drills.definitions(await _flags(session)), "tala_keeping": drills.TALA_KEEPING}
+            "drills": await _drills(session), "tala_keeping": await _tala_keeping(session)}
     return JSONResponse(body, headers={"ETag": tag, "Cache-Control": "no-cache"})
 
 
@@ -515,7 +546,8 @@ def recording_json(r: CarnaticRecording, *, reveal: bool = True, analyses: int =
     out = {"id": r.id, "status": r.status, "provider": r.provider, "url": r.url, "title": r.title,
            "channel": r.channel, "artists": r.artists, "instrument": r.instrument, "composition": r.composition,
            "composer": r.composer, "form": r.form, "raga": r.raga, "tala": r.tala, "listenFor": r.listen_for,
-           "clips": r.clips or [], "sections": r.sections or [], "beatMap": r.beat_map, "analyses": analyses}
+           "clips": r.clips or [], "sections": r.sections or [], "beatMap": r.beat_map,
+           "annotations": r.marks or {}, "analyses": analyses}
     if not reveal:
         for k in ("title", "channel", "artists", "composition", "composer", "raga", "listenFor", "sections"):
             out[k] = None

@@ -10,7 +10,7 @@
  * "Not quite. We'll come back to this one." and becomes a review card.
  */
 import { checkNumber, checkSargam, checkText, clock, seconds, type SargamRule } from "../answers";
-import { check as constructCheck, perAvartanam, type ConstructSpec } from "../construct";
+import { check as constructCheck, eduppuUnits, perAvartanam, type ConstructSpec } from "../construct";
 import { generate, type GenData, type GenItem } from "../generators";
 import { inline, type Script, type TamilStyle } from "../notation";
 import { phraseHtml } from "../render";
@@ -44,7 +44,7 @@ export interface EngineOpts {
 }
 
 export interface PreparedItem { key: string; label: string; exId: string; lesson?: string; item: Item; gen?: GenItem; skill?: string }
-export interface Summary { right: number; of: number; items: { key: string; right: boolean; skill?: string; text?: string; card?: string }[] }
+export interface Summary { right: number; of: number; items: { key: string; right: boolean; skill?: string; text?: string; card?: string; share?: number }[] }
 
 const esc = (s: string) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
@@ -76,7 +76,7 @@ export function genData() {
 
 const TYPE_LABEL: Record<string, string> = {
   choice: "Choose one", multi: "Choose all that apply", order: "Drag to order", number: "A number", text: "Type the answer",
-  sargam: "Write it in notation", fill: "Fill the gaps", ear: "Listen", timestamp: "Mark a moment", generated: "Generated",
+  sargam: "Write it in notation", fill: "Fill the gaps", ear: "Listen", timestamp: "Mark a moment", tap: "Tap the moment", generated: "Generated",
   construct: "Construction task",
 };
 
@@ -85,6 +85,13 @@ export function prepare(ex: Exercise): PreparedItem[] {
     const t = item.type === "choice" && (item.select === "many" || Array.isArray(item.answer)) ? "multi" : item.type;
     const one = (k = 0): PreparedItem => ({ key: `${ex.id}#${i + 1}${k ? `.${k + 1}` : ""}`, label: TYPE_LABEL[t] ?? item.type,
       exId: `${ex.id}.${i + 1}`, lesson: ex.lesson, item, skill: item.skill });
+    // match: one choice card per pair, the options being all the rights (FORMAT.md §4a).
+    if (item.type === "match" && Array.isArray(item.pairs)) {
+      const rights = item.pairs.map((p: any, k: number) => ({ id: `r${k}`, text: String(p.right) }));
+      return item.pairs.map((p: any, k: number): PreparedItem => ({
+        key: `${ex.id}#${i + 1}.${k + 1}`, label: "Match", exId: `${ex.id}.${i + 1}`, lesson: ex.lesson, skill: item.skill,
+        item: { type: "choice", text: `${item.text}: ${p.left}`, options: rights, answer: `r${k}`, explain: item.explain } }));
+    }
     // A generator with `count` asks that many fresh questions (FORMAT.md §4d).
     const n = item.type === "generated" ? Math.max(1, Math.min(8, Number(item.settings?.count ?? 1) || 1)) : 1;
     return Array.from({ length: n }, (_, k) => one(k));
@@ -114,9 +121,10 @@ export class QuizRunner {
     card.innerHTML = `<div class="ex-head"><span class="ex-eyebrow">${esc(eyebrow)}</span><span class="ex-id">${esc(p.exId)}</span></div><div class="ex-body"></div>`;
     this.root.replaceChildren(card);
     const body = card.querySelector<HTMLElement>(".ex-body")!;
-    await renderItem(body, p, this.o, (right) => {
-      this.results.push({ key: p.key, right, skill: p.skill, text: String((p.gen as any)?.text ?? p.item.text ?? ""), card: p.gen?.card ?? p.key });
-      if (this.o.cards) review(p.gen?.card ?? p.key, right);
+    await renderItem(body, p, this.o, (right, share) => {
+      this.results.push({ key: p.key, right, skill: p.skill, text: String((p.gen as any)?.text ?? p.item.text ?? ""), card: p.gen?.card ?? p.key,
+                          ...(share !== undefined ? { share } : {}) });
+      if (this.o.cards && share === undefined) review(p.gen?.card ?? p.key, right);
     }, () => { this.at += 1; void this.show(); }, this.at === this.items.length - 1);
   }
 
@@ -130,7 +138,7 @@ export class QuizRunner {
         if (!sk) continue;
         skills[sk] = skills[sk] ?? { right: 0, of: 0 };
         skills[sk].of += 1;
-        if (r.right) skills[sk].right += 1;
+        skills[sk].right += r.share !== undefined ? r.share : r.right ? 1 : 0;
       }
       recordAttempt({ itemId: this.o.record.itemId, kind: this.o.record.kind, startedAt: this.started,
                       seconds: Math.round((Date.now() - this.t0) / 1000),
@@ -164,9 +172,36 @@ function actions(check: string, next: string): string {
   return `<div class="ex-actions">${check}${next}</div>`;
 }
 
-export async function renderItem(el: HTMLElement, p: PreparedItem, o: EngineOpts, onAnswer: (right: boolean) => void,
+export async function renderItem(el: HTMLElement, p: PreparedItem, o: EngineOpts, onAnswer: (right: boolean, share?: number) => void,
                                  onNext: () => void, last = false): Promise<void> {
   let item = p.item;
+  // A checkpoint's tap and drill parts (FORMAT.md §5): they count in the share of targets or items right.
+  if (item.type === "_tap" || item.type === "_drill") {
+    const next = `<div class="ex-actions"><button type="button" class="ex-btn" data-next hidden>${last ? "Finish" : "Next"}</button></div>`;
+    el.innerHTML = `<p class="ex-prompt">${esc(item.text ?? "")}</p><div data-part></div>${next}`;
+    const host = el.querySelector<HTMLElement>("[data-part]")!;
+    const nextBtn = el.querySelector<HTMLButtonElement>("[data-next]")!;
+    nextBtn.addEventListener("click", onNext);
+    let reported = false;
+    const report = (share: number) => {
+      if (reported) return;
+      reported = true;
+      if (share >= 0) onAnswer(share >= 0.8, share); // below zero: nothing could be asked, so the profile says nothing
+
+      nextBtn.hidden = false;
+    };
+    if (item.type === "_tap") {
+      const { mountTap } = await import("./taptask");
+      const task = await mountTap(host, item.spec, item.overrides ?? {});
+      if (task) task.done = (r) => report(r.of ? (r.perfect + r.onTime) / r.of : 0);
+      else report(0);
+    } else {
+      const { runSession } = await import("./ear");
+      await runSession(host, [item.level], item.drills, { script: o.script, tamil: o.tamil, size: item.count, set: item.set,
+        done: () => true, backHref: "", lessonHref: () => null, embedded: (right, of) => report(of ? right / of : -1) });
+    }
+    return;
+  }
   const data = await genData();
   if (item.type === "generated") {
     const g = generate(item.generator, data, item.settings ?? {});
@@ -201,7 +236,7 @@ export async function renderItem(el: HTMLElement, p: PreparedItem, o: EngineOpts
     case "sargam": return sargamItem(el, item, prompt, answered, o, data.scales, !!p.gen);
     case "fill": return fillItem(el, item, prompt, answered, o, data.scales);
     case "ear": return earItem(el, item, prompt, answered, o, data.scales);
-    case "timestamp": return timestampItem(el, item, prompt, answered, o);
+    case "timestamp": case "tap": return timestampItem(el, item, prompt, answered, o);
     case "construct": return constructItem(el, item, prompt, answered, o, data);
     default:
       el.innerHTML = `${prompt}<p class="ex-note">This kind of question (${esc(item.type)}) can't be shown here yet.</p>`
@@ -393,7 +428,7 @@ function ruleOf(item: Item, scales: Record<string, string>): SargamRule {
   };
 }
 
-function sargamResultHtml(res: ReturnType<typeof checkSargam>, o: EngineOpts): string {
+export function sargamResultHtml(res: ReturnType<typeof checkSargam>, o: EngineOpts): string {
   const draw = (k: string) => {
     const [name, oct] = k.split("@");
     const n = Number(oct);
@@ -493,7 +528,7 @@ function timestampItem(el: HTMLElement, item: Item, prompt: string, answered: An
   let player: Player | null = null;
   const show = () => { el.querySelector<HTMLElement>("[data-t]")!.textContent = marked === null ? "0:00" : clock(marked); };
   el.querySelector("[data-load]")?.addEventListener("click", () => {
-    player = loadPlayer(el.querySelector<HTMLElement>("[data-box]")!, rec!.provider, rec!.url, { start: seconds(item.clip?.start) ?? undefined });
+    player = loadPlayer(el.querySelector<HTMLElement>("[data-box]")!, rec!.provider, rec!.url, { start: seconds(item.start ?? null) ?? undefined });
   });
   el.querySelector("[data-mark]")!.addEventListener("click", () => {
     const t = player?.time();
@@ -511,7 +546,7 @@ function timestampItem(el: HTMLElement, item: Item, prompt: string, answered: An
       answered(null, `<p class="ex-why">Shruti hasn't marked this moment yet, so there's nothing to compare with. You marked ${clock(marked)}.</p>`);
       return;
     }
-    const tol = Number(item.tolerance ?? 5);
+    const tol = item.type === "tap" ? Number(item.tolerance_ms ?? 150) / 1000 : Number(item.tolerance ?? 6);
     const right = Math.abs(marked - want) <= tol;
     answered(right, `<p class="ex-why">Accepted between ${clock(Math.max(0, want - tol))} and ${clock(want + tol)}. You marked ${clock(marked)}.</p>`);
   });
@@ -525,7 +560,7 @@ function constructItem(el: HTMLElement, item: Item, prompt: string, answered: An
     ?? data.suladi.find((t: any) => t.id === item.tala)?.aksharas ?? 8;
   const spec: ConstructSpec = { input: item.input === "konnakol" ? "konnakol" : "sargam", tala: item.tala, counts,
     nadai: item.input === "konnakol" ? Number(item.nadai ?? 4) : undefined, speed: Number(item.speed ?? 1),
-    start: item.start ? Number(item.start) : undefined, raga: item.raga };
+    eduppu: item.eduppu !== undefined ? Number(item.eduppu) : undefined, raga: item.raga };
   if (item.raga && data.scales[item.raga]) spec.allowed = new Set(data.scales[item.raga].match(/[SRGMPDN][123]?/g) ?? []);
   const per = perAvartanam(spec);
   const talaName = data.practical.find((t: any) => t.id === item.tala)?.name ?? String(item.tala ?? "").replace(/_/g, " ");
@@ -534,7 +569,7 @@ function constructItem(el: HTMLElement, item: Item, prompt: string, answered: An
     ? `<div class="ex-chips">${KONNAKOL.map((k) => `<button type="button" data-syl="${k}">${k}</button>`).join("")}<button type="button" class="ex-chip-gap" data-syl=",">, (gap)</button><button type="button" class="ex-chip-gap" data-back>⌫</button></div>`
     : `<div data-pad-host></div>`;
   el.innerHTML = `${prompt}${head}<div class="ex-grid" data-grid style="--cols:${Math.min(counts, 8)}"></div>`
-    + (item.ask_start ? `<label class="ex-start">It starts on matra <input type="number" min="1" max="${per}" value="1" data-start></label>` : "")
+    + (item.ask_start ? `<label class="ex-start">It starts <input type="number" min="0" max="${counts}" step="0.5" value="0" data-start> counts after samam</label>` : "")
     + `${chips}<div class="ex-live" data-live></div>`
     + actions(`<button type="button" class="ex-btn ex-btn-s" data-play>Play it over the tala</button>`, `<button type="button" class="ex-btn" data-check>Check it</button>`);
   let syl: string[] = [];
@@ -543,7 +578,7 @@ function constructItem(el: HTMLElement, item: Item, prompt: string, answered: An
   const value = () => (pad ? pad.value() : syl.join(" "));
   const drawGrid = () => {
     const v = value().split(/\s+/).filter(Boolean);
-    const start = (spec.start ?? 1) - 1;
+    const start = eduppuUnits(spec);
     const perCount = per / counts;
     const avs = Math.max(1, Math.ceil((start + v.length) / per));
     const cells: string[] = [];
@@ -563,17 +598,17 @@ function constructItem(el: HTMLElement, item: Item, prompt: string, answered: An
   el.querySelector("[data-back]")?.addEventListener("click", () => { syl.pop(); drawGrid(); });
   el.querySelector("[data-pad-host]")?.addEventListener("click", () => setTimeout(drawGrid));
   el.querySelector("[data-pad-host]")?.addEventListener("keydown", () => setTimeout(drawGrid));
-  el.querySelector<HTMLInputElement>("[data-start]")?.addEventListener("input", (e) => { spec.start = Number((e.target as HTMLInputElement).value) || 1; drawGrid(); });
+  el.querySelector<HTMLInputElement>("[data-start]")?.addEventListener("input", (e) => { spec.eduppu = Number((e.target as HTMLInputElement).value) || 0; drawGrid(); });
   el.querySelector("[data-play]")!.addEventListener("click", () => {
     const v = value().split(/\s+/).filter(Boolean);
     const tempo = 60;
     const beat = 60 / tempo;
     const perCount = per / counts;
     const t0 = audioCtx().currentTime + 0.3;
-    const avs = Math.max(1, Math.ceil(((spec.start ?? 1) - 1 + v.length) / per));
+    const avs = Math.max(1, Math.ceil((eduppuUnits(spec) + v.length) / per));
     for (let c = 0; c <= counts * avs; c++) talaSound(c % counts === 0 ? "clap" : "finger", t0 + c * beat, { samam: c % counts === 0 });
     v.forEach((t, i) => {
-      if (t !== ",") blip(880, t0 + (((spec.start ?? 1) - 1 + i) / perCount) * beat, 0.05, 0.06);
+      if (t !== ",") blip(880, t0 + ((eduppuUnits(spec) + i) / perCount) * beat, 0.05, 0.06);
     });
   });
   el.querySelector("[data-check]")!.addEventListener("click", () => {

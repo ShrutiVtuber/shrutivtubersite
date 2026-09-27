@@ -17,7 +17,7 @@ const { settings } = await visitor(Astro);
 const [all, dr] = await Promise.all([units(), drills()]);
 const page = {
   units: all.map((u) => ({ n: u.n, title: u.title, lessons: u.lessons.filter((l) => l.available).map((l) => ({ id: l.id, slug: l.slug, title: l.title, available: l.available, order: l.order })) })),
-  topics: dr?.topics ?? {}, script: swaraScript(settings, lang), tamil: settings.tamilStyle, lang,
+  topics: dr?.topics ?? {}, drills: dr, script: swaraScript(settings, lang), tamil: settings.tamilStyle, lang,
 };
 ---
 <SwaraLayout title={`${say("title", "Test yourself")} · Swara Studio`} noindex

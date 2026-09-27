@@ -14,8 +14,7 @@ export interface ConstructSpec {
   nadai?: number;
   speed?: number;
   kalai?: number;
-  /** Matra the phrase starts on (1-based), given by the item or stated by the learner. */
-  start?: number;
+  /** Where the phrase starts, in counts of the tala after samam (FORMAT.md §3b, §4f), given or stated by the learner. */
   eduppu?: number;
   raga?: string;
   /** The raga's allowed swaras (arohana, avarohana, anya), for only_raga_swaras. */
@@ -43,9 +42,15 @@ export function perAvartanam(spec: ConstructSpec): number {
 }
 
 /** Where the phrase ends relative to the next samam, as a sentence. */
+/** The eduppu in units (matras) from samam. */
+export function eduppuUnits(spec: ConstructSpec): number {
+  const per = perAvartanam(spec);
+  return Math.round((spec.eduppu ?? 0) * (per / Math.max(1, (spec.counts ?? 8) * (spec.kalai ?? 1))));
+}
+
 export function landing(n: number, spec: ConstructSpec): { lands: boolean; text: string } {
   const per = perAvartanam(spec);
-  const start = (spec.start ?? 1) - 1 + (spec.eduppu ?? 0);
+  const start = eduppuUnits(spec);
   const end = start + n;
   const rem = end % per;
   if (rem === 0) return { lands: true, text: "lands on samam" };
@@ -121,7 +126,8 @@ export function check(line: string, checks: (string | Record<string, any>)[], sp
         break;
       }
       case "total_matras": {
-        const want = arg === "from_start" ? per * Math.ceil(((spec.start ?? 1) - 1 + n) / per) - ((spec.start ?? 1) - 1) : arg;
+        // from_eduppu: the space from the eduppu to the next samam.
+        const want = arg === "from_eduppu" ? (per - (eduppuUnits(spec) % per)) || per : arg;
         const wants = Array.isArray(want) ? want.map(Number) : [Number(want)];
         if (!wants.includes(n)) {
           notes.push(`${n} matras; this asks for ${wants.join(" or ")}.`);

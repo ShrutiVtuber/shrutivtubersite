@@ -13,13 +13,13 @@ import { playLine } from "./phrase";
 import { Mic, readSwara } from "./pitch";
 import { blip, ctx, talaSound } from "./audio";
 import { boot, settings, startDrone, stopDrone, theDrone, onDrone } from "./state";
-import { TapTask, tapData } from "./taptask";
+import { mountTap } from "./taptask";
 import { inline, pitchHz } from "../notation";
 
 interface PageData {
   id: string; slug: string; title: string; minutes: number; words: number; unitHref: string;
   sources: { key: string; n: number; cite: string; url?: string | null; research?: string | null; confidence?: string }[];
-  glossary: { slug: string; term: string; definition: string; lesson?: string; lessonTitle?: string; lessonHref?: string }[];
+  glossary: { slug: string; term: string; definition: string; iso?: string; lesson?: string; lessonTitle?: string; lessonHref?: string }[];
   exercises: Record<string, any>;
   recordings: Record<string, { provider: string; url: string; label: string }>;
   lessonTitles: Record<string, { title: string; href: string }>;
@@ -73,7 +73,7 @@ export function hydrateLesson(root: HTMLElement, data: PageData) {
   root.querySelectorAll<HTMLElement>("[data-term]").forEach((b) => b.addEventListener("click", () => {
     const g = data.glossary.find((x) => x.slug === b.dataset.term);
     if (!g) return;
-    open(b, `Glossary\u0000<p><b>${esc(g.term)}</b>: ${esc(g.definition)}</p>${g.lessonHref ? `<p class="lr-fn-link">Taught in <a href="${esc(g.lessonHref)}">${esc(g.lessonTitle ?? g.lesson ?? "")}</a></p>` : ""}`);
+    open(b, `Glossary\u0000<p><b>${esc(g.term)}</b>${g.iso && g.iso !== g.term ? ` <span class="lr-iso">${esc(g.iso)}</span>` : ""}: ${esc(g.definition)}</p>${g.lessonHref ? `<p class="lr-fn-link">Taught in <a href="${esc(g.lessonHref)}">${esc(g.lessonTitle ?? g.lesson ?? "")}</a></p>` : ""}`);
   }));
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") close(); });
 
@@ -214,7 +214,7 @@ export function hydrateLesson(root: HTMLElement, data: PageData) {
       btn.textContent = opening ? "Close" : "Start";
       if (!opening || mounted) return;
       mounted = true;
-      if (ex.kind === "tap" || card.dataset.embed === "tap") new TapTask(body, ex, await tapData(ex));
+      if (ex.kind === "tap" || card.dataset.embed === "tap") await mountTap(body, ex);
       else mountQuiz(body, ex, engine(ex));
     });
   });

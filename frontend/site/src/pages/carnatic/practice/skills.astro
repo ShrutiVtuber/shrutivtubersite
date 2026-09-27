@@ -1,0 +1,49 @@
+---
+/* The skill map (EAR_TRAINING.md §5; artboard P9): per drill family, the
+ * highest level the learner is comfortable with, in words, and a small
+ * chart of recent sessions. No overall score, by design. Kept on the
+ * device; drill sessions also go to the account as attempts. */
+import SwaraLayout from "../../../layouts/SwaraLayout.astro";
+import PracticeTabs from "../../../components/carnatic/PracticeTabs.astro";
+import { langOf } from "../../../lib/carnatic/i18n";
+import { copy } from "../../../lib/copy";
+import { drills } from "../../../lib/carnatic/course";
+
+langOf(Astro);
+const say = await copy("carnatic/practice/skills");
+const dr = await drills();
+const fams = (dr?.families ?? []).map((f) => ({ ...f, levels: (dr?.levels ?? []).filter((l) => l.family === f.id) }));
+---
+<SwaraLayout title={`${say("title", "Skill map")} · Swara Studio`} description={say("desc", "For each ear-training family, the highest level you're comfortable with, in words.")}>
+  <PracticeTabs />
+  <h1 class="sr-only">{say("title", "Skill map")}</h1>
+  <p class="et-intro" style="border: 0">{say("intro", "For each family, the highest level you're comfortable with, in words.")}</p>
+  <ul class="st-profile sk-map">
+    {fams.map((f) => (
+      <li data-fam={f.id} data-levels={JSON.stringify(f.levels)}>
+        <span class="st-skill"><b><span class="mono sk-id">{f.id}</span> {f.title}</b><small data-highest>{say("notStarted", "not started")}</small></span>
+        <span class="st-wb"><span class="st-word" data-word>new</span></span>
+        <svg class="st-chart" viewBox="0 0 150 36" width="150" height="36" aria-hidden="true" data-chart><line x1="0" x2="150" y1="30" y2="30" /></svg>
+      </li>
+    ))}
+  </ul>
+  <p class="st-note">{say("noScore", "No overall score, by design.")}</p>
+</SwaraLayout>
+
+<script>
+  import { familyHistory, levelState } from "../../../lib/carnatic/client/ear";
+  document.querySelectorAll<HTMLElement>("[data-fam]").forEach((li) => {
+    const levels = JSON.parse(li.dataset.levels!);
+    const h = familyHistory(levels);
+    const word = li.querySelector<HTMLElement>("[data-word]")!;
+    word.textContent = h.word;
+    word.classList.toggle("is-top", h.word === "comfortable");
+    const started = levels.some((l: any) => levelState(l.id).recent.length);
+    li.querySelector<HTMLElement>("[data-highest]")!.textContent = h.highest ? `highest comfortable level: ${h.highest}` : started ? "started, not yet comfortable at a level" : "not started";
+    const pts = h.points.length ? h.points : [0];
+    const step = pts.length > 1 ? 146 / (pts.length - 1) : 0;
+    const y = (v: number) => 30 - (v >= 0.8 ? 24 : v >= 0.5 ? 12 : 0);
+    const svg = li.querySelector<SVGElement>("[data-chart]")!;
+    svg.insertAdjacentHTML("beforeend", `<polyline points="${pts.map((v, i) => `${2 + i * step},${y(v)}`).join(" ")}${pts.length === 1 ? ` 148,${y(pts[0])}` : ""}" />`);
+  });
+</script>

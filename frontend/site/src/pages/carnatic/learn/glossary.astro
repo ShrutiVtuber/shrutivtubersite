@@ -44,7 +44,7 @@ const taught = (id?: string) => {
           const where = taught(t.lesson);
           return (
             <article class="gl-term" id={t.slug}>
-              <h2>{t.term}{(t as any).translit && <small>{(t as any).translit}</small>}</h2>
+              <h2>{t.term}{t.iso && t.iso !== t.term && <small>{t.iso}</small>}</h2>
               <p>{t.definition}</p>
               {where && <a href={where.href}>{where.text} ›</a>}
             </article>

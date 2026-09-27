@@ -121,7 +121,10 @@ class CarnaticGlossary(TimestampMixin, table=True):
     term: str = ""
     definition: str = ""
     lesson: str = ""
+    # glossary.yaml's `forms`: what the reader matches in lesson text (FORMAT.md §3e)
     aliases: list = Field(default_factory=list, sa_column=Column(JSONB, nullable=False))
+    iso: str = ""                   # ISO 15919 form, shown on the glossary page
+    source: str = ""                # a key from the teaching lesson's sources
     base_hash: str = ""
     admin_edited: bool = False
     file_hash: str = ""
@@ -159,6 +162,9 @@ class CarnaticRecording(TimestampMixin, table=True):
     clips: list = Field(default_factory=list, sa_column=Column(JSONB, nullable=False))
     sections: list = Field(default_factory=list, sa_column=Column(JSONB, nullable=False))
     beat_map: Optional[dict] = Field(default=None, sa_column=Column(JSONB, nullable=True))
+    # Marks the ear trainer drills on (EAR_TRAINING.md PD.09, GM.07, TL.11):
+    # {"transcriptions": [{start, end, sargam}], "gamakas": [{t, gamakas}], "korvais": [{start, landing}]}
+    marks: dict = Field(default_factory=dict, sa_column=Column(JSONB, nullable=False, server_default="{}"))
     # Decisions
     reason: str = ""                # a rejection reason the suggester sees
     decided_at: Optional[datetime] = Field(default=None, sa_type=UTC_TS)

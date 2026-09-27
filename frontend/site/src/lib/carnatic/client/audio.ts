@@ -231,6 +231,12 @@ export function playNote(e: NoteEvent) {
       f.linearRampToValueAtTime(up, e.at + 0.05);
       f.linearRampToValueAtTime(e.hz, e.at + 0.1);
       break;
+    case "khandippu":
+      /* GAMAKA.md: a hit on the previous (lower) note and back, with no new stroke. */
+      f.setValueAtTime(e.hz, e.at);
+      f.linearRampToValueAtTime(down, e.at + 0.05);
+      f.linearRampToValueAtTime(e.hz, e.at + 0.1);
+      break;
     case "orikkai":
       f.setValueAtTime(e.hz, end - 0.09);
       f.linearRampToValueAtTime(up, end - 0.02);

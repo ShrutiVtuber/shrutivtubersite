@@ -39,7 +39,7 @@ Press play[^a]. A second mention[^b] and the first again[^a].
 
 {{quiz id=T01.L01.Q1}}
 """
-FRONT = {"format": 1, "id": "T01.L01", "slug": "test-sa", "lang": "en", "revision": 1, "status": "draft", "unit": 1,
+FRONT = {"format": 2, "id": "T01.L01", "slug": "test-sa", "lang": "en", "revision": 1, "status": "draft", "unit": 1,
          "order": 1, "title": "Test Sa", "summary": "A test.", "level": "beginner", "minutes": 5,
          "goals": ["one"], "sources": [{"key": "a", "cite": "A", "confidence": "high"},
                                         {"key": "b", "cite": "B", "confidence": "medium"}],
@@ -66,6 +66,35 @@ def test_the_checks_speak_in_words_and_only_three_things_block_publishing() -> N
     missing = course.check_lesson({**FRONT, "title": ""}, course.strip_notes(BODY), set())
     texts = [p["text"] for p in missing["problems"] if p["blocksPublishing"]]
     assert any("title" in t for t in texts) and any("T01.L01.Q1" in t for t in texts)
+
+
+def test_format_2_is_the_only_format_and_tags_follow_the_exercise_kind() -> None:
+    body = course.strip_notes(BODY)
+    old = course.check_lesson({**FRONT, "format": 1}, body, {"T01.L01.Q1"})
+    assert not old["publishable"] and any("format 2" in p["text"] for p in old["problems"])
+    # {{quiz}} on a tap task: the tag follows the kind, said in words (not blocking)
+    tagged = course.check_lesson(FRONT, body, {"T01.L01.Q1"}, None, {"T01.L01.Q1": "tap"})
+    assert tagged["publishable"] and any("its tag is {{tap}}" in p["text"] for p in tagged["problems"])
+    # a key a tag doesn't know, and the format-2 tags
+    extra = course.check_lesson(FRONT, body + "\n{{recording id=x hide_raga=true}}\n{{checkpoint unit=4}}\n{{selftest id=K.04}}\n",
+                                {"T01.L01.Q1"})
+    texts = [p["text"] for p in extra["problems"]]
+    assert any("doesn't take hide_raga" in t for t in texts)
+    assert not any("checkpoint" in t and "isn't a tag" in t for t in texts)
+    assert not any("selftest" in t and "isn't a tag" in t for t in texts)
+    # tools must match the embeds
+    tools = course.check_lesson({**FRONT, "tools": ["drone", "tuner"]}, body, {"T01.L01.Q1"})
+    assert any("listed but not used: tuner" in p["text"] and "used but not listed: quiz" in p["text"] for p in tools["problems"])
+
+
+def test_items_waiting_for_an_annotation_are_hidden() -> None:
+    from shruti.api.routes import carnatic_course as routes
+    ex = {"id": "U04.L10.A1", "kind": "listening", "auto": [
+        {"type": "timestamp", "recording": "r", "answer": None, "text": "When?"},
+        {"type": "text", "recording": "r", "answer_from": "raga", "answer": None},
+        {"type": "choice", "answer": "a", "options": [{"id": "a", "text": "A"}], "explain": "x"}]}
+    out = routes._ready(ex)
+    assert len(out["auto"]) == 2 and out["waiting"] == 1
 
 
 def test_a_typo_is_not_a_change_of_meaning() -> None:
@@ -130,7 +159,7 @@ def _bundle(tag: str, body: str = BODY, title: str = "Test Sa", rec_title: str =
     front = {**FRONT, "id": lesson_id, "slug": f"test-sa-{tag}", "title": title, "exercises": [f"{lesson_id}.Q1"],
              "unit": 1}
     return {
-        "format": 1, "units": [],
+        "format": 2, "units": [],
         "lessons": [{"hash": course.digest(front, body), "front": front, "body": body}],
         "exercises": [{"id": f"{lesson_id}.Q1", "unit": 1, "lesson": lesson_id, "kind": "quiz", "hash": "h1",
                        "data": {"id": f"{lesson_id}.Q1", "kind": "quiz", "items": [
@@ -142,9 +171,12 @@ def _bundle(tag: str, body: str = BODY, title: str = "Test Sa", rec_title: str =
                                                "sargam": {"required": False, "raga": "mohanam", "tala": "adi", "speed": 1}},
                                 "prechecks": ["fits_tala"],
                                 "rubric": [{"id": "clear", "ask": "Clear?", "scale": ["no", "partly", "yes"]},
-                                           {"id": "tip", "ask": "A tip", "answer": "free"}]}}],
+                                           {"id": "tip", "ask": "A tip", "answer": "free"}]}},
+                      {"id": f"CP.T{tag}", "unit": 1, "lesson": lesson_id, "kind": "checkpoint", "hash": "h3",
+                       "data": {"id": f"CP.T{tag}", "kind": "checkpoint", "skills": [{"id": "s", "name": "Sa"}],
+                                "parts": [{"quiz": f"{lesson_id}.Q1", "count": 1, "skill": "s"}], "items": []}}],
         "glossary": [{"slug": f"vakra-{tag}", "term": "vakra", "definition": "zigzag", "lesson": lesson_id,
-                      "aliases": [], "hash": "g1"}],
+                      "aliases": ["vakra", "vakra raga"], "iso": "vakra", "source": "a", "hash": "g1"}],
         "recordings": [{"id": f"rec-{tag}-01", "provider": "youtube", "url": "https://youtu.be/x", "title": rec_title,
                         "channel": "C", "uploader_kind": "label", "artists": ["A"], "composition": "", "composer": "",
                         "form": "kriti", "raga": "mohanam", "tala": "", "page_says": {}, "listen_for": "the G",
@@ -191,6 +223,27 @@ async def _import_never_overwrites_her_edits():
         await s.refresh(rec)
         assert rec.status == "approved" and rec.title == "A recording"
     await engine.dispose()
+
+
+async def _format_2_import():
+    from shruti.models.carnatic_course import CarnaticExercise, CarnaticGlossary
+    tag = uuid.uuid4().hex[:6]
+    engine, s = await _session()
+    async with s:
+        await course.import_bundle(s, _bundle(tag))
+        await s.commit()
+        g = await s.get(CarnaticGlossary, f"vakra-{tag}")
+        assert g.aliases == ["vakra", "vakra raga"] and g.iso == "vakra" and g.source == "a"
+        cp = await s.get(CarnaticExercise, f"CP.T{tag}")
+        assert cp.kind == "checkpoint" and cp.data["parts"][0]["skill"] == "s"
+        with pytest.raises(ValueError):
+            await course.import_bundle(s, {**_bundle(tag), "format": 1})
+    await engine.dispose()
+
+
+@needs_db
+def test_the_import_reads_format_2_and_refuses_format_1() -> None:
+    asyncio.run(_format_2_import())
 
 
 @needs_db

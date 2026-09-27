@@ -16,7 +16,7 @@ const L = (p: string) => hrefIn(lang, p);
 const [dr, all] = await Promise.all([drills(), units()]);
 const k = (dr?.talaKeeping ?? []).find((x: any) => x.id === Astro.params.id) as any;
 if (!k) return notFound(Astro);
-if (k.id === "K.16") return Astro.redirect(L("/carnatic/listen?tap=1"), 302);
+if (k.plays?.recording) return Astro.redirect(L("/carnatic/listen?tap=1"), 302);
 const lesson = all.flatMap((u) => u.lessons).find((l) => l.id === k.unlockedBy);
 ---
 <SwaraLayout title={`${k.id} ${k.title} · Swara Studio`} description={say("desc", "Keep the tala with your taps: perfect within 30 ms, on time within 80 ms. Results are for you only.")}
@@ -32,8 +32,8 @@ const lesson = all.flatMap((u) => u.lessons).find((l) => l.id === k.unlockedBy);
 </SwaraLayout>
 
 <script>
-  import { TapTask, tapData } from "../../../../lib/carnatic/client/taptask";
+  import { mountTap } from "../../../../lib/carnatic/client/taptask";
   const spec = JSON.parse(document.getElementById("tap-spec")!.textContent!);
   const host = document.querySelector<HTMLElement>("[data-tap]")!;
-  void tapData(spec).then((d) => new TapTask(host, spec, d));
+  void mountTap(host, spec);
 </script>

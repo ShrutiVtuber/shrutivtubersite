@@ -1,0 +1,89 @@
+---
+/* A confusable pair (EAR_TRAINING.md §4 PR; artboard P12): the ragas side by
+ * side with their sourced prayogas, what separates them, and the drill.
+ * A set whose ragas the synth can't play honestly (the raga flags, the
+ * Studio's switch) is heard only from approved recordings. */
+import SwaraLayout from "../../../../../layouts/SwaraLayout.astro";
+import PracticeTabs from "../../../../../components/carnatic/PracticeTabs.astro";
+import { hrefIn, langOf } from "../../../../../lib/carnatic/i18n";
+import { visitor, swaraScript } from "../../../../../lib/carnatic/prefs";
+import { copy } from "../../../../../lib/copy";
+import { notFound } from "../../../../../lib/carnatic/notfound";
+import { drills, recordings } from "../../../../../lib/carnatic/course";
+import { ragas as loadRagas } from "../../../../../lib/carnatic/data";
+import { phraseHtml } from "../../../../../lib/carnatic/render";
+
+const lang = langOf(Astro);
+const say = await copy("carnatic/practice/ear/pair/[set]");
+const L = (p: string) => hrefIn(lang, p);
+const { settings } = await visitor(Astro);
+const [dr, rd, recs] = await Promise.all([drills(), loadRagas(), recordings()]);
+const set = (dr?.confusable ?? []).find((c) => c.set === Astro.params.set);
+if (!set) return notFound(Astro);
+const script = swaraScript(settings, lang);
+const all = [...(rd?.janyas ?? []), ...(rd?.performed ?? []), ...(rd?.melakartas ?? [])] as any[];
+const synthOk = (id: string) => dr?.ragaFlags?.[id]?.synthOk ?? true;
+const bySynth = set.mode.startsWith("synth") && set.ragas.every(synthOk);
+const cards = set.ragas.map((id) => {
+  const r = all.find((x) => x.id === id);
+  const approved = recs.filter((x) => x.status === "approved" && x.raga === id && x.clips.length);
+  return {
+    id, name: r?.name ?? id,
+    meta: r?.kind === "janya" || r?.parent ? say("janyaOf", "Janya of {n}").replace("{n}", String(r?.parent?.number ?? "")) : r?.number ? say("mela", "Melakarta {n}").replace("{n}", String(r.number)) : "",
+    phrases: ((r?.prayogas ?? []) as any[]).filter((p) => p.sargam).slice(0, 3),
+    scale: r ? `${r.arohana} ${r.avarohana}` : "",
+    rec: approved[0] ?? null,
+  };
+});
+const title = cards.map((c) => c.name).join(cards.length > 2 ? ", " : " and ").replace(/, ([^,]+)$/, " and $1");
+---
+<SwaraLayout title={`${title} · ${say("title", "Confusable pair")} · Swara Studio`} description={`${title}: ${set.differ}.`}
+             crumbs={[[say("crumb", "Ear training"), L("/carnatic/practice/ear")], [set.set]]}>
+  <PracticeTabs />
+  <p class="lr-eyebrow-top">{say("eyebrow", "PR · confusable pair")} · {set.set}</p>
+  <h1 class="lr-title">{title}</h1>
+  <p class="cu-lede" style="max-width: 620px">{say("differ", "What separates them: {d}.").replace("{d}", set.differ)}</p>
+  <div class="ep-cols" data-pair data-sa={settings.sa}>
+    {cards.map((c) => (
+      <div class="ep-card">
+        <h2>{c.name}</h2>
+        <small>{c.meta}</small>
+        {c.phrases.length === 0 && <p class="ep-foot">{say("noPhrases", "The research has no sourced phrases for this raga yet.")}</p>}
+        {c.phrases.map((p) => (
+          <div class="ep-ph">
+            {bySynth && <button type="button" class="lr-play" data-phrase={p.sargam} data-scale={c.scale} aria-label={say("play", "Play")}><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M5 3l8 5-8 5z" fill="currentColor"/></svg></button>}
+            <span><span class={`sn-script-${script}`} set:html={phraseHtml(p.sargam, { script, tamil: settings.tamilStyle })} />{p.note && <small>{p.note}</small>}</span>
+          </div>
+        ))}
+        {bySynth
+          ? <p class="ep-foot">{say("synthFoot", "Synthesised approximation, from the phrases the research sources.")}</p>
+          : c.rec
+            ? <div class="ep-rec"><button type="button" class="lr-btn lr-btn-s" data-rec={c.rec.id} data-provider={c.rec.provider} data-url={c.rec.url} data-start={c.rec.clips[0]?.start} data-end={c.rec.clips[0]?.end}>{say("hearRec", "Hear it in a recording")}</button><div data-rec-box></div><p class="ep-foot">{say("recFoot", "Phrases from real recordings: this raga depends on gamaka, so nothing here is synthesised.")}</p></div>
+            : <p class="ep-foot">{say("noRec", "This raga depends on gamaka, so it's heard only from recordings, and none is approved with clips yet.")}</p>}
+      </div>
+    ))}
+  </div>
+  <div class="st-actions" style="margin-top: 16px">
+    {bySynth && <button type="button" class="lr-btn lr-btn-s" data-both>{say("both", "Hear the difference: a phrase of each, one after the other")}</button>}
+    <a class="lr-btn" href={L(`/carnatic/practice/ear?level=PR.01&set=${set.set}`)}>{say("start", "Start the drill")}</a>
+  </div>
+</SwaraLayout>
+
+<script>
+  import { playLine } from "../../../../../lib/carnatic/client/phrase";
+  import { loadPlayer } from "../../../../../lib/carnatic/client/embed";
+  import { settings, startDrone, theDrone } from "../../../../../lib/carnatic/client/state";
+  import { pitchHz } from "../../../../../lib/carnatic/notation";
+  const sa = () => pitchHz(settings().sa || "C3");
+  const play = (line: string, scale: string, at?: number) => { if (!theDrone().playing) startDrone("pa"); return playLine(line, { saHz: sa(), scale, unit: 0.42, at }); };
+  document.querySelectorAll<HTMLElement>("[data-phrase]").forEach((b) => b.addEventListener("click", () => play(b.dataset.phrase!, b.dataset.scale!)));
+  document.querySelector("[data-both]")?.addEventListener("click", () => {
+    const firsts = [...document.querySelectorAll<HTMLElement>(".ep-card")].map((c) => c.querySelector<HTMLElement>("[data-phrase]")).filter(Boolean) as HTMLElement[];
+    let at: number | undefined;
+    for (const b of firsts) at = play(b.dataset.phrase!, b.dataset.scale!, at ? at + 0.8 : undefined);
+  });
+  const toS = (t?: string) => (t ? t.split(":").reduce((a, x) => a * 60 + Number(x), 0) : undefined);
+  document.querySelectorAll<HTMLElement>("[data-rec]").forEach((b) => b.addEventListener("click", () => {
+    loadPlayer(b.parentElement!.querySelector<HTMLElement>("[data-rec-box]")!, b.dataset.provider!, b.dataset.url!, { start: toS(b.dataset.start), end: toS(b.dataset.end) });
+  }));
+</script>

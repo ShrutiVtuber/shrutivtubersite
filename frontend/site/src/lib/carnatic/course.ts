@@ -147,7 +147,9 @@ export async function lessonContext(l: Lesson, base: Pick<LessonCtx, "script" | 
     exercises: Object.fromEntries(extra.exercises.map((e) => [e.id, e])),
     recordings: recordingsMap, ragas: ragaMap, melas, talaNames,
     drillTitles: Object.fromEntries((extra.drills?.levels ?? []).map((d) => [d.id, d.title])),
-    lessonTitles, slug: l.slug,
+    lessonTitles, slug: l.slug, lessonId: l.id,
+    selftests: Object.fromEntries((extra.drills?.talaKeeping ?? []).map((k: any) => [k.id, { title: k.title, minutes: k.minutes }])),
+    unitTitles: Object.fromEntries(extra.units.map((u) => [u.n, u.title])),
   };
 }
 

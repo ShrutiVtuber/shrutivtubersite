@@ -34,7 +34,7 @@ from shruti.models.carnatic_course import (
     CarnaticUnit,
 )
 
-BUNDLE_FORMAT = 1
+BUNDLE_FORMAT = 2
 LEVEL_LABEL = {"foundations": "Foundations", "intermediate": "Intermediate", "advanced": "Advanced",
                "any time": "Any time"}
 
@@ -133,7 +133,7 @@ async def import_bundle(session: AsyncSession, bundle: dict, *, by: str = "impor
     for item in bundle.get("glossary", []):
         row = await session.get(CarnaticGlossary, item["slug"])
         s = summary["glossary"]
-        data = {k: item[k] for k in ("term", "definition", "lesson", "aliases")}
+        data = {k: item.get(k, "" if k != "aliases" else []) for k in ("term", "definition", "lesson", "aliases", "iso", "source")}
         if row is None:
             session.add(CarnaticGlossary(slug=item["slug"], base_hash=item["hash"], **data))
             s["created"] += 1
@@ -160,7 +160,7 @@ async def import_bundle(session: AsyncSession, bundle: dict, *, by: str = "impor
             session.add(CarnaticRecording(id=item["id"], status="candidate", base_hash=item["hash"],
                                           **{k: item.get(k) if item.get(k) is not None else "" for k in fields}))
             s["created"] += 1
-        elif row.status != "candidate" or row.admin_edited or row.clips or row.sections or row.beat_map:
+        elif row.status != "candidate" or row.admin_edited or row.clips or row.sections or row.beat_map or row.marks:
             s["keptEdited"] += 1
         elif item["hash"] != row.base_hash:
             for k in fields:
@@ -229,12 +229,23 @@ def words(body: str) -> int:
 
 
 KNOWN_EMBEDS = {"drone", "sargam", "tala", "raga", "mela", "gamaka", "konnakol", "recording", "quiz", "practice",
-                "listen", "drill", "tuner", "composer", "tap"}
+                "listen", "drill", "tuner", "composer", "tap", "selftest", "checkpoint"}
+# Format 2: the keys each tag takes (FORMAT.md §3a). A key the tag doesn't know is reported.
+EMBED_KEYS = {
+    "drone": {"tuning", "autoplay"}, "sargam": {"line", "raga", "tala", "speed", "eduppu", "caption", "sahitya", "gamaka", "label", "nadai"},
+    "tala": {"id", "nadai", "eduppu", "mode", "tempo", "konnakol"}, "raga": {"slug", "show"}, "mela": {"n", "grid", "highlight"},
+    "gamaka": {"name", "on", "raga"}, "konnakol": {"example", "pattern", "tala", "nadai", "eduppu"},
+    "recording": {"id", "start", "end", "guess"}, "quiz": {"id"}, "tap": {"id"}, "practice": {"id"}, "listen": {"id"},
+    "drill": {"id", "set", "count"}, "selftest": {"id"}, "checkpoint": {"unit"}, "tuner": {"raga"}, "composer": {"raga", "tala", "line"},
+}
+# The tag follows the exercise's kind (FORMAT.md §3a).
+TAG_FOR_KIND = {"quiz": "quiz", "tap": "tap", "practice": "practice", "listening": "listen"}
 REQUIRED_FRONT = ("format", "id", "slug", "lang", "revision", "status", "unit", "order", "title", "summary",
                   "level", "minutes", "goals", "sources")
 
 
-def check_lesson(front: dict, body: str, exercise_ids: set[str], drill_ids: set[str] | None = None) -> dict:
+def check_lesson(front: dict, body: str, exercise_ids: set[str], drill_ids: set[str] | None = None,
+                 kinds: dict[str, str] | None = None) -> dict:
     """
     FORMAT.md §5-§6 in words: what to fix, and whether publishing is blocked.
     Saving a draft is never blocked; publishing is blocked only by a missing
@@ -248,6 +259,10 @@ def check_lesson(front: dict, body: str, exercise_ids: set[str], drill_ids: set[
     for f in REQUIRED_FRONT:
         if front.get(f) in (None, "", []):
             say(f"The {f} field is empty.", True, "field")
+    if front.get("format") not in (None, "") and str(front.get("format")) != "2":
+        say(f"This lesson says format {front.get('format')}; the site reads format 2 (FORMAT_CHANGES.md).", True, "field")
+    if front.get("level") not in (None, "", "beginner", "intermediate", "advanced"):
+        say(f"Level {front.get('level')!r} isn't one of beginner, intermediate, advanced.", True, "field")
     sources = {s.get("key") for s in (front.get("sources") or []) if isinstance(s, dict)}
     used = footnote_order(body)
     for key in used:
@@ -265,10 +280,30 @@ def check_lesson(front: dict, body: str, exercise_ids: set[str], drill_ids: set[
             say(f"Line {e['line']}: {{{{{e['kind']}}}}} isn't a tag the site knows; it shows as a grey box.")
         elif e["kind"] in ("quiz", "practice", "listen", "tap") and e["attrs"].get("id") not in exercise_ids:
             say(f"Line {e['line']}: exercise {e['attrs'].get('id')} doesn't exist.", True, "exercise")
+        elif e["kind"] in ("quiz", "practice", "listen", "tap") and kinds and \
+                TAG_FOR_KIND.get(kinds.get(e["attrs"].get("id"), ""), e["kind"]) != e["kind"]:
+            say(f"Line {e['line']}: {e['attrs'].get('id')} is a {kinds[e['attrs']['id']]} exercise; its tag is "
+                f"{{{{{TAG_FOR_KIND[kinds[e['attrs']['id']]]}}}}}.")
+        elif e["kind"] == "selftest" and not re.fullmatch(r"K\.\d\d", e["attrs"].get("id", "")):
+            say(f"Line {e['line']}: a selftest tag needs a K id.")
+        elif e["kind"] == "checkpoint" and not str(e["attrs"].get("unit", "")).isdigit():
+            say(f"Line {e['line']}: a checkpoint tag needs unit=.")
         elif e["kind"] == "drill" and drill_ids is not None and e["attrs"].get("id") not in drill_ids:
             say(f"Line {e['line']}: drill {e['attrs'].get('id')} doesn't exist.")
         elif e["kind"] == "sargam" and not e["attrs"].get("line"):
             say(f"Line {e['line']}: a sargam tag needs line=\"…\".")
+        if e["kind"] in EMBED_KEYS:
+            unknown = sorted(set(e["attrs"]) - EMBED_KEYS[e["kind"]])
+            if unknown:
+                say(f"Line {e['line']}: {{{{{e['kind']}}}}} doesn't take {', '.join(unknown)}; shown as a grey box.")
+    used_tools = {("listen" if e["kind"] == "listen" else e["kind"]) for e in embeds(body) if e["kind"] != "sargam-block"}
+    if any(e["kind"] == "sargam-block" for e in embeds(body)):
+        used_tools.add("sargam")
+    tools = set(front.get("tools") or [])
+    if tools and (tools != used_tools):
+        extra, missing = sorted(tools - used_tools), sorted(used_tools - tools)
+        say("tools: " + "; ".join(x for x in (f"listed but not used: {', '.join(extra)}" if extra else "",
+                                              f"used but not listed: {', '.join(missing)}" if missing else "") if x) + ".")
     notes = editor_notes(body)
     for note in notes:
         say(f"An editor note is still open: “{note[:90]}”", True, "note")
