@@ -66,8 +66,7 @@ export function hydrateLesson(root: HTMLElement, data: PageData) {
     const s = data.sources.find((x) => x.key === b.dataset.fn);
     if (!s) return;
     const conf = confidenceLine(s.confidence);
-    const link = s.url ? `<a href="${esc(s.url)}" rel="noopener nofollow">${esc(s.url.replace(/^https?:\/\//, ""))}</a>`
-      : s.research ? `<code>${esc(s.research)}</code>` : "";
+    const link = s.url ? `<a href="${esc(s.url)}" rel="noopener nofollow">${esc(s.url.replace(/^https?:\/\//, ""))}</a>` : "";
     open(b, `Footnote ${s.n}\u0000<p>${esc(s.cite)}</p>${conf ? `<p class="lr-conf">${esc(conf)}</p>` : ""}${link ? `<p class="lr-fn-link">${link}</p>` : ""}`);
   }));
   root.querySelectorAll<HTMLElement>("[data-term]").forEach((b) => b.addEventListener("click", () => {

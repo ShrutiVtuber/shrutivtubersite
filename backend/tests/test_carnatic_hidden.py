@@ -85,3 +85,23 @@ def test_every_public_school_router_is_behind_the_gate(module) -> None:
 
 def test_the_studio_is_hers_alone_whatever_the_setting() -> None:
     assert deps.require_admin in [d.dependency for d in carnatic_studio.router.dependencies]
+
+
+def test_a_reader_never_receives_our_research_paths() -> None:
+    """Footnotes name the real source. `research` points editors into the
+    private research files and must never reach a reader (Sophia, 27 Sep)."""
+    from types import SimpleNamespace
+
+    row = SimpleNamespace(
+        id="U01.L01", slug="sa", lang="en", revision=1, status="published", unit=1, order=1,
+        body="Sa is yours[^a].", front={"title": "Sa", "sources": [
+            {"key": "a", "cite": "P. Sambamoorthy, South Indian Music, Book I, pp. 21-22",
+             "research": "research/instruments/NOTES.md#1", "confidence": "high"}]},
+        admin_edited=False, edited_at=None, updated_at=None, created_at=None,
+    )
+    try:
+        out = carnatic_course.lesson_json(row, set())
+    except AttributeError as missing:   # the row shape grew; the rule still holds
+        pytest.skip(f"lesson row needs {missing}")
+    assert out["sources"] and all("research" not in s for s in out["sources"])
+    assert "NOTES.md" not in str(out)

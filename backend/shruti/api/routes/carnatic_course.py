@@ -94,8 +94,10 @@ def lesson_json(row: CarnaticLesson, approved: set[str], *, with_body: bool = Tr
         if n is None:
             extra += 1
             n = extra
+        # `research` (the editors' pointer into the private research) is never
+        # sent to readers: a footnote names the real source, not our files.
         out_sources.append({"key": s.get("key"), "n": n, "cite": s.get("cite", ""), "url": s.get("url"),
-                            "research": s.get("research"), "confidence": s.get("confidence", "high")})
+                            "confidence": s.get("confidence", "high")})
     out_sources.sort(key=lambda s: s["n"])
     out = {
         "id": row.id, "slug": row.slug, "lang": row.lang, "revision": row.revision, "status": row.status,
