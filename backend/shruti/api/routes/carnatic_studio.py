@@ -361,7 +361,7 @@ def _rec(r: CarnaticRecording, suggester: str | None = None) -> dict:
             "channel": r.channel, "uploaderKind": r.uploader_kind, "artists": r.artists, "instrument": r.instrument,
             "composition": r.composition, "composer": r.composer, "form": r.form, "raga": r.raga, "tala": r.tala,
             "pageSays": r.page_says, "listenFor": r.listen_for, "flags": r.flags, "duration": r.duration,
-            "clips": r.clips, "sections": r.sections, "beatMap": r.beat_map, "marks": r.marks or {}, "reason": r.reason,
+            "clips": r.clips, "sections": r.sections, "beatMap": r.beat_map, "marks": r.marks or {}, "guessMode": r.guess_mode, "reason": r.reason,
             "decidedAt": _iso(r.decided_at), "approvedAt": _iso(r.approved_at),
             "suggestion": ({**(r.suggestion or {}), "by": suggester} if r.suggestion is not None else None),
             "research": (r.raw or {}).get("file", "")}
@@ -435,6 +435,7 @@ class Annotations(BaseModel):
     beatMap: dict | None = None
     clearBeatMap: bool = False
     marks: dict | None = None
+    guessMode: bool | None = None
     listenFor: str | None = None
     raga: str | None = None
     tala: str | None = None
@@ -482,6 +483,10 @@ async def annotate(rid: str, body: Annotations, session: AsyncSession = Depends(
         r.beat_map = None
     if body.marks is not None:
         r.marks = _clean_marks(body.marks)
+    if body.guessMode is not None:
+        r.guess_mode = body.guessMode
+        from shruti.api.routes.carnatic_course import _guess_cache
+        _guess_cache.clear()
     for field, attr in (("listenFor", "listen_for"), ("raga", "raga"), ("tala", "tala"), ("form", "form"),
                         ("instrument", "instrument"), ("composition", "composition"), ("composer", "composer"),
                         ("artists", "artists")):

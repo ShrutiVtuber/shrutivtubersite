@@ -555,15 +555,19 @@ async def put_cards(body: CardsIn, user: User = Depends(require_user),
 
 # ── the Listening room: recordings, guesses, suggestions ────────────────────
 
-def recording_json(r: CarnaticRecording, *, reveal: bool = True, analyses: int = 0) -> dict:
+def recording_json(r: CarnaticRecording, *, reveal: bool = True, analyses: int | None = 0,
+                   guess_mode: bool = False, guessed: bool = True) -> dict:
+    # A guess-mode recording's analyses (and their count) stay hidden until the viewer has guessed it.
+    locked = guess_mode and not guessed
+    guess = {"guessMode": guess_mode, "analysesLocked": locked}
     if r.status == "retired":
         return {"id": r.id, "status": "retired", "form": r.form, "raga": r.raga if reveal else None,
-                "analyses": analyses}
+                "analyses": None if locked else analyses, **guess}
     out = {"id": r.id, "status": r.status, "provider": r.provider, "url": r.url, "title": r.title,
            "channel": r.channel, "artists": r.artists, "instrument": r.instrument, "composition": r.composition,
            "composer": r.composer, "form": r.form, "raga": r.raga, "tala": r.tala, "listenFor": r.listen_for,
            "clips": r.clips or [], "sections": r.sections or [], "beatMap": r.beat_map,
-           "annotations": r.marks or {}, "analyses": analyses}
+           "annotations": r.marks or {}, "analyses": None if locked else analyses, **guess}
     if not reveal:
         for k in ("title", "channel", "artists", "composition", "composer", "raga", "listenFor", "sections"):
             out[k] = None
@@ -579,7 +583,7 @@ async def _analysis_counts(session: AsyncSession) -> dict[str, int]:
 
 
 @router.get("/listening/recordings")
-async def listening_recordings(raga: str | None = None, form: str | None = None,
+async def listening_recordings(raga: str | None = None, form: str | None = None, viewer: User | None = Depends(current_user),
                                session: AsyncSession = Depends(get_session)) -> dict:
     q = select(CarnaticRecording).where(CarnaticRecording.status.in_(("approved", "retired")))
     if raga:
@@ -588,16 +592,19 @@ async def listening_recordings(raga: str | None = None, form: str | None = None,
         q = q.where(CarnaticRecording.form == form)
     rows = (await session.execute(q.order_by(CarnaticRecording.id))).scalars().all()
     counts = await _analysis_counts(session)
-    return {"items": [recording_json(r, analyses=counts.get(r.id, 0)) for r in rows]}
+    gm, done = await guess_mode_ids(session), await guessed_ids(session, getattr(viewer, "id", None))
+    return {"items": [recording_json(r, analyses=counts.get(r.id, 0), guess_mode=r.id in gm, guessed=r.id in done) for r in rows]}
 
 
 @router.get("/listening/recordings/{rid}")
-async def listening_recording(rid: str, session: AsyncSession = Depends(get_session)) -> dict:
+async def listening_recording(rid: str, viewer: User | None = Depends(current_user),
+                              session: AsyncSession = Depends(get_session)) -> dict:
     r = await session.get(CarnaticRecording, rid)
     if r is None or r.status not in ("approved", "retired"):
         raise HTTPException(404, "No such recording.")
     counts = await _analysis_counts(session)
-    return recording_json(r, analyses=counts.get(r.id, 0))
+    return recording_json(r, analyses=counts.get(r.id, 0), guess_mode=r.id in await guess_mode_ids(session),
+                          guessed=await has_guessed(session, getattr(viewer, "id", None), r.id))
 
 
 class GuessIn(BaseModel):
@@ -673,6 +680,44 @@ async def my_guesses(user: User = Depends(require_user), session: AsyncSession =
                                   .order_by(CarnaticGuess.id.desc()))).scalars().all()
     return {"items": [{"recording": g.recording_id, "guess": g.guess, "confidence": g.confidence, "right": g.right,
                        "at": _iso(g.created_at)} for g in rows]}
+
+
+_guess_cache: dict[str, tuple[float, set[str]]] = {}
+
+
+async def guess_mode_ids(session: AsyncSession) -> set[str]:
+    """
+    Recordings in guess mode (LISTENING.md §5): flagged in the Studio, named by a
+    `guess: true` exercise, or embedded with {{recording … guess=true}} in a lesson.
+    Their analyses are hidden from anyone who hasn't committed a guess.
+    """
+    hit = _guess_cache.get("ids")
+    if hit and time.monotonic() - hit[0] < 20:
+        return hit[1]
+    import re
+    ids = {r[0] for r in (await session.execute(select(CarnaticRecording.id).where(CarnaticRecording.guess_mode.is_(True)))).all()}
+    for (data,) in (await session.execute(select(CarnaticExercise.data))).all():
+        if (data or {}).get("guess"):
+            ids |= {str(r.get("id")) for r in (data.get("recordings") or []) if isinstance(r, dict) and r.get("id")}
+    for (body,) in (await session.execute(select(CarnaticLesson.body).where(CarnaticLesson.lang == "en"))).all():
+        for m in re.finditer(r"\{\{\s*recording\b([^}]*)\}\}", body or ""):
+            if re.search(r"\bguess=\"?true", m.group(1)):
+                rid = re.search(r"\bid=\"?([a-z0-9-]+)", m.group(1))
+                if rid:
+                    ids.add(rid.group(1))
+    _guess_cache["ids"] = (time.monotonic(), ids)
+    return ids
+
+
+async def guessed_ids(session: AsyncSession, uid: int | None) -> set[str]:
+    if uid is None:
+        return set()
+    return {r[0] for r in (await session.execute(select(CarnaticGuess.recording_id).where(CarnaticGuess.user_id == uid))).all()}
+
+
+async def locked_recordings(session: AsyncSession, viewer) -> set[str]:
+    """The guess-mode recordings this viewer hasn't guessed: their analyses stay hidden."""
+    return await guess_mode_ids(session) - await guessed_ids(session, getattr(viewer, "id", None))
 
 
 async def has_guessed(session: AsyncSession, uid: int | None, rid: str) -> bool:

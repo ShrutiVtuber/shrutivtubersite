@@ -13,7 +13,8 @@ import { ragas as loadRagas } from "../../../lib/carnatic/data";
 const lang = langOf(Astro);
 const say = await copy("carnatic/listen/guess");
 const [recs, rd, all] = await Promise.all([recordings(), loadRagas(), units()]);
-const live = recs.filter((r) => r.status === "approved" && r.raga);
+// Only recordings in guess mode: their analyses stay hidden until a guess (LISTENING.md §5).
+const live = recs.filter((r) => r.status === "approved" && r.raga && r.guessMode);
 const page = {
   lang,
   recordings: live.map((r, i) => ({ id: r.id, provider: r.provider, url: r.url, start: r.clips[0]?.start, end: r.clips[0]?.end, n: i + 1 })),

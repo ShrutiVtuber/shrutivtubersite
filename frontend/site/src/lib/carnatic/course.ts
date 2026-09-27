@@ -27,7 +27,9 @@ export interface Recording {
   instrument: string; composition: string; composer: string; form: string; raga: string; tala: string;
   listenFor: string; clips: { id: string; start: string; end: string; label: string }[];
   sections: { t: string; label: string }[]; beatMap: { clip?: string; samam: number[]; counts?: number[] } | null;
-  analyses: number;
+  analyses: number | null;
+  /** LISTENING.md §5: in guess mode, analyses (and their count) stay hidden until the viewer has guessed. */
+  guessMode?: boolean; analysesLocked?: boolean;
 }
 
 async function get<T>(path: string, astro?: any): Promise<T | null> {
@@ -93,6 +95,18 @@ export async function drills(): Promise<Drills | null> {
 export async function recordings(filter: { raga?: string; form?: string } = {}): Promise<Recording[]> {
   const q = new URLSearchParams(filter as Record<string, string>);
   return (await get<{ items: Recording[] }>(`/api/carnatic/listening/recordings?${q}`))?.items ?? [];
+}
+
+/** As the viewer sees them: whether each guess-mode recording's analyses are open to them. */
+export async function recordingsFor(astro: any, filter: { raga?: string; form?: string } = {}): Promise<Recording[]> {
+  const q = new URLSearchParams(filter as Record<string, string>);
+  const r = await asReader(astro, `/api/carnatic/listening/recordings?${q}`);
+  return r.ok ? r.body?.items ?? [] : [];
+}
+
+export async function recordingFor(astro: any, id: string): Promise<Recording | null> {
+  const r = await asReader(astro, `/api/carnatic/listening/recordings/${encodeURIComponent(id)}`);
+  return r.ok ? (r.body as Recording) : null;
 }
 
 export async function recording(id: string): Promise<Recording | null> {

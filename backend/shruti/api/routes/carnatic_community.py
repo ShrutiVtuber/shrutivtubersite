@@ -182,7 +182,15 @@ async def _visible_work(session: AsyncSession, work_id: int, viewer: User | None
         raise HTTPException(404, {"code": "NOT_AVAILABLE", "detail": "This piece isn't available."})
     if viewer is not None and work.user_id in await _hidden_from(session, viewer):
         raise HTTPException(404, {"code": "NOT_AVAILABLE", "detail": "This piece isn't available."})
+    if not mine and await _locked(session, work, viewer):
+        raise HTTPException(404, {"code": "GUESS_FIRST", "detail": "Guess the raga of this recording first: its analyses open after your guess."})
     return work
+
+
+async def _locked(session: AsyncSession, work: PracticeWork, viewer: User | None) -> bool:
+    """An analysis of a guess-mode recording the viewer hasn't guessed (LISTENING.md §5.4)."""
+    from shruti.api.routes.carnatic_course import locked_recordings
+    return work.subject.startswith("recording:") and work.subject[10:] in await locked_recordings(session, viewer)
 
 
 # ── reading ─────────────────────────────────────────────────────────────────
@@ -208,11 +216,19 @@ async def works(room: str, subject: str | None = None, sort: str = "new", before
     if before and sort == "new":
         q = q.where(PracticeWork.id < before)
     rows = (await session.execute(q.order_by(PracticeWork.id.desc()).limit(300))).scalars().all()
+    # Analyses of guess-mode recordings the viewer hasn't guessed are left out, count and all.
+    from shruti.api.routes.carnatic_course import locked_recordings
+    locked = await locked_recordings(session, viewer) if room == "carnatic-analysis" else set()
+    if subject and subject.startswith("recording:") and subject[10:] in locked:
+        return {"items": [w for w in [await work_json(session, x, viewer, full=False) for x in rows if viewer and x.user_id == viewer.id]],
+                "next": None, "locked": True}
+    rows = [w for w in rows if not (w.subject.startswith("recording:") and w.subject[10:] in locked
+                                    and not (viewer and w.user_id == viewer.id))]
     items = [await work_json(session, w, viewer, full=False) for w in rows]
     if sort == "discussed":
         items.sort(key=lambda w: (-w["discussed"], -w["id"]))
     page = items[:30]
-    return {"items": page, "next": page[-1]["id"] if len(items) > 30 and sort == "new" else None}
+    return {"items": page, "next": page[-1]["id"] if len(items) > 30 and sort == "new" else None, "locked": False}
 
 
 @router.get("/works/{work_id}")

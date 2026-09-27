@@ -145,6 +145,7 @@ def upgrade() -> None:
                     "composer", "form", "raga", "tala", "listen_for", "duration", "reason", "base_hash")],
         _j("artists", "[]"), _j("page_says"), _j("flags", "[]"), _j("raw"),
         _j("clips", "[]"), _j("sections", "[]"), _j("beat_map", nullable=True), _j("marks", "{}"),
+        sa.Column("guess_mode", sa.Boolean(), nullable=False, server_default=sa.false()),
         sa.Column("decided_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("approved_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("oembed_failures", sa.Integer(), nullable=False, server_default="0"),

@@ -12,7 +12,7 @@ import { hrefIn, langOf } from "../../../lib/carnatic/i18n";
 import { visitor } from "../../../lib/carnatic/prefs";
 import { copy } from "../../../lib/copy";
 import { localize } from "../../../lib/carnatic/v2strings";
-import { ago, recordings, works } from "../../../lib/carnatic/course";
+import { ago, recordingsFor, works } from "../../../lib/carnatic/course";
 import { ragas as loadRagas, talas as loadTalas } from "../../../lib/carnatic/data";
 
 const lang = langOf(Astro);
@@ -22,7 +22,7 @@ const { me } = await visitor(Astro);
 const raga = Astro.url.searchParams.get("raga") ?? "";
 const form = Astro.url.searchParams.get("form") ?? "";
 const tapMode = Astro.url.searchParams.has("tap");
-const [all, rd, td, recent] = await Promise.all([recordings(), loadRagas(), loadTalas(), works(Astro, "carnatic-analysis")]);
+const [all, rd, td, recent] = await Promise.all([recordingsFor(Astro), loadRagas(), loadTalas(), works(Astro, "carnatic-analysis")]);
 const live = all.filter((r) => r.status === "approved");
 const shown = live.filter((r) => (!raga || r.raga === raga) && (!form || r.form === form) && (!tapMode || r.beatMap));
 const ragaNames = new Map<string, string>([...(rd?.janyas ?? []), ...(rd?.performed ?? []), ...(rd?.melakartas ?? [])].map((x: any) => [x.id, x.name]));

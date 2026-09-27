@@ -21,7 +21,7 @@ import { inline } from "../../../lib/carnatic/notation";
 import { ragaView } from "../../../lib/carnatic/ragapage";
 import { notFound } from "../../../lib/carnatic/notfound";
 import RecordingCard from "../../../components/carnatic/RecordingCard.astro";
-import { ago, lessonsAbout, recordings as loadRecordings, works } from "../../../lib/carnatic/course";
+import { ago, lessonsAbout, recordingsFor, works } from "../../../lib/carnatic/course";
 import { copy } from "../../../lib/copy";
 import { localize } from "../../../lib/carnatic/v2strings";
 
@@ -62,7 +62,7 @@ const iso = r.iso ?? "";
 const description = `${r.name}: ${r.kind === "janya" ? `a janya raga of melakarta ${r.parent.number} ${r.parent.name}` : `melakarta ${r.parent.number}`}. Characteristic phrases, arohana ${r.arohana.replace(/!\w/g, "")}, avarohana ${r.avarohana}, gamaka character and well-known compositions, with sources.`;
 /* v2: the Listening tab (reference recordings, guess, analyses) and the lessons that discuss the raga. */
 const say = localize(lang, await copy("carnatic/ragas/[id]"));
-const [recsAll, ragaLessons] = await Promise.all([loadRecordings({ raga: r.id }), lessonsAbout({ raga: r.id })]);
+const [recsAll, ragaLessons] = await Promise.all([recordingsFor(Astro, { raga: r.id }), lessonsAbout({ raga: r.id })]);
 const recs = recsAll.filter((x) => x.status === "approved");
 const talaNames: Record<string, string> = { adi: "Adi", rupaka_3count: "Rupaka", misra_chapu: "Misra chapu", khanda_chapu: "Khanda chapu", adi_2_kalai: "Adi, 2 kalai" };
 const analyses = (await Promise.all(recs.map((x) => works(Astro, "carnatic-analysis", `recording:${x.id}`)))).flat()

@@ -449,3 +449,60 @@ def test_a_close_guess_is_named_as_its_pair() -> None:
     assert pair["set"] == "C9"
     src = inspect.getsource(routes.guess)
     assert '"close"' in src and "CONFUSABLE" in src
+
+
+async def _guess_first():
+    from fastapi import HTTPException
+    from shruti.core.consents import PUBLISH
+    from shruti.models.accounts import ConsentRecord, User
+    tag = uuid.uuid4().hex[:6]
+    lid = f"T{tag}.L01"
+    rid = f"rec-{tag}-01"
+    b = _bundle(tag)
+    b["exercises"].append({"id": f"{lid}.A2", "unit": 1, "lesson": lid, "kind": "listening", "hash": "hg",
+                           "data": {"id": f"{lid}.A2", "kind": "listening", "guess": True, "recordings": [{"id": rid}], "auto": []}})
+    engine, s = await _session()
+    async with s:
+        await course.import_bundle(s, b)
+        author, reader = User(email=f"ga-{tag}@example.com", display_name="GA"), User(email=f"gb-{tag}@example.com", display_name="GB")
+        s.add_all([author, reader])
+        await s.commit()
+        s.add(ConsentRecord(user_id=author.id, email=author.email, kind=PUBLISH.kind, granted=True,
+                            version="test", wording=PUBLISH.wording, lawful_basis=PUBLISH.lawful_basis, source="test"))
+        await s.commit()
+        await studio.decide(rid, studio.Decision(action="approve"), s)
+        routes._guess_cache.clear()
+        # The author guessed it, then wrote an analysis.
+        await routes.guess(routes.GuessIn(recording=rid, guess="Mohanam"), author, s)
+        w = await community.create(community.WorkIn(room="carnatic-analysis", subject=f"recording:{rid}", title="Mine", parts=[
+            community.PartIn(key="note:1", body="Ga rests", data={"t": "0:40", "category": "resting note"})]), author, s)
+        sent = await community.submit(w["id"], author, s)
+        assert getattr(sent, "status_code", 200) == 200
+        # Someone who hasn't guessed: no list, no count, no detail, no replies.
+        listed = await community.works("carnatic-analysis", f"recording:{rid}", "new", None, False, reader, s)
+        assert listed["locked"] and listed["items"] == []
+        everywhere = await community.works("carnatic-analysis", None, "new", None, False, reader, s)
+        assert all(x["id"] != w["id"] for x in everywhere["items"])
+        rec = await routes.listening_recording(rid, reader, s)
+        assert rec["guessMode"] and rec["analysesLocked"] and rec["analyses"] is None
+        with pytest.raises(HTTPException) as e:
+            await community.work(w["id"], reader, s)
+        assert e.value.detail["code"] == "GUESS_FIRST"
+        with pytest.raises(HTTPException):
+            await community.comments(w["id"], reader, s)
+        # Signed out: hidden too.
+        assert (await community.works("carnatic-analysis", f"recording:{rid}", "new", None, False, None, s))["locked"]
+        # The author sees their own; after a guess, the reader sees everything.
+        assert (await community.work(w["id"], author, s))["id"] == w["id"]
+        await routes.guess(routes.GuessIn(recording=rid, guess="Kalyani"), reader, s)
+        open_now = await community.works("carnatic-analysis", f"recording:{rid}", "new", None, False, reader, s)
+        assert not open_now["locked"] and [x["id"] for x in open_now["items"]] == [w["id"]]
+        rec = await routes.listening_recording(rid, reader, s)
+        assert not rec["analysesLocked"] and rec["analyses"] == 1
+        assert (await community.work(w["id"], reader, s))["id"] == w["id"]
+    await engine.dispose()
+
+
+@needs_db
+def test_guess_mode_hides_analyses_until_you_have_guessed() -> None:
+    asyncio.run(_guess_first())

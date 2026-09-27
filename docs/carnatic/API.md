@@ -838,11 +838,23 @@ Only recordings Sophia has **approved** are ever returned.
   "analyses": 14 }
 ```
 
-Guess mode: clients must not show `title`, `channel`, `raga` or
-`composition` until the learner has committed a guess (§14b). `sections`
-are only returned to clients for recordings the learner has guessed or
-that are not used in guess mode; auto-checking of analyses happens on the
-server (§15).
+**Guess mode** (LISTENING.md §5.4). A recording is in guess mode when
+Shruti marks it so in the Studio, or when a `guess: true` exercise or a
+lesson's `{{recording … guess=true}}` names it. Every recording carries
+`"guessMode": true|false` and `"analysesLocked": true|false`:
+`analysesLocked` is true for a guess-mode recording the viewer hasn't
+committed a guess for (always true signed out), and then `analyses` (the
+count) is `null`. While it's locked, the server hides its analyses
+everywhere: `GET /api/carnatic/community/works?room=carnatic-analysis&subject=recording:<id>`
+answers `{"items": [], "locked": true}` (the viewer's own analysis still
+shows), room-wide lists leave them out, and `GET …/works/{id}` and its
+`…/comments` answer 404 `{"code": "GUESS_FIRST"}`. After `POST
+/api/carnatic/listening/guesses` (signed in, so the guess is stored) the
+same calls return them. The app should send the token on these reads, show
+"Guess its raga to open the analyses" with a way into guess mode while
+`analysesLocked` is true, and fetch the recording again after the guess.
+Clients also must not show `title`, `channel`, `raga` or `composition` in
+guess mode until the learner has committed a guess (§14b).
 
 ### 14b. Guess the raga
 

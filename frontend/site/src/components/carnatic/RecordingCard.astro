@@ -40,7 +40,9 @@ const who = [r.instrument, r.artists?.slice(0, 2).join(", ")].filter(Boolean).jo
         {clip && r.sections?.length === 0 && <p class="lr-meta">Clip {clip.start}{clip.end && `–${clip.end}`}{clip.label && ` · ${clip.label}`}</p>}
         {!compact && (
           <p class="lr-reccard-links">
-            <a href={href(`/carnatic/listen/recording/${r.id}`)}>{r.analyses ? `${r.analyses} analys${r.analyses === 1 ? "is" : "es"}` : "Write the first analysis"} ›</a>
+            {r.analysesLocked
+              ? <a href={href(`/carnatic/listen/guess?r=${r.id}`)}>{say("guessFirst", "Guess its raga to open the analyses")} ›</a>
+              : <a href={href(`/carnatic/listen/recording/${r.id}`)}>{r.analyses ? `${r.analyses} analys${r.analyses === 1 ? "is" : "es"}` : say("first", "Write the first analysis")} ›</a>}
             {r.beatMap && <a href={href(`/carnatic/listen/tap/${r.id}`)}>Tap along ›</a>}
           </p>
         )}

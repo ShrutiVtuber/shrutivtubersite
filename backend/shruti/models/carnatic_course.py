@@ -165,6 +165,9 @@ class CarnaticRecording(TimestampMixin, table=True):
     # Marks the ear trainer drills on (EAR_TRAINING.md PD.09, GM.07, TL.11):
     # {"transcriptions": [{start, end, sargam}], "gamakas": [{t, gamakas}], "korvais": [{start, landing}]}
     marks: dict = Field(default_factory=dict, sa_column=Column(JSONB, nullable=False, server_default="{}"))
+    # In guess mode (LISTENING.md §5): its analyses stay hidden from anyone who hasn't guessed it.
+    # Also on for any recording a guess: true exercise or a {{recording … guess=true}} tag names.
+    guess_mode: bool = False
     # Decisions
     reason: str = ""                # a rejection reason the suggester sees
     decided_at: Optional[datetime] = Field(default=None, sa_type=UTC_TS)

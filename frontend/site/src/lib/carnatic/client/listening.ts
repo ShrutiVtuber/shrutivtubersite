@@ -122,7 +122,8 @@ export async function runGuess(root: HTMLElement, page: GuessPage, want?: string
       + `<p class="lr-reccard-links"><a href="${esc(page.href(`/carnatic/ragas/${d.raga}`))}">${esc(d.ragaName)} · raga page</a>`
       + (lesson ? `<a href="${esc(page.href(`/carnatic/learn/${lesson.slug}`))}">Unit ${lesson.unit} · ${esc(lesson.title)}</a>` : "")
       + (d.pair ? `<a href="${esc(page.href(`/carnatic/practice/ear/pair/${d.pair.set}`))}">The pair in ear training</a>` : "") + `</p>`
-      + `<p class="lr-reccard-links"><a href="${esc(page.href(`/carnatic/listen/recording/${rec.id}`))}">The analyses of this recording are open to you now ›</a></p>`
+      + (boot().signedIn ? `<p class="lr-reccard-links"><a href="${esc(page.href(`/carnatic/listen/recording/${rec.id}`))}">The analyses of this recording are open to you now ›</a></p>`
+        : `<p class="st-note">Its analyses open to members who have guessed it: sign in, and your next guess is kept.</p>`)
       + `<div class="st-actions" style="justify-content:flex-end"><a class="lr-btn" href="${esc(page.href("/carnatic/listen/guess"))}">Another recording</a></div></div>`;
     root.querySelector("[data-load]")!.addEventListener("click", () => loadPlayer(root.querySelector<HTMLElement>("[data-box]")!, rec.provider, rec.url, { start: toS(rec.start) }));
   });

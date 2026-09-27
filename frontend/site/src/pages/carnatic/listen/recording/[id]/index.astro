@@ -11,13 +11,13 @@ import { hrefIn, langOf } from "../../../../../lib/carnatic/i18n";
 import { copy } from "../../../../../lib/copy";
 import { localize } from "../../../../../lib/carnatic/v2strings";
 import { notFound } from "../../../../../lib/carnatic/notfound";
-import { ago, lessonsAbout, recording, recordingLabel, works } from "../../../../../lib/carnatic/course";
+import { ago, lessonsAbout, recordingFor, recordingLabel, works } from "../../../../../lib/carnatic/course";
 import { ragas as loadRagas, talas as loadTalas } from "../../../../../lib/carnatic/data";
 
 const lang = langOf(Astro);
 const say = localize(lang, await copy("carnatic/listen/recording/[id]"));
 const L = (p: string) => hrefIn(lang, p);
-const r = await recording(Astro.params.id!);
+const r = await recordingFor(Astro, Astro.params.id!);
 if (!r) return notFound(Astro);
 const sort = Astro.url.searchParams.get("sort") === "discussed" ? "discussed" : "new";
 const [rd, td, list, lessons] = await Promise.all([loadRagas(), loadTalas(), works(Astro, "carnatic-analysis", `recording:${r.id}`, sort), lessonsAbout({ recording: r.id })]);
@@ -52,7 +52,11 @@ const title = r.status === "retired" ? say("retired", "A recording no longer onl
       {r.status !== "retired" && <a class="lr-link" href={L(`/carnatic/listen/recording/${r.id}/write`)}>{say("write", "Write an analysis")}</a>}
     </div>
   </div>
-  {list.length === 0 ? <p class="li-note">{say("none", "Nobody has written about this one yet. An analysis is a few timestamped notes on what you hear: phrases, resting notes, gamakas, sections, the tala.")}</p> : (
+  {r.analysesLocked ? (
+    <div class="li-cta"><div><span class="t-eyebrow ch-blue">{say("lockedH", "Guess first")}</span><b>{say("lockedT", "This recording is in guess mode")}</b>
+      <small>{say("lockedP", "Its analyses open once you've committed a guess of its raga, so the discussion can't spoil it.")}</small></div>
+      <a class="lr-btn" href={L(`/carnatic/listen/guess?r=${r.id}`)}>{say("guessIt", "Guess it")}</a></div>
+  ) : list.length === 0 ? <p class="li-note">{say("none", "Nobody has written about this one yet. An analysis is a few timestamped notes on what you hear: phrases, resting notes, gamakas, sections, the tala.")}</p> : (
     <ul class="li-list">
       {list.map((w) => (
         <li><a href={L(`/carnatic/room/${w.id}`)}>

@@ -61,6 +61,7 @@ const lines = {
           <label class="wide">Composer<input name="composer" value={r.composer} /></label>
           <label class="wide">Listen for<textarea name="listenFor" rows="3">{r.listenFor}</textarea></label>
         </div>
+        <label class="sa-soft" style="display:block;margin-top:8px"><input type="checkbox" data-guess-mode checked={r.guessMode} /> Guess mode: its analyses stay hidden until a learner has guessed its raga (also on when a guess exercise or a lesson's guess tag names it)</label>
         {r.pageSays?.text && <p class="sa-soft">The page says: {r.pageSays.text}</p>}
         {(r.flags ?? []).map((f: string) => <span class="sa-tag">{f}</span>)}
       </div>
@@ -156,7 +157,7 @@ const lines = {
     const meta: Record<string, string> = {};
     document.querySelectorAll<HTMLInputElement>("[data-meta] [name]").forEach((x) => { meta[x.name] = x.value; });
     const tala = $<HTMLInputElement>("[data-bm-tala]").value.trim();
-    const body = { clips, sections, marks: marks(), ...(samam.length ? { beatMap: { clip: clips[0]?.id ?? null, tala, samam } } : { clearBeatMap: true }), ...meta };
+    const body = { clips, sections, marks: marks(), guessMode: $<HTMLInputElement>("[data-guess-mode]").checked, ...(samam.length ? { beatMap: { clip: clips[0]?.id ?? null, tala, samam } } : { clearBeatMap: true }), ...meta };
     const r = await fetch(`/api/carnatic/studio/recordings/${R.id}`, { method: "PUT", headers: { "content-type": "application/json", "x-csrf-token": csrf() }, body: JSON.stringify(body) });
     $("[data-note]").textContent = r.ok ? "Saved." : `Didn't save (${r.status}).`;
   });
