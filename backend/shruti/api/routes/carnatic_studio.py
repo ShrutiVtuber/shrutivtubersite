@@ -19,7 +19,7 @@ import re
 from collections import Counter, defaultdict
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import func
@@ -32,6 +32,7 @@ from shruti.core import carnatic_drills as drills
 from shruti.core.db import get_session
 from shruti.models.accounts import User
 from shruti.models.carnatic_course import (
+    CarnaticQuestion,
     CarnaticExercise, CarnaticGlossary, CarnaticLesson, CarnaticLessonRevision, CarnaticRagaFlag,
     CarnaticRecording, CarnaticUnit, PracticePart,
 )
@@ -633,3 +634,117 @@ async def verdict(kind: str, item_id: int, body: Verdict, session: AsyncSession 
         suspended = "indefinite" if until is None else until.isoformat()
     await session.commit()
     return {"ok": True, "hidden": thing.hidden, "suspendedUntil": suspended}
+
+
+
+# ── everything waiting for her, in one place (the lessons tree's other tabs) ──
+
+@router.get("/notes")
+async def notes(session: AsyncSession = Depends(get_session)) -> dict:
+    """Every open <!-- Sophia: … --> note, with the line it sits on, so the editor can jump to it."""
+    rows = (await session.execute(select(CarnaticLesson).where(CarnaticLesson.lang == "en")
+                                  .order_by(CarnaticLesson.unit, CarnaticLesson.order))).scalars().all()
+    out = []
+    for r in rows:
+        for m in re.finditer(r"<!--(.*?)-->", r.body or "", re.S):
+            text = " ".join(m.group(1).split())
+            who = "Sophia" if text.lower().startswith("sophia") else "Editor" if text.lower().startswith("editor") else "note"
+            out.append({"lesson": r.id, "title": (r.front or {}).get("title", ""), "status": r.status,
+                        "line": r.body.count("\n", 0, m.start()) + 1, "who": who,
+                        "text": re.sub(r"^(Sophia|Editor)\s*:\s*", "", text, flags=re.I)})
+    return {"items": out, "sophia": sum(1 for x in out if x["who"] == "Sophia")}
+
+
+def _q(q: CarnaticQuestion) -> dict:
+    return {"id": q.id, "group": q.group, "text": q.text, "lessons": q.lessons, "answer": q.answer, "done": q.done,
+            "answeredAt": _iso(q.answered_at), "inFile": q.in_file}
+
+
+@router.get("/questions")
+async def questions(session: AsyncSession = Depends(get_session)) -> dict:
+    rows = (await session.execute(select(CarnaticQuestion).order_by(CarnaticQuestion.in_file.desc(),
+                                                                    CarnaticQuestion.position))).scalars().all()
+    return {"items": [_q(q) for q in rows], "open": sum(1 for q in rows if not q.done and q.in_file)}
+
+
+class QuestionIn(BaseModel):
+    answer: str | None = Field(default=None, max_length=8000)
+    done: bool | None = None
+
+
+@router.put("/questions/{qid}")
+async def answer_question(qid: str, body: QuestionIn, session: AsyncSession = Depends(get_session)) -> dict:
+    q = await session.get(CarnaticQuestion, qid)
+    if q is None:
+        raise HTTPException(404, "No such question.")
+    if body.answer is not None:
+        q.answer, q.answered_at = body.answer, _now()
+    if body.done is not None:
+        q.done = body.done
+    q.updated_at = _now()
+    await session.commit()
+    return _q(q)
+
+
+@router.get("/questions/export")
+async def export_questions(format: str = "csv", session: AsyncSession = Depends(get_session)):
+    """Her answers, to take back to the course repository (CSV or JSON)."""
+    rows = (await session.execute(select(CarnaticQuestion).order_by(CarnaticQuestion.position))).scalars().all()
+    if format == "json":
+        return JSONResponse([_q(q) for q in rows], headers={"Content-Disposition": 'attachment; filename="questions-for-sophia.json"'})
+    import csv
+    import io
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    w.writerow(["group", "question", "lessons", "answer", "done", "answered_at", "still in EDITING.md"])
+    for q in rows:
+        w.writerow([q.group, q.text, " ".join(q.lessons), q.answer, "yes" if q.done else "no", _iso(q.answered_at) or "",
+                    "yes" if q.in_file else "no"])
+    return Response(buf.getvalue(), media_type="text/csv; charset=utf-8",
+                    headers={"Content-Disposition": 'attachment; filename="questions-for-sophia.csv"'})
+
+
+@router.get("/waiting")
+async def waiting(session: AsyncSession = Depends(get_session)) -> dict:
+    """Exercise items waiting for her annotation (answer: null): clip times, section times, beat maps."""
+    rows = (await session.execute(select(CarnaticExercise).order_by(CarnaticExercise.id))).scalars().all()
+    out = []
+    for r in rows:
+        data = r.data or {}
+        recs = [x.get("id") for x in (data.get("recordings") or []) if isinstance(x, dict)]
+        for key in ("items", "auto"):
+            for i, it in enumerate(data.get(key) or []):
+                if isinstance(it, dict) and "answer" in it and it["answer"] is None and not it.get("answer_from"):
+                    rid = it.get("recording") or (recs[0] if recs else None)
+                    out.append({"exercise": r.id, "kind": r.kind, "lesson": r.lesson, "part": key, "index": i,
+                                "type": it.get("type"), "text": it.get("text", ""), "recording": rid,
+                                "tolerance": it.get("tolerance") or it.get("tolerance_ms")})
+    # K.16 and tap-alongs need a beat map: approved recordings without one
+    return {"items": out}
+
+
+class WaitingAnswer(BaseModel):
+    part: str = Field(pattern="^(items|auto)$")
+    index: int = Field(ge=0)
+    answer: str = Field(min_length=1, max_length=40)
+
+
+@router.put("/waiting/{ex_id}")
+async def fill_waiting(ex_id: str, body: WaitingAnswer, session: AsyncSession = Depends(get_session)) -> dict:
+    """Set the time an item waits for ("m:ss" or "m:ss.s"); the exercise then counts as edited here."""
+    row = await session.get(CarnaticExercise, ex_id)
+    if row is None:
+        raise HTTPException(404, "No such exercise.")
+    if not re.fullmatch(r"\d{1,2}:\d{2}(\.\d)?|\d+(\.\d+)?", body.answer.strip()):
+        raise HTTPException(422, "A time like 2:14 or 2:14.5.")
+    data = dict(row.data or {})
+    items = list(data.get(body.part) or [])
+    if body.index >= len(items):
+        raise HTTPException(404, "No such item.")
+    item = dict(items[body.index])
+    item["answer"] = body.answer.strip()
+    items[body.index] = item
+    data[body.part] = items
+    row.data, row.admin_edited, row.edited_at, row.updated_at = data, True, _now(), _now()
+    await session.commit()
+    return {"ok": True}

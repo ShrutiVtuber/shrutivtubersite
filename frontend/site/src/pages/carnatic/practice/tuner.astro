@@ -11,6 +11,7 @@
  * the drone keeps working. The headphones hint is always there while listening.
  */
 import SwaraLayout from "../../../layouts/SwaraLayout.astro";
+import PracticeTabs from "../../../components/carnatic/PracticeTabs.astro";
 import Hero from "../../../components/carnatic/Hero.astro";
 import DroneControl from "../../../components/carnatic/DroneControl.astro";
 import { hrefIn, langOf, words } from "../../../lib/carnatic/i18n";
@@ -27,6 +28,7 @@ const LANES: [string, string][] = [["P", "P"], ["M2", "M₂"], ["M1", "M₁"], [
 <SwaraLayout title={say("meta.title", "Tuner and drone · Swara Studio")}
              description={say("meta.description", "A tanpura drone in just intonation relative to your Sa, and a tuner that reads your pitch as a swara with its octave and draws it as a line. Free, in the browser, no account.")}
              crumbs={[[tr("crumb.practice"), hrefIn(lang, "/carnatic/practice/tuner")], [say("crumb", "Tuner and drone")]]}>
+  <PracticeTabs />
   <Hero eyebrow={tr("crumb.practice")} title={say("title", "Tuner and drone")} lede={say("lede", "Tune to your Sa, then watch your pitch as a line.")} />
   <nav class="sw-p sw-also sw-also-row" aria-label={say("alsoAria", "More in Practice")}>
     {say("also", "Also in Practice:")} <a href="/carnatic/practice/tala">{say("also.tala", "Tala trainer")}</a> · <a href="/carnatic/practice/quiz">{say("also.quiz", "Quizzes")}</a>

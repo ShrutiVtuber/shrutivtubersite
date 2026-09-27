@@ -3,9 +3,10 @@
  * training, Skill map, Tuner, Tala trainer. */
 import { hrefIn, langOf } from "../../lib/carnatic/i18n";
 import { copy } from "../../lib/copy";
+import { localize } from "../../lib/carnatic/v2strings";
 
 const lang = langOf(Astro);
-const say = await copy("carnatic/practice");
+const say = localize(lang, await copy("carnatic/practice"));
 const here = Astro.url.pathname;
 const TABS: [string, string, (p: string) => boolean][] = [
   ["/carnatic/practice", say("tab.test", "Test yourself"), (p) => p === "/carnatic/practice" || p.startsWith("/carnatic/practice/test")],

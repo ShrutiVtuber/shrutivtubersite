@@ -323,6 +323,70 @@ def parse_recordings(folder: Path) -> list[dict]:
     return records
 
 
+# ── EDITING.md: the questions for Sophia, as a checklist she answers in the Studio ──
+
+def parse_questions(path: Path) -> list[dict]:
+    if not path.is_file():
+        return []
+    lines = path.read_text(encoding="utf-8").splitlines()
+    try:
+        start = next(i for i, l in enumerate(lines) if l.strip().lower() == "## questions for sophia")
+    except StopIteration:
+        return []
+    out: list[dict] = []
+    group = ""
+    current: list[str] | None = None
+
+    def flush():
+        if current:
+            text = " ".join(" ".join(current).split())
+            key = f"{group}|{re.sub(r'[^a-z0-9]+', ' ', text.lower())[:60]}"
+            out.append({"id": sha(key)[:16], "group": group, "text": text, "position": len(out),
+                        "lessons": sorted(set(re.findall(r"U\d\d\.L\d\d", text)))})
+
+    for line in lines[start + 1:]:
+        if line.startswith("## "):
+            break
+        g = re.match(r"^\*\*(.+?)\*\*", line.strip())
+        if g and not line.startswith("-"):
+            flush(); current = None
+            group = re.sub(r"\s*\(.*\)\s*$", "", g.group(1)).strip()
+            continue
+        if line.startswith("- "):
+            flush()
+            current = [line[2:]]
+        elif current is not None and line.startswith("  ") and line.strip():
+            current.append(line.strip())
+        elif not line.strip():
+            flush(); current = None
+    flush()
+    return out
+
+
+COMMON = {"Which", "What", "Second", "Front", "Clip", "Beat", "Your", "Research", "Sources", "Some", "Dikshitar", "Sambamoorthy", "Then",
+          "Most", "None", "Shruti", "Sophia", "Data", "Choices", "Carnatic"}
+
+
+def link_questions(questions: list[dict], lessons: list[dict]) -> None:
+    """The lessons a question concerns: ids it names, lessons that use a recording it names, and
+    lessons whose own notes for Sophia name the same proper nouns (Vatapi, Analekara…)."""
+    en = [l for l in lessons if l["front"].get("lang", "en") == "en"]
+    notes = {l["front"]["id"]: " ".join(re.findall(r"<!--\s*Sophia:(.*?)-->", l["body"], re.S)) for l in en}
+    for q in questions:
+        found = set(q["lessons"])
+        for rid in re.findall(r"\b[a-z]+(?:-[a-z]+)*-\d\d\b", q["text"]):
+            for l in en:
+                recs = [(r.get("id") if isinstance(r, dict) else r) for r in l["front"].get("recordings") or []]
+                if rid in recs or re.search(rf"id={re.escape(rid)}\b", l["body"]):
+                    found.add(l["front"]["id"])
+        names = [w for w in re.findall(r"\b[A-Z][a-z]{4,}(?: [a-z]+ [a-z]+)?\b", q["text"]) if w.split()[0] not in COMMON]
+        for w in names:
+            for lid, text in notes.items():
+                if w.split()[0] in text:
+                    found.add(lid)
+        q["lessons"] = sorted(found)[:12]
+
+
 # ── main ─────────────────────────────────────────────────────────────────────
 
 def build(course: Path) -> dict:
@@ -341,6 +405,8 @@ def build(course: Path) -> dict:
     exercises = parse_exercises(course / "exercises")
     glossary = parse_glossary(course / "glossary.yaml")
     recordings = parse_recordings(course / "research" / "recordings")
+    questions = parse_questions(course / "EDITING.md")
+    link_questions(questions, lessons)
     try:
         commit = subprocess.run(["git", "-C", str(course), "rev-parse", "--short", "HEAD"],
                                 capture_output=True, text=True, check=True).stdout.strip()
@@ -348,7 +414,7 @@ def build(course: Path) -> dict:
         commit = ""
     return {"format": FORMAT, "built_at": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
             "source": {"commit": commit}, "units": units, "lessons": lessons, "exercises": exercises,
-            "glossary": glossary, "recordings": recordings}
+            "glossary": glossary, "recordings": recordings, "questions": questions}
 
 
 def main(argv: list[str]) -> int:
@@ -363,7 +429,7 @@ def main(argv: list[str]) -> int:
     Path(argv[2]).write_text(json.dumps(bundle, ensure_ascii=False), encoding="utf-8")
     print(json.dumps({"units": len(bundle["units"]), "lessons": len(bundle["lessons"]),
                       "exercises": len(bundle["exercises"]), "glossary": len(bundle["glossary"]),
-                      "recordings": len(bundle["recordings"])}))
+                      "recordings": len(bundle["recordings"]), "questions": len(bundle["questions"])}))
     return 0
 
 

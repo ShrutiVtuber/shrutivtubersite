@@ -11,11 +11,12 @@ import RecordingCard from "../../../components/carnatic/RecordingCard.astro";
 import { hrefIn, langOf } from "../../../lib/carnatic/i18n";
 import { visitor } from "../../../lib/carnatic/prefs";
 import { copy } from "../../../lib/copy";
+import { localize } from "../../../lib/carnatic/v2strings";
 import { ago, recordings, works } from "../../../lib/carnatic/course";
 import { ragas as loadRagas, talas as loadTalas } from "../../../lib/carnatic/data";
 
 const lang = langOf(Astro);
-const say = await copy("carnatic/listen");
+const say = localize(lang, await copy("carnatic/listen"));
 const L = (p: string) => hrefIn(lang, p);
 const { me } = await visitor(Astro);
 const raga = Astro.url.searchParams.get("raga") ?? "";

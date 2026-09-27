@@ -9,10 +9,11 @@ import SwaraLayout from "../../../layouts/SwaraLayout.astro";
 import PracticeTabs from "../../../components/carnatic/PracticeTabs.astro";
 import { hrefIn, langOf } from "../../../lib/carnatic/i18n";
 import { copy } from "../../../lib/copy";
+import { localize } from "../../../lib/carnatic/v2strings";
 import { drills, exercises, units } from "../../../lib/carnatic/course";
 
 const lang = langOf(Astro);
-const say = await copy("carnatic/practice/index");
+const say = localize(lang, await copy("carnatic/practice/index"));
 const L = (p: string) => hrefIn(lang, p);
 const [all, exs, dr] = await Promise.all([units(), exercises({}), drills()]);
 const quizzes = exs.filter((e) => e.kind === "quiz" && !e.checkpoint && !e.id.startsWith("CP."));

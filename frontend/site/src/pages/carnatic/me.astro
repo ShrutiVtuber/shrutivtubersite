@@ -11,11 +11,12 @@ import { asReader } from "../../lib/account";
 import { lessons } from "../../lib/carnatic/data";
 import { lessonList } from "../../lib/carnatic/lessons";
 import { copy } from "../../lib/copy";
+import { localize } from "../../lib/carnatic/v2strings";
 import { drills as loadDrills, units as loadUnits } from "../../lib/carnatic/course";
 
 const lang = langOf(Astro);
 const tr = await words(lang);
-const say = await copy("carnatic/me");
+const say = localize(lang, await copy("carnatic/me"));
 const L = (p: string) => hrefIn(lang, p);
 const { me } = await visitor(Astro);
 const month = new Date().toISOString().slice(0, 7);

@@ -7,10 +7,11 @@ import SwaraLayout from "../../../layouts/SwaraLayout.astro";
 import PracticeTabs from "../../../components/carnatic/PracticeTabs.astro";
 import { langOf } from "../../../lib/carnatic/i18n";
 import { copy } from "../../../lib/copy";
+import { localize } from "../../../lib/carnatic/v2strings";
 import { drills } from "../../../lib/carnatic/course";
 
-langOf(Astro);
-const say = await copy("carnatic/practice/skills");
+const lang = langOf(Astro);
+const say = localize(lang, await copy("carnatic/practice/skills"));
 const dr = await drills();
 const fams = (dr?.families ?? []).map((f) => ({ ...f, levels: (dr?.levels ?? []).filter((l) => l.family === f.id) }));
 ---

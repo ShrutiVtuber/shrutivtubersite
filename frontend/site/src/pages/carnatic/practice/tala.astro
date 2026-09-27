@@ -11,6 +11,7 @@
  * tala §10); until then the call and response is syllables with click cues.
  */
 import SwaraLayout from "../../../layouts/SwaraLayout.astro";
+import PracticeTabs from "../../../components/carnatic/PracticeTabs.astro";
 import Hero from "../../../components/carnatic/Hero.astro";
 import TalaGrid from "../../../components/carnatic/TalaGrid.astro";
 import Hand from "../../../components/carnatic/Hand.astro";
@@ -42,6 +43,7 @@ const claps = tala ? tala.counts.filter((c) => c.action === "clap").map((c) => c
 <SwaraLayout title={say("meta.title", "Tala trainer · Swara Studio")}
              description={say("meta.description", "Learn to keep Carnatic talas with your hand: watch the hand, count along, then tap the claps and see whether you are early or late. Adi, rupaka, the chapu talas and more.")}
              crumbs={[[tr("crumb.practice"), L("/carnatic/practice/tuner")], [say("crumb", "Tala trainer")]]}>
+  <PracticeTabs />
   <Hero eyebrow={tr("crumb.practice")} title={say("title", "Tala trainer")} lede={say("lede", "Learn the hand, follow along, then tap the claps.")} />
   {!tala ? <div class="sw-section"><Absent /></div> : (
     <div class="tr" data-trainer data-tala={JSON.stringify(tala.counts)} data-tempo={tempo} data-nadai={nadai[1]} data-mode={mode}>

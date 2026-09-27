@@ -149,7 +149,16 @@ const page = { id, lang, status: l.status, revision: l.revision, front: f, body:
       + blocks.map((p: any) => `<p class="blocks">${esc(p.text)} <span class="sa-soft">(publishing waits for this)</span></p>`).join("")
       + rest.map((p: any) => `<p class="blocks">${esc(p.text)}</p>`).join("") + `<p class="sa-soft">Saving a draft is never blocked.</p>`
       : `<b>Nothing to look at: this lesson can be published.</b>`;
-    $("[data-notes]").innerHTML = (c.notes ?? []).length ? c.notes.map((x: string) => `<li>${esc(x)}</li>`).join("") : `<li class="sa-soft">No open notes.</li>`;
+    $("[data-notes]").innerHTML = (c.notes ?? []).length ? c.notes.map((x: string, i: number) => `<li><button type="button" class="lr-link" data-note-i="${i}" style="text-align:left">${esc(x)}</button></li>`).join("") : `<li class="sa-soft">No open notes.</li>`;
+    document.querySelectorAll<HTMLElement>("[data-note-i]").forEach((b) => b.addEventListener("click", () => {
+      const note = c.notes[Number(b.dataset.noteI)];
+      const at = body.value.indexOf(note.slice(0, 40));
+      if (at < 0) return;
+      body.focus();
+      body.setSelectionRange(at, at + note.length);
+      const line = body.value.slice(0, at).split("\n").length;
+      body.scrollTop = Math.max(0, (line - 5) * 21);
+    }));
     ($("[data-publish]") as HTMLButtonElement).disabled = !c.publishable;
   };
   drawCheck(P.check);
@@ -166,6 +175,16 @@ const page = { id, lang, status: l.status, revision: l.revision, front: f, body:
   body.addEventListener("input", onEdit);
   document.querySelectorAll("[data-front] input, [data-front] textarea, [data-front] select").forEach((x) => x.addEventListener("input", onEdit));
   preview();
+  // ?line=N (from "Notes for Sophia"): put the cursor on that line of the body, in view.
+  const jump = Number(new URLSearchParams(location.search).get("line"));
+  if (jump > 0) {
+    const ls = body.value.split("\n");
+    const start = ls.slice(0, jump - 1).reduce((n, l) => n + l.length + 1, 0);
+    body.focus();
+    body.setSelectionRange(start, start + (ls[jump - 1]?.length ?? 0));
+    body.scrollTop = Math.max(0, (jump - 5) * 21);
+    body.scrollIntoView({ block: "center" });
+  }
 
   const save = async (st: string, meaningChange?: boolean): Promise<void> => {
     const r = await fetch(`/api/carnatic/studio/lessons/${P.id}?lang=${P.lang}`, { method: "PUT", headers: { "content-type": "application/json", "x-csrf-token": csrf() },

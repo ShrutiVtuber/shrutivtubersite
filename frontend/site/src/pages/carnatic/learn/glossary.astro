@@ -7,10 +7,11 @@
 import SwaraLayout from "../../../layouts/SwaraLayout.astro";
 import { hrefIn, langOf } from "../../../lib/carnatic/i18n";
 import { copy } from "../../../lib/copy";
+import { localize } from "../../../lib/carnatic/v2strings";
 import { glossary, units } from "../../../lib/carnatic/course";
 
 const lang = langOf(Astro);
-const say = await copy("carnatic/learn/glossary");
+const say = localize(lang, await copy("carnatic/learn/glossary"));
 const L = (p: string) => hrefIn(lang, p);
 const [terms, all] = await Promise.all([glossary(), units()]);
 const lessons = new Map(all.flatMap((u) => u.lessons.map((x) => [x.id, { ...x, unit: u.n }] as const)));

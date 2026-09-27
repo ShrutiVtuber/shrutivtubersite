@@ -113,6 +113,28 @@ const playLine = say("playLine", "drone Sa = {sa} · tala clicks on · {tuning}"
   };
   let meta: any = B.song ? { id: B.song.id, slug: B.song.slug, updatedAt: B.song.updatedAt } : null;
   let song: any = B.song?.song ?? (() => { try { return JSON.parse(localStorage.getItem(KEY) || "null"); } catch { return null; } })() ?? fresh();
+  /* "Open in composer" from a lesson (?line=&raga=&tala=): a new song whose pallavi starts with that line. */
+  {
+    const q = new URLSearchParams(location.search);
+    const line = q.get("line");
+    if (line) {
+      song = fresh();
+      meta = null;
+      if (q.get("raga") && B.ragas.some((x: any) => x.id === q.get("raga"))) song.raga = q.get("raga");
+      if (q.get("tala") && B.talas.some((x: any) => x.id === q.get("tala"))) song.tala = q.get("tala");
+      const toks = line.split(/\s+/).filter((x) => x && x !== "|" && x !== "||");
+      const n = tala(song.tala).counts.length;
+      const per = 2;
+      const lines: any[] = [];
+      for (let i = 0; i < toks.length; i += n * per) {
+        const ln = blankLine(n, per, song.parts);
+        ln.counts.forEach((c: any, ci: number) => { c.notes = Array.from({ length: per }, (_, k) => toks[i + ci * per + k] ?? ","); });
+        lines.push(ln);
+      }
+      song.sections[0].lines = lines.length ? lines : song.sections[0].lines;
+      song.title = "From a lesson";
+    }
+  }
 
   const ragaScale = () => B.ragas.find((x: any) => x.id === song.raga)?.scale ?? "";
   const outside = () => {

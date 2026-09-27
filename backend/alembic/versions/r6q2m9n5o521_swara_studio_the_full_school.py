@@ -162,6 +162,19 @@ def upgrade() -> None:
         sa.Column("note", sa.String(), nullable=False, server_default=""),
         *_ts(),
     )
+    op.create_table(
+        "carnatic_question",
+        sa.Column("id", sa.String(), primary_key=True),
+        sa.Column("group", sa.String(), nullable=False, server_default=""),
+        sa.Column("text", sa.String(), nullable=False, server_default=""),
+        _j("lessons", "[]"),
+        sa.Column("position", sa.Integer(), nullable=False, server_default="0"),
+        sa.Column("answer", sa.String(), nullable=False, server_default=""),
+        sa.Column("done", sa.Boolean(), nullable=False, server_default=sa.false()),
+        sa.Column("answered_at", sa.DateTime(timezone=True), nullable=True),
+        sa.Column("in_file", sa.Boolean(), nullable=False, server_default=sa.true()),
+        *_ts(),
+    )
     # The ragas EAR_TRAINING.md §3 drills only from recordings.
     op.execute(
         "INSERT INTO carnatic_raga_flag (raga, synth_ok, note) VALUES "
@@ -269,6 +282,6 @@ def downgrade() -> None:
     op.drop_column("practice_work", "subject")
     op.drop_column("practice_work", "room")
     for table in ("carnatic_guess", "carnatic_card", "carnatic_best", "carnatic_attempt", "carnatic_lesson_state",
-                  "carnatic_raga_flag", "carnatic_recording", "carnatic_glossary", "carnatic_exercise",
+                  "carnatic_question", "carnatic_raga_flag", "carnatic_recording", "carnatic_glossary", "carnatic_exercise",
                   "carnatic_lesson_revision", "carnatic_lesson", "carnatic_unit"):
         op.drop_table(table)

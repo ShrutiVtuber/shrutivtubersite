@@ -9,10 +9,11 @@ import Hero from "../../../components/carnatic/Hero.astro";
 import { hrefIn, langOf } from "../../../lib/carnatic/i18n";
 import { visitor } from "../../../lib/carnatic/prefs";
 import { copy } from "../../../lib/copy";
+import { localize } from "../../../lib/carnatic/v2strings";
 import { duration, isOperator, myLessons, units } from "../../../lib/carnatic/course";
 
 const lang = langOf(Astro);
-const say = await copy("carnatic/learn");
+const say = localize(lang, await copy("carnatic/learn"));
 const L = (p: string) => hrefIn(lang, p);
 const { me } = await visitor(Astro);
 const preview = Astro.url.searchParams.get("preview") === "true" && (await isOperator(Astro));

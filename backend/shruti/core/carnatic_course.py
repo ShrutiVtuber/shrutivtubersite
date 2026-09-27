@@ -30,7 +30,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
 from shruti.models.carnatic_course import (
-    CarnaticExercise, CarnaticGlossary, CarnaticLesson, CarnaticLessonRevision, CarnaticRecording,
+    CarnaticExercise, CarnaticGlossary, CarnaticLesson, CarnaticLessonRevision, CarnaticQuestion, CarnaticRecording,
     CarnaticUnit,
 )
 
@@ -149,6 +149,25 @@ async def import_bundle(session: AsyncSession, bundle: dict, *, by: str = "impor
             s["updated"] += 1
         else:
             s["unchanged"] += 1
+
+    # ── the questions for Sophia (EDITING.md): wording follows the file; her answers never change here
+    if "questions" in bundle:
+        summary["questions"] = {"created": 0, "updated": 0}
+        seen_q = set()
+        for q in bundle["questions"]:
+            seen_q.add(q["id"])
+            row = await session.get(CarnaticQuestion, q["id"])
+            if row is None:
+                session.add(CarnaticQuestion(id=q["id"], group=q["group"], text=q["text"], lessons=q["lessons"],
+                                             position=q["position"], in_file=True))
+                summary["questions"]["created"] += 1
+            elif (row.text, row.group, row.lessons, row.position, row.in_file) != (q["text"], q["group"], q["lessons"], q["position"], True):
+                row.text, row.group, row.lessons, row.position, row.in_file = q["text"], q["group"], q["lessons"], q["position"], True
+                row.updated_at = now
+                summary["questions"]["updated"] += 1
+        for row in (await session.execute(select(CarnaticQuestion))).scalars().all():
+            if row.id not in seen_q and row.in_file:
+                row.in_file, row.updated_at = False, now
 
     # ── recordings: candidates only; decisions and annotations are hers
     fields = ("provider", "url", "title", "channel", "uploader_kind", "artists", "composition", "composer", "form",

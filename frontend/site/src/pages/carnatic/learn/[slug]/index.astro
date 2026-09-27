@@ -11,11 +11,12 @@ import { hrefIn, langOf, LANG_NAME } from "../../../../lib/carnatic/i18n";
 import { visitor, swaraScript } from "../../../../lib/carnatic/prefs";
 import { notFound } from "../../../../lib/carnatic/notfound";
 import { copy } from "../../../../lib/copy";
+import { localize } from "../../../../lib/carnatic/v2strings";
 import { drills, exercises, glossary, isOperator, lesson, lessonContext, units } from "../../../../lib/carnatic/course";
 import { confidenceLine, renderLesson } from "../../../../lib/carnatic/lesson";
 
 const lang = langOf(Astro);
-const say = await copy("carnatic/learn/[slug]");
+const say = localize(lang, await copy("carnatic/learn/[slug]"));
 const L = (p: string) => hrefIn(lang, p);
 const { settings } = await visitor(Astro);
 const wantPreview = Astro.url.searchParams.get("preview") === "true";

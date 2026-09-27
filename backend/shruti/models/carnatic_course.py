@@ -187,6 +187,26 @@ class CarnaticRagaFlag(TimestampMixin, table=True):
     note: str = ""
 
 
+class CarnaticQuestion(TimestampMixin, table=True):
+    """
+    One of the "Questions for Sophia" (course/EDITING.md), imported as a
+    checklist she answers in the Studio. The import adds new questions and
+    updates their wording; her answer and done mark are never touched by it.
+    """
+
+    __tablename__ = "carnatic_question"
+
+    id: str = Field(primary_key=True)      # a hash of the group and the question's first words, stable across rewording
+    group: str = ""
+    text: str = ""
+    lessons: list = Field(default_factory=list, sa_column=Column(JSONB, nullable=False))
+    position: int = 0
+    answer: str = ""
+    done: bool = False
+    answered_at: Optional[datetime] = Field(default=None, sa_type=UTC_TS)
+    in_file: bool = True                   # false once EDITING.md no longer lists it
+
+
 # ── per person ──────────────────────────────────────────────────────────────
 
 class CarnaticLessonState(SQLModel, table=True):

@@ -7,7 +7,12 @@ import { studio, studioGate } from "../../../../lib/carnatic/course";
 
 const gate = await studioGate(Astro);
 if (gate) return gate;
-const t = await studio(Astro, "/tree");
+const tab = Astro.url.searchParams.get("tab") ?? "";
+const [t, nt, qs, wt] = await Promise.all([studio(Astro, "/tree"), studio(Astro, "/notes"), studio(Astro, "/questions"), studio(Astro, "/waiting")]);
+const noteItems: any[] = (nt?.items ?? []).filter((n: any) => n.who === "Sophia" || Astro.url.searchParams.has("all"));
+const questions: any[] = qs?.items ?? [];
+const waitingItems: any[] = wt?.items ?? [];
+const qGroups = [...new Set(questions.map((q) => q.group))];
 const units: any[] = t?.units ?? [];
 const counts: Record<string, number> = t?.counts ?? {};
 const total = units.reduce((n, u) => n + u.lessons.length, 0);
@@ -17,6 +22,55 @@ const TR: Record<string, string> = { none: "—", draft: "draft", review: "revie
 <StudioLayout title="Lessons" counts={{ lessons: total }}>
   <div class="sa-head"><h1>Lessons</h1><span class="spacer"></span>
     <small>{total} lessons · {counts.published ?? 0} published · {counts.review ?? 0} in review · {counts.draft ?? 0} draft · {counts.planned ?? 0} planned</small></div>
+  <nav class="sa-row sa-tabs" style="margin-bottom:12px" aria-label="What to look at">
+    <a class="lr-link" href="?" aria-current={!tab ? "page" : undefined}>All lessons</a>
+    <a class="lr-link" href="?tab=notes" aria-current={tab === "notes" ? "page" : undefined}>Notes for Sophia · {nt?.sophia ?? 0}</a>
+    <a class="lr-link" href="?tab=questions" aria-current={tab === "questions" ? "page" : undefined}>Questions for Sophia · {qs?.open ?? 0} open</a>
+    <a class="lr-link" href="?tab=waiting" aria-current={tab === "waiting" ? "page" : undefined}>Waiting for your annotation · {waitingItems.length}</a>
+  </nav>
+  {tab === "notes" && (
+    <table class="sa-table">
+      <thead><tr><th>Lesson</th><th>Line</th><th>The note</th><th>Status</th></tr></thead>
+      <tbody>{noteItems.map((n) => (
+        <tr><td><span class="mono">{n.lesson}</span><br /><span class="sa-soft">{n.title}</span></td><td class="mono">{n.line}</td>
+          <td><a href={`/carnatic/studio/lessons/${n.lesson}?line=${n.line}`}>{n.text}</a></td><td><span class:list={["sa-pill", n.status]}>{n.status}</span></td></tr>
+      ))}</tbody>
+    </table>
+  )}
+  {tab === "questions" && (
+    <div data-questions>
+      <div class="sa-row" style="justify-content:space-between;margin-bottom:8px"><span class="sa-soft">From course/EDITING.md. Your answers are kept here, never overwritten by an import, and exported below.</span>
+        <span><a class="sa-btn" href="/api/carnatic/studio/questions/export?format=csv">Export CSV</a> <a class="sa-btn" href="/api/carnatic/studio/questions/export?format=json">Export JSON</a></span></div>
+      {qGroups.map((g) => (
+        <section class="sa-card" style="margin-bottom:12px"><b>{g}</b>
+          <ul class="sa-rev">{questions.filter((q) => q.group === g).map((q) => (
+            <li data-q={q.id} style={q.inFile ? undefined : "opacity:.6"}>
+              <label class="sa-row"><input type="checkbox" data-done checked={q.done} /> <span>{q.text}</span></label>
+              {q.lessons.length > 0 && <span class="sa-soft">Concerns {q.lessons.map((l: string, i: number) => <>{i > 0 && " · "}<a href={`/carnatic/studio/lessons/${l}`}>{l}</a></>)}</span>}
+              {!q.inFile && <span class="sa-soft">No longer in EDITING.md; kept for your answer.</span>}
+              <textarea class="sa-btn" data-answer rows="2" placeholder="Your answer" style="width:100%">{q.answer}</textarea>
+              <span class="sa-soft" data-state>{q.answeredAt ? `answered ${new Date(q.answeredAt).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}` : ""}</span>
+            </li>
+          ))}</ul>
+        </section>
+      ))}
+    </div>
+  )}
+  {tab === "waiting" && (
+    <table class="sa-table" data-waiting>
+      <thead><tr><th>Exercise</th><th>What it asks</th><th>Recording</th><th>Your time</th></tr></thead>
+      <tbody>{waitingItems.map((w) => (
+        <tr data-ex={w.exercise} data-part={w.part} data-index={w.index}>
+          <td><span class="mono">{w.exercise}</span> <span class="sa-pill">{w.type}</span><br /><span class="sa-soft">{w.kind}{w.lesson && ` · ${w.lesson}`}</span></td>
+          <td>{w.text || "(no prompt)"}</td>
+          <td>{w.recording ? <a href={`/carnatic/studio/recordings/${w.recording}`}>{w.recording} · annotate ›</a> : <span class="sa-soft">none named</span>}</td>
+          <td style="white-space:nowrap"><input class="sa-btn" data-time placeholder="m:ss" style="width:80px" /> <button type="button" class="sa-btn" data-set>Set</button> <span class="sa-soft" data-state></span></td>
+        </tr>
+      ))}
+      {waitingItems.length === 0 && <tr><td class="sa-soft">Nothing is waiting.</td></tr>}</tbody>
+    </table>
+  )}
+  {!tab && <>
   <div class="sa-row" style="margin-bottom:12px">
     {["", "draft", "review", "published", "planned"].map((s) => <a class="sa-btn" href={s ? `?status=${s}` : "?"} aria-current={filter === s ? "true" : undefined} style={filter === s ? "border-color:var(--accent)" : undefined}>{s || "all"}</a>)}
   </div>
@@ -41,10 +95,29 @@ const TR: Record<string, string> = { none: "—", draft: "draft", review: "revie
       })}
     </tbody>
   </table>
+  </>}
 </StudioLayout>
 
 <script>
   import { csrf } from "../../../../lib/carnatic/client/state";
+  const put = (url: string, body: unknown) => fetch(url, { method: "PUT", headers: { "content-type": "application/json", "x-csrf-token": csrf() }, body: JSON.stringify(body) });
+  document.querySelectorAll<HTMLElement>("[data-q]").forEach((li) => {
+    const state = li.querySelector<HTMLElement>("[data-state]")!;
+    li.querySelector<HTMLInputElement>("[data-done]")!.addEventListener("change", async (e) => {
+      const r = await put(`/api/carnatic/studio/questions/${li.dataset.q}`, { done: (e.target as HTMLInputElement).checked });
+      state.textContent = r.ok ? "saved" : "didn't save";
+    });
+    li.querySelector<HTMLTextAreaElement>("[data-answer]")!.addEventListener("change", async (e) => {
+      const r = await put(`/api/carnatic/studio/questions/${li.dataset.q}`, { answer: (e.target as HTMLTextAreaElement).value });
+      state.textContent = r.ok ? "answer saved" : "didn't save";
+    });
+  });
+  document.querySelectorAll<HTMLElement>("[data-waiting] [data-ex]").forEach((row) => row.querySelector("[data-set]")?.addEventListener("click", async () => {
+    const answer = row.querySelector<HTMLInputElement>("[data-time]")!.value.trim();
+    const r = await put(`/api/carnatic/studio/waiting/${row.dataset.ex}`, { part: row.dataset.part, index: Number(row.dataset.index), answer });
+    row.querySelector("[data-state]")!.textContent = r.ok ? "set: the item now shows to learners" : r.status === 422 ? "a time like 2:14" : "didn't save";
+    if (r.ok) row.style.opacity = "0.5";
+  }));
   document.querySelectorAll<HTMLButtonElement>("[data-create]").forEach((b) => b.addEventListener("click", async () => {
     b.disabled = true;
     const r = await fetch(`/api/carnatic/studio/lessons/${b.dataset.create}/create`, { method: "POST", headers: { "x-csrf-token": csrf() } });
