@@ -408,7 +408,7 @@ async def _everything_waiting_for_her():
     tag = uuid.uuid4().hex[:6]
     lid = f"T{tag}.L01"
     b = _bundle(tag)
-    b["questions"] = [{"id": f"q{tag}", "group": "By ear", "text": "kalyani-02's tala.", "lessons": [lid], "position": 0}]
+    b["questions"] = [{"id": f"q{tag}", "group": "By ear", "text": "The test recording's tala.", "lessons": [lid], "position": 0}]
     b["exercises"].append({"id": f"{lid}.A1", "unit": 1, "lesson": lid, "kind": "listening", "hash": "h9",
                            "data": {"id": f"{lid}.A1", "kind": "listening", "recordings": [{"id": f"rec-{tag}-01"}],
                                     "auto": [{"type": "timestamp", "text": "When does the anupallavi begin?", "answer": None,
@@ -422,7 +422,7 @@ async def _everything_waiting_for_her():
         assert notes and notes[0]["who"] == "Sophia" and notes[0]["line"] > 1 and "a note for later" in notes[0]["text"]
         # The question: answered, then the file rewords it; her answer stays.
         await studio.answer_question(f"q{tag}", studio.QuestionIn(answer="Adi, 2 kalai", done=True), s)
-        b["questions"][0]["text"] = "kalyani-02's tala, by ear."
+        b["questions"][0]["text"] = "The test recording's tala, by ear."
         await course.import_bundle(s, b)
         await s.commit()
         q = await s.get(CarnaticQuestion, f"q{tag}")
