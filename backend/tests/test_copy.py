@@ -490,7 +490,7 @@ def test_no_prose_is_stranded_around_inline_markup() -> None:
 
     offenders: list[str] = []
     for f in sorted(SRC.rglob("*.astro")):
-        if "/admin/" in str(f) or "/overlay/" in str(f):
+        if "/admin/" in str(f) or "/overlay/" in str(f) or "/carnatic/studio/" in str(f):  # the Studio is hers, like the admin
             continue
         text = f.read_text(encoding="utf-8")
         if text.startswith("---"):

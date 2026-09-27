@@ -13,6 +13,7 @@ import { notFound } from "../../../../lib/carnatic/notfound";
 import { copy } from "../../../../lib/copy";
 import { localize } from "../../../../lib/carnatic/v2strings";
 import { drills, exercises, glossary, isOperator, lesson, lessonContext, units } from "../../../../lib/carnatic/course";
+import { SITE_URL } from "../../../../lib/api";
 import { confidenceLine, renderLesson } from "../../../../lib/carnatic/lesson";
 
 const lang = langOf(Astro);
@@ -58,7 +59,8 @@ const pageData = {
 const untranslated = lang !== "en" && l.translation && l.translation.status === "none";
 const outOfDate = lang !== "en" && l.translation?.outOfDate;
 ---
-<SwaraLayout title={`${l.title} · Swara Studio`} description={l.summary.slice(0, 300)} noindex={preview && l.status !== "published"}>
+<SwaraLayout title={`${l.title} · Swara Studio`} description={l.summary.slice(0, 300)}
+             ogImage={`${SITE_URL}/carnatic/learn/${l.slug}/og.png`} ogImageAlt={`${l.title}: unit ${l.unit}, lesson ${l.order} of the Swara Studio course`} noindex={preview && l.status !== "published"}>
   <div class="lr-progress-track" aria-hidden="true"></div>
   <div class="lr-progress" data-progress aria-hidden="true"></div>
   <div class="lr-wrap" id="top">

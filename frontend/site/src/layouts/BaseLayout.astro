@@ -47,6 +47,8 @@ interface Props {
    * timeline it lands on.
    */
   ogImage?: string;
+  /** A section with its own mark (Swara Studio, /carnatic/*) overrides the site's favicon. */
+  icons?: "site" | "carnatic";
   ogImageAlt?: string;
   /**
    * Page-specific structured data, already shaped.
@@ -78,7 +80,7 @@ interface Props {
   alternates?: [string, string][];
 }
 const { title, description = "", bare = false, noindex = false,
-        ogImage, ogImageAlt, jsonLd: pageLd = null, canonical,
+        ogImage, ogImageAlt, icons = "site", jsonLd: pageLd = null, canonical,
         feed, oembed, lang = "en", alternates = []} = Astro.props;
 const inSchool = /^\/carnatic(\/|$)/.test(Astro.url.pathname);
 
@@ -184,9 +186,22 @@ const homeLd = isHome
     <link rel="preload" as="font" type="font/woff2" crossorigin
           href="/fonts/ebgaramond-ef73a8c5.woff2" />
 
-    <link rel="icon" href="/favicon.ico" sizes="any" />
-    <link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32" />
-    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    {icons === "carnatic" ? (
+      <>
+        {/* Swara Studio's own mark: the Kannada Sa with its dot (design/logo/DEVELOPER_NOTE.md). */}
+        <link rel="icon" href="/carnatic/brand/favicon.svg" type="image/svg+xml" />
+        <link rel="icon" href="/carnatic/brand/favicon-48.png" type="image/png" sizes="48x48" />
+        <link rel="icon" href="/carnatic/brand/favicon-32.png" type="image/png" sizes="32x32" />
+        <link rel="icon" href="/carnatic/brand/favicon-16.png" type="image/png" sizes="16x16" />
+        <link rel="apple-touch-icon" href="/carnatic/brand/apple-touch-icon-180.png" sizes="180x180" />
+      </>
+    ) : (
+      <>
+        <link rel="icon" href="/favicon.ico" sizes="any" />
+        <link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32" />
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+      </>
+    )}
     <link rel="manifest" href="/site.webmanifest" />
 
     {/* So a reader's browser and their feed app can both find it without

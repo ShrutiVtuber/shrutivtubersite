@@ -815,3 +815,4 @@
 .ch-also-card b { font: 400 19px var(--font-display); }
 .ch-also-card small { font-size: 13px; color: var(--ink-soft); }
 @media (max-width: 699px) { .ch-also { grid-template-columns: minmax(0, 1fr); } }
+.sh-logo svg { height: 26px; width: auto; display: block; margin-bottom: 10px; }

@@ -10,6 +10,7 @@
 import "../styles/carnatic.css";
 import "../styles/carnatic-course.css";
 import BaseLayout from "./BaseLayout.astro";
+import { SITE_URL } from "../lib/api";
 import { LANGS, langOf, words } from "../lib/carnatic/i18n";
 import { visitor } from "../lib/carnatic/prefs";
 
@@ -22,8 +23,11 @@ interface Props {
   crumbs?: [string, string?][];
   /** Pages that print (the song sheet) drop the page wrapper's width. */
   wide?: boolean;
+  /** Open Graph image: the school's own by default; lesson pages pass theirs. */
+  ogImage?: string;
+  ogImageAlt?: string;
 }
-const { title, description, noindex = false, jsonLd = null, crumbs = [], wide = false } = Astro.props;
+const { title, description, noindex = false, jsonLd = null, crumbs = [], wide = false, ogImage, ogImageAlt } = Astro.props;
 const lang = langOf(Astro);
 const tr = await words(lang);
 const { me, settings } = await visitor(Astro);
@@ -50,7 +54,9 @@ const boot = {
 };
 ---
 
-<BaseLayout title={title} description={description} noindex={noindex} jsonLd={jsonLd} lang={lang}
+<BaseLayout title={title} description={description} noindex={noindex} jsonLd={jsonLd} lang={lang} icons="carnatic"
+            ogImage={ogImage ?? `${SITE_URL}/carnatic/brand/og-carnatic.png`}
+            ogImageAlt={ogImageAlt ?? "Swara Studio, the Carnatic music school of shrutivtuber.com"}
             alternates={noindex ? [] : alternates} canonical={canonical} bare>
   <main id="main" class:list={["sw", wide ? "sw-wide" : "page"]} lang={lang} data-swara>
     {crumbs.length > 0 && (

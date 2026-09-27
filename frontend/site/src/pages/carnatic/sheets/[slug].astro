@@ -14,6 +14,7 @@ import { GAMAKA_SIGN } from "../../../lib/carnatic/notation";
 import { notFound } from "../../../lib/carnatic/notfound";
 import { SITE_URL } from "../../../lib/api";
 import { copy } from "../../../lib/copy";
+import monoSvg from "../../../assets/carnatic-brand/swara-studio-horizontal-mono.svg?raw";
 
 const lang = langOf(Astro);
 const tr = await words(lang);
@@ -33,6 +34,8 @@ for (const s of song.sections) for (const l of s.lines) for (const c of l.counts
 const legend = Object.entries(GAMAKA_SIGN).filter(([g]) => used.has(g) || ["kampita", "jaru-up", "nokku", "sphurita"].includes(g));
 const NAMES: Record<string, string> = { kampita: "kampita", "jaru-up": "jaru", "jaru-down": "jaru", nokku: "nokku", sphurita: "sphurita", pratyahata: "pratyahata", ravai: "ravai", khandippu: "khandippu", odukkal: "odukkal", orikkai: "orikkai" };
 const url = new URL(`/carnatic/sheets/${sheet.slug}`, SITE_URL);
+/* The mono lockup heads a printed sheet (design/logo: -mono for print), inline so the wordmark uses EB Garamond. */
+const monoLockup = monoSvg.replace(/<metadata>[\s\S]*?<\/metadata>/, "").replace(/<svg /, '<svg role="img" aria-label="Swara Studio" ');
 ---
 <SwaraLayout title={`${song.title} · ${raga?.name ?? song.raga} · Swara Studio`} noindex={!sheet.published}
              description={`${song.title}: a song in ${raga?.name ?? song.raga}, ${tala?.name ?? song.tala} tala${sheet.author ? `, by ${sheet.author}` : ""}. Swara notation with sahitya, printable.`}>
@@ -60,6 +63,7 @@ const url = new URL(`/carnatic/sheets/${sheet.slug}`, SITE_URL);
   )}
   <article class="sh-paper">
     <header class="sh-head">
+      <div class="sh-logo" set:html={monoLockup} />
       <h1>{song.title}</h1>
       {song.titleScript && <p class="sh-script" lang={song.sahityaScript}>{song.titleScript}</p>}
       <p class="sh-meta">{(raga?.name ?? song.raga).toUpperCase()} · {(tala?.name ?? song.tala).toUpperCase()} {sheet.author ? ` · ${say("composedBy", "Composed by")} ${sheet.author}`.toUpperCase() : ""}</p>

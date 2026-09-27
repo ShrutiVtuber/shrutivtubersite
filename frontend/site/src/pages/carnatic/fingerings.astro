@@ -102,7 +102,7 @@ const NAME: Record<Inst, string> = { venu: "Venu", veena: "Veena", violin: "Viol
     <span class="sw-chips">{RAGAS.map(([id, nm]) => <Chip href={link({ raga: id })} active={id === ragaParam}>{nm}</Chip>)}</span>
     <datalist id="fg-ragas">{allRagas.map(([id, nm]) => <option value={id}>{nm}</option>)}</datalist>
   </form>
-  <p class="sw-mono fg-sa">Sa = {instSa.replace("#", "♯")} · {settings.instrument === inst ? say("yours", "your Sa, from your settings") : say("default", "the default for this instrument; set yours in settings")} · <a href={L("/carnatic/settings")}>{say("settings", "settings")}</a>{ragaSlug && <> · <a href={L(`/carnatic/ragas/${ragaSlug}`)}>{ragaName} {say("ragaPage", "raga page")}</a></>}</p>
+  <p class="sw-mono fg-sa">{say("sa", "Sa = {sa}").replace("{sa}", instSa.replace("#", "♯"))}{" · "}{settings.instrument === inst ? say("yours", "your Sa, from your settings") : say("default", "the default for this instrument; set yours in settings")} · <a href={L("/carnatic/settings")}>{say("settings", "settings")}</a>{ragaSlug && <> · <a href={L(`/carnatic/ragas/${ragaSlug}`)}>{ragaName} {say("ragaPage", "raga page")}</a></>}</p>
 
   {!ragaName ? <p class="ch-empty">{say("noRaga", "That raga isn't in the explorer. Choose another.")}</p> : inst === "voice" ? (
     <div class="sw-card fg-explain"><p>{say("voice", "For the voice the swara names are the fingering: you sing Sa, Ri, Ga… at your own Sa, and the drone keeps you there. Tap each swara to hear where it sits, then sing it back.")}</p></div>
