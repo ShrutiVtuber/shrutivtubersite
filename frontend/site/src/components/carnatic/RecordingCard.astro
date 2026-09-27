@@ -26,7 +26,7 @@ const who = [r.instrument, r.artists?.slice(0, 2).join(", ")].filter(Boolean).jo
   </div>
   <div class="lr-reccard-t">
     {guess ? (
-      <p class="lr-reccard-h"><b>{label ?? say("aRecording", "A recording")}</b> <span>{say("covered", "The raga, title and composition are covered until you guess.")}</span></p>
+      <p class="lr-reccard-h"><b>{label ?? say("aRecording", "A recording")}</b> <span>{say("covered", "We don't name its raga until you guess. The provider's player shows the recording's own title: try not to look.")}</span></p>
     ) : (
       <>
         <p class="lr-reccard-h"><b>{r.composition || recordingLabel(r)}</b>{meta && <span>{meta}</span>}</p>

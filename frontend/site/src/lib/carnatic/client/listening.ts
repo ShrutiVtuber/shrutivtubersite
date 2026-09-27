@@ -77,9 +77,8 @@ export async function runGuess(root: HTMLElement, page: GuessPage, want?: string
   const steps = (n: number) => `<div class="li-steps">${["Listen", "Guess", "Reveal"].map((s, i) => `<span class="${i + 1 === n ? "on" : ""}"><i>${i + 1}</i>${s}</span>`).join("<hr>")}<hr></div>`;
   let confidence = "fairly";
   root.innerHTML = `${steps(1)}<h1 class="lr-title">Which raga is Recording ${rec.n}?</h1>`
-    + `<div class="li-guess"><div class="lr-embed lr-rec"><div class="lr-rec-foot"><b>Recording ${rec.n}</b><span>The provider's title is covered</span></div>`
-    + `<div class="lr-rec-box" data-box><button type="button" class="lr-btn" data-load>Load the recording</button><small>Nothing loads from the provider until you press this.</small></div>`
-    + `<div class="lr-rec-foot"><span>The provider may still show the title in its own player or on its site. Try not to peek: the guess is only for you.</span></div></div>`
+    + `<div class="li-guess"><p class="li-peek">The provider's player shows the recording's own title, and so does its site. Try not to look at it: the guess is only for you.</p>`
+    + `<div class="li-player" data-box><button type="button" class="lr-btn" data-load>Load Recording ${rec.n}</button><small>Nothing loads from the provider until you press this. It starts at the part Shruti chose.</small></div>`
     + `<form class="li-form" data-form><label>Your guess<span class="li-sugg"><input name="guess" autocomplete="off" required data-in><ul data-sugg hidden></ul></span></label>`
     + `<div><span class="li-form-l">How sure are you?</span><div class="lr-seg" role="group">${[["hunch", "A hunch"], ["fairly", "Fairly sure"], ["sure", "Sure"]].map(([v, l]) => `<button type="button" data-conf="${v}" aria-pressed="${v === confidence}">${l}</button>`).join("")}</div></div>`
     + `<label>What told you? (optional)<textarea name="phrases" rows="3" maxlength="1000"></textarea></label>`
@@ -113,8 +112,8 @@ export async function runGuess(root: HTMLElement, page: GuessPage, want?: string
     const verdict = d.right ? "Yes." : d.close ? `Close: ${d.pair.guessName} and ${d.ragaName} are a pair that's easy to confuse (${d.pair.differ}). The pair is waiting in ear training. We'll bring this recording back later.`
       : "Not this time. We'll bring this recording back later.";
     root.innerHTML = `${steps(3)}<h1 class="lr-title">Recording ${rec.n}</h1><div class="li-guess">`
-      + `<div class="lr-embed lr-rec"><div class="lr-rec-box" data-box><button type="button" class="lr-btn" data-load>Load the recording</button></div>`
-      + `<div class="lr-rec-foot"><span>${esc([d.composition, d.ragaName, d.recording?.instrument].filter(Boolean).join(" · "))}</span></div></div>`
+      + `<div class="li-player" data-box><button type="button" class="lr-btn" data-load>Load the recording</button></div>`
+      + `<p class="st-note">${esc([d.composition, d.ragaName, d.recording?.instrument].filter(Boolean).join(" · "))}</p>`
       + `<div class="li-reveal"><div><span class="t-eyebrow">You said</span><b>${esc(String(fd.get("guess")))}</b><small>${esc({ hunch: "a hunch", fairly: "fairly sure", sure: "sure" }[confidence] ?? "")}</small></div>`
       + `<div class="it"><span class="t-eyebrow ch-blue">It was</span><b>${esc(d.ragaName)}</b><small>${esc([d.composition, d.composer].filter(Boolean).join(" · "))}</small></div></div>`
       + `<p class="st-note">${esc(verdict)}</p>`

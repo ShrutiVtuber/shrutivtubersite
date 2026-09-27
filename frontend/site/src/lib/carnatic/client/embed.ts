@@ -54,6 +54,18 @@ export function loadPlayer(box: HTMLElement, provider: string, url: string, o: P
   f.title = "Player";
   f.className = "lr-frame";
   box.replaceChildren(f);
+  // SoundCloud's widget has no start parameter: seek with its own API (seekTo, in ms) once it is ready.
+  if (provider === "soundcloud" && o.start) {
+    const seek = () => {
+      f.contentWindow?.postMessage(JSON.stringify({ method: "seekTo", value: Math.floor((o.start ?? 0) * 1000) }), "https://w.soundcloud.com");
+      if (o.autoplay !== false) f.contentWindow?.postMessage(JSON.stringify({ method: "play" }), "https://w.soundcloud.com");
+    };
+    f.addEventListener("load", () => { f.contentWindow?.postMessage(JSON.stringify({ method: "addEventListener", value: "ready" }), "https://w.soundcloud.com"); setTimeout(seek, 1200); });
+    window.addEventListener("message", (e) => {
+      if (e.source !== f.contentWindow) return;
+      try { if (JSON.parse(String(e.data))?.method === "ready") seek(); } catch { /* not ours */ }
+    });
+  }
   if (provider === "youtube") {
     const hello = () => f.contentWindow?.postMessage(JSON.stringify({ event: "listening", id: 1 }), "*");
     f.addEventListener("load", () => { hello(); setTimeout(hello, 800); });
