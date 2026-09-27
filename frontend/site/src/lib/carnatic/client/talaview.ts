@@ -1,6 +1,8 @@
-/* Moves a tala grid's playhead and pips, and the hand, from a TalaClock. */
+/* Moves a tala grid's playhead and pips, and the hand, from a TalaClock: all
+ * from the count being heard (the audio clock less the output latency). */
 import type { TalaClock } from "./tala";
 import { ctx } from "./audio";
+import { latency } from "./timing";
 
 const LABEL: Record<string, string> = { clap: "Clap", wave: "Wave", silent: "Silent count", little: "Little", ring: "Ring", middle: "Middle", index: "Index", thumb: "Thumb" };
 
@@ -29,11 +31,12 @@ export function bindTalaView(clock: TalaClock, grid: HTMLElement | null, hand: H
   clock.onFrame = () => {
     /* A clap lifts 120 ms before it lands (25 % of a count above 120 a minute). */
     if (!hand || reduce) return;
-    const cur = clock.times.filter((t) => t.at <= ctx().currentTime).pop();
-    if (!cur) return;
+    const cur = clock.heard();
+    if (!cur || !clock.sched) return;
     const next = clock.counts[(cur.index + 1) % clock.counts.length];
     const lead = clock.bpm > 120 ? clock.countSeconds * 0.25 : 0.12;
-    if (next.action === "clap" && cur.at + clock.countSeconds - ctx().currentTime < lead + 1 / 60) hand.dataset.lifting = "";
+    const heardNow = ctx().currentTime - latency();
+    if (next.action === "clap" && clock.sched.timeOf(cur.n + 1) - heardNow < lead + 1 / 60) hand.dataset.lifting = "";
   };
   clock.onStop = () => {
     cells.forEach((c) => c.classList.remove("is-now"));

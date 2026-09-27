@@ -5,6 +5,7 @@
  */
 import { TalaClock, type ClockCount } from "./tala";
 import { playNote, ctx } from "./audio";
+import { latency } from "./timing";
 import { ratio, semitones, tokenize, variantsOf } from "../notation";
 
 export interface Exercise {
@@ -62,7 +63,7 @@ export class Player {
     return this.saHz * ratio(semitones(t.swara, v) + 12 * (t.octave ?? 0), this.tuning);
   }
 
-  private schedule(at: number, countSeconds: number) {
+  private schedule(at: number, countSeconds: number): void {
     if (this.ended) return;
     const g = this.g++;
     const where = this.locate(g);
@@ -74,7 +75,7 @@ export class Player {
       }
       const done = this.runs.map((r) => r.speed);
       this.ended = true;
-      window.setTimeout(() => { this.stop(); this.onDone(done); }, Math.max(0, (at - ctx().currentTime) * 1000));
+      window.setTimeout(() => { this.stop(); this.onDone(done); }, Math.max(0, (at + latency() - ctx().currentTime) * 1000));
       return;
     }
     const run = this.runs[where.runIndex];
@@ -94,7 +95,8 @@ export class Player {
     const avStart = avIndex * counts * run.perCount;
     const av: string[][] = [];
     for (let c = 0; c < counts; c++) av.push(run.notes.slice(avStart + c * run.perCount, avStart + (c + 1) * run.perCount));
-    const delay = Math.max(0, (at - ctx().currentTime) * 1000);
+    // Shown when it is heard: the scheduled time plus the output latency.
+    const delay = Math.max(0, (at + latency() - ctx().currentTime) * 1000);
     window.setTimeout(() => this.onView(run, where.runIndex, av, k % counts), delay);
   }
 

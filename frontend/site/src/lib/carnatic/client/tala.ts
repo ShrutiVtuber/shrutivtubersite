@@ -1,26 +1,36 @@
-/* The tala clock: schedules each count on the audio clock (so the beat never
- * drifts with the page's frame rate) and tells the page which count is
- * sounding, for the grid's playhead and the hand.
+/* The tala clock: schedules each count on the audio clock and tells the page
+ * which count is being heard, for the grid's playhead, the hand and scoring.
+ *
+ * - No gap between avartanams and no drift: count n sounds at
+ *   start + n × count (beatclock.ts), handed to Web Audio 150 ms ahead by a
+ *   25 ms refill timer; a cycle is never scheduled when the one before ends.
+ *   With the tab hidden (timers slowed to about once a second) it schedules
+ *   further ahead; back in view it re-anchors to the next count ahead.
+ * - One source of truth: the hand, the grid and the scoring read the same
+ *   AudioContext clock, less the output's latency (what is heard now).
  *
  * Speed 1 is 60 counts a minute by default (DECISIONS tala §6). The tala never
  * speeds up for the faster speeds; only the melody doubles.
  */
 import { ctx, talaSound } from "./audio";
+import { BeatScheduler, type Beat } from "../beatclock";
+import { latency } from "./timing";
 
 export interface ClockCount { n: number; action: "clap" | "finger" | "wave" | "silent"; finger?: string; samam?: boolean }
 
+export const LOOKAHEAD = 0.15;
+export const LOOKAHEAD_HIDDEN = 1.5;
+export const REFILL_MS = 25;
+
 export class TalaClock {
   counts: ClockCount[];
-  bpm: number;
+  private _bpm: number;
   nadai = 4;
   sound = true;
-  /** When each count of the current run was scheduled (AudioContext time). */
-  times: { at: number; index: number; cycle: number }[] = [];
+  sched: BeatScheduler | null = null;
   private timer: number | null = null;
   private raf = 0;
-  private next = 0;
-  private index = 0;
-  private cycle = 0;
+  private onVisible = () => {};
   onCount: (index: number, cycle: number) => void = () => {};
   onMatra: (index: number, matra: number) => void = () => {};
   onStop: () => void = () => {};
@@ -30,43 +40,52 @@ export class TalaClock {
 
   constructor(counts: ClockCount[], bpm = 60) {
     this.counts = counts;
-    this.bpm = bpm;
+    this._bpm = bpm;
   }
 
   get playing() { return this.timer !== null; }
-  get countSeconds() { return 60 / this.bpm; }
+  get countSeconds() { return 60 / this._bpm; }
+  get bpm() { return this._bpm; }
+  /** A new tempo while playing takes over from the next unscheduled count, without a jump. */
+  set bpm(v: number) {
+    this._bpm = v;
+    if (this.sched) this.sched.retempo(60 / v, ctx().currentTime);
+  }
+
+  /** The count being heard now (AudioContext time less the output latency). */
+  heard(): Beat | null {
+    return this.sched?.beatAt(ctx().currentTime - latency()) ?? null;
+  }
 
   start(delay = 0.15) {
     this.stop();
     const ac = ctx();
-    this.next = ac.currentTime + delay;
-    this.index = 0;
-    this.cycle = 0;
-    this.times = [];
+    void ac.resume?.();
+    const sched = (this.sched = new BeatScheduler(ac.currentTime + delay, this.countSeconds, this.counts.length));
     const tick = () => {
-      const now = ctx().currentTime;
-      while (this.next < now + 0.25) {
-        const c = this.counts[this.index];
-        if (this.sound) talaSound(c.action, this.next, { samam: c.samam, finger: c.finger });
-        this.onSchedule(this.index, this.cycle, this.next, this.countSeconds);
-        this.times.push({ at: this.next, index: this.index, cycle: this.cycle });
-        if (this.times.length > 64) this.times.shift();
-        this.next += this.countSeconds;
-        this.index += 1;
-        if (this.index >= this.counts.length) { this.index = 0; this.cycle += 1; }
+      const ahead = document.hidden ? LOOKAHEAD_HIDDEN : LOOKAHEAD;
+      for (const b of sched.due(ctx().currentTime, ahead)) {
+        const c = this.counts[b.index];
+        if (this.sound) talaSound(c.action, b.at, { samam: c.samam, finger: c.finger });
+        this.onSchedule(b.index, b.cycle, b.at, sched.beat);
       }
     };
     tick();
-    this.timer = window.setInterval(tick, 40);
+    this.timer = window.setInterval(tick, REFILL_MS);
+    this.onVisible = () => {
+      if (document.hidden) return;
+      void ctx().resume?.();
+      sched.reanchor(ctx().currentTime);
+      tick();
+    };
+    document.addEventListener("visibilitychange", this.onVisible);
     let shown = -1, shownMatra = -1;
     const frame = () => {
-      const now = ctx().currentTime;
-      const past = this.times.filter((t) => t.at <= now);
-      const cur = past[past.length - 1];
+      const t = ctx().currentTime - latency();
+      const cur = sched.beatAt(t);
       if (cur) {
-        const key = cur.cycle * 1000 + cur.index;
-        if (key !== shown) { shown = key; this.onCount(cur.index, cur.cycle); }
-        const matra = Math.min(this.nadai - 1, Math.floor(((now - cur.at) / this.countSeconds) * this.nadai));
+        if (cur.n !== shown) { shown = cur.n; shownMatra = -1; this.onCount(cur.index, cur.cycle); }
+        const matra = Math.min(this.nadai - 1, Math.floor(((t - cur.at) / sched.beat) * this.nadai));
         if (matra !== shownMatra) { shownMatra = matra; this.onMatra(cur.index, matra); }
       }
       this.onFrame();
@@ -78,25 +97,17 @@ export class TalaClock {
   stop() {
     if (this.timer !== null) window.clearInterval(this.timer);
     this.timer = null;
+    document.removeEventListener("visibilitychange", this.onVisible);
     cancelAnimationFrame(this.raf);
     this.onStop();
   }
 
-  /** The scheduled count nearest a moment, for tap scoring. */
-  nearest(at: number): { at: number; index: number; delta: number } | null {
-    let best: { at: number; index: number; delta: number } | null = null;
-    for (const t of this.times) {
-      const delta = at - t.at;
-      if (!best || Math.abs(delta) < Math.abs(best.delta)) best = { at: t.at, index: t.index, delta };
-    }
-    return best;
+  /** The count nearest a tap (AudioContext time); `at` is the count's scheduled time. */
+  nearest(tapAt: number): { at: number; index: number; cycle: number } | null {
+    const hit = this.sched?.nearest(tapAt - latency());
+    return hit ? { at: hit.beat.at, index: hit.beat.index, cycle: hit.beat.cycle } : null;
   }
 }
 
-/** Tap rating (Foundations v2 §04b): perfect ±30 ms, on time ±80 ms, otherwise early or late. Never red. */
-export function rate(deltaMs: number): "perfect" | "ontime" | "early" | "late" {
-  const a = Math.abs(deltaMs);
-  if (a <= 30) return "perfect";
-  if (a <= 80) return "ontime";
-  return deltaMs < 0 ? "early" : "late";
-}
+/** Tap rating (Foundations v2 §04b, windows from the Timing setting): perfect, on time, early or late. Never red. */
+export { rate } from "../beatclock";
