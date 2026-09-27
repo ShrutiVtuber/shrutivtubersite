@@ -1,0 +1,163 @@
+---
+/* Annotating a recording (artboard D5; LISTENING.md §2, §6): the player with
+ * her sections, clips and beat map on lanes under it; "add clip at 3:12",
+ * "mark section", and tapping the beat map with the space bar (each tap a
+ * samam), with taps far off the smoothed tempo flagged for a second look;
+ * the marks the ear trainer drills on (transcriptions, gamakas, korvai
+ * landings); and what the recording is: raga, tala, form, instrument, what
+ * to listen for. Nothing loads from the provider until she presses Load.
+ */
+import StudioLayout from "../../../../layouts/StudioLayout.astro";
+import { notFound } from "../../../../lib/carnatic/notfound";
+import { studio, studioGate } from "../../../../lib/carnatic/course";
+
+const gate = await studioGate(Astro);
+if (gate) return gate;
+const r = await studio(Astro, `/recordings/${encodeURIComponent(Astro.params.id!)}`);
+if (!r) return notFound(Astro);
+const m = r.marks ?? {};
+const lines = {
+  transcriptions: (m.transcriptions ?? []).map((x: any) => `${x.start}-${x.end} | ${x.sargam}`).join("\n"),
+  gamakas: (m.gamakas ?? []).map((x: any) => `${x.t} | ${x.gamakas.join(", ")}`).join("\n"),
+  korvais: (m.korvais ?? []).map((x: any) => `${x.start} | ${x.landing}`).join("\n"),
+};
+---
+<StudioLayout title={`Annotate ${r.id}`}>
+  <div class="sa-head"><a class="lr-link" href={`/carnatic/studio/recordings?view=${r.status === "approved" ? "approved" : "queue"}`}>‹ Recordings</a>
+    <h1>{[r.composition || r.title, r.raga, r.instrument].filter(Boolean).join(" · ")}</h1><span class="spacer"></span>
+    <small>{r.duration && `${r.duration} · `}{r.status}{r.approvedAt && ` · approved ${new Date(r.approvedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}`}</small></div>
+  <div class="sa-edit" data-annot>
+    <div style="display:grid;gap:12px">
+      <div class="an-player"><div data-player><button type="button" class="lr-btn" data-load>Load the recording</button><small class="sa-soft">{r.provider} · {r.url}</small></div>
+        <div class="row"><span data-now>0:00</span><span data-dur>{r.duration}</span></div></div>
+      <div class="sa-card">
+        <div class="sa-lane"><span>Sections</span><div class="sa-track" data-lane="sections"></div></div>
+        <div class="sa-lane"><span>Clips</span><div class="sa-track" data-lane="clips"></div></div>
+        <div class="sa-lane"><span>Beat map</span><div class="sa-track" data-lane="beats"></div></div>
+      </div>
+      <div class="sa-row"><button type="button" class="sa-btn" data-add-clip>Add clip at <span data-now2>0:00</span></button><button type="button" class="sa-btn" data-add-section>Mark section</button>
+        <button type="button" class="sa-btn" data-tap-mode aria-pressed="false">Tap the beat map (space)</button><button type="button" class="sa-btn" data-clear-beats>Clear taps</button>
+        <span style="flex:1"></span><button type="button" class="sa-btn primary" data-save>Save</button></div>
+      <p class="sa-soft" data-note></p>
+      <div class="sa-card"><b>Clips</b> <span class="sa-soft">start, end, label. The drills and Listening room play only these ranges.</span><ul class="sa-list" data-clips></ul></div>
+      <div class="sa-card"><b>Sections</b> <span class="sa-soft">time and label (pallavi, anupallavi, charanam, alapana, tanam, niraval, kalpanaswaram, tani…). They're the answer keys for form drills and analyses.</span><ul class="sa-list" data-sections></ul></div>
+      <div class="sa-card"><b>Marks for the ear trainer</b>
+        <div class="sa-form" style="margin-top:8px">
+          <label class="wide">Transcriptions (PD.09), one a line: start-end | sargam<textarea rows="2" data-marks="transcriptions">{lines.transcriptions}</textarea></label>
+          <label class="wide">Gamakas (GM.07), one a line: time | gamaka names<textarea rows="2" data-marks="gamakas">{lines.gamakas}</textarea></label>
+          <label class="wide">Korvai landings (TL.11), one a line: start | landing in seconds<textarea rows="2" data-marks="korvais">{lines.korvais}</textarea></label>
+        </div></div>
+    </div>
+    <div style="display:grid;gap:12px;align-content:start">
+      <div class="sa-card"><b>Beat map</b> <span class="sa-soft" data-pass></span>
+        <p class="sa-soft">Tap along once with the space bar, one tap a samam, then correct. Taps more than 80 ms off the smoothed tempo are listed for a second look.</p>
+        <ul class="sa-list" data-beat-flags></ul><p class="sa-soft" data-beat-sum></p>
+        <label class="sa-soft">Tala of the beat map <input class="sa-btn" data-bm-tala value={r.beatMap?.tala || r.tala || "adi"} /></label></div>
+      <div class="sa-card"><b>What it is</b>
+        <div class="sa-form" style="margin-top:8px" data-meta>
+          <label>Raga<input name="raga" value={r.raga} /></label><label>Tala<input name="tala" value={r.tala} /></label>
+          <label>Form<input name="form" value={r.form} /></label><label>Instrument<input name="instrument" value={r.instrument} /></label>
+          <label class="wide">Composition<input name="composition" value={r.composition} /></label>
+          <label class="wide">Composer<input name="composer" value={r.composer} /></label>
+          <label class="wide">Listen for<textarea name="listenFor" rows="3">{r.listenFor}</textarea></label>
+        </div>
+        {r.pageSays?.text && <p class="sa-soft">The page says: {r.pageSays.text}</p>}
+        {(r.flags ?? []).map((f: string) => <span class="sa-tag">{f}</span>)}
+      </div>
+    </div>
+  </div>
+  <script type="application/json" id="rec-data" set:html={JSON.stringify(r)} />
+</StudioLayout>
+
+<script>
+  import { loadPlayer, type Player } from "../../../../lib/carnatic/client/embed";
+  import { csrf } from "../../../../lib/carnatic/client/state";
+  const R = JSON.parse(document.getElementById("rec-data")!.textContent!);
+  const esc = (s: string) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
+  const toS = (t?: string | null) => (t ? String(t).split(":").reduce((a, x) => a * 60 + Number(x), 0) : 0);
+  const clock = (s: number) => `${Math.floor(s / 60)}:${(s % 60).toFixed(1).padStart(4, "0")}`;
+  const $ = <T extends HTMLElement = HTMLElement>(s: string) => document.querySelector<T>(s)!;
+  let clips: any[] = [...(R.clips ?? [])];
+  let sections: any[] = [...(R.sections ?? [])];
+  let samam: number[] = [...(R.beatMap?.samam ?? [])];
+  let player: Player | null = null;
+  let last = { time: 0, at: 0 };
+  const now = () => (player?.time() == null ? 0 : last.time + (performance.now() - last.at) / 1000);
+  $("[data-load]").addEventListener("click", () => {
+    player = loadPlayer($("[data-player]"), R.provider, R.url, {});
+    player.onTime((s) => { last = { time: s, at: performance.now() }; });
+  });
+  setInterval(() => { const t = clock(now()); $("[data-now]").textContent = t; $("[data-now2]").textContent = t.replace(/\.\d$/, ""); }, 200);
+  const dur = () => Math.max(toS(R.duration) || 0, ...samam, ...sections.map((x) => toS(x.t)), ...clips.map((x) => toS(x.end)), now(), 60);
+  const drawLanes = () => {
+    const d = dur();
+    const pos = (s: number) => `${(s / d) * 100}%`;
+    $("[data-lane=sections]").innerHTML = sections.map((x, i) => `<i style="left:${pos(toS(x.t))};right:${sections[i + 1] ? `calc(100% - ${pos(toS(sections[i + 1].t))})` : "0"}">${esc(x.label)}</i>`).join("");
+    $("[data-lane=clips]").innerHTML = clips.map((x) => `<i class="clip" style="left:${pos(toS(x.start))};width:${((toS(x.end) - toS(x.start)) / d) * 100}%">${esc(x.label)}</i>`).join("");
+    $("[data-lane=beats]").innerHTML = samam.map((s) => `<i class="beat" style="left:${pos(s)}"></i>`).join("");
+  };
+  const drawLists = () => {
+    $("[data-clips]").innerHTML = clips.map((c, i) => `<li><input value="${esc(c.start)}" data-c="${i}" data-k="start"><input value="${esc(c.label)}" data-c="${i}" data-k="label" placeholder="label"><span class="sa-row"><input value="${esc(c.end)}" data-c="${i}" data-k="end" style="width:70px"><button type="button" class="lr-link" data-rm-c="${i}">Remove</button></span></li>`).join("") || `<li class="sa-soft">No clips yet.</li>`;
+    $("[data-sections]").innerHTML = sections.map((c, i) => `<li><input value="${esc(c.t)}" data-s="${i}" data-k="t"><input value="${esc(c.label)}" data-s="${i}" data-k="label"><button type="button" class="lr-link" data-rm-s="${i}">Remove</button></li>`).join("") || `<li class="sa-soft">No sections yet.</li>`;
+    document.querySelectorAll<HTMLInputElement>("[data-c]").forEach((x) => x.addEventListener("change", () => { clips[Number(x.dataset.c)][x.dataset.k!] = x.value; drawLanes(); }));
+    document.querySelectorAll<HTMLInputElement>("[data-s]").forEach((x) => x.addEventListener("change", () => { sections[Number(x.dataset.s)][x.dataset.k!] = x.value; drawLanes(); }));
+    document.querySelectorAll<HTMLElement>("[data-rm-c]").forEach((b) => b.addEventListener("click", () => { clips.splice(Number(b.dataset.rmC), 1); drawAll(); }));
+    document.querySelectorAll<HTMLElement>("[data-rm-s]").forEach((b) => b.addEventListener("click", () => { sections.splice(Number(b.dataset.rmS), 1); drawAll(); }));
+  };
+  const drawBeats = () => {
+    const iv = samam.slice(1).map((s, i) => s - samam[i]);
+    const flags: string[] = [];
+    iv.forEach((d, i) => {
+      const win = iv.slice(Math.max(0, i - 3), i + 4).filter((_, j) => j !== Math.min(3, i)).sort((a, b) => a - b);
+      const med = win[Math.floor(win.length / 2)] ?? d;
+      const off = (d - med) * 1000;
+      if (Math.abs(off) > 80) flags.push(`<li><span class="mono">${clock(samam[i + 1])}</span><span>${Math.abs(off) > med * 500 ? "double tap?" : `${Math.round(Math.abs(off))} ms ${off < 0 ? "early" : "late"}`}</span><button type="button" class="lr-link" data-rm-b="${i + 1}">Remove</button></li>`);
+    });
+    $("[data-beat-flags]").innerHTML = flags.join("") || (samam.length > 2 ? `<li class="sa-soft">No tap is far off the smoothed tempo.</li>` : "");
+    const avg = iv.length ? iv.reduce((a, b) => a + b, 0) / iv.length : 0;
+    $("[data-beat-sum]").textContent = samam.length ? `${samam.length} samams · ${samam.length - 1} avartanams${avg ? ` · about ${avg.toFixed(2)} s an avartanam` : ""}` : "No beat map yet.";
+    document.querySelectorAll<HTMLElement>("[data-rm-b]").forEach((b) => b.addEventListener("click", () => { samam.splice(Number(b.dataset.rmB), 1); drawAll(); }));
+  };
+  const drawAll = () => { drawLanes(); drawLists(); drawBeats(); };
+  drawAll();
+  $("[data-add-clip]").addEventListener("click", () => {
+    const s = Math.floor(now());
+    clips.push({ id: String.fromCharCode(97 + clips.length), start: clock(s).replace(/\.\d$/, ""), end: clock(s + 30).replace(/\.\d$/, ""), label: "" });
+    drawAll();
+  });
+  $("[data-add-section]").addEventListener("click", () => {
+    const label = prompt("Which section starts here? (pallavi, anupallavi, charanam, alapana, tanam, niraval, kalpanaswaram, tani…)");
+    if (!label) return;
+    sections.push({ t: clock(now()).replace(/\.\d$/, ""), label: label.trim() });
+    sections.sort((a, b) => toS(a.t) - toS(b.t));
+    drawAll();
+  });
+  const tapBtn = $("[data-tap-mode]");
+  let tapping = false;
+  tapBtn.addEventListener("click", () => { tapping = !tapping; tapBtn.setAttribute("aria-pressed", String(tapping)); tapBtn.classList.toggle("ok", tapping); $("[data-note]").textContent = tapping ? "Tapping: press the space bar on each samam. Press the button again to stop." : ""; });
+  document.addEventListener("keydown", (e) => {
+    if (!tapping || e.code !== "Space" || (e.target as HTMLElement)?.closest("input, textarea")) return;
+    e.preventDefault();
+    if (!player) { $("[data-note]").textContent = "Load the recording and press play first."; return; }
+    samam.push(Math.round(now() * 1000) / 1000);
+    samam.sort((a, b) => a - b);
+    drawLanes(); drawBeats();
+  });
+  $("[data-clear-beats]").addEventListener("click", () => { if (confirm("Clear every tap of the beat map?")) { samam = []; drawAll(); } });
+  const marks = () => {
+    const rows = (k: string) => ($(`[data-marks="${k}"]`) as HTMLTextAreaElement).value.split("\n").map((x) => x.trim()).filter(Boolean).map((x) => x.split("|").map((y) => y.trim()));
+    return {
+      transcriptions: rows("transcriptions").map(([range, sargam]) => { const [start, end] = (range ?? "").split("-").map((y) => y.trim()); return { start, end, sargam }; }),
+      gamakas: rows("gamakas").map(([t, g]) => ({ t, gamakas: (g ?? "").split(",").map((y) => y.trim()).filter(Boolean) })),
+      korvais: rows("korvais").map(([start, landing]) => ({ start, landing: Number(landing) })),
+    };
+  };
+  $("[data-save]").addEventListener("click", async () => {
+    const meta: Record<string, string> = {};
+    document.querySelectorAll<HTMLInputElement>("[data-meta] [name]").forEach((x) => { meta[x.name] = x.value; });
+    const tala = $<HTMLInputElement>("[data-bm-tala]").value.trim();
+    const body = { clips, sections, marks: marks(), ...(samam.length ? { beatMap: { clip: clips[0]?.id ?? null, tala, samam } } : { clearBeatMap: true }), ...meta };
+    const r = await fetch(`/api/carnatic/studio/recordings/${R.id}`, { method: "PUT", headers: { "content-type": "application/json", "x-csrf-token": csrf() }, body: JSON.stringify(body) });
+    $("[data-note]").textContent = r.ok ? "Saved." : `Didn't save (${r.status}).`;
+  });
+</script>

@@ -1,0 +1,218 @@
+---
+/* The lesson editor (artboard D2; README_v2 §9): the front matter as a
+ * form, the body as plain text (embed tags stay as text), the checks in
+ * words ("two things to look at before publishing"), the open editor notes,
+ * a live preview drawn by the same renderer the reader uses, the revision
+ * history with restore, and "a newer file version exists" when the course
+ * files moved on after she edited it here. Saving a draft is never blocked;
+ * a change of more than a typo asks once whether it changes the meaning.
+ */
+import StudioLayout from "../../../../layouts/StudioLayout.astro";
+import { notFound } from "../../../../lib/carnatic/notfound";
+import { drills, glossary, studio, studioGate, units as loadUnits } from "../../../../lib/carnatic/course";
+import { ragas as loadRagas, talas as loadTalas } from "../../../../lib/carnatic/data";
+
+const gate = await studioGate(Astro);
+if (gate) return gate;
+const id = Astro.params.id!;
+const lang = Astro.url.searchParams.get("lang") ?? "en";
+const l = await studio(Astro, `/lessons/${encodeURIComponent(id)}?lang=${lang}`);
+if (!l) return notFound(Astro);
+const unit = Number(id.slice(1, 3));
+const [exs, gl, dr, us, rd, td, recs] = await Promise.all([
+  studio(Astro, `/exercises?unit=${unit}`), glossary(), drills(), loadUnits(Astro, true), loadRagas(), loadTalas(), studio(Astro, "/recordings"),
+]);
+const f = l.front ?? {};
+const ragaMap: Record<string, any> = {};
+for (const r of [...(rd?.janyas ?? []), ...(rd?.performed ?? [])]) ragaMap[r.id] = { name: r.name, arohana: r.arohana, avarohana: r.avarohana, parent: `mela ${r.parent?.number}` };
+const melas: Record<number, any> = {};
+for (const m of rd?.melakartas ?? []) { melas[m.number] = { name: m.name, arohana: m.arohana, avarohana: m.avarohana, chakra: m.chakra?.name }; ragaMap[m.id] = ragaMap[m.id] ?? { name: m.name, arohana: m.arohana, avarohana: m.avarohana }; }
+const talaNames: Record<string, string> = {};
+for (const t of td?.practical ?? []) talaNames[t.id] = t.name;
+const recordings: Record<string, any> = {};
+for (const r of recs?.items ?? []) recordings[r.id] = { id: r.id, available: r.status === "approved", label: r.composition || r.title || r.id, provider: r.provider, url: r.url, raga: r.raga, clips: r.clips, status: r.status };
+const lessonTitles: Record<string, any> = {};
+for (const u of us) for (const x of u.lessons) lessonTitles[x.id] = { title: x.title, slug: x.slug };
+const ctxData = {
+  glossary: gl, exercises: Object.fromEntries((exs?.items ?? []).map((e: any) => [e.id, { ...e.data, id: e.id, kind: e.kind }])),
+  recordings, ragas: ragaMap, melas, talaNames, lessonTitles, lessonId: id, slug: l.slug,
+  drillTitles: Object.fromEntries((dr?.levels ?? []).map((d) => [d.id, d.title])),
+  selftests: Object.fromEntries((dr?.talaKeeping ?? []).map((k: any) => [k.id, { title: k.title }])),
+  unitTitles: Object.fromEntries(us.map((u) => [u.n, u.title])),
+};
+const join = (a: any) => (Array.isArray(a) ? a.join(", ") : "");
+const recLines = (f.recordings ?? []).map((r: any) => `${r.id ?? r} · ${r.why ?? ""}`).join("\n");
+const srcLines = (f.sources ?? []).map((s: any) => [s.key, s.cite, s.research || s.url || "", s.confidence || ""].join(" | ")).join("\n");
+const page = { id, lang, status: l.status, revision: l.revision, front: f, body: l.body, check: l.check, newerFile: l.newerFile, ctx: ctxData };
+---
+<StudioLayout title={`${id} · ${f.title ?? ""}`}>
+  <div class="sa-head">
+    <a class="lr-link" href="/carnatic/studio/lessons">‹ Lessons</a>
+    <h1>{id} · <span data-title-h>{f.title}</span></h1>
+    <span class="spacer"></span>
+    <span class="sa-pill" data-status>{l.status} · revision {l.revision}</span>
+    <button type="button" class="lr-link" data-history>History</button>
+    {l.status === "published" && <a class="lr-link" href={`/carnatic/learn/${l.slug}`} target="_blank">Open on the site</a>}
+    {l.status !== "published" && <a class="lr-link" href={`/carnatic/learn/${l.slug}?preview=true`} target="_blank">Preview on the site</a>}
+    <select data-status-pick aria-label="Status"><option value="draft">draft</option><option value="review">review</option><option value="published">published</option></select>
+    <button type="button" class="sa-btn" data-save>Save</button>
+    <button type="button" class="sa-btn primary" data-publish>Publish</button>
+  </div>
+  {l.newerFile && (
+    <div class="sa-banner" data-newer><b>A newer file version exists.</b> The course files changed after you edited this lesson here; your version is kept until you choose.
+      <button type="button" class="sa-btn" data-take-file>Take the file version</button><button type="button" class="sa-btn" data-show-file>Show the file version</button></div>
+  )}
+  <div class="sa-checks" data-checks></div>
+  <div class="sa-edit">
+    <div style="display:grid;gap:14px">
+      <details class="sa-card" open>
+        <summary><b>Front matter</b></summary>
+        <div class="sa-form" data-front style="margin-top:12px">
+          <label class="wide">Title<input name="title" value={f.title ?? ""} /></label>
+          <label class="wide">Summary<textarea name="summary" rows="2">{f.summary ?? ""}</textarea></label>
+          <label>Level<select name="level">{["beginner", "intermediate", "advanced"].map((v) => <option value={v} selected={f.level === v}>{v}</option>)}</select></label>
+          <label>Minutes<input name="minutes" type="number" min="1" value={f.minutes ?? 15} /></label>
+          <label>Slug<input name="slug" value={f.slug ?? ""} /></label>
+          <label>Order<input name="order" type="number" value={f.order ?? 1} /></label>
+          <label class="wide">Goals (one a line)<textarea name="goals" rows="3">{(f.goals ?? []).join("\n")}</textarea></label>
+          <label>Prerequisites<input name="prerequisites" value={join(f.prerequisites)} /></label>
+          <label>Tools<input name="tools" value={join(f.tools)} /></label>
+          <label>Ragas<input name="ragas" value={join(f.ragas)} /></label>
+          <label>Talas<input name="talas" value={join(f.talas)} /></label>
+          <label class="wide">Exercises<input name="exercises" value={join(f.exercises)} /></label>
+          <label class="wide">Recordings (one a line: id · what to listen for)<textarea name="recordings" rows="3">{recLines}</textarea></label>
+          <label class="wide">Sources (one a line: key | cite | research path or URL | confidence)<textarea name="sources" rows="5" style="font-family:var(--font-mono);font-size:12px">{srcLines}</textarea></label>
+          <label>Author<input name="author" value={f.author ?? ""} /></label>
+          <label>Editor<input name="editor" value={f.editor ?? ""} /></label>
+        </div>
+      </details>
+      <div class="sa-card sa-body">
+        <div class="sa-row" style="justify-content:space-between;margin-bottom:6px"><span><b>Body</b> <span class="sa-soft">plain text · embed tags stay as text · editor notes are &lt;!-- --&gt;</span></span><span class="sa-soft" data-words></span></div>
+        <textarea data-body spellcheck="true">{l.body}</textarea>
+      </div>
+      <div class="sa-card" data-notes-card><b>Editor notes</b><ul class="sa-rev" data-notes></ul></div>
+    </div>
+    <div>
+      <p class="sa-soft" style="margin:0 0 6px">Live preview · what the reader sees</p>
+      <div class="sa-preview" data-preview></div>
+      <div class="sa-card" data-history-card hidden style="margin-top:12px"><b>Revision history</b><ul class="sa-rev" data-revs></ul></div>
+    </div>
+  </div>
+  <dialog class="sa-dialog" data-meaning>
+    <h2>Is this a change of meaning?</h2>
+    <p>You changed more than the wording. If the meaning changed, the revision goes up and the Tamil, Telugu and Kannada versions are marked out of date.</p>
+    <div class="sa-row" style="justify-content:flex-end"><button type="button" class="sa-btn" data-wording>Wording only</button><button type="button" class="sa-btn primary" data-meaning-yes>Yes, the meaning changed</button></div>
+  </dialog>
+  <script type="application/json" id="lesson-edit" set:html={JSON.stringify(page)} />
+</StudioLayout>
+
+<script>
+  import { renderLesson, footnoteOrder, countWords, confidenceLine } from "../../../../lib/carnatic/lesson";
+  import { csrf } from "../../../../lib/carnatic/client/state";
+  const P = JSON.parse(document.getElementById("lesson-edit")!.textContent!);
+  const esc = (s: string) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const $ = <T extends HTMLElement = HTMLElement>(s: string) => document.querySelector<T>(s)!;
+  const body = $<HTMLTextAreaElement>("[data-body]");
+  const status = $<HTMLSelectElement>("[data-status-pick]");
+  status.value = P.status;
+  const list = (v: string) => v.split(",").map((x) => x.trim()).filter(Boolean);
+  const front = () => {
+    const g = (n: string) => ($(`[data-front] [name="${n}"]`) as HTMLInputElement).value;
+    const recordings = g("recordings").split("\n").map((x) => x.trim()).filter(Boolean).map((x) => { const [rid, ...why] = x.split("·"); return { id: rid.trim(), why: why.join("·").trim() }; });
+    const sources = g("sources").split("\n").map((x) => x.trim()).filter(Boolean).map((x) => {
+      const [key, cite, where, confidence] = x.split("|").map((y) => (y ?? "").trim());
+      return { key, cite, ...(/^https?:/.test(where) ? { url: where } : where ? { research: where } : {}), ...(confidence ? { confidence } : {}) };
+    });
+    return { ...P.front, title: g("title"), summary: g("summary"), level: g("level"), minutes: Number(g("minutes")) || 15, slug: g("slug"), order: Number(g("order")) || 1,
+      goals: g("goals").split("\n").map((x) => x.trim()).filter(Boolean), prerequisites: list(g("prerequisites")), tools: list(g("tools")),
+      ragas: list(g("ragas")), talas: list(g("talas")), exercises: list(g("exercises")), recordings, sources, author: g("author"), editor: g("editor") };
+  };
+  const preview = () => {
+    const f = front();
+    const order = footnoteOrder(body.value);
+    const sources = (f.sources as any[]).map((s) => ({ ...s, n: order.indexOf(s.key) + 1 || 999 })).sort((a, b) => a.n - b.n);
+    const r = renderLesson(body.value, { ...P.ctx, script: "lat", sources, href: (p: string) => p, saLabel: "C3", strict: true });
+    $("[data-words]").textContent = `${countWords(body.value).toLocaleString("en")} words`;
+    $("[data-preview]").innerHTML = `<p class="lr-eyebrow-top">Unit ${f.unit} · Lesson ${f.order} · ${esc(f.level)} · ${f.minutes} min</p><h1 class="lr-title">${esc(f.title)}</h1>`
+      + (f.summary ? `<p class="lr-lede">${esc(f.summary)}</p>` : "")
+      + (f.goals.length ? `<div class="lr-goals"><span class="t-eyebrow">By the end of this lesson you can</span><ul>${f.goals.map((x: string) => `<li>${esc(x)}</li>`).join("")}</ul></div>` : "")
+      + `<div class="lr-prose">${r.html}</div>`
+      + (sources.length ? `<section class="lr-sources"><h2 class="t-eyebrow">Sources</h2><ol>${sources.filter((s) => s.n < 999).map((s) => `<li><b>${s.n}</b><span>${esc(s.cite)}${confidenceLine(s.confidence) ? `<small>${esc(confidenceLine(s.confidence))}</small>` : ""}</span></li>`).join("")}</ol></section>` : "");
+    $("[data-title-h]").textContent = f.title;
+  };
+  const drawCheck = (c: any) => {
+    if (!c) return;
+    const blocks = c.problems.filter((p: any) => p.blocksPublishing);
+    const rest = c.problems.filter((p: any) => !p.blocksPublishing);
+    const n = c.problems.length;
+    $("[data-checks]").innerHTML = n ? `<b>${n === 1 ? "One thing" : `${["", "", "Two", "Three", "Four", "Five", "Six"][n] ?? n} things`} to look at before publishing</b>`
+      + blocks.map((p: any) => `<p class="blocks">${esc(p.text)} <span class="sa-soft">(publishing waits for this)</span></p>`).join("")
+      + rest.map((p: any) => `<p class="blocks">${esc(p.text)}</p>`).join("") + `<p class="sa-soft">Saving a draft is never blocked.</p>`
+      : `<b>Nothing to look at: this lesson can be published.</b>`;
+    $("[data-notes]").innerHTML = (c.notes ?? []).length ? c.notes.map((x: string) => `<li>${esc(x)}</li>`).join("") : `<li class="sa-soft">No open notes.</li>`;
+    ($("[data-publish]") as HTMLButtonElement).disabled = !c.publishable;
+  };
+  drawCheck(P.check);
+  let t = 0;
+  const check = () => {
+    window.clearTimeout(t);
+    t = window.setTimeout(async () => {
+      const r = await fetch(`/api/carnatic/studio/lessons/${P.id}/check?lang=${P.lang}`, { method: "POST", headers: { "content-type": "application/json", "x-csrf-token": csrf() }, body: JSON.stringify({ front: front(), body: body.value }) });
+      if (r.ok) drawCheck(await r.json());
+    }, 700);
+  };
+  let pt = 0;
+  const onEdit = () => { window.clearTimeout(pt); pt = window.setTimeout(preview, 250); check(); };
+  body.addEventListener("input", onEdit);
+  document.querySelectorAll("[data-front] input, [data-front] textarea, [data-front] select").forEach((x) => x.addEventListener("input", onEdit));
+  preview();
+
+  const save = async (st: string, meaningChange?: boolean): Promise<void> => {
+    const r = await fetch(`/api/carnatic/studio/lessons/${P.id}?lang=${P.lang}`, { method: "PUT", headers: { "content-type": "application/json", "x-csrf-token": csrf() },
+      body: JSON.stringify({ front: front(), body: body.value, status: st, ...(meaningChange !== undefined ? { meaningChange } : {}) }) });
+    const d = await r.json().catch(() => null);
+    if (r.status === 409 && d?.code === "MEANING_PROMPT") {
+      const dlg = $<HTMLDialogElement>("[data-meaning]");
+      dlg.showModal();
+      const answer = await new Promise<boolean | null>((res) => {
+        $("[data-wording]").onclick = () => res(false);
+        $("[data-meaning-yes]").onclick = () => res(true);
+        dlg.onclose = () => res(null);
+      });
+      dlg.close();
+      if (answer !== null) return save(st, answer);
+      return;
+    }
+    if (r.status === 422 && d?.check) { drawCheck(d.check); $("[data-status]").textContent = "Not published: fix the things above first."; return; }
+    if (!r.ok) { $("[data-status]").textContent = `Didn't save (${r.status})`; return; }
+    P.status = d.status; P.revision = d.revision; P.body = body.value;
+    $("[data-status]").textContent = `${d.status} · revision ${d.revision} · saved`;
+    drawCheck(d.check);
+  };
+  $("[data-save]").addEventListener("click", () => void save(status.value === "published" && P.status !== "published" ? P.status : status.value));
+  $("[data-publish]").addEventListener("click", () => void save("published"));
+
+  // history
+  $("[data-history]").addEventListener("click", async () => {
+    const card = $("[data-history-card]");
+    card.hidden = !card.hidden;
+    if (card.hidden) return;
+    const r = await fetch(`/api/carnatic/studio/lessons/${P.id}/revisions?lang=${P.lang}`).then((x) => x.json());
+    $("[data-revs]").innerHTML = r.items.map((x: any) => `<li><span>${new Date(x.at).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" })} · ${esc(x.source)}${x.by ? ` · ${esc(x.by)}` : ""} · revision ${x.revision}${x.meaningChange ? " · meaning changed" : ""}</span>`
+      + `<span class="sa-soft">${esc(x.changed)}${x.note ? ` · ${esc(x.note)}` : ""}</span><button type="button" class="lr-link" data-restore="${x.id}" style="justify-self:start">Restore this version</button></li>`).join("");
+    document.querySelectorAll<HTMLElement>("[data-restore]").forEach((b) => b.addEventListener("click", async () => {
+      if (!confirm("Restore this version? Your current text becomes a revision too, so nothing is lost.")) return;
+      const q = await fetch(`/api/carnatic/studio/lessons/${P.id}/restore/${b.dataset.restore}?lang=${P.lang}`, { method: "POST", headers: { "x-csrf-token": csrf() } });
+      if (q.ok) location.reload();
+    }));
+  });
+  document.querySelector("[data-take-file]")?.addEventListener("click", async () => {
+    if (!confirm("Replace your edited version with the file version? Your version stays in the history.")) return;
+    const q = await fetch(`/api/carnatic/studio/lessons/${P.id}/take-file?lang=${P.lang}`, { method: "POST", headers: { "x-csrf-token": csrf() } });
+    if (q.ok) location.reload();
+  });
+  document.querySelector("[data-show-file]")?.addEventListener("click", () => {
+    const w = window.open("", "_blank");
+    if (w) { w.document.title = `${P.id}: the file version`; w.document.body.innerHTML = `<pre style="white-space:pre-wrap;font:13px monospace;padding:16px">${esc(JSON.stringify(P.newerFile.front, null, 2))}\n\n${esc(P.newerFile.body)}</pre>`; }
+  });
+</script>

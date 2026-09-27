@@ -1,0 +1,75 @@
+---
+/* Moderation of the rooms (artboard D6): what three reporters hid, waiting
+ * for her, first; then what's reported but still visible; restore, remove,
+ * or remove with a strike (the practice room's suspension: she sets the
+ * days, 0 is until she lifts it). Reporters are never shown, here either.
+ * This week's most discussed, to read on stream. */
+import StudioLayout from "../../../layouts/StudioLayout.astro";
+import { studio, studioGate } from "../../../lib/carnatic/course";
+
+const gate = await studioGate(Astro);
+if (gate) return gate;
+const m = await studio(Astro, "/moderation");
+const items: any[] = m?.items ?? [];
+const waiting = items.filter((i) => i.hiddenBy === "reports");
+const visible = items.filter((i) => !i.hidden && i.reports > 0);
+const hiddenByHer = items.filter((i) => i.hiddenBy === "her");
+const REASON: Record<string, string> = { "not-about-this-exercise": "not about the brief", spam: "spam or advertising", abuse: "rude or harassing", hate: "hateful", sexual: "sexual or a minor", "self-harm": "someone may need help", other: "something else" };
+const what = (i: any) => i.kind === "comment" ? `Reply · ${i.author} · on piece #${i.workId}` : `${i.room === "carnatic-analysis" ? "Analysis" : "Practice piece"} · ${i.author}${i.title ? ` · “${i.title}”` : ""}`;
+const link = (i: any) => `/carnatic/room/${i.kind === "comment" ? i.workId : i.id}`;
+const strikesFor = (uid: number | null) => (m?.strikes ?? []).filter((s: any) => s.userId === uid).length;
+---
+<StudioLayout title="Moderation" counts={{ moderation: waiting.length }}>
+  <div class="sa-head"><h1>Moderation</h1><span class="spacer"></span><small>Reporters are never shown, including here. Listen posts and song sheets are moderated in <a href="/carnatic/admin?tab=moderation">Review</a>.</small></div>
+  <p class="t-eyebrow">Waiting for you · hidden by 3 reports</p>
+  <table class="sa-table"><tbody>
+    {waiting.length === 0 && <tr><td class="sa-soft">Nothing is waiting.</td></tr>}
+    {[...waiting, ...hiddenByHer].map((i) => (
+      <tr data-item={`${i.kind}/${i.id}`}>
+        <td style="width:50%"><span class="sa-soft">{what(i)}</span><br /><a href={link(i)} target="_blank">{i.excerpt || "(no text)"}</a></td>
+        <td class="sa-soft" style="width:24%">Reasons: {Object.entries(i.reasons).map(([k, v]) => `${REASON[k] ?? k} ×${v}`).join(" · ") || "none open"}<br />{strikesFor(i.authorId) ? `${strikesFor(i.authorId)} active strike` : "no active strike"}
+          {i.details.length > 0 && <><br />“{i.details.join("” · “")}”</>}{i.hiddenBy === "her" && <><br />hidden by you</>}</td>
+        <td style="text-align:right;white-space:nowrap"><button type="button" class="sa-btn" data-v="restore">Restore</button> <button type="button" class="sa-btn" data-v="remove">Remove</button> <button type="button" class="sa-btn" data-v="strike">Remove + strike</button><br /><span class="sa-soft" data-state></span></td>
+      </tr>
+    ))}
+  </tbody></table>
+  <p class="t-eyebrow" style="margin-top:24px">Reported, still visible · 1-2 reports</p>
+  <table class="sa-table"><tbody>
+    {visible.length === 0 && <tr><td class="sa-soft">Nothing reported.</td></tr>}
+    {visible.map((i) => (
+      <tr data-item={`${i.kind}/${i.id}`}><td><span class="sa-soft">{what(i)}</span> · <a href={link(i)} target="_blank">{(i.excerpt || "").slice(0, 90)}</a></td>
+        <td class="sa-soft">{i.reports} report{i.reports === 1 ? "" : "s"} · {Object.keys(i.reasons).map((k) => REASON[k] ?? k).join(", ")}</td>
+        <td style="text-align:right;white-space:nowrap"><button type="button" class="sa-btn" data-v="restore">Dismiss</button> <button type="button" class="sa-btn" data-v="hide">Hide</button> <span class="sa-soft" data-state></span></td></tr>
+    ))}
+  </tbody></table>
+  <div class="sa-card" style="margin-top:24px"><b>This week's most discussed · to read on stream</b>
+    <table class="sa-table" style="margin-top:6px"><tbody>{(m?.mostDiscussed ?? []).map((d: any) => <tr><td><a href={`/carnatic/room/${d.id}`} target="_blank">{d.room === "carnatic-analysis" ? "Analysis" : "Piece"} · {d.title || d.subject}</a></td><td class="sa-soft" style="text-align:right">{d.comments} replies · {d.votes} helpful</td></tr>)}
+      {(m?.mostDiscussed ?? []).length === 0 && <tr><td class="sa-soft">Quiet week.</td></tr>}</tbody></table></div>
+  <dialog class="sa-dialog" data-strike>
+    <h2>Remove and suspend from posting</h2>
+    <p>Posting and replying pause for this person; reading, lessons and drills stay open. The same strike as the practice room.</p>
+    <label class="sa-soft">Days (0 is until you lift it) <input type="number" min="0" max="3650" value="7" data-days class="sa-btn" style="width:80px" /></label>
+    <label class="sa-soft" style="display:block;margin-top:8px">The reason they're told<input data-reason class="sa-btn" style="width:100%" value="Your recent posts were removed after review." /></label>
+    <div class="sa-row" style="justify-content:flex-end;margin-top:12px"><button type="button" class="sa-btn" data-cancel>Cancel</button><button type="button" class="sa-btn primary" data-go>Remove + strike</button></div>
+  </dialog>
+</StudioLayout>
+
+<script>
+  import { csrf } from "../../../lib/carnatic/client/state";
+  const post = (url: string, body: unknown) => fetch(url, { method: "POST", headers: { "content-type": "application/json", "x-csrf-token": csrf() }, body: JSON.stringify(body) });
+  const dlg = document.querySelector<HTMLDialogElement>("[data-strike]")!;
+  document.querySelectorAll<HTMLElement>("[data-item]").forEach((row) => row.querySelectorAll<HTMLElement>("[data-v]").forEach((b) => b.addEventListener("click", async () => {
+    const v = b.dataset.v!;
+    let body: any = { outcome: v === "strike" ? "remove" : v };
+    if (v === "strike") {
+      dlg.showModal();
+      const ok = await new Promise<boolean>((res) => { dlg.querySelector<HTMLElement>("[data-go]")!.onclick = () => res(true); dlg.querySelector<HTMLElement>("[data-cancel]")!.onclick = () => res(false); dlg.onclose = () => res(false); });
+      dlg.close();
+      if (!ok) return;
+      body = { ...body, suspendDays: Number(dlg.querySelector<HTMLInputElement>("[data-days]")!.value || 0), reason: dlg.querySelector<HTMLInputElement>("[data-reason]")!.value };
+    }
+    const r = await post(`/api/carnatic/studio/moderation/${row.dataset.item}`, body);
+    row.querySelector("[data-state]")!.textContent = r.ok ? (v === "restore" ? "restored" : v === "hide" ? "hidden" : "removed") : `didn't work (${r.status})`;
+    if (r.ok) row.style.opacity = "0.5";
+  })));
+</script>

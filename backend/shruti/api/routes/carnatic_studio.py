@@ -14,6 +14,8 @@ their v1 endpoints under /api/carnatic/admin).
 """
 from __future__ import annotations
 
+import re
+
 from collections import Counter, defaultdict
 from datetime import datetime, timedelta, timezone
 
@@ -117,6 +119,31 @@ async def lesson(lesson_id: str, lang: str = "en", session: AsyncSession = Depen
     row = await _lesson(session, lesson_id, lang)
     check = course.check_lesson(row.front, row.body, await _exercise_ids(session), DRILL_IDS, await _exercise_kinds(session))
     return _lesson_admin(row, check)
+
+
+@router.post("/lessons/{lesson_id}/create", status_code=201)
+async def create_lesson(lesson_id: str, by: str = Depends(require_admin), session: AsyncSession = Depends(get_session)) -> dict:
+    """A draft for a lesson the syllabus plans but no file has written yet (format 2 front matter, empty body)."""
+    if await session.get(CarnaticLesson, (lesson_id, "en")) is not None:
+        raise HTTPException(409, "That lesson already exists.")
+    units = (await session.execute(select(CarnaticUnit))).scalars().all()
+    entry = next(((u, s) for u in units for s in (u.lessons or []) if s.get("id") == lesson_id), None)
+    if entry is None:
+        raise HTTPException(404, "The syllabus has no such lesson.")
+    u, s = entry
+    goals = [g.strip() for g in re.split(r";\s*", str(s.get("goals") or "")) if g.strip()]
+    front = {"format": 2, "id": lesson_id, "slug": s.get("slug") or lesson_id.lower().replace(".", "-"), "lang": "en",
+             "revision": 1, "status": "draft", "unit": u.n, "order": int(lesson_id[-2:]), "title": s.get("title", ""),
+             "summary": "", "level": s.get("level") if s.get("level") in ("beginner", "intermediate", "advanced") else "beginner",
+             "minutes": s.get("minutes") or 15, "goals": goals, "prerequisites": s.get("after") or [],
+             "tools": [], "ragas": [], "talas": [], "recordings": [], "sources": [], "exercises": [], "author": "", "editor": by}
+    row = CarnaticLesson(id=lesson_id, lang="en", front=front, body="", base_hash="", admin_edited=True,
+                         edited_at=_now(), edited_by=by, **course.lesson_fields(front))
+    session.add(row)
+    session.add(CarnaticLessonRevision(lesson_id=lesson_id, lang="en", revision=1, front=front, body="", source="admin",
+                                       by=by, note="started in the Studio", created_at=_now()))
+    await session.commit()
+    return {"id": lesson_id}
 
 
 class LessonDraft(BaseModel):
@@ -364,6 +391,18 @@ async def recordings(status: str | None = None, raga: str | None = None, form: s
             name = (u.display_name or "").strip() or "somebody" if u else "somebody"
         out.append(_rec(r, name))
     return {"items": out, "counts": counts}
+
+
+@router.get("/recordings/{rid}")
+async def one_recording(rid: str, session: AsyncSession = Depends(get_session)) -> dict:
+    r = await session.get(CarnaticRecording, rid)
+    if r is None:
+        raise HTTPException(404, "No such recording.")
+    name = None
+    if r.suggested_by:
+        u = await session.get(User, r.suggested_by)
+        name = ((u.display_name or "").strip() or "somebody") if u else "somebody"
+    return _rec(r, name)
 
 
 class Decision(BaseModel):

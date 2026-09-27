@@ -1,0 +1,97 @@
+---
+/* Exercises (artboard D3): a unit's quizzes item by item, with the key and
+ * whether the explanation is written; the preview as the learner sees it;
+ * and editing an exercise as data (format 2, FORMAT.md §4-§5). Items
+ * waiting for an annotation (answer: null) are marked, not hidden, here. */
+import StudioLayout from "../../../layouts/StudioLayout.astro";
+import { studio, studioGate } from "../../../lib/carnatic/course";
+
+const gate = await studioGate(Astro);
+if (gate) return gate;
+const unit = Number(Astro.url.searchParams.get("unit") ?? 1) || 1;
+const [exs, t] = await Promise.all([studio(Astro, `/exercises?unit=${unit}`), studio(Astro, "/tree")]);
+const items: any[] = exs?.items ?? [];
+const units: any[] = t?.units ?? [];
+const count = (k: string) => items.filter((e) => e.kind === k).length;
+const key = (it: any) => it.type === "generated" ? `generator ${it.generator}` : it.type === "match" ? `${(it.pairs ?? []).length} pairs`
+  : it.answer === null ? "waiting for your annotation" : Array.isArray(it.answer) ? it.answer.join(", ") : it.answer !== undefined ? String(it.answer) : it.accept ? it.accept.join(" / ") : "—";
+const TITLE: Record<string, string> = Object.fromEntries(units.flatMap((u) => u.lessons.map((l: any) => [l.id, l.title])));
+---
+<StudioLayout title={`Exercises · Unit ${unit}`}>
+  <div class="sa-head"><h1>Exercises · Unit {unit}</h1>
+    <select aria-label="Unit" data-unit-pick>{units.map((u) => <option value={u.n} selected={u.n === unit}>Unit {u.n}: {u.title}</option>)}</select>
+    <span class="spacer"></span><small>{count("quiz")} quizzes · {count("tap")} tap tasks · {count("practice")} practice pieces · {count("listening")} listening · {count("checkpoint")} checkpoint</small></div>
+  <div class="sa-edit">
+    <div style="display:grid;gap:10px">
+      {items.map((e) => (
+        <section class="sa-card" data-ex={e.id}>
+          <div class="sa-row"><b class="mono">{e.id}</b><span class="sa-pill">{e.kind}</span><span class="sa-soft">{e.data.title}{e.lesson && ` · ${TITLE[e.lesson] ?? e.lesson}`}</span><span style="flex:1"></span>
+            {e.newerFile && <span class="sa-tag">a newer file version exists</span>}{e.edited && <span class="sa-soft">edited here</span>}
+            <button type="button" class="lr-link" data-edit={e.id}>Edit</button>{["quiz", "tap", "checkpoint"].includes(e.kind) && <button type="button" class="lr-link" data-try={e.id}>Try it</button>}</div>
+          {(e.data.items ?? e.data.auto ?? []).map((it: any, i: number) => (
+            <div class="sa-list" style="margin-top:6px"><li style="grid-template-columns:110px minmax(0,1fr)"><span class="mono">{e.id}.{i + 1} <span class="sa-pill">{it.type}</span></span>
+              <span>{it.text ?? `(${it.generator ?? it.type})`}<br /><span class="sa-soft">Key: {key(it)} · Explanation: {it.explain ? "written" : <span class="sa-rose">missing</span>}</span></span></li></div>
+          ))}
+          {e.kind === "checkpoint" && <p class="sa-soft">Parts: {(e.data.parts ?? []).map((p: any) => p.quiz ?? p.tap ?? p.drill ?? `${p.items} written`).join(" · ")} · skills: {(e.data.skills ?? []).map((s: any) => s.name).join(", ")}</p>}
+          {e.kind === "tap" && <p class="sa-soft">{e.data.tala} · targets {(e.data.targets ?? []).join(", ")}{e.data.segments ? ` · ${e.data.segments.length} segments` : ""}{e.data.variants ? ` · ${e.data.variants.length} variants` : ""}</p>}
+        </section>
+      ))}
+    </div>
+    <div>
+      <p class="sa-soft" style="margin:0 0 6px">Preview as the learner sees it</p>
+      <div class="sa-preview" data-preview><p class="sa-soft">Press “Try it” on a quiz, tap task or checkpoint.</p></div>
+      <div class="sa-card" data-editor hidden style="margin-top:12px">
+        <div class="sa-row"><b data-editing></b><span style="flex:1"></span><button type="button" class="sa-btn" data-take hidden>Take the file version</button><button type="button" class="sa-btn primary" data-save-ex>Save</button></div>
+        <p class="sa-soft">The exercise as data (JSON of the YAML). Format 2: kinds quiz, tap, practice, listening, checkpoint.</p>
+        <textarea class="sa-json" data-json spellcheck="false"></textarea>
+        <p class="sa-soft" data-ex-note></p>
+      </div>
+    </div>
+  </div>
+  <script type="application/json" id="ex-data" set:html={JSON.stringify(items)} />
+</StudioLayout>
+
+<script>
+  import { mountQuiz } from "../../../lib/carnatic/client/exercise";
+  import { mountTap } from "../../../lib/carnatic/client/taptask";
+  import { csrf } from "../../../lib/carnatic/client/state";
+  document.querySelector<HTMLSelectElement>("[data-unit-pick]")?.addEventListener("change", (e) => { location.search = `?unit=${(e.target as HTMLSelectElement).value}`; });
+  const items: any[] = JSON.parse(document.getElementById("ex-data")!.textContent!);
+  const find = (id: string) => items.find((e) => e.id === id);
+  const prev = document.querySelector<HTMLElement>("[data-preview]")!;
+  document.querySelectorAll<HTMLElement>("[data-try]").forEach((b) => b.addEventListener("click", () => {
+    const e = find(b.dataset.try!);
+    prev.innerHTML = "";
+    const host = document.createElement("div");
+    prev.append(host);
+    if (e.kind === "tap") void mountTap(host, { ...e.data, id: e.id });
+    else if (e.kind === "checkpoint") host.innerHTML = `<p class="sa-soft">A checkpoint draws its parts at run time. <a href="/carnatic/practice/test?checkpoint=${e.unit}" target="_blank">Take it as a learner</a>.</p>`;
+    else mountQuiz(host, { ...e.data, id: e.id }, { script: "lat", cards: false, record: null, from: () => null });
+  }));
+  const ed = document.querySelector<HTMLElement>("[data-editor]")!;
+  const json = document.querySelector<HTMLTextAreaElement>("[data-json]")!;
+  const note = document.querySelector<HTMLElement>("[data-ex-note]")!;
+  let current = "";
+  document.querySelectorAll<HTMLElement>("[data-edit]").forEach((b) => b.addEventListener("click", () => {
+    const e = find(b.dataset.edit!);
+    current = e.id;
+    ed.hidden = false;
+    document.querySelector("[data-editing]")!.textContent = e.id;
+    json.value = JSON.stringify(e.data, null, 2);
+    document.querySelector<HTMLElement>("[data-take]")!.hidden = !e.newerFile;
+    note.textContent = "";
+    ed.scrollIntoView({ behavior: "smooth" });
+  }));
+  document.querySelector("[data-save-ex]")!.addEventListener("click", async () => {
+    let data: any;
+    try { data = JSON.parse(json.value); } catch (err) { note.textContent = `That isn't valid JSON: ${(err as Error).message}`; return; }
+    if (!["quiz", "tap", "practice", "listening", "checkpoint"].includes(data.kind)) { note.textContent = "kind must be quiz, tap, practice, listening or checkpoint (format 2)."; return; }
+    const r = await fetch(`/api/carnatic/studio/exercises/${encodeURIComponent(current)}`, { method: "PUT", headers: { "content-type": "application/json", "x-csrf-token": csrf() }, body: JSON.stringify({ data }) });
+    note.textContent = r.ok ? "Saved. Later imports keep your version and say when the file changed." : `Didn't save (${r.status}).`;
+    if (r.ok) find(current).data = data;
+  });
+  document.querySelector("[data-take]")!.addEventListener("click", async () => {
+    const r = await fetch(`/api/carnatic/studio/exercises/${encodeURIComponent(current)}/take-file`, { method: "POST", headers: { "x-csrf-token": csrf() } });
+    if (r.ok) location.reload();
+  });
+</script>

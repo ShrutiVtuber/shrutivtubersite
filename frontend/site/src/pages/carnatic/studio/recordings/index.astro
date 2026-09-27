@@ -1,0 +1,104 @@
+---
+/* Recordings (artboard D4): the queue of candidates (imported from the
+ * research and suggested by members), approved and the rest, each decided
+ * with approve, hold or reject (a reason the suggester sees); the balance of
+ * approved recordings per raga by instrument and artist; and the per-raga
+ * synth flags the ear trainer honours. */
+import StudioLayout from "../../../../layouts/StudioLayout.astro";
+import { studio, studioGate } from "../../../../lib/carnatic/course";
+
+const gate = await studioGate(Astro);
+if (gate) return gate;
+const view = Astro.url.searchParams.get("view") ?? "queue";
+const status = view === "queue" ? "candidate" : view === "approved" ? "approved" : view === "held" ? "held" : view === "rejected" ? "rejected" : "";
+const raga = Astro.url.searchParams.get("raga") ?? "";
+const q = Astro.url.searchParams.get("q") ?? "";
+const members = Astro.url.searchParams.has("members");
+const [list, bal, flags] = await Promise.all([
+  view === "balance" ? null : studio(Astro, `/recordings?${new URLSearchParams({ ...(status ? { status } : {}), ...(raga ? { raga } : {}), ...(q ? { q } : {}) })}`),
+  view === "balance" ? studio(Astro, "/balance") : null, view === "balance" ? studio(Astro, "/raga-flags") : null,
+]);
+const items: any[] = (list?.items ?? []).filter((r: any) => !members || r.suggestion);
+const counts: Record<string, number> = list?.counts ?? {};
+const TABS: [string, string][] = [["queue", `Queue · ${counts.candidate ?? ""}`], ["approved", `Approved · ${counts.approved ?? ""}`], ["held", "Held"], ["rejected", "Rejected"], ["balance", "Balance and flags"]];
+const INSTR = ["voice", "veena", "violin", "venu", "nagaswaram", "other"];
+const known = INSTR.slice(0, -1);
+const balRows = ((bal?.items ?? []) as any[]).map((b) => {
+  const artists = b.artists as Record<string, number>;
+  const top = Object.values(artists).sort((x, y) => y - x)[0] ?? 0;
+  return { key: b.key, total: b.total, cells: known.map((i) => b.instruments[i] ?? 0),
+           other: Object.entries(b.instruments).filter(([k]) => !known.includes(k)).reduce((n, [, v]) => n + Number(v), 0),
+           artists: Object.keys(artists).length, leans: top > b.total / 2 && b.total > 2 };
+});
+---
+<StudioLayout title="Recordings" counts={{ recordings: counts.candidate }}>
+  <div class="sa-head"><h1>Recordings</h1><span class="spacer"></span>
+    {TABS.map(([v, label]) => <a class="lr-link" href={`?view=${v}`} style={view === v ? "font-weight:600" : "text-decoration:none"}>{label}</a>)}</div>
+  {view !== "balance" && (
+    <>
+      <form class="sa-row" style="margin-bottom:12px" method="get">
+        <input type="hidden" name="view" value={view} />
+        <input name="q" value={q} placeholder="Search title, channel, id" class="sa-btn" style="min-width:240px" />
+        <input name="raga" value={raga} placeholder="Raga id" class="sa-btn" />
+        <label class="sa-soft"><input type="checkbox" name="members" checked={members} /> Member suggestions only</label>
+        <button class="sa-btn">Filter</button>
+      </form>
+      <table class="sa-table">
+        <tbody>
+          {items.length === 0 && <tr><td class="sa-soft">Nothing here.</td></tr>}
+          {items.slice(0, 200).map((r) => (
+            <tr data-rec={r.id}>
+              <td style="width:36%"><b><a href={`/carnatic/studio/recordings/${r.id}`}>{r.title || r.url}</a></b><br />
+                <span class="sa-soft">{[r.channel, r.uploaderKind].filter(Boolean).join(" · ")} · <span class="mono">{r.id}</span></span><br />
+                {r.suggestion ? <span class="sa-soft">suggested by {r.suggestion.by ?? "somebody"}: “{r.suggestion.why}”</span> : <span class="sa-soft">{r.research}</span>}</td>
+              <td style="width:22%">{[r.raga || "raga not stated", r.tala].filter(Boolean).join(" · ")}<br /><span class="sa-soft">{[r.form, r.instrument].filter(Boolean).join(" · ")}</span>
+                {r.pageSays?.text && <><br /><span class="sa-soft">page says: {r.pageSays.text}</span></>}</td>
+              <td style="width:22%">{(r.flags ?? []).map((f: string) => <span class="sa-tag">{f}</span>)}{r.reason && <span class="sa-soft">reason: {r.reason}</span>}</td>
+              <td style="text-align:right;white-space:nowrap">
+                <a class="sa-btn" href={r.url} target="_blank" rel="noopener">Open</a>
+                {r.status !== "approved" && <button type="button" class="sa-btn ok" data-act="approve">Approve</button>}
+                {r.status !== "held" && <button type="button" class="sa-btn" data-act="hold">Hold</button>}
+                {r.status !== "rejected" && <button type="button" class="sa-btn" data-act="reject">Reject…</button>}
+                {r.status === "approved" && <button type="button" class="sa-btn" data-act="retire">Retire</button>}
+                <br /><span class="sa-soft" data-state>{r.status}</span></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </>
+  )}
+  {view === "balance" && (
+    <div style="display:grid;gap:16px">
+      <div class="sa-card"><b>Balance · approved recordings per raga</b>
+        <table class="sa-table" style="margin-top:8px"><thead><tr><th>Raga</th>{INSTR.map((i) => <th>{i}</th>)}<th>Artists</th><th>Total</th></tr></thead>
+          <tbody>{balRows.map((b) => <tr><td>{b.key}</td>{b.cells.map((c) => <td>{c}</td>)}<td>{b.other}</td>
+            <td class:list={[b.leans && "sa-rose"]}>{b.artists}{b.leans ? " · leans on one artist" : ""}</td><td>{b.total}</td></tr>)}</tbody></table>
+      </div>
+      <div class="sa-card"><b>Synth flags</b> <span class="sa-soft">Ragas the synth can't play honestly are drilled only from recordings (EAR_TRAINING.md §3).</span>
+        <table class="sa-table" style="margin-top:8px"><tbody>
+          {(flags?.items ?? []).map((f: any) => <tr><td>{f.raga}</td><td><label><input type="checkbox" data-flag={f.raga} checked={f.synthOk} /> synth OK</label></td><td class="sa-soft">{f.note}</td></tr>)}
+          <tr><td><input class="sa-btn" data-new-flag placeholder="raga id" /></td><td><button type="button" class="sa-btn" data-add-flag>Add as recordings-only</button></td><td></td></tr>
+        </tbody></table>
+      </div>
+    </div>
+  )}
+</StudioLayout>
+
+<script>
+  import { csrf } from "../../../../lib/carnatic/client/state";
+  const send = (method: string, url: string, body: unknown) => fetch(url, { method, headers: { "content-type": "application/json", "x-csrf-token": csrf() }, body: JSON.stringify(body) });
+  document.querySelectorAll<HTMLElement>("[data-rec]").forEach((row) => row.querySelectorAll<HTMLButtonElement>("[data-act]").forEach((b) => b.addEventListener("click", async () => {
+    const action = b.dataset.act!;
+    let reason = "";
+    if (action === "reject") { reason = prompt("Why, in a line? The person who suggested it sees the reason.") ?? ""; if (!reason.trim()) return; }
+    if (action === "hold") reason = prompt("A note for yourself (optional)") ?? "";
+    const r = await send("POST", `/api/carnatic/studio/recordings/${row.dataset.rec}/decide`, { action, reason });
+    row.querySelector("[data-state]")!.textContent = r.ok ? `${(await r.json()).status}` : `didn't work (${r.status})`;
+    if (r.ok) row.style.opacity = "0.5";
+  })));
+  document.querySelectorAll<HTMLInputElement>("[data-flag]").forEach((c) => c.addEventListener("change", () => void send("PUT", `/api/carnatic/studio/raga-flags/${c.dataset.flag}`, { synthOk: c.checked })));
+  document.querySelector("[data-add-flag]")?.addEventListener("click", async () => {
+    const v = document.querySelector<HTMLInputElement>("[data-new-flag]")!.value.trim();
+    if (v && (await send("PUT", `/api/carnatic/studio/raga-flags/${v}`, { synthOk: false })).ok) location.reload();
+  });
+</script>

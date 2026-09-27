@@ -189,3 +189,14 @@ export function ago(iso: string | null): string {
   if (d < 60) return `${Math.floor(d / 7)} weeks ago`;
   return new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
 }
+
+/** The Swara Studio admin is the operator's only: anyone else goes to the admin sign-in. */
+export async function studioGate(astro: any): Promise<Response | null> {
+  if (await isOperator(astro)) return null;
+  return astro.redirect(`/admin/signin?next=${encodeURIComponent(astro.url.pathname + astro.url.search)}`, 303);
+}
+
+export async function studio<T = any>(astro: any, path: string): Promise<T | null> {
+  const r = await asAdmin(astro, `/api/carnatic/studio${path}`);
+  return r.ok ? (r.body as T) : null;
+}

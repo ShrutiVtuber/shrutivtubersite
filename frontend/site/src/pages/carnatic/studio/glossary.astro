@@ -1,0 +1,63 @@
+---
+/* The glossary (course/glossary.yaml, FORMAT.md §3e), editable here: term,
+ * ISO form, the forms the reader matches in lesson text, the one-line
+ * definition, the teaching lesson and its source key. An edited term keeps
+ * her version on later imports and says when the file changed. */
+import StudioLayout from "../../../layouts/StudioLayout.astro";
+import { studio, studioGate } from "../../../lib/carnatic/course";
+
+const gate = await studioGate(Astro);
+if (gate) return gate;
+const g = await studio(Astro, "/glossary");
+const q = (Astro.url.searchParams.get("q") ?? "").toLowerCase();
+const all: any[] = g?.items ?? [];
+const items = all.filter((t) => !q || `${t.term} ${t.definition} ${t.lesson}`.toLowerCase().includes(q));
+---
+<StudioLayout title="Glossary" counts={{ glossary: all.length }}>
+  <div class="sa-head"><h1>Glossary</h1><form method="get"><input name="q" value={q} class="sa-btn" placeholder="Search terms" /></form><span class="spacer"></span><small>{all.length} terms · <a href="/carnatic/learn/glossary" target="_blank">the public page</a></small>
+    <button type="button" class="sa-btn primary" data-new>New term</button></div>
+  <table class="sa-table">
+    <thead><tr><th>Term</th><th>ISO</th><th>Forms</th><th>Definition</th><th>Lesson</th><th>Source</th><th></th></tr></thead>
+    <tbody data-rows>
+      {items.slice(0, 500).map((t) => (
+        <tr data-slug={t.slug}>
+          <td><input class="sa-btn" data-k="term" value={t.term} /></td><td><input class="sa-btn" data-k="iso" value={t.iso} style="width:110px" /></td>
+          <td><input class="sa-btn" data-k="forms" value={(t.forms ?? []).join(", ")} /></td>
+          <td style="min-width:320px"><textarea class="sa-btn" data-k="definition" rows="2" style="width:100%">{t.definition}</textarea>{t.newerFile && <span class="sa-tag">a newer file version exists: “{t.fileData?.definition?.slice(0, 60)}…”</span>}</td>
+          <td><input class="sa-btn" data-k="lesson" value={t.lesson} style="width:90px" /></td><td><input class="sa-btn" data-k="source" value={t.source} style="width:110px" /></td>
+          <td style="white-space:nowrap"><button type="button" class="sa-btn" data-save>Save</button> <button type="button" class="lr-link" data-del>Delete</button> <span class="sa-soft" data-state>{t.edited ? "edited here" : ""}</span></td>
+        </tr>
+      ))}
+    </tbody>
+  </table>
+</StudioLayout>
+
+<script>
+  import { csrf } from "../../../lib/carnatic/client/state";
+  const send = (method: string, url: string, body?: unknown) => fetch(url, { method, headers: { "content-type": "application/json", "x-csrf-token": csrf() }, body: body === undefined ? undefined : JSON.stringify(body) });
+  const wire = (row: HTMLElement) => {
+    const val = (k: string) => (row.querySelector(`[data-k="${k}"]`) as HTMLInputElement).value.trim();
+    row.querySelector("[data-save]")!.addEventListener("click", async () => {
+      const slug = row.dataset.slug || val("term").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+      const r = await send("PUT", `/api/carnatic/studio/glossary/${slug}`, { term: val("term"), iso: val("iso"), forms: val("forms").split(",").map((x) => x.trim()).filter(Boolean),
+        definition: val("definition"), lesson: val("lesson"), source: val("source") });
+      row.dataset.slug = slug;
+      row.querySelector("[data-state]")!.textContent = r.ok ? "saved" : `didn't save (${r.status})`;
+    });
+    row.querySelector("[data-del]")!.addEventListener("click", async () => {
+      if (!row.dataset.slug) { row.remove(); return; }
+      if (!confirm(`Delete “${val("term")}” from the glossary?`)) return;
+      const r = await send("DELETE", `/api/carnatic/studio/glossary/${row.dataset.slug}`);
+      if (r.ok) row.remove();
+    });
+  };
+  document.querySelectorAll<HTMLElement>("[data-slug]").forEach(wire);
+  document.querySelector("[data-new]")!.addEventListener("click", () => {
+    const tb = document.querySelector("[data-rows]")!;
+    const tr = document.createElement("tr");
+    tr.dataset.slug = "";
+    tr.innerHTML = `<td><input class="sa-btn" data-k="term"></td><td><input class="sa-btn" data-k="iso" style="width:110px"></td><td><input class="sa-btn" data-k="forms"></td><td><textarea class="sa-btn" data-k="definition" rows="2" style="width:100%"></textarea></td><td><input class="sa-btn" data-k="lesson" style="width:90px"></td><td><input class="sa-btn" data-k="source" style="width:110px"></td><td><button type="button" class="sa-btn" data-save>Save</button> <button type="button" class="lr-link" data-del>Delete</button> <span class="sa-soft" data-state></span></td>`;
+    tb.prepend(tr);
+    wire(tr);
+  });
+</script>

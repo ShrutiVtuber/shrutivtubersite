@@ -1,0 +1,53 @@
+---
+/* The course tree (artboard D1): every lesson of the syllabus by unit, with
+ * its status, translations, and what the checks say. A planned lesson (in
+ * the syllabus, no file yet) can be started here as a draft. */
+import StudioLayout from "../../../../layouts/StudioLayout.astro";
+import { studio, studioGate } from "../../../../lib/carnatic/course";
+
+const gate = await studioGate(Astro);
+if (gate) return gate;
+const t = await studio(Astro, "/tree");
+const units: any[] = t?.units ?? [];
+const counts: Record<string, number> = t?.counts ?? {};
+const total = units.reduce((n, u) => n + u.lessons.length, 0);
+const filter = Astro.url.searchParams.get("status") ?? "";
+const TR: Record<string, string> = { none: "—", draft: "draft", review: "review", published: "published", "out of date": "out of date" };
+---
+<StudioLayout title="Lessons" counts={{ lessons: total }}>
+  <div class="sa-head"><h1>Lessons</h1><span class="spacer"></span>
+    <small>{total} lessons · {counts.published ?? 0} published · {counts.review ?? 0} in review · {counts.draft ?? 0} draft · {counts.planned ?? 0} planned</small></div>
+  <div class="sa-row" style="margin-bottom:12px">
+    {["", "draft", "review", "published", "planned"].map((s) => <a class="sa-btn" href={s ? `?status=${s}` : "?"} aria-current={filter === s ? "true" : undefined} style={filter === s ? "border-color:var(--accent)" : undefined}>{s || "all"}</a>)}
+  </div>
+  <table class="sa-table">
+    <thead><tr><th>Id</th><th>Title</th><th>Status</th><th>TA</th><th>TE</th><th>KN</th><th>Checks</th></tr></thead>
+    <tbody>
+      {units.map((u) => {
+        const rows = u.lessons.filter((l: any) => !filter || l.status === filter);
+        if (!rows.length) return null;
+        return <>
+          <tr class="u"><td class="mono">U{String(u.n).padStart(2, "0")}</td><td colspan="6">{u.title}</td></tr>
+          {rows.map((l: any) => (
+            <tr>
+              <td class="mono">{l.id}</td>
+              <td>{l.status === "planned" ? <span>{l.title} <button type="button" class="sa-btn" data-create={l.id} style="padding:3px 8px;margin-left:6px">Start it</button></span> : <a href={`/carnatic/studio/lessons/${l.id}`}>{l.title}</a>}</td>
+              <td><span class:list={["sa-pill", l.status]}>{l.status}</span></td>
+              {(["ta", "te", "kn"] as const).map((x) => <td class:list={[l.translations?.[x] === "out of date" && "sa-rose"]}>{TR[l.translations?.[x]] ?? "—"}</td>)}
+              <td class="sa-soft">{[l.notes ? `${l.notes} editor note${l.notes === 1 ? "" : "s"} open` : "", l.newerFile ? "a newer file version exists" : "", l.edited ? "edited here" : ""].filter(Boolean).join(" · ")}</td>
+            </tr>
+          ))}
+        </>;
+      })}
+    </tbody>
+  </table>
+</StudioLayout>
+
+<script>
+  import { csrf } from "../../../../lib/carnatic/client/state";
+  document.querySelectorAll<HTMLButtonElement>("[data-create]").forEach((b) => b.addEventListener("click", async () => {
+    b.disabled = true;
+    const r = await fetch(`/api/carnatic/studio/lessons/${b.dataset.create}/create`, { method: "POST", headers: { "x-csrf-token": csrf() } });
+    if (r.ok) location.href = `/carnatic/studio/lessons/${b.dataset.create}`; else { b.disabled = false; b.textContent = "Didn't work"; }
+  }));
+</script>
