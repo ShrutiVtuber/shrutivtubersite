@@ -797,3 +797,5 @@
 .sa-tabs { gap: 18px; border-bottom: 1px solid var(--line); padding-bottom: 10px; }
 .sa-tabs a { text-decoration: none; color: var(--ink-soft); }
 .sa-tabs a[aria-current="page"] { color: var(--ink); font-weight: 600; }
+.ch-levels { max-width: 100%; overflow-x: auto; flex-wrap: nowrap; } .ch-levels button { white-space: nowrap; }
+.li-suggest > *, .li-form .row > * { min-width: 0; } .li-form input, .li-form textarea { width: 100%; box-sizing: border-box; }
