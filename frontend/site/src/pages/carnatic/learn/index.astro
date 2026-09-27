@@ -51,6 +51,10 @@ const available = flat.some((x) => x.available);
       <div class="ch-pills">{[4, 5, 6, 13].map((n) => <a class="ch-pill" href={L(`/carnatic/learn/unit/${n}`)}>{say("unitWord", "Unit")} {n}</a>)}</div>
     </div>
   </div>
+  <div class="ch-also">
+    <a class="ch-also-card" href="/carnatic/ragas"><span class="t-eyebrow ch-blue">{say("ragasH", "Ragas")}</span><b>{say("ragasT", "Every raga, its phrases and its lessons")}</b><small>{say("ragasP", "The 72 melakartas and the janya ragas, with phrases you can play over the drone.")}</small></a>
+    <a class="ch-also-card" href="/carnatic/fingerings"><span class="t-eyebrow ch-blue">{say("fingH", "Fingerings")}</span><b>{say("fingT", "Each raga on your instrument")}</b><small>{say("fingP", "Venu holes, veena frets and violin first position, at your Sa.")}</small></a>
+  </div>
   <p class="ch-kept">
     {me.signedIn ? say("keptAccount", "Your progress is kept in your account, on every device you sign in on.")
       : <>{say("keptDevice", "Your progress is kept on this device.")}{" "}<a href={`/signin?next=${encodeURIComponent(L("/carnatic/learn"))}`}>{say("keptSignIn", "Sign in to keep it across devices.")}</a></>}

@@ -97,6 +97,7 @@ const jsonLd = { "@context": "https://schema.org", "@type": "DefinedTerm", name:
   <nav class="rp-tabs" aria-label={say("tabs", "On this page")}>
     <a href="#top">{say("tab.overview", "Overview")}</a><a href="#rp-ph">{say("tab.phrases", "Phrases")}</a><a href="#rp-co">{say("tab.comps", "Compositions")}</a>
     <a href="#listening">{say("tab.listening", "Listening")}</a><a href="#lessons">{say("tab.lessons", "Lessons")}</a>
+    <a href={`/carnatic/fingerings?raga=${r.id}`}>{say("tab.fingerings", "Fingerings for this raga")}</a>
   </nav>
   <div class="sw-cols">
     <div class="sw-main">

@@ -183,7 +183,7 @@ export const GET: APIRoute = async () => {
       ["/carnatic/practice/tuner", "0.8"], ["/carnatic/practice/tala", "0.7"], ["/carnatic/practice/quiz", "0.6"],
       ["/carnatic/compose", "0.6"], ["/carnatic/listen", "0.7"], ["/carnatic/support", "0.4"],
       ["/carnatic/learn", "0.9"], ["/carnatic/learn/glossary", "0.6"], ["/carnatic/practice", "0.7"],
-      ["/carnatic/practice/ear", "0.7"], ["/carnatic/practice/skills", "0.4"], ["/carnatic/listen/hall", "0.5"],
+      ["/carnatic/practice/ear", "0.7"], ["/carnatic/practice/skills", "0.4"], ["/carnatic/listen/hall", "0.5"], ["/carnatic/fingerings", "0.6"],
       ...["voice", "venu", "veena", "violin", "mridangam"].map((i) => [`/carnatic/instruments/${i}`, "0.6"]),
     ]) add(path, priority, "monthly");
     try {

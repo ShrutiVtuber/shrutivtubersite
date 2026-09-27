@@ -168,6 +168,7 @@ const gamakaFor = (gam?.gamakas ?? []).filter((g: any) => g.on?.[inst]).slice(0,
   <div class="sw-toolbar">
     <div class="sw-chips">{INST.map((i) => <Chip href={L(`/carnatic/instruments/${i}`)} active={i === inst}>{i[0].toUpperCase() + i.slice(1)}</Chip>)}</div>
     <span class="spacer"></span>
+    <a class="sw-mono" href="/carnatic/fingerings">{say("fingerings", "Fingerings by raga")} ›</a>
     <span class="sw-mono">{META[inst]}</span>
   </div>
   {!data ? <div class="sw-section"><Absent /></div> : (

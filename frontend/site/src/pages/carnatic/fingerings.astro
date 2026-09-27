@@ -1,0 +1,159 @@
+---
+/* Fingerings: where each swara of a raga lives on the learner's instrument,
+ * at their Sa. Venu holes (closed, open, half) with the research's confidence
+ * notes; veena string and fret; violin first position; for voice and
+ * mridangam, what "fingering" means there. Tap a swara to hear it at your Sa
+ * (a synthesised approximation). Filter by raga; linked from each raga page
+ * and each instrument page. */
+import SwaraLayout from "../../layouts/SwaraLayout.astro";
+import Hero from "../../components/carnatic/Hero.astro";
+import Chip from "../../components/carnatic/Chip.astro";
+import ConfidenceNote from "../../components/carnatic/ConfidenceNote.astro";
+import { hrefIn, langOf } from "../../lib/carnatic/i18n";
+import { cleared, instruments, ragaById, ragas, reviews } from "../../lib/carnatic/data";
+import { visitor, swaraScript, DEFAULT_SA } from "../../lib/carnatic/prefs";
+import { inline, semitones, tokenize, variantsOf } from "../../lib/carnatic/notation";
+import { copy } from "../../lib/copy";
+import { localize } from "../../lib/carnatic/v2strings";
+
+const lang = langOf(Astro);
+const say = localize(lang, await copy("carnatic/fingerings"));
+const L = (p: string) => hrefIn(lang, p);
+const { settings } = await visitor(Astro);
+const INST = ["venu", "veena", "violin", "voice", "mridangam"] as const;
+type Inst = typeof INST[number];
+const q = Astro.url.searchParams;
+const inst = (INST as readonly string[]).includes(q.get("inst") ?? "") ? (q.get("inst") as Inst) : (INST as readonly string[]).includes(settings.instrument) ? (settings.instrument as Inst) : "voice";
+const ragaParam = q.get("raga") ?? "mela-15";
+const [data, all, rv] = await Promise.all([instruments(), ragas(), reviews()]);
+let ragaName = "", scale = "", ragaSlug = "";
+if (ragaParam.startsWith("mela-")) {
+  const m = all?.melakartas.find((x) => x.number === Number(ragaParam.slice(5)));
+  if (m) { ragaName = m.name; scale = `${m.arohana} ${m.avarohana}`; ragaSlug = (m as any).id; }
+} else {
+  const r = await ragaById(ragaParam);
+  if (r) { ragaName = r.name; scale = `${r.arohana} ${r.avarohana}`.replace(/!\w/g, ""); ragaSlug = r.id; }
+}
+const script = swaraScript(settings, lang);
+const tamil = settings.tamilStyle;
+const vars = variantsOf(scale);
+const names = [...new Set(tokenize(scale).filter((x) => x.kind === "note" && x.swara).map((x) => x.swara + (x.variant ?? vars[x.swara!] ?? "")))]
+  .map((n) => (n === "S0" || n === "P0" ? n[0] : n.replace(/^([SP])\d$/, "$1")))
+  .map((n) => ({ n, semi: semitones(n[0] as any, Number(n.slice(1)) || null) }))
+  .filter((x, i, a) => a.findIndex((y) => y.semi === x.semi) === i)
+  .sort((a, b) => a.semi - b.semi);
+const OCT = [["mandra", -1], ["madhya", 0], ["tara", 1]] as const;
+const octave = OCT.find(([o]) => o === q.get("octave")) ?? OCT[1];
+const tokenOf = (n: string, o: number) => (o < 0 ? "." : "") + n + (o > 0 ? "'" : "");
+const fluteSa = settings.flute.endsWith(" bass") ? `${settings.flute.replace(" bass", "")}4` : `${settings.flute}5`;
+const instSa = settings.instrument === inst ? settings.sa : inst === "venu" ? fluteSa : (DEFAULT_SA as any)[inst] ?? settings.sa;
+
+/* venu */
+const venuRows = ((data?.venu?.fingerings ?? []) as any[]).map((f) =>
+  cleared(rv, `fact:venu:${f.sthayi}-${f.swara}-${f.kind ?? "primary"}`) ? { ...f, confidence: "high" } : f);
+const left = settings.hand === "left";
+const holeSvg = (holes: string | null, size = 14) => {
+  const cells = (holes ?? "????????").split("").map((h, i) => {
+    const cx = 7 + i * (size + 5);
+    if (h === "C") return `<circle cx="${cx}" cy="7" r="${size / 2 - 1}" class="h-c"/>`;
+    if (h === "H") return `<circle cx="${cx}" cy="7" r="${size / 2 - 1}" class="h-o"/><path d="M${cx} 1 A${size / 2 - 1} ${size / 2 - 1} 0 0 0 ${cx} 13 Z" class="h-c"/>`;
+    return `<circle cx="${cx}" cy="7" r="${size / 2 - 1}" class="h-o"/>`;
+  });
+  const w = 8 * (size + 5);
+  return `<svg viewBox="0 0 ${w} 14" width="${w}" height="14" role="img" aria-label="${holes ?? "unknown"}" ${left ? 'style="transform:scaleX(-1)"' : ""}>${cells.join("")}</svg>`;
+};
+const BLOW: Record<string, string> = { normal: "normal breath", overblow: "overblown", overblow_hard: "overblown hard" };
+/* veena: the four playing strings, open Sa and Pa in three octaves; 24 frets */
+const VEENA = [["Sarani", 0], ["Panchamam", -5], ["Mandaram", -12], ["Anumandram", -17]] as const;
+const veenaAt = (semi: number) => VEENA.map(([s, off]) => ({ s, fret: semi - off })).filter((x) => x.fret >= 0 && x.fret <= 24).slice(0, 2);
+/* violin: first position, from the research's hand frame */
+const violinAt = (semi: number) => {
+  const out: string[] = [];
+  for (const st of (data?.violin?.strings ?? []) as any[]) {
+    if (st.open?.semitonesFromMadhyaSa === semi) out.push(`${st.role} string, open`);
+    for (const [fg, list] of Object.entries<any>(st.positions?.["1"] ?? {})) for (const p of list) if (p.semitonesFromMadhyaSa === semi) out.push(`${st.role} string, finger ${fg}`);
+  }
+  return out.slice(0, 2);
+};
+const rows = names.map(({ n, semi }) => {
+  const at = semi + 12 * octave[1];
+  const tok = tokenOf(n, octave[1]);
+  const venu = venuRows.filter((f) => f.semitonesFromMadhyaSa === at).sort((a, b) => (a.kind === "primary" ? -1 : 1) - (b.kind === "primary" ? -1 : 1));
+  return { n, tok, venu, veena: veenaAt(at), violin: violinAt(at) };
+});
+const RAGAS: [string, string][] = [["mela-15", "Mayamalavagowla"], ["mohanam", "Mohanam"], ["mela-29", "Sankarabharanam"], ["mela-65", "Kalyani"], ["mela-22", "Kharaharapriya"], ["hamsadhwani", "Hamsadhwani"], ["bhairavi", "Bhairavi"], ["hindolam", "Hindolam"]];
+const allRagas = [...(all?.janyas ?? []), ...(all?.performed ?? [])].map((r) => [r.id, r.name] as [string, string]).concat((all?.melakartas ?? []).map((m) => [`mela-${m.number}`, m.name] as [string, string]));
+const link = (p: Record<string, string>) => L(`/carnatic/fingerings?${new URLSearchParams({ inst, raga: ragaParam, octave: octave[0], ...p })}`);
+const NAME: Record<Inst, string> = { venu: "Venu", veena: "Veena", violin: "Violin", voice: "Voice", mridangam: "Mridangam" };
+---
+<SwaraLayout title={`${say("title", "Fingerings")}${ragaName ? ` · ${ragaName}` : ""} · ${NAME[inst]} · Swara Studio`}
+             description={say("desc", "Where each swara of a raga lives on your instrument, at your Sa: venu holes, veena frets, violin first position. Tap to hear it.")}
+             crumbs={[[say("crumbLearn", "Learn"), L("/carnatic/learn")], [say("crumbRagas", "Ragas"), L("/carnatic/ragas")], [say("title", "Fingerings")]]}>
+  <Hero eyebrow={say("eyebrow", "Fingerings")} title={`${NAME[inst]}${ragaName ? ` · ${ragaName}` : ""}`}
+        lede={say("lede", "Where each swara of the raga lives on your instrument, at your Sa. Tap a swara to hear it (a synthesised approximation).")} />
+  <div class="sw-toolbar">
+    <div class="sw-chips" role="group" aria-label={say("inst", "Instrument")}>{INST.map((i) => <Chip href={link({ inst: i })} active={i === inst}>{NAME[i]}</Chip>)}</div>
+    <div class="sw-chips" role="group" aria-label={say("octave", "Octave")}>{OCT.map(([o]) => <Chip href={link({ octave: o })} active={o === octave[0]}>{o}</Chip>)}</div>
+  </div>
+  <form class="fg-raga" method="get">
+    <input type="hidden" name="inst" value={inst} /><input type="hidden" name="octave" value={octave[0]} />
+    <label>{say("raga", "Raga")} <input name="raga" list="fg-ragas" value={ragaParam} /></label>
+    <button class="lr-btn lr-btn-s">{say("show", "Show")}</button>
+    <span class="sw-chips">{RAGAS.map(([id, nm]) => <Chip href={link({ raga: id })} active={id === ragaParam}>{nm}</Chip>)}</span>
+    <datalist id="fg-ragas">{allRagas.map(([id, nm]) => <option value={id}>{nm}</option>)}</datalist>
+  </form>
+  <p class="sw-mono fg-sa">Sa = {instSa.replace("#", "♯")} · {settings.instrument === inst ? say("yours", "your Sa, from your settings") : say("default", "the default for this instrument; set yours in settings")} · <a href={L("/carnatic/settings")}>{say("settings", "settings")}</a>{ragaSlug && <> · <a href={L(`/carnatic/ragas/${ragaSlug}`)}>{ragaName} {say("ragaPage", "raga page")}</a></>}</p>
+
+  {!ragaName ? <p class="ch-empty">{say("noRaga", "That raga isn't in the explorer. Choose another.")}</p> : inst === "voice" ? (
+    <div class="sw-card fg-explain"><p>{say("voice", "For the voice the swara names are the fingering: you sing Sa, Ri, Ga… at your own Sa, and the drone keeps you there. Tap each swara to hear where it sits, then sing it back.")}</p></div>
+  ) : inst === "mridangam" ? (
+    <div class="sw-card fg-explain"><p>{say("mridangam", "The mridangam doesn't play swaras: its right head is tuned to your Sa and every stroke has a syllable. The strokes are on the instrument page.")} <a href={L("/carnatic/instruments/mridangam")}>{say("strokes", "Mridangam strokes")} ›</a></p></div>
+  ) : null}
+  {ragaName && inst !== "mridangam" && (
+    <table class="fg-table" data-fingerings data-sa={instSa}>
+      <thead><tr><th>{say("swara", "Swara")}</th>{inst === "venu" && <><th>{say("holes", "Holes, 1 nearest the blowing hole")}</th><th>{say("blow", "Blow")}</th></>}
+        {inst === "veena" && <th>{say("veenaWhere", "String and fret")}</th>}{inst === "violin" && <th>{say("violinWhere", "First position")}</th>}<th>{say("hear", "Hear it")}</th></tr></thead>
+      <tbody>{rows.map((r) => (
+        <tr>
+          <td class="fg-sw">{inline(r.tok, script, tamil)}</td>
+          {inst === "venu" && <><td>{r.venu.length ? r.venu.slice(0, 2).map((f: any) => <div class="fg-hole"><span set:html={holeSvg(f.holes)} /><span class="sw-mono">{f.holes}</span>{f.kind && f.kind !== "primary" && <span class="sw-note">{f.kind.replace("-", " ")}</span>}
+              {f.confidence !== "high" && <ConfidenceNote level={f.confidence === "low" ? "low" : "medium"} text={say("varies", "Fingering varies by flute; check by ear.")} />}</div>)
+            : <span class="sw-note">{say("noVenu", "Not on the flute in this octave, or not charted yet.")}</span>}</td>
+            <td class="sw-note">{r.venu[0] ? BLOW[r.venu[0].blow] ?? r.venu[0].blow : ""}</td></>}
+          {inst === "veena" && <td>{r.veena.map((v) => <div>{v.s} · {v.fret === 0 ? say("open", "open") : `${say("fret", "fret")} ${v.fret}`}</div>)}</td>}
+          {inst === "violin" && <td>{r.violin.length ? r.violin.map((v) => <div>{v}</div>) : <span class="sw-note">{say("shift", "Shift out of first position for this one.")}</span>}</td>}
+          <td><button type="button" class="lr-play" data-tok={r.tok} aria-label={say("play", "Play")}><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M5 3l8 5-8 5z" fill="currentColor"/></svg></button></td>
+        </tr>
+      ))}</tbody>
+    </table>
+  )}
+  {inst === "violin" && <p class="sw-note fg-note">{say("violinNote", "A guide to placement: Carnatic violinists shift often and slide into notes for gamaka.")}</p>}
+  {inst === "venu" && <p class="sw-note fg-note">{say("venuNote", "Closed ● open ○ half ◐. Hole 8 stays open in normal playing. Rows the research is unsure of say so: check them by ear on your flute.")}</p>}
+  <p class="lr-synth fg-note">{say("synth", "Sounds are a synthesised approximation at your Sa.")} <a href={L(`/carnatic/instruments/${inst}`)}>{say("instPage", "The instrument page")} ›</a></p>
+</SwaraLayout>
+
+<script>
+  import { playLine } from "../../lib/carnatic/client/phrase";
+  import { settings } from "../../lib/carnatic/client/state";
+  import { pitchHz } from "../../lib/carnatic/notation";
+  const t = document.querySelector<HTMLElement>("[data-fingerings]");
+  const sa = pitchHz(t?.dataset.sa || "C3");
+  document.querySelectorAll<HTMLElement>("[data-tok]").forEach((b) => b.addEventListener("click", () => {
+    playLine(b.dataset.tok!, { saHz: sa, tuning: settings().playbackTuning, unit: 0.8 });
+  }));
+</script>
+
+<style>
+  .fg-raga { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 12px 0; font-size: 14px; }
+  .fg-raga input { padding: 8px 10px; border: 1px solid var(--line-strong); border-radius: 6px; background: var(--surface-card); color: var(--ink); font: 14px var(--font-body); }
+  .fg-sa { margin: 0 0 16px; }
+  .fg-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .fg-table th { text-align: left; font: 600 11px var(--font-body); letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; color: var(--ink-soft); padding: 8px 8px 8px 0; border-bottom: 1px solid var(--ink); }
+  .fg-table td { padding: 10px 8px 10px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+  .fg-sw { font: 22px var(--font-display); }
+  .fg-hole { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 4px; }
+  .fg-hole :global(.h-c) { fill: var(--ink); stroke: var(--ink); }
+  .fg-hole :global(.h-o) { fill: none; stroke: var(--ink); stroke-width: 1.2; }
+  .fg-explain p { margin: 0; font-size: 16px; line-height: 1.6; }
+  .fg-note { margin-top: 10px; }
+</style>
